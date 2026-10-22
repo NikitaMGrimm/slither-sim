@@ -1,0 +1,179 @@
+//! Local process transport. Each connection controls one independent world.
+use crate::{Action, Config, Simulator};
+use serde::Deserialize;
+use serde_json::{Value, json};
+use std::io::{self, BufRead, Write};
+
+pub const PROTOCOL: &str = "slither-sim-json-v1";
+
+fn default_seed() -> u32 {
+    1
+}
+fn default_agents() -> usize {
+    4
+}
+fn default_decision_ticks() -> usize {
+    6
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Command {
+    heading: f64,
+    boost: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(
+    tag = "op",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+enum Request {
+    // Empty struct variants make serde reject unknown fields on these requests too.
+    Info {},
+    Reset {
+        #[serde(default = "default_seed")]
+        seed: u32,
+        #[serde(default = "default_agents")]
+        agents: usize,
+        #[serde(default = "default_decision_ticks")]
+        decision_ticks: usize,
+        #[serde(default)]
+        config: Box<Config>,
+    },
+    Step {
+        actions: Vec<Option<Command>>,
+    },
+    Observe {
+        slot: usize,
+    },
+    Snapshot {},
+}
+
+struct WorldSession {
+    world: Simulator,
+    decision_ticks: usize,
+}
+
+#[derive(Default)]
+struct Session {
+    current: Option<WorldSession>,
+}
+
+impl Session {
+    fn handle(&mut self, request: Request) -> Result<Value, String> {
+        match request {
+            Request::Info {} => Ok(json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "defaultConfig": Config::default(),
+                "defaultDecisionTicks": default_decision_ticks(),
+                "maxAgents": 128,
+                "maxDecisionTicks": 1000,
+            })),
+            Request::Reset {
+                seed,
+                agents,
+                decision_ticks,
+                config,
+            } => {
+                if !(1..=128).contains(&agents) || !(1..=1000).contains(&decision_ticks) {
+                    return Err("Need 1..128 agents and 1..1000 decisionTicks".into());
+                }
+                // Construct completely before replacing a working session.
+                let mut world = Simulator::new(seed, *config)?;
+                for slot in 0..agents {
+                    world.add(slot.to_string(), slot, agents)?;
+                }
+                let result = json!({
+                    "seed": seed,
+                    "config": world.config,
+                    "decisionTicks": decision_ticks,
+                    "observations": world.observe_all(),
+                    "time": world.time,
+                });
+                self.current = Some(WorldSession {
+                    world,
+                    decision_ticks,
+                });
+                Ok(result)
+            }
+            Request::Step { actions } => {
+                let session = self.current.as_mut().ok_or("Reset first")?;
+                let actions: Vec<_> = actions
+                    .into_iter()
+                    .map(|command| {
+                        command.map(|command| Action {
+                            heading: command.heading,
+                            boost: command.boost,
+                        })
+                    })
+                    .collect();
+                // Reject the whole batch before advancing any physics.
+                session.world.validate_actions(&actions)?;
+                let start = session.world.time;
+                let previous_deaths = session.world.deaths.len();
+                let mut ticks = 0;
+                for _ in 0..session.decision_ticks {
+                    if session.world.living() == 0 {
+                        break;
+                    }
+                    session.world.advance_validated(&actions);
+                    ticks += 1;
+                }
+                Ok(json!({
+                    "observations": session.world.observe_all(),
+                    "deaths": session.world.deaths[previous_deaths..],
+                    "time": session.world.time,
+                    "elapsedSeconds": session.world.time - start,
+                    "ticks": ticks,
+                    "living": session.world.living(),
+                }))
+            }
+            Request::Observe { slot } => {
+                let world = &self.current.as_ref().ok_or("Reset first")?.world;
+                let snake = world.snakes.get(slot).ok_or("Unknown agent slot")?;
+                Ok(
+                    json!({"observation": if snake.alive { Some(world.observe(slot)?) } else { None }}),
+                )
+            }
+            Request::Snapshot {} => {
+                let world = &self.current.as_ref().ok_or("Reset first")?.world;
+                // Deliberately exclude hidden RNG/control state from this debug view.
+                Ok(json!({
+                    "config": world.config,
+                    "time": world.time,
+                    "snakes": world.snakes,
+                    "food": world.food,
+                    "prey": world.prey,
+                    "deaths": world.deaths,
+                }))
+            }
+        }
+    }
+}
+
+/// Serve a trusted local controller until EOF. Request errors leave the stream usable.
+pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> {
+    let mut session = Session::default();
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        if input.read_until(b'\n', &mut line)? == 0 {
+            return Ok(());
+        }
+        let request = line.strip_suffix(b"\n").unwrap_or(&line);
+        let request = request.strip_suffix(b"\r").unwrap_or(request);
+        let result = serde_json::from_slice(request)
+            .map_err(|error| error.to_string())
+            .and_then(|request| session.handle(request));
+        let reply = match result {
+            Ok(result) => json!({"protocol": PROTOCOL, "result": result}),
+            Err(error) => json!({"protocol": PROTOCOL, "error": error}),
+        };
+        serde_json::to_writer(&mut output, &reply)?;
+        output.write_all(b"\n")?;
+        output.flush()?;
+    }
+}

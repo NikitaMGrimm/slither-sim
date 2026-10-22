@@ -1,0 +1,120 @@
+{
+  "dataOrigin": "synthetic",
+  "description": "Private-preview JSON serialization example, written independently of the Rust structs. Values exercise field names, types, optional reports and nesting; they are not a wire capture or physics evidence. Update deliberately with intentional contract changes.",
+  "frame": {
+    "contract": "slither-client-v2",
+    "time": 1.5,
+    "status": "playing",
+    "life": 2,
+    "settings": {
+      "protocol": 19,
+      "gridCenter": 21600,
+      "sectorSize": 300,
+      "maxSegments": 430,
+      "bodySpacing": 42.0,
+      "bodyContraction": 0.43,
+      "sectorCountAlongEdge": 144,
+      "spangdv": 4.8,
+      "nsp1": 5.39,
+      "nsp2": 0.4,
+      "nsp3": 14.0,
+      "mamu": 0.033,
+      "mamu2": 0.029,
+      "serverNumber": 17,
+      "gameMode": 2,
+      "teamVal": 1
+    },
+    "observation": {
+      "time": 0.5,
+      "self": {
+        "id": "7",
+        "head": {"x": 1.5, "y": -2.25},
+        "body": [{"x": 0.0, "y": 0.0}, {"x": -42.0, "y": 0.0}],
+        "heading": 0.0,
+        "speed": 100.0,
+        "radius": 5.0,
+        "length": 42.0,
+        "segments": 2,
+        "fam": 0.5,
+        "score": 17.0,
+        "kills": 0,
+        "alive": true
+      },
+      "opponents": [{
+        "id": "8",
+        "head": {"x": 100.0, "y": 50.0},
+        "body": [{"x": 84.0, "y": 50.0}, {"x": 42.0, "y": 50.0}],
+        "heading": 0.0,
+        "speed": 100.0,
+        "radius": 5.0,
+        "length": 42.0,
+        "segments": 2,
+        "fam": 0.25,
+        "score": 13.0,
+        "kills": 1,
+        "alive": true
+      }],
+      "food": [{"x": 5.0, "y": 6.0, "value": 0.5, "size": 2.0}],
+      "prey": [{
+        "id": 4,
+        "position": {"x": 10.0, "y": 12.0},
+        "heading": 0.5,
+        "targetHeading": 0.75,
+        "speed": 125.0,
+        "size": 6.0
+      }],
+      "arena": {"center": {"x": 0.0, "y": 0.0}, "radius": 1500.0},
+      "visionRadius": null
+    },
+    "received": {
+      "connectionGeneration": 2,
+      "snakes": [{
+        "snakeId": "7",
+        "incarnation": 2,
+        "appearance": {"ageSeconds": 0.5, "valid": true, "predicted": false},
+        "position": {"ageSeconds": 0.25, "valid": true, "predicted": true},
+        "heading": {"ageSeconds": 0.25, "valid": true, "predicted": false},
+        "wantedHeading": {"ageSeconds": 0.25, "valid": true, "predicted": false},
+        "speed": {"ageSeconds": 0.25, "valid": true, "predicted": false},
+        "body": {"ageSeconds": 0.25, "valid": true, "predicted": false},
+        "mass": {"ageSeconds": 0.25, "valid": true, "predicted": false},
+        "wantedHistory": [{"value": 0.5, "ageSeconds": 0.25, "valid": true}],
+        "speedHistory": [
+          {"value": 100.0, "ageSeconds": 0.25, "valid": true},
+          {"value": 0.0, "ageSeconds": 0.0, "valid": false}
+        ]
+      }],
+      "bodies": {"valid": true, "complete": false, "ageSeconds": 0.25},
+      "food": {"valid": true, "complete": false, "ageSeconds": 0.25},
+      "prey": {"valid": true, "complete": false, "ageSeconds": 0.25},
+      "minimap": {"ageSeconds": 0.25, "valid": true, "predicted": false}
+    },
+    "minimap": {"side": 2, "cells": [0, 1, 1, 0], "age_seconds": 0.25},
+    "timing": {
+      "pingSeconds": 0.125,
+      "pingRangeSeconds": [0.0625, 0.125],
+      "pingWaitSeconds": null,
+      "processingSeconds": 0.0625,
+      "sentCommands": [{"secondsAgo": 0.25, "action": {"heading": 0.5, "boost": true}}]
+    },
+    "hud": {
+      "leaderboard": {
+        "ownPosition": 1,
+        "rank": 2,
+        "playerCount": 3,
+        "entries": [{"segments": 2, "fam": 0.5, "score": 17.0, "color": 8, "name": "Example", "own": true}],
+        "ageSeconds": 0.25
+      },
+      "record": {"segments": 200, "fam": 0.5, "score": 4000.0, "name": "Example", "message": "hello", "ageSeconds": 0.5},
+      "session": {"snakeId": "7", "sessionId": 4294967295, "ageSeconds": 0.5},
+      "teamScores": {"team1": -1, "team2": 50, "history": [[-1, 50], [0, 40]], "ageSeconds": 0.25},
+      "snakes": [
+        {"snakeId": "7", "name": "Example", "skin": 8, "customSkin": [0, 255], "cosmetic": 1, "kills": null, "ageSeconds": 0.5},
+        {"snakeId": "8", "name": "Other", "skin": 3, "customSkin": [], "cosmetic": 0, "kills": {"count": 1, "ageSeconds": 0.25}, "ageSeconds": 0.5}
+      ],
+      "removals": [{"snakeId": "9", "killed": null, "ageSeconds": 0.25}],
+      "minimapCommand": "L",
+      "minimapTeams": {"side": 2, "layers": [[0, 1, 0, 0], [0, 0, 1, 0]], "ageSeconds": 0.25}
+    }
+  }
+}

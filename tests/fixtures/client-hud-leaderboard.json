@@ -1,0 +1,208 @@
+{
+ "description": "Exact setup and both leaderboard packets from one retained protocol-19 capture, with stock-handler reference decoding. Used to check the Rust HUD decoder against real wire bytes.",
+ "source": {
+  "archive": "outputs/raw-server-compat-20261022/live/wire.json",
+  "archiveRoot": "slither-sim checkout (ignored outputs directory; not distributed)",
+  "archiveSha256": "d64842f8c5033638510e44ff9476cf7ac3cb3a3145fd86038540a9205255478b",
+  "recordFormat": "JSON array of {event, time, bytes}; record indices are zero-based positions in that array, times are local receipt seconds",
+  "framing": "server elapsed-ms header with length-prefixed bundled packets",
+  "origin": "one bounded live connection by the `slither-sim client` network backend with recordWire; controller log and RESULT.json sit beside the archive"
+ },
+ "reference": "transcription of the stock client a/l handlers and setMscps tables (client.js sha256 5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095)",
+ "setup": {
+  "record": 5,
+  "time": 0.0638776,
+  "hex": "61007f2601ae012c006630021b002805780021001d01ae132a22c600312a01000008fe33e9715c00feddcd060000000000000000000000000000000000",
+  "expected": {
+   "gridCenter": 32550,
+   "maxSegments": 430,
+   "sectorSize": 300,
+   "sectorCountAlongEdge": 102,
+   "spangdvTenths": 48,
+   "nspHundredths": [
+    539,
+    40,
+    1400
+   ],
+   "mamuThousandths": [
+    33,
+    29
+   ],
+   "cstThousandths": 430,
+   "protocol": 19,
+   "bodySpacing": 42,
+   "serverNumber": 8902,
+   "radius": 12586,
+   "gameMode": 1,
+   "teamVal": null
+  },
+  "note": "Bytes beyond offset 31 are not parsed by the stock client."
+ },
+ "leaderboards": [
+  {
+   "record": 283,
+   "time": 2.5908419,
+   "hex": "6c000123019d013987856d01185b54545d2020542045204b20452052205a205a2020202020013761e57401026869010f6b4ca000024c37010500f52f01135447313d646973696e666f726d617a696f6e6500fc4a32d30402474700ea24dfac000000e5b00e23050000de661e2f07075374657068616e00d711e43d070363627200cb40e66b0106646c79737472",
+   "expected": {
+    "ownPosition": 0,
+    "rank": 291,
+    "playerCount": 413,
+    "entries": [
+     {
+      "segments": 313,
+      "famU24": 8881517,
+      "score": 21093,
+      "color": 1,
+      "name": "[TT]  T E K E R Z Z     "
+     },
+     {
+      "segments": 311,
+      "famU24": 6415732,
+      "score": 20503,
+      "color": 1,
+      "name": "hi"
+     },
+     {
+      "segments": 271,
+      "famU24": 7031968,
+      "score": 12711,
+      "color": 0,
+      "name": "L7"
+     },
+     {
+      "segments": 261,
+      "famU24": 62767,
+      "score": 11348,
+      "color": 1,
+      "name": "TG1=disinformazione"
+     },
+     {
+      "segments": 252,
+      "famU24": 4862675,
+      "score": 10345,
+      "color": 4,
+      "name": "GG"
+     },
+     {
+      "segments": 234,
+      "famU24": 2416556,
+      "score": 8573,
+      "color": 0,
+      "name": ""
+     },
+     {
+      "segments": 229,
+      "famU24": 11537955,
+      "score": 8193,
+      "color": 5,
+      "name": ""
+     },
+     {
+      "segments": 222,
+      "famU24": 6692399,
+      "score": 7610,
+      "color": 7,
+      "name": "Stephan"
+     },
+     {
+      "segments": 215,
+      "famU24": 1172541,
+      "score": 7069,
+      "color": 7,
+      "name": "cbr"
+     },
+     {
+      "segments": 203,
+      "famU24": 4253291,
+      "score": 6279,
+      "color": 1,
+      "name": "dlystr"
+     }
+    ]
+   }
+  },
+  {
+   "record": 631,
+   "time": 5.6001718,
+   "hex": "6c0000dc0199013990a0bd01185b54545d2020542045204b20452052205a205a20202020200138f1d24701026869010f78e46700024c37010500f52f01135447313d646973696e666f726d617a696f6e6500fc1134550402474700ea1f2153000000e5e5f45e050000de88b5b807075374657068616e00d7e08893070363627200cb40e66b0106646c79737472",
+   "expected": {
+    "ownPosition": 0,
+    "rank": 220,
+    "playerCount": 409,
+    "entries": [
+     {
+      "segments": 313,
+      "famU24": 9478333,
+      "score": 21103,
+      "color": 1,
+      "name": "[TT]  T E K E R Z Z     "
+     },
+     {
+      "segments": 312,
+      "famU24": 15848007,
+      "score": 20929,
+      "color": 1,
+      "name": "hi"
+     },
+     {
+      "segments": 271,
+      "famU24": 7922791,
+      "score": 12719,
+      "color": 0,
+      "name": "L7"
+     },
+     {
+      "segments": 261,
+      "famU24": 62767,
+      "score": 11348,
+      "color": 1,
+      "name": "TG1=disinformazione"
+     },
+     {
+      "segments": 252,
+      "famU24": 1127509,
+      "score": 10320,
+      "color": 4,
+      "name": "GG"
+     },
+     {
+      "segments": 234,
+      "famU24": 2040147,
+      "score": 8571,
+      "color": 0,
+      "name": ""
+     },
+     {
+      "segments": 229,
+      "famU24": 15070302,
+      "score": 8210,
+      "color": 5,
+      "name": ""
+     },
+     {
+      "segments": 222,
+      "famU24": 8959416,
+      "score": 7621,
+      "color": 7,
+      "name": "Stephan"
+     },
+     {
+      "segments": 215,
+      "famU24": 14715027,
+      "score": 7127,
+      "color": 7,
+      "name": "cbr"
+     },
+     {
+      "segments": 203,
+      "famU24": 4253291,
+      "score": 6279,
+      "color": 1,
+      "name": "dlystr"
+     }
+    ]
+   }
+  }
+ ],
+ "limits": "Matching these bytes establishes decoder layout agreement, not authenticated provenance or closed-server ranking rules. No own row appears (position 0)."
+}

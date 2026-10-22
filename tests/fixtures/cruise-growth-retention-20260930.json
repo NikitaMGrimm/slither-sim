@@ -1,0 +1,424 @@
+{
+  "note": "Illustrative regression pair selected after the separate-server cohort analysis, not an independent cohort or proof of within-ramp coupling. Raw outgoing controls establish no boost before the grown settle phase; reported coordinate/timing uncertainty remains.",
+  "source": "recordings\\headless\\growth-anchor-holdout-20260930\\bot0.jsonl.gz",
+  "source_sha256": "0c5f03a3c2134683ffb054f09e4c83b80d967b873ca4bcc35ff96674b490385a",
+  "speed_analyzer_sha256": "88964a3d28bed695884b4453c140151b91f845d2b4c01821988b93f286f8d9ff",
+  "decoder_sha256": "fc964fe8b6254af6ff6ee906a3a5795b317d27878a97b1f0e58b901caaa1c89a",
+  "cohort_summary": {
+    "target_phases": 104,
+    "eligible": 38,
+    "paired_eligible_trials_with_raw_boost": 6,
+    "exclusions": {
+      "incomplete_trial": 65,
+      "size_event_at_window_boundary": 1
+    }
+  },
+  "retained_candidate_summary": {
+    "windows": 37,
+    "discriminating_windows": 3,
+    "current_size_mae": 0.019079047860372178,
+    "held_wire_mae": 0.026150517332603523,
+    "retained_cruise_mae": 0.004561932860357953
+  },
+  "raw_control_evidence": {
+    "phase_starts": [
+      {
+        "type": "meta",
+        "t": 5060.541,
+        "wall": 1790728115929,
+        "event": "speed-phase",
+        "scenario": "speedprobe",
+        "life": 1,
+        "trial": 1,
+        "phase": "coast",
+        "heading": 5.659853150587037,
+        "serverClock": 4526,
+        "unboostedBaseline": true,
+        "growthTargetSegments": null,
+        "sct": 2,
+        "fam": 0.3405995571970676,
+        "sp": 5.79,
+        "anchor": {
+          "x": 35463.6805443131,
+          "y": 32897.75690209791
+        }
+      },
+      {
+        "type": "meta",
+        "t": 72541.689,
+        "wall": 1790728183410,
+        "event": "speed-phase",
+        "scenario": "speedprobe",
+        "life": 1,
+        "trial": 3,
+        "phase": "settle",
+        "heading": 0.7363107781851077,
+        "serverClock": 72011,
+        "unboostedBaseline": false,
+        "growthTargetSegments": 14,
+        "sct": 22,
+        "fam": 0.7765945659038166,
+        "sp": 5.79,
+        "anchor": {
+          "x": 32684.958349384273,
+          "y": 32533.48505357461
+        }
+      },
+      {
+        "type": "meta",
+        "t": 77059.629,
+        "wall": 1790728187928,
+        "event": "speed-phase",
+        "scenario": "speedprobe",
+        "life": 1,
+        "trial": 3,
+        "phase": "boost",
+        "heading": 0.7363107781851077,
+        "serverClock": 76524,
+        "unboostedBaseline": false,
+        "growthTargetSegments": 14,
+        "sct": 22,
+        "fam": 0.9290872173957359,
+        "sp": 5.79,
+        "anchor": {
+          "x": 33281.16044650132,
+          "y": 33063.73925176657
+        }
+      },
+      {
+        "type": "meta",
+        "t": 77924.19,
+        "wall": 1790728188792,
+        "event": "speed-phase",
+        "scenario": "speedprobe",
+        "life": 1,
+        "trial": 3,
+        "phase": "coast",
+        "heading": 0.7363107781851077,
+        "serverClock": 77390,
+        "unboostedBaseline": false,
+        "growthTargetSegments": 14,
+        "sct": 22,
+        "fam": 0.5603329873283498,
+        "sp": 14,
+        "anchor": {
+          "x": 33500.889846813705,
+          "y": 33259.016161280015
+        }
+      }
+    ],
+    "trial_end": {
+      "type": "meta",
+      "t": 82445.567,
+      "wall": 1790728193314,
+      "event": "speed-trial-end",
+      "scenario": "speedprobe",
+      "life": 1,
+      "trial": 3,
+      "phase": "coast",
+      "reason": "coast_complete",
+      "completed": true,
+      "unboostedBaseline": false,
+      "growthTargetSegments": 14,
+      "elapsedMs": 9904.089300000007,
+      "phaseElapsedMs": 4521.442999999999,
+      "serverClock": 81909,
+      "sct": 22,
+      "fam": 0.48270162836919,
+      "sp": 5.833333333333333,
+      "anchor": {
+        "x": 34160.70260894374,
+        "y": 33844.00102541005
+      }
+    },
+    "raw_boost_commands_through_end": [
+      {
+        "local_ms": 77059.764,
+        "byte": 253
+      },
+      {
+        "local_ms": 77924.256,
+        "byte": 254
+      }
+    ]
+  },
+  "windows": [
+    {
+      "label": "small_unboosted",
+      "conn": 1,
+      "trial": 1,
+      "phase": "coast",
+      "segments_first": 2,
+      "segments_last": 2,
+      "heading_byte": 226,
+      "retained_candidate": {
+        "excluded": [],
+        "sp": 5.79,
+        "source": {
+          "time": 0,
+          "sp": 5.79,
+          "segments": 2,
+          "kind": "spawn"
+        },
+        "projected_minus_candidate_sp": -0.006455442844544024,
+        "current_minus_candidate_sp": 0.0
+      },
+      "control_evidence": {
+        "first_server": 5567,
+        "last_server": 7889,
+        "controls": 91,
+        "outgoing": 9,
+        "last_raw_heading_before_window": 226,
+        "last_raw_boost_command_before_window": null,
+        "wrong_headings": [],
+        "boost_on": []
+      },
+      "hypothetical_four_ms_sensitivity_sp": {
+        "arc": 0.027191266292753254,
+        "projected": 0.02718794652186892
+      },
+      "anchors": [
+        [
+          5567,
+          35633.53977741838,
+          32774.336896170906
+        ],
+        [
+          5796,
+          35667.64020355921,
+          32749.818312667492
+        ],
+        [
+          6032,
+          35701.11891980481,
+          32724.457406560912
+        ],
+        [
+          6258,
+          35735.21934594564,
+          32699.9388230575
+        ],
+        [
+          6492,
+          35769.92029427806,
+          32676.277796350478
+        ],
+        [
+          6724,
+          35803.39901052366,
+          32650.916890243898
+        ],
+        [
+          6958,
+          35837.49943666449,
+          32626.398306740484
+        ],
+        [
+          7192,
+          35871.59986280532,
+          32601.87972323707
+        ],
+        [
+          7421,
+          35905.70028894615,
+          32577.361139733657
+        ],
+        [
+          7658,
+          35939.80071508698,
+          32552.842556230244
+        ],
+        [
+          7889,
+          35973.27943133258,
+          32527.481650123664
+        ]
+      ]
+    },
+    {
+      "label": "grown_unboosted",
+      "conn": 1,
+      "trial": 3,
+      "phase": "settle",
+      "segments_first": 22,
+      "segments_last": 22,
+      "heading_byte": 29,
+      "retained_candidate": {
+        "excluded": [],
+        "sp": 5.79,
+        "source": {
+          "time": 0,
+          "sp": 5.79,
+          "segments": 2,
+          "kind": "spawn"
+        },
+        "projected_minus_candidate_sp": 0.00130280473476585,
+        "current_minus_candidate_sp": 0.07547169811320664
+      },
+      "control_evidence": {
+        "first_server": 73120,
+        "last_server": 75460,
+        "controls": 93,
+        "outgoing": 10,
+        "last_raw_heading_before_window": 29,
+        "last_raw_boost_command_before_window": null,
+        "wrong_headings": [],
+        "boost_on": []
+      },
+      "hypothetical_four_ms_sensitivity_sp": {
+        "arc": 0.02725121320655496,
+        "projected": 0.02724778429216582
+      },
+      "anchors": [
+        [
+          73140,
+          32840.99925047581,
+          32673.96175178663
+        ],
+        [
+          73369,
+          32873.17513012937,
+          32700.9564321611
+        ],
+        [
+          73602,
+          32903.96578663868,
+          32729.521016382223
+        ],
+        [
+          73831,
+          32935.45883854873,
+          32757.309281556405
+        ],
+        [
+          74064,
+          32966.95189045878,
+          32785.09754673058
+        ],
+        [
+          74295,
+          32998.444942368835,
+          32812.885811904765
+        ],
+        [
+          74528,
+          33029.93799427889,
+          32840.67407707895
+        ],
+        [
+          74760,
+          33061.43104618894,
+          32868.46234225313
+        ],
+        [
+          74995,
+          33092.22170269825,
+          32897.02692647425
+        ],
+        [
+          75225,
+          33124.397582351805,
+          32924.02160684872
+        ],
+        [
+          75460,
+          33155.18823886111,
+          32952.586191069844
+        ]
+      ]
+    },
+    {
+      "label": "grown_after_boost",
+      "conn": 1,
+      "trial": 3,
+      "phase": "coast",
+      "segments_first": 22,
+      "segments_last": 22,
+      "heading_byte": 29,
+      "retained_candidate": {
+        "excluded": [],
+        "sp": 5.865471698113208,
+        "source": {
+          "time": 77971,
+          "sp": 5.833333333333333,
+          "segments": 22,
+          "kind": "change"
+        },
+        "falling_intervals": 11,
+        "projected_minus_candidate_sp": 0.0014199938746770613,
+        "current_minus_candidate_sp": 8.881784197001252E-16
+      },
+      "control_evidence": {
+        "first_server": 78454,
+        "last_server": 80786,
+        "controls": 93,
+        "outgoing": 9,
+        "last_raw_heading_before_window": 29,
+        "last_raw_boost_command_before_window": 254,
+        "wrong_headings": [],
+        "boost_on": []
+      },
+      "hypothetical_four_ms_sensitivity_sp": {
+        "arc": 0.027955318178537605,
+        "projected": 0.02794511835712506
+      },
+      "anchors": [
+        [
+          78496,
+          33720.61924712609,
+          33454.29307079346
+        ],
+        [
+          78723,
+          33752.11229903614,
+          33482.08133596764
+        ],
+        [
+          78951,
+          33784.2881786897,
+          33509.07601634211
+        ],
+        [
+          79182,
+          33814.357308562125,
+          33538.39917150514
+        ],
+        [
+          79410,
+          33846.53318821568,
+          33565.393851879606
+        ],
+        [
+          79642,
+          33878.026240125735,
+          33593.18211705379
+        ],
+        [
+          79865,
+          33908.81689663504,
+          33621.74670127491
+        ],
+        [
+          80096,
+          33940.9927762886,
+          33648.74138164938
+        ],
+        [
+          80326,
+          33971.78343279791,
+          33677.3059658705
+        ],
+        [
+          80556,
+          34003.959312451465,
+          33704.30064624497
+        ],
+        [
+          80786,
+          34034.74996896077,
+          33732.86523046609
+        ]
+      ]
+    }
+  ]
+}

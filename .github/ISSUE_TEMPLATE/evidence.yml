@@ -1,0 +1,30 @@
+name: Measurement or evidence contribution
+description: Propose a measurement, submit a dataset or reproduce an existing claim.
+title: "evidence: "
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or claim
+      description: Separate observed behavior from a proposed explanation.
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Method and competing explanations
+      description: Include the sampling unit, timing/visibility limits and independent validation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and reproduction
+      description: Bundle URL and SHA-256, study/capture windows, frozen plan and exact commands; or say that collection is proposed.
+    validations:
+      required: true
+  - type: textarea
+    id: limits
+    attributes:
+      label: Results and uncertainty
+      description: Include failures, inconclusive results, exclusions and plan deviations.

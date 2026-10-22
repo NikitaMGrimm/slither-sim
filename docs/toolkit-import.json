@@ -1,0 +1,145 @@
+{
+  "formatVersion": 1,
+  "sourceRepository": "NikitaMGrimm/slither-arena-rs",
+  "sourceCommit": "aab1149460c0f5606fbdc7d73e295ba79d094789",
+  "extractedOn": "2026-10-22",
+  "files": [
+    {
+      "path": "examples/fidelity_replay.rs",
+      "sourceSha256": "0541de6589fa6df54d67d76108f9b0e1b6adf1c4a623243dcac579ab60c8ec9f",
+      "extractedSha256": "79733e629365071059edbe8610ad73b8cf4629934f961cec4054ce7e2a21922e",
+      "adaptations": [
+        "Import the simulator crate as slither_sim instead of slither_arena_rs; replay logic and output schema unchanged."
+      ]
+    },
+    {
+      "path": "tools/fidelity/analyze-capture-quality.py",
+      "sourceSha256": "19dd915bb7f8ebfd639b52818b6bce634bbe60d69a63e23c46211ba0a7746af6",
+      "extractedSha256": "19dd915bb7f8ebfd639b52818b6bce634bbe60d69a63e23c46211ba0a7746af6",
+      "adaptations": []
+    },
+    {
+      "path": "tools/fidelity/capture_quality.py",
+      "sourceSha256": "7de3dfcb30c2a92222a3748ed0173c088736b1fb57c17a5a39a8457b8a50e8e6",
+      "extractedSha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff",
+      "adaptations": [
+        "Quarantine captures whose observed setup advertises an unsupported wire protocol, retaining raw bytes and the advertised version.",
+        "Split header-free bundled payloads with the same grammar as elapsed frames without inventing a server clock."
+      ]
+    },
+    {
+      "path": "tools/fidelity/prepare-fidelity-replay.py",
+      "sourceSha256": "2fb07ddf93af18c8cdb7812b4379bcfc31992b2d8e54231845ce8026a145eb0e",
+      "extractedSha256": "3658462cc4e415454919e79872cd65991548ed5007db531426c4b29b7aad531a",
+      "adaptations": [
+        "Reject replay windows containing self removal or loss of self state even without a game-over packet."
+      ]
+    },
+    {
+      "path": "tools/fidelity/slither-feeding-shape.mjs",
+      "sourceSha256": "d323fd06c714c8af46019d59f6e17c9b7652f9a4b9f58fedf08d9b535f6a282f",
+      "extractedSha256": "030c84778f13df88bac6bebb36d4db11a8ab51c77715225a6b3686f60992cc6c",
+      "adaptations": [
+        "Accept an optional caller-supplied WebSocket Origin and preserve it in acquisition provenance."
+      ]
+    },
+    {
+      "path": "tools/fidelity/slither-feeding-shape.test.mjs",
+      "sourceSha256": "a835f0b83b97817e9e901cc08c85bed03f2c944aed623c6dfda1bfdb1b168857",
+      "extractedSha256": "a835f0b83b97817e9e901cc08c85bed03f2c944aed623c6dfda1bfdb1b168857",
+      "adaptations": []
+    },
+    {
+      "path": "tools/fidelity/slither-headless.mjs",
+      "sourceSha256": "86f9a7ff486e362875212cd644f4a14f9b6989cd60f97dfeb8f441c167422fa3",
+      "extractedSha256": "6c1edd2f9cd2b7e10226547b77be393d3cb204298e8625538c471997d6679a52",
+      "adaptations": [
+        "Require an explicit IPv4 endpoint, remove official-server discovery and survey selection, and accept an optional caller-supplied WebSocket Origin.",
+        "Replace server-provided JavaScript evaluation with the bounded captured string-copy challenge parser and regression tests.",
+        "Decode header-free packet bundles through the shared payload splitter, retaining unknown server time."
+      ]
+    },
+    {
+      "path": "tools/fidelity/slither-headless.test.mjs",
+      "sourceSha256": "2f41ddc3fa05a9014c73ad56d5be4563fe85126eb443c8371791c62343244dca",
+      "extractedSha256": "e08d3cd290c7e4b59e8ba54463725f760858d518d482dfab2bc385047801b5d1",
+      "adaptations": [
+        "Adapt CLI assertions and add offline endpoint, Origin forwarding and provenance regressions for explicit-endpoint collection.",
+        "Replace server-provided JavaScript evaluation with the bounded captured string-copy challenge parser and regression tests.",
+        "Cover synthetic bundled setup and pong after a header-free challenge."
+      ]
+    },
+    {
+      "path": "tools/fidelity/slither-paired-death.mjs",
+      "sourceSha256": "638976633ca651f41e0cebf80b8c45c2a05b69bc75be11748c5a590c6c35def5",
+      "extractedSha256": "f6a565aee6253c1efe1509cb1bc1926ef73d3a4ba05c8ea84c153113a699502c",
+      "adaptations": [
+        "Accept an optional caller-supplied WebSocket Origin and preserve it in acquisition provenance."
+      ]
+    },
+    {
+      "path": "tools/fidelity/slither-paired-death.test.mjs",
+      "sourceSha256": "3ed6b974d989bb9e2ac75bccf3206715bd457057aea4c4bf46c711be389631a6",
+      "extractedSha256": "3ed6b974d989bb9e2ac75bccf3206715bd457057aea4c4bf46c711be389631a6",
+      "adaptations": []
+    },
+    {
+      "path": "tools/fidelity/slither-paired-prey.mjs",
+      "sourceSha256": "71c2f9ee90e26d0dfb85ebd5cb654be7b1ba2552e87b277d29d97d6b7a6ebf08",
+      "extractedSha256": "7ce51d795567633c372062336703f857d83580ee01155beb82a22f0541ae86d7",
+      "adaptations": [
+        "Accept an optional caller-supplied WebSocket Origin and preserve it in acquisition provenance."
+      ]
+    },
+    {
+      "path": "tools/fidelity/slither-paired-prey.test.mjs",
+      "sourceSha256": "697253e78b88bf887dc95b315960198f8ef061d14d23500f5ca2434b333d7dae",
+      "extractedSha256": "697253e78b88bf887dc95b315960198f8ef061d14d23500f5ca2434b333d7dae",
+      "adaptations": []
+    },
+    {
+      "path": "tools/fidelity/slither_protocol.py",
+      "sourceSha256": "1e82c660defd85867eafc453a6fe08b4dadd77314f0d8766f86f80c0f1939dad",
+      "extractedSha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+      "adaptations": [
+        "Narrow the World class description to partial reconstruction and identify missing minimap occupancy decoding.",
+        "Reject short or non-19 setup commands before mutating decoded world state.",
+        "Expose shared header-independent packet splitting for capture auditing; keep timed replay clocks unchanged.",
+        "Describe standalone behavior in comments/docstrings; no executable changes."
+      ]
+    },
+    {
+      "path": "tools/fidelity/test_capture_quality.py",
+      "sourceSha256": "9d550b8b367b4b95a2d32edb7a13cdbfca62c50d335bf44db6666b6189ad024e",
+      "extractedSha256": "105678fa9cda255120611851c804ccdce4c18f705fa615027abf86602bdf316d",
+      "adaptations": [
+        "Add a regression proving that an integrity-valid protocol-11 capture is quarantined without modifying its bytes.",
+        "Cover synthetic header-free bundled setup and pong with no invented elapsed time."
+      ]
+    },
+    {
+      "path": "tools/fidelity/test_prepare_fidelity_replay.py",
+      "sourceSha256": "0a40c1144d7a46bcd1608b0e1ea7ba4d2275f68021a392aaed90511d03c67f88",
+      "extractedSha256": "2b7be698c5ad5307277dfc94ead53020ad330c4d3d720402999f6287539d240f",
+      "adaptations": [
+        "Cover self removal without game over, including a same-frame reappearance."
+      ]
+    },
+    {
+      "path": "tools/fidelity/test_received_protocol.py",
+      "sourceSha256": "8946feb7e7bd06d480321a202bfbddf524e9edf1448aad9779dcb7d907ac2fd7",
+      "extractedSha256": "eab6a03354fb1a999822e4d7932363fffb7caa4c44f79f301006bd1de578d38b",
+      "adaptations": [
+        "Describe standalone behavior in comments/docstrings; no executable changes."
+      ]
+    },
+    {
+      "path": "tools/fidelity/test_slither_protocol.py",
+      "sourceSha256": "dc87bd18943d35a319cd44fb47f137185c60e17b1730882cabba2392af5964c1",
+      "extractedSha256": "722da46f8cff588cb8c35352ed069fb7c9790c9638d5d87915b144123a114049",
+      "adaptations": [
+        "Add captured-setup coverage and regressions for unsupported protocols and short setups."
+      ]
+    }
+  ]
+}

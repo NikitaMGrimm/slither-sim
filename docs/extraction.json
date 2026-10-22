@@ -1,0 +1,353 @@
+{
+  "formatVersion": 1,
+  "sourceRepository": "NikitaMGrimm/slither-arena-rs",
+  "sourceCommit": "aab1149460c0f5606fbdc7d73e295ba79d094789",
+  "extractedOn": "2026-10-22",
+  "files": [
+    {
+      "path": "Cargo.lock",
+      "sourceSha256": "0243afc58972a691c1cd174ccef067989a1692a42677a856a1446197a4f125ba",
+      "extractedSha256": "9740354d23782860658fb0e82792710c7848438683cce96ed0e66e8f05fbba7d",
+      "adaptations": [
+        "Rename root package to slither-sim.",
+        "Add tungstenite 0.30.0 and verified TLS dependencies for the portable protocol-19 network backend; resolve within Rust 1.86 compatibility."
+      ]
+    },
+    {
+      "path": "src/boundary.rs",
+      "sourceSha256": "8c7f83c7ffed6caeca97a3a3944a67b80f53d710ab59ee8a6d67a6afb038e73a",
+      "extractedSha256": "8c7f83c7ffed6caeca97a3a3944a67b80f53d710ab59ee8a6d67a6afb038e73a",
+      "adaptations": []
+    },
+    {
+      "path": "src/kiosk.rs",
+      "sourceSha256": "eacaf4c138410330280a11bb9debb82840e8dec229792841cabc7b6c18b0965d",
+      "extractedSha256": "eacaf4c138410330280a11bb9debb82840e8dec229792841cabc7b6c18b0965d",
+      "adaptations": []
+    },
+    {
+      "path": "src/model.rs",
+      "sourceSha256": "e020dfd398fc1f12a0d94e0ada57ce67e9d92f855c5c81decdde69ca69f014f9",
+      "extractedSha256": "b3f90b7b51a37b2c2e2f2aa3bfb905223f451342e5a2c1bb01377503a9a6e8c0",
+      "adaptations": [
+        "Clarify that received observations use zero for unreported kills and the portable HUD records whether the count is known; model behavior unchanged.",
+        "Describe standalone behavior in comments/docstrings; no executable changes."
+      ]
+    },
+    {
+      "path": "src/observation/mod.rs",
+      "sourceSha256": "facd6961fe11f09354c4ed861b560fde1f4bd4e7cbcd885cf14ca5c52517d8d3",
+      "extractedSha256": "068be485bf2e57f0827651a5e21de3f204c994dfab5607b7b03f05882077dc4c",
+      "adaptations": [
+        "Remove unused internal helper Simulator::observe_selected; observation implementation unchanged."
+      ]
+    },
+    {
+      "path": "src/physics.rs",
+      "sourceSha256": "13999cd2475fa2de2765f66b753f11d287b6b107c7e3c865d2151cad12c7da52",
+      "extractedSha256": "13999cd2475fa2de2765f66b753f11d287b6b107c7e3c865d2151cad12c7da52",
+      "adaptations": []
+    },
+    {
+      "path": "src/prey.rs",
+      "sourceSha256": "c332a7e03fe01ebcdad0826486658e92c29399946992bbc01672f881e088e547",
+      "extractedSha256": "c332a7e03fe01ebcdad0826486658e92c29399946992bbc01672f881e088e547",
+      "adaptations": []
+    },
+    {
+      "path": "src/profiling.rs",
+      "sourceSha256": "06a37b0d83978d6eef17c8cf996b4cc95a5c9f53b4ad4bbdb3e168a912bd1f6e",
+      "extractedSha256": "fd3583fc1a155f19941cbd9cc78f1d99cec6d37ed9a541f815ed5b1ff4c180d0",
+      "adaptations": [
+        "Describe standalone behavior in comments/docstrings; no executable changes."
+      ]
+    },
+    {
+      "path": "src/simulator.rs",
+      "sourceSha256": "d1d2057d495350a672ec419200f890933befb8ade8f91e7e0249fd0a295f23f6",
+      "extractedSha256": "45f640e06cff4b9c06bdfc6d6ede0b6983b92d8106799c67c34c30e415d8f9a0",
+      "adaptations": [
+        "Remove unused internal helper Simulator::set_ambient_rate; stepping and mechanics unchanged.",
+        "Describe opt-in event buffers without application-specific terminology; behavior unchanged."
+      ]
+    },
+    {
+      "path": "src/spawn.rs",
+      "sourceSha256": "b0f602a43494b9ad1f37faab62e53b860322b3261020e831451062e0c0ccdcbe",
+      "extractedSha256": "b0f602a43494b9ad1f37faab62e53b860322b3261020e831451062e0c0ccdcbe",
+      "adaptations": []
+    },
+    {
+      "path": "tests/ambient_food.rs",
+      "sourceSha256": "fb362ec4a443cc587875e9de9ef3d148d63c4294b9e88665caf5e15db175def6",
+      "extractedSha256": "54524634fd0b26f8c92b07618d738262a197c42e7e9cfd1da49a00806d868c93",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim.",
+        "Retain simulator-level imports and tests from mixed test modules."
+      ]
+    },
+    {
+      "path": "tests/boost_food.rs",
+      "sourceSha256": "f8e2e16e6845261acb0265d135847a8ced0b73928480265a9dc1b8fd9834b783",
+      "extractedSha256": "6d7be77aba942fc8c4375719a0de8db691f206ce24a9847cb51ab7892d8038cb",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim.",
+        "Retain simulator-level imports and tests from mixed test modules."
+      ]
+    },
+    {
+      "path": "tests/boundary.rs",
+      "sourceSha256": "934311a08a2fb5b484d50b704bdf4a455253e743d66b2dd522745df6741ea540",
+      "extractedSha256": "2ec7ef78b5810dddb16807f16eeffd619f9d2d0d613e7e851e4b85cfca84b742",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim.",
+        "Retain simulator-level imports and tests from mixed test modules."
+      ]
+    },
+    {
+      "path": "tests/circle_pickup.rs",
+      "sourceSha256": "7e08e8c36dc0bdd9b7bbb8a50bfe41cb0c994d054589a558658a63bb8f01bc39",
+      "extractedSha256": "1d261b3fcf61e2ce067dcd648d042dfafa0dd7296b00c3e167d9b6b2e0470c44",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/config.rs",
+      "sourceSha256": "f02c64654d516db3adc9b4680fb0e4ef97518c15c5bf026c67e8c333abb038b1",
+      "extractedSha256": "ef837add5f4913ae2ba26d4badfe579a403508ac181f237fbbfada3862accea2",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/cruise_growth_retention.rs",
+      "sourceSha256": "4097e3602f4e3feeedaf4af7af8132ab57cbd5c76d848fe6adb9a1aa277b3382",
+      "extractedSha256": "6eee895e96624ac6a86412d49a237f895409ab9d73b4e586927588ac920c85f1",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/death_food.rs",
+      "sourceSha256": "ca72683f389ec85abc777775b5557e669e7c0dd09b79ee8d64d3bae485f78fa0",
+      "extractedSha256": "d5b945941f645c9cbc803c00a897d297888bafd9e1e309dee4209e8568c2bf6f",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim.",
+        "Retain simulator-level imports and tests from mixed test modules."
+      ]
+    },
+    {
+      "path": "tests/fixtures/arena-radius-updates.json",
+      "sourceSha256": "d3200c00ed54c14415d472747aa66fe15c71b149a55f406d0bd2e5536384ced7",
+      "extractedSha256": "d3200c00ed54c14415d472747aa66fe15c71b149a55f406d0bd2e5536384ced7",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/body-updates-larger.json",
+      "sourceSha256": "64752066934d7b7eb2154d0601b98d7335d272bbd62964b9b0fbf414a65cd72e",
+      "extractedSha256": "64752066934d7b7eb2154d0601b98d7335d272bbd62964b9b0fbf414a65cd72e",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/body-updates.json",
+      "sourceSha256": "37de6e342bb60b905c5bb949b29e131051bd7d31e3d86814897cc47659f28120",
+      "extractedSha256": "37de6e342bb60b905c5bb949b29e131051bd7d31e3d86814897cc47659f28120",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/boost-circle-food.json",
+      "sourceSha256": "b801694c5e5d82ce7a99f005499efeb53afa022b3fae78107b4775d62f92f696",
+      "extractedSha256": "b801694c5e5d82ce7a99f005499efeb53afa022b3fae78107b4775d62f92f696",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/boundary-contact.json",
+      "sourceSha256": "405566f04fc1808ba7a1356cb00a42139572b19632885a55644b6cbbcde1ed12",
+      "extractedSha256": "405566f04fc1808ba7a1356cb00a42139572b19632885a55644b6cbbcde1ed12",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/cruise-growth-retention-20260930.json",
+      "sourceSha256": "70036bf08eee4940501c882da32dd89431e6aa4d6d781509bbb3194fcc94f5e2",
+      "extractedSha256": "70036bf08eee4940501c882da32dd89431e6aa4d6d781509bbb3194fcc94f5e2",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/cruise-retention-pair.json",
+      "sourceSha256": "6fa363c7c52186100c058edddf19a479432d719dd77f14fd6388c210c7f4a34f",
+      "extractedSha256": "6fa363c7c52186100c058edddf19a479432d719dd77f14fd6388c210c7f4a34f",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/death-food-prospective.json",
+      "sourceSha256": "a4313602f28bbd969db9cfb83f351cc659429c521066361293e21992b19107eb",
+      "extractedSha256": "a4313602f28bbd969db9cfb83f351cc659429c521066361293e21992b19107eb",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/death-food.json",
+      "sourceSha256": "90bf06d0ff904c5eb5f79d71c4ddd9da81df34dfcac416574322c7ed3f499ad1",
+      "extractedSha256": "90bf06d0ff904c5eb5f79d71c4ddd9da81df34dfcac416574322c7ed3f499ad1",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/death-jitter-fresh.json",
+      "sourceSha256": "810cb7a5136b4aa6b3788ec382aa5816f3b2c889358373058eb62225a95b7aa1",
+      "extractedSha256": "810cb7a5136b4aa6b3788ec382aa5816f3b2c889358373058eb62225a95b7aa1",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/food-growth.json",
+      "sourceSha256": "a85cd9ee5e8369fe265a0be28d9c406df9646d5642eee9f97ddcd643295660bc",
+      "extractedSha256": "a85cd9ee5e8369fe265a0be28d9c406df9646d5642eee9f97ddcd643295660bc",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/movement-turn-runs.json",
+      "sourceSha256": "f3b848831fd8cd3dffb40920fa59bbe44c54faa495a5e0cd8a8ba7f00d7f466c",
+      "extractedSha256": "f3b848831fd8cd3dffb40920fa59bbe44c54faa495a5e0cd8a8ba7f00d7f466c",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/official-collision-cases.json",
+      "sourceSha256": "fc44684e0754589249d8721bf5d789443cfa6d3069e6f975371879266368100d",
+      "extractedSha256": "fc44684e0754589249d8721bf5d789443cfa6d3069e6f975371879266368100d",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/prey-flight-speed-fresh.json",
+      "sourceSha256": "efcd46b936786cc7a48fb3da25bd93273b4c8ffb9a240b78a13d3eabda73221e",
+      "extractedSha256": "efcd46b936786cc7a48fb3da25bd93273b4c8ffb9a240b78a13d3eabda73221e",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/prey-motion-quantization.json",
+      "sourceSha256": "15156f6aeea4b59aef6c6b5142a94edc9fe8957b54dbb2c41fc36777a6f01883",
+      "extractedSha256": "15156f6aeea4b59aef6c6b5142a94edc9fe8957b54dbb2c41fc36777a6f01883",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/prey-nutrition.json",
+      "sourceSha256": "aea609e59115758b40eacef3e051386c27e79be21f3224666d6f881c244779cb",
+      "extractedSha256": "aea609e59115758b40eacef3e051386c27e79be21f3224666d6f881c244779cb",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/prey-outward-motion.json",
+      "sourceSha256": "c54b79d3d2a73d4bd69cccf73f5b1be19b1d1aa1ca25bd7c1468306a05493ca3",
+      "extractedSha256": "c54b79d3d2a73d4bd69cccf73f5b1be19b1d1aa1ca25bd7c1468306a05493ca3",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/server-body-snapshots.json",
+      "sourceSha256": "c0500f6de3c10d3664d5b86c1a3423e1dc9e8922e55dac3f0744aabbbf324fde",
+      "extractedSha256": "c0500f6de3c10d3664d5b86c1a3423e1dc9e8922e55dac3f0744aabbbf324fde",
+      "adaptations": []
+    },
+    {
+      "path": "tests/fixtures/speed-ramp-validation.json",
+      "sourceSha256": "94a704bbf2073ac98c7324331b93d0bd35603edeaa4e1d768db1f6b4b2a68c0e",
+      "extractedSha256": "94a704bbf2073ac98c7324331b93d0bd35603edeaa4e1d768db1f6b4b2a68c0e",
+      "adaptations": []
+    },
+    {
+      "path": "tests/kiosk.rs",
+      "sourceSha256": "63eb67edda2157d6499069118c15f0f78915f0d3ca93903154fdaa4a53334c25",
+      "extractedSha256": "077b18d35b96706302f818a907658abae4219bb147fa528d5d010c08a2b28b1f",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim.",
+        "Retain simulator-level imports and tests from mixed test modules."
+      ]
+    },
+    {
+      "path": "tests/movement_turns.rs",
+      "sourceSha256": "fec64ac524c118840ab4644a7b1faba81534dafbc48c2400b6da54fc56afc03c",
+      "extractedSha256": "f1f385d7812d248a6a2d8d50b049d2cff12a2a5eb71c559ed1feddbbcd0f906c",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/physics.rs",
+      "sourceSha256": "f9c350e66ed3b611c60ff8b69cc559b994d31b965405cb8ff41a60e9c996fce8",
+      "extractedSha256": "5f6922e6ba9f52bffcd4a3398dbfce3106f2d57051b3ddf2a24836576ffb1096",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/pickup_events.rs",
+      "sourceSha256": "bb4ace801e030c374793fe09aff239a400a29b65ef279370df7e8c3658e3c2c9",
+      "extractedSha256": "b44b810bdc2c1ad39003cb34287b5a3f69cb2311090733834f405ffc52f89e02",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/prey.rs",
+      "sourceSha256": "b997794c81d31e8de1249993fdccb37bb23674e496b04f88294a681837af8342",
+      "extractedSha256": "7e4f5b87c9e021ccb4df451d14438c25c5bb05886fe9ff11f5ae345b7080a900",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/prey_activation.rs",
+      "sourceSha256": "74142fcf61cee7f4bfbb919f6b168bfb07c0a689dfc12c2962335cfbb41d16d8",
+      "extractedSha256": "858fc1bc0fc91ef00dd0ee5143911ab1fa5c153354049b6e8dfe93067fbdec86",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/prey_decisions.rs",
+      "sourceSha256": "8d1934095753965bf5f7e93707f68d80d476cd8f48c63d28c006d8cdeec7c4d8",
+      "extractedSha256": "af8759f4dbcb60c6b015495123bf54d520809e13bf9f2c5ce3687ddf0bfd8269",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/prey_outward.rs",
+      "sourceSha256": "389018716f14b9456b49833837c7edcb90a5c0e2c5e2aeb5a40aa013ea3727c9",
+      "extractedSha256": "d30d6be460f1be9ff24c2a1ec2cc391989be9e77e925094533f09f2317d20dc0",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/replay_controls.rs",
+      "sourceSha256": "f7227efef96e6a724ef67ecb31a07a166c263f0429cb7d393f1055c3aedfe9b3",
+      "extractedSha256": "4a8de4fd4bfbb5953091e8276c94456585d122120609d721b9afff4b608b98ff",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/server_body.rs",
+      "sourceSha256": "9bea956c665459b7fdef4afec41096e07262811a7e968358f05af485197d0c99",
+      "extractedSha256": "257834fff420fd88623209e8dc01c3cec053461361f50876becabef49e6cff11",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    },
+    {
+      "path": "tests/spawn.rs",
+      "sourceSha256": "dce017d3fd68ee84e5291b719670a9bdd039de9a00e2e58bcdda8712aacb997b",
+      "extractedSha256": "3297ba8a4ebe0f54300a192a352db68c6333aae21694d4866416a4ff6edfe56f",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim.",
+        "Retain simulator-level imports and tests from mixed test modules."
+      ]
+    },
+    {
+      "path": "tests/speed_state.rs",
+      "sourceSha256": "f2577c17d18d78441b8542f3d8aaf7d825f351fb7e63cc9f6dde2ab7da464b64",
+      "extractedSha256": "fdee36dcefec30f41dd78c79ed34e90dfd60558638de89c9ba808bd6da9302e1",
+      "adaptations": [
+        "Rename crate import from slither_arena_rs to slither_sim."
+      ]
+    }
+  ]
+}

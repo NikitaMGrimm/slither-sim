@@ -1,0 +1,29 @@
+{
+  "description": "Observed setup prefix from an existing WSL browser capture. The archive is partial; this fixture establishes setup fields only.",
+  "source": {
+    "archiveRoot": "WSL Slither Arena research cache",
+    "archive": "research-operation-20261010/live-client-r1/recordings/death-1791597688250647929-ulf87uee.jsonl.gz",
+    "archiveSha256": "4a7aab8ef418069a39cce5d1ae6b1a7ab8096123e8be9217b9a5b6a543bb6bea",
+    "recordLine": 9492,
+    "recordTimeMs": 374371.1,
+    "sourceLabel": "chrome-live",
+    "partialArchive": true,
+    "rawFrameSha256": "3d842511a2eb7ad21b9dcc11049f7456c4396eae7b44c529769d0bff5dc42b9e",
+    "framing": "server elapsed-ms header followed by an a setup command"
+  },
+  "setupPrefixHex": "61007f2601ae012c006630021b002805780021001d01ae132a10a7001ef6",
+  "expected": {
+    "protocolVersion": 19,
+    "grd": 32550,
+    "mscps": 430,
+    "sectorSize": 300,
+    "cstWire": 430,
+    "msl": 42,
+    "radius": 7926
+  },
+  "limitations": [
+    "Only the first 30 setup-command bytes are distributed; the original archive is unchanged and is not bundled.",
+    "The source label and archive hash identify the supplied evidence; they do not authenticate its server origin.",
+    "This is an observation of wire setup fields, not proof of official server implementation or complete-session coverage."
+  ]
+}

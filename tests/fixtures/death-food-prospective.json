@@ -1,0 +1,626 @@
+{
+  "note": "Prospective measurements after commit 60a4f65, no refit. Zero drops are retained. Counts are received additions, not guaranteed complete server totals.",
+  "sources": [
+    {
+      "name": "focused-A.json",
+      "sha256": "9335942720a6d3cd8ce4e769ad1a03993e8292632425397d341262490c2a3bc5"
+    },
+    {
+      "name": "focused-A-coil.json",
+      "sha256": "66ebfc7549bc709f9eceee98a1a77816d7616e7d8ac743deb46a050543a648cb"
+    },
+    {
+      "name": "focused-B.json",
+      "sha256": "2e52536310488296bad2d9fae2457656ebb67ecffbca045a3b09f4bd8eee65c3"
+    },
+    {
+      "name": "focused-C.json",
+      "sha256": "64f9981b3c4654ba0430281a49dd5d62d34d36ebb9c588076d194a25f430c29d"
+    },
+    {
+      "name": "focused-human.json",
+      "sha256": "581585f25f5c584a42ea8edfe5617a200cc87619dde655e0bbef5ae2f3508fa9"
+    },
+    {
+      "name": "focused-boundary-food.json",
+      "sha256": "89976b3b3ea6d0ca6176431df27b35fb924d1a0afdcdf377012b164c74df2d2d"
+    }
+  ],
+  "own_deaths": [
+    {
+      "source": "focused-A.json",
+      "time": 64.4545,
+      "segments": 17,
+      "fraction": 0.4814039159657905,
+      "score": 254,
+      "count": 35,
+      "sizes": {
+        "13.6": 35
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 4280.857874216275,
+      "nearest_known_body_distance": 22.92087876110316,
+      "extent": 430.86717882840435
+    },
+    {
+      "source": "focused-A.json",
+      "time": 114.8515,
+      "segments": 9,
+      "fraction": 0.8783212231589093,
+      "score": 131,
+      "count": 19,
+      "sizes": {
+        "13.6": 19
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 129.91887990413488,
+      "nearest_known_body_distance": 32.35006222993102,
+      "extent": 290.77475755153176
+    },
+    {
+      "source": "focused-A.json",
+      "time": 171.2805,
+      "segments": 13,
+      "fraction": 0.8024764539287361,
+      "score": 194,
+      "count": 27,
+      "sizes": {
+        "13.6": 27
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 10987.70451848236,
+      "nearest_known_body_distance": 27.82999160257226,
+      "extent": 334.40914507626456
+    },
+    {
+      "source": "focused-A.json",
+      "time": 330.9008999999985,
+      "segments": 32,
+      "fraction": 0.654385367297254,
+      "score": 513,
+      "count": 65,
+      "sizes": {
+        "13.6": 65
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 9073.783014070648,
+      "nearest_known_body_distance": 28.337294609204456,
+      "extent": 665.9300543848624
+    },
+    {
+      "source": "focused-A.json",
+      "time": 353.63780000000077,
+      "segments": 6,
+      "fraction": 0.05159086296503919,
+      "score": 71,
+      "count": 13,
+      "sizes": {
+        "13.6": 13
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 6450.211386218836,
+      "nearest_known_body_distance": 20.55788453421701,
+      "extent": 127.8642070786773
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 22.25710000000149,
+      "segments": 17,
+      "fraction": 1,
+      "score": 262,
+      "count": 35,
+      "sizes": {
+        "13.6": 35
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 4073.679786116245,
+      "nearest_known_body_distance": 57.36073395835212,
+      "extent": 458.92980333111484
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 132.1871000000015,
+      "segments": 30,
+      "fraction": 0.18132800944614463,
+      "score": 470,
+      "count": 61,
+      "sizes": {
+        "13.6": 61
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 9924.604314429205,
+      "nearest_known_body_distance": 27.974209424417687,
+      "extent": 447.6774834534259
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 181.65480000000073,
+      "segments": 8,
+      "fraction": 0.6043784978615342,
+      "score": 111,
+      "count": 17,
+      "sizes": {
+        "13.6": 17
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 6298.309752369414,
+      "nearest_known_body_distance": 34.93122362581265,
+      "extent": 70.92397155147984
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 236.71380000000073,
+      "segments": 9,
+      "fraction": 0.7729228003575087,
+      "score": 130,
+      "count": 19,
+      "sizes": {
+        "13.6": 19
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 4570.799736002144,
+      "nearest_known_body_distance": 24.144621078771028,
+      "extent": 90.63875032218385
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 340.9446999999993,
+      "segments": 21,
+      "fraction": 0.6175793181407045,
+      "score": 322,
+      "count": 43,
+      "sizes": {
+        "13.6": 43
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 8870.204150890002,
+      "nearest_known_body_distance": 41.5697096192685,
+      "extent": 361.8818759188555
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 367.3323000000008,
+      "segments": 6,
+      "fraction": 0.03426081146364281,
+      "score": 71,
+      "count": 13,
+      "sizes": {
+        "13.6": 13
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 9911.217268771765,
+      "nearest_known_body_distance": 30.207969032053562,
+      "extent": 88.89642000424188
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 392.7966999999993,
+      "segments": 6,
+      "fraction": 0.08335644503572255,
+      "score": 72,
+      "count": 13,
+      "sizes": {
+        "13.6": 13
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 8535.587151625019,
+      "nearest_known_body_distance": 22.956991110507225,
+      "extent": 171.3097000986989
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 487.5138999999985,
+      "segments": 23,
+      "fraction": 0.8380341433307018,
+      "score": 360,
+      "count": 47,
+      "sizes": {
+        "13.6": 47
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 3471.158407454779,
+      "nearest_known_body_distance": 26.1189245833199,
+      "extent": 365.00381753053466
+    },
+    {
+      "source": "focused-A-coil.json",
+      "time": 566.3261000000015,
+      "segments": 25,
+      "fraction": 0.35782309519190164,
+      "score": 386,
+      "count": 50,
+      "sizes": {
+        "13.6": 50
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 4890.560139711641,
+      "nearest_known_body_distance": 33.51335888328982,
+      "extent": 146.1208258973341,
+      "wide_window_count": 50,
+      "burst_all_large_additions": 50
+    },
+    {
+      "source": "focused-B.json",
+      "time": 11.15160000000149,
+      "segments": 4,
+      "fraction": 0.029368759952113625,
+      "score": 40,
+      "count": 9,
+      "sizes": {
+        "13.6": 9
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 6032.182990939366,
+      "nearest_known_body_distance": 21.291533341753482,
+      "extent": 135.5653778987189
+    },
+    {
+      "source": "focused-B.json",
+      "time": 63.28140000000224,
+      "segments": 11,
+      "fraction": 0.6974891839915027,
+      "score": 160,
+      "count": 23,
+      "sizes": {
+        "13.6": 23
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 6354.216890217169,
+      "nearest_known_body_distance": 39.06370708568885,
+      "extent": 57.732748989213654
+    },
+    {
+      "source": "focused-B.json",
+      "time": 125.93640000000224,
+      "segments": 12,
+      "fraction": 0.6466067222718431,
+      "score": 175,
+      "count": 25,
+      "sizes": {
+        "13.6": 25
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 5447.454772358836,
+      "nearest_known_body_distance": 63.60172265738809,
+      "extent": 79.53380851008298
+    },
+    {
+      "source": "focused-B.json",
+      "time": 162.6788000000007,
+      "segments": 64,
+      "fraction": 0.028592945849475016,
+      "score": 1128,
+      "count": 129,
+      "sizes": {
+        "13.6": 129
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 10211.727759143967,
+      "nearest_known_body_distance": 57.904258970652926,
+      "extent": 474.16074504944316
+    },
+    {
+      "source": "focused-B.json",
+      "time": 241.13090000000224,
+      "segments": 67,
+      "fraction": 1,
+      "score": 1215,
+      "count": 135,
+      "sizes": {
+        "13.6": 135
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 13243.00358514628,
+      "nearest_known_body_distance": 37.47153001441607,
+      "extent": 512.8409802582922
+    },
+    {
+      "source": "focused-B.json",
+      "time": 312.08219999999926,
+      "segments": 36,
+      "fraction": 0.8962495265155749,
+      "score": 590,
+      "count": 66,
+      "sizes": {
+        "13.6": 66
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 9936.299825824553,
+      "nearest_known_body_distance": 43.50667074215212,
+      "extent": 487.86950566593384,
+      "wide_window_count": 81,
+      "burst_all_large_additions": 66
+    },
+    {
+      "source": "focused-B.json",
+      "time": 482.62769999999927,
+      "segments": 40,
+      "fraction": 0.3118260688678067,
+      "score": 653,
+      "count": 81,
+      "sizes": {
+        "13.6": 81
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 5263.6272943746935,
+      "nearest_known_body_distance": 21.642418322059854,
+      "extent": 805.076141549016
+    },
+    {
+      "source": "focused-C.json",
+      "time": 59.78889999999851,
+      "segments": 41,
+      "fraction": 0.30784257101074286,
+      "score": 672,
+      "count": 83,
+      "sizes": {
+        "13.6": 83
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 11225.032243540612,
+      "nearest_known_body_distance": 25.943020138795575,
+      "extent": 879.4977766277128
+    },
+    {
+      "source": "focused-C.json",
+      "time": 156.7303999999985,
+      "segments": 49,
+      "fraction": 0.19051093998616575,
+      "score": 823,
+      "count": 99,
+      "sizes": {
+        "13.6": 99
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 11635.661203626432,
+      "nearest_known_body_distance": 48.04962282021396,
+      "extent": 724.4176756195401
+    },
+    {
+      "source": "focused-C.json",
+      "time": 378.5586999999993,
+      "segments": 83,
+      "fraction": 0.6352216383946918,
+      "score": 1577,
+      "count": 159,
+      "sizes": {
+        "13.6": 159
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 10948.49265844388,
+      "nearest_known_body_distance": 49.097580366886866,
+      "extent": 527.1347089085149,
+      "wide_window_count": 161,
+      "burst_all_large_additions": 159
+    },
+    {
+      "source": "focused-C.json",
+      "time": 516.8721999999992,
+      "segments": 46,
+      "fraction": 0.8532484086303954,
+      "score": 778,
+      "count": 62,
+      "sizes": {
+        "13.6": 62
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 3770.8522131998197,
+      "nearest_known_body_distance": 54.866307974711766,
+      "extent": 50.216968394506715,
+      "wide_window_count": 83,
+      "burst_all_large_additions": 62
+    },
+    {
+      "source": "focused-C.json",
+      "time": 564.0416000000015,
+      "segments": 36,
+      "fraction": 0.944428917433555,
+      "score": 591,
+      "count": 73,
+      "sizes": {
+        "13.6": 73
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 11354.774750690189,
+      "nearest_known_body_distance": 48.14665550188557,
+      "extent": 480.9125123477671
+    },
+    {
+      "source": "focused-C.json",
+      "time": 743.6708999999985,
+      "segments": 118,
+      "fraction": 0.9147263118461556,
+      "score": 2545,
+      "count": 158,
+      "sizes": {
+        "13.8": 158
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 8929.839192309792,
+      "nearest_known_body_distance": 58.08386539123389,
+      "extent": 2458.9068679145057,
+      "wide_window_count": 165,
+      "burst_all_large_additions": 158
+    },
+    {
+      "source": "focused-C.json",
+      "time": 864.6898000000008,
+      "segments": 35,
+      "fraction": 0.260450557497177,
+      "score": 560,
+      "count": 71,
+      "sizes": {
+        "13.6": 71
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 10238.008745330893,
+      "nearest_known_body_distance": 44.941300497792135,
+      "extent": 487.54951750408475
+    },
+    {
+      "source": "focused-human.json",
+      "time": 93.95,
+      "segments": 73,
+      "fraction": 1,
+      "score": 1349,
+      "count": 147,
+      "sizes": {
+        "13.6": 147
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 3215.021683978862,
+      "nearest_known_body_distance": 28.391728768620464,
+      "extent": 601.4441318733259
+    },
+    {
+      "source": "focused-human.json",
+      "time": 103.30569999999923,
+      "segments": 2,
+      "fraction": 0.061053041282477453,
+      "score": 11,
+      "count": 0,
+      "sizes": {},
+      "boundary_candidate": true,
+      "boundary_gap": 14.112645904781402,
+      "nearest_known_body_distance": 1714.3004986563851,
+      "extent": 64.92478121977695,
+      "wide_window_count": 0,
+      "burst_all_large_additions": 0
+    },
+    {
+      "source": "focused-human.json",
+      "time": 114.59519999999924,
+      "segments": 2,
+      "fraction": 0,
+      "score": 10,
+      "count": 0,
+      "sizes": {},
+      "boundary_candidate": true,
+      "boundary_gap": -2.0673629999523655,
+      "nearest_known_body_distance": 849.0900878390624,
+      "extent": 85.04503123399279,
+      "wide_window_count": 0,
+      "burst_all_large_additions": 0
+    },
+    {
+      "source": "focused-human.json",
+      "time": 135.05769999999924,
+      "segments": 3,
+      "fraction": 0.7041402282798427,
+      "score": 35,
+      "count": 7,
+      "sizes": {
+        "13.6": 7
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 1611.6592557615452,
+      "nearest_known_body_distance": 18.939854489925995,
+      "extent": 83.21124150894445
+    },
+    {
+      "source": "focused-human.json",
+      "time": 198.4191000000015,
+      "segments": 165,
+      "fraction": 0.4008420348669311,
+      "score": 4273,
+      "count": 331,
+      "sizes": {
+        "14.2": 331
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 3572.289200300136,
+      "nearest_known_body_distance": 26.3261829064312,
+      "extent": 933.0699453000644
+    },
+    {
+      "source": "focused-human.json",
+      "time": 244.872,
+      "segments": 6,
+      "fraction": 0.4280363576433872,
+      "score": 77,
+      "count": 13,
+      "sizes": {
+        "13.6": 13
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 11197.902955224276,
+      "nearest_known_body_distance": 30.643161399597656,
+      "extent": 181.61116044551278
+    },
+    {
+      "source": "focused-boundary-food.json",
+      "time": 19.145599999997764,
+      "segments": 28,
+      "fraction": 0.027889253371313417,
+      "score": 432,
+      "count": 57,
+      "sizes": {
+        "13.6": 57
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 7684.236718451611,
+      "nearest_known_body_distance": 30.66171088118692,
+      "extent": 733.1995569409704
+    },
+    {
+      "source": "focused-boundary-food.json",
+      "time": 91.40259999999776,
+      "segments": 8,
+      "fraction": 0.204392624163188,
+      "score": 105,
+      "count": 0,
+      "sizes": {},
+      "boundary_candidate": true,
+      "boundary_gap": 15.152534029293747,
+      "nearest_known_body_distance": 1304.0199499125054,
+      "extent": 270.5914339311353,
+      "wide_window_count": 0,
+      "burst_all_large_additions": 0
+    },
+    {
+      "source": "focused-boundary-food.json",
+      "time": 158.8068999999985,
+      "segments": 8,
+      "fraction": 0.9894353741070852,
+      "score": 117,
+      "count": 0,
+      "sizes": {},
+      "boundary_candidate": true,
+      "boundary_gap": 15.458337236663283,
+      "nearest_known_body_distance": null,
+      "extent": 268.51805281111837,
+      "wide_window_count": 0,
+      "burst_all_large_additions": 0
+    },
+    {
+      "source": "focused-boundary-food.json",
+      "time": 198.89,
+      "segments": 10,
+      "fraction": 0.1793459760752902,
+      "score": 136,
+      "count": 21,
+      "sizes": {
+        "13.6": 21
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 7785.9180614588695,
+      "nearest_known_body_distance": 61.93933731235776,
+      "extent": 291.632158197558
+    },
+    {
+      "source": "focused-boundary-food.json",
+      "time": 231.29769999999925,
+      "segments": 9,
+      "fraction": 0.029333831628193356,
+      "score": 118,
+      "count": 19,
+      "sizes": {
+        "13.6": 19
+      },
+      "boundary_candidate": false,
+      "boundary_gap": 10331.313601298063,
+      "nearest_known_body_distance": 48.00891723094382,
+      "extent": 277.7942992050716
+    }
+  ]
+}

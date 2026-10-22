@@ -1,0 +1,36 @@
+{
+  "source": "Android 3.06 Main.as oef(), lines 11616-11920; outputs/apk-reference-20260928/official-3.06/collision-findings.md",
+  "note": "Both scales 1. The moving head goes from (-2,0) to (0,0) facing +x, so its last tip is (12.5,0) and its tip (14.5,0). Each line starts at the other snake's tip, then its head, then its body from newest to oldest.",
+  "head_segments": 2,
+  "body_segments": 2,
+  "last_tip": [12.5, 0],
+  "tip": [14.5, 0],
+  "heading": 0,
+  "cases": [
+    {
+      "name": "parallel body 20 below the centerline",
+      "line": [[98.5, 20], [84, 20], [42, 20], [0, 20], [-42, 20]],
+      "strikes": false
+    },
+    {
+      "name": "parallel body 10 away, tip between anchors",
+      "line": [[92, 10], [77.5, 10], [35.5, 10], [-6.5, 10], [-48.5, 10]],
+      "strikes": false
+    },
+    {
+      "name": "parallel body 10 away, anchor beside the tip",
+      "line": [[113, 10], [98.5, 10], [56.5, 10], [14.5, 10], [-27.5, 10]],
+      "strikes": true
+    },
+    {
+      "name": "body crossing the forward probe",
+      "line": [[25, 77.5], [25, 63], [25, 21], [25, -21]],
+      "strikes": true
+    },
+    {
+      "name": "other snake's tip-to-head segment crossing the probe",
+      "line": [[27, 0.5], [27, -14], [27, -56], [27, -98]],
+      "strikes": true
+    }
+  ]
+}

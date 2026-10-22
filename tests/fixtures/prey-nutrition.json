@@ -1,0 +1,83 @@
+{
+  "note": "Original-game catches. One isolated; three nonboost controls retain separately recorded food. Food correction is approximate at initial mass. 30x is a rounded estimate, not an exact recovered server formula.",
+  "cases": [
+    {
+      "source": "coordinated-smart-B.json",
+      "sha256": "758a1deb3ce85b067db15838178c1c2a2a8e603d5dc47ae6cbbbdeff5e10e42c",
+      "time": 353.409299999997,
+      "size": 6.6,
+      "segments": 9,
+      "fraction": 0.21843261828616967,
+      "gain": 3.9961644408800865,
+      "seconds_to_uncapped": 0.7401998664885809,
+      "food_sizes": [],
+      "boost": false,
+      "other_prey_events": 0,
+      "predicted_food_equivalent": 0.13223236987402204,
+      "ratio": 30.220773057967865,
+      "food_adjusted_ratio_estimate": 30.220773057967865,
+      "status": "isolated"
+    },
+    {
+      "source": "coordinated-smart-C.json",
+      "sha256": "682a05ea807e868b1ea6371780e17cc1341ec2b3a14d6a63f27b494d84264b3b",
+      "time": 17.78839999999851,
+      "size": 6,
+      "segments": 9,
+      "fraction": 0.11119348473510055,
+      "gain": 3.373128436394241,
+      "seconds_to_uncapped": 0.6342999904677278,
+      "food_sizes": [
+        4.8
+      ],
+      "boost": false,
+      "other_prey_events": 0,
+      "predicted_food_equivalent": 0.1093453296852128,
+      "ratio": 30.848399708564806,
+      "food_adjusted_ratio_estimate": 30.208399708564805,
+      "status": "confounded"
+    },
+    {
+      "source": "coordinated-smart-C.json",
+      "sha256": "682a05ea807e868b1ea6371780e17cc1341ec2b3a14d6a63f27b494d84264b3b",
+      "time": 88.67510000000149,
+      "size": 7.8,
+      "segments": 32,
+      "fraction": 0.6840261032596888,
+      "gain": 5.191625487305252,
+      "seconds_to_uncapped": 1.1467999904640038,
+      "food_sizes": [
+        5,
+        7.6,
+        5.2
+      ],
+      "boost": false,
+      "other_prey_events": 0,
+      "predicted_food_equivalent": 0.16242039186380222,
+      "ratio": 31.96412364069836,
+      "food_adjusted_ratio_estimate": 30.15938991288771,
+      "status": "confounded"
+    },
+    {
+      "source": "coordinated-smart-C.json",
+      "sha256": "682a05ea807e868b1ea6371780e17cc1341ec2b3a14d6a63f27b494d84264b3b",
+      "time": 115.0568999999985,
+      "size": 8.8,
+      "segments": 45,
+      "fraction": 0.7558585259830073,
+      "gain": 5.938692446869162,
+      "seconds_to_uncapped": 1.1901999904662404,
+      "food_sizes": [
+        4.8,
+        3.8,
+        4.8
+      ],
+      "boost": false,
+      "other_prey_events": 0,
+      "predicted_food_equivalent": 0.1918198032168014,
+      "ratio": 30.959746320649938,
+      "food_adjusted_ratio_estimate": 30.178238056187126,
+      "status": "confounded"
+    }
+  ]
+}

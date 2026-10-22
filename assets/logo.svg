@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 48" width="405" height="72" role="img" aria-label="SlitherSim">
+  <style>
+    .snake { fill: none; stroke: #0969da; }
+    .food { fill: #0969da; }
+    .word { fill: #1f2328; }
+    @media (prefers-color-scheme: dark) {
+      .snake { stroke: #4493f8; }
+      .food { fill: #4493f8; }
+      .word { fill: #e6edf3; }
+    }
+  </style>
+  <path class="snake" d="M5 37H31V25H11V11H37" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter"/>
+  <rect class="food" x="35" y="34" width="6" height="6"/>
+  <text class="word" x="56" y="35" font-family="ui-monospace, Consolas, monospace" font-size="34" font-weight="700">SlitherSim</text>
+</svg>

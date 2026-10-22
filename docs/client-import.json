@@ -1,0 +1,56 @@
+{
+  "formatVersion": 1,
+  "sourceRepository": "NikitaMGrimm/slither-arena-rs",
+  "sourceCommit": "aab1149460c0f5606fbdc7d73e295ba79d094789",
+  "extractedOn": "2026-10-22",
+  "files": [
+    {
+      "path": "src/client/received.rs",
+      "sourcePath": "src/learning/received.rs",
+      "sourceSha256": "96f9d93de6360915658cbee82ca3d98c4541fe8e71268ad713419dac5db176c1",
+      "extractedSha256": "57535667190ca47fd0c430dfd76ab6cead463ffd5c2a7d8f446391905db2d2bf",
+      "adaptations": [
+        "Retain the shared receipt tracker and public types from source lines 147-564, excluding application-specific orchestration.",
+        "Reduce imports; expose own_score and alive_snakes; add grow-only ensure_slots.",
+        "Add anchor_with for setup-provided contraction, preserving default pre-insertion contraction at 0.43.",
+        "Reject contraction outside 0 through 1 before any mutation so received bodies stay finite.",
+        "Allow additional JSON response fields in receipt metadata; preserve field types, validation and strict request/config parsing.",
+        "Add internal scalar mass_values and route public mass through it so wire reports avoid body copies; retain mass formulas and receipt behavior."
+      ]
+    },
+    {
+      "path": "src/client/minimap.rs",
+      "sourcePath": "src/learning/minimap.rs",
+      "sourceSha256": "26f1d0113345284fbf61c17bbfca73d04051e060ab488611ef9cab6adc03cb32",
+      "extractedSha256": "56aa165b5aa5747c41710b3e7d3945169801e6dbe86fb6bed11102b1f1f8bfe0",
+      "adaptations": [
+        "Add PartialEq; retain minimap decoding and approximate rasterization behavior.",
+        "Add received U/u/L minimap families and team layers with stock cross-family delta state, transactional application and a 1,048,576-cell team-layer limit; preserve public M/V decoding and approximate rasterization.",
+        "Keep the modern M/V/U/L image target separate from legacy u pixels, including canvas clears on size changes, matching stock cross-format V behavior.",
+        "Allow additional JSON snapshot response fields without changing known field types, packet validation or rasterization."
+      ]
+    },
+    {
+      "path": "tests/client_received.rs",
+      "sourcePath": "tests/received.rs",
+      "sourceSha256": "1fd1b313bfb468d594de4a92618530f308f39d7e36927a8def31af7c426b23d2",
+      "extractedSha256": "bc10ce9d3bc23aa0c80d8bd59ea3728bcca332f36c411de6ca10b67d52f8e48d",
+      "adaptations": [
+        "Retain tracker-only tests from source lines 1-93, 124-140 and 411-428 with public crate imports.",
+        "Add standalone receipt, minimap, slot-growth and configurable-contraction tests.",
+        "Accept additional JSON snapshot fields in the response regression while retaining invalid-packet and value-validation checks."
+      ]
+    },
+    {
+      "path": "src/client/latency.rs",
+      "sourcePath": "src/learning/latency.rs",
+      "sourceSha256": "b35b3a64ebaeabe93adced48a675f01ef19024b9d2de4956f3dad0966f64efff",
+      "extractedSha256": "13909e62b082772d83162bea97175ea0f1cf02c6e5be9ecdf6bb9bef1d0f0a39",
+      "adaptations": [
+        "Adapt public RTT, jitter, congestion and processing configuration concepts for standalone ordered protocol message queues.",
+        "Use a seeded PRNG and configurable uplink share for standalone connection queues.",
+        "Describe standalone behavior in comments/docstrings; no executable changes."
+      ]
+    }
+  ]
+}
