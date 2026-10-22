@@ -160,7 +160,7 @@ def create_study(plan_source, output):
         "## Observations\n\nRecord measurements, exposure and failed/inconclusive attempts.\n\n"
         "## Interpretation\n\nSeparate direct observations, inferences and provisional rules.\n\n"
         "## Reproduce\n\nRecord exact commands and analysis parameters.\n\n"
-        "## Reuse\n\nIdentify the rights holder, covered paths and license or sharing permission for the report and data.\n\n"
+        "## Data sources\n\nFor external data, note its source and any sharing restrictions.\n\n"
         "## Limitations\n\nState missing coverage, timing uncertainty and independent validation.\n",
         encoding="utf-8", newline="\n",
     )

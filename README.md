@@ -79,5 +79,4 @@ Report bugs in [Issues](https://github.com/NikitaMGrimm/slither-sim/issues), wit
 the command, configuration and expected behavior. Build from source; no crate or
 release binaries are published yet.
 
-[MIT](LICENSE). Evidence archives declare their own reuse terms.
-Independent of Slither.io.
+[MIT](LICENSE). Independent of Slither.io.

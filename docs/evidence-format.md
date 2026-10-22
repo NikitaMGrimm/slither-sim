@@ -22,7 +22,7 @@ software/*
 | `plan.json` | [Study plan](../schemas/study-plan-v1.schema.json), copied byte-for-byte by `init` and identified by SHA-256. Later edits/reformatting are rejected. Unknown fields require a schema revision. |
 | `attempts.jsonl` | [Ledger](../schemas/attempt-event-v1.schema.json): one durable `started` reservation and one `finished` result per attempt, with status, exit code and raw members. Missing finishes remain incomplete. Timestamps include UTC offsets; commands are provenance strings, never verifier input to execute. |
 | `manifest.json` | Study ID, plan digest, data origin, audit and every other file's exact size/SHA-256. `scientificStatus` is always `unreviewed`. |
-| `REPORT.md` | Rights holder, covered paths and reuse terms for the report/data. |
+| `REPORT.md` | Findings, reproduction and limitations; external-data sources and sharing restrictions. |
 | `software/` | Required source snapshot: core, Cargo inputs, scripts, schemas, replay examples, Python lockfile and license. `software/LICENSE` covers bundled project code. |
 
 Allowed origins are `official-server`, `community-server` and `local-simulator`.

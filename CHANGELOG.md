@@ -20,5 +20,4 @@
 - Automatic pull-request checks, shared local/CI check commands, contributor
   task guidance and protocol-labelled regression fixtures.
 
-Interfaces remain experimental. Code, documentation and repository fixtures use
-MIT; evidence archives declare their own reuse terms.
+Interfaces remain experimental.
