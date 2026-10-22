@@ -15,6 +15,8 @@
 
 <p align="center">
   <a href="https://github.com/NikitaMGrimm/slither-sim/actions/workflows/checks.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/NikitaMGrimm/slither-sim/checks.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
+  <a href="https://github.com/NikitaMGrimm/slither-sim/releases"><img alt="Release" src="https://img.shields.io/github/v/release/NikitaMGrimm/slither-sim?style=flat-square"></a>
+  <a href="https://crates.io/crates/slither-sim"><img alt="crates.io" src="https://img.shields.io/crates/v/slither-sim?style=flat-square"></a>
   <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/Cargo.toml"><img alt="Rust 1.86+" src="https://img.shields.io/badge/rust-1.86%2B-orange?style=flat-square"></a>
   <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
 </p>
@@ -84,9 +86,10 @@ See [interface versions](docs/client-api.md#interface-versions) for compatibilit
   These separately require uv, Python 3.12 and Node.js 22+ (24 recommended).
 - [Provenance](docs/provenance.md): source hashes and adaptations.
 - [Verification](docs/verification.md): completed checks and coverage limits.
+- [Releasing](docs/releasing.md): version tags and trusted publishing.
 
 Report bugs in [Issues](https://github.com/NikitaMGrimm/slither-sim/issues), with
-the command, configuration and expected behavior. Build from source; no crate or
-release binaries are published yet.
+the command, configuration and expected behavior. Add the Rust library with
+`cargo add slither-sim`, or install the CLI with `cargo install slither-sim --locked`.
 
 [MIT](LICENSE). Independent of Slither.io.

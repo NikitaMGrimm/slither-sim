@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-22)
 
 - Deterministic headless Rust simulator with configurable worlds, geometric
   observations and mechanics regression fixtures.
