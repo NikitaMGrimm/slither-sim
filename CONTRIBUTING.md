@@ -1,22 +1,56 @@
 # Contributing
 
 Keep each PR focused on one problem. For larger features or interface changes,
-open an issue to discuss the scope before starting.
+discuss the scope with the maintainer before starting; small fixes can go straight
+to a PR. Use one task, branch and worktree; preserve other contributors' work.
 Start with the [API guides](README.md#choose-an-interface) and
 [rules and limits](docs/server-rules.md).
 
-## Changes
+## Find the change
+
+Paths below are relative to the repository root. Read the relevant guide, trace
+the source owner and its callers, then start with the matching test.
+
+| Task | Guide and source / tests | Focused check |
+| --- | --- | --- |
+| Mechanics, motion, food, prey | [Rules and evidence](docs/server-rules.md); `src/simulator.rs`, `src/physics.rs`, `src/prey.rs`; matching `tests/*.rs` and `tests/fixtures/` | `cargo test --locked --test movement_turns` (choose the affected test) |
+| Bot JSON API and lifecycle | [Client API](docs/client-api.md), [direct API](docs/bot-api.md); `src/main.rs`, `src/client/mod.rs`, `src/client/received.rs`; `tests/client_contract.rs`, `tests/client_runner.rs`, `tests/transport.rs` | `cargo test --locked --test client_contract` |
+| Wire decoder and local host | [Server guide](docs/raw-server.md); `src/client/protocol.rs`, `src/client/server.rs`; `tests/client_protocol.rs`, `tests/client_server.rs` | `cargo test --locked --test client_protocol` |
+| Capture, audit and recorded replay | [Research workflow](docs/research-workflow.md); `tools/fidelity/evidence.py`, `tools/fidelity/prepare-fidelity-replay.py` and adjacent tests; `examples/fidelity_replay.rs` | Matching Python/Node test; `cargo test --locked --example fidelity_replay` for Rust replay |
+| Core library / WASM consumer | [Configuration](docs/configuration.md), `examples/basic.rs`; `src/lib.rs`, `src/observation/mod.rs`; `tests/core_consumer.rs` | `cargo test --locked --no-default-features --test core_consumer`; explicit `wasm` group for target changes |
+| Documentation | Relevant guide and its linked source/examples | Review accuracy and local links; no research dependencies |
+
+## Evidence proportional to the change
 
 - Explain the problem and resulting behavior. Include a reproducer and relevant
   tests; add a short before/after example when useful, such as a request and response.
-- Mechanics changes need an evidence note and a regression fixture. Separate
-  observations from inferred rules and validate fits on separate data.
-- Measurements and data-only contributions follow the
-  [research workflow](docs/research-workflow.md). Submit a bundle URL, SHA-256,
-  report, analysis commands and any distilled fixture; retain failed attempts.
-- Use Conventional Commits and LF. Keep recordings, credentials and generated
-  outputs outside Git. Run the [offline checks](docs/research-workflow.md#offline-checks).
-  CI is manual-only and runs when the owner requests it.
+- **Documentation:** review accuracy and links against current sources.
+- **Tool/API fixes:** minimal reproducer and regression using existing evidence
+  or clearly labelled synthetic inputs. Fresh capture is not required.
+- **Behavior-preserving optimizations:** demonstrate output parity on relevant
+  cases; provide matched before/after measurements only when claiming performance.
+- **Mechanics corrections:** cite the existing evidence that justifies the rule
+  and add a focused regression fixture. Collect more only if that evidence cannot
+  support the correction.
+- **New empirical or fitted claims:** follow the [research workflow](docs/research-workflow.md)
+  with the complete relevant study, failed/inconclusive attempts, selection rules,
+  uncertainty and held-out validation where applicable. State why a method does
+  not apply rather than adding a ceremonial requirement.
+
+Keep bounded, selected [regression fixtures](docs/research-workflow.md#fixture-and-protocol-evolution)
+in Git and full recordings, credentials and generated outputs outside it. Use
+Conventional Commits and LF; avoid unrelated formatting. Run the
+[relevant offline checks](docs/research-workflow.md#offline-checks); PR CI runs
+automatically. Maintainer review checks ownership, callers, contracts and evidence
+independently of contributor-written tests. Passing those tests alone is not
+acceptance. Tests stay offline; collection or publication needs separate authorization.
+
+A maintainer reviews the current PR revision and its evidence before merging.
+Required CI must pass with the latest main; new commits need the relevant checks
+and review again. Auto-merge can finish an approved PR once these requirements
+pass. An independent agent review is useful evidence, but agents using the same
+GitHub account cannot approve that account's own PR. Publishing a release is a
+separate maintainer action.
 
 For geometry or motion changes, a before/after plot, diagram or clip can help.
 Visualizations are optional; attach or link PR-only media rather than committing it.
@@ -24,13 +58,14 @@ Visualizations are optional; attach or link PR-only media rather than committing
 ## AI assistance
 
 If you use AI, review its work and verify the result. End the PR description
-with the models, tools and roles involved, including delegated work. Use model
-display names and report review and checks accurately. For example:
+with a short footer naming actual models, harnesses and roles, including material
+delegated work. Use display names and report review and checks accurately. Example:
 
 > [!NOTE]
-> 🤖 **Agent assistance: Model via Tool** — implementation; verification.
+> 🤖 **Agent assistance: GPT 6.1 Sol via Codex** — implementation; supporting work (verification).
 
-For multiple models or tools, list each with its roles in the same closing note.
+Group multiple credits by harness in the same closing note. Transcripts and a
+fixed number of reviewers are not required.
 
 ## Interfaces and packaging
 
@@ -45,9 +80,12 @@ Within `0.x`, incompatible Rust API changes bump the minor version. Keep unrelea
 changes together in the changelog; no permanent freeze or multi-version support
 is promised.
 
-`cargo package --locked` verifies a local crate containing Rust tests and fixtures.
+The `package` check group verifies a local crate containing Rust tests and fixtures.
 Evidence tools and schemas require the Git checkout. Registry publishing is disabled.
-[Provenance](docs/provenance.md) records imported components and adaptations.
+[Historical provenance](docs/provenance.md) records imported components and adaptations;
+routine edits do not refresh import hashes. Per-study source pins remain required.
+Do not publish releases, change repository visibility,
+collaborators or licensing without the owner's authorization.
 
 ## Contribution terms
 

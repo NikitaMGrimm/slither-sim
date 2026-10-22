@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "path": "tests/fixtures/client-protocol-paired-coil.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/client-hud-leaderboard.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/client-contract-v2.json",
+      "wireProtocol": 19,
+      "clientContract": "slither-client-v2",
+      "dataOrigin": "synthetic",
+      "expectedOrigin": "synthetic"
+    },
+    {
+      "path": "tools/fidelity/fixtures/protocol19-setup.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
+    }
+  ]
+}

@@ -10,23 +10,29 @@ or error text. -->
 ## Validation
 
 <!-- List checks actually run and their results. Name unrun checks and material limits.
-Optional: add a before/after plot, diagram or clip for geometry or motion changes.
-Attach or link PR-only media rather than committing it.
+Use CONTRIBUTING.md's evidence tier:
+- Docs: accuracy and local links.
+- Tool/API fix: minimal repro and regression; existing or labelled synthetic inputs.
+- Behavior-preserving optimization: output parity; measurements for performance claims.
+- Mechanics correction: supporting evidence and focused fixture.
+- New empirical/fitted claim: complete relevant study, failed attempts, selection,
+  uncertainty and held-out validation where applicable; see docs/research-workflow.md.
 
-For mechanics/data changes, follow the [research workflow](../docs/research-workflow.md):
-include bundle URL/SHA-256, study/window IDs, frozen plan, analysis commands,
-alternatives, uncertainty and held-out validation. Retain failed and inconclusive
-attempts; distinguish synthetic data, observations and inferred rules. -->
+Keep selected fixtures in Git and full recordings outside it. Add a case per scenario,
+retain valid regressions and justify expectation corrections independently of the code
+under test. Pin protocol/contract labels; distinguish recorded packets from derived
+expectations, and observed from synthetic inputs.
+Optional geometry/motion media belongs in PR attachments or links. -->
 
 - [ ] Relevant checks pass; unrun checks are identified.
-- [ ] Mechanics changes include evidence and a regression fixture.
+- [ ] Relevant evidence tier and fixture/version requirements are met (or inapplicable).
 - [ ] Contribution terms in CONTRIBUTING.md are met; recordings stay outside Git.
 
 <!-- If AI helped, end with the disclosure described in CONTRIBUTING.md#ai-assistance.
-Name the models, tools and roles, including delegated work. For example:
+Name actual models, harnesses and roles, including material delegated work. Example:
 
 > [!NOTE]
-> 🤖 **Agent assistance: Model via Tool** — implementation; verification.
+> 🤖 **Agent assistance: GPT 6.1 Sol via Codex** — implementation; supporting work (verification).
 
-List multiple contributors with their roles in the same closing note.
+Group multiple credits by harness in the same closing note; no transcript or reviewer quota.
 Omit the note if no AI was used. -->
