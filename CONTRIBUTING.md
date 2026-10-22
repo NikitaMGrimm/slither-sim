@@ -84,7 +84,7 @@ changes together in the changelog; no permanent freeze or multi-version support
 is promised.
 
 The `package` check group verifies a local crate containing Rust tests and fixtures.
-Evidence tools and schemas require the Git checkout. Registry publishing is disabled.
+Evidence tools and schemas require the Git checkout.
 [Historical provenance](docs/provenance.md) records imported components and adaptations;
 routine edits do not refresh import hashes. Per-study source pins remain required.
 Do not publish releases, change repository visibility,

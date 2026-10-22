@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="SlitherSim" width="420">
+  <img src="https://raw.githubusercontent.com/NikitaMGrimm/slither-sim/main/assets/logo.svg" alt="SlitherSim" width="420">
 </p>
 
 <p align="center">
@@ -17,6 +17,10 @@
   <a href="https://github.com/NikitaMGrimm/slither-sim/actions/workflows/checks.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/NikitaMGrimm/slither-sim/checks.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
   <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/Cargo.toml"><img alt="Rust 1.86+" src="https://img.shields.io/badge/rust-1.86%2B-orange?style=flat-square"></a>
   <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NikitaMGrimm/slither-sim/main/assets/banner.gif" alt="Stylized snake animation with the cargo run --locked -- serve command" width="860">
 </p>
 
 ## Quick start

@@ -22,7 +22,7 @@ include = [
     "/LICENSE",
     "/CHANGELOG.md",
 ]
-publish = false
+publish = ["crates-io"]
 
 [features]
 default = ["networking"]
