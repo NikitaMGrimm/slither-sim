@@ -45,6 +45,10 @@ The verifier stages regular files in a temporary directory, checks exact members
 and hashes, then recomputes the audit. It never executes bundled scripts or
 extracts links.
 
+Version 1 requires the original 33-file source minimum (`V1_SOURCE_FLOOR` in
+`evidence.py`) and checks all declared source pins. Later source additions in the
+verifier's checkout do not become requirements for historical bundles.
+
 Paths must be portable across Windows/Linux: no traversal, absolute/drive paths,
 backslashes, device names, trailing dots, case aliases or file/directory collisions.
 
