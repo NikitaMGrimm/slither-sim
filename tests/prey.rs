@@ -93,6 +93,48 @@ fn client_prey_units_and_turn_limit() {
 }
 
 #[test]
+fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
+    for profiled in [false, true] {
+        let config = Config {
+            food_count: 0,
+            dt: 0.01,
+            prey: PreyConfig {
+                count: 1,
+                respawn_seconds: 0.01,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut world = Simulator::new(7, config.clone()).unwrap();
+        let mut reference = Simulator::new(7, config.clone()).unwrap();
+        world.prey.clear();
+        reference.prey.clear();
+        world.config.prey.size = 9.21;
+        world.config.prey.max_size = 9.39;
+        let before = serde_json::to_value(&world).unwrap();
+        assert!(world.validate_actions(&[]).is_err());
+        let mut profile = StepProfile::default();
+        let result = if profiled {
+            world.step_profiled(&[], &mut profile)
+        } else {
+            world.step(&[])
+        };
+        assert_eq!(result.unwrap_err(), "Invalid prey settings");
+        assert_eq!(serde_json::to_value(&world).unwrap(), before);
+        assert_eq!(profile.ticks, 0);
+
+        world.config.prey = config.prey;
+        world.step(&[]).unwrap();
+        reference.step(&[]).unwrap();
+        assert_eq!(world.prey.len(), 1);
+        assert_eq!(
+            serde_json::to_value(&world).unwrap(),
+            serde_json::to_value(&reference).unwrap()
+        );
+    }
+}
+
+#[test]
 fn authoritative_prey_rounds_coordinates_down_on_each_server_tick() {
     let mut w = Simulator::new(
         42,

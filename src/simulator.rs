@@ -587,6 +587,9 @@ impl Simulator {
         Ok(())
     }
     pub fn validate_actions(&self, actions: &[Option<Action>]) -> Result<(), String> {
+        // The public configuration may have changed since construction. Reject
+        // invalid prey settings before movement, clocks or refill mutate state.
+        self.config.prey.validate()?;
         if actions.len() != self.snakes.len() {
             return Err("Action batch must have one slot per spawned agent".into());
         }
