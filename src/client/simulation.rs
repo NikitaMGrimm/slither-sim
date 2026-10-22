@@ -193,8 +193,7 @@ struct Connection {
     downlink: VecDeque<(f64, Vec<u8>)>,
     /// The server has received the connect and sent setup.
     setup: bool,
-    /// Game over was sent; afterwards the server ignores everything from this
-    /// connection except victory text and sends only leaderboards and records.
+    /// Game over was sent; afterwards only pings and victory text are accepted.
     over: bool,
     /// Setup emission time and milliseconds of elapsed headers sent since then.
     /// Headers difference quantized absolute times, so rounding never drifts.
@@ -776,6 +775,12 @@ impl SimulatorBackend {
             let over = self.slots[slot].connection.over;
             match message {
                 Uplink::Victory(text) => self.victory(slot, text, now)?,
+                // The stock browser keeps pinging during its death fade and
+                // victory entry. Missing pongs trips its lag detector and slows
+                // the animation to one fifth speed, delaying Play Again.
+                Uplink::Message(ref bytes) if bytes == &[251] => {
+                    self.emit(slot, now, &[encode::pong()])?;
+                }
                 _ if over => {}
                 Uplink::Connect => {
                     let radius = self.world.config.radius;
@@ -786,7 +791,6 @@ impl SimulatorBackend {
                     self.emit(slot, now, &[encode::setup(radius)?])?;
                 }
                 Uplink::Message(bytes) => match bytes[..] {
-                    [251] => self.emit(slot, now, &[encode::pong()])?,
                     [heading @ 0..=250] => {
                         self.slots[slot].control.heading = (f64::from(heading) + 0.5) * TAU / 251.;
                     }
@@ -919,14 +923,10 @@ impl SimulatorBackend {
         if !self.slots.iter().any(|slot| slot.connection.setup) {
             return Ok(());
         }
-        // Connections after game over only receive leaderboards and records,
-        // so world geometry is gathered only for a live connection.
-        let live = self
-            .slots
-            .iter()
-            .any(|slot| slot.connection.setup && !slot.connection.over);
+        // Dead clients still render the world during the stock death fade;
+        // withholding deltas leaves opponents extrapolating stale motion.
         let mut sectors: BTreeMap<[u8; 2], BTreeMap<[u8; 2], u8>> = BTreeMap::new();
-        for food in self.world.food.iter().filter(|_| live) {
+        for food in &self.world.food {
             let key = encode::food_key(food.point())?;
             let size = food
                 .size
@@ -941,7 +941,6 @@ impl SimulatorBackend {
             .world
             .snakes
             .iter()
-            .filter(|_| live)
             .map(|snake| {
                 snake.body.iter().fold(
                     [snake.head.x, snake.head.y, snake.head.x, snake.head.y],
@@ -957,6 +956,7 @@ impl SimulatorBackend {
                 continue;
             }
             let alive = self.world.snakes[slot].alive;
+            let was_over = connection.over;
             // The board is needed when a leaderboard is due, on first
             // appearance or to freeze the rank at death.
             let due = connection
@@ -966,22 +966,12 @@ impl SimulatorBackend {
             if board.is_none() && due {
                 board = Some(Board::new(&self.world, &self.profiles)?);
             }
-            if connection.over {
-                // Motion, food and pongs stop after game over; a dead but open
-                // connection still gets leaderboards with its frozen rank and
-                // record updates, as official sessions retain the rank.
-                let packets = self.hud(slot, now, board.as_ref())?;
-                if !packets.is_empty() {
-                    self.emit(slot, now, &packets)?;
-                }
-                continue;
-            }
-            if !alive {
+            if !alive && !was_over {
                 let snake = &self.world.snakes[slot];
                 let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
-            if minimap.is_none() && now + 1e-9 >= self.slots[slot].connection.minimap_at {
+            if alive && minimap.is_none() && now + 1e-9 >= self.slots[slot].connection.minimap_at {
                 let arena = Arena {
                     center: Point::default(),
                     radius: self.world.config.radius,
@@ -995,7 +985,7 @@ impl SimulatorBackend {
             let mut packets = self.updates(slot, now, &sectors, &bounds, minimap.as_ref())?;
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
-            let live_board = board.as_ref().filter(|_| alive);
+            let live_board = board.as_ref().filter(|_| alive || was_over);
             packets.extend(self.hud(slot, now, live_board)?);
             if !packets.is_empty() {
                 self.emit(slot, now, &packets)?;
@@ -1021,7 +1011,7 @@ impl SimulatorBackend {
             .is_some_and(|record| record.slot == slot && record.life == self.slots[slot].life);
         let mut packets = Vec::new();
         let connection = &mut self.slots[slot].connection;
-        if !me.alive {
+        if !me.alive && !connection.over {
             // Game over alone leaves the stock client predicting its snake: send
             // the final mass, then game over, then the death removal.
             connection.over = true;
@@ -1043,7 +1033,6 @@ impl SimulatorBackend {
             if known.is_some() {
                 packets.push(encode::removal(id, true));
             }
-            return Ok(packets);
         }
         let radius = world.config.radius.round() as u32;
         if connection.radius != radius {
@@ -1135,7 +1124,7 @@ impl SimulatorBackend {
             }
             connection.prey.insert(id, current);
         }
-        if let Some(map) = minimap.filter(|_| now + 1e-9 >= connection.minimap_at) {
+        if let Some(map) = minimap.filter(|_| me.alive && now + 1e-9 >= connection.minimap_at) {
             packets.push(encode::minimap(map));
             connection.minimap_at = now + self.config.minimap_interval_seconds;
         }
@@ -2036,6 +2025,108 @@ mod tests {
     }
 
     #[test]
+    fn post_death_opponents_keep_the_live_broadcast_cadence() {
+        for rtt in [0., 0.1] {
+            let mut config = raw_config(2);
+            config.latency.round_trip_seconds = vec![rtt];
+            config.minimap_interval_seconds = 0.01;
+            let interval = config.broadcast_ticks as f64 * config.world.dt;
+            let mut sim = RawSimulator::new(6, config, 2).unwrap();
+            let mut a = Remote::connect(&mut sim, 0, "Dead");
+            let mut b = Remote::connect(&mut sim, 1, "Moving");
+            run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 60);
+            sim.backend.world.snakes[0].alive = false;
+            let mut over = false;
+            let mut deaths = 0;
+            let mut motion_at = Vec::new();
+            for _ in 0..120 {
+                // Synthetic steering keeps the opponent's wanted angle changing
+                // on every broadcast, so packet gaps expose a stopped stream.
+                sim.backend.slots[1].control.heading += 0.02;
+                sim.advance_ticks(1).unwrap();
+                b.pump(&mut sim, 1);
+                for packet in a.pump(&mut sim, 0) {
+                    if packet[0] == b'v' {
+                        over = true;
+                        deaths += 1;
+                    }
+                    if !over {
+                        continue;
+                    }
+                    assert!(
+                        !matches!(packet[0], b'M' | b'V' | b'u'),
+                        "post-death minimap"
+                    );
+                    assert!(!matches!(packet[0], b'G' | b'N' | b'd' | b'7'));
+                    if matches!(packet[0], b'e' | b'E' | b'3' | b'4' | b'5')
+                        && packet.get(1..3) == Some(&[0, 1])
+                    {
+                        motion_at.push(sim.time());
+                    }
+                }
+            }
+            assert_eq!(deaths, 1);
+            assert!(
+                motion_at.len() >= 10,
+                "missing post-death motion: {motion_at:?}"
+            );
+            for gap in motion_at.windows(2) {
+                assert!((gap[1] - gap[0] - interval).abs() < 1e-9, "{gap:?}");
+            }
+            assert_eq!(a.frame(&sim).status, ClientStatus::Dead);
+            assert!(a.frame(&sim).observation.is_none());
+        }
+    }
+
+    #[test]
+    fn sole_dead_session_still_receives_food_and_prey() {
+        let mut sim = RawSimulator::new(6, raw_config(1), 1).unwrap();
+        let mut a = Remote::connect(&mut sim, 0, "");
+        run(&mut sim, &mut [(0, &mut a)], 12);
+        sim.backend.world.snakes[0].alive = false;
+        assert!(
+            next_broadcast(&mut sim, 0, &mut a)
+                .iter()
+                .any(|p| p[0] == b'v')
+        );
+        let head = sim.backend.world.snakes[0].head;
+        let food = crate::model::Food {
+            x: head.x + 100.,
+            y: head.y,
+            value: 1.,
+            size: Some(2.),
+            origin: None,
+        };
+        let key = encode::food_key(food.point()).unwrap();
+        let prey = crate::prey::Prey {
+            id: 123,
+            position: Point {
+                x: head.x,
+                y: head.y + 100.,
+            },
+            heading: 0.,
+            target_heading: 0.,
+            speed: 100.,
+            size: 6.,
+        };
+        let appear = encode::prey_appearance(&prey).unwrap();
+        // Synthetic world edits isolate visibility even with no living sessions.
+        sim.backend.world.food.push(food);
+        sim.backend.world.prey.push(prey);
+        sim.backend.slots[0].connection.minimap_at = 0.;
+        sim.backend.broadcast().unwrap();
+        let packets = a.pump(&mut sim, 0);
+        assert!(packets.contains(&encode::food_add(key, encode::food_size(2.))));
+        assert!(packets.contains(&appear));
+        assert!(
+            packets
+                .iter()
+                .all(|p| !matches!(p[0], b'v' | b'M' | b'V' | b'u'))
+        );
+        assert_eq!(a.frame(&sim).status, ClientStatus::Dead);
+    }
+
+    #[test]
     fn remote_death_sends_mass_game_over_then_removal_and_stays_dead() {
         let mut sim = RawSimulator::new(6, raw_config(3), 2).unwrap();
         let mut a = Remote::connect(&mut sim, 0, "");
@@ -2057,29 +2148,42 @@ mod tests {
         ];
         // The completed life is the session record, sent to every connection.
         let record = encode::record(segments, fam, b"", b"").unwrap();
-        assert_eq!(
-            a.pump(&mut sim, 0),
-            [&death[..], std::slice::from_ref(&record)].concat()
-        );
+        let packets = a.pump(&mut sim, 0);
+        assert!(packets.starts_with(&death));
+        assert!(packets.ends_with(std::slice::from_ref(&record)));
         assert_eq!(a.frame(&sim).status, ClientStatus::Dead);
         let seen = b.pump(&mut sim, 1);
         assert!(seen.contains(&encode::removal(0, true)) && seen.contains(&record));
-        // Afterwards the open connection only receives leaderboards with its
-        // frozen rank: no appearances, motion, food or pongs.
-        sim.receive(0, &[251]).unwrap();
+        // A dead session must still answer pings during the stock client's
+        // death fade, without accepting controls or reviving the snake.
+        let control = sim.backend.slots[0].control;
+        for bytes in [&[0][..], &[252, 100], &[253], &[251]] {
+            sim.receive(0, bytes).unwrap();
+        }
         let rank = sim.backend.slots[0].connection.final_rank.unwrap();
         let mut boards = 0;
+        let mut pongs = 0;
         for _ in 0..600 {
             sim.advance_ticks(1).unwrap();
             b.pump(&mut sim, 1);
             let living = sim.backend.world.snakes.iter().filter(|s| s.alive).count();
             for packet in a.pump(&mut sim, 0) {
+                if packet == encode::pong() {
+                    pongs += 1;
+                    continue;
+                }
+                assert!(!matches!(packet[0], b'v' | b'M' | b'V' | b'u'));
+                if packet[0] != b'l' {
+                    continue;
+                }
                 let (position, own_rank, count, _) = board_packet(&packet);
                 assert_eq!((position, own_rank, count), (0, rank, living));
                 boards += 1;
             }
         }
         assert!(boards > 0);
+        assert_eq!(pongs, 1);
+        assert_eq!(sim.backend.slots[0].control, control);
         assert!(!sim.backend.world.snakes[0].alive);
     }
 
@@ -2290,6 +2394,7 @@ mod tests {
             packets,
             [
                 encode::victory_accepted(),
+                encode::pong(),
                 encode::record(30, fam, b"Ann", b"gg").unwrap(),
             ]
         );

@@ -118,6 +118,24 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   A qualifying death sends `v1` for victory-message entry, other deaths `v0`.
   The owning dead connection/life may submit once (including empty text); `v2`
   acknowledges. Slot reuse cannot edit that record.
+- An open dead session still answers pings, including during victory entry.
+  The stock browser keeps pinging through its death fade; withholding replies
+  triggers its lag detector and slows the return to Play Again. Gameplay
+  controls remain ignored after game over. This is a local compatibility policy.
+- Opponent, food and prey updates continue at the existing broadcast cadence
+  around the dead player's final position. Game-over and own removal are sent
+  once; minimap updates stop. Otherwise the browser extrapolates stale opponents
+  through the fade. The native bot frame stays dead with no playable observation.
+
+The tested stock browser owns the death timing: a 1,600 ms hold followed by a
+fade subtracting `.004 * min(5, elapsed_ms / 8) * lag_mult` per rendered update.
+With frequent frames and no lag, the fade takes about 2 seconds. The host keeps
+streaming through this transition; it does not replace it with a fixed menu timer.
+Retained official observations reported post-death world traffic and three
+transport closes at 6.775, 6.861 and 7.124 seconds. Those are limited receipts,
+not a universal timeout; this host leaves the connection open until the client
+closes it, including during victory entry. Broadcast and delivery times remain
+subject to the configured tick cadence, link delays and host load.
 
 These ranking, cadence and record rules are local policies, not recovered official
 server rules. Keyboard turns use 0.033 times the size turn factor per count;
@@ -126,7 +144,7 @@ this remains an approximation. Ignored unknown packets are not decoded features.
 ### Stock browser client
 
 Official assets are not distributed. Redirect an idle client to the local server;
-public discovery does not list it. For the tested HTTP bundle with `forceOnce`,
+public discovery does not list it. For the tested HTTP bundle,
 use its developer console:
 
 ```js
@@ -134,7 +152,12 @@ if (window.playing || window.connecting || window.connected) {
   throw new Error("Use a fresh idle tab");
 }
 waiting_for_sos = false;
-forceOnce("127.0.0.1", 8766);
+// Keep a local discovery entry for Play Again; forceOnce is cleared on setup.
+sos = [{ip: "127.0.0.1", po: 8766, ac: 999, active: true, sid: 1}];
+clus = [];
+loadSos = function () {}; // Ignore late public discovery responses until reload.
+forcing = false;
+fobso = null;
 connect();
 ```
 
