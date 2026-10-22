@@ -17,6 +17,8 @@
   replay and bundles containing frozen plans, attempt records and source snapshots.
 - Offline worked study, documented fidelity limits, extraction provenance and
   manual checks on Windows and Linux.
+- Automatic pull-request checks, shared local/CI check commands, contributor
+  task guidance and protocol-labelled regression fixtures.
 
 Interfaces remain experimental. Code, documentation and repository fixtures use
 MIT; evidence archives declare their own reuse terms.

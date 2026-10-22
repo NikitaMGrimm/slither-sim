@@ -1,9 +1,12 @@
 # Evidence workflow
 
-Mechanics proposals need measurements and a regression fixture. Tool fixes need
-a reproducer and tests; documentation changes do not require new captures.
+Choose the [evidence tier](../CONTRIBUTING.md#evidence-proportional-to-the-change)
+before starting. Existing evidence can support mechanics corrections; routine
+tool/API fixes need a reproducer and regression, not a new study. New empirical
+or fitted claims need the complete relevant study and its limitations.
 
-Use Python 3.12, uv, Rust 1.86+ and Node.js 22+ (24 recommended):
+For the evidence workflow below, use Python 3.12, uv, Rust 1.86+ and Node.js 22+
+(24 recommended). Rust-only and documentation work can skip this setup:
 
 ```sh
 uv sync --locked --only-group tools
@@ -85,6 +88,13 @@ completeness, duplicates and batch consistency. Missing attempts are incomplete;
 corrupt, interrupted or mismatched captures are quarantined. Before removing a
 leftover `.study.lock`, check its owner/process and ledger.
 
+Before export, audit the complete study and inspect its attempt ledger, source
+pins and quarantine status. Preserve that audit result and the selected window
+identity with the analysis. The standalone exporter reads the supplied capture;
+it does not perform a study audit or freeze a source snapshot. Packaging below
+creates the source snapshot. Do not replace collection-time source pins to make
+a later audit pass.
+
 Export a preselected complete window:
 
 ```sh
@@ -128,17 +138,60 @@ repository code/fixtures use MIT and bundled software retains its license.
 Review must trace claims to exact windows, alternatives and held-out checks;
 byte integrity alone cannot establish a scientific conclusion.
 
+## Fixture and protocol evolution
+
+Keep bounded selected cases in `tests/fixtures/`; keep full recordings and study
+bundles outside Git. Add a case for each new scenario and preserve valid old
+regressions. Avoid wholesale fixture reformatting. Record the source study/window
+and distinguish raw recorded packets from decoder- or model-derived expectations;
+label observed and synthetic inputs explicitly. Synthetic cases test a specified
+contract, not an empirical server claim.
+
+Pin the wire protocol, API contract and fixture schema where relevant for each
+fixture/test, using the fixture version inventory documented in
+[the fixture guide](../tests/fixtures/README.md). Current wire support is protocol 19;
+a future default may change. Older evidence keeps its original labels. A default
+change needs explicit new cases and compatibility/rejection expectations, not a
+bulk relabelling of recordings. Retain old decoder/rejection coverage according
+to the versions actually supported; retained historical fixtures do not promise
+runtime legacy support or establish support for an unverified newer version.
+
+Expected results must have an independent justification: recorded bytes, a
+specified contract, a checked calculation or supporting evidence. Regenerating
+expectations from the changed implementation cannot by itself approve a regression.
+If an expectation was wrong, document its independent correction and preserve the
+original evidence. Deprecating a case requires a reason tied to the supported
+contract or invalid evidence, with a replacement or retained rejection test where
+applicable. A passing decoder cross-check is not independent proof of its model.
+
 ## Offline checks
 
+Run focused tests for the changed owner first (see the
+[task map](../CONTRIBUTING.md#find-the-change)), then the relevant group from the
+repository root. Documentation-only changes need accuracy/link review, not builds
+or the research stack. Rust 1.86+ and platform build tools suffice for `rust` and
+`package`; the runner itself uses standard-library Python (3.11+).
+
+| Group | Command | Coverage / prerequisites |
+| --- | --- | --- |
+| Rust | `python tools/check.py rust` | Cargo-only fmt, default and core-only tests, Clippy and doctests; no uv or Node |
+| Tools | `uv run --locked --only-group tools python tools/check.py tools` | Root tools/fidelity Python, Node and local bot smoke tests; locked uv, Node 22+ and Rust |
+| Package | `python tools/check.py package` | Local `cargo package` verification; no registry publication |
+| WASM | `python tools/check.py wasm` | Explicit target check; install `wasm32-unknown-unknown` first |
+
+For tools, prepare the environment with `uv sync --locked --only-group tools`.
+`all` runs the host groups (`rust`, `tools`, `package`); WASM is explicit and needs
+its installed target. Append `--list` to a group command to print commands without
+executing them. Direct focused Cargo commands are also valid, for example:
+
 ```sh
-cargo fmt --check
-cargo test --all-targets --locked
-cargo clippy --all-targets --locked -- -D warnings
-uv run --locked --only-group tools python -m unittest discover -s tools/fidelity -p 'test_*.py'
-uv run --locked --only-group tools node --test tools/fidelity/*.test.mjs
-uv run --locked --only-group tools python tools/verify_extraction.py
+cargo test --locked --test client_protocol
+cargo test --locked --no-default-features --test core_consumer
 ```
 
 Tests use doubles or loopback, never outside game servers. uv supplies Python for
 Node audit subprocesses; worked-study tests build this checkout's Rust binaries.
-CI is manual-only.
+PR CI automatically invokes the check runner. Report checks actually run and
+material gaps; a test pass does not establish scientific validity. Import
+attribution remains in [historical provenance](provenance.md); routine edits do
+not refresh import manifests. Per-study source identity checks still apply.

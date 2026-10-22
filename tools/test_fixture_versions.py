@@ -1,0 +1,118 @@
+"""Historical fixture labels, independent of the decoder's current defaults."""
+
+import json
+import unittest
+from pathlib import Path, PurePosixPath
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class FixtureVersionsTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.manifest = json.loads(
+            (ROOT / "tests/fixtures/manifest.json").read_text(encoding="utf-8")
+        )
+
+    def fixture(self, path):
+        entries = [row for row in self.manifest["fixtures"] if row["path"] == path]
+        self.assertEqual(len(entries), 1, path)
+        return entries[0], json.loads((ROOT / path).read_text(encoding="utf-8"))
+
+    def assert_protocol19_setup(self, entry, hex_text):
+        # Offset 23 belongs to these historical protocol-19 a packets. Do not
+        # import PROTOCOL_VERSION: changing the default cannot relabel old bytes.
+        packet = bytes.fromhex(hex_text)
+        self.assertGreaterEqual(len(packet), 25)
+        self.assertEqual(packet[0], ord("a"))
+        self.assertEqual(packet[23], 19)
+        self.assertEqual(entry["wireProtocol"], packet[23])
+
+    def test_inventory_schema_and_unique_existing_paths(self):
+        self.assertEqual(set(self.manifest), {"schemaVersion", "fixtures"})
+        self.assertIs(type(self.manifest["schemaVersion"]), int)
+        self.assertEqual(self.manifest["schemaVersion"], 1)
+        self.assertIsInstance(self.manifest["fixtures"], list)
+        self.assertTrue(self.manifest["fixtures"])
+        seen = set()
+        for entry in self.manifest["fixtures"]:
+            with self.subTest(entry=entry):
+                self.assertEqual(set(entry), {
+                    "path", "wireProtocol", "clientContract",
+                    "dataOrigin", "expectedOrigin",
+                })
+                self.assertIsInstance(entry["path"], str)
+                path = PurePosixPath(entry["path"])
+                self.assertFalse(path.is_absolute())
+                self.assertNotIn("..", path.parts)
+                self.assertEqual(path.as_posix(), entry["path"])
+                self.assertTrue(
+                    path.parts[:2] == ("tests", "fixtures")
+                    or path.parts[:3] == ("tools", "fidelity", "fixtures")
+                )
+                resolved = (ROOT / entry["path"]).resolve()
+                self.assertTrue(resolved.is_relative_to(ROOT))
+                self.assertEqual(resolved.suffix, ".json")
+                self.assertTrue(resolved.is_file(), entry["path"])
+                self.assertNotIn(resolved, seen)
+                seen.add(resolved)
+                self.assertIs(type(entry["wireProtocol"]), int)
+                self.assertTrue(0 <= entry["wireProtocol"] <= 255)
+                contract = entry["clientContract"]
+                self.assertTrue(contract is None or (
+                    isinstance(contract, str) and bool(contract.strip())
+                ))
+                self.assertIn(
+                    (entry["dataOrigin"], entry["expectedOrigin"]),
+                    {("captured", "reference-decoder"), ("synthetic", "synthetic")},
+                )
+
+    def test_protocol19_paired_capture_and_embedded_setup(self):
+        entry, fixture = self.fixture("tests/fixtures/client-protocol-paired-coil.json")
+        self.assertEqual(entry["dataOrigin"], "captured")
+        self.assertIsNone(entry["clientContract"])
+        self.assertTrue(fixture["source"]["archive"])
+        self.assertTrue(fixture["reference"])
+        # Record 5 starts with the elapsed-ms header and a two-byte packet
+        # length of 61; subsequent packets in this frame are unrelated.
+        record = fixture["records"][5]
+        self.assertEqual(record[0], "i")
+        frame = bytes.fromhex(record[2])
+        self.assertEqual(frame[2:4], bytes([0, 61]))
+        self.assertGreaterEqual(len(frame), 65)
+        self.assert_protocol19_setup(entry, frame[4:65].hex())
+        setup = fixture["wslSetup"]
+        self.assert_protocol19_setup(entry, setup["setupPrefixHex"])
+        self.assertEqual(setup["expected"]["protocolVersion"], entry["wireProtocol"])
+
+    def test_protocol19_hud_capture(self):
+        entry, fixture = self.fixture("tests/fixtures/client-hud-leaderboard.json")
+        self.assertEqual(entry["dataOrigin"], "captured")
+        self.assertIsNone(entry["clientContract"])
+        self.assertTrue(fixture["source"]["archive"])
+        self.assertTrue(fixture["reference"])
+        self.assert_protocol19_setup(entry, fixture["setup"]["hex"])
+        self.assertEqual(fixture["setup"]["expected"]["protocol"], entry["wireProtocol"])
+
+    def test_protocol19_partial_setup_capture(self):
+        entry, fixture = self.fixture("tools/fidelity/fixtures/protocol19-setup.json")
+        self.assertEqual(entry["dataOrigin"], "captured")
+        self.assertIsNone(entry["clientContract"])
+        self.assertTrue(fixture["source"]["partialArchive"])
+        self.assertTrue(fixture["source"]["archive"])
+        self.assert_protocol19_setup(entry, fixture["setupPrefixHex"])
+        self.assertEqual(fixture["expected"]["protocolVersion"], entry["wireProtocol"])
+
+    def test_synthetic_v2_contract_is_separate_from_wire_version(self):
+        entry, fixture = self.fixture("tests/fixtures/client-contract-v2.json")
+        self.assertEqual(entry["dataOrigin"], fixture["dataOrigin"])
+        self.assertEqual(entry["dataOrigin"], "synthetic")
+        self.assertEqual(entry["clientContract"], "slither-client-v2")
+        self.assertEqual(fixture["frame"]["contract"], entry["clientContract"])
+        self.assertEqual(entry["wireProtocol"], 19)
+        self.assertEqual(fixture["frame"]["settings"]["protocol"], entry["wireProtocol"])
+
+
+if __name__ == "__main__":
+    unittest.main()
