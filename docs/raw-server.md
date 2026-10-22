@@ -118,6 +118,10 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   A qualifying death sends `v1` for victory-message entry, other deaths `v0`.
   The owning dead connection/life may submit once (including empty text); `v2`
   acknowledges. Slot reuse cannot edit that record.
+- An open dead session still answers pings, including during victory entry.
+  The stock browser keeps pinging through its death fade; withholding replies
+  triggers its lag detector and slows the return to Play Again. Gameplay
+  controls remain ignored after game over. This is a local compatibility policy.
 
 These ranking, cadence and record rules are local policies, not recovered official
 server rules. Keyboard turns use 0.033 times the size turn factor per count;
@@ -126,7 +130,7 @@ this remains an approximation. Ignored unknown packets are not decoded features.
 ### Stock browser client
 
 Official assets are not distributed. Redirect an idle client to the local server;
-public discovery does not list it. For the tested HTTP bundle with `forceOnce`,
+public discovery does not list it. For the tested HTTP bundle,
 use its developer console:
 
 ```js
@@ -134,7 +138,12 @@ if (window.playing || window.connecting || window.connected) {
   throw new Error("Use a fresh idle tab");
 }
 waiting_for_sos = false;
-forceOnce("127.0.0.1", 8766);
+// Keep a local discovery entry for Play Again; forceOnce is cleared on setup.
+sos = [{ip: "127.0.0.1", po: 8766, ac: 999, active: true, sid: 1}];
+clus = [];
+loadSos = function () {}; // Ignore late public discovery responses until reload.
+forcing = false;
+fobso = null;
 connect();
 ```
 

@@ -193,8 +193,7 @@ struct Connection {
     downlink: VecDeque<(f64, Vec<u8>)>,
     /// The server has received the connect and sent setup.
     setup: bool,
-    /// Game over was sent; afterwards the server ignores everything from this
-    /// connection except victory text and sends only leaderboards and records.
+    /// Game over was sent; afterwards only pings and victory text are accepted.
     over: bool,
     /// Setup emission time and milliseconds of elapsed headers sent since then.
     /// Headers difference quantized absolute times, so rounding never drifts.
@@ -776,6 +775,12 @@ impl SimulatorBackend {
             let over = self.slots[slot].connection.over;
             match message {
                 Uplink::Victory(text) => self.victory(slot, text, now)?,
+                // The stock browser keeps pinging during its death fade and
+                // victory entry. Missing pongs trips its lag detector and slows
+                // the animation to one fifth speed, delaying Play Again.
+                Uplink::Message(ref bytes) if bytes == &[251] => {
+                    self.emit(slot, now, &[encode::pong()])?;
+                }
                 _ if over => {}
                 Uplink::Connect => {
                     let radius = self.world.config.radius;
@@ -786,7 +791,6 @@ impl SimulatorBackend {
                     self.emit(slot, now, &[encode::setup(radius)?])?;
                 }
                 Uplink::Message(bytes) => match bytes[..] {
-                    [251] => self.emit(slot, now, &[encode::pong()])?,
                     [heading @ 0..=250] => {
                         self.slots[slot].control.heading = (f64::from(heading) + 0.5) * TAU / 251.;
                     }
@@ -919,8 +923,8 @@ impl SimulatorBackend {
         if !self.slots.iter().any(|slot| slot.connection.setup) {
             return Ok(());
         }
-        // Connections after game over only receive leaderboards and records,
-        // so world geometry is gathered only for a live connection.
+        // Post-death broadcasts only contain leaderboards and records, so
+        // world geometry is gathered only for a live connection.
         let live = self
             .slots
             .iter()
@@ -967,7 +971,7 @@ impl SimulatorBackend {
                 board = Some(Board::new(&self.world, &self.profiles)?);
             }
             if connection.over {
-                // Motion, food and pongs stop after game over; a dead but open
+                // Motion and food stop after game over; a dead but open
                 // connection still gets leaderboards with its frozen rank and
                 // record updates, as official sessions retain the rank.
                 let packets = self.hud(slot, now, board.as_ref())?;
@@ -2064,22 +2068,32 @@ mod tests {
         assert_eq!(a.frame(&sim).status, ClientStatus::Dead);
         let seen = b.pump(&mut sim, 1);
         assert!(seen.contains(&encode::removal(0, true)) && seen.contains(&record));
-        // Afterwards the open connection only receives leaderboards with its
-        // frozen rank: no appearances, motion, food or pongs.
-        sim.receive(0, &[251]).unwrap();
+        // A dead session must still answer pings during the stock client's
+        // death fade, without accepting controls or reviving the snake.
+        let control = sim.backend.slots[0].control;
+        for bytes in [&[0][..], &[252, 100], &[253], &[251]] {
+            sim.receive(0, bytes).unwrap();
+        }
         let rank = sim.backend.slots[0].connection.final_rank.unwrap();
         let mut boards = 0;
+        let mut pongs = 0;
         for _ in 0..600 {
             sim.advance_ticks(1).unwrap();
             b.pump(&mut sim, 1);
             let living = sim.backend.world.snakes.iter().filter(|s| s.alive).count();
             for packet in a.pump(&mut sim, 0) {
+                if packet == encode::pong() {
+                    pongs += 1;
+                    continue;
+                }
                 let (position, own_rank, count, _) = board_packet(&packet);
                 assert_eq!((position, own_rank, count), (0, rank, living));
                 boards += 1;
             }
         }
         assert!(boards > 0);
+        assert_eq!(pongs, 1);
+        assert_eq!(sim.backend.slots[0].control, control);
         assert!(!sim.backend.world.snakes[0].alive);
     }
 
@@ -2290,6 +2304,7 @@ mod tests {
             packets,
             [
                 encode::victory_accepted(),
+                encode::pong(),
                 encode::record(30, fam, b"Ann", b"gg").unwrap(),
             ]
         );

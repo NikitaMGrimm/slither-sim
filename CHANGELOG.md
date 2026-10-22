@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep answering post-death pings so the stock browser's death fade and victory
+  entry do not trigger lag slowdown; document a local endpoint that survives Play Again.
+
+## Unreleased
+
 - Keep configured prey sizes positive and within their bounds, ambient food
   inside tiny arenas, and finite extreme respawn poses numerically usable.
 - Disambiguate initial protocol timing headers and bound retained client bodies
