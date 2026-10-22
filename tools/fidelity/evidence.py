@@ -24,6 +24,22 @@ MAX_FILE = 512 * 1024 * 1024
 MAX_TOTAL = 2 * 1024 * 1024 * 1024
 MAX_CAPTURE_TEXT = 256 * 1024 * 1024
 MAX_FILES = 10000
+# The original v1 packager's minimum, independent of the verifier's checkout.
+V1_SOURCE_FLOOR = frozenset("""
+Cargo.lock Cargo.toml LICENSE pyproject.toml uv.lock
+examples/basic.rs examples/fidelity_replay.rs
+schemas/attempt-event-v1.schema.json schemas/evidence-bundle-v1.schema.json
+schemas/study-plan-v1.schema.json
+src/boundary.rs src/kiosk.rs src/lib.rs src/main.rs src/model.rs
+src/observation/mod.rs src/physics.rs src/prey.rs src/profiling.rs
+src/simulator.rs src/spawn.rs src/transport.rs
+tools/fidelity/analyze-capture-quality.py tools/fidelity/capture_quality.py
+tools/fidelity/collect.py tools/fidelity/evidence.py
+tools/fidelity/prepare-fidelity-replay.py tools/fidelity/slither-feeding-shape.mjs
+tools/fidelity/slither-headless.mjs tools/fidelity/slither-paired-death.mjs
+tools/fidelity/slither-paired-prey.mjs tools/fidelity/slither_protocol.py
+tools/fidelity/worked_study.py
+""".split())
 RESERVED = {"con", "prn", "aux", "nul"} | {f"{name}{n}" for name in ("com", "lpt") for n in range(1, 10)}
 
 
@@ -462,8 +478,9 @@ def verify_bundle(path):
         actual = set(_file_set(root)) - {"manifest.json"}
         if actual != set(expected):
             raise ValueError("manifest does not describe exactly the archive members")
-        if not any(name.startswith("software/") for name in actual):
-            raise ValueError("bundle is missing its source snapshot")
+        missing_sources = {f"software/{name}" for name in V1_SOURCE_FLOOR} - actual
+        if missing_sources:
+            raise ValueError(f"bundle is missing its source snapshot files: {', '.join(sorted(missing_sources))}")
         for name, entry in expected.items():
             if (root / name).stat().st_size != entry["bytes"] or _digest_file(root / name) != entry["sha256"]:
                 raise ValueError(f"artifact hash/size mismatch: {name}")

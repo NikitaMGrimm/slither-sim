@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Keep configured prey sizes positive and within their bounds, ambient food
+  inside tiny arenas, and finite extreme respawn poses numerically usable.
+- Disambiguate initial protocol timing headers and bound retained client bodies
+  and food with atomic frame rejection.
+- Require the original v1 evidence source minimum and report replay targets
+  left unprocessed after early simulator death.
+
 ## 0.1.0 (2026-10-22)
 
 - Deterministic headless Rust simulator with configurable worlds, geometric

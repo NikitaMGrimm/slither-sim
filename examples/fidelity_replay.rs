@@ -403,7 +403,7 @@ fn divergence(
     }
 }
 
-fn run(f: Fixture, mode: &str) -> Result<(), Box<dyn Error>> {
+fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>> {
     validate(&f)?;
     if mode != "free" && mode != "motion_only" {
         return Err(fail("mode must be free or motion_only"));
@@ -433,7 +433,6 @@ fn run(f: Fixture, mode: &str) -> Result<(), Box<dyn Error>> {
         .collect();
     world.pickup_events = Some(Vec::new());
 
-    let mut out = BufWriter::new(io::stdout().lock());
     write(
         &mut out,
         json!({"kind":"meta","schema_version":1,"name":f.name,"mode":mode,
@@ -450,7 +449,20 @@ fn run(f: Fixture, mode: &str) -> Result<(), Box<dyn Error>> {
     let (mut control_i, mut food_i, mut mass_i, mut observation_i) = (0, 0, 0, 0);
     let (mut next_sample, mut generated_id, mut anchor_index) = (0.0, 0usize, 0usize);
     let mut first = HashMap::new();
-    let mut observed_anchors = Vec::new();
+    // Targets belong to the capture, including those after a simulated death.
+    let observed_anchors: Vec<_> = f
+        .observations
+        .iter()
+        .filter_map(|o| {
+            o.anchor_index
+                .zip(o.anchor)
+                .map(|(index, point)| AnchorEvent {
+                    index,
+                    time: o.time,
+                    point,
+                })
+        })
+        .collect();
     let mut simulated_anchors = Vec::new();
     let mut observed_eats = Vec::new();
     let mut simulated_eats = Vec::new();
@@ -657,13 +669,6 @@ fn run(f: Fixture, mode: &str) -> Result<(), Box<dyn Error>> {
                 "heading_error_diagnostic":heading_error,"heading_source":o.heading_source,
                 "boost_match":boost_match,"anchor_index":o.anchor_index}),
             )?;
-            if let (Some(index), Some(point)) = (o.anchor_index, o.anchor) {
-                observed_anchors.push(AnchorEvent {
-                    index,
-                    time: o.time,
-                    point,
-                });
-            }
             observation_i += 1;
         }
         if world.time + EPS >= next_sample {
@@ -679,6 +684,12 @@ fn run(f: Fixture, mode: &str) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if let Some(observation) = f.observations.get(observation_i) {
+        first.insert(
+            "observation_missing",
+            json!({"metric":"observation_missing","time":observation.time}),
+        );
+    }
     let mut anchor_errors = Vec::new();
     for observed in &observed_anchors {
         if let Some(simulated) = simulated_anchors
@@ -777,6 +788,9 @@ fn run(f: Fixture, mode: &str) -> Result<(), Box<dyn Error>> {
         "observed_pickups_complete":f.expected_pickups.is_some(),
         "external_food_events_applied":external_food_events,
         "external_food_events_pending":f.food_events.len() - food_i,
+        "observations_total":f.observations.len(),
+        "observations_compared":observation_i,
+        "observations_pending":f.observations.len() - observation_i,
         "mass_interventions":if mode == "motion_only" {mass_i} else {0},
         "first_divergences":first_divergences}),
     )?;
@@ -792,7 +806,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ));
     }
     let fixture: Fixture = serde_json::from_str(&fs::read_to_string(&args[1])?)?;
-    run(fixture, &args[2])
+    run(fixture, &args[2], BufWriter::new(io::stdout().lock()))
 }
 
 #[cfg(test)]
@@ -819,6 +833,43 @@ mod tests {
         assert_eq!(fixture.observations[0].anchor_index, Some(1));
         assert!(fixture.expected_pickups.is_some());
         assert!(matches!(fixture.options.boost_drops, DropMode::Recorded));
+    }
+
+    #[test]
+    fn early_death_keeps_later_observation_and_anchor_targets() {
+        let mut value = fixture_value();
+        value["options"]["radius"] = json!(100.0);
+        value["observations"] = json!([
+            {"time":0.25,"anchor_index":1,"anchor":{"x":42.0,"y":0.0}},
+            {"time":0.9,"anchor_index":3,"anchor":{"x":126.0,"y":0.0}}
+        ]);
+        let fixture: Fixture = serde_json::from_value(value).unwrap();
+        let mut output = Vec::new();
+        run(fixture, "free", &mut output).unwrap();
+        let rows: Vec<Value> = String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let summary = rows.last().unwrap();
+        assert_eq!(summary["ended_alive"], false);
+        assert!(summary["replayed_seconds"].as_f64().unwrap() < 0.9);
+        assert_eq!(summary["observations_total"], 2);
+        assert_eq!(summary["observations_compared"], 1);
+        assert_eq!(summary["observations_pending"], 1);
+        assert_eq!(summary["anchor_events_observed"], 2);
+        for metric in ["observation_missing", "anchor_missing"] {
+            assert!(
+                summary["first_divergences"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|row| row["metric"] == metric && row["time"] == 0.9)
+            );
+        }
+        assert!(rows.iter().any(|row| row["kind"] == "anchor_comparison"
+            && row["index"] == 3
+            && row["simulated_time"].is_null()));
     }
 
     #[test]

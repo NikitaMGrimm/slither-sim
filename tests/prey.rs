@@ -26,6 +26,59 @@ fn world() -> Simulator {
     w
 }
 #[test]
+fn spawned_prey_respect_positive_representable_size_bounds() {
+    for (size, max_size) in [
+        (6.01, 6.39),
+        (0.01, 0.39),
+        (6.0, 9.2),
+        (6.6000000000000005, 6.8),
+        (6.2, 6.599999999999999),
+    ] {
+        let world = Simulator::new(
+            7,
+            Config {
+                food_count: 0,
+                prey: PreyConfig {
+                    count: 100,
+                    size,
+                    max_size,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(world.prey.len(), 100);
+        for prey in world.prey {
+            assert!(prey.size >= size && prey.size <= max_size && prey.size > 0.0);
+            assert!((prey.size * 5.0 - (prey.size * 5.0).round()).abs() < 1e-12);
+        }
+    }
+    for (size, max_size) in [
+        (9.21, 9.39),
+        (0.01, 0.02),
+        (0.21, 0.21),
+        (1e308, 1e308),
+        (6.6000000000000005, 6.6000000000000005),
+    ] {
+        assert!(
+            Simulator::new(
+                7,
+                Config {
+                    prey: PreyConfig {
+                        size,
+                        max_size,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn client_prey_units_and_turn_limit() {
     // Public client: mamu2=0.029 radians per 8ms; movement sp*vfr/4.
     let mut p = entity(0., 3.8 / 0.032);
@@ -37,6 +90,48 @@ fn client_prey_units_and_turn_limit() {
     p.target_heading = 0.03;
     p.advance(0.008, 0.029 / 0.008);
     assert!((p.heading - 0.03).abs() < 1e-12);
+}
+
+#[test]
+fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
+    for profiled in [false, true] {
+        let config = Config {
+            food_count: 0,
+            dt: 0.01,
+            prey: PreyConfig {
+                count: 1,
+                respawn_seconds: 0.01,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut world = Simulator::new(7, config.clone()).unwrap();
+        let mut reference = Simulator::new(7, config.clone()).unwrap();
+        world.prey.clear();
+        reference.prey.clear();
+        world.config.prey.size = 9.21;
+        world.config.prey.max_size = 9.39;
+        let before = serde_json::to_value(&world).unwrap();
+        assert!(world.validate_actions(&[]).is_err());
+        let mut profile = StepProfile::default();
+        let result = if profiled {
+            world.step_profiled(&[], &mut profile)
+        } else {
+            world.step(&[])
+        };
+        assert_eq!(result.unwrap_err(), "Invalid prey settings");
+        assert_eq!(serde_json::to_value(&world).unwrap(), before);
+        assert_eq!(profile.ticks, 0);
+
+        world.config.prey = config.prey;
+        world.step(&[]).unwrap();
+        reference.step(&[]).unwrap();
+        assert_eq!(world.prey.len(), 1);
+        assert_eq!(
+            serde_json::to_value(&world).unwrap(),
+            serde_json::to_value(&reference).unwrap()
+        );
+    }
 }
 
 #[test]

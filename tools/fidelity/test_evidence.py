@@ -165,6 +165,38 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(manifest["audit"]["status"], "quarantined")
         self.assertEqual(manifest, evidence.verify_bundle(output))
 
+    def test_source_floor_rejects_partial_snapshots_and_accepts_historical_membership(self):
+        self.complete()
+        output = self.directory / "bundle.tar.gz"
+        evidence.package_study(self.study, output)
+        with tarfile.open(output, "r:gz") as source:
+            original = {member.name: source.extractfile(member).read() for member in source}
+        floor = {f"software/{name}" for name in evidence.V1_SOURCE_FLOOR}
+        # The v1 floor predates the portable client; newer files must stay optional.
+        self.assertNotIn("software/src/client/network.rs", floor)
+        for index, missing in enumerate((None, "Cargo.lock", "LICENSE", "src/physics.rs",
+                        "schemas/study-plan-v1.schema.json", "examples/fidelity_replay.rs",
+                        "tools/fidelity/prepare-fidelity-replay.py")):
+            with self.subTest(missing=missing):
+                files = {name: data for name, data in original.items()
+                         if not name.startswith("software/") or name in floor}
+                if missing is not None:
+                    del files[f"software/{missing}"]
+                manifest = json.loads(files["manifest.json"])
+                manifest["files"] = [entry for entry in manifest["files"] if entry["path"] in files]
+                files["manifest.json"] = json.dumps(manifest).encode()
+                changed = self.directory / f"snapshot-{index}.tar.gz"
+                with tarfile.open(changed, "w:gz") as archive:
+                    for name, data in files.items():
+                        info = tarfile.TarInfo(name)
+                        info.size = len(data)
+                        archive.addfile(info, io.BytesIO(data))
+                if missing is None:
+                    self.assertEqual(evidence.verify_bundle(changed)["audit"]["status"], "verified")
+                else:
+                    with self.assertRaisesRegex(ValueError, "source snapshot files"):
+                        evidence.verify_bundle(changed)
+
     def test_malformed_deflate_stream_is_quarantined(self):
         self.complete()
         path = self.study / "raw/known.jsonl.gz"

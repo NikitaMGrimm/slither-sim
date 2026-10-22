@@ -11,6 +11,111 @@ use slither_sim::{
 use std::f64::consts::TAU;
 
 const GRID: f64 = 21600.;
+// Same archived bot0 challenge as client_challenge.rs, record 4.
+const RAW_CHALLENGE: &[u8] = b"6euLxuGXMjVNCwXDSLcWXFbjNuKZXhYQPBNffoPvMhWQcTpdrOHROCcmItebmheOLZwfSnCyLBxlKwRCBjGSmxOgfRIZZIulatqGwnZWizOLFQRYmgfrLwWEUMHutfZJjRrZXmhtNbQjWrdyVHBonUvfrJmVjDwLxUgzPjjRGZPFTqetQFZJHSreb";
+
+#[test]
+fn alphabetic_timed_session_report_does_not_select_bare_framing() {
+    let mut state = ClientState::new();
+    state.new_connection(0.).unwrap();
+    state.receive_frame(b"6ASAAAAAA", 0.).unwrap();
+    let report = state.frame(0.).unwrap();
+    assert!(report.hud.session.is_some());
+    let mut frame = vec![0, 0];
+    frame.extend(setup());
+    state.receive_frame(&frame, 0.1).unwrap();
+    assert!(state.frame(0.1).unwrap().settings.is_some());
+}
+
+fn bundled(packets: &[&[u8]]) -> Vec<u8> {
+    let mut frame = vec![0, 0];
+    for packet in packets {
+        frame.extend((packet.len() as u16).to_be_bytes());
+        frame.extend(*packet);
+    }
+    frame
+}
+
+#[test]
+fn retained_body_limits_reject_whole_frames_and_reuse_removed_slots() {
+    let mut client = Client::with_setup(&setup_with(1, 0, 430));
+    client.send(&straight(9, 0.));
+    let grow = [b'N', 0, 0, 0];
+    let growth = bundled(&vec![grow.as_slice(); 4093]);
+    client.state.receive_frame(&growth, client.time).unwrap();
+    assert_eq!(client.me().body.len(), 4096);
+    let before = client.frame();
+    let error = client
+        .state
+        .receive_frame(&bundled(&[&[b'e', 64], &grow]), client.time)
+        .unwrap_err();
+    assert!(error.contains("snake body limit"));
+    assert_eq!(client.frame(), before);
+
+    let mut client = Client::new();
+    let points = vec![Point::default(); 4094];
+    for id in 1..=16 {
+        client.send(&appearance(id, 0, 5000, Point::default(), &points, Some(0)));
+    }
+    let before = client.frame();
+    let next = appearance(
+        17,
+        0,
+        5000,
+        Point::default(),
+        &[Point::default(); 16],
+        Some(0),
+    );
+    assert!(
+        client
+            .state
+            .receive_packet(&next, client.server, client.time)
+            .unwrap_err()
+            .contains("total body limit")
+    );
+    assert_eq!(client.frame(), before);
+    // Removed records still retain their bodies; replacement reuses that budget.
+    client.send(&[b's', 0, 2]);
+    client.send(&next);
+    assert_eq!(client.frame().received.snakes.len(), 16);
+}
+
+#[test]
+fn retained_food_limit_counts_unique_ids_and_releases_cleared_sectors() {
+    let mut client = Client::new();
+    client.send(&straight(9, 0.));
+    for sx in 0..2 {
+        let mut packet = vec![b'F', sx, 0];
+        for rx in 0..=255 {
+            for ry in 0..=255 {
+                packet.extend([0, rx, ry, 5]);
+            }
+        }
+        client.send(&packet);
+        client.send(&packet); // Replacement packets do not add retained entities.
+    }
+    assert_eq!(client.frame().observation.unwrap().food.len(), 131_072);
+    let before = client.frame();
+    let pellet = [b'f', 2, 0, 0, 0, 5];
+    assert!(
+        client
+            .state
+            .receive_frame(&bundled(&[&[b'e', 64], &pellet]), client.time)
+            .unwrap_err()
+            .contains("food limit")
+    );
+    assert_eq!(client.frame(), before);
+    client
+        .state
+        .receive_frame(&bundled(&[&[b'w', 0, 0], &pellet]), client.time)
+        .unwrap();
+    assert_eq!(client.frame().observation.unwrap().food.len(), 65_537);
+    client.state.new_connection(client.time).unwrap();
+    client.send(&setup());
+    client.send(&straight(9, 0.));
+    client.send(&pellet);
+    assert_eq!(client.frame().observation.unwrap().food.len(), 1);
+}
 
 fn u24(value: u32) -> [u8; 3] {
     let [_, a, b, c] = value.to_be_bytes();
@@ -721,7 +826,7 @@ fn pings_track_pending_measured_and_recent_range() {
 fn raw_challenge_selects_unframed_messages() {
     let mut state = ClientState::new();
     state.new_connection(0.).unwrap();
-    state.receive_frame(b"6abc", 0.).unwrap();
+    state.receive_frame(RAW_CHALLENGE, 0.).unwrap();
     state.receive_frame(&setup(), 1.).unwrap();
     state.receive_frame(&straight(9, 0.), 1.).unwrap();
     state.receive_frame(&[b'e', 64], 1.5).unwrap();
@@ -732,10 +837,27 @@ fn raw_challenge_selects_unframed_messages() {
 }
 
 #[test]
+fn timing_header_high_byte_six_does_not_select_bare_framing() {
+    for low in [0, b'a', 255] {
+        let mut state = ClientState::new();
+        state.new_connection(0.).unwrap();
+        let mut frame = vec![b'6', low];
+        frame.extend(setup());
+        state.receive_frame(&frame, 0.).unwrap();
+        let mut frame = vec![0, 7];
+        frame.extend(straight(9, 0.));
+        state.receive_frame(&frame, 0.1).unwrap();
+        let frame = state.frame(0.1).unwrap();
+        assert_eq!(frame.status, ClientStatus::Playing);
+        assert_eq!(frame.observation.unwrap().time, 0.007);
+    }
+}
+
+#[test]
 fn header_free_messages_accept_bundles_and_reject_them_atomically() {
     let mut state = ClientState::new();
     state.new_connection(0.).unwrap();
-    state.receive_frame(b"6abc", 0.).unwrap();
+    state.receive_frame(RAW_CHALLENGE, 0.).unwrap();
     let snake = straight(9, 0.);
     let mut bundle = vec![0, setup().len() as u8];
     bundle.extend(setup());

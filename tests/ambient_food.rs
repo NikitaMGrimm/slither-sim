@@ -38,6 +38,41 @@ fn startup_attempts_admit_only_two_per_cell_and_disabled_keeps_all() {
 }
 
 #[test]
+fn sub_margin_arenas_keep_startup_and_refill_food_inside() {
+    let mut world = Simulator::new(
+        7,
+        Config {
+            radius: 1.0,
+            food_count: 350,
+            ambient_replenish_per_second: 100.0,
+            dt: 0.01,
+            ambient_food: AmbientFoodConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(world.food.len(), 350);
+    assert!(
+        world
+            .food
+            .iter()
+            .all(|food| food.point() == Point::default())
+    );
+    world.food.clear();
+    world.step(&[]).unwrap();
+    assert!(!world.food.is_empty());
+    assert!(
+        world
+            .food
+            .iter()
+            .all(|food| food.point() == Point::default())
+    );
+}
+
+#[test]
 fn refill_counts_all_origins_and_reconciles_public_food_edits() {
     let mut world = tiny_world(true, 0, 100.0);
     world.config.food_count = 5;

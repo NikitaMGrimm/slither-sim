@@ -65,6 +65,24 @@ impl Default for PreyConfig {
     }
 }
 impl PreyConfig {
+    pub(crate) fn size_steps(&self) -> Option<(f64, f64)> {
+        let mut lower = (self.size * 5.0).ceil().max(1.0);
+        let mut upper = (self.max_size * 5.0).floor();
+        // Multiplication can round an adjacent float onto a grid endpoint.
+        if lower / 5.0 < self.size {
+            lower += 1.0;
+        }
+        if upper / 5.0 > self.max_size {
+            upper -= 1.0;
+        }
+        (lower.is_finite()
+            && upper.is_finite()
+            && lower <= upper
+            && lower / 5.0 >= self.size
+            && upper / 5.0 <= self.max_size)
+            .then_some((lower, upper))
+    }
+
     /// Empirical flight speed follows the threatening snake's protocol speed.
     /// The measured default endpoints are (5.79, 6.153) and (14, 10.997).
     pub fn flight_speed(&self, snake_speed: f64) -> f64 {
@@ -89,6 +107,7 @@ impl PreyConfig {
             || self.escape_speed < self.cruise_speed
             || self.sprint_speed < self.escape_speed
             || self.max_size < self.size
+            || self.size_steps().is_none()
         {
             return Err("Invalid prey settings".into());
         }

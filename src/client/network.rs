@@ -1,7 +1,7 @@
 //! A real-time protocol-19 connection using the same decoder as simulation.
 use super::{
     Backend, ClientFrame, ClientState, ClientStatus, WireEvent, WireRecord, challenge,
-    protocol::{action_packets, split_frame, split_payload},
+    protocol::{action_packets, initial_raw_framing, split_frame, split_payload},
 };
 use crate::Action;
 use serde::{Deserialize, Serialize};
@@ -302,7 +302,7 @@ impl NetworkBackend {
     fn receive_binary(&mut self, bytes: &[u8], at: f64) -> Result<(), String> {
         self.record(at, WireEvent::Receive, bytes)?;
         self.incoming_frames += 1;
-        if self.incoming_frames == 1 && bytes.first() == Some(&b'6') {
+        if self.incoming_frames == 1 && initial_raw_framing(bytes) {
             self.raw_framing = true;
         }
         let packets = if self.raw_framing {

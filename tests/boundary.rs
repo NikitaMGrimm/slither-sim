@@ -311,3 +311,23 @@ fn original_received_radius_trace_replays_without_moving_the_center() {
     w.add("center-check", 0, 1).unwrap();
     assert_eq!(w.observe(0).unwrap().arena.center, Point::default());
 }
+#[test]
+fn finite_large_radius_does_not_overflow_contact_checks() {
+    use slither_sim::{
+        Point,
+        boundary::{BoundaryMode, constrain},
+    };
+    for mode in [BoundaryMode::Hard, BoundaryMode::Sliding] {
+        for radius in [1e200, f64::MAX / 2.0] {
+            for fraction in [0.5, 0.9, 1.0, 1.1] {
+                let point = Point {
+                    x: radius * fraction,
+                    y: 0.0,
+                };
+                let (head, lethal) = constrain(point, 0.0, 1.0, radius, mode);
+                assert_eq!(head, point);
+                assert_eq!(lethal, fraction >= 1.0);
+            }
+        }
+    }
+}
