@@ -9,6 +9,9 @@ and ecology using a provisional population model.
 
 ## Packaged regression evidence
 
+[Client presentation](presentation.md) covers pellet palettes separately from
+physical food generation and pickup rules.
+
 Fixtures retain sources, methods and hashes. Original recordings and analysis
 outputs are not distributed; packaged tests run without them, but repeating the
 measurements may require the original archives.

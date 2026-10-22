@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Keep browser-host opponents streamed beyond native bot coverage and make
+  synthetic world-run records/victory entry opt-in (`localRecords`, default false).
+
+- Restore source-linked pellet palettes, persistent ambient colors, birth types
+  and explicit pickup attribution from the earlier client presentation layer.
+
 - Keep answering post-death pings so the stock browser's death fade and victory
   entry do not trigger lag slowdown; document a local endpoint that survives Play Again.
 - Continue opponent, food and prey updates through the stock death animation,

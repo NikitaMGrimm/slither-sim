@@ -65,6 +65,12 @@ at zero for normal remote use. Client processing delay is not simulated twice.
 ### Presets
 
 There are no named host/JSON presets; omitted settings use the compact defaults.
+Remote clients receive all living snakes so native bot coverage cannot clip the
+stock browser's viewport. This is a compact-host policy, not a measured official
+subscription envelope; larger worlds incur more snake traffic. Food sectors and
+prey keep `world.vision` coverage, as do all native bot observations. The browser
+does not send its viewport or zoom to this host.
+
 Rust callers can use `Config::default()` or `Config::realistic(n)`. The latter
 scales radius and ecology with a provisional population model, rather than
 reproducing an official server configuration.
@@ -86,6 +92,9 @@ are disconnected before exhausting output buffers. An overloaded host may slow
 world time; it does not skip physics ticks to catch up.
 
 ## Packet compatibility
+
+[Client presentation](presentation.md) describes source-linked pellet colors,
+their retained evidence and remaining uncertainty.
 
 The host uses the native simulator's encoder. Packet layouts follow protocol 19;
 world values, compression choices and update schedules can differ from official
@@ -114,7 +123,9 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.
-- `m`: highest-scoring completed life in this world run; resets with the world.
+- With `simulation.localRecords: true`, `m` shows the highest-scoring completed
+  life in this world run; resets with the world. This feature is off by default:
+  official qualification, persistence and reset rules have not been established.
   A qualifying death sends `v1` for victory-message entry, other deaths `v0`.
   The owning dead connection/life may submit once (including empty text); `v2`
   acknowledges. Slot reuse cannot edit that record.

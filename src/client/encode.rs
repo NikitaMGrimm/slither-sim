@@ -315,8 +315,15 @@ pub(crate) fn food_key(point: Point) -> Result<[u8; 4], String> {
 pub(crate) fn food_size(size: f64) -> u8 {
     (size * 5.).round().clamp(0., 255.) as u8
 }
+/// Presentation only; the bot decoder deliberately omits color and birth kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FoodStyle {
+    pub color: u8,
+    pub size: u8,
+    pub snake_food: bool,
+}
 /// Sector listing on subscription, split into frameable packets.
-pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], u8)]) -> Vec<Vec<u8>> {
+pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], FoodStyle)]) -> Vec<Vec<u8>> {
     let chunks: Vec<_> = if foods.is_empty() {
         vec![foods]
     } else {
@@ -326,19 +333,37 @@ pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], u8)]) -> Vec<Vec<u
         .into_iter()
         .map(|chunk| {
             let mut p = vec![b'F', sector[0], sector[1]];
-            for &([rx, ry], size) in chunk {
-                p.extend([0, rx, ry, size]);
+            for &([rx, ry], style) in chunk {
+                p.extend([style.color, rx, ry, style.size]);
             }
             p
         })
         .collect()
 }
-/// New food. Always `f`: boost/death origin is not exposed to clients here.
-pub(crate) fn food_add(key: [u8; 4], size: u8) -> Vec<u8> {
-    vec![b'f', key[0], key[1], key[2], key[3], 0, size]
+/// Explicit color/sector: no dependency on another connection's implicit state.
+pub(crate) fn food_add(key: [u8; 4], style: FoodStyle) -> Vec<u8> {
+    vec![
+        if style.snake_food { b'b' } else { b'f' },
+        key[0],
+        key[1],
+        key[2],
+        key[3],
+        style.color,
+        style.size,
+    ]
 }
-pub(crate) fn food_remove(key: [u8; 4]) -> Vec<u8> {
-    vec![b'c', key[0], key[1], key[2], key[3]]
+pub(crate) fn food_remove(key: [u8; 4], eater: Option<u16>) -> Vec<u8> {
+    let mut p = vec![
+        if eater.is_some() { b'<' } else { b'c' },
+        key[0],
+        key[1],
+        key[2],
+        key[3],
+    ];
+    if let Some(id) = eater {
+        p.extend(u16be(id));
+    }
+    p
 }
 pub(crate) fn sector_clear(sector: [u8; 2]) -> Vec<u8> {
     vec![b'w', sector[0], sector[1]]
@@ -544,6 +569,40 @@ pub(crate) fn minimap(map: &Minimap) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn food_packets_keep_color_origin_and_explicit_eater() {
+        let ambient = FoodStyle {
+            color: 7,
+            size: 35,
+            snake_food: false,
+        };
+        let snake = FoodStyle {
+            color: 3,
+            size: 68,
+            snake_food: true,
+        };
+        assert_eq!(
+            food_sector([108, 109], &[([20, 30], ambient), ([40, 50], snake)]),
+            [vec![b'F', 108, 109, 7, 20, 30, 35, 3, 40, 50, 68]]
+        );
+        assert_eq!(
+            food_add([108, 109, 20, 30], ambient),
+            [b'f', 108, 109, 20, 30, 7, 35]
+        );
+        assert_eq!(
+            food_add([108, 109, 40, 50], snake),
+            [b'b', 108, 109, 40, 50, 3, 68]
+        );
+        assert_eq!(
+            food_remove([108, 109, 20, 30], Some(1)),
+            [b'<', 108, 109, 20, 30, 0, 1]
+        );
+        assert_eq!(
+            food_remove([108, 109, 20, 30], None),
+            [b'c', 108, 109, 20, 30]
+        );
+    }
+
     fn u24(p: &[u8], m: usize) -> f64 {
         f64::from(u32::from_be_bytes([0, p[m], p[m + 1], p[m + 2]]))
     }
@@ -574,7 +633,7 @@ mod tests {
         let one = frame(7, &[pong()]).unwrap();
         assert_eq!(one, [0, 7, b'p']);
         assert_eq!(split(&one), [pong()]);
-        let packets = vec![removal(3, true), food_remove([1, 2, 3, 4]), pong()];
+        let packets = vec![removal(3, true), food_remove([1, 2, 3, 4], None), pong()];
         let many = frame(300, &packets).unwrap();
         assert_eq!(&many[..2], &300u16.to_be_bytes());
         assert_eq!(split(&many), packets);

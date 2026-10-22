@@ -63,6 +63,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `minimapIntervalSeconds` | `2.5` | Positive finite interval. |
 | `minimapSide` | `32` | Square minimap width, 1–512 cells. |
 | `leaderboardIntervalSeconds` | `3` | Positive finite interval; a board also arrives on entry. |
+| `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
 
