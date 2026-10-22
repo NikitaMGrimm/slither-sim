@@ -1,7 +1,6 @@
 use serde_json::{Value, json};
 use slither_sim::{Action, Config, Simulator, transport};
-use std::io::{Cursor, Write};
-use std::process::{Command, Stdio};
+use std::io::Cursor;
 
 fn exchange(requests: &[Value]) -> Vec<Value> {
     let mut input = String::new();
@@ -145,7 +144,11 @@ fn dead_slots_remain_stable_and_all_dead_worlds_stop() {
 }
 
 #[test]
+#[cfg(feature = "networking")]
 fn executable_emits_only_replies_and_exits_on_eof() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
     let mut child = Command::new(env!("CARGO_BIN_EXE_slither-sim"))
         .arg("serve")
         .stdin(Stdio::piped())

@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 use slither_sim::{
     Action,
     client::network::{Handshake, login_packet},

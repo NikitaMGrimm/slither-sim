@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 //! A literal external JSON example guards the current private-preview shape.
 //! Intentional revisions remain possible; this is not a permanent API freeze.
 use serde_json::{Value, json};

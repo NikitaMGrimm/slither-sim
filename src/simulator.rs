@@ -276,6 +276,24 @@ pub struct Simulator {
     radius_update_index: usize,
 }
 impl Simulator {
+    /// Set ambient placement attempts per second, preserving fractional refill credit.
+    /// Zero disables refill and discards pending credit. Invalid rates or unrepresentable
+    /// clock rescaling leave the world unchanged. Use this instead of editing the rate directly.
+    pub fn set_ambient_rate(&mut self, rate: f64) -> Result<(), String> {
+        if !rate.is_finite() || !(0.0..=10_000.0).contains(&rate) {
+            return Err("Ambient rate must be finite and between 0 and 10000".into());
+        }
+        if rate != self.config.ambient_replenish_per_second {
+            let credit = self.ambient_clock * self.config.ambient_replenish_per_second;
+            let clock = if rate > 0.0 { credit / rate } else { 0.0 };
+            if !clock.is_finite() {
+                return Err("Ambient refill credit cannot be represented at this rate".into());
+            }
+            self.ambient_clock = clock;
+            self.config.ambient_replenish_per_second = rate;
+        }
+        Ok(())
+    }
     pub fn new(seed: u32, config: Config) -> Result<Self, String> {
         config.validate()?;
         let mut world = Self {
@@ -454,22 +472,39 @@ impl Simulator {
             x: head.x - heading.cos() * 42. * (segments - 1) as f64,
             y: head.y - heading.sin() * 42. * (segments - 1) as f64,
         };
-        if head.distance(Point::default()) >= self.config.radius - 60.
-            || tail.distance(Point::default()) >= self.config.radius - 60.
+        self.line_is_clear(&[head, tail], segments, clearance)
+    }
+    /// Check a supplied head-first body with one anchor per segment (2..=430).
+    /// Uses the same arena margin and centerline exclusion as straight spawns.
+    /// This tests other living snakes, not self-intersections in the supplied body.
+    pub fn body_is_clear(&self, body: &[Point], clearance: f64) -> bool {
+        (2..=430).contains(&body.len())
+            && body.iter().all(|p| p.finite())
+            && self.line_is_clear(body, body.len(), clearance)
+    }
+    fn line_is_clear(&self, line: &[Point], segments: usize, clearance: f64) -> bool {
+        if !clearance.is_finite()
+            || clearance < 0.0
+            || line
+                .iter()
+                .any(|p| p.distance(Point::default()) >= self.config.radius - 60.)
         {
             return false;
         }
         self.snakes.iter().filter(|s| s.alive).all(|s| {
             let width = (collision_distance(s.segments, segments) + 40.).max(clearance);
-            // Include the head even if an externally supplied body is empty.
-            if segment_distance(s.head, head, tail) <= width {
-                return false;
-            }
-            let mut a = s.head;
-            s.body.iter().all(|&b| {
-                let distance = swept_distance(head, tail, a, b);
-                a = b;
-                distance > width
+            line.windows(2).all(|edge| {
+                let (head, tail) = (edge[0], edge[1]);
+                // Include the head even if an externally supplied body is empty.
+                if segment_distance(s.head, head, tail) <= width {
+                    return false;
+                }
+                let mut a = s.head;
+                s.body.iter().all(|&b| {
+                    let distance = swept_distance(head, tail, a, b);
+                    a = b;
+                    distance > width
+                })
             })
         })
     }
@@ -487,12 +522,31 @@ impl Simulator {
         if s.alive || !head.finite() || !heading.is_finite() || !(2..=430).contains(&segments) {
             return Err("Respawn requires a dead slot, finite pose and 2..430 segments".into());
         }
-        let body: Vec<_> = (0..segments)
+        let body = (0..segments)
             .map(|i| Point {
                 x: head.x - heading.cos() * 42.0 * i as f64,
                 y: head.y - heading.sin() * 42.0 * i as f64,
             })
             .collect();
+        self.respawn_body(index, body, heading)
+    }
+    /// Respawn a dead slot with a supplied head-first body (2..=430 finite anchors).
+    /// Every anchor must be inside the arena. Resets the same per-life state as
+    /// `respawn`; call `body_is_clear` separately if placement needs exclusion.
+    pub fn respawn_body(
+        &mut self,
+        index: usize,
+        body: Vec<Point>,
+        heading: f64,
+    ) -> Result<(), String> {
+        let s = self.snakes.get(index).ok_or("Unknown respawn slot")?;
+        if s.alive
+            || !heading.is_finite()
+            || !(2..=430).contains(&body.len())
+            || body.iter().any(|p| !p.finite())
+        {
+            return Err("Respawn requires a dead slot, finite pose and 2..430 segments".into());
+        }
         if body
             .iter()
             .any(|p| p.distance(Point::default()) >= self.config.radius)
@@ -500,11 +554,11 @@ impl Simulator {
             return Err("Spawn body extends outside arena".into());
         }
         let s = &mut self.snakes[index];
-        s.head = head;
+        s.head = body[0];
+        s.segments = body.len();
         s.body = body;
         s.heading = heading;
-        s.speed = base_speed(segments);
-        s.segments = segments;
+        s.speed = base_speed(s.segments);
         s.fam = 0.0;
         s.kills = 0;
         s.alive = true;

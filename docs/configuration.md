@@ -4,6 +4,8 @@ These are the world, host and portable-client settings. JSON uses camelCase;
 Rust fields use snake_case. Omitted fields use defaults; unknown fields are
 rejected. Durations are seconds unless named `Ticks`; distances are world units.
 Defaults below are constructor defaults, not the customized server example.
+World `Config` is available in core-only builds; the host and portable-client
+configs require the default-enabled `networking` feature.
 
 | Entry point | Configuration object |
 | --- | --- |

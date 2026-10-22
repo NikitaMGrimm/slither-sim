@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 use slither_sim::client::challenge::solve_challenge;
 
 // Exact encoded payloads (without `6`) and next outbound replies from:

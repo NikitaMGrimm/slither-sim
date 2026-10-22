@@ -116,3 +116,29 @@ coverage, prediction, receipt ages or network latency. Use the
 `Simulator::new`, `add`, `step`, `observe` and `observe_all` provide direct access;
 see [the basic example](../examples/basic.rs). Rust callers can build their own
 admission, respawn and match rules around the core.
+
+Set `default-features = false` on a path or Git dependency for the core alone:
+no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
+observations, JSON transport and the `basic`/`fidelity_replay` examples remain
+available. `networking` is enabled by default and restores the full interface.
+
+```sh
+cargo build --lib --no-default-features --locked
+```
+
+| Method | Purpose |
+| --- | --- |
+| `observe_selected(&mask)` | Shared-index batch observations, one result per slot. Unselected/dead slots are `None`; wrong mask length is an error. |
+| `body_is_clear(&body, clearance)` | Check all supplied edges against living snakes and the 60-unit arena margin; invalid input returns false. |
+| `respawn_body(slot, body, heading)` | Replace a dead slot using supplied geometry and reset per-life motion, boost, penalty, death-time and join-order state. |
+| `set_ambient_rate(attempts_per_second)` | Change refill rate while preserving fractional placement credit. Zero discards pending credit and disables refill. |
+
+Supplied bodies are head-first, one anchor per segment, with 2–430 finite points.
+Respawn requires all points inside the arena; it does not enforce clearance or
+reject self-intersections. Call `body_is_clear` separately for spawn exclusion.
+The straight-body `spawn_is_clear` and `respawn` methods remain available.
+
+Refill rates must be finite and within 0–10,000; a rate too small to represent
+the rescaled pending clock is rejected. Use the setter instead of directly
+editing `config.ambient_replenish_per_second` when changing a running world.
+Rejected operations leave the world unchanged.

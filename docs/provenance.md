@@ -1,6 +1,6 @@
 # Provenance
 
-Imported components come from `NikitaMGrimm/slither-arena-rs`, commit
+Initial imported components come from `NikitaMGrimm/slither-arena-rs`, commit
 `aab1149460c0f5606fbdc7d73e295ba79d094789` (2026-10-16).
 SlitherSim builds and tests independently of that repository.
 
@@ -16,6 +16,11 @@ original source hashes. Mechanics and stepping order were retained; adaptations
 include crate naming, removal of unused helpers and standalone interfaces.
 The Rust protocol encoder/decoder, network runtime, WebSocket host, JSON
 controllers, study schemas and evidence packager were added here.
+
+Generic body-clearance and respawn helpers were subsequently adapted from
+`src/simulator.rs` at `c2fb7285febb4273034e30699dc880715a334423`. Selected
+observations and refill-rate controls expose existing core paths with public
+validation. Their adaptations are recorded without replacing the initial pins.
 
 ## Verify imports
 

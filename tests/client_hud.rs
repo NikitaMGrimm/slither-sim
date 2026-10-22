@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 //! HUD reports and minimap families decoded with the stock client's handlers.
 //!
 //! The leaderboard fixture holds exact bytes from a retained live capture. Every

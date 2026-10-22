@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 use slither_sim::{
     client::{Minimap, ReceivedField, ReceivedTracker},
     physics, *,

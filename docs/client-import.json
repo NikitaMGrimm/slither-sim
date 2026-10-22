@@ -34,11 +34,12 @@
       "path": "tests/client_received.rs",
       "sourcePath": "tests/received.rs",
       "sourceSha256": "1fd1b313bfb468d594de4a92618530f308f39d7e36927a8def31af7c426b23d2",
-      "extractedSha256": "bc10ce9d3bc23aa0c80d8bd59ea3728bcca332f36c411de6ca10b67d52f8e48d",
+      "extractedSha256": "f73b2708ab34be4961e9ec8be0aba200d7489292f1c0c11a1f1a7bf43032df25",
       "adaptations": [
         "Retain tracker-only tests from source lines 1-93, 124-140 and 411-428 with public crate imports.",
         "Add standalone receipt, minimap, slot-growth and configurable-contraction tests.",
-        "Accept additional JSON snapshot fields in the response regression while retaining invalid-packet and value-validation checks."
+        "Accept additional JSON snapshot fields in the response regression while retaining invalid-packet and value-validation checks.",
+        "Gate client tests behind the default-enabled networking feature."
       ]
     },
     {

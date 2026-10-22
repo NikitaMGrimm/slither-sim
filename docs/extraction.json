@@ -37,9 +37,9 @@
     {
       "path": "src/observation/mod.rs",
       "sourceSha256": "facd6961fe11f09354c4ed861b560fde1f4bd4e7cbcd885cf14ca5c52517d8d3",
-      "extractedSha256": "068be485bf2e57f0827651a5e21de3f204c994dfab5607b7b03f05882077dc4c",
+      "extractedSha256": "d54ffcf9e4640a24743f97f34c1ff967e5873db4b1bcc4df902bb063dffb84bf",
       "adaptations": [
-        "Remove unused internal helper Simulator::observe_selected; observation implementation unchanged."
+        "Expose selected-slot batch observations as a public API using the existing shared index; unselected/dead slots remain empty."
       ]
     },
     {
@@ -65,10 +65,11 @@
     {
       "path": "src/simulator.rs",
       "sourceSha256": "d1d2057d495350a672ec419200f890933befb8ade8f91e7e0249fd0a295f23f6",
-      "extractedSha256": "45f640e06cff4b9c06bdfc6d6ede0b6983b92d8106799c67c34c30e415d8f9a0",
+      "extractedSha256": "b0e6633588ec978f83f68c3f0194fcc1e3a12b5f71d2a602fa5e989ad2769be2",
       "adaptations": [
-        "Remove unused internal helper Simulator::set_ambient_rate; stepping and mechanics unchanged.",
-        "Describe opt-in event buffers without application-specific terminology; behavior unchanged."
+        "Expose validated Simulator::set_ambient_rate, preserving fractional refill credit and defining zero-rate reset without changing the stepping loop.",
+        "Describe opt-in event buffers without application-specific terminology; behavior unchanged.",
+        "Adapt generic supplied-body clearance and respawn from src/simulator.rs at slither-arena-rs c2fb7285febb4273034e30699dc880715a334423; retain straight-body placement, existing per-life resets and physics rules."
       ]
     },
     {

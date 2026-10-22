@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 //! Loopback checks of the raw protocol-19 host. No outside server is contacted.
 use slither_sim::{
     Action,

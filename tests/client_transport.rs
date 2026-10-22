@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 use serde_json::{Value, json};
 use slither_sim::client::{CONTRACT, ClientFrame, ClientStatus, WireEvent, WireRecord, transport};
 use std::io::{BufRead, BufReader, Cursor, Write};

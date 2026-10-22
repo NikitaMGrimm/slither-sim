@@ -4,6 +4,8 @@
 
 - Deterministic headless Rust simulator with configurable worlds, geometric
   observations and mechanics regression fixtures.
+- Core-only library builds, selected-slot observations, supplied-body respawn
+  and runtime ambient refill-rate control.
 - Portable bot frames (`slither-client-v2`) reconstructed by a shared
   protocol-19 decoder, with simulator and WebSocket backends, receipt ages,
   measured ping and simulated latency.

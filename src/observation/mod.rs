@@ -141,6 +141,11 @@ impl Simulator {
         self.observe_matching(None)
             .expect("observations of existing slots cannot fail")
     }
+    /// Materialize selected living slots using one shared observation index.
+    /// The mask and result have one entry per snake; dead and unselected slots are None.
+    pub fn observe_selected(&self, selected: &[bool]) -> Result<Vec<Option<Observation>>, String> {
+        self.observe_matching(Some(selected))
+    }
     fn observe_matching(
         &self,
         selected: Option<&[bool]>,

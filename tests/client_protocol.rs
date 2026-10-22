@@ -1,3 +1,5 @@
+#![cfg(feature = "networking")]
+
 use serde_json::Value;
 use slither_sim::{
     client::{

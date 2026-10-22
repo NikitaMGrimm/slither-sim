@@ -13,11 +13,12 @@ was part of these checks. Original import hashes remain in [provenance](provenan
 | Interface audit, after `03243bb` | 256 Rust tests across 35 binaries on Rust 1.99.0/1.86.0, formatting/Clippy, 102 Python and 147 Node tests. Release build and 60-step native/loopback bot runs pass; package includes the contract fixture. |
 | Whole-repository fixes, `dd96044` | 261 Rust tests across 35 binaries on Windows with Rust 1.99.0/1.86.0, formatting/Clippy, 105 Python and 147 Node tests. A 100,000-food loopback snapshot arrives in bounded, ordered messages. |
 | Onboarding, `57d21a3` | 261 Rust tests, formatting/Clippy, release build and 102-file crate verification pass. Rust and Python bots complete 200-step native and loopback runs, ending playing. README rendering and local links checked. |
+| Core consumer APIs | 268 default and 127 core-only Rust tests on Windows; formatting and both Clippy modes pass. Seven new regressions also pass on Rust 1.86. Core-only WASM builds, with no WebSocket/TLS dependencies. A 122-request seeded baseline matches exactly. |
 
 All checkpoints verify 69 imports against their manifests and pinned Git bytes.
 Later extensions were not rerun on Linux or a live endpoint. Offline tests use
-doubles/loopback; temporary hosts and checkouts were cleaned up. Package contents
-exclude evidence tools, game assets and generated caches.
+doubles/loopback; temporary hosts were stopped and verification artifacts remain
+local. Package contents exclude evidence tools, game assets and generated caches.
 
 ## Bot transfer demonstration
 
@@ -76,6 +77,9 @@ Regressions cover:
 - Broadcast size/order, prey-speed validation before backend replacement,
   malformed UTF-8 recovery, header-free capture bundles, replay self removal and
   bundles missing source snapshots.
+- Selected-slot observation parity, supplied-body clearance/respawn resets,
+  fractional refill credit, and failed-operation nonmutation. An independent
+  GPT 6.1 Sol review found no supported defects in these core-consumer changes.
 
 A new replay test initially reused a growth marker; correction restored all 35
 replay tests. Its failed run remains in the local review artifacts.
@@ -101,6 +105,7 @@ traffic, payloads, checks and failed attempts; they are not distributed in Git.
 | `interface-audit-20261022-221e5147/` | Lifecycle/interface audit. |
 | `repository-review-20261022-6d18ae56/` | Whole-repository fixes, including the failed Python run before marker correction. |
 | `public-polish-20261022-dfdd479c/` | Setup, rendering and package checks. |
+| `core-consumer-check-20261022-5738850b/` | Seeded baseline/replay, default/core-only test logs and dependency tree. |
 
 Captured and synthetic evidence remain distinct. Hashes establish consistency,
 not authenticated origin, independent sampling or scientific validity.
