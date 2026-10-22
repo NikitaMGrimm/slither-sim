@@ -76,6 +76,11 @@ may require several empty steps. Omitting an action holds the last command.
 A replacement backend is installed only after successful construction.
 Poll network backends regularly to avoid accumulating stale input.
 
+The decoder retains at most 4,096 snake slots, 4,096 body anchors per snake,
+65,536 body anchors in total (including removed records), and 131,072 food IDs.
+Updates exceeding these limits fail before changing the frame's received state;
+network backends disconnect on that error. Reconnect clears retained entities.
+
 `processingSeconds` is measured bot compute time, between 0 and 2 seconds in
 simulation. It replaces the configured sample for that decision, including when
 no action is sent. Network computation has already elapsed, so the value is

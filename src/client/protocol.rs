@@ -32,6 +32,63 @@ const MAX_PING_SECONDS: f64 = 2.;
 const MAX_MOTION_STEPS: usize = 256;
 /// The stock `setMscps` extends its score tables by this many repeated entries.
 const SCORE_TABLE_EXTENSION: usize = 2048;
+const MAX_RECEIVED_SNAKES: usize = 4096;
+const MAX_RECEIVED_BODY_POINTS: usize = 65_536;
+const MAX_RECEIVED_SNAKE_POINTS: usize = 4096;
+const MAX_RECEIVED_FOOD: usize = 131_072;
+
+struct FoodBudget<'a> {
+    base: &'a BTreeMap<u32, Food>,
+    updates: HashMap<u32, bool>,
+    count: usize,
+}
+impl FoodBudget<'_> {
+    fn set(&mut self, id: u32, present: bool) -> Result<(), String> {
+        let previous = self
+            .updates
+            .get(&id)
+            .copied()
+            .unwrap_or_else(|| self.base.contains_key(&id));
+        if present && !previous {
+            if self.count == MAX_RECEIVED_FOOD {
+                return Err("Received food limit exceeded".into());
+            }
+            self.count += 1;
+        } else if previous && !present {
+            self.count -= 1;
+        }
+        self.updates.insert(id, present);
+        Ok(())
+    }
+
+    fn clear_sector(&mut self, sx: u8, sy: u8) -> Result<(), String> {
+        let first = food_id(sx, sy, 0, 0);
+        let last = food_id(sx, sy, 255, 255);
+        let ids: Vec<_> = self
+            .base
+            .range(first..=last)
+            .map(|(&id, _)| id)
+            .chain(
+                self.updates
+                    .keys()
+                    .copied()
+                    .filter(|id| (first..=last).contains(id)),
+            )
+            .collect();
+        for id in ids {
+            self.set(id, false)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy)]
+struct BodyBudget {
+    slot: usize,
+    known: bool,
+    direction: bool,
+    segments: usize,
+}
 
 fn truncated(p: &[u8]) -> String {
     format!(
@@ -116,6 +173,12 @@ pub(crate) fn split_payload(bytes: &[u8]) -> Result<Vec<&[u8]>, String> {
         m += length;
     }
     Ok(packets)
+}
+
+/// Only the supported challenge grammar identifies header-free framing; timing
+/// headers and session IDs may consist entirely of alphabetic bytes too.
+pub(crate) fn initial_raw_framing(bytes: &[u8]) -> bool {
+    bytes.first() == Some(&b'6') && super::challenge::solve_challenge(&bytes[1..]).is_ok()
 }
 
 /// Encode one decision as the bytes a protocol-19 client sends: a heading byte on
@@ -744,7 +807,7 @@ impl ClientState {
         }
         // A bare first challenge identifies a connection without timing headers.
         let raw = if self.session.frames == 0 {
-            bytes[0] == b'6'
+            initial_raw_framing(bytes)
         } else {
             self.session.raw_framing
         };
@@ -828,6 +891,7 @@ impl ClientState {
                 _ => {}
             }
         }
+        self.validate_retention(&parsed)?;
         for packet in parsed {
             self.apply_packet(packet, server, receipt)?;
         }
@@ -836,6 +900,165 @@ impl ClientState {
         }
         self.session.server_time = Some(server);
         self.local = Some(receipt);
+        Ok(())
+    }
+
+    /// Simulate retained sizes before committing any packet in a frame. The
+    /// food overlay touches only updated IDs, rather than copying all pellets.
+    fn validate_retention(&self, packets: &[Packet<'_>]) -> Result<(), String> {
+        if !packets.iter().any(|p| {
+            matches!(
+                p,
+                Packet::Appear(_)
+                    | Packet::Anchor { fam: Some(_), .. }
+                    | Packet::Sector(..)
+                    | Packet::Pellet(..)
+            )
+        }) {
+            return Ok(());
+        }
+        let mut lengths: Vec<_> = (0..self.session.slot_count)
+            .map(|slot| self.tracker.snake(slot).map_or(0, |snake| snake.body.len()))
+            .collect();
+        let mut total: usize = lengths.iter().sum();
+        let mut bodies: HashMap<_, _> = self
+            .session
+            .sides
+            .iter()
+            .map(|(&id, side)| {
+                (
+                    id,
+                    BodyBudget {
+                        slot: side.slot,
+                        known: side.body_known,
+                        direction: side.iang.is_some(),
+                        segments: self.tracker.snake(side.slot).map_or(0, |s| s.segments),
+                    },
+                )
+            })
+            .collect();
+        let mut free = self.session.free_slots.clone();
+        let mut own = self.session.self_id;
+        let mut own_dead = self.session.own_dead;
+        let mut last_food = self.session.last_food_sector;
+        let mut last_eaten = self.session.last_eaten_sector;
+        let mut food = FoodBudget {
+            base: &self.session.food,
+            updates: HashMap::new(),
+            count: self.session.food.len(),
+        };
+        for packet in packets {
+            match packet {
+                Packet::Appear(a) => {
+                    let length = if a.first.is_some() {
+                        a.deltas.len() + 1 + usize::from(a.iang.is_some())
+                    } else {
+                        0
+                    };
+                    let slot = if let Some(body) = bodies.get(&a.id) {
+                        body.slot
+                    } else if let Some(slot) = free.pop() {
+                        slot
+                    } else {
+                        if lengths.len() == MAX_RECEIVED_SNAKES {
+                            return Err("Received snake limit exceeded".into());
+                        }
+                        lengths.push(0);
+                        lengths.len() - 1
+                    };
+                    total = total - lengths[slot] + length;
+                    lengths[slot] = length;
+                    bodies.insert(
+                        a.id,
+                        BodyBudget {
+                            slot,
+                            known: true,
+                            direction: a.iang.is_some(),
+                            segments: length,
+                        },
+                    );
+                    own.get_or_insert(a.id);
+                    if length > MAX_RECEIVED_SNAKE_POINTS {
+                        return Err("Received snake body limit exceeded".into());
+                    }
+                }
+                Packet::Remove(id, _) => {
+                    if let Some(body) = bodies.remove(id) {
+                        free.push(body.slot);
+                    }
+                    if own == Some(*id) {
+                        own_dead = true;
+                    }
+                }
+                Packet::GameOver => own_dead = true,
+                Packet::Anchor {
+                    target,
+                    iang,
+                    absolute,
+                    fam,
+                } => {
+                    let id = match target {
+                        Target::Id(id) => Some(*id),
+                        Target::Own => own.filter(|_| !own_dead),
+                    };
+                    if let Some(body) = id.and_then(|id| bodies.get_mut(&id)) {
+                        body.direction |= iang.is_some();
+                        let length = &mut lengths[body.slot];
+                        let previous = *length;
+                        if body.known {
+                            if absolute.is_some() || (*length > 0 && body.direction) {
+                                *length += usize::from(fam.is_some());
+                            } else {
+                                *length = 0;
+                                body.known = false;
+                            }
+                        }
+                        body.segments += usize::from(fam.is_some());
+                        total = total - previous + *length;
+                        if *length > MAX_RECEIVED_SNAKE_POINTS
+                            || body.segments > MAX_RECEIVED_SNAKE_POINTS
+                        {
+                            return Err("Received snake body limit exceeded".into());
+                        }
+                    }
+                }
+                Packet::Tail(id, _) => {
+                    if let Some(body) = bodies.get_mut(id) {
+                        if body.known && lengths[body.slot] > 0 {
+                            lengths[body.slot] -= 1;
+                            total -= 1;
+                        }
+                        body.segments = body.segments.saturating_sub(1);
+                    }
+                }
+                Packet::Sector(sx, sy, pellets) => {
+                    for &(rx, ry, _) in pellets {
+                        food.set(food_id(*sx, *sy, rx, ry), true)?;
+                    }
+                }
+                Packet::Pellet(sector, rx, ry, _) => {
+                    if sector.is_some() {
+                        last_food = *sector;
+                    }
+                    if let Some((sx, sy)) = last_food {
+                        food.set(food_id(sx, sy, *rx, *ry), true)?;
+                    }
+                }
+                Packet::Eaten(sector, rx, ry) => {
+                    if sector.is_some() {
+                        last_eaten = *sector;
+                    }
+                    if let Some((sx, sy)) = last_eaten {
+                        food.set(food_id(sx, sy, *rx, *ry), false)?;
+                    }
+                }
+                Packet::ClearSector(sx, sy) => food.clear_sector(*sx, *sy)?,
+                _ => {}
+            }
+            if total > MAX_RECEIVED_BODY_POINTS {
+                return Err("Received total body limit exceeded".into());
+            }
+        }
         Ok(())
     }
 

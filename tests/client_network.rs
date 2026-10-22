@@ -293,6 +293,38 @@ fn captured_challenge_and_unframed_reconnect_clear_connection_knowledge() {
 }
 
 #[test]
+fn direct_login_accepts_timing_header_with_challenge_high_byte() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut socket = tungstenite::accept(stream).unwrap();
+        socket.read().unwrap();
+        let mut frame = vec![b'6', 0];
+        frame.extend(setup());
+        socket.send(Message::Binary(frame.into())).unwrap();
+        socket.send(framed(&appearance())).unwrap();
+        while let Ok(message) = socket.read() {
+            if matches!(message, Message::Close(_)) {
+                break;
+            }
+        }
+    });
+    let mut backend = NetworkBackend::connect(NetworkConfig {
+        url: format!("ws://{address}/slither"),
+        handshake: Handshake::Direct,
+        ..NetworkConfig::default()
+    })
+    .unwrap();
+    assert_eq!(backend.next_frame().unwrap().status, ClientStatus::Playing);
+    backend.disconnect();
+    server.join().unwrap();
+}
+
+#[test]
 fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
