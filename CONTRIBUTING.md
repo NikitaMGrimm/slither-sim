@@ -45,6 +45,9 @@ automatically. Maintainer review checks ownership, callers, contracts and eviden
 independently of contributor-written tests. Passing those tests alone is not
 acceptance. Tests stay offline; collection or publication needs separate authorization.
 
+Preserve third-party license notices. For external data, note its source and any
+sharing restrictions in `REPORT.md`.
+
 A maintainer reviews the current PR revision and its evidence before merging.
 Required CI must pass with the latest main; new commits need the relevant checks
 and review again. Auto-merge can finish an approved PR once these requirements
@@ -86,10 +89,3 @@ Evidence tools and schemas require the Git checkout. Registry publishing is disa
 routine edits do not refresh import hashes. Per-study source pins remain required.
 Do not publish releases, change repository visibility,
 collaborators or licensing without the owner's authorization.
-
-## Contribution terms
-
-You retain copyright. Submitting code, documentation or fixtures offers them
-under [MIT](LICENSE) and confirms your right to contribute them. Preserve
-third-party attribution and licenses. Evidence archives specify their rights
-holder, covered paths and reuse terms in `REPORT.md`.

@@ -26,7 +26,6 @@ Optional geometry/motion media belongs in PR attachments or links. -->
 
 - [ ] Relevant checks pass; unrun checks are identified.
 - [ ] Relevant evidence tier and fixture/version requirements are met (or inapplicable).
-- [ ] Contribution terms in CONTRIBUTING.md are met; recordings stay outside Git.
 
 <!-- If AI helped, end with the disclosure described in CONTRIBUTING.md#ai-assistance.
 Name actual models, harnesses and roles, including material delegated work. Example:

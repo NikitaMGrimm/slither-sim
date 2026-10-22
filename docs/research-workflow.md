@@ -133,8 +133,7 @@ bundled code. See [bundle format](evidence-format.md).
 
 Scientific status stays `unreviewed`. Submit the bundle URL/SHA-256, report,
 reproduction commands and a distilled regression fixture. Keep full recordings
-outside Git. `REPORT.md` identifies rights holders, covered paths and reuse terms;
-repository code/fixtures use MIT and bundled software retains its license.
+outside Git. For external data, note its source and sharing restrictions in `REPORT.md`.
 Review must trace claims to exact windows, alternatives and held-out checks;
 byte integrity alone cannot establish a scientific conclusion.
 
