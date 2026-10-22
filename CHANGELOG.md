@@ -4,6 +4,8 @@
 
 - Keep answering post-death pings so the stock browser's death fade and victory
   entry do not trigger lag slowdown; document a local endpoint that survives Play Again.
+- Continue opponent, food and prey updates through the stock death animation,
+  preserving broadcast cadence while suppressing repeated death and minimap reports.
 
 ## Unreleased
 
