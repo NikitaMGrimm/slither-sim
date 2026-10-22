@@ -33,16 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          commit=$(git rev-parse HEAD)
-          git merge-base --is-ancestor "$commit" origin/main
-          run_id=$(gh run list --workflow checks.yml --event push --branch main --commit "$commit" \
-            --limit 1 --json databaseId --jq '.[0].databaseId // empty')
-          if [[ -z "$run_id" ]]; then
-            echo '::error::No main CI run exists for this commit.'
-            exit 1
-          fi
-          gh run watch "$run_id" --exit-status --interval 15
+        run: python3 tools/release.py --check-ci
       - name: Check tag and published identity
         if: github.event_name == 'push'
         id: package

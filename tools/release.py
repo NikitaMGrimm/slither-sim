@@ -1,4 +1,4 @@
-"""Check a version tag and recognize a previous upload of the same commit."""
+"""Check release CI, a version tag and any previous upload of the same commit."""
 
 import hashlib
 import io
@@ -7,12 +7,30 @@ from pathlib import Path
 import subprocess
 import sys
 import tarfile
+import time
 import tomllib
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = "https://crates.io/api/v1/crates"
+
+
+def require_main_ci(commit, timeout=300):
+    subprocess.run(["git", "merge-base", "--is-ancestor", commit, "origin/main"], cwd=ROOT, check=True)
+    deadline = time.monotonic() + timeout
+    while True:
+        run_id = subprocess.check_output([
+            "gh", "run", "list", "--workflow", "checks.yml", "--event", "push", "--branch", "main",
+            "--commit", commit, "--limit", "1", "--json", "databaseId", "--jq", ".[0].databaseId // empty",
+        ], cwd=ROOT, text=True).strip()
+        if run_id:
+            subprocess.run(["gh", "run", "watch", run_id, "--exit-status", "--interval", "15"], cwd=ROOT, check=True)
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(f"No main CI run appeared for {commit} within {timeout} seconds")
+        time.sleep(min(5, remaining))
 
 
 def fetch(url):
@@ -55,10 +73,13 @@ def prepare(tag, package, commit):
 
 def main():
     if len(sys.argv) != 2:
-        raise SystemExit("Usage: python tools/release.py vVERSION")
+        raise SystemExit("Usage: python tools/release.py vVERSION | --check-ci")
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    if sys.argv[1] == "--check-ci":
+        require_main_ci(commit)
+        return
     with (ROOT / "Cargo.toml").open("rb") as stream:
         package = tomllib.load(stream)["package"]
-    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     for key, value in prepare(sys.argv[1], package, commit).items():
         print(f"{key}={value}")
 

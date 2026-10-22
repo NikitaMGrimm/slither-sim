@@ -28,7 +28,8 @@ git push origin v0.1.1
 ```
 
 The workflow requires the tag to match the manifest and the commit to belong to
-main. It waits for that commit's main CI, verifies the package, publishes to
+main. It allows five minutes for that commit's main CI run to appear, waits for
+it to pass, verifies the package, publishes to
 crates.io and creates a GitHub Release with generated notes. Prerelease tags get
 prerelease releases. Do not move published tags or reuse published versions.
 

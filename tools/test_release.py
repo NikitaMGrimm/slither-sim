@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import subprocess
 import tarfile
 import unittest
 from unittest.mock import patch
@@ -12,6 +13,55 @@ import release
 class ReleaseTests(unittest.TestCase):
     package = {"name": "slither-sim", "version": "0.1.0", "publish": ["crates-io"]}
     commit = "a" * 40
+
+    def test_ci_lookup_waits_for_the_exact_main_run(self):
+        for replies in (["123\n"], ["", "123\n"]):
+            with self.subTest(replies=replies), \
+                    patch.object(release.subprocess, "run") as run, \
+                    patch.object(release.subprocess, "check_output", side_effect=replies) as lookup, \
+                    patch.object(release.time, "monotonic", return_value=0), \
+                    patch.object(release.time, "sleep") as sleep:
+                release.require_main_ci(self.commit)
+                self.assertEqual(run.call_args_list[0].args[0],
+                                 ["git", "merge-base", "--is-ancestor", self.commit, "origin/main"])
+                self.assertEqual(run.call_args_list[1].args[0],
+                                 ["gh", "run", "watch", "123", "--exit-status", "--interval", "15"])
+                self.assertEqual(lookup.call_count, len(replies))
+                for call in lookup.call_args_list:
+                    self.assertEqual(call.args[0], [
+                        "gh", "run", "list", "--workflow", "checks.yml", "--event", "push", "--branch", "main",
+                        "--commit", self.commit, "--limit", "1", "--json", "databaseId", "--jq", ".[0].databaseId // empty",
+                    ])
+                self.assertEqual(sleep.call_count, len(replies) - 1)
+
+    def test_missing_ci_fails_at_the_deadline_without_watching(self):
+        with patch.object(release.subprocess, "run") as run, \
+                patch.object(release.subprocess, "check_output", return_value=""), \
+                patch.object(release.time, "monotonic", side_effect=[0, 298, 300]), \
+                patch.object(release.time, "sleep") as sleep:
+            with self.assertRaisesRegex(TimeoutError, "within 300 seconds"):
+                release.require_main_ci(self.commit)
+            sleep.assert_called_once_with(2)
+            self.assertEqual(run.call_count, 1)
+
+    def test_ci_errors_fail_without_retry(self):
+        for failing_stage in ("ancestry", "lookup", "watch"):
+            with self.subTest(stage=failing_stage), \
+                    patch.object(release.subprocess, "run") as run, \
+                    patch.object(release.subprocess, "check_output", return_value="123\n") as lookup, \
+                    patch.object(release.time, "sleep") as sleep:
+                error = subprocess.CalledProcessError(1, failing_stage)
+                if failing_stage == "ancestry":
+                    run.side_effect = error
+                elif failing_stage == "lookup":
+                    lookup.side_effect = error
+                else:
+                    run.side_effect = [None, error]
+                with self.assertRaises(subprocess.CalledProcessError):
+                    release.require_main_ci(self.commit)
+                self.assertEqual(lookup.call_count, 0 if failing_stage == "ancestry" else 1)
+                self.assertEqual(run.call_count, 2 if failing_stage == "watch" else 1)
+                sleep.assert_not_called()
 
     def archive(self, **git):
         data = json.dumps({"git": {"sha1": self.commit, **git}}).encode()
