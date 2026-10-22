@@ -145,6 +145,9 @@ selects header-free framing, including bundled packets. Body contraction outside
 
 ### Simulation
 
+See the [configuration reference](configuration.md) for all world, simulation,
+latency and network fields, their defaults and limits.
+
 Defaults: one snake, six 7 ms ticks per decision/broadcast, 32×32 minimap every
 2.5 seconds, leaderboard on entry/every 3 seconds and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.

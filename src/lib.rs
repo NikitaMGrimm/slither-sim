@@ -1,4 +1,4 @@
-//! Headless simulator inspired by Slither.io with protocol-19 bot interfaces.
+//! Headless Slither.io simulator for bot development, training and custom protocol-19 servers.
 //!
 //! The default physics tick is 7 ms. Mechanics include measured rules and explicit
 //! approximations; see `docs/server-rules.md` for mechanics and evidence limits.

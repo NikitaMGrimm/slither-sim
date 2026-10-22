@@ -1,8 +1,8 @@
 # Protocol-19 WebSocket server
 
 `slither-sim host` serves one shared world at `ws://127.0.0.1:8766/slither`.
-Use it for socket-based bots. For virtual-time runs without socket overhead, use
-`SimulatorBackend` through the [portable API](client-api.md).
+Use it for custom servers and socket-based bots. For virtual-time runs without
+socket overhead, use `SimulatorBackend` through the [portable API](client-api.md).
 
 From the checkout:
 
@@ -21,6 +21,9 @@ No game UI is served.
 
 ## Configuration
 
+The [configuration reference](configuration.md) lists every host/world setting,
+default and limit, including [timing and ping](configuration.md#timing-and-ping).
+
 Save as `arena.json`:
 
 ```json
@@ -30,13 +33,22 @@ Save as `arena.json`:
   "maxClients": 4,
   "bots": 4,
   "simulation": {
-    "world": {"radius": 1500, "foodCount": 600},
+    "world": {
+      "radius": 1500,
+      "foodCount": 550,
+      "ambientReplenishPerSecond": 8.04,
+      "dt": 0.007
+    },
     "broadcastTicks": 6,
-    "leaderboardIntervalSeconds": 3.0,
-    "latency": {"roundTripSeconds": [0.06], "jitterSeconds": 0.003}
+    "leaderboardIntervalSeconds": 3.0
   }
 }
 ```
+
+The 1,500-unit arena and eight slots keep this example small. Food settings scale
+the existing provisional ecology estimate: about 7 pellets and 0.1024 placement
+attempts/s per 300×300 sector. `dt` is the measured 7 ms tick. This is not an
+official server preset; see [rules and limits](server-rules.md).
 
 ```sh
 cargo run --release --locked -- host --config arena.json
@@ -49,6 +61,13 @@ these counts. Host `recordWire` must be false; enable recording on a client inst
 `--bind IP:PORT` overrides the file. Real sockets already include network and
 compute delay; configured latency adds another ordered link. Keep added latency
 at zero for normal remote use. Client processing delay is not simulated twice.
+
+### Presets
+
+There are no named host/JSON presets; omitted settings use the compact defaults.
+Rust callers can use `Config::default()` or `Config::realistic(n)`. The latter
+scales radius and ecology with a provisional population model, rather than
+reproducing an official server configuration.
 
 ## VPS use
 

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  A headless Rust simulator inspired by Slither.io, for bot training and protocol-19 WebSocket hosting.
+  A headless Slither.io simulator in Rust for bot development, training and custom servers.
 </p>
 
 <p align="center">
@@ -53,6 +53,7 @@ cargo run --release --locked --example portable_bot -- --url ws://127.0.0.1:8766
 
 The host binds loopback by default. Stop it with Ctrl+C.
 [Server configuration](docs/raw-server.md) covers custom worlds and remote hosting.
+[All settings](docs/configuration.md) lists defaults, limits and timing behavior.
 
 ## Choose an interface
 

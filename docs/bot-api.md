@@ -34,6 +34,7 @@ Works before reset. Returns `version`, `defaultConfig`, `defaultDecisionTicks`,
 All fields except `op` are optional. Defaults: seed 1, four agents, six decision
 ticks and `Config::default()`. Agents must be 1–128 and decision ticks 1–1000.
 `config` and nested settings use camelCase; omitted fields use defaults.
+All world settings are listed in the [configuration reference](configuration.md#world-config).
 Invalid resets preserve the previous world.
 
 Returns `seed`, resolved `config`, `decisionTicks`, `observations` and `time`.
