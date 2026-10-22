@@ -63,9 +63,13 @@ pub(crate) fn angle_byte(angle: f64) -> u8 {
 pub(crate) fn angle_u16(angle: f64) -> u16 {
     ((angle.rem_euclid(TAU) / TAU * 65536.).round() as u32 % 65536) as u16
 }
-/// Motion speed byte: protocol `sp` (units per 8 ms / 4) times 18.
+/// Motion speed byte: world units/s converted to protocol `sp`, times 18.
 pub(crate) fn speed_byte(speed: f64) -> Result<u8, String> {
-    Ok(checked((speed * 0.032 * 18.).round(), 255., "Speed")? as u8)
+    Ok(checked(
+        (speed * physics::SPEED_UNIT_SECONDS * 18.).round(),
+        255.,
+        "Speed",
+    )? as u8)
 }
 pub(crate) fn speed_u16(speed: f64) -> Result<u16, String> {
     Ok(checked((speed * 32.).round(), 65535., "Speed")? as u16)

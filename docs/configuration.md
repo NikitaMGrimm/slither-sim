@@ -127,6 +127,8 @@ unoccupied remote slots do not.
 All numeric values except `count` must be positive and finite. Speeds are world
 units/s, turn rate is radians/s; `cruiseSpeed ≤ escapeSpeed ≤ sprintSpeed` and
 `size ≤ maxSize`.
+Protocol speed is divided by 0.032 to obtain world units/s; turn coefficients
+use an 8 ms reference. These conversion scales are separate from `world.dt`.
 
 | Field under `prey` | Default | Meaning |
 | --- | --- | --- |
@@ -157,6 +159,9 @@ positive integer `maxPerCell`. All existing food counts toward cell occupancy.
 This is a historical, provisional anti-camping model. Set `kiosk.enabled: false`
 when it should not affect a replay. Numeric fields must be positive and finite,
 except `graceSeconds`, which may be zero.
+Defaults fit a 62,000-to-8,500 change over six minutes for physical score and
+120 minutes for displayed score. Recovery reuses the physical decay rate as an
+approximation.
 
 | Field under `kiosk` | Default | Meaning |
 | --- | --- | --- |

@@ -14,13 +14,15 @@ use super::{
     },
     minimap::{Minimap, MinimapDecoder},
 };
-use crate::{Action, Arena, Food, Observation, Point, Snake, physics, prey::Prey};
+use crate::{
+    Action, Arena, Food, Observation, Point, Snake,
+    physics::{self, SPEED_UNIT_SECONDS},
+    prey::Prey,
+};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::f64::consts::TAU;
 
 pub const PROTOCOL_VERSION: u8 = 19;
-/// Client `sp` values are distance per 32 ms of server time.
-const SPEED_UNIT_SECONDS: f64 = 0.032;
 const MAX_SENT_COMMANDS: usize = 64;
 const PING_RANGE_SECONDS: f64 = 5.;
 /// The stock client sends a game ping only after more than 250 ms.

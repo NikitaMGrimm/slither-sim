@@ -1,6 +1,9 @@
 //! Moving edible entities. Authoritative positions are quantized each server tick;
 //! client prediction is smooth. Steering and population control remain estimates.
-use crate::{model::*, physics::advance};
+use crate::{
+    model::*,
+    physics::{REFERENCE_FRAME_SECONDS, SPEED_UNIT_SECONDS, advance},
+};
 use serde::{Deserialize, Serialize};
 
 /// Explicit replay state. The official trigger for outward departure is unknown.
@@ -12,7 +15,7 @@ pub enum PreyMode {
     Outward,
 }
 
-pub(crate) const OUTWARD_SPEED: f64 = 6.060 / 0.032;
+pub(crate) const OUTWARD_SPEED: f64 = 6.060 / SPEED_UNIT_SECONDS;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -47,10 +50,10 @@ impl Default for PreyConfig {
     fn default() -> Self {
         Self {
             count: 0,
-            cruise_speed: 3.8 / 0.032,
-            escape_speed: 6.153 / 0.032,
-            sprint_speed: 10.997 / 0.032,
-            turn_rate: 0.029 / 0.008,
+            cruise_speed: 3.8 / SPEED_UNIT_SECONDS,
+            escape_speed: 6.153 / SPEED_UNIT_SECONDS,
+            sprint_speed: 10.997 / SPEED_UNIT_SECONDS,
+            turn_rate: 0.029 / REFERENCE_FRAME_SECONDS,
             flee_half_width: 320.0,
             size: 6.0,
             // Observed range; the server's spawn distribution remains unknown.
@@ -65,7 +68,7 @@ impl PreyConfig {
     /// Empirical flight speed follows the threatening snake's protocol speed.
     /// The measured default endpoints are (5.79, 6.153) and (14, 10.997).
     pub fn flight_speed(&self, snake_speed: f64) -> f64 {
-        let fraction = ((snake_speed * 0.032 - 5.79) / (14.0 - 5.79)).clamp(0.0, 1.0);
+        let fraction = ((snake_speed * SPEED_UNIT_SECONDS - 5.79) / (14.0 - 5.79)).clamp(0.0, 1.0);
         self.escape_speed + (self.sprint_speed - self.escape_speed) * fraction
     }
 

@@ -1,7 +1,8 @@
 //! Server rules measured from protocol-19 captures (`tools/fidelity/slither-headless.mjs`,
 //! analyzed on the server's elapsed-ms clock) and constants the server sends to clients.
-//! Speeds are world units per second; the protocol's `sp` is units per 8 ms frame / 4,
-//! so `sp / 0.032` converts. See docs/server-rules.md for the evidence behind each fit.
+//! Speeds are world units per second; protocol speed converts as `sp / 0.032`.
+//! Turning and boost progress use a separate 8 ms reference interval. Neither
+//! conversion is the physics tick. See docs/server-rules.md for each fit's evidence.
 use crate::model::Point;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -13,12 +14,16 @@ use std::{
 /// Snake motion scales with elapsed time. Prey coordinate rounding occurs once
 /// per loop, so its effective velocity also depends on this period.
 pub const LOOP_SECONDS: f64 = 0.007;
+/// Protocol speed divided by this factor gives world units/s; not a server tick.
+pub(crate) const SPEED_UNIT_SECONDS: f64 = 0.032;
+/// Nominal interval for turning and boost-progress coefficients, separate from LOOP_SECONDS.
+pub(crate) const REFERENCE_FRAME_SECONDS: f64 = 0.008;
 /// Distance between body anchors (`default_msl`).
 pub const ANCHOR_SPACING: f64 = 42.0;
 /// Radius of drawn bodies and heads per scale (`sc * 29 / 2`).
 pub const BODY_RADIUS: f64 = 14.5;
 /// Boost speed (`nsp3`).
-pub const BOOST_SPEED: f64 = 14.0 / 0.032;
+pub const BOOST_SPEED: f64 = 14.0 / SPEED_UNIT_SECONDS;
 /// Nominal interval between boost pellets while boosting.
 pub const BOOST_DROP_SECONDS: f64 = 0.155;
 /// Food nutrition per squared pellet size before the mass multiplier.
@@ -38,19 +43,19 @@ pub fn scang(segments: usize) -> f64 {
 }
 /// Cruise speed `nsp1 + nsp2 * sc`.
 pub fn base_speed(segments: usize) -> f64 {
-    (5.39 + 0.4 * scale(segments)) / 0.032
+    (5.39 + 0.4 * scale(segments)) / SPEED_UNIT_SECONDS
 }
 /// Maximum turn in radians per second: `mamu * scang` per 8 ms, independent of boost
 /// (speed never drops below `spangdv`, so `spang` is always 1).
 pub fn turn_rate(segments: usize) -> f64 {
-    0.033 / 0.008 * scang(segments)
+    0.033 / REFERENCE_FRAME_SECONDS * scang(segments)
 }
 /// Speed ramp derived from the current APK's normalized boost progress, using nominal
 /// time. The fixed-size slope is independently supported by online speed reports;
 /// latent progress retention during growth and offline saturation quirks are unverified.
 /// See docs/research/speed-equations.md. Network delay and the offline 1.3 clock are excluded.
 pub fn approach_speed(current: f64, target: f64, segments: usize, dt: f64) -> f64 {
-    let up = (BOOST_SPEED - base_speed(segments)) * (0.015 / 0.008)
+    let up = (BOOST_SPEED - base_speed(segments)) * (0.015 / REFERENCE_FRAME_SECONDS)
         / (1.0 + 0.305 * (scale(segments) - 1.0));
     let limit = if target > current { up } else { up * 4.0 / 3.0 } * dt;
     current + (target - current).clamp(-limit, limit)
@@ -118,9 +123,9 @@ impl SpeedState {
             *self = Self::from_observed_speed(self.speed, segments);
         } else if (boosting && self.progress < 1.0) || (!boosting && self.progress > 0.0) {
             let rate = if boosting {
-                0.015 / 0.008
+                0.015 / REFERENCE_FRAME_SECONDS
             } else {
-                -0.02 / 0.008
+                -0.02 / REFERENCE_FRAME_SECONDS
             };
             self.progress = (self.progress + rate * dt / (1.0 + 0.305 * (scale(segments) - 1.0)))
                 .clamp(0.0, 1.0);
@@ -157,7 +162,7 @@ pub fn boost_cost(segments: usize) -> f64 {
 /// previously biased the fit toward a larger circle (see docs/research/circle-eating-investigation.md).
 pub fn pickup_circle(head: Point, heading: f64, speed: f64, segments: usize) -> (Point, f64) {
     let sc = scale(segments) - 1.0;
-    let lead = speed * 0.032 * (7.55 + 1.8 * sc);
+    let lead = speed * SPEED_UNIT_SECONDS * (7.55 + 1.8 * sc);
     (
         Point {
             x: head.x + heading.cos() * lead,

@@ -25,17 +25,22 @@ pub struct KioskConfig {
 
 impl Default for KioskConfig {
     fn default() -> Self {
+        // Calibration data from the historical chart; runtime settings remain independent.
+        let reference_score = 62_000.0_f64;
+        let floor_score = 8_500.0;
+        let shrink_seconds = 6.0 * 60.0;
+        let score_decay_seconds = 120.0 * 60.0;
+        let log_score_ratio = (reference_score / floor_score).ln();
+        let shrink_rate = log_score_ratio / shrink_seconds;
         Self {
             enabled: true,
-            floor_score: 8_500.0,
+            floor_score,
             grace_seconds: 20.0 * 60.0,
             stationary_radius: 800.0,
-            // A 62k snake reaches 8.5k in about six minutes in the 2024 chart.
-            shrink_per_second: (62_000.0_f64 / 8_500.0).ln() / (6.0 * 60.0),
-            // The chart reaches 8.5k about 120 minutes after size hits the floor.
-            score_decay_per_second: (62_000.0_f64 / 8_500.0).ln() / (120.0 * 60.0),
+            shrink_per_second: shrink_rate,
+            score_decay_per_second: log_score_ratio / score_decay_seconds,
             // No measured recovery curve; use the same time scale as shrinkage.
-            recovery_per_second: (62_000.0_f64 / 8_500.0).ln() / (6.0 * 60.0),
+            recovery_per_second: shrink_rate,
         }
     }
 }

@@ -22,8 +22,10 @@
     {
       "path": "src/kiosk.rs",
       "sourceSha256": "eacaf4c138410330280a11bb9debb82840e8dec229792841cabc7b6c18b0965d",
-      "extractedSha256": "eacaf4c138410330280a11bb9debb82840e8dec229792841cabc7b6c18b0965d",
-      "adaptations": []
+      "extractedSha256": "eb580a865301e670ddc6c53f4d536c15a4463eb7580a32c64c2756270c9b4fd5",
+      "adaptations": [
+        "Name local default-calibration scores and durations and reuse the identical logarithmic ratio; preserve all defaults and independent runtime settings."
+      ]
     },
     {
       "path": "src/model.rs",
@@ -45,14 +47,18 @@
     {
       "path": "src/physics.rs",
       "sourceSha256": "13999cd2475fa2de2765f66b753f11d287b6b107c7e3c865d2151cad12c7da52",
-      "extractedSha256": "13999cd2475fa2de2765f66b753f11d287b6b107c7e3c865d2151cad12c7da52",
-      "adaptations": []
+      "extractedSha256": "c1f49621707621981c83e9572cb01742b884915b48ceccf900c9f9ddb0082e74",
+      "adaptations": [
+        "Name shared protocol-speed and nominal-reference-frame conversion constants; preserve values and floating-point operation order."
+      ]
     },
     {
       "path": "src/prey.rs",
       "sourceSha256": "c332a7e03fe01ebcdad0826486658e92c29399946992bbc01672f881e088e547",
-      "extractedSha256": "c332a7e03fe01ebcdad0826486658e92c29399946992bbc01672f881e088e547",
-      "adaptations": []
+      "extractedSha256": "6857609bc6842d4ed661a753f6c795c5fcac9c0763bf880fdb12630be1b7f614",
+      "adaptations": [
+        "Reuse the shared speed/reference-frame constants in prey defaults and conversions; preserve calculated values and motion rules."
+      ]
     },
     {
       "path": "src/profiling.rs",
