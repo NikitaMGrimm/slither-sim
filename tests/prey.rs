@@ -26,6 +26,59 @@ fn world() -> Simulator {
     w
 }
 #[test]
+fn spawned_prey_respect_positive_representable_size_bounds() {
+    for (size, max_size) in [
+        (6.01, 6.39),
+        (0.01, 0.39),
+        (6.0, 9.2),
+        (6.6000000000000005, 6.8),
+        (6.2, 6.599999999999999),
+    ] {
+        let world = Simulator::new(
+            7,
+            Config {
+                food_count: 0,
+                prey: PreyConfig {
+                    count: 100,
+                    size,
+                    max_size,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(world.prey.len(), 100);
+        for prey in world.prey {
+            assert!(prey.size >= size && prey.size <= max_size && prey.size > 0.0);
+            assert!((prey.size * 5.0 - (prey.size * 5.0).round()).abs() < 1e-12);
+        }
+    }
+    for (size, max_size) in [
+        (9.21, 9.39),
+        (0.01, 0.02),
+        (0.21, 0.21),
+        (1e308, 1e308),
+        (6.6000000000000005, 6.6000000000000005),
+    ] {
+        assert!(
+            Simulator::new(
+                7,
+                Config {
+                    prey: PreyConfig {
+                        size,
+                        max_size,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn client_prey_units_and_turn_limit() {
     // Public client: mamu2=0.029 radians per 8ms; movement sp*vfr/4.
     let mut p = entity(0., 3.8 / 0.032);

@@ -18,6 +18,28 @@ fn empty_world() -> Simulator {
 }
 
 #[test]
+fn large_respawn_headings_preserve_orientation_and_can_turn() {
+    for supplied_body in [false, true] {
+        let mut world = empty_world();
+        world.add("self", 0, 1).unwrap();
+        world.snakes[0].alive = false;
+        let heading: f64 = 1e20;
+        if supplied_body {
+            world
+                .respawn_body(0, vec![Point::default(), Point { x: -42., y: 0. }], heading)
+                .unwrap();
+        } else {
+            world.respawn(0, Point::default(), heading, 2).unwrap();
+        }
+        let before = world.snakes[0].heading;
+        assert!((before.cos() - heading.cos()).abs() < 1e-12);
+        assert!((before.sin() - heading.sin()).abs() < 1e-12);
+        world.step(&[Some(Action::default())]).unwrap();
+        assert!(world.snakes[0].heading.abs() < before.abs());
+    }
+}
+
+#[test]
 fn selected_observations_match_individual_and_indexed_batches_without_mutation() {
     let mut world = Simulator::new(
         7,

@@ -353,7 +353,7 @@ impl Simulator {
         let r = loop {
             let f = self.random.next().sqrt();
             if self.random.next() * 0.217 <= 0.217 - 0.172 * f {
-                break f * (self.config.radius - 20.0);
+                break f * (self.config.radius - 20.0).max(0.0);
             }
         };
         let size = ((3.0 + self.random.next() * 6.4) * 5.0).round() / 5.0;
@@ -557,7 +557,12 @@ impl Simulator {
         s.head = body[0];
         s.segments = body.len();
         s.body = body;
-        s.heading = heading;
+        // Large finite angles lose per-tick turn increments to rounding.
+        s.heading = if heading.abs() > TAU {
+            heading.sin().atan2(heading.cos())
+        } else {
+            heading
+        };
         s.speed = base_speed(s.segments);
         s.fam = 0.0;
         s.kills = 0;
@@ -1011,6 +1016,11 @@ impl Simulator {
         let angle = self.prey_random.next() * TAU;
         let radius = self.prey_random.next().sqrt() * self.config.radius * 0.95;
         let heading = self.prey_random.next() * TAU;
+        let (min_size, max_size) = self
+            .config
+            .prey
+            .size_steps()
+            .expect("validated prey size range");
         self.prey.push(Prey {
             id: self.next_prey_id,
             position: Point {
@@ -1024,6 +1034,7 @@ impl Simulator {
                 + self.prey_random.next() * (self.config.prey.max_size - self.config.prey.size))
                 * 5.0)
                 .round()
+                .clamp(min_size, max_size)
                 / 5.0,
         });
         self.next_prey_id = self.next_prey_id.wrapping_add(1);

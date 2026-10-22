@@ -126,7 +126,8 @@ unoccupied remote slots do not.
 
 All numeric values except `count` must be positive and finite. Speeds are world
 units/s, turn rate is radians/s; `cruiseSpeed ≤ escapeSpeed ≤ sprintSpeed` and
-`size ≤ maxSize`.
+`size ≤ maxSize`. The size range must contain a positive 0.2-grid value and
+remain finite when multiplied by 5, so spawned prey can respect both bounds.
 Protocol speed is divided by 0.032 to obtain world units/s; turn coefficients
 use an 8 ms reference. These conversion scales are separate from `world.dt`.
 

@@ -22,7 +22,7 @@ pub fn constrain(
 ) -> (Point, bool) {
     let distance_squared = head.x * head.x + head.y * head.y;
     if mode == BoundaryMode::Hard {
-        return (head, distance_squared >= radius * radius);
+        return (head, head.distance(Point::default()) >= radius);
     }
     // Fit to received anchors, not the rendered/predicted head outside the rim.
     let lead = 16.0 * scale;
@@ -31,7 +31,7 @@ pub fn constrain(
         return (head, false);
     }
     // A large radius discontinuity or an already-outside head is not a teleport.
-    if distance_squared >= radius * radius {
+    if head.distance(Point::default()) >= radius {
         return (head, true);
     }
     let (dy, dx) = heading.sin_cos();
@@ -39,11 +39,10 @@ pub fn constrain(
         x: head.x + lead * dx,
         y: head.y + lead * dy,
     };
-    let tip_squared = tip.x * tip.x + tip.y * tip.y;
-    if tip_squared < radius * radius {
+    let distance = tip.distance(Point::default());
+    if distance < radius {
         return (head, false);
     }
-    let distance = tip_squared.sqrt();
     // sin(0.7): the observed transition is near 40 degrees outward from tangent.
     // Input quantization and packet timing limit the precision of this estimate.
     if (tip.x * dx + tip.y * dy) > 0.644217687237691 * distance {
