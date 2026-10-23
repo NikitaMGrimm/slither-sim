@@ -263,10 +263,12 @@ def collect(output, head):
         env = {**os.environ, "CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "2",
                "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
         report.setdefault("cargo_locks", {})[label] = digest(checkout / "Cargo.lock")
-        # Keep dependency builds, but force fresh simulator outputs after taking
-        # independent copies of the baseline executables below.
-        if label == "candidate" and command(["cargo", "clean", "--locked", "--package", "slither-sim"],
-                                             baseline, output / "candidate-clean.log", env):
+        # Package-only clean defaults to dev; explicitly clear release too.
+        # Baseline executables have already been copied out of this target.
+        if label == "candidate" and any(
+                command(["cargo", "clean", "--locked", "--package", "slither-sim", "--profile", profile],
+                        baseline, output / f"candidate-clean-{profile}.log", env)
+                for profile in ("release", "dev")):
             report["errors"].append("candidate package cleanup failed; candidate measurements unavailable")
             continue
         print(f"[{label}] Building release measurement examples", flush=True)

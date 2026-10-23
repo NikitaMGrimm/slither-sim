@@ -14,8 +14,9 @@ therefore see identical measurement code and evidence. Cargo lockfiles can diffe
 and their hashes are retained. Compilation failures make results unavailable.
 Both revisions reuse one run-owned Cargo target directory for dependencies.
 After baseline executables are copied and hashed, only the simulator package's
-build outputs are cleaned, forcing a fresh candidate build without recompiling
-compatible dependencies. A failed cleanup leaves candidate results unavailable.
+release and dev build outputs are explicitly cleaned, forcing a fresh candidate
+build without recompiling compatible dependencies. A failed cleanup leaves
+candidate results unavailable.
 
 The performance table reuses the six [baseline workloads](performance.md).
 Three adjacent alternating pairs follow a warmup; raw results are retained.

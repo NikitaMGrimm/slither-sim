@@ -19,7 +19,7 @@ def metric(value, samples=6, unit="rad/s"):
 
 class ReportTests(unittest.TestCase):
     def test_shared_build_outputs_are_copied_before_clean_and_failures_never_reuse_them(self):
-        for failure in (None, "clean", "candidate-build"):
+        for failure in (None, "clean-release", "clean-dev", "candidate-build"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 checkout = root / "checkout"
@@ -44,11 +44,13 @@ class ReportTests(unittest.TestCase):
                     if args[0] == "cargo":
                         target = Path(environment["CARGO_TARGET_DIR"])
                         target_paths.add(target)
-                        events.append((args[1], label))
                         if args[1] == "clean":
+                            profile = args[args.index("--profile") + 1] if "--profile" in args else "dev"
+                            events.append(("clean-" + profile, label))
                             self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
                             log.write_text("synthetic clean result\n")
-                            return int(failure == "clean")
+                            return int(failure == "clean-" + profile)
+                        events.append((args[1], label))
                         if args[1] == "build":
                             log.write_text("synthetic build result\n")
                             if label == "candidate" and failure == "candidate-build":
@@ -75,12 +77,14 @@ class ReportTests(unittest.TestCase):
                     report = pr_report.collect(output, "a" * 40)
                 self.assertEqual(target_paths, {work / "target"})
                 self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
-                self.assertEqual(events[:3], [("build", "baseline"), ("test", "baseline"), ("clean", "baseline")])
+                self.assertEqual(events[:3], [("build", "baseline"), ("test", "baseline"), ("clean-release", "baseline")])
+                if failure != "clean-release":
+                    self.assertEqual(events[3], ("clean-dev", "baseline"))
                 if failure:
                     self.assertTrue(report["errors"])
                     self.assertNotIn("candidate", report["binaries"])
                     self.assertFalse((work / "bin-candidate").exists())
-                    if failure == "clean":
+                    if failure.startswith("clean-"):
                         self.assertNotIn(("build", "candidate"), events)
                 else:
                     self.assertEqual((work / f"bin-candidate/perf_baseline{suffix}").read_bytes(), b"candidate")
