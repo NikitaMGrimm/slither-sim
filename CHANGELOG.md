@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep empty food subscriptions internal and send per-connection minimap XOR
+  deltas when shorter. Add fixed diagonal collection routes and clarify the
+  source/evidence boundary, ecology models and offline collision rationale.
+
 - Match the default prey turn setup to physics; separate leaderboard deadlines
   and bounded prey reporting from gameplay broadcasts. Add an offline packet
   census, source-pinned cadence fixture and generic localhost capture workflow;

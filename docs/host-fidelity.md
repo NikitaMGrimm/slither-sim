@@ -11,7 +11,7 @@ official preset determined solely by bot count.
 | Snakes | Complete centerline intersects `world.vision`, default 1,500, for native and browser clients. | Paired receipts reject 500 and whole-world streaming. A 1,500-unit circle reduces missed presence, but is an engineering compromise; entry/exit geometry, retention and size scaling remain unresolved. |
 | Prey | Same configurable distance, independently checked as points; actual pickups include eater IDs. | The 500 cutoff also misses received prey. A shared numeric default does not establish a shared official subscription algorithm. |
 | Hosted spawning | Radial-lattice candidates; complete newborn corridor must clear living heads and body edges by 600 units. No cramped fallback. | Own joins support a large exclusion zone, with exceptions below 600. This is conservative admission, not a recovered universal rule or invulnerability. Native initial test rings remain synthetic. |
-| Minimap | 136×136 global living centerlines, full `M` snapshots, nominal 2.5 s deadlines serviced every physics tick. Stop maps after death; reset on reconnect. | Resolution and cadence are measured. Center/radius mapping agrees with the stock marker. Exact raster filtering and official full/delta selection are unknown. |
+| Minimap | 136×136 global living centerlines, full `M` or XOR `V`, nominal 2.5 s deadlines serviced every physics tick. Stop maps after death; reset on reconnect. | Resolution and cadence are measured. Center/radius mapping agrees with the stock marker. Exact raster filtering and official full/delta selection are unknown. |
 
 ## Rechecked evidence
 
@@ -42,9 +42,57 @@ client joined; both interrupted archives remain retained and establish no new
 visibility result. Exact subscription recovery still needs successful paired
 crossings with present/absent intervals and held-out legs.
 
+The next frozen cardinal/diagonal plan stopped at its one-client preflight:
+neither the retained endpoint nor a disclosed current-list endpoint opened a
+WebSocket. Both attempts retained complete capture files with zero frames and
+zero joins. The dependent crossings were not run; the new route tooling supplies
+no additional visibility validation.
+
 Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
+
+## Food sector delivery
+
+The complete six-minute archive above contains 1,513 nonempty `F` listings, no
+empty `F` and no `W` sector announcements. The host tracks empty subscriptions
+internally, introduces nonempty sectors with `F`, and sends subsequent births and
+pickups as deltas. The first birth in an already empty subscription uses a birth
+delta; that choice is not an identified server rule. `w` clears retained recipient
+food on exit; it does not delete physical food. The selected
+[food fixture](../tests/fixtures/client-food-interest.json) pins the full-archive
+announcement census as well as entry witnesses. Decoder support for other valid
+packet forms does not require the host to emit them.
+
+## Minimap encoding
+
+Each connection retains its own last-sent bitmap. First/reconnected/resized maps
+use full `M`; later maps may use the shorter of full `M` and XOR `V`. The base
+advances only after queuing that recipient's packet, preserving ordered delivery.
+This is a local compression policy: on the retained sequence the older bridge's
+shortest-encoding policy disagreed with 10 of 129 noninitial packet choices.
+Both encodings reconstruct the intended bitmap; the closed server's selection
+rule and raster filtering remain unknown.
+
+## Ecology models
+
+`Config::realistic(n)` is a provisional helper, including its population-scaled
+radius, food target/refill and radial food profile. It keeps the default zero prey;
+choose `world.prey.count` explicitly for a playable scenario. Received arrivals
+and occupancy cannot identify rejected generation attempts, global counts or
+startup seeding. The earlier ambient replacement association did not survive a
+later matched-sector check, so it supplies no refill retuning.
+
+The optional radius controller is known to differ: hash-verified
+`run4-radius-long-20260927/bot0.jsonl.gz` (SHA-256
+`3180b8201f51d5f4fe9732b6c69e85bab8ce49448742a2a72cfd228ef60613ef`)
+contains expansions faster than its local rate limit. In connection 4, source
+server time 292,116→292,243 ms, radius grows 13,940→13,947. The target/controller
+replacement remains unidentified; use recorded `radiusUpdates` with
+`dynamicRadius:false` for measured replay. The cited historical studies
+`radius-dynamics.md`, `radius-load-followup.md` and `ambient-event-study.md` retain
+failed controller fits and negative refill results. Do not install the fastest
+observed slope as a new official cap.
 
 ## Packet timing
 

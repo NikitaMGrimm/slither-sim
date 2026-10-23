@@ -37,7 +37,8 @@ Save as `arena.json`:
       "radius": 1500,
       "foodCount": 550,
       "ambientReplenishPerSecond": 8.04,
-      "dt": 0.007
+      "dt": 0.007,
+      "prey": { "count": 6 }
     },
     "broadcastTicks": 6,
     "leaderboardIntervalSeconds": 3.0
@@ -48,7 +49,8 @@ Save as `arena.json`:
 The 1,500-unit arena and eight slots keep this example small. Food settings scale
 the existing provisional ecology estimate: about 7 pellets and 0.1024 placement
 attempts/s per 300×300 sector. `dt` is the measured 7 ms tick. This is not an
-official server preset; see [rules and limits](server-rules.md).
+official server preset; six prey is an explicit local choice to exercise prey
+gameplay, not a measured global population. See [rules and limits](server-rules.md).
 
 ```sh
 cargo run --release --locked -- host --config arena.json

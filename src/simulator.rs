@@ -144,11 +144,13 @@ impl Default for Config {
         }
     }
 }
-/// Measured ambient food: ~7 standing pellets and ~0.051*2 spawns per second per
-/// 300x300 sector, averaged over the radial spawn profile.
+/// Protocol sector area used to scale the provisional ecology helper below.
 const SECTOR_AREA: f64 = 300.0 * 300.0;
 impl Config {
-    /// Server-like arena for `snakes` players: population-scaled boundary and food ecology.
+    /// Provisional population-scaled arena and food ecology, not an official preset.
+    /// Received food mixes origins and subscriptions; it does not identify global
+    /// startup density or refill attempts. Prey stays disabled until configured.
+    /// See docs/host-fidelity.md#ecology-models for evidence and counterexamples.
     pub fn realistic(snakes: usize) -> Self {
         let radius = population_radius(snakes);
         let sectors = PI * radius * radius / SECTOR_AREA;
@@ -186,12 +188,13 @@ impl Config {
         crate::boundary::validate(&self.radius_updates)
     }
 }
-/// Boundary target: server radii were ~6100 at ~87 players and ~8900 at ~170 players,
-/// i.e. constant snake density.
+/// Constant-density boundary heuristic. Population/radius pairs do not identify
+/// the server's controller; measured replay uses `Config::radius_updates` instead.
 pub fn population_radius(snakes: usize) -> f64 {
     670.0 * (snakes.max(1) as f64).sqrt()
 }
-/// Observed boundary movement: steps of at most ~3 units per 128 ms update.
+/// Local controller rate limit; later received expansions exceed this value.
+/// It must not be applied to measured `radius_updates` replay.
 const RADIUS_RATE: f64 = 3.0 / 0.128;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -349,8 +352,8 @@ impl Simulator {
             origin: Some(origin),
         }
     }
-    /// Ambient spawns thin out toward the rim: measured rates per sector fall linearly from
-    /// ~0.20/s near the center to ~0.06/s at the boundary.
+    /// Provisional radial profile fitted to received additions. Recipient coverage
+    /// and admission censor those counts; this is not a recovered generation law.
     fn new_food(&mut self) -> Food {
         let a = self.random.next() * TAU;
         let r = loop {
@@ -779,9 +782,9 @@ impl Simulator {
                 (i, bounds, s.segments)
             })
             .collect();
-        // The official loop moves and tests each snake in join order, oldest first,
-        // against the others newest first; a struck snake is dead at once and can no
-        // longer kill this tick, so two snakes never kill each other in one tick.
+        // The offline Android client resolves collisions oldest first against
+        // newer snakes first, skipping those already dead. We preserve that
+        // resolution after moving all snakes; online move/test phasing is unverified.
         let mut order = alive.clone();
         order.sort_unstable_by_key(|&i| self.joins[i]);
         let mut dead: Vec<(usize, Option<usize>, DeathReason)> = vec![];

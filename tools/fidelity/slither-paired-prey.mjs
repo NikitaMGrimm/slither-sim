@@ -20,6 +20,30 @@ export const CROSSING = Object.freeze({
   endpointTolerance: 120, crossTrackTolerance: 180,
   legTimeoutMs: 30000, primaryFreshMs: 600,
 });
+// Fixed crossing directions. Offsets scale the unsigned (x, y) components, so a diagonal
+// offset is a max-axis distance; cross is the unit perpendicular used for cross-track.
+export const CROSSING_DIRECTIONS = Object.freeze({
+  x: Object.freeze({ x: 1, y: 0, crossX: 0, crossY: 1 }),
+  y: Object.freeze({ x: 0, y: 1, crossX: 1, crossY: 0 }),
+  'diagonal-positive': Object.freeze({ x: 1, y: 1, crossX: -Math.SQRT1_2, crossY: Math.SQRT1_2 }),
+  'diagonal-negative': Object.freeze({ x: 1, y: -1, crossX: Math.SQRT1_2, crossY: Math.SQRT1_2 }),
+});
+
+export function validateDirection(mode, direction) {
+  if (direction === undefined || direction === null) return null;
+  if (mode !== 'crossing') throw Error('--direction requires --mode crossing');
+  if (typeof direction !== 'string' || !Object.hasOwn(CROSSING_DIRECTIONS, direction))
+    throw Error('use --direction x|y|diagonal-positive|diagonal-negative');
+  return direction;
+}
+
+// Along is the max-axis offset of the nearest point on the signed route; crossTrack is the
+// signed Euclidean distance from it. Adaptive trials have no direction and use their axis.
+export function crossingProjection(crossing, dx, dy) {
+  const d = CROSSING_DIRECTIONS[crossing.direction ?? crossing.axis];
+  return { along: crossing.sign * (dx * d.x + dy * d.y) / (d.x * d.x + d.y * d.y),
+    crossTrack: dx * d.crossX + dy * d.crossY };
+}
 
 export function snapshot(bot, peer, now) {
   const me = bot.world.snakes.get(bot.world.self);
@@ -43,12 +67,33 @@ export function preyOffset(prey, center, sign) {
 export function crossingOffset(prey, crossing, observer) {
   const offset = observer === 0 ? CROSSING.followerOffset :
     crossing.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset;
-  return { x: prey.x + (crossing.axis === 'x' ? crossing.sign * offset : 0),
-    y: prey.y + (crossing.axis === 'y' ? crossing.sign * offset : 0) };
+  const d = CROSSING_DIRECTIONS[crossing.direction ?? crossing.axis];
+  return { x: prey.x + crossing.sign * offset * d.x, y: prey.y + crossing.sign * offset * d.y };
+}
+
+// A fixed direction may point the far endpoint outward. Keep it at least as far inside as
+// an outward cardinal far endpoint is at the minimum prey gap (minArenaGap - farOffset).
+export function farEndpointArenaGap(prey, crossing, center, radius) {
+  const far = crossingOffset(prey, { ...crossing, leg: 'far' }, 1);
+  return radius - Math.hypot(far.x - center, far.y - center);
+}
+
+function segmentEntersSquare(a, b, center, radius) {
+  let enter = 0, leave = 1;
+  for (const [p, q] of [[a.x - b.x, a.x - center.x + radius], [b.x - a.x, center.x + radius - a.x],
+    [a.y - b.y, a.y - center.y + radius], [b.y - a.y, center.y + radius - a.y]]) {
+    if (p === 0) { if (q <= 0) return false; continue; }
+    if (p < 0) enter = Math.max(enter, q / p); else leave = Math.min(leave, q / p);
+  }
+  return enter < leave;
 }
 
 export function safePreyWaypoint(own, prey, target) {
   const margin = PAIR_PREY.preyOffset;
+  // Diagonal targets fly straight while that segment stays outside the prey square;
+  // otherwise, like cardinal targets, they take the axis-aligned detours below.
+  if (target.x !== prey.x && target.y !== prey.y && !segmentEntersSquare(own, target, prey, margin))
+    return target;
   if (target.x !== prey.x) {
     if (Math.sign(own.x - prey.x) !== Math.sign(target.x - prey.x) &&
         Math.abs(own.y - prey.y) < margin)
@@ -67,7 +112,19 @@ export function safePreyWaypoint(own, prey, target) {
 }
 
 export class PairPreyState {
-  constructor(mode = 'overlap') { this.mode = mode; this.crossingTrial = 0; this.reset(); }
+  constructor(mode = 'overlap', direction = null) {
+    this.mode = mode; this.direction = validateDirection(mode, direction);
+    this.crossingTrial = 0; this.reset();
+  }
+  crossingFrame(p, first, second, center) {
+    const direction = this.direction;
+    const axis = direction ? ['x', 'y'].includes(direction) ? direction : null :
+      Math.abs(p.x - center) >= Math.abs(p.y - center) ? 'y' : 'x';
+    const unsigned = { axis, direction, sign: 1 };
+    const fromB = crossingProjection(unsigned, second.x - p.x, second.y - p.y).along;
+    const fromA = crossingProjection(unsigned, first.x - p.x, first.y - p.y).along;
+    return { axis, direction, sign: Math.sign(fromB || fromA) || 1 };
+  }
   reset() {
     this.identities = null;
     this.phase = 'waiting';
@@ -142,15 +199,16 @@ export class PairPreyState {
         if (newest) this.navigationPrey = newest;
         if (this.mode === 'crossing') {
           const c = this.crossing, p = observations[0];
-          const arenaGap = Math.min(worlds[0].radius, worlds[1].radius) -
-            Math.hypot(p.x - worlds[0].grd, p.y - worlds[0].grd);
-          if (arenaGap < CROSSING.minArenaGap) {
+          const radius = Math.min(worlds[0].radius, worlds[1].radius);
+          const arenaGap = radius - Math.hypot(p.x - worlds[0].grd, p.y - worlds[0].grd);
+          if (arenaGap < CROSSING.minArenaGap || this.direction &&
+              farEndpointArenaGap(p, c, worlds[0].grd, radius) < CROSSING.minArenaGap - CROSSING.farOffset) {
             this.target = null; this.navigationPrey = null;
             this.crossing = null; this.phase = 'search'; this.reason = 'rim_margin_lost';
           } else {
-          const axis = c.axis, crossAxis = axis === 'x' ? 'y' : 'x';
-          c.actualAxisDistance = c.sign * (snapshots[1][axis] - p[axis]);
-          c.actualCrossTrack = snapshots[1][crossAxis] - p[crossAxis];
+          const measured = crossingProjection(c, snapshots[1].x - p.x, snapshots[1].y - p.y);
+          c.actualAxisDistance = measured.along;
+          c.actualCrossTrack = measured.crossTrack;
           c.actualBoxDistance = Math.max(Math.abs(snapshots[1].x - p.x),
             Math.abs(snapshots[1].y - p.y));
           c.actualEuclideanDistance = Math.hypot(snapshots[1].x - p.x,
@@ -188,10 +246,11 @@ export class PairPreyState {
       if (gap < (this.mode === 'crossing' ? CROSSING.minArenaGap : PAIR_PREY.minArenaGap) ||
           Math.hypot(p.x - midpoint.x, p.y - midpoint.y) > 1300) return false;
       if (this.mode !== 'crossing') return true;
-      const axis = Math.abs(p.x - center) >= Math.abs(p.y - center) ? 'y' : 'x';
-      const sign = Math.sign(second[axis] - p[axis] || first[axis] - p[axis]) || 1;
-      return sign * (first[axis] - p[axis]) >= CROSSING.followerOffset &&
-        sign * (second[axis] - p[axis]) >= CROSSING.followerOffset;
+      const frame = this.crossingFrame(p, first, second, center);
+      if (this.direction && farEndpointArenaGap(p, frame, center, radius) <
+          CROSSING.minArenaGap - CROSSING.farOffset) return false;
+      return crossingProjection(frame, first.x - p.x, first.y - p.y).along >= CROSSING.followerOffset &&
+        crossingProjection(frame, second.x - p.x, second.y - p.y).along >= CROSSING.followerOffset;
     });
     eligible.sort((a, b) => b[1].observers - a[1].observers ||
       Math.hypot(a[1].prey.x - midpoint.x, a[1].prey.y - midpoint.y) -
@@ -204,11 +263,8 @@ export class PairPreyState {
       this.lastSeenAt = row.prey.t;
       this.phase = 'follow'; this.reason = null;
       if (this.mode === 'crossing') {
-        const axis = Math.abs(row.prey.x - center) >= Math.abs(row.prey.y - center) ? 'y' : 'x';
-        const fromB = snapshots[1][axis] - row.prey[axis];
-        const fromA = snapshots[0][axis] - row.prey[axis];
         this.crossing = { trial: ++this.crossingTrial, selectedAt: now,
-          axis, sign: Math.sign(fromB || fromA) || 1,
+          ...this.crossingFrame(row.prey, snapshots[0], snapshots[1], center),
           leg: 'near', legStarted: now, completedLegs: 0, reentries: 0,
           actualAxisDistance: null, actualCrossTrack: null,
           actualBoxDistance: null, actualEuclideanDistance: null };
@@ -284,14 +340,16 @@ export class PairPreyBot extends Bot {
     const primaryDy = crossing && primary && navigationPrey ? primary.y - navigationPrey.y : null;
     const secondaryDx = crossing && secondary && navigationPrey ? secondary.x - navigationPrey.x : null;
     const secondaryDy = crossing && secondary && navigationPrey ? secondary.y - navigationPrey.y : null;
-    const primaryAxisDistance = primaryDx === null ? null : crossing.sign *
-      (crossing.axis === 'x' ? primaryDx : primaryDy);
-    const primaryCrossTrack = primaryDx === null ? null :
-      (crossing.axis === 'x' ? primaryDy : primaryDx);
-    const secondaryAxisDistance = secondaryDx === null ? null : crossing.sign *
-      (crossing.axis === 'x' ? secondaryDx : secondaryDy);
-    const secondaryCrossTrack = secondaryDx === null ? null :
-      (crossing.axis === 'x' ? secondaryDy : secondaryDx);
+    const primaryProjection = primaryDx === null ? null :
+      crossingProjection(crossing, primaryDx, primaryDy);
+    const secondaryProjection = secondaryDx === null ? null :
+      crossingProjection(crossing, secondaryDx, secondaryDy);
+    const actualProjection = crossing && navigationPrey ?
+      crossingProjection(crossing, rawDx, rawDy) : null;
+    const primaryAxisDistance = primaryProjection?.along ?? null;
+    const primaryCrossTrack = primaryProjection?.crossTrack ?? null;
+    const secondaryAxisDistance = secondaryProjection?.along ?? null;
+    const secondaryCrossTrack = secondaryProjection?.crossTrack ?? null;
     const primaryBoxDistance = primaryDx === null ? null :
       Math.max(Math.abs(primaryDx), Math.abs(primaryDy));
     const secondaryBoxDistance = secondaryDx === null ? null :
@@ -322,6 +380,7 @@ export class PairPreyBot extends Bot {
           ? now - this.pair.navigationPrey.t : null,
         crossingLeg: crossing?.leg ?? null, crossingAxis: crossing?.axis ?? null,
         crossingSign: crossing?.sign ?? null,
+        ...(this.pair.direction ? { crossingDirection: this.pair.direction } : {}),
         crossingTrial: crossing?.trial ?? null, crossingSelectedAt: crossing?.selectedAt ?? null,
         crossingLegStartedAt: crossing?.legStarted ?? null,
         intendedOffset: crossing ? this.index === 0 ? CROSSING.followerOffset :
@@ -342,10 +401,8 @@ export class PairPreyBot extends Bot {
           Math.abs(secondaryCrossTrack) <= CROSSING.crossTrackTolerance : null,
         actualPreyBoxDistance: rawDx === null ? null : Math.max(Math.abs(rawDx), Math.abs(rawDy)),
         actualPreyEuclideanDistance: rawDx === null ? null : Math.hypot(rawDx, rawDy),
-        actualPreyAxisDistance: crossing && navigationPrey
-          ? crossing.sign * (crossing.axis === 'x' ? rawDx : rawDy) : null,
-        actualPreyCrossTrack: crossing && navigationPrey
-          ? crossing.axis === 'x' ? rawDy : rawDx : null,
+        actualPreyAxisDistance: actualProjection?.along ?? null,
+        actualPreyCrossTrack: actualProjection?.crossTrack ?? null,
         ownX: raw.x, ownY: raw.y, ownAnchorAgeMs: now - me.t,
         intendedHeading: this.movementIntent.intendedHeading,
         interruption: this.movementIntent.interruption,
@@ -363,31 +420,34 @@ export class PairPreyBot extends Bot {
 }
 
 export function parseArgs(argv) {
-  const args = {}, allowed = new Set(['--out', '--server', '--seconds', '--mode', '--plan', '--origin']);
+  const args = {}, allowed = new Set(['--out', '--server', '--seconds', '--mode', '--direction', '--plan', '--origin']);
   for (let i = 0; i < argv.length; i += 2) {
     const key = argv[i], value = argv[i + 1];
     if (!allowed.has(key) || !value || value.startsWith('--') || key in args)
       throw Error(`invalid or repeated option: ${key}`);
     args[key] = value;
   }
+  const mode = args['--mode'] ?? 'overlap', direction = validateDirection(mode, args['--direction']);
   return { out: args['--out'], server: args['--server'],
     ...(args['--origin'] ? { origin: validateOrigin(args['--origin']) } : {}),
     seconds: Number(args['--seconds'] ?? PAIR_PREY.maxSeconds),
-    mode: args['--mode'] ?? 'overlap', ...(args['--plan'] ? { plan: args['--plan'] } : {}) };
+    mode, ...(direction ? { direction } : {}), ...(args['--plan'] ? { plan: args['--plan'] } : {}) };
 }
 
-export async function recordPair({ out, server, seconds = PAIR_PREY.maxSeconds, mode = 'overlap', plan, origin }, signal) {
+export async function recordPair({ out, server, seconds = PAIR_PREY.maxSeconds, mode = 'overlap', direction, plan, origin }, signal) {
   if (signal?.aborted) return [];
   if (!out || !server || !Number.isFinite(seconds) || seconds < 1 || seconds > PAIR_PREY.maxSeconds)
     throw Error('use --out, --server ip:port and 1..480 seconds');
   if (!['overlap', 'crossing'].includes(mode)) throw Error('use --mode overlap|crossing');
+  direction = validateDirection(mode, direction);
   origin = validateOrigin(origin);
   if (fs.existsSync(out)) throw Error(`refusing to overwrite ${out}`);
   const [ip, portText] = server.split(':');
   const port = Number(portText);
   if (!ip || !Number.isInteger(port) || port < 1 || port > 65535) throw Error('invalid server');
-  const batch = createCaptureBatch({ seconds, mode, server, scenario: 'paired-prey', plan, origin }, 2, COLLECTOR_SOURCE);
-  const state = new PairPreyState(mode), bots = [], recorders = [];
+  const batch = createCaptureBatch({ seconds, mode, ...(direction ? { direction } : {}),
+    server, scenario: 'paired-prey', plan, origin }, 2, COLLECTOR_SOURCE);
+  const state = new PairPreyState(mode, direction), bots = [], recorders = [];
   let timer, deadline, onAbort, completed = false, failure = null;
   const collectorTiming = { targetTickMs: 25, ticks: 0, lateTicks: 0, maxTickGapMs: 0 };
   let lastTick = performance.now();
@@ -395,10 +455,11 @@ export async function recordPair({ out, server, seconds = PAIR_PREY.maxSeconds, 
     fs.mkdirSync(out, { recursive: true });
     for (const index of [0, 1]) {
       if (signal?.aborted) break;
-      const nick = `Probe prey ${index}`;
+      const nick = `(Bot) Probe prey ${index}`;
       const rec = new Recorder(path.join(out, `bot${index}.jsonl.gz`), {
         schema: 1, server: { ip, port }, nick, scenario: 'paired-prey',
-        mode, botIndex: index, plan: mode === 'crossing' ? { ...PAIR_PREY, ...CROSSING } : PAIR_PREY,
+        mode, ...(direction ? { direction } : {}), botIndex: index,
+        plan: mode === 'crossing' ? { ...PAIR_PREY, ...CROSSING } : PAIR_PREY,
         ...(batch.dataOrigin ? { dataOrigin: batch.dataOrigin } : {}),
         wall: Date.now(), t: performance.now(), captureProvenance: batch.provenance(index) });
       recorders.push(rec);

@@ -58,6 +58,21 @@ separate maintainer action.
 For geometry or motion changes, a before/after plot, diagram or clip can help.
 Visualizations are optional; attach or link PR-only media rather than committing it.
 
+## Rationale and evidence
+
+Put non-obvious reasons, units, invariants and model limitations beside the owning
+code. Keep formulas/defaults in their implementation; link to their declarations
+instead of maintaining another explanation in a separate agent guide. A short
+comment should identify whether a rule is measured, protocol/client-derived or
+provisional, and point to its canonical note and regression when useful.
+
+Keep experimental methods, source/archive hashes, selected windows, failed cases
+and uncertainty in the evidence note/fixture, with full recordings outside Git.
+Tests consume selected fixtures; synthetic cases establish their stated contract.
+When changing a rule, update its owner, linked evidence and focused regression
+together. Preserve historical plans and contradictory results rather than
+regenerating expectations to agree with the new code.
+
 ## AI assistance
 
 If you use AI, review its work and verify the result. End the PR description

@@ -36,7 +36,7 @@ pub fn scale(segments: usize) -> f64 {
 }
 /// Empirical server turn factor. Sustained anchor turns support a size denominator
 /// of 111 (validated through 293 segments); the client's drawn scale still uses 106.
-/// See docs/research/movement-fidelity.md for held-out fits and packet-heading cross-checks.
+/// Evidence and packaged regressions: docs/server-rules.md#movement-and-geometry.
 pub fn scang(segments: usize) -> f64 {
     let turn_scale = (1.0 + (segments as f64 - 2.0) / 111.0).clamp(1.0, 6.0);
     0.13 + 0.87 * ((7.0 - turn_scale) / 6.0).powi(2)
@@ -53,7 +53,7 @@ pub fn turn_rate(segments: usize) -> f64 {
 /// Speed ramp derived from the current APK's normalized boost progress, using nominal
 /// time. The fixed-size slope is independently supported by online speed reports;
 /// latent progress retention during growth and offline saturation quirks are unverified.
-/// See docs/research/speed-equations.md. Network delay and the offline 1.3 clock are excluded.
+/// See docs/server-rules.md#movement-and-geometry. Network delay and the offline 1.3 clock are excluded.
 pub fn approach_speed(current: f64, target: f64, segments: usize, dt: f64) -> f64 {
     let up = (BOOST_SPEED - base_speed(segments)) * (0.015 / REFERENCE_FRAME_SECONDS)
         / (1.0 + 0.305 * (scale(segments) - 1.0));
@@ -159,7 +159,7 @@ pub fn boost_cost(segments: usize) -> f64 {
 /// Food pickup region: a circle ahead of the head. Its center leads by the distance covered
 /// in ~242 ms at scale 1 (longer for larger snakes), and its radius grows with scale.
 /// Calibrated with spatial anchor tangents: packet headings lag during turns and
-/// previously biased the fit toward a larger circle (see docs/research/circle-eating-investigation.md).
+/// previously biased the fit toward a larger circle; see docs/server-rules.md#movement-and-geometry.
 pub fn pickup_circle(head: Point, heading: f64, speed: f64, segments: usize) -> (Point, f64) {
     let sc = scale(segments) - 1.0;
     let lead = speed * SPEED_UNIT_SECONDS * (7.55 + 1.8 * sc);
@@ -185,8 +185,8 @@ pub fn head_tip(head: Point, heading: f64, segments: usize) -> Point {
     }
 }
 /// Whether a moving head strikes another snake's line, as the official client's
-/// own collision code tests it (Android 3.06 `oef`, see
-/// docs/research/official-collisions-20261003.md). `last_tip` and `tip` are the
+/// offline collision code tests it (Android 3.06 `oef`, see
+/// docs/server-rules.md#movement-and-geometry). `last_tip` and `tip` are the
 /// head's tips before and after this tick's move; `line` starts at the other snake's
 /// tip, then its head center, then its body from newest to oldest anchor. Only line
 /// points within 3.666 summed radii of the tip on both axes count. The head dies
@@ -265,7 +265,7 @@ pub fn advance(
 }
 pub fn append_anchor(body: &mut Vec<Point>, anchor: Point, grow: bool) {
     // Fresh server body snapshots match contraction of the existing body before
-    // insertion. The stock client does the opposite; see docs/research/body-geometry.md.
+    // insertion. The stock client does the opposite; see docs/server-rules.md#movement-and-geometry.
     contract_body(body);
     body.insert(0, anchor);
     if !grow {

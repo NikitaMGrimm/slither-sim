@@ -84,6 +84,20 @@ JavaScript and require a reviewed parser update.
 Low-level paired death/prey and feeding-shape collectors need their own matching
 coordinator and attempt accounting; the managed wrapper does not cover those modes.
 
+For two-client visibility crossings, the paired-prey collector supports fixed
+`x`, `y`, `diagonal-positive` and `diagonal-negative` directions:
+
+```sh
+node tools/fidelity/slither-paired-prey.mjs --out outputs/paired-diagonal --server 127.0.0.1:8766 --seconds 480 --mode crossing --direction diagonal-positive --plan path/to/paired-plan.json
+```
+
+Offsets are max-axis distances; diagonal `(800,800)` is about 1,131 units away.
+The logs retain projected along-route/cross-track distances, visibility, freshness,
+interruptions and completed legs. An intended route or phase name is not proof of
+an achieved crossing. Freeze candidate geometry/retention, calibration/held-out
+legs, attempt budget and required coverage before connecting. Preserve failed
+joins and empty cohorts; they cannot validate a new visibility rule.
+
 Raw frames retain direction, bytes and monotonic send/receipt timestamps. Metadata
 pins the plan/collector sources, wall-clock origin, connection/life boundaries,
 ping sends/replies/RTT and censored requests, including post-death observation.
