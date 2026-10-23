@@ -1,0 +1,72 @@
+name: PR report preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: report-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Advisory measurements
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/report-preview'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - name: Compare target and proposed merge
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          REPORT_DIRECTORY: ${{ runner.temp }}/pr-report
+        run: python tools/pr_report.py --output "$env:REPORT_DIRECTORY" --head "$env:PR_HEAD"
+      - name: Retain results and failed attempts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-report
+          path: ${{ runner.temp }}/pr-report
+          if-no-files-found: error
+          retention-days: 14
+
+  comment:
+    name: Update advisory PR comment
+    needs: measure
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/report-preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: report-preview-comment-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      # Only repository collaborators can push this named branch. The publisher
+      # comes from that checkout; downloaded artifacts are never executed.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: pr-report
+          path: ${{ runner.temp }}/pr-report-data
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          REPORT_DIRECTORY: ${{ runner.temp }}/pr-report-data
+        with:
+          script: |
+            const publish = require('./tools/pr_report_comment.cjs');
+            await publish({github, context, core, directory: process.env.REPORT_DIRECTORY});
