@@ -991,14 +991,7 @@ impl Simulator {
                     if ambient_food_count < target {
                         let f = self.new_food();
                         let admitted = if single_attempt && self.config.ambient_food.enabled {
-                            let density = &self.config.ambient_food;
-                            let cell = food_cell(f.x, f.y, density.cell_size);
-                            self.food
-                                .iter()
-                                .filter(|food| food_cell(food.x, food.y, density.cell_size) == cell)
-                                .take(density.max_per_cell)
-                                .count()
-                                < density.max_per_cell
+                            ambient_cell_available(&f, &self.food, &self.config.ambient_food)
                         } else {
                             admit_ambient_food(&f, &self.config.ambient_food, &mut occupied)
                         };
@@ -1292,6 +1285,18 @@ impl Simulator {
         }
         count
     }
+}
+
+// Keep the occasional single-cell scan separate from the large stepping body.
+#[inline(never)]
+fn ambient_cell_available(food: &Food, existing: &[Food], config: &AmbientFoodConfig) -> bool {
+    let cell = food_cell(food.x, food.y, config.cell_size);
+    existing
+        .iter()
+        .filter(|f| food_cell(f.x, f.y, config.cell_size) == cell)
+        .take(config.max_per_cell)
+        .count()
+        < config.max_per_cell
 }
 
 fn admit_ambient_food(
