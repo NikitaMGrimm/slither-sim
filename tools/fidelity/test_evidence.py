@@ -36,6 +36,7 @@ class EvidenceTests(unittest.TestCase):
         self.addCleanup(helper.doCleanups)
         header = helper.header()
         header["dataOrigin"] = "local-simulator"
+        header["server"] = dict(self.plan["capture"]["server"])
         digest = hashlib.sha256((evidence.ROOT / "tools/fidelity/slither-headless.mjs").read_bytes()).hexdigest()
         header["captureProvenance"].update(
             collectorSha256=digest, planSha256=self.base["planSha256"],

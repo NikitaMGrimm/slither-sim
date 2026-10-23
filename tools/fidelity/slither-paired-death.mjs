@@ -244,6 +244,7 @@ export async function recordPair({ out, server, seconds = 480, minSegments = 30,
       const rec = new Recorder(path.join(out, `bot${index}.jsonl.gz`), {
         schema: 1, server: { ip, port }, nick, scenario: 'paired-death',
         roleMode: 'adaptive', botIndex: index, minSegments,
+        ...(batch.dataOrigin ? { dataOrigin: batch.dataOrigin } : {}),
         wall: Date.now(), t: performance.now(), captureProvenance: batch.provenance(index) });
       recorders.push(rec);
       bots.push(new PairBot(options, index, rec));

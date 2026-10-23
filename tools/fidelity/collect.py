@@ -14,8 +14,8 @@ import evidence
 def capture_command(study, output, node="node"):
     study = Path(study).resolve()
     plan = evidence.read_plan(study)
-    if plan["dataOrigin"] == "local-simulator" or "capture" not in plan:
-        raise ValueError("live capture requires an official/community-server plan with capture settings")
+    if "capture" not in plan:
+        raise ValueError("socket capture requires a plan with capture settings")
     capture = plan["capture"]
     address = ipaddress.ip_address(capture["server"]["ip"])
     if address.version != 4:

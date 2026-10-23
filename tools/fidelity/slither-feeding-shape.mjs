@@ -325,6 +325,7 @@ export async function recordFeedingShape({ out, server, seconds = 480, plan, ori
       const nick = `Feeding shape ${index}`;
       const rec = new Recorder(path.join(out, `bot${index}.jsonl.gz`), {
         schema: 1, server: { ip, port }, nick, scenario: 'feeding-shape',
+        ...(batch.dataOrigin ? { dataOrigin: batch.dataOrigin } : {}),
         botIndex: index, wall: Date.now(), t: performance.now(), captureProvenance: batch.provenance(index) });
       recorders.push(rec);
       bots.push(new FeedingBot({ scenario: 'movement', nick, serverBody: true, origin }, index, rec));

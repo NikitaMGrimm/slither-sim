@@ -25,6 +25,10 @@ configs require the default-enabled `networking` feature.
 
 Broadcast cadence is a local setting, not an exact recovered official schedule.
 Pongs can be sent between broadcasts. Physics keeps advancing between updates.
+Minimaps and leaderboards have independent nominal 2.5/3-second clocks, serviced
+at physics ticks; deadlines do not accumulate gameplay-broadcast rounding. Prey
+position refreshes have their own bounded reporting intervals; see
+[host fidelity](host-fidelity.md#packet-timing).
 
 Ping is a measured round trip, not a target the server needs you to set. Native
 clients send game pings automatically after setup, with at most one outstanding.
@@ -61,8 +65,9 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `decisionTicks` | `6` | Physics ticks per bot decision, 1–1000. |
 | `broadcastTicks` | `6` | Physics ticks per gameplay broadcast, 1–1000, subject to the bound below. |
 | `minimapIntervalSeconds` | `2.5` | Positive finite interval. |
-| `minimapSide` | `32` | Square minimap width, 1–512 cells. |
+| `minimapSide` | `136` | Received protocol-19 minimap resolution; configurable 1–512. Rasterization remains approximate. |
 | `leaderboardIntervalSeconds` | `3` | Positive finite interval; a board also arrives on entry. |
+| `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
 
@@ -76,7 +81,7 @@ configured prey speeds must satisfy `round(speed × 32) ≤ 65535`.
 | --- | --- | --- |
 | `radius` | `1000` | Positive finite arena radius. |
 | `dynamicRadius` | `false` | Enable the provisional population-driven boundary model. |
-| `vision` | `500` | Positive finite visibility distance. |
+| `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
 | `foodCount` | `350` | Ambient food target/startup placement attempts, at most 100,000. Admission limits can reduce placement. |
 | `ambientReplenishPerSecond` | `5` | Ambient placement attempts/s below target, 0–10,000. |
 | `dt` | `0.007` | Positive finite physics step, at most 0.032 s. |

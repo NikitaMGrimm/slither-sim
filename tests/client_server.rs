@@ -110,10 +110,9 @@ fn until(
 }
 
 #[test]
-fn large_initial_broadcast_fits_bounded_socket_transports() {
+fn dense_initial_sector_listings_fit_bounded_socket_transports() {
     let mut config = config(1, 0);
-    config.simulation.world.radius = 32000.;
-    config.simulation.world.vision = 1_000_000.;
+    config.simulation.world.radius = 1500.;
     config.simulation.world.food_count = 100_000;
     config.simulation.world.ambient_food.enabled = false;
     config.simulation.world.ambient_replenish_per_second = 0.;
@@ -137,13 +136,15 @@ fn large_initial_broadcast_fits_bounded_socket_transports() {
                 received_bytes += record.bytes.len();
             }
         }
-        // Early pickups and wire-coordinate collisions can reduce the food
-        // count; require the large snapshot and its split tail to arrive.
-        if received_bytes > 1 << 20
+        // Food interest is bounded independently of vision. Concentrate enough
+        // food inside the real stencil to require multiple listing packets;
+        // whole-world receipt of 100,000 pellets is no longer the host policy.
+        // The backend's aggregate-emission test covers the 1 MiB split itself.
+        if received_bytes > 8192
             && frame
                 .observation
                 .as_ref()
-                .is_some_and(|o| o.food.len() > 99_000)
+                .is_some_and(|o| o.food.len() > 10_000)
         {
             break;
         }

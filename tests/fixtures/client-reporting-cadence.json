@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "wireProtocol": 19,
+  "dataOrigin": "captured",
+  "source": {
+    "archive": "official-r1/bot0.jsonl.gz",
+    "archiveSha256": "dd65ff79bf5cb258cf0d72c35af22d07e9c6ff06068b6679e1ec011bafcb8a60",
+    "decoderSha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+    "censusSha256": "01271eaafbecce2f85e33a651adbadaedc8813bf4d6612d6e947ef11f861f8b7",
+    "connection": 1,
+    "setupIndex": 1
+  },
+  "selection": "First protocol-19 setup epoch in the retained six-minute capture. All consecutive known-prey j gaps within recipient lifetimes; all l gaps in this epoch. Includes its short post-death tail. No endpoint-error filtering.",
+  "limits": "Retrospective correlated recipient sample; not independent trials, an exact timer, first-report timing or whole-host accuracy. Host nominal timers approximate these distributions.",
+  "preyUpdateGapsMs": {
+    "n": 144,
+    "min": 332,
+    "median": 338.0,
+    "p95": 341,
+    "max": 355
+  },
+  "leaderboardGapsMs": {
+    "n": 27,
+    "min": 3003,
+    "median": 3008.0,
+    "p95": 3013,
+    "max": 3014
+  }
+}

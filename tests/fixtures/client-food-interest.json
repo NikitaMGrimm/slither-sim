@@ -1,0 +1,116 @@
+{
+  "wireProtocol": 19,
+  "dataOrigin": "captured",
+  "source": {
+    "archive": "official-r1/bot0.jsonl.gz",
+    "sha256": "dd65ff79bf5cb258cf0d72c35af22d07e9c6ff06068b6679e1ec011bafcb8a60",
+    "decoderSha256": "1e82c660defd85867eafc453a6fe08b4dadd77314f0d8766f86f80c0f1939dad"
+  },
+  "selection": "First six distinct clean small-snake entry frames (anchor age <=60ms) admitted by the previously frozen 45-sector/100-unit-lead model. Regression witnesses, not an unbiased accuracy sample.",
+  "coordinateSystem": "Absolute wire coordinates; subtract 32550 for centered simulator coordinates. Heads are received-state estimates.",
+  "limits": "Membership witnesses only. Do not infer exact expiry, large-snake scaling, snake/prey range or official internal geometry.",
+  "entries": [
+    {
+      "connection": 1,
+      "frame_index": 739,
+      "packet_index": 0,
+      "server_ms": 8678,
+      "sector": [
+        132,
+        106
+      ],
+      "head": [
+        40594.25708066953,
+        31117.270363704316
+      ],
+      "ang": 3.043417883165112,
+      "anchor_age_ms": 21,
+      "sct": 4
+    },
+    {
+      "connection": 1,
+      "frame_index": 781,
+      "packet_index": 0,
+      "server_ms": 10339,
+      "sector": [
+        131,
+        106
+      ],
+      "head": [
+        40294.4483669891,
+        31139.659440580013
+      ],
+      "ang": 3.067961575771282,
+      "anchor_age_ms": 58,
+      "sct": 4
+    },
+    {
+      "connection": 1,
+      "frame_index": 1662,
+      "packet_index": 1,
+      "server_ms": 20665,
+      "sector": [
+        135,
+        108
+      ],
+      "head": [
+        40112.950028598716,
+        31403.897588195086
+      ],
+      "ang": 1.3499030933393643,
+      "anchor_age_ms": 34,
+      "sct": 8
+    },
+    {
+      "connection": 1,
+      "frame_index": 1834,
+      "packet_index": 1,
+      "server_ms": 22545,
+      "sector": [
+        130,
+        101
+      ],
+      "head": [
+        39993.93559356712,
+        31326.34850369265
+      ],
+      "ang": 3.018874190558942,
+      "anchor_age_ms": 8,
+      "sct": 11
+    },
+    {
+      "connection": 1,
+      "frame_index": 3983,
+      "packet_index": 0,
+      "server_ms": 40763,
+      "sector": [
+        134,
+        106
+      ],
+      "head": [
+        39359.14583068368,
+        31110.843825620243
+      ],
+      "ang": 1.1535535524900022,
+      "anchor_age_ms": 20,
+      "sct": 19
+    },
+    {
+      "connection": 1,
+      "frame_index": 4794,
+      "packet_index": 7,
+      "server_ms": 48478,
+      "sector": [
+        125,
+        99
+      ],
+      "head": [
+        38447.46702229824,
+        30687.68146269626
+      ],
+      "ang": 4.147884050442774,
+      "anchor_age_ms": 7,
+      "sct": 21
+    }
+  ]
+}

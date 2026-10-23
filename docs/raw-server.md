@@ -64,7 +64,18 @@ at zero for normal remote use. Client processing delay is not simulated twice.
 
 ### Presets
 
-There are no named host/JSON presets; omitted settings use the compact defaults.
+There are no named host/JSON presets; omitted settings use the documented defaults.
+Native and remote clients share finite snake/prey coverage (`world.vision`, default
+1,500). Snakes remain visible while any centerline segment is covered. Food uses
+a separate 45-sector entry stencil with heading lead and temporal retention.
+These are approximations with [measured constraints and known gaps](host-fidelity.md);
+the browser does not send its viewport or zoom to this host.
+
+Human joins and hosted bot lives, including startup, request 600-unit clearance
+between the complete newborn body and living heads/bodies. Crowded admission
+waits or fails without near-contact fallback. This conservative model is not an
+identified official exclusion rule.
+
 Rust callers can use `Config::default()` or `Config::realistic(n)`. The latter
 scales radius and ecology with a provisional population model, rather than
 reproducing an official server configuration.
@@ -86,6 +97,9 @@ are disconnected before exhausting output buffers. An overloaded host may slow
 world time; it does not skip physics ticks to catch up.
 
 ## Packet compatibility
+
+[Client presentation](presentation.md) describes source-linked pellet colors,
+their retained evidence and remaining uncertainty.
 
 The host uses the native simulator's encoder. Packet layouts follow protocol 19;
 world values, compression choices and update schedules can differ from official
@@ -111,10 +125,15 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 - `k`: simulator collision-attributed kills.
 - `W` then `F`: sector entry, including empty sectors; `w` clears on exit.
   Bot food coverage comes from `F`/`w`, not the browser's `W` display list.
+- `M`: a full 136×136 global minimap on an independent nominal 2.5-second clock.
+  Living heads and body centerlines are rasterized; the stock client draws its
+  own player marker. Exact official pixel filtering and `M`/`V` selection are unknown.
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.
-- `m`: highest-scoring completed life in this world run; resets with the world.
+- With `simulation.localRecords: true`, `m` shows the highest-scoring completed
+  life in this world run; resets with the world. This feature is off by default:
+  official qualification, persistence and reset rules have not been established.
   A qualifying death sends `v1` for victory-message entry, other deaths `v0`.
   The owning dead connection/life may submit once (including empty text); `v2`
   acknowledges. Slot reuse cannot edit that record.
@@ -122,8 +141,8 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   The stock browser keeps pinging through its death fade; withholding replies
   triggers its lag detector and slows the return to Play Again. Gameplay
   controls remain ignored after game over. This is a local compatibility policy.
-- Opponent, food and prey updates continue at the existing broadcast cadence
-  around the dead player's final position. Game-over and own removal are sent
+- Opponent and food updates continue around the dead player's final position;
+  prey retain their periodic reporting clock. Game-over and own removal are sent
   once; minimap updates stop. Otherwise the browser extrapolates stale opponents
   through the fade. The native bot frame stays dead with no playable observation.
 

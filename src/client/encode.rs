@@ -125,7 +125,15 @@ pub(crate) fn frame(elapsed_ms: u16, packets: &[Vec<u8>]) -> Result<Vec<u8>, Str
 pub(crate) const SERVER_NUMBER: u16 = 1;
 
 /// Setup packet with the constants the simulator's physics uses.
-pub(crate) fn setup(radius: f64) -> Result<Vec<u8>, String> {
+pub(crate) fn setup(radius: f64, prey_turn_rate: f64) -> Result<Vec<u8>, String> {
+    let prey_turn = checked(
+        (prey_turn_rate * physics::REFERENCE_FRAME_SECONDS * 1000.).round(),
+        u16::MAX as f64,
+        "Prey turn rate",
+    )? as u16;
+    if prey_turn == 0 {
+        return Err("Prey turn rate rounds to zero on the wire".into());
+    }
     let mut p = vec![b'a'];
     p.extend(u24be(GRID_CENTER));
     p.extend(u16be(physics::MAX_SEGMENTS as u16));
@@ -138,7 +146,7 @@ pub(crate) fn setup(radius: f64) -> Result<Vec<u8>, String> {
     p.extend(u16be(40)); // nsp2 * 100
     p.extend(u16be(1400)); // nsp3 * 100
     p.extend(u16be(33)); // mamu * 1000
-    p.extend(u16be(28)); // manu2 * 1000
+    p.extend(u16be(prey_turn)); // mamu2 * 1000, in client reference-frame units
     p.extend(u16be(430)); // cst * 1000
     p.push(PROTOCOL);
     p.push(physics::ANCHOR_SPACING as u8);
@@ -315,8 +323,15 @@ pub(crate) fn food_key(point: Point) -> Result<[u8; 4], String> {
 pub(crate) fn food_size(size: f64) -> u8 {
     (size * 5.).round().clamp(0., 255.) as u8
 }
+/// Presentation only; the bot decoder deliberately omits color and birth kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FoodStyle {
+    pub color: u8,
+    pub size: u8,
+    pub snake_food: bool,
+}
 /// Sector listing on subscription, split into frameable packets.
-pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], u8)]) -> Vec<Vec<u8>> {
+pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], FoodStyle)]) -> Vec<Vec<u8>> {
     let chunks: Vec<_> = if foods.is_empty() {
         vec![foods]
     } else {
@@ -326,19 +341,37 @@ pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], u8)]) -> Vec<Vec<u
         .into_iter()
         .map(|chunk| {
             let mut p = vec![b'F', sector[0], sector[1]];
-            for &([rx, ry], size) in chunk {
-                p.extend([0, rx, ry, size]);
+            for &([rx, ry], style) in chunk {
+                p.extend([style.color, rx, ry, style.size]);
             }
             p
         })
         .collect()
 }
-/// New food. Always `f`: boost/death origin is not exposed to clients here.
-pub(crate) fn food_add(key: [u8; 4], size: u8) -> Vec<u8> {
-    vec![b'f', key[0], key[1], key[2], key[3], 0, size]
+/// Explicit color/sector: no dependency on another connection's implicit state.
+pub(crate) fn food_add(key: [u8; 4], style: FoodStyle) -> Vec<u8> {
+    vec![
+        if style.snake_food { b'b' } else { b'f' },
+        key[0],
+        key[1],
+        key[2],
+        key[3],
+        style.color,
+        style.size,
+    ]
 }
-pub(crate) fn food_remove(key: [u8; 4]) -> Vec<u8> {
-    vec![b'c', key[0], key[1], key[2], key[3]]
+pub(crate) fn food_remove(key: [u8; 4], eater: Option<u16>) -> Vec<u8> {
+    let mut p = vec![
+        if eater.is_some() { b'<' } else { b'c' },
+        key[0],
+        key[1],
+        key[2],
+        key[3],
+    ];
+    if let Some(id) = eater {
+        p.extend(u16be(id));
+    }
+    p
 }
 pub(crate) fn sector_clear(sector: [u8; 2]) -> Vec<u8> {
     vec![b'w', sector[0], sector[1]]
@@ -386,9 +419,12 @@ pub(crate) fn prey_motion(prey: &Prey, full: bool) -> Result<Vec<u8>, String> {
     }
     Ok(p)
 }
-pub(crate) fn prey_removal(id: u16) -> Vec<u8> {
+pub(crate) fn prey_removal(id: u16, eater: Option<u16>) -> Vec<u8> {
     let mut p = vec![b'y'];
     p.extend(u16be(id));
+    if let Some(eater) = eater {
+        p.extend(u16be(eater));
+    }
     p
 }
 
@@ -544,6 +580,42 @@ pub(crate) fn minimap(map: &Minimap) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn food_packets_keep_color_origin_and_explicit_eater() {
+        assert_eq!(prey_removal(123, Some(2)), [b'y', 0, 123, 0, 2]);
+        assert_eq!(prey_removal(123, None), [b'y', 0, 123]);
+        let ambient = FoodStyle {
+            color: 7,
+            size: 35,
+            snake_food: false,
+        };
+        let snake = FoodStyle {
+            color: 3,
+            size: 68,
+            snake_food: true,
+        };
+        assert_eq!(
+            food_sector([108, 109], &[([20, 30], ambient), ([40, 50], snake)]),
+            [vec![b'F', 108, 109, 7, 20, 30, 35, 3, 40, 50, 68]]
+        );
+        assert_eq!(
+            food_add([108, 109, 20, 30], ambient),
+            [b'f', 108, 109, 20, 30, 7, 35]
+        );
+        assert_eq!(
+            food_add([108, 109, 40, 50], snake),
+            [b'b', 108, 109, 40, 50, 3, 68]
+        );
+        assert_eq!(
+            food_remove([108, 109, 20, 30], Some(1)),
+            [b'<', 108, 109, 20, 30, 0, 1]
+        );
+        assert_eq!(
+            food_remove([108, 109, 20, 30], None),
+            [b'c', 108, 109, 20, 30]
+        );
+    }
+
     fn u24(p: &[u8], m: usize) -> f64 {
         f64::from(u32::from_be_bytes([0, p[m], p[m + 1], p[m + 2]]))
     }
@@ -574,7 +646,7 @@ mod tests {
         let one = frame(7, &[pong()]).unwrap();
         assert_eq!(one, [0, 7, b'p']);
         assert_eq!(split(&one), [pong()]);
-        let packets = vec![removal(3, true), food_remove([1, 2, 3, 4]), pong()];
+        let packets = vec![removal(3, true), food_remove([1, 2, 3, 4], None), pong()];
         let many = frame(300, &packets).unwrap();
         assert_eq!(&many[..2], &300u16.to_be_bytes());
         assert_eq!(split(&many), packets);
@@ -584,7 +656,7 @@ mod tests {
 
     #[test]
     fn minimap_round_trips_through_the_client_decoder() {
-        for (side, pattern) in [(1, 1), (7, 3), (32, 5), (40, 97), (512, 4093)] {
+        for (side, pattern) in [(1, 1), (7, 3), (32, 5), (40, 97), (136, 173), (512, 4093)] {
             let cells: Vec<u8> = (0..side * side)
                 .map(|i| u8::from(i % pattern == 0 && i % 3 != 1))
                 .collect();
@@ -804,8 +876,26 @@ mod tests {
         let at = Point { x: 1., y: 2. };
         assert_eq!(anchor_at(true, 9, 7, at, None).unwrap().len(), 7);
         assert_eq!(anchor_at(false, 9, 7, at, Some(1)).unwrap().len(), 12);
-        assert_eq!(setup(1000.).unwrap().len(), 30);
-        assert!(setup(MAX_RADIUS + 1.).is_err());
+        let turn_rate = crate::prey::PreyConfig::default().turn_rate;
+        let packet = setup(1000., turn_rate).unwrap();
+        assert_eq!(packet.len(), 30);
+        // Independent recorded setup, not an expectation regenerated by setup().
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/client-hud-leaderboard.json"
+        ))
+        .unwrap();
+        let measured = fixture["setup"]["expected"]["mamuThousandths"][1]
+            .as_u64()
+            .unwrap();
+        assert_eq!(
+            u16::from_be_bytes([packet[19], packet[20]]) as u64,
+            measured
+        );
+        assert_eq!(&setup(1000., turn_rate * 2.).unwrap()[19..21], &[0, 58]);
+        assert!(setup(MAX_RADIUS + 1., turn_rate).is_err());
+        assert!(setup(1000., f64::INFINITY).is_err());
+        assert!(setup(1000., f64::MAX).is_err());
+        assert!(setup(1000., 0.001).is_err());
     }
 
     /// Stock-client `l` handler: position, rank, count, then sct/fam/color/name.

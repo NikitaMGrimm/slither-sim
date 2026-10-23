@@ -12,11 +12,13 @@ pub mod hud;
 pub mod latency;
 pub mod minimap;
 pub mod network;
+mod presentation;
 pub mod protocol;
 pub mod received;
 pub mod server;
 pub mod simulation;
 pub mod transport;
+mod visibility;
 
 pub use hud::{
     ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MinimapTeams,

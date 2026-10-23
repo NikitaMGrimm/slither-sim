@@ -113,6 +113,24 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assertEqual(entry["wireProtocol"], 19)
         self.assertEqual(fixture["frame"]["settings"]["protocol"], entry["wireProtocol"])
 
+    def test_protocol19_food_interest_receipts(self):
+        entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")
+        self.assertEqual(entry["wireProtocol"], 19)
+        self.assertEqual(fixture["wireProtocol"], 19)
+        self.assertEqual(entry["dataOrigin"], fixture["dataOrigin"])
+        self.assertIsNone(entry["clientContract"])
+        self.assertEqual(len(fixture["source"]["sha256"]), 64)
+        self.assertTrue(fixture["entries"])
+
+    def test_protocol19_reporting_cadence_is_source_pinned(self):
+        entry, fixture = self.fixture("tests/fixtures/client-reporting-cadence.json")
+        self.assertEqual(entry["wireProtocol"], fixture["wireProtocol"])
+        self.assertEqual(entry["dataOrigin"], fixture["dataOrigin"])
+        for key in ("archiveSha256", "decoderSha256", "censusSha256"):
+            self.assertEqual(len(fixture["source"][key]), 64)
+        self.assertEqual(fixture["preyUpdateGapsMs"]["n"], 144)
+        self.assertEqual(fixture["leaderboardGapsMs"]["n"], 27)
+
 
 if __name__ == "__main__":
     unittest.main()

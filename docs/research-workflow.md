@@ -32,18 +32,25 @@ or browser. Inspect `REPORT.md`, `analysis/results.json`, `analysis/replay/` and
 All data is labelled **synthetic, local-simulator**. The study compares causal
 heading reconstruction with a known-state control and timing/heading perturbations;
 corruption and truncation have separate tests. Initialization errors are retained.
-Passing checks establish pipeline agreement, not official mechanics or playing
+Passing checks establish pipeline agreement, not server mechanics or playing
 strength. Repeated runs reuse data identities, and thresholds were chosen during
 development, not blinded validation.
 
 ## Plan a real measurement
+
+Collection tools target protocol-19 WebSocket servers at an explicit IPv4
+address/port and `/slither` path. They do not discover servers. The template
+targets the local host at `127.0.0.1:8766`; use `dataOrigin: local-simulator` for
+that source, or `community-server` for another compatible server. Set an HTTP(S)
+`capture.origin` only when required by the endpoint. Recordings contain raw
+received packets and sent controls; they do not include server-only state.
 
 Copy [the movement plan](../evidence/templates/movement-plan.json). Specify:
 
 - Study ID, question, competing explanations and method.
 - Sampling unit, attempt budget, exclusions and held-out validation.
 - Operator-supplied protocol-19 IP/port, optional HTTP(S) `capture.origin` and
-  actual `dataOrigin`. The template uses loopback `127.0.0.1:444` and `/slither`.
+  actual `dataOrigin`. The template uses loopback `127.0.0.1:8766` and `/slither`.
 
 For confirmatory work, freeze predictions and selection rules before collection.
 Keep exploratory results labelled exploratory; a plan hash cannot prove when or
@@ -77,6 +84,13 @@ JavaScript and require a reviewed parser update.
 Low-level paired death/prey and feeding-shape collectors need their own matching
 coordinator and attempt accounting; the managed wrapper does not cover those modes.
 
+Raw frames retain direction, bytes and monotonic send/receipt timestamps. Metadata
+pins the plan/collector sources, wall-clock origin, connection/life boundaries,
+ping sends/replies/RTT and censored requests, including post-death observation.
+Server elapsed headers give a separate received clock. The audit derives RTT and
+arrival-gap summaries from those same frames; no second timing log is needed.
+These clocks cannot identify one-way latency or hidden processing ticks.
+
 ## Inspect, analyze and reproduce
 
 ```sh
@@ -87,6 +101,18 @@ Audits check plan/attempt accounting, file membership, sources, receipts, gzip
 completeness, duplicates and batch consistency. Missing attempts are incomplete;
 corrupt, interrupted or mismatched captures are quarantined. Before removing a
 leftover `.study.lock`, check its owner/process and ledger.
+
+For packet families, byte counts and cadence, analyze an audited complete capture:
+
+```sh
+uv run --locked --only-group tools python tools/fidelity/packet_census.py outputs/your-study/raw/ATTEMPT/bot0.jsonl.gz --output outputs/your-study/analysis/packets.json
+```
+
+Create `analysis/` first. The census refuses existing output, incomplete captures
+and non-19 setups. It includes archive/tool hashes, separate server/receipt gaps,
+active/post-death counts and prey reporting rates per known-prey second. Entry,
+removal, reconnect and censored lifetimes remain distinct. It does not repeat the
+audit's integrity/RTT analysis or infer world populations from recipient counts.
 
 Before export, audit the complete study and inspect its attempt ledger, source
 pins and quarantine status. Preserve that audit result and the selected window
@@ -162,6 +188,12 @@ If an expectation was wrong, document its independent correction and preserve th
 original evidence. Deprecating a case requires a reason tied to the supported
 contract or invalid evidence, with a replacement or retained rejection test where
 applicable. A passing decoder cross-check is not independent proof of its model.
+
+For a new regression, retain a small selected raw packet/window with the archive
+SHA-256, record indices, wire version, decoder identity and selection rule. Derive
+expected fields with the existing decoder or replay exporter, label that derivation,
+then have the focused test consume the fixture. Keep the full audited study outside
+Git; the [worked study](../tools/fidelity/worked_study.py) demonstrates this path.
 
 ## Offline checks
 

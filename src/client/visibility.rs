@@ -1,0 +1,267 @@
+//! Provisional small-snake food interest from the retained sector study.
+//!
+//! The 2.6-second threshold was a temporal classifier split, not an exact
+//! official expiry timer. Combining it with nominal 504 ms cleanup is an
+//! approximation; neither the official scheduler nor size scaling is identified.
+
+use super::encode;
+use crate::model::Point;
+use std::collections::{BTreeMap, BTreeSet};
+
+const HEADING_LEAD: f64 = 100.;
+const RETENTION_SECONDS: f64 = 2.6;
+const CLEANUP_SECONDS: f64 = 0.504;
+
+/// Recipient state, reset with its connection rather than shared with the world.
+#[derive(Clone, Debug, Default)]
+pub(super) struct SectorInterest {
+    subscribed: BTreeSet<[u8; 2]>,
+    last_seen: BTreeMap<[u8; 2], f64>,
+    cleanup_epoch: u64,
+}
+
+impl SectorInterest {
+    /// Advance on every physics tick using finite, monotonic virtual time.
+    /// The caller keeps the final pose for dead clients and resets on reconnect.
+    pub(super) fn advance(&mut self, head: Point, heading: f64, now: f64) {
+        let size = f64::from(encode::SECTOR_SIZE);
+        let center = f64::from(encode::GRID_CENTER);
+        // The wire origin is half a sector from the centered world origin, so
+        // add it before flooring, including for negative world coordinates.
+        let cx = ((head.x + center + HEADING_LEAD * heading.cos()) / size).floor();
+        let cy = ((head.y + center + HEADING_LEAD * heading.sin()) / size).floor();
+        for dx in -3_i32..=3 {
+            for dy in -3_i32..=3 {
+                if dx.abs() == 3 && dy.abs() == 3 {
+                    continue;
+                }
+                let sx = cx + f64::from(dx);
+                let sy = cy + f64::from(dy);
+                // Clip the stencil, rather than wrapping or clamping offsets
+                // onto an edge. These keys bound both collections to 65,536.
+                if (0. ..=255.).contains(&sx) && (0. ..=255.).contains(&sy) {
+                    let sector = [sx as u8, sy as u8];
+                    self.subscribed.insert(sector);
+                    self.last_seen.insert(sector, now);
+                }
+            }
+        }
+
+        // Absolute epochs keep phase at multiples of 0.504 from virtual zero.
+        // Touch before cleanup; a large jump needs only one bounded sweep and
+        // never advances the clock by repeatedly adding a floating interval.
+        let epoch = (now / CLEANUP_SECONDS).floor() as u64;
+        if epoch > self.cleanup_epoch {
+            self.cleanup_epoch = epoch;
+            let subscribed = &mut self.subscribed;
+            self.last_seen.retain(|sector, last_seen| {
+                if now - *last_seen <= RETENTION_SECONDS {
+                    true
+                } else {
+                    subscribed.remove(sector);
+                    false
+                }
+            });
+        }
+    }
+
+    pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
+        &self.subscribed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f64::consts::FRAC_PI_2;
+
+    const FAR: Point = Point { x: 10_000., y: 0. };
+
+    #[test]
+    fn fresh_received_sector_entries_are_admitted_beyond_the_old_circle() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/client-food-interest.json"
+        ))
+        .unwrap();
+        for entry in fixture["entries"].as_array().unwrap() {
+            let center = f64::from(encode::GRID_CENTER);
+            let head = Point {
+                x: entry["head"][0].as_f64().unwrap() - center,
+                y: entry["head"][1].as_f64().unwrap() - center,
+            };
+            let sector = [
+                entry["sector"][0].as_u64().unwrap() as u8,
+                entry["sector"][1].as_u64().unwrap() as u8,
+            ];
+            let mut interest = SectorInterest::default();
+            interest.advance(head, entry["ang"].as_f64().unwrap(), 0.);
+            assert!(interest.subscribed().contains(&sector), "{entry}");
+            let nearest = |axis: usize| {
+                let p = entry["head"][axis].as_f64().unwrap();
+                let lower = f64::from(sector[axis]) * 300.;
+                (lower - p).max(p - lower - 300.).max(0.)
+            };
+            assert!(nearest(0).hypot(nearest(1)) > 500.);
+        }
+    }
+
+    #[test]
+    fn initial_stencil_has_45_sectors_without_four_corners() {
+        let mut interest = SectorInterest::default();
+        interest.advance(Point::default(), 0., 0.);
+        let sectors = interest.subscribed();
+        assert_eq!(sectors.len(), 45);
+        assert!(sectors.contains(&[108, 108]));
+        assert!(sectors.contains(&[105, 106]));
+        assert!(sectors.contains(&[106, 105]));
+        assert!(sectors.contains(&[110, 111]));
+        assert!(sectors.contains(&[111, 110]));
+        for corner in [[105, 105], [105, 111], [111, 105], [111, 111]] {
+            assert!(!sectors.contains(&corner));
+        }
+        assert!(
+            sectors
+                .iter()
+                .all(|&[x, y]| (105..=111).contains(&x) && (105..=111).contains(&y))
+        );
+    }
+
+    #[test]
+    fn heading_lead_changes_the_grid_center() {
+        let head = Point { x: 60., y: 60. };
+        let mut east = SectorInterest::default();
+        let mut north = SectorInterest::default();
+        east.advance(head, 0., 0.);
+        north.advance(head, FRAC_PI_2, 0.);
+        assert!(east.subscribed().contains(&[112, 108]));
+        assert!(!north.subscribed().contains(&[112, 108]));
+        assert!(north.subscribed().contains(&[108, 112]));
+        assert!(!east.subscribed().contains(&[108, 112]));
+    }
+
+    #[test]
+    fn negative_world_positions_floor_after_the_wire_offset_and_lead() {
+        let mut interest = SectorInterest::default();
+        interest.advance(Point { x: -249., y: -149. }, 0., 0.);
+        assert!(interest.subscribed().contains(&[111, 108]));
+        assert!(interest.subscribed().contains(&[108, 111]));
+        assert!(!interest.subscribed().contains(&[104, 108]));
+        assert!(!interest.subscribed().contains(&[108, 104]));
+
+        let mut below_boundary = SectorInterest::default();
+        below_boundary.advance(
+            Point {
+                x: -250.01,
+                y: -150.01,
+            },
+            0.,
+            0.,
+        );
+        assert!(below_boundary.subscribed().contains(&[104, 107]));
+        assert!(below_boundary.subscribed().contains(&[107, 104]));
+        assert!(!below_boundary.subscribed().contains(&[111, 108]));
+        assert!(!below_boundary.subscribed().contains(&[108, 111]));
+    }
+
+    #[test]
+    fn expired_sectors_wait_for_the_fixed_cleanup_phase() {
+        let mut interest = SectorInterest::default();
+        interest.advance(Point::default(), 0., 0.);
+        interest.advance(FAR, 0., 0.007);
+        interest.advance(FAR, 0., 2.52);
+        interest.advance(FAR, 0., 3.023);
+        assert!(interest.subscribed().contains(&[108, 108]));
+        interest.advance(FAR, 0., 3.024);
+        assert!(!interest.subscribed().contains(&[108, 108]));
+        assert_eq!(interest.subscribed().len(), 45);
+    }
+
+    #[test]
+    fn revisiting_refreshes_retention_before_cleanup() {
+        let mut interest = SectorInterest::default();
+        interest.advance(Point::default(), 0., 0.);
+        interest.advance(FAR, 0., 0.007);
+        interest.advance(Point::default(), 0., 2.4);
+        interest.advance(FAR, 0., 2.5);
+        interest.advance(FAR, 0., 3.024);
+        assert!(interest.subscribed().contains(&[108, 108]));
+        interest.advance(FAR, 0., 5.04);
+        assert!(!interest.subscribed().contains(&[108, 108]));
+    }
+
+    #[test]
+    fn a_final_stationary_pose_is_touched_before_cleanup() {
+        let mut interest = SectorInterest::default();
+        interest.advance(Point::default(), 0., 0.);
+        let original = interest.subscribed().clone();
+        interest.advance(Point::default(), 0., 1_000_000_000_000.);
+        assert_eq!(interest.subscribed(), &original);
+        assert_eq!(interest.last_seen.len(), 45);
+    }
+
+    #[test]
+    fn default_reset_discards_the_old_connections_history_and_clock() {
+        let mut interest = SectorInterest::default();
+        interest.advance(Point::default(), 0., 2.);
+        let clone = interest.clone();
+        assert_eq!(clone.subscribed(), interest.subscribed());
+        interest = SectorInterest::default();
+        assert!(interest.subscribed().is_empty());
+        assert!(interest.last_seen.is_empty());
+        assert_eq!(interest.cleanup_epoch, 0);
+        interest.advance(FAR, 0., 2.1);
+        assert!(!interest.subscribed().contains(&[108, 108]));
+        assert_eq!(interest.subscribed().len(), 45);
+    }
+
+    fn at_wire_sector(x: u16, y: u16) -> Point {
+        Point {
+            x: f64::from(x) * 300. - 32550. - 100.,
+            y: f64::from(y) * 300. - 32550.,
+        }
+    }
+
+    #[test]
+    fn stencil_clips_at_both_wire_edges_without_wrapping() {
+        let mut low = SectorInterest::default();
+        low.advance(at_wire_sector(0, 0), 0., 0.);
+        assert_eq!(low.subscribed().len(), 15);
+        assert!(low.subscribed().contains(&[0, 0]));
+        assert!(!low.subscribed().contains(&[3, 3]));
+        assert!(low.subscribed().iter().all(|&[x, y]| x <= 3 && y <= 3));
+
+        let mut high = SectorInterest::default();
+        high.advance(at_wire_sector(255, 255), 0., 0.);
+        assert_eq!(high.subscribed().len(), 15);
+        assert!(high.subscribed().contains(&[255, 255]));
+        assert!(!high.subscribed().contains(&[252, 252]));
+        assert!(high.subscribed().iter().all(|&[x, y]| x >= 252 && y >= 252));
+
+        let mut outside = SectorInterest::default();
+        outside.advance(
+            Point {
+                x: -34_000.,
+                y: -34_000.,
+            },
+            0.,
+            0.,
+        );
+        assert!(outside.subscribed().is_empty());
+    }
+
+    #[test]
+    fn all_legal_ids_bound_state_and_a_large_jump_cleans_in_one_sweep() {
+        let mut interest = SectorInterest::default();
+        // Centers five cells apart cover every legal ID without cleanup.
+        for x in (0..=255).step_by(5) {
+            for y in (0..=255).step_by(5) {
+                interest.advance(at_wire_sector(x, y), 0., 0.);
+            }
+        }
+        assert_eq!(interest.subscribed().len(), 65_536);
+        assert_eq!(interest.last_seen.len(), 65_536);
+        interest.advance(Point::default(), 0., 1_000_000_000_000.);
+        assert_eq!(interest.subscribed().len(), 45);
+        assert_eq!(interest.last_seen.len(), 45);
+    }
+}

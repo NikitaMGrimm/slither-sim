@@ -2,12 +2,24 @@
 
 ## Unreleased
 
+- Match the default prey turn setup to physics; separate leaderboard deadlines
+  and bounded prey reporting from gameplay broadcasts. Add an offline packet
+  census, source-pinned cadence fixture and generic localhost capture workflow;
+  keep recording ping timing through post-death observation and capture shutdown.
+- Keep correcting predicted prey positions even when authoritative grid/motion
+  is unchanged, preventing drifting ghosts and later snap-backs.
+- Use shared finite 1,500-unit snake/prey coverage and retained food-sector interest;
+  restore 136-cell minimaps with an independent clock. Require safe whole-body
+  admission for hosted startup, joins and respawns, with no cramped fallback.
+- Make synthetic world-run records/victory entry opt-in (`localRecords`, default false).
+
+- Restore source-linked pellet palettes, persistent ambient colors, birth types
+  and explicit pickup attribution from the earlier client presentation layer.
+
 - Keep answering post-death pings so the stock browser's death fade and victory
   entry do not trigger lag slowdown; document a local endpoint that survives Play Again.
 - Continue opponent, food and prey updates through the stock death animation,
   preserving broadcast cadence while suppressing repeated death and minimap reports.
-
-## Unreleased
 
 - Keep configured prey sizes positive and within their bounds, ambient food
   inside tiny arenas, and finite extreme respawn poses numerically usable.
