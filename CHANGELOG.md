@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+Changes since 0.2.0, available from Git until the next release.
+
+- Bound food-sector clearing in bundled client frames, including preflight
+  validation, to avoid repeatedly scanning unrelated retained food.
+- Bound minimap rasterization for extreme geometry while preserving ordinary
+  output, and reject frames exceeding the aggregate minimap decoding work budget.
+- Reject protocol-19 simulation-client prey sizes that cannot fit the wire format.
+- Index collision body bounds by stable snake slot and skip observation-index
+  construction when no selected snake is alive. Add reproducible offline
+  workloads, full-state parity traces and [fixture-specific performance reports](docs/performance.md).
+- Automate compatible patch-release preparation and publication with a 12-hour
+  cooldown and protected checks for release-bot PRs; see [releasing](docs/releasing.md).
+- Add informational performance and fidelity comparisons to PR CI. Synthetic
+  comparisons do not establish official-server fidelity or general speedups.
+
 ## 0.2.0 (2026-10-23)
 
 - Rust compatibility: `SimulationConfig` adds `local_records`, defaulting to
