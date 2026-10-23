@@ -70,7 +70,7 @@ fn sliding_does_not_skip_snake_body_collisions() {
         Config {
             radius: 8000.,
             food_count: 0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -121,7 +121,7 @@ fn boundary_deaths_drop_no_food_even_with_the_body_inside() {
                 radius: 8000.,
                 food_count: 0,
                 boundary_mode: mode,
-                ..Config::default()
+                ..Config::sandbox()
             },
         )
         .unwrap();
@@ -155,7 +155,7 @@ fn boundary_modes_share_interior_motion() {
         Config {
             radius: 8000.,
             food_count: 100,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -226,7 +226,7 @@ fn radius_trace_changes_boundary_and_raw_observations_at_tick_end() {
                     radius: 200.,
                 },
             ],
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -279,7 +279,7 @@ fn malformed_radius_updates_fail_before_world_creation() {
                 1,
                 Config {
                     radius_updates: updates,
-                    ..Config::default()
+                    ..Config::sandbox()
                 }
             )
             .is_err()
@@ -301,7 +301,7 @@ fn original_received_radius_trace_replays_without_moving_the_center() {
             food_count: 0,
             radius: initial_radius,
             radius_updates: updates,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();

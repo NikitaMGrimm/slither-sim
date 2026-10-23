@@ -2000,7 +2000,7 @@ mod tests {
             agents,
             world: Config {
                 vision: 3000.,
-                ..Config::default()
+                ..Config::sandbox()
             },
             ..Default::default()
         }

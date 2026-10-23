@@ -27,7 +27,7 @@ fn recorded_circle_retains_food_until_boost_exhaustion() {
                 food_count: 0,
                 ambient_replenish_per_second: 0.0,
                 emit_boost_food: false,
-                ..Config::default()
+                ..Config::sandbox()
             },
         )
         .unwrap();

@@ -18,6 +18,7 @@ fn config(agents: usize, latency: LatencyConfig) -> SimulationConfig {
         agents,
         latency,
         record_wire: true,
+        world: slither_sim::Config::sandbox(),
         ..Default::default()
     };
     config.world.radius = 1500.;

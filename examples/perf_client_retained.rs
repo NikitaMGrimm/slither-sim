@@ -162,7 +162,7 @@ mod retained {
             food_count: 12_000,
             vision: 3000.0,
             dt: DT,
-            ..Config::default()
+            ..Config::sandbox()
         };
         world.prey.count = 8;
         SimulationConfig {

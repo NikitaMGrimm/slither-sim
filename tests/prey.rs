@@ -15,7 +15,7 @@ fn world() -> Simulator {
         42,
         Config {
             food_count: 0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -151,7 +151,7 @@ fn authoritative_prey_rounds_coordinates_down_on_each_server_tick() {
         Config {
             radius: 10000.,
             food_count: 0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -183,7 +183,7 @@ fn coarse_simulation_steps_preserve_prey_coordinate_quantization() {
                 radius: 10000.,
                 food_count: 0,
                 dt,
-                ..Config::default()
+                ..Config::sandbox()
             },
         )
         .unwrap();
@@ -250,7 +250,7 @@ fn later_prey_injection_keeps_the_server_tick_phase() {
             radius: 10000.,
             food_count: 0,
             dt: 0.005,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -482,7 +482,7 @@ fn raw_visibility_keeps_moving_entities_separate_from_food() {
 }
 #[test]
 fn prey_randomness_does_not_perturb_ambient_food_and_profile_is_passive() {
-    let plain = Simulator::new(21, Config::default()).unwrap();
+    let plain = Simulator::new(21, Config::sandbox()).unwrap();
     let mut enabled = Simulator::new(
         21,
         Config {
@@ -490,7 +490,7 @@ fn prey_randomness_does_not_perturb_ambient_food_and_profile_is_passive() {
                 count: 3,
                 ..PreyConfig::default()
             },
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -530,7 +530,7 @@ fn invalid_prey_configuration_is_rejected() {
                 1,
                 Config {
                     prey: p,
-                    ..Config::default()
+                    ..Config::sandbox()
                 }
             )
             .is_err()

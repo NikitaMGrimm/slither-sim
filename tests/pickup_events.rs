@@ -7,7 +7,7 @@ fn capture_telemetry_identifies_the_eater_without_changing_the_simulation() {
         Config {
             food_count: 0,
             ambient_replenish_per_second: 0.,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
