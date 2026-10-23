@@ -130,6 +130,10 @@ excluded from completed legs. A shared trial binds identities, center and axis;
 reset. Avoidance interruptions, actual anchors, cache membership, intended and
 sent headings remain available for analysis. Counters and intended waypoints
 alone do not certify an uninterrupted traversal or fresh causal query.
+Both own anchors must remain within the 150 ms operational freshness limit
+during approach, holds and travel. A stale anchor abandons the trial with
+`own_anchor_stale` and suppresses new heading commands until fresh reference
+state returns. This is separate from opponent-cache absence.
 
 ```json
 {"scenario": "food-lanes", "bots": 1, "seconds": 480}

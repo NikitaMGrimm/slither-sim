@@ -76,8 +76,7 @@ test('endpoints are exact, B-only, initial approach excluded; holds include reve
 
 test('endpoint gates require both fresh anchors, raw reference radius and rail geometry', () => {
   for (const [a, b, offset] of [
-    [{ anchorAgeMs: 151 }, {}, 800], [{}, { anchorAgeMs: -1 }, 800],
-    [{}, { anchorAgeMs: NaN }, 800], [{ x: center.x + 201 }, {}, 800],
+    [{ x: center.x + 201 }, {}, 800],
     [{}, { y: center.y + 181 }, 800], [{}, {}, 921],
   ]) {
     const { state, events, ws } = start();
@@ -87,6 +86,52 @@ test('endpoint gates require both fresh anchors, raw reference radius and rail g
   const { state, events, ws } = start();
   state.update(200, poses('x', 1, 920, { anchorAgeMs: 150 }, { anchorAgeMs: 150, y: center.y + 180 }), ws);
   assert.equal(events.length, 1);
+});
+
+test('stale own anchors block approach and abandon holds and travel before later fresh endpoints', () => {
+  for (const index of [0, 1]) for (const age of [151, -1, NaN, Infinity]) {
+    const unavailable = poses('x', 1, 600);
+    unavailable[index].anchorAgeMs = age;
+    const freshState = new PairSnakeState('x');
+    freshState.update(100, unavailable, worlds());
+    assert.equal(freshState.crossing, null);
+    assert.equal(freshState.reason, 'own_anchor_stale');
+    assert.equal(freshState.meetingTargets, null);
+    for (const stage of ['approach', 'hold', 'travel']) {
+      const { state, events, ws } = start();
+      if (stage !== 'approach') state.update(200, poses('x', 1, 800), ws);
+      if (stage === 'travel') state.update(2200, poses('x', 1, 800), ws);
+      const invalid = poses('x', 1, stage === 'travel' ? 1550 : 800);
+      invalid[index].anchorAgeMs = age;
+      const t = stage === 'travel' ? 2300 : 300;
+      state.update(t, invalid, ws);
+      assert.equal(state.crossing, null);
+      const ended = events.at(-1);
+      assert.equal(ended.event, 'paired-snake-trial-end');
+      assert.equal(ended.reason, 'own_anchor_stale');
+      assert.equal(ended.feasibilityPassed, false);
+      const count = events.filter(e => e.event === 'paired-snake-endpoint').length;
+      state.update(t + 100, poses('x', 1, 2300), ws);
+      state.update(t + 2200, poses('x', 1, 800), ws);
+      assert.equal(events.filter(e => e.event === 'paired-snake-endpoint').length, count);
+      assert.equal(state.crossing, null, 'fresh distant endpoints cannot bridge the abandoned trial');
+    }
+  }
+});
+
+test('stale own or paired reference skips heading delivery despite fresh non-position traffic', () => {
+  for (const stalePeer of [false, true]) {
+    const { state } = start();
+    const events = [], a = makeBot(0, state, events), b = makeBot(1, state, events);
+    a.bot.peers = b.bot.peers = [a.bot, b.bot];
+    a.bot.lastReceivedAt = 10000;
+    a.me.t = stalePeer ? 10000 : 100;
+    if (stalePeer) state.update(10000, poses('x', 1, 600, {}, { anchorAgeMs: 9900 }), worlds());
+    a.bot.tick(10000);
+    assert.equal(a.sent.filter(bytes => bytes.length === 1 && bytes[0] <= 250).length, 0);
+    assert.equal(events.find(e => e.event === 'paired-snake-control-skipped').reason, 'own_anchor_stale');
+    assert.equal(a.bot.boost, false);
+  }
 });
 
 test('an interrupted achieved leg is preserved but cannot pass the near-far-near scale gate', () => {

@@ -92,6 +92,10 @@ function rawPose(s) {
   return s ? { id: s.id, life: s.life, x: s.x, y: s.y, anchorAgeMs: s.anchorAgeMs } : null;
 }
 
+function freshAnchor(age) {
+  return Number.isFinite(age) && age >= 0 && age <= PAIR_SNAKE.endpointAnchorFreshMs;
+}
+
 export class PairSnakeState {
   constructor(direction, emit = () => {}) {
     this.direction = validateDirection(direction); this.emit = emit;
@@ -119,6 +123,11 @@ export class PairSnakeState {
     const [a, b] = snapshots;
     if (!a || !b) {
       if (this.identities) this.reset(now, 'pair_unavailable');
+      this.snapshots = snapshots; return;
+    }
+    // Fresh arrivals cannot establish continuity across lost own-pose geometry.
+    if (!snapshots.every(s => freshAnchor(s.anchorAgeMs))) {
+      this.reset(now, 'own_anchor_stale');
       this.snapshots = snapshots; return;
     }
     const identities = snapshots.map((s, i) => `${i}/${s.life}/${s.id}`);
@@ -160,10 +169,8 @@ export class PairSnakeState {
     if (released || c.holdUntil !== null) return;
     const p = railProjection(c.center, this.direction, c.sign, b);
     const offset = c.leg === 'near' ? PAIR_SNAKE.nearOffset : PAIR_SNAKE.farOffset;
-    const fresh = snapshots.every(s => Number.isFinite(s.anchorAgeMs) && s.anchorAgeMs >= 0 &&
-      s.anchorAgeMs <= PAIR_SNAKE.endpointAnchorFreshMs);
     if (now > c.legStarted && Math.abs(p.along - offset) <= PAIR_SNAKE.endpointTolerance &&
-        Math.abs(p.crossTrack) <= PAIR_SNAKE.crossTrackTolerance && fresh &&
+        Math.abs(p.crossTrack) <= PAIR_SNAKE.crossTrackTolerance &&
         Math.hypot(a.x - c.center.x, a.y - c.center.y) <= PAIR_SNAKE.referenceTolerance) {
       const end = { t: now, offset, pairIdentities: [...identities],
         primary: rawPose(a), secondary: rawPose(b), fixedCenter: { ...c.center },
@@ -262,6 +269,21 @@ export class PairSnakeBot extends Bot {
   }
   tick(now) {
     this.pendingSample = null;
+    const me = this.world.snakes.get(this.world.self);
+    if (this.ws?.readyState === 1 && me?.pts.length && !this.deathObservation &&
+        now - this.lastReceivedAt <= 15000 &&
+        (!freshAnchor(now - me.t) || this.pair.reason === 'own_anchor_stale')) {
+      if (now - (this.lastStaleSampleAt ?? -Infinity) >= PAIR_SNAKE.sampleMs) {
+        this.lastStaleSampleAt = now;
+        this.rec.meta({ event: 'paired-snake-control-skipped', reason: 'own_anchor_stale',
+          botIndex: this.index, life: this.lives, controlAt: now,
+          ownAnchorAgeMs: now - me.t,
+          pairAnchorAgesMs: this.pair.snapshots.map(s => s?.anchorAgeMs ?? null) });
+      }
+      this.ping(now);
+      this.setBoost(false, now);
+      return;
+    }
     super.tick(now);
     if (this.pendingSample) this.rec.meta({ ...this.pendingSample, sentHeading: this.lastHeading, boost: this.boost });
   }
