@@ -258,10 +258,17 @@ def collect(output, head):
     report["rustc"] = subprocess.check_output(["rustc", "-Vv"], text=True, timeout=30)
     fidelity = {}
     binaries = {}
+    target = work / "target"
     for label, checkout in (("baseline", baseline), ("candidate", ROOT)):
-        env = {**os.environ, "CARGO_TARGET_DIR": str(work / f"target-{label}"), "CARGO_BUILD_JOBS": "2",
+        env = {**os.environ, "CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "2",
                "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
         report.setdefault("cargo_locks", {})[label] = digest(checkout / "Cargo.lock")
+        # Keep dependency builds, but force fresh simulator outputs after taking
+        # independent copies of the baseline executables below.
+        if label == "candidate" and command(["cargo", "clean", "--locked", "--package", "slither-sim"],
+                                             baseline, output / "candidate-clean.log", env):
+            report["errors"].append("candidate package cleanup failed; candidate measurements unavailable")
+            continue
         print(f"[{label}] Building release measurement examples", flush=True)
         build_log = output / f"{label}-build.log"
         built = command(["cargo", "build", "--release", "--locked", "--example", "perf_baseline", "--example", "fidelity_metrics"], checkout, build_log, env)
@@ -278,7 +285,7 @@ def collect(output, head):
         bins = work / f"bin-{label}"
         bins.mkdir()
         for name in ("perf_baseline", "fidelity_metrics"):
-            shutil.copy2(work / f"target-{label}/release/examples/{name}{suffix}", bins / f"{name}{suffix}")
+            shutil.copy2(target / f"release/examples/{name}{suffix}", bins / f"{name}{suffix}")
         binaries[label] = bins / f"perf_baseline{suffix}"
         report.setdefault("binaries", {})[label] = {p.name: digest(p) for p in bins.iterdir()}
         metrics_log = output / f"{label}-fidelity.json"

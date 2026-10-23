@@ -12,6 +12,10 @@ same toolchain, after copying the PR's benchmark and fidelity examples, selected
 test sources and fixtures into a fresh, detached baseline worktree. Both runtimes
 therefore see identical measurement code and evidence. Cargo lockfiles can differ
 and their hashes are retained. Compilation failures make results unavailable.
+Both revisions reuse one run-owned Cargo target directory for dependencies.
+After baseline executables are copied and hashed, only the simulator package's
+build outputs are cleaned, forcing a fresh candidate build without recompiling
+compatible dependencies. A failed cleanup leaves candidate results unavailable.
 
 The performance table reuses the six [baseline workloads](performance.md).
 Three adjacent alternating pairs follow a warmup; raw results are retained.
@@ -63,6 +67,8 @@ No personal token or external benchmarking service is needed. Full measurements,
 input/binary hashes, traces and logs remain in a separate artifact for 14 days,
 including partial output on failure. The publisher downloads only the small
 comment artifact. Broken report generation remains visible as a failed job.
+Full-state trace archives use gzip level 1 to reduce untimed compression work;
+parity still hashes every uncompressed byte. Archive sizes can therefore grow.
 
 GitHub's usual approval policy still applies to first-time fork contributors.
 Conflicting PRs need their conflicts resolved before a merge checkout can run.
