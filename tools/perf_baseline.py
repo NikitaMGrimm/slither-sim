@@ -220,9 +220,13 @@ def process_metrics(process):
 class Lines:
     """Deadline-aware pipe reads without helper threads; includes polling overhead."""
 
-    def __init__(self, pipe):
+    def __init__(self, pipe, spin_seconds=0.0):
         self.pipe = pipe
         self.pending = b""
+        # Untimed bulk reads yield instead of sleeping for a short idle interval:
+        # Windows pipes hold a few KiB, so a sleep per chunk made a 210 MB trace
+        # take 27 s instead of 5 s. Timed callers keep the plain 0.5 ms sleep.
+        self.spin_seconds = spin_seconds
 
     def available(self):
         if os.name == "nt":
@@ -245,6 +249,7 @@ class Lines:
         # is quadratic for the multi-megabyte lines of large scenario traces.
         chunks, size = [self.pending], len(self.pending)
         index = self.pending.find(b"\n")
+        idle_since = None
         try:
             while index < 0:
                 if time.perf_counter() >= deadline:
@@ -259,8 +264,11 @@ class Lines:
                         index = size + found
                     chunks.append(chunk)
                     size += len(chunk)
+                    idle_since = None
                 else:
-                    time.sleep(0.0005)
+                    now = time.perf_counter()
+                    idle_since = now if idle_since is None else idle_since
+                    time.sleep(0 if now - idle_since < self.spin_seconds else 0.0005)
         finally:
             if len(chunks) > 1:
                 self.pending = b"".join(chunks)
@@ -361,7 +369,7 @@ def capture_trace(executable, case, iterations, directory, *, terminal=False, de
         process = subprocess.Popen([str(executable), case, str(iterations), "--trace"],
                                    stdout=subprocess.PIPE, stderr=errors)
         cleanup.callback(close_child, process)
-        reader = Lines(process.stdout)
+        reader = Lines(process.stdout, spin_seconds=0.005)
         sha = hashlib.sha256()
         lines = 0
         size = 0

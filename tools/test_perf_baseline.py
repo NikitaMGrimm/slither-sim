@@ -547,6 +547,22 @@ class ProcessFailures(unittest.TestCase):
         self.assertEqual((len(line), reader.pending), (size, b"tail"))
         self.assertLess(elapsed, 1.5)
 
+    def test_only_untimed_bulk_reads_yield_before_sleeping(self):
+        class Pipe:
+            def fileno(self):
+                return -1
+
+        for spin, expected in ((0.0, [0.0005, 0.0005]), (0.005, [0, 0])):
+            with self.subTest(spin=spin):
+                reader = perf_baseline.Lines(Pipe(), spin_seconds=spin)
+                polls = iter([0, 0, 3])
+                reader.available = lambda: next(polls)
+                with patch.object(perf_baseline.os, "read", return_value=b"ok\n"), patch.object(
+                        perf_baseline.time, "sleep") as sleep:
+                    self.assertEqual(reader.read(time.perf_counter() + 60), b"ok")
+                self.assertEqual([call.args[0] for call in sleep.call_args_list], expected)
+        self.assertEqual(perf_baseline.Lines(Pipe()).spin_seconds, 0)
+
     def test_timeout_terminates_and_waits_for_child(self):
         processes = []
         real_popen = subprocess.Popen
