@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- List benchmark workloads with `perf_baseline --list` from one registration table.
+  New synthetic steady-state workloads cover sandbox, official worlds at 30–500
+  snakes, a dense no-prey arena standing in for a future Battle Dome, and an
+  official in-process client path, with deaths, death food and respawns inside the
+  measured and traced windows. The six historical cases and their traces are unchanged.
+  See [performance workloads](docs/performance-workloads.md).
+
 ## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23
 
 ### Added

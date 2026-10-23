@@ -23,6 +23,7 @@ to find its source owner and focused check.
 | Plan, collect, audit or replay evidence | [Evidence workflow](research-workflow.md) |
 | Read or produce a portable evidence bundle | [Bundle format](evidence-format.md) |
 | Measure simulator and client costs | [Performance](performance.md), with observation, retained-client and deadline guides linked there |
+| Add or change a benchmark workload | [Performance workloads](performance-workloads.md) |
 | Understand automatic PR measurements | [PR comparisons](pr-reports.md) |
 
 ## Maintain and trace history
