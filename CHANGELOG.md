@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.2.0 (2026-10-23)
+
+- Rust compatibility: `SimulationConfig` adds `local_records`, defaulting to
+  false. Update exhaustive struct literals or use `..Default::default()`.
+  The JSON protocol identifiers remain unchanged.
+- Publish the current evidence-constrained host defaults: finite 1,500-unit
+  snake/prey coverage, retained food sectors, 136-cell minimaps and independent
+  reporting clocks. The compact default arena and provisional ecology remain
+  explicit; no exact official-server preset or overall accuracy is claimed.
+- Retain paired-snake targets through bounded stale-pose pauses without granting
+  clean-route credit, and screen food-route corridors against complete received
+  bodies. Add controlled snake/food collectors, ordered sector diagnostics and
+  explicit paired capture budgets up to 3,600 seconds.
+
 - Run declared paired-prey routes through the managed evidence collector and
   verify route settings against the plan; retain process outcomes across audit errors.
 

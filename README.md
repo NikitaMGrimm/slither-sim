@@ -79,6 +79,18 @@ The portable backends share a Rust packet decoder; bots in other languages use
 JSON. The geometric `serve` API provides direct observations without network delay.
 See [interface versions](docs/client-api.md#interface-versions) for compatibility.
 
+## Defaults and fidelity
+
+The defaults combine measured movement and protocol constants with approximate
+visibility, spawning and ecology. They include the current coverage, food-sector,
+minimap and reporting corrections; see [host fidelity](docs/host-fidelity.md).
+
+The default world is a compact sandbox: radius 1,000, fixed boundary and no
+spawned prey. `Config::realistic(n)` scales the arena and food using a provisional
+population model. Neither configuration is a verified official-server preset.
+See [configuration](docs/configuration.md) for each default and
+[rules and evidence limits](docs/server-rules.md) for what has been measured.
+
 ## Development
 
 - [Contributing](CONTRIBUTING.md): changes, tests and packaging.
