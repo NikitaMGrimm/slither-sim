@@ -1,7 +1,7 @@
 # Evidence bundle v1
 
 A bundle is a gzip-compressed tar of regular files, described by the
-[bundle schema](../schemas/evidence-bundle-v1.schema.json). Raw captures retain
+[bundle schema](https://github.com/NikitaMGrimm/slither-sim/blob/main/schemas/evidence-bundle-v1.schema.json). Raw captures retain
 schema-1 JSONL/gzip bytes.
 
 ```text
@@ -19,8 +19,8 @@ software/*
 
 | File | Contract |
 | --- | --- |
-| `plan.json` | [Study plan](../schemas/study-plan-v1.schema.json), copied byte-for-byte by `init` and identified by SHA-256. Later edits/reformatting are rejected. Unknown fields require a schema revision. |
-| `attempts.jsonl` | [Ledger](../schemas/attempt-event-v1.schema.json): one durable `started` reservation and one `finished` result per attempt, with status, exit code and raw members. Missing finishes remain incomplete. Timestamps include UTC offsets; commands are provenance strings, never verifier input to execute. |
+| `plan.json` | [Study plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/schemas/study-plan-v1.schema.json), copied byte-for-byte by `init` and identified by SHA-256. Later edits/reformatting are rejected. Unknown fields require a schema revision. |
+| `attempts.jsonl` | [Ledger](https://github.com/NikitaMGrimm/slither-sim/blob/main/schemas/attempt-event-v1.schema.json): one durable `started` reservation and one `finished` result per attempt, with status, exit code and raw members. Missing finishes remain incomplete. Timestamps include UTC offsets; commands are provenance strings, never verifier input to execute. |
 | `manifest.json` | Study ID, plan digest, data origin, audit and every other file's exact size/SHA-256. `scientificStatus` is always `unreviewed`. |
 | `REPORT.md` | Findings, reproduction and limitations; external-data sources and sharing restrictions. |
 | `software/` | Required source snapshot: core, Cargo inputs, scripts, schemas, replay examples, Python lockfile and license. `software/LICENSE` covers bundled project code. |

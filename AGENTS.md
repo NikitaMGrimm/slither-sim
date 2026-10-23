@@ -20,6 +20,10 @@ Read README.md and the relevant API guide before changing behavior; consult
 - Use one task, branch and worktree. Discuss large/API changes first; small fixes
   can go directly to a PR. Inspect owners and callers; tests written with the
   change do not replace independent source/evidence checks by maintainers.
+- Keep current guides in `docs/` and dated studies with selected results under
+  `research/`; follow the [placement guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md).
+  Preserve historical paths/hashes inside evidence. Packaged guides must use
+  repository URLs for research records excluded from the crate.
 - Keep selected fixtures in Git and full recordings outside it. Follow
   [fixture evolution](docs/research-workflow.md#fixture-and-protocol-evolution):
   pin protocol/contract labels, preserve valid regressions, and independently

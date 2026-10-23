@@ -45,7 +45,7 @@ that source, or `community-server` for another compatible server. Set an HTTP(S)
 `capture.origin` only when required by the endpoint. Recordings contain raw
 received packets and sent controls; they do not include server-only state.
 
-Copy [the movement plan](../evidence/templates/movement-plan.json). Specify:
+Copy [the movement plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/movement-plan.json). Specify:
 
 - Study ID, question, competing explanations and method.
 - Sampling unit, attempt budget, exclusions and held-out validation.
@@ -282,7 +282,7 @@ is meaningful only against a positively retained peer reference; it is not world
 absence. Any later continuity checks select the sample retrospectively and must
 stay separate from causal state reconstruction. Shared receipt time does not
 establish simultaneous server geometry or one-way latency. The
-[exploratory receipt-time recheck](host-fidelity-recheck-20261023.md#exploratory-common-receipt-time-replay)
+[exploratory receipt-time recheck](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-common-receipt-time-replay)
 records a bounded example and its missing validation coverage.
 
 ## Package and submit
@@ -310,7 +310,7 @@ byte integrity alone cannot establish a scientific conclusion.
 
 ## Compare contributed evidence
 
-Copy [comparison.json](../evidence/templates/comparison.json). Replace its dummy
+Copy [comparison.json](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/comparison.json). Replace its dummy
 digests and acquisition rationale, and name every planned baseline/candidate
 bundle. Each bundle must contain exactly one complete acquisition batch under
 the existing audited bundle format. Concurrent bots, reconnects and packets do
@@ -364,7 +364,7 @@ Unsupported protocols require a separately reviewed decoder update.
 For CI, publish a submission JSON and its pinned bundles on public GitHub release
 or attachment hosts; a raw GitHub JSON URL also works for the submission. Replace
 local `source` paths with immutable HTTPS asset URLs and compute each SHA-256.
-Submit those identities through the [evidence issue](../.github/ISSUE_TEMPLATE/evidence.yml).
+Submit those identities through the [evidence issue](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/ISSUE_TEMPLATE/evidence.yml).
 A maintainer runs **Evidence comparison** from the default branch with the
 submission URL and digest. The manual workflow uses read-only permissions,
 trusted checkout code, bounded HTTPS downloads with checked redirects, and no
@@ -409,7 +409,7 @@ For a new regression, retain a small selected raw packet/window with the archive
 SHA-256, record indices, wire version, decoder identity and selection rule. Derive
 expected fields with the existing decoder or replay exporter, label that derivation,
 then have the focused test consume the fixture. Keep the full audited study outside
-Git; the [worked study](../tools/fidelity/worked_study.py) demonstrates this path.
+Git; the [worked study](https://github.com/NikitaMGrimm/slither-sim/blob/main/tools/fidelity/worked_study.py) demonstrates this path.
 
 The standalone replay exporter hashes and decodes one temporary archive snapshot.
 Its schema-1 `provenance` retains the archive, selected window/connection, wire

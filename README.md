@@ -98,7 +98,8 @@ See [configuration](docs/configuration.md) for each default and
   These separately require uv, Python 3.12 and Node.js 22+ (24 recommended).
 - [Provenance](docs/provenance.md): source hashes and adaptations.
 - [Verification](docs/verification.md): completed checks and coverage limits.
-- [Performance](docs/performance.md): reproducible release workloads and measured costs.
+- [Performance](docs/performance.md): reproducible release workloads.
+- [Research records](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md): dated results and evidence limits.
 - [PR comparisons](docs/pr-reports.md): automatic performance and regression tables.
 - [Releasing](docs/releasing.md): version tags and trusted publishing.
 
