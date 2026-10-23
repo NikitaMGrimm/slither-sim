@@ -12,6 +12,9 @@ export const PAIR_SNAKE = Object.freeze({
   orbitRadius: 80, referenceTolerance: 200,
   nearOffset: 800, farOffset: 2300, endpointHoldMs: 2000,
   endpointAnchorFreshMs: 150, endpointTolerance: 120, crossTrackTolerance: 180,
+  // Engineering pause bounds; neither extends endpoint or scientific freshness.
+  // R7 failures: docs/host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7.
+  controlAnchorMaxAgeMs: 500, pairedReacquireMs: 1000,
   minArenaGap: 700, maxPairSeparation: 3000, legTimeoutMs: 30000,
   sampleMs: 100, targetTickMs: 25,
 });
@@ -111,30 +114,78 @@ export class PairSnakeState {
       crossingLegStartedAt: c.legStarted, crossingHoldUntil: c.holdUntil,
       crossingHeldOffset: c.holdOffset, endpointVisits: c.endpointVisits,
       completedLegs: c.completedLegs, feasibilityPassed: c.feasibilityPassed,
-      legInterruptionCount: c.interruptions });
+      legInterruptionCount: c.interruptions, pauseInterruptionCount: c.pauseInterruptions,
+      avoidanceInterruptionCount: c.avoidanceInterruptions,
+      poseStatus: this.poseStatus, pauseStartedAt: this.pauseStartedAt });
     this.identities = null; this.crossing = null; this.snapshots = [null, null];
+    this.poseStatus = 'paused'; this.pauseStartedAt = null;
+    this.pauseIdentities = null;
     this.phase = 'waiting'; this.reason = reason ?? null;
     this.meetingTargets = null; this.pairDistance = null;
   }
   noteControl(interruption) {
-    if (this.crossing && interruption) this.crossing.interruptions++;
+    if (this.crossing && interruption) {
+      this.crossing.interruptions++;
+      this.crossing.avoidanceInterruptions++;
+    }
+  }
+  poseEvent(event, now) {
+    const c = this.crossing;
+    this.emit({ event, controlAt: now, poseStatus: this.poseStatus,
+      pauseStartedAt: this.pauseStartedAt, pairIdentities: this.identities ?? this.pauseIdentities,
+      pairAnchorAgesMs: this.snapshots.map(s => s?.anchorAgeMs ?? null),
+      crossingTrial: c?.trial ?? null, fixedCenter: c?.center ?? null,
+      crossingLeg: c?.leg ?? null, crossingHoldUntil: c?.holdUntil ?? null,
+      crossingHeldOffset: c?.holdOffset ?? null });
   }
   update(now, snapshots, worlds) {
     const [a, b] = snapshots;
     if (!a || !b) {
-      if (this.identities) this.reset(now, 'pair_unavailable');
+      if (this.identities || this.pauseStartedAt !== null) this.reset(now, 'pair_unavailable');
       this.snapshots = snapshots; return;
     }
-    // Fresh arrivals cannot establish continuity across lost own-pose geometry.
-    if (!snapshots.every(s => freshAnchor(s.anchorAgeMs))) {
-      this.reset(now, 'own_anchor_stale');
-      this.snapshots = snapshots; return;
-    }
-    if (this.reason === 'own_anchor_stale') this.reason = null;
     const identities = snapshots.map((s, i) => `${i}/${s.life}/${s.id}`);
-    if (this.identities && identities.some((id, i) => id !== this.identities[i]))
+    const fresh = snapshots.every(s => freshAnchor(s.anchorAgeMs));
+    const previousIdentities = this.identities ?? this.pauseIdentities;
+    if (previousIdentities && identities.some((id, i) => id !== previousIdentities[i])) {
       this.reset(now, 'pair_identity_changed');
+      if (!fresh) { this.snapshots = snapshots; return; }
+    }
     this.snapshots = snapshots;
+    const c = this.crossing;
+    if (c && !siteInside(c.center, this.direction, c.sign, worlds)) {
+      this.reset(now, 'rim_margin_lost'); return;
+    }
+    if (c && now - c.legStarted > PAIR_SNAKE.legTimeoutMs) {
+      this.reset(now, 'crossing_leg_timeout'); return;
+    }
+    this.pairDistance = fresh ? Math.hypot(a.x - b.x, a.y - b.y) : null;
+    if (c && fresh && this.pairDistance > PAIR_SNAKE.maxPairSeparation) {
+      this.reset(now, 'pair_separated'); return;
+    }
+    if (snapshots.some(s => !Number.isFinite(s.anchorAgeMs) || s.anchorAgeMs < 0 ||
+        s.anchorAgeMs > PAIR_SNAKE.controlAnchorMaxAgeMs)) {
+      this.reset(now, 'own_anchor_stale'); this.snapshots = snapshots; return;
+    }
+    if (this.pauseStartedAt !== null && now - this.pauseStartedAt > PAIR_SNAKE.pairedReacquireMs) {
+      this.reset(now, 'paired_reacquire_timeout'); this.snapshots = snapshots; return;
+    }
+    if (!fresh && this.pauseStartedAt === null) {
+      this.pauseStartedAt = now; this.poseStatus = 'paused'; this.reason = 'own_anchor_stale';
+      this.pauseIdentities = identities;
+      // Target persistence cannot restore an uninterrupted leg or certify its hold.
+      if (c) { c.interruptions++; c.pauseInterruptions++; c.cleanLegStreak = 0; }
+      this.poseEvent('paired-snake-pause', now);
+    }
+    if (this.pauseStartedAt !== null) {
+      // Age is receipt-based. Both anchors must be strictly newer than pause entry.
+      if (!fresh || snapshots.some(s => now - s.anchorAgeMs <= this.pauseStartedAt)) return;
+      this.poseStatus = 'ready'; this.reason = null;
+      this.poseEvent('paired-snake-resume', now);
+      this.pauseStartedAt = null; this.pauseIdentities = null;
+    }
+    this.poseStatus = 'ready';
+    if (this.reason === 'own_anchor_stale' || this.reason === 'paired_reacquire_timeout') this.reason = null;
     if (!this.identities) {
       this.identities = identities;
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
@@ -144,10 +195,6 @@ export class PairSnakeState {
         { x: mx + dy / length * 220, y: my - dx / length * 220 }];
       this.phase = 'rendezvous';
     }
-    this.pairDistance = Math.hypot(a.x - b.x, a.y - b.y);
-    if (this.crossing && this.pairDistance > PAIR_SNAKE.maxPairSeparation) {
-      this.reset(now, 'pair_separated'); return;
-    }
     if (this.phase === 'rendezvous' && this.pairDistance <= PAIR_SNAKE.rendezvousDistance &&
         a.peerVisible && b.peerVisible) this.phase = 'site';
     if (this.phase === 'site') {
@@ -156,15 +203,12 @@ export class PairSnakeState {
       this.crossing = { trial: ++this.trialCount, selectedAt: now,
         ...site, leg: 'near', legStarted: now, holdUntil: null, holdOffset: null,
         endpointVisits: 0, completedLegs: 0, legStart: null, interruptions: 0,
+        pauseInterruptions: 0, avoidanceInterruptions: 0,
         cleanLegStreak: 0, feasibilityPassed: false };
       this.phase = 'crossing'; this.reason = null;
       return; // The first endpoint requires a later observed/control update.
     }
-    const c = this.crossing;
     if (!c) return;
-    if (!siteInside(c.center, this.direction, c.sign, worlds)) {
-      this.reset(now, 'rim_margin_lost'); return;
-    }
     const released = c.holdUntil !== null && now >= c.holdUntil;
     if (released) { c.holdUntil = null; c.holdOffset = null; }
     if (released || c.holdUntil !== null) return;
@@ -177,18 +221,20 @@ export class PairSnakeState {
         primary: rawPose(a), secondary: rawPose(b), fixedCenter: { ...c.center },
         direction: this.direction, sign: c.sign, along: p.along, crossTrack: p.crossTrack };
       const witness = { start: c.legStart, end, completed: c.legStart !== null,
-        interrupted: c.interruptions > 0, interruptionCount: c.interruptions };
+        interrupted: c.interruptions > 0, interruptionCount: c.interruptions,
+        pauseInterruptionCount: c.pauseInterruptions, avoidanceInterruptionCount: c.avoidanceInterruptions };
       if (witness.completed) c.completedLegs++;
       c.cleanLegStreak = witness.completed && !witness.interrupted ? c.cleanLegStreak + 1 : 0;
       c.feasibilityPassed ||= c.cleanLegStreak >= 2 && offset === PAIR_SNAKE.nearOffset;
       c.endpointVisits++; c.legStart = end; c.interruptions = 0;
+      c.pauseInterruptions = 0; c.avoidanceInterruptions = 0;
       c.leg = c.leg === 'near' ? 'far' : 'near'; c.legStarted = now;
       c.holdOffset = offset; c.holdUntil = now + PAIR_SNAKE.endpointHoldMs;
       this.emit({ event: 'paired-snake-endpoint', crossingTrial: c.trial,
         crossingEndpoint: witness, endpointVisits: c.endpointVisits,
         completedLegs: c.completedLegs, feasibilityPassed: c.feasibilityPassed,
         crossingHoldUntil: c.holdUntil, crossingHeldOffset: c.holdOffset }, 1);
-    } else if (now - c.legStarted > PAIR_SNAKE.legTimeoutMs) this.reset(now, 'crossing_leg_timeout');
+    }
   }
 }
 
@@ -226,20 +272,32 @@ export function safeSteering(bot, now, me, choice, intendedHeading) {
 }
 
 export class PairSnakeBot extends Bot {
+  send(bytes) {
+    const sentAt = super.send(bytes);
+    if (sentAt !== undefined && bytes.length === 1 && bytes[0] <= 250) {
+      this.lastDeliveredHeading = bytes[0]; this.lastDeliveredLife = this.lives;
+    }
+    return sentAt;
+  }
+  targetPoint() {
+    const state = this.pair, c = state.crossing;
+    return c ? this.index === 0 ? c.center : railPoint(c.center, state.direction, c.sign,
+      c.holdOffset ?? (c.leg === 'near' ? PAIR_SNAKE.nearOffset : PAIR_SNAKE.farOffset)) :
+      state.meetingTargets?.[this.index] ?? null;
+  }
   movement(now, me, choice) {
     const state = this.pair, own = this.world.head(me, now), c = state.crossing;
-    let targetPoint = state.meetingTargets?.[this.index] ?? null, orbit = false;
-    if (c) {
-      targetPoint = this.index === 0 ? c.center : railPoint(c.center, state.direction, c.sign,
-        c.holdOffset ?? (c.leg === 'near' ? PAIR_SNAKE.nearOffset : PAIR_SNAKE.farOffset));
-      orbit = this.index === 0;
-    }
+    const targetPoint = this.targetPoint(), orbit = !!c && this.index === 0;
     let intended = null;
     if (targetPoint) intended = orbit || Math.hypot(own.x - targetPoint.x, own.y - targetPoint.y) <= PAIR_SNAKE.orbitRadius
       ? orbitHeading(own, targetPoint, me.ang) : Math.atan2(targetPoint.y - own.y, targetPoint.x - own.x);
     this.movementIntent = { ...safeSteering(this, now, me, choice, intended), targetPoint };
     state.noteControl(this.movementIntent.interruption);
-    const key = `${this.lives}/${state.phase}/${c?.trial}/${c?.leg}/${c?.holdUntil}`;
+    this.sampleState(now, me, choice);
+  }
+  sampleState(now, me, choice = null) {
+    const state = this.pair, c = state.crossing;
+    const key = `${this.lives}/${state.phase}/${c?.trial}/${c?.leg}/${c?.holdUntil}/${state.poseStatus}`;
     if (key === this.lastSampleKey && now - (this.lastSampleAt ?? -Infinity) < PAIR_SNAKE.sampleMs) return;
     this.lastSampleKey = key; this.lastSampleAt = now;
     const local = snapshot(this, this.peers[1 - this.index], now);
@@ -248,6 +306,8 @@ export class PairSnakeBot extends Bot {
     this.pendingSample = { event: 'paired-snake-state', scenario: 'paired-snake', mode: 'crossing',
       direction: state.direction, botIndex: this.index, life: this.lives, selfId: me.id,
       serverClock: this.serverClock, phase: state.phase, reason: state.reason,
+      controlAt: now, poseStatus: state.poseStatus, pauseStartedAt: state.pauseStartedAt,
+      pairAnchorAgesMs: state.snapshots.map(s => s?.anchorAgeMs ?? null),
       pairIdentities: state.identities, pairDistance: state.pairDistance,
       primary: rawPose(state.snapshots[0]), secondary: rawPose(state.snapshots[1]),
       ownX: raw.x, ownY: raw.y, ownAnchorAgeMs: now - me.t,
@@ -265,15 +325,17 @@ export class PairSnakeBot extends Bot {
       completedLegs: c?.completedLegs ?? null, feasibilityPassed: c?.feasibilityPassed ?? false,
       actualAlong: p?.along ?? null, actualCrossTrack: p?.crossTrack ?? null,
       legInterruptionCount: c?.interruptions ?? null,
-      ...this.movementIntent, requestedHeading: choice.a,
-      encodedHeading: Math.floor(251 * ((choice.a % TAU + TAU) % TAU) / TAU) };
+      pauseInterruptionCount: c?.pauseInterruptions ?? null,
+      avoidanceInterruptionCount: c?.avoidanceInterruptions ?? null,
+      ...this.movementIntent, requestedHeading: choice?.a ?? null,
+      encodedHeading: choice ? Math.floor(251 * ((choice.a % TAU + TAU) % TAU) / TAU) : null };
   }
   tick(now) {
     this.pendingSample = null;
     const me = this.world.snakes.get(this.world.self);
-    if (this.ws?.readyState === 1 && me?.pts.length && !this.deathObservation &&
+    if (!this.stopped && this.ws?.readyState === 1 && me?.pts.length && !this.deathObservation &&
         now - this.lastReceivedAt <= 15000 &&
-        (!freshAnchor(now - me.t) || this.pair.reason === 'own_anchor_stale')) {
+        (!freshAnchor(now - me.t) || this.pair.poseStatus !== 'ready')) {
       if (now - (this.lastStaleSampleAt ?? -Infinity) >= PAIR_SNAKE.sampleMs) {
         this.lastStaleSampleAt = now;
         this.rec.meta({ event: 'paired-snake-control-skipped', reason: 'own_anchor_stale',
@@ -282,11 +344,18 @@ export class PairSnakeBot extends Bot {
           pairAnchorAgesMs: this.pair.snapshots.map(s => s?.anchorAgeMs ?? null) });
       }
       this.ping(now);
-      this.setBoost(false, now);
-      return;
+      // Releasing boost must not wait for its ordinary 50 ms toggle throttle.
+      if (this.boost) { this.send([254]); this.boost = false; this.lastBoostAt = now; }
+      this.movementIntent = { intendedHeading: null, intendedDanger: null, selectedDanger: null,
+        interruption: 'own_anchor_stale', controlStatus: 'paused', desiredBoost: false,
+        targetPoint: this.targetPoint() };
+      this.sampleState(now, me);
+    } else super.tick(now);
+    if (this.pendingSample) {
+      const delivered = this.lastDeliveredLife === this.lives ? this.lastDeliveredHeading : null;
+      this.rec.meta({ ...this.pendingSample, sentHeading: delivered,
+        lastDeliveredHeading: delivered, boost: this.boost });
     }
-    super.tick(now);
-    if (this.pendingSample) this.rec.meta({ ...this.pendingSample, sentHeading: this.lastHeading, boost: this.boost });
   }
 }
 

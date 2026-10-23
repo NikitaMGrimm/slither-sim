@@ -130,10 +130,15 @@ excluded from completed legs. A shared trial binds identities, center and axis;
 reset. Avoidance interruptions, actual anchors, cache membership, intended and
 sent headings remain available for analysis. Counters and intended waypoints
 alone do not certify an uninterrupted traversal or fresh causal query.
-Both own anchors must remain within the 150 ms operational freshness limit
-during approach, holds and travel. A stale anchor abandons the trial with
-`own_anchor_stale` and suppresses new heading commands until fresh reference
-state returns. This is separate from opponent-cache absence.
+Both own anchors must be at most 150 ms old for endpoint recognition and new
+heading commands. A brief stale interval pauses control while retaining the
+trial's center, targets and hold deadline; it counts as an interruption. Both
+anchors must refresh after pause entry before control resumes. Ages over 500 ms
+or failure to reacquire within 1,000 ms abandon the trial. Pausing suppresses new
+headings and boost; the last delivered heading continues physically. Holds and
+leg deadlines keep running, and interrupted legs cannot establish an
+uninterrupted round trip. These are engineering bounds, separate from the frozen
+analysis freshness screens and opponent-cache absence.
 
 ```json
 {"scenario": "food-lanes", "bots": 1, "seconds": 480}
@@ -146,6 +151,10 @@ are preassigned calibration and the last four holdout; approach and transfers
 are excluded. Route failure retains missing slots and stops without reconnecting
 or selecting a replacement site. `food-lane-phase-end` records achieved endpoints
 and interruptions; `food-lane-route-end` preserves the terminal outcome.
+Initial site screening requires received opponent body polylines, including
+their extrapolated tips, to clear both lanes, the west transfer and the approach
+by more than 800 units. This conservative acquisition margin cannot guarantee
+future or unreceived safety; the route's danger veto remains active.
 
 Both scenarios use the standard recorder, source/plan pins, managed attempt
 ledger and audit/package commands. The driver can complete an intact recording

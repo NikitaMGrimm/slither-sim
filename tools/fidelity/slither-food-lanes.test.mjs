@@ -6,7 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { FOOD_LANES, FOOD_LANES_SOURCE, FoodLaneBot, foodLaneGeometry,
+import { FOOD_LANES, FOOD_LANES_SOURCE, FoodLaneBot, foodLaneGeometry, foodLaneSiteQuiet,
   parseArgs, recordFoodLanes } from './slither-food-lanes.mjs';
 
 function fixture() {
@@ -178,6 +178,121 @@ test('first eligible site is selected once; quiet/rim gates and acquisition dead
   missing.bot.tick(90000);
   assert.equal(missing.bot.routeReason, 'acquire_timeout');
   assert(missing.bot.summary().slots.every(slot => slot.status === 'missing'));
+});
+
+const acquisitionObstacles = {
+  'far head with a near received body': ({ A, cx }) =>
+    [{ x: cx - 2000, y: A.west.y + 2000 }, { x: cx, y: A.west.y + 200 },
+      { x: A.east.x + 2000, y: A.east.y + 2000 }],
+  'body segment crossing lanes with far vertices': ({ A, B, cx }) =>
+    [{ x: cx, y: A.west.y - 2000 }, { x: cx, y: B.west.y + 2000 }],
+  'lane middle outside all endpoint clearance discs': ({ B, cx }) =>
+    [{ x: cx, y: B.west.y + 700 }],
+  'approach interior outside lane and head clearance discs': ({ A }, head) => {
+    const dx = A.west.x - head.x, dy = A.west.y - head.y, length = Math.hypot(dx, dy);
+    return [{ x: (head.x + A.west.x) / 2 - dy / length * 799,
+      y: (head.y + A.west.y) / 2 + dx / length * 799 }];
+  },
+  'west transfer interior outside endpoint clearance discs': ({ A, B }) =>
+    [{ x: A.west.x - 799.5, y: (A.west.y + B.west.y) / 2 }],
+};
+
+for (const [name, obstacle] of Object.entries(acquisitionObstacles)) {
+  test(`acquisition waits for ${name}`, () => {
+    const { bot, me, events, pose } = fixture();
+    const geometry = foodLaneGeometry(me.pts[0]), head = bot.world.head(me, 100);
+    const pts = obstacle(geometry, head);
+    const sites = [geometry.A.west, geometry.A.east, geometry.B.west, geometry.B.east, head];
+    assert(sites.every(site => Math.hypot(pts.at(-1).x - site.x, pts.at(-1).y - site.y) > 800),
+      'the former head-site check would accept this obstacle');
+    bot.world.snakes.set(2, { ...me, id: 2, pts, sp: 0 });
+    for (const now of [100, 200]) {
+      pose(now); bot.tick(now);
+      assert.equal(bot.geometry, null);
+      assert.equal(bot.lanePhase, null);
+      assert.equal(bot.routeStatus, 'active');
+      const control = events.findLast(event => event.event === 'food-lane-control');
+      assert.equal(control.phase, 'acquire');
+      assert.equal(control.quiet, false);
+      assert.equal(control.rimSafe, true);
+      assert(bot.summary().slots.every(slot => slot.status === 'missing'));
+    }
+    assert(!events.some(event => event.event === 'food-lane-site'));
+    bot.world.snakes.delete(2);
+    pose(300); bot.tick(300);
+    assert.deepEqual(bot.geometry, geometry);
+    assert.equal(bot.lanePhase.kind, 'approach');
+  });
+}
+
+test('quietness includes the current extrapolated tip and its connecting segment', () => {
+  const geometry = { A: { west: { x: 0, y: 0 }, east: { x: 1300, y: 0 } },
+    B: { west: { x: 0, y: 75 }, east: { x: 1300, y: 75 } } };
+  const { bot, me } = fixture();
+  const other = { ...me, id: 2, pts: [{ x: 650, y: -820 }], ang: Math.PI / 2, sp: 9.6, t: 0 };
+  bot.world.snakes.set(2, other);
+  assert.equal(foodLaneSiteQuiet(bot.world, 0, geometry, geometry.A.west), true);
+  assert.equal(foodLaneSiteQuiet(bot.world, 100, geometry, geometry.A.west), false);
+  const world = { self: 1, snakes: new Map([[2, other]]), head: (snake, now) => {
+    assert.equal(snake, other);
+    assert.equal(now, 123);
+    return { x: 650, y: 2000 };
+  } };
+  other.pts = [{ x: 650, y: -2000 }];
+  assert.equal(foodLaneSiteQuiet(world, 123, geometry, geometry.A.west), false,
+    'far anchor and tip still have a connecting segment crossing the corridors');
+});
+
+test('interior intersections have zero clearance even when all endpoint projections are far', () => {
+  // Longer synthetic corridors isolate intersection math from the 800-unit margin.
+  const geometry = { A: { west: { x: 0, y: 0 }, east: { x: 4000, y: 0 } },
+    B: { west: { x: 0, y: 75 }, east: { x: 4000, y: 75 } } };
+  const { bot, me } = fixture();
+  bot.world.snakes.set(2, { ...me, id: 2, sp: 0,
+    pts: [{ x: 2000, y: -2000 }, { x: 2000, y: 2000 }] });
+  assert.equal(foodLaneSiteQuiet(bot.world, 100, geometry, geometry.A.west), false);
+});
+
+test('quietness handles isolated points, repeated points, collinear overlap and degenerate approach', () => {
+  const { bot, me } = fixture();
+  const geometry = foodLaneGeometry(me.pts[0]), head = geometry.A.west;
+  const cases = [
+    [{ x: geometry.cx, y: geometry.yA }],
+    [head, head],
+    [{ x: geometry.A.west.x - 1000, y: geometry.yA },
+      { x: geometry.A.east.x + 1000, y: geometry.yA }],
+  ];
+  for (const pts of cases) {
+    bot.world.snakes.set(2, { ...me, id: 2, pts, sp: 0 });
+    assert.equal(foodLaneSiteQuiet(bot.world, 100, geometry, head), false);
+  }
+  const point = { x: geometry.cx, y: geometry.yB + 801 };
+  bot.world.snakes.set(2, { ...me, id: 2, pts: [point, point], sp: 0 });
+  assert.equal(foodLaneSiteQuiet(bot.world, 100, geometry, head), true);
+});
+
+test('800-unit clearance is strict; a safe full body acquires and own body is excluded', () => {
+  for (const clearance of [799.999, 800, 800.001]) {
+    const { bot, me, events } = fixture();
+    const geometry = foodLaneGeometry(me.pts[0]);
+    const pts = [{ x: geometry.A.west.x - 1000, y: geometry.yB + clearance },
+      { x: geometry.A.east.x + 1000, y: geometry.yB + clearance }];
+    bot.world.snakes.set(2, { ...me, id: 2, pts, sp: 0 });
+    bot.tick(100);
+    if (clearance <= 800) {
+      assert.equal(bot.geometry, null);
+      assert.equal(events.findLast(event => event.event === 'food-lane-control').quiet, false);
+    } else {
+      assert.deepEqual(bot.geometry, geometry);
+      assert.equal(bot.lanePhase.kind, 'approach');
+    }
+  }
+  const { bot, me } = fixture();
+  const geometry = foodLaneGeometry(me.pts[0]);
+  me.pts = [geometry.A.west, geometry.B.east, me.pts[0]];
+  assert.equal(foodLaneSiteQuiet(bot.world, 100, geometry, bot.world.head(me, 100)), true);
+  bot.tick(100);
+  assert.deepEqual(bot.geometry, geometry);
 });
 
 test('avoidance, stale anchors, gaps and phase deadlines abort without replacing missing slots', () => {

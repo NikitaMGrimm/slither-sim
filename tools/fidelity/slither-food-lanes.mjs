@@ -33,6 +33,43 @@ export function foodLaneGeometry(head) {
     B: { west: { x: cx - cfg.halfSpan, y: yB }, east: { x: cx + cfg.halfSpan, y: yB } } };
 }
 
+function pointSegmentDistance(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1,
+    ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared));
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+
+function segmentDistance(a, b, c, d) {
+  const ux = b.x - a.x, uy = b.y - a.y, vx = d.x - c.x, vy = d.y - c.y;
+  const denominator = ux * vy - uy * vx;
+  if (denominator !== 0) {
+    const dx = c.x - a.x, dy = c.y - a.y;
+    const t = (dx * vy - dy * vx) / denominator;
+    const s = (dx * uy - dy * ux) / denominator;
+    if (t >= 0 && t <= 1 && s >= 0 && s <= 1) return 0;
+  }
+  return Math.min(pointSegmentDistance(a, c, d), pointSegmentDistance(b, c, d),
+    pointSegmentDistance(c, a, b), pointSegmentDistance(d, a, b));
+}
+
+export function foodLaneSiteQuiet(world, now, geometry, head) {
+  const { A, B } = geometry;
+  const corridors = [[A.west, A.east], [B.west, B.east], [A.west, B.west], [head, A.west]];
+  // Received bodies plus extrapolated tips must clear whole planned corridors;
+  // this engineering margin cannot guarantee future or unreceived safety.
+  // R7 witnesses: docs/host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7.
+  return [...world.snakes.values()].filter(other => other.id !== world.self).every(other => {
+    const points = [...other.pts, world.head(other, now)];
+    for (let i = 1; i < points.length; i++) {
+      if (!corridors.every(([a, b]) =>
+        segmentDistance(points[i - 1], points[i], a, b) > FOOD_LANES.otherClearance)) return false;
+    }
+    return true;
+  });
+}
+
 export class FoodLaneBot extends Bot {
   constructor(opts, index, rec, { onFinish = () => {}, now = performance.now() } = {}) {
     // Reuse the standard movement dispatch, quantized sends and avoidance path.
@@ -173,11 +210,7 @@ export class FoodLaneBot extends Bot {
     if (!this.geometry) {
       const candidate = foodLaneGeometry(pose.anchor);
       const sites = [candidate.A.west, candidate.A.east, candidate.B.west, candidate.B.east, head];
-      const quiet = [...this.world.snakes.values()].filter(other => other.id !== this.world.self)
-        .every(other => sites.every(site => {
-          const p = this.world.head(other, now);
-          return Math.hypot(p.x - site.x, p.y - site.y) > cfg.otherClearance;
-        }));
+      const quiet = foodLaneSiteQuiet(this.world, now, candidate, head);
       const rimSafe = sites.every(site => this.world.radius -
         Math.hypot(site.x - this.world.grd, site.y - this.world.grd) >= cfg.rimMargin);
       const ready = pose.anchorAgeMs >= 0 && pose.anchorAgeMs <= cfg.endpointAnchorMaxAgeMs &&
