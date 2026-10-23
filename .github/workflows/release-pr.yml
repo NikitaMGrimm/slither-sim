@@ -1,0 +1,51 @@
+name: Release PR
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-pr
+  cancel-in-progress: false
+
+env:
+  CARGO_BUILD_JOBS: 2
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - name: Wait for any merged release to publish
+        id: pending
+        run: python3 tools/release_automation.py prepare >> "$GITHUB_OUTPUT"
+      - name: Update the rolling release PR
+        if: steps.pending.outputs.ready == 'true'
+        id: release
+        uses: release-plz/action@7ef5e4d4b0420630cfcaeb182c01e13651d4c577 # v0.5.0
+        with:
+          command: release-pr
+          version: '0.4.0'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Start protected PR checks on the bot branch
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: python3 tools/release_automation.py start-pr-checks

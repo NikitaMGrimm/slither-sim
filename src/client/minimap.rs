@@ -7,6 +7,17 @@ const LEGACY_SIDE: usize = 80;
 /// Bound on cells retained across one L packet's team layers: four 512-by-512
 /// layers, enough for the client's two-team mode at the maximum side.
 pub const MAX_TEAM_MINIMAP_CELLS: usize = 1 << 20;
+/// Aggregate logical grid cells decoded in one frame. Admit the largest
+/// supported L snapshot (team layers plus union); repeated small packets must
+/// not multiply full-grid work without bound. This is a local resource limit.
+pub const MAX_FRAME_MINIMAP_CELLS: usize = MAX_TEAM_MINIMAP_CELLS + MAX_SIDE * MAX_SIDE;
+
+fn charge_cells(remaining: &mut usize, cells: usize) -> Result<(), String> {
+    *remaining = remaining.checked_sub(cells).ok_or_else(|| {
+        format!("Minimap frame exceeds the {MAX_FRAME_MINIMAP_CELLS}-cell work limit")
+    })?;
+    Ok(())
+}
 
 /// Decode one stock run-length layer of `cells` cells starting at `cursor`, calling
 /// `set` with each occupied index. Bytes of 128 or more skip `k - 128` cells; with
@@ -58,6 +69,17 @@ fn side_at(payload: &[u8], at: usize) -> Result<usize, String> {
         0 => Err("Invalid minimap size".into()),
         side => Ok(side),
     }
+}
+
+fn snapshot_side(payload: &[u8]) -> Result<usize, String> {
+    let bytes = payload
+        .get(1..3)
+        .ok_or("Expected modern M/V minimap packet")?;
+    let side = usize::from(u16::from_be_bytes([bytes[0], bytes[1]]));
+    if !(1..=MAX_SIDE).contains(&side) {
+        return Err("Invalid minimap size".into());
+    }
+    Ok(side)
 }
 
 /// Received minimap state across all stock command families.
@@ -112,10 +134,17 @@ impl MinimapDecoder {
 
     /// Apply one M, V, U, u or L payload including its command byte. Callers
     /// clone the decoder per frame so an error leaves the committed state intact.
-    pub(crate) fn apply(&mut self, payload: &[u8], receipt: f64) -> Result<(), String> {
+    pub(crate) fn apply(
+        &mut self,
+        payload: &[u8],
+        receipt: f64,
+        remaining_cells: &mut usize,
+    ) -> Result<(), String> {
         let command = *payload.first().ok_or("Empty minimap packet")?;
         match command {
             b'M' => {
+                let side = snapshot_side(payload)?;
+                charge_cells(remaining_cells, side * side)?;
                 let map = Minimap::packet(None, payload)?;
                 self.base = Some(map.cells.clone());
                 self.show_modern(map.side, map.cells, receipt);
@@ -130,6 +159,7 @@ impl MinimapDecoder {
                     .modern
                     .as_mut()
                     .ok_or("Minimap delta before full snapshot")?;
+                charge_cells(remaining_cells, base.len())?;
                 let mut toggled = Vec::new();
                 layer(payload, &mut 1, base.len(), true, true, |i| toggled.push(i))?;
                 // V toggles mmdata and paints the modern target. A legacy u
@@ -143,6 +173,7 @@ impl MinimapDecoder {
             }
             b'U' => {
                 let side = side_at(payload, 1)?;
+                charge_cells(remaining_cells, side * side)?;
                 self.resize(side);
                 let mut cells = vec![0; side * side];
                 layer(payload, &mut 3, cells.len(), false, true, |i| cells[i] = 1)?;
@@ -150,6 +181,7 @@ impl MinimapDecoder {
                 self.teams = None;
             }
             b'u' => {
+                charge_cells(remaining_cells, LEGACY_SIDE * LEGACY_SIDE)?;
                 self.resize(LEGACY_SIDE);
                 let mut cells = vec![0; LEGACY_SIDE * LEGACY_SIDE];
                 layer(payload, &mut 1, cells.len(), false, false, |i| cells[i] = 1)?;
@@ -165,6 +197,7 @@ impl MinimapDecoder {
                          {MAX_TEAM_MINIMAP_CELLS}-cell limit"
                     ));
                 }
+                charge_cells(remaining_cells, (usize::from(count) + 1) * side * side)?;
                 self.resize(side);
                 let mut cursor = 4;
                 let mut union = vec![0; side * side];
@@ -195,6 +228,137 @@ pub struct Minimap {
     pub cells: Vec<u8>,
     pub age_seconds: f64,
 }
+
+// Finite nonzero values split into a signed mantissa in [1, 2) and a binary
+// exponent. Normalize subnormals before extracting their exponent.
+fn binary_parts(value: f64) -> (f64, i32) {
+    let mut bits = value.to_bits();
+    let mut adjustment = 0;
+    if bits & (0x7ff << 52) == 0 {
+        bits = (value * 4_503_599_627_370_496.).to_bits();
+        adjustment = -52;
+    }
+    let exponent = ((bits >> 52) & 0x7ff) as i32 - 1023 + adjustment;
+    let mantissa = f64::from_bits((bits & !(0x7ff << 52)) | (1023 << 52));
+    (mantissa, exponent)
+}
+
+fn power_of_two(exponent: i32) -> f64 {
+    f64::from_bits(((exponent + 1023) as u64) << 52)
+}
+
+// Evaluate n / d / (radius * 2^scale) without underflowing the scaled radius
+// or overflowing an intermediate quotient. The final result may be infinite.
+fn relative_intercept(n: f64, d: f64, radius: f64, scale: i32) -> f64 {
+    if n == 0. {
+        return 0.;
+    }
+    let (nm, ne) = binary_parts(n);
+    let (dm, de) = binary_parts(d);
+    let (rm, re) = binary_parts(radius);
+    let (mantissa, correction) = binary_parts(nm / dm / rm);
+    let exponent = ne - de - re - scale + correction;
+    if exponent > 1023 {
+        f64::INFINITY.copysign(mantissa)
+    } else if exponent < -1075 {
+        0_f64.copysign(mantissa)
+    } else if exponent < -1022 {
+        (mantissa * power_of_two(exponent + 1022)) * f64::MIN_POSITIVE
+    } else {
+        mantissa * power_of_two(exponent)
+    }
+}
+
+fn difference_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    let cd = c * d;
+    a.mul_add(b, -cd) + (-c).mul_add(d, cd)
+}
+
+// Only the extreme-edge fallback uses this approximate line clip. Keep world
+// endpoints: projected infinities and rounded-equal entry/exit parameters can
+// otherwise discard a real crossing. Work depends on grid size, not tail extent.
+fn clipped_edge(a: Point, b: Point, arena: &Arena, side: usize) -> Option<(Point, Point)> {
+    if !a.finite()
+        || !b.finite()
+        || !arena.center.finite()
+        || !arena.radius.is_finite()
+        || arena.radius <= 0.
+    {
+        return None;
+    }
+    let mut dx = b.x - a.x;
+    let mut dy = b.y - a.y;
+    if !dx.is_finite() || !dy.is_finite() {
+        dx = b.x * 0.5 - a.x * 0.5;
+        dy = b.y * 0.5 - a.y * 0.5;
+    }
+    let swap = dy.abs() > dx.abs();
+    let (major, minor) = if swap { (dy, dx) } else { (dx, dy) };
+    if major == 0. {
+        return None;
+    }
+    let slope = minor / major;
+    // Separate axis scales retain tiny offsets even when the other axis spans
+    // enormous coordinates. Powers of two avoid additional division rounding.
+    let scale_axis = |a: f64, b: f64, center: f64| {
+        let largest = a.abs().max(b.abs()).max(center.abs());
+        if largest == 0. {
+            0
+        } else {
+            (-binary_parts(largest).1).clamp(-1022, 1023)
+        }
+    };
+    let (scale_x, scale_y) = (
+        scale_axis(a.x, b.x, arena.center.x),
+        scale_axis(a.y, b.y, arena.center.y),
+    );
+    let scaled = |p: Point| Point {
+        x: p.x * power_of_two(scale_x),
+        y: p.y * power_of_two(scale_y),
+    };
+    let (sa, sb, center) = (scaled(a), scaled(b), scaled(arena.center));
+    let axes = |p: Point| if swap { (p.y, p.x) } else { (p.x, p.y) };
+    let ((au, av), (bu, bv), (cu, cv)) = (axes(sa), axes(sb), axes(center));
+    let (du, dv) = (bu - au, bv - av);
+    if du == 0. {
+        return None;
+    }
+    // Compensated products preserve proportional crossings that slope times a
+    // distant anchor would turn into a large spurious offset from the center.
+    let n = difference_of_products(av, bu, au, bv) + difference_of_products(cu, dv, cv, du);
+    let minor_scale = if swap { scale_x } else { scale_y };
+    let intercept = relative_intercept(n, du, arena.radius, minor_scale);
+    if !intercept.is_finite() {
+        return None;
+    }
+    let (a_major, b_major, center_major) = (axes(a).0, axes(b).0, axes(arena.center).0);
+    let project = |value: f64| (value - center_major) / arena.radius;
+    let mut lo = project(a_major.min(b_major)).max(-1.);
+    let mut hi = project(a_major.max(b_major)).min(1.);
+    if slope == 0. {
+        if !(-1. ..=1.).contains(&intercept) {
+            return None;
+        }
+    } else {
+        let first = (-1. - intercept) / slope;
+        let last = (1. - intercept) / slope;
+        lo = lo.max(first.min(last));
+        hi = hi.min(first.max(last));
+    }
+    if lo > hi {
+        return None;
+    }
+    let grid = |u: f64| {
+        let v = slope.mul_add(u, intercept).clamp(-1., 1.);
+        let (x, y) = if swap { (v, u) } else { (u, v) };
+        Point {
+            x: ((x + 1.) * side as f64 / 2.).clamp(0., side as f64),
+            y: ((y + 1.) * side as f64 / 2.).clamp(0., side as f64),
+        }
+    };
+    Some((grid(lo), grid(hi)))
+}
+
 impl Minimap {
     pub fn validate(&self) -> Result<(), String> {
         if !(1..=512).contains(&self.side)
@@ -212,11 +376,8 @@ impl Minimap {
     /// Decode transactionally: a malformed delta cannot corrupt the last snapshot.
     pub fn packet(previous: Option<&Self>, payload: &[u8]) -> Result<Self, String> {
         let (mut map, mut cursor, delta) = match payload.first() {
-            Some(b'M') if payload.len() >= 3 => {
-                let side = usize::from(u16::from_be_bytes([payload[1], payload[2]]));
-                if !(1..=512).contains(&side) {
-                    return Err("Invalid minimap size".into());
-                }
+            Some(b'M') => {
+                let side = snapshot_side(payload)?;
                 (
                     Self {
                         side,
@@ -258,11 +419,20 @@ impl Minimap {
             y: ((p.y - arena.center.y) / arena.radius + 1.) * side as f64 / 2.,
         };
         for s in snakes.iter().filter(|s| s.alive) {
-            let mut a = grid(s.head);
-            for b in std::iter::once(s.head)
-                .chain(s.body.iter().copied())
-                .map(grid)
-            {
+            let mut previous = s.head;
+            for next in std::iter::once(s.head).chain(s.body.iter().copied()) {
+                let (mut a, mut b) = (grid(previous), grid(next));
+                let samples = ((b.x - a.x).abs().max((b.y - a.y).abs()) * 2.)
+                    .ceil()
+                    .max(1.);
+                if !a.finite() || !b.finite() || samples > (2 * side) as f64 {
+                    let clipped = clipped_edge(previous, next, arena, side);
+                    previous = next;
+                    let Some(edge) = clipped else { continue };
+                    (a, b) = edge;
+                } else {
+                    previous = next;
+                }
                 let steps = ((b.x - a.x).abs().max((b.y - a.y).abs()) * 2.)
                     .ceil()
                     .max(1.) as usize;
@@ -274,7 +444,6 @@ impl Minimap {
                         cells[y as usize * side + x as usize] = 1;
                     }
                 }
-                a = b;
             }
         }
         Self {

@@ -56,8 +56,10 @@ A maintainer reviews the current PR revision and its evidence before merging.
 Required CI must pass with the latest main; new commits need the relevant checks
 and review again. Auto-merge can finish an approved PR once these requirements
 pass. An independent agent review is useful evidence, but agents using the same
-GitHub account cannot approve that account's own PR. Publishing a release is a
-separate maintainer action.
+GitHub account cannot approve that account's own PR. The owner-authorized
+[release automation](docs/releasing.md) can merge compatible patch release PRs
+containing only version/changelog metadata after required CI. Other release
+bumps require maintainer review and merge; publication then runs automatically.
 
 For geometry or motion changes, a before/after plot, diagram or clip can help.
 Visualizations are optional; attach or link PR-only media rather than committing it.
