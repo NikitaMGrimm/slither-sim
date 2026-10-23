@@ -160,6 +160,36 @@ class PacketCensusTests(unittest.TestCase):
             gaps.add(value)
         self.assertEqual(gaps.summary(), dict(n=200, min=1, median=50.5, p95=95, max=100))
 
+    def test_capture_precision_merges_float_noise_without_merging_microseconds(self):
+        budget = pc.Budget()
+        gaps = pc.Gaps(budget)
+        with patch.object(pc, "MAX_GAP_VALUES", 2):
+            # Identical decimal gaps sampled throughout a one-hour capture.
+            for offset in range(0, 3_600_000, 3600):
+                previous = float(f"{offset + .123:.3f}")
+                for end in (.567, .568):
+                    current = float(f"{offset + 10 + end:.3f}")
+                    gaps.add(current - previous)
+        self.assertEqual(budget.gap_values, 2)
+        summary = gaps.summary()
+        self.assertAlmostEqual(summary.pop("median"), 10.4445)
+        self.assertEqual(summary, dict(n=2000, min=10.444, p95=10.445, max=10.445))
+        with self.assertRaisesRegex(ValueError, "clock"):
+            gaps.add(-.000001)
+
+    def test_packet_and_prey_receipt_gaps_use_capture_precision(self):
+        segment = pc.census(self.archive([
+            self.connect(1), incoming(100.123, setup(), prey(7), b"p"),
+            incoming(110.567, update(7), b"p", elapsed=10),
+            incoming(121.011, update(7), b"p", elapsed=11),
+        ]))["connections"][0]
+        pong = command(segment, "p")
+        self.assertEqual(pong["gapsMs"]["receipt"], dict(
+            n=2, min=10.444, median=10.444, p95=10.444, max=10.444))
+        self.assertEqual(pong["gapsMs"]["server"], dict(
+            n=2, min=10, median=10.5, p95=11, max=11))
+        self.assertEqual(segment["prey"]["updateGapsMs"]["receipt"]["median"], 10.444)
+
     def test_repeated_entry_censors_and_never_joins_update_gaps(self):
         report = pc.census(self.archive([
             self.connect(1), incoming(10, setup(), prey(7)), incoming(20, update(7), elapsed=100),

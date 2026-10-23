@@ -50,7 +50,7 @@ class Budget:
 
 
 class Gaps:
-    """Exact weighted quantiles with a shared hard bound on distinct values."""
+    """Weighted quantiles at capture precision, with bounded distinct values."""
     def __init__(self, budget):
         self.budget = budget
         self.values = Counter()
@@ -59,6 +59,9 @@ class Gaps:
     def add(self, value):
         if value < 0 or not math.isfinite(value):
             raise ValueError("clock regressed or became non-finite")
+        # Recorder timestamps have three decimal places in milliseconds.
+        # Remove subtraction noise before it consumes the distinct-value budget.
+        value = round(value, 3)
         if value not in self.values:
             if self.budget.gap_values >= MAX_GAP_VALUES:
                 raise ValueError("distinct gap value limit exceeded")
@@ -393,7 +396,8 @@ def census(source):
                                  "and bundle length prefixes. incomingBytes includes those prefixes."),
                     gaps=("Consecutive occurrences of the command or command/length family within one "
                           "connection/setup epoch; same-frame occurrences have zero gap. "
-                          "Median exact, p95 nearest rank."),
+                          "Gaps rounded to 0.001 ms capture precision; integer server gaps unchanged. "
+                          "Median exact over those values, p95 nearest rank."),
                     ownState=("State before each packet. First full s (length >7) after setup identifies "
                               "own as in World, never assumes ID 0. v is counted before its transition; "
                               "following bundled packets are post-own-death. Mid-life captures cannot "
