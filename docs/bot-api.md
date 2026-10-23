@@ -126,6 +126,19 @@ available. `networking` is enabled by default and restores the full interface.
 cargo build --lib --no-default-features --locked
 ```
 
+Before embedding:
+
+- Pin a dependency version or Git revision and record the resolved `Config` and
+  seed. Choose settings explicitly: default geometric `vision` is 1,500 units;
+  defaults and seeded trajectories can change between versions. See
+  [configuration](configuration.md) for the full settings.
+- Handle fallible core calls before committing related command queues or timers
+  in your application. A rejected operation preserves the simulator world, not
+  changes you already made to your own driver state.
+- Define admission and respawn policy in your application. If clearance is
+  required, use the clearance checks below before respawning; respawn alone
+  does not enforce it.
+
 | Method | Purpose |
 | --- | --- |
 | `observe_selected(&mask)` | Shared-index batch observations, one result per slot. Unselected/dead slots are `None`; wrong mask length is an error. |
