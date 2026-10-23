@@ -222,3 +222,7 @@ This comparison uses the published 0.2.0 runtime baseline. If correctness change
 are integrated, establish and name that updated baseline before extending these
 performance claims. The remaining shortlist above is investigative work, not
 additional promised speedups.
+
+The [observation follow-up](performance-observations.md) adds immutable geometry
+and selection cases with separate output-destruction timing and an explicitly
+updated source baseline.

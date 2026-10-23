@@ -153,6 +153,15 @@ impl Simulator {
         if selected.is_some_and(|flags| flags.len() != self.snakes.len()) {
             return Err("One selection flag per agent slot required".into());
         }
+        // A dead-only or empty selection needs stable result slots, but no index.
+        if !self
+            .snakes
+            .iter()
+            .enumerate()
+            .any(|(i, s)| s.alive && selected.is_none_or(|flags| flags[i]))
+        {
+            return Ok((0..self.snakes.len()).map(|_| None).collect());
+        }
         let observer = Observer::new(VisibleState::of(self), true);
         // Result collection cannot promise an exact lower size hint. Reserve stable slots once.
         let mut observations = Vec::with_capacity(self.snakes.len());
