@@ -1,6 +1,6 @@
 [package]
 name = "slither-sim"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.86"
 description = "Headless Slither.io simulator for bot development, training and custom protocol-19 servers"

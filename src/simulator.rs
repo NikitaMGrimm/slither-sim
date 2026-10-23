@@ -90,7 +90,7 @@ impl BoostFoodConfig {
 pub struct Config {
     /// Boundary radius; the starting radius when `dynamicRadius` is set.
     pub radius: f64,
-    /// Follow the server's population-driven boundary (see `Config::realistic`).
+    /// Enable the provisional population-driven boundary model (see `Config::realistic`).
     pub dynamic_radius: bool,
     pub vision: f64,
     /// Global ambient pellet target; boost and death do not count against it.
