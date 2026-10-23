@@ -25,13 +25,20 @@ def capture_command(study, output, node="node"):
     executable = shutil.which(node)
     if executable is None:
         raise ValueError(f"Node executable not found: {node}")
+    paired = capture["scenario"] == "paired-prey"
+    driver = "slither-paired-prey.mjs" if paired else "slither-headless.mjs"
     command = [
-        executable, str(evidence.ROOT / "tools/fidelity/slither-headless.mjs"),
+        executable, str(evidence.ROOT / "tools/fidelity" / driver),
         "--out", str(output), "--plan", str(study / "plan.json"),
         "--server", f"{address}:{capture['server']['port']}",
-        "--seconds", str(capture["seconds"]), "--bots", str(capture["bots"]),
-        "--scenario", capture["scenario"],
+        "--seconds", str(capture["seconds"]),
     ]
+    if paired:
+        command.extend(["--mode", capture["mode"]])
+        if "direction" in capture:
+            command.extend(["--direction", capture["direction"]])
+    else:
+        command.extend(["--bots", str(capture["bots"]), "--scenario", capture["scenario"]])
     if "origin" in capture:
         command.extend(["--origin", capture["origin"]])
     return command
@@ -78,6 +85,7 @@ def collect(study, node="node"):
                 _stop(process)
                 code = process.returncode
             captures = sorted(path.relative_to(study).as_posix() for path in output.glob("*.jsonl.gz"))
+            # Audit errors must not erase the process outcome or free its attempt.
             evidence.append_event(study, {**base, "event": "finished", "time": evidence.utc_now(),
                 "status": status, "exitCode": code, "captures": captures, "error": error})
         return {"attemptId": attempt, "status": status, "exitCode": code,

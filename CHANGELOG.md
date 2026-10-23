@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Run declared paired-prey routes through the managed evidence collector and
+  verify route settings against the plan; retain process outcomes across audit errors.
+
 - Move crossing acquisition's near waypoint inward and hold achieved endpoints
   for observation; retain commanded hold offsets and release timing in metadata.
 

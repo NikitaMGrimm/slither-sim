@@ -44,6 +44,46 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(command[-2:], ["--origin", "http://localhost:8080"])
 
     @patch("collect.shutil.which", return_value="node")
+    def test_paired_routes_use_the_paired_driver_and_declared_controls(self, _which):
+        for mode, direction in (("overlap", None), ("crossing", None),
+                                ("crossing", "x"), ("crossing", "y"),
+                                ("crossing", "diagonal-positive"), ("crossing", "diagonal-negative")):
+            with self.subTest(mode=mode, direction=direction):
+                plan = evidence.read_plan(self.study)
+                plan["capture"].update(scenario="paired-prey", mode=mode, bots=2, seconds=480)
+                if direction:
+                    plan["capture"]["direction"] = direction
+                source = self.directory / "pair-plan.json"
+                source.write_text(json.dumps(plan), encoding="utf-8")
+                study = evidence.create_study(source, self.directory / f"pair-{mode}-{direction}")
+                command = collect.capture_command(study, self.directory / "unused")
+                self.assertEqual(Path(command[1]).name, "slither-paired-prey.mjs")
+                self.assertEqual(command[command.index("--mode") + 1], mode)
+                self.assertNotIn("--bots", command)
+                self.assertNotIn("--scenario", command)
+                self.assertEqual("--direction" in command, direction is not None)
+                if direction:
+                    self.assertEqual(command[command.index("--direction") + 1], direction)
+
+    @patch("collect.shutil.which", return_value="node")
+    def test_audit_failure_keeps_finished_exit_code_and_consumes_attempt(self, _which):
+        process = Mock()
+        process.wait.return_value = process.returncode = 0
+        process.poll.return_value = 0
+        with patch("collect.subprocess.Popen", return_value=process), \
+                patch("collect.evidence.audit_study", side_effect=ValueError("synthetic audit failure")):
+            with self.assertRaisesRegex(ValueError, "synthetic audit failure"):
+                collect.collect(self.study)
+        starts, ends = evidence.read_attempts(self.study)
+        self.assertEqual(len(starts), 1)
+        self.assertEqual(len(ends), 1)
+        self.assertEqual(next(iter(ends.values()))["exitCode"], 0)
+        with patch("collect.subprocess.Popen") as launch:
+            with self.assertRaisesRegex(ValueError, "no automatic replacements"):
+                collect.collect(self.study)
+        launch.assert_not_called()
+
+    @patch("collect.shutil.which", return_value="node")
     def test_start_failure_is_recorded_and_never_replaced(self, _which):
         with patch("collect.subprocess.Popen", side_effect=OSError("start failed")):
             reply = collect.collect(self.study)
