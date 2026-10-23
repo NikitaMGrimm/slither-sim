@@ -376,9 +376,6 @@ pub(crate) fn food_remove(key: [u8; 4], eater: Option<u16>) -> Vec<u8> {
 pub(crate) fn sector_clear(sector: [u8; 2]) -> Vec<u8> {
     vec![b'w', sector[0], sector[1]]
 }
-pub(crate) fn sector_enter(sector: [u8; 2]) -> Vec<u8> {
-    vec![b'W', sector[0], sector[1]]
-}
 
 pub(crate) fn prey_id(prey: &Prey) -> u16 {
     prey.id as u16
@@ -533,18 +530,38 @@ pub(crate) fn victory_accepted() -> Vec<u8> {
     vec![b'v', 2]
 }
 
-/// Full `M` snapshot: cells are written from the last index down, seven bits per
-/// literal byte (most significant first) or skipped in zero runs.
+/// Full `M` snapshot: side, then the occupied cells as a [`cell_runs`] layer.
 pub(crate) fn minimap(map: &Minimap) -> Vec<u8> {
     let mut p = vec![b'M'];
     p.extend(u16be(map.side as u16));
-    let mut remaining = map.cells.len();
+    cell_runs(&mut p, map.cells.len(), |i| map.cells[i] != 0);
+    p
+}
+
+/// `V` delta toggling the cells that differ from `previous`, the last bitmap sent
+/// on this connection. It carries no side, so both maps must share one; a first,
+/// reconnect or resized map needs [`minimap`]. Callers choose between the two
+/// encodings themselves; see `docs/host-fidelity.md` for what is measured.
+pub(crate) fn minimap_delta(previous: &Minimap, map: &Minimap) -> Result<Vec<u8>, String> {
+    previous.validate()?;
+    map.validate()?;
+    if previous.side != map.side {
+        return Err("Minimap delta needs an unchanged size".into());
+    }
+    let mut p = vec![b'V'];
+    cell_runs(&mut p, map.cells.len(), |i| {
+        previous.cells[i] != map.cells[i]
+    });
+    Ok(p)
+}
+
+/// Stock M/V layer: cells are written from the last index down, seven bits per
+/// literal byte (most significant first) or skipped in zero runs; 255 skips 126
+/// times the next byte. Trailing unset cells are omitted.
+fn cell_runs(p: &mut Vec<u8>, cells: usize, set: impl Fn(usize) -> bool) {
+    let mut remaining = cells;
     while remaining > 0 {
-        let zeros = map.cells[..remaining]
-            .iter()
-            .rev()
-            .take_while(|&&cell| cell == 0)
-            .count();
+        let zeros = (0..remaining).rev().take_while(|&i| !set(i)).count();
         if zeros == remaining {
             break;
         }
@@ -567,18 +584,18 @@ pub(crate) fn minimap(map: &Minimap) -> Vec<u8> {
                 break;
             }
             remaining -= 1;
-            if map.cells[remaining] != 0 {
+            if set(remaining) {
                 byte |= 1 << bit;
             }
         }
         p.push(byte);
     }
-    p
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::minimap::MinimapDecoder;
 
     #[test]
     fn food_packets_keep_color_origin_and_explicit_eater() {
@@ -674,6 +691,72 @@ mod tests {
         };
         assert_eq!(minimap(&empty).len(), 3);
         assert_eq!(Minimap::packet(None, &minimap(&empty)).unwrap(), empty);
+    }
+
+    fn map(side: usize, set: &[usize]) -> Minimap {
+        let mut cells = vec![0; side * side];
+        for &i in set {
+            cells[i] = 1;
+        }
+        Minimap {
+            side,
+            cells,
+            age_seconds: 0.,
+        }
+    }
+
+    #[test]
+    fn minimap_delta_bytes_follow_the_stock_reverse_scan() {
+        // Cell 8 cleared, cell 1 set, cell 0 kept: toggles 8 then 1, last index first.
+        let delta = minimap_delta(&map(3, &[0, 8]), &map(3, &[0, 1])).unwrap();
+        assert_eq!(delta, [b'V', 64, 64]);
+        assert_eq!(
+            minimap_delta(&map(3, &[0, 8]), &map(3, &[0, 8])),
+            Ok(vec![b'V'])
+        );
+        // 18488 skipped cells: 146 extended runs of 126, then 92.
+        let last = 136 * 136 - 1;
+        assert_eq!(
+            minimap_delta(&map(136, &[last]), &map(136, &[0])).unwrap(),
+            [b'V', 64, 255, 146, 220, 64]
+        );
+        // 262143 = 126 * (8 * 255 + 40) + 63 skipped cells cap each run at 255.
+        let mut long = vec![b'V'];
+        long.extend([255, 255].repeat(8));
+        long.extend([255, 40, 191, 64]);
+        assert_eq!(
+            minimap_delta(&map(512, &[]), &map(512, &[0])).unwrap(),
+            long
+        );
+    }
+
+    #[test]
+    fn minimap_delta_rejects_unmatched_or_invalid_maps() {
+        assert!(minimap_delta(&map(3, &[]), &map(4, &[])).is_err());
+        let mut invalid = map(3, &[]);
+        invalid.cells[4] = 2;
+        assert!(minimap_delta(&map(3, &[]), &invalid).is_err());
+        assert!(minimap_delta(&invalid, &map(3, &[])).is_err());
+    }
+
+    #[test]
+    fn minimap_deltas_rebuild_the_sent_sequence_in_the_client_decoder() {
+        let side = 136;
+        let frames = [
+            map(side, &[0, 1, 135, 136, 9000, side * side - 1]),
+            map(side, &[1, 135, 9001, side * side - 2]),
+            map(side, &[]),
+            map(side, &[]),
+            map(side, &[7, 18000]),
+        ];
+        let mut decoder = MinimapDecoder::default();
+        decoder.apply(&minimap(&frames[0]), 0.).unwrap();
+        for pair in frames.windows(2) {
+            decoder
+                .apply(&minimap_delta(&pair[0], &pair[1]).unwrap(), 0.)
+                .unwrap();
+            assert_eq!(decoder.shown.as_ref().unwrap().0, pair[1]);
+        }
     }
 
     #[test]

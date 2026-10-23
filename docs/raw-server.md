@@ -37,7 +37,8 @@ Save as `arena.json`:
       "radius": 1500,
       "foodCount": 550,
       "ambientReplenishPerSecond": 8.04,
-      "dt": 0.007
+      "dt": 0.007,
+      "prey": { "count": 6 }
     },
     "broadcastTicks": 6,
     "leaderboardIntervalSeconds": 3.0
@@ -48,7 +49,8 @@ Save as `arena.json`:
 The 1,500-unit arena and eight slots keep this example small. Food settings scale
 the existing provisional ecology estimate: about 7 pellets and 0.1024 placement
 attempts/s per 300×300 sector. `dt` is the measured 7 ms tick. This is not an
-official server preset; see [rules and limits](server-rules.md).
+official server preset; six prey is an explicit local choice to exercise prey
+gameplay, not a measured global population. See [rules and limits](server-rules.md).
 
 ```sh
 cargo run --release --locked -- host --config arena.json
@@ -123,11 +125,17 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 - `l`: top ten living snakes, recipient rank and population, on entry and every
   `leaderboardIntervalSeconds` (default 3; positive and finite).
 - `k`: simulator collision-attributed kills.
-- `W` then `F`: sector entry, including empty sectors; `w` clears on exit.
-  Bot food coverage comes from `F`/`w`, not the browser's `W` display list.
-- `M`: a full 136×136 global minimap on an independent nominal 2.5-second clock.
+- `F`: nonempty sector listings on entry; empty subscriptions stay internal and
+  send neither `W` nor an empty `F`. Births/pickups update subscribed food;
+  `w` clears on exit. See [food delivery](host-fidelity.md#food-sector-delivery).
+- `M`/`V`: a global minimap (136×136 by default, configurable via
+  `simulation.minimapSide`) on an independent nominal 2.5-second clock.
+  First, reconnected and resized maps use full `M`; later maps use XOR `V` only
+  when strictly shorter than `M`, against that connection's last queued bitmap.
   Living heads and body centerlines are rasterized; the stock client draws its
-  own player marker. Exact official pixel filtering and `M`/`V` selection are unknown.
+  own player marker. This compression choice is local; exact official pixel
+  filtering and full/delta selection remain unknown. See
+  [minimap encoding](host-fidelity.md#minimap-encoding).
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.

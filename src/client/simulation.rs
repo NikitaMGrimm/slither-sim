@@ -225,6 +225,8 @@ struct Connection {
     prey: BTreeMap<u16, KnownPrey>,
     radius: u32,
     minimap_at: f64,
+    /// XOR bases belong to recipients: missed deadlines and reconnects differ.
+    minimap_sent: Option<Minimap>,
     /// Next leaderboard, scheduled once the connection's own snake appears.
     leaderboard_at: Option<f64>,
     /// Rank frozen when the connection's snake died.
@@ -1112,7 +1114,23 @@ impl SimulatorBackend {
                     self.config.minimap_side,
                 ));
             }
-            self.emit(slot, now, &[encode::minimap(map.as_ref().unwrap())])?;
+            let map = map.as_ref().unwrap();
+            let mut packet = encode::minimap(map);
+            if let Some(previous) = self.slots[slot]
+                .connection
+                .minimap_sent
+                .as_ref()
+                .filter(|previous| previous.side == map.side)
+            {
+                let delta = encode::minimap_delta(previous, map)?;
+                // Shortest valid encoding is a local compression choice, not
+                // a recovered server policy; see docs/host-fidelity.md.
+                if delta.len() < packet.len() {
+                    packet = delta;
+                }
+            }
+            self.emit(slot, now, &[packet])?;
+            self.slots[slot].connection.minimap_sent = Some(map.clone());
             self.slots[slot].connection.minimap_at = if deadline == 0. {
                 now + interval
             } else {
@@ -1718,8 +1736,8 @@ fn changes(
     Ok(())
 }
 
-/// Sector subscriptions around the head: `W` and listings on entry, `f`/`c` changes
-/// while subscribed and a sector clear on exit.
+/// Keep empty subscriptions internally. Retained receipts introduce food with
+/// nonempty `F`, then births/pickups; see docs/host-fidelity.md#food-sector-delivery.
 fn food_updates(
     packets: &mut Vec<Vec<u8>>,
     connection: &mut Connection,
@@ -1744,8 +1762,9 @@ fn food_updates(
         match connection.food.get_mut(&sector) {
             None => {
                 let foods: Vec<_> = current.iter().map(|(k, v)| (*k, v.style)).collect();
-                packets.push(encode::sector_enter(sector));
-                packets.extend(encode::food_sector(sector, &foods));
+                if !foods.is_empty() {
+                    packets.extend(encode::food_sector(sector, &foods));
+                }
                 connection.food.insert(sector, current.clone());
             }
             Some(known) => {
@@ -1914,7 +1933,14 @@ mod tests {
             &BTreeSet::from([[108, 108]]),
         )
         .unwrap();
-        assert_eq!(packets, [vec![b'W', 108, 108], vec![b'F', 108, 108]]);
+        let evidence: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/client-food-interest.json"
+        ))
+        .unwrap();
+        assert_eq!(evidence["announcements"]["W"], 0);
+        assert_eq!(evidence["announcements"]["emptyF"], 0);
+        assert!(packets.is_empty());
+        assert!(connection.food.contains_key(&[108, 108]));
         packets.clear();
         food_updates(
             &mut packets,
@@ -1933,14 +1959,29 @@ mod tests {
             &BTreeSet::from([[110, 108]]),
         )
         .unwrap();
-        assert_eq!(
-            packets,
-            [
-                vec![b'w', 108, 108],
-                vec![b'W', 110, 108],
-                vec![b'F', 110, 108]
-            ]
-        );
+        assert_eq!(packets, [vec![b'w', 108, 108]]);
+        packets.clear();
+        // Food arriving after an empty subscription is a birth, not a new
+        // subscription or a replayed stale listing.
+        let point = Point { x: 650., y: -149. };
+        let food = KnownFood {
+            point,
+            style: encode::FoodStyle {
+                color: 3,
+                size: 20,
+                snake_food: false,
+            },
+        };
+        let sectors = BTreeMap::from([([110, 108], BTreeMap::from([([0, 0], food)]))]);
+        food_updates(
+            &mut packets,
+            &mut connection,
+            &sectors,
+            &eaters,
+            &BTreeSet::from([[110, 108]]),
+        )
+        .unwrap();
+        assert_eq!(packets, [encode::food_add([110, 108, 0, 0], food.style)]);
     }
     use std::f64::consts::PI;
 
@@ -2111,8 +2152,10 @@ mod tests {
         for _ in 0..760 {
             sim.advance_ticks(1).unwrap();
             for packet in remote.pump(&mut sim, 0) {
-                if packet[0] == b'M' {
-                    assert_eq!(&packet[1..3], &136_u16.to_be_bytes());
+                if matches!(packet[0], b'M' | b'V') {
+                    if packet[0] == b'M' {
+                        assert_eq!(&packet[1..3], &136_u16.to_be_bytes());
+                    }
                     times.push(sim.time());
                 }
             }
@@ -2129,10 +2172,79 @@ mod tests {
 
         sim.backend.world.snakes[0].alive = false;
         sim.advance_ticks(400).unwrap();
-        assert!(remote.pump(&mut sim, 0).iter().all(|p| p[0] != b'M'));
+        assert!(
+            remote
+                .pump(&mut sim, 0)
+                .iter()
+                .all(|p| !matches!(p[0], b'M' | b'V'))
+        );
         let mut next_life = Remote::connect(&mut sim, 0, "New map");
         run(&mut sim, &mut [(0, &mut next_life)], 7);
         assert!(next_life.packets.iter().any(|p| p[0] == b'M'));
+    }
+
+    #[test]
+    fn minimap_deltas_use_each_recipients_last_sent_bitmap() {
+        let mut config = raw_config(2);
+        config.world.radius = 10_000.;
+        let mut sim = RawSimulator::new(7, config, 2).unwrap();
+        let mut first = Remote::connect(&mut sim, 0, "First");
+        let mut second = Remote::connect(&mut sim, 1, "Second");
+        run(&mut sim, &mut [(0, &mut first), (1, &mut second)], 7);
+        assert!(first.packets.iter().any(|p| p[0] == b'M'));
+        assert!(second.packets.iter().any(|p| p[0] == b'M'));
+        let original = second.frame(&sim).minimap.unwrap();
+
+        // Send only to the first recipient after changing global geometry.
+        // The second recipient must retain its own older XOR base.
+        sim.backend.world.snakes[1].head = Point {
+            x: 3000.,
+            y: -3000.,
+        };
+        sim.backend.world.snakes[1].body = vec![Point {
+            x: 3100.,
+            y: -3000.,
+        }];
+        let now = sim.time();
+        sim.backend.slots[0].connection.minimap_at = now;
+        sim.backend.slots[1].connection.minimap_at = now + 10.;
+        sim.backend.minimaps().unwrap();
+        assert!(
+            first
+                .pump(&mut sim, 0)
+                .iter()
+                .any(|p| matches!(p[0], b'M' | b'V'))
+        );
+        assert!(second.pump(&mut sim, 1).is_empty());
+        let current = first.frame(&sim).minimap.unwrap();
+        assert_ne!(original.cells, current.cells);
+
+        // Slot zero is not due: the lazily shared raster must still be built
+        // for slot one, against slot one's older base rather than slot zero's.
+        sim.backend.slots[1].connection.minimap_at = now;
+        sim.backend.minimaps().unwrap();
+        second.pump(&mut sim, 1);
+        assert_eq!(second.frame(&sim).minimap.unwrap().cells, current.cells);
+
+        sim.backend.slots[1].connection.minimap_at = now;
+        sim.backend.minimaps().unwrap();
+        assert!(second.pump(&mut sim, 1).contains(&vec![b'V']));
+
+        // A new side cannot use an old-size delta; a dead slot before this
+        // recipient must not prevent its full replacement snapshot.
+        sim.backend.world.snakes[0].alive = false;
+        sim.backend.config.minimap_side = 80;
+        sim.backend.slots[0].connection.minimap_at = now;
+        sim.backend.slots[1].connection.minimap_at = now;
+        sim.backend.minimaps().unwrap();
+        assert!(first.pump(&mut sim, 0).is_empty());
+        assert!(
+            second
+                .pump(&mut sim, 1)
+                .iter()
+                .any(|p| p.starts_with(&[b'M', 0, 80]))
+        );
+        assert_eq!(second.frame(&sim).minimap.unwrap().side, 80);
     }
 
     #[test]

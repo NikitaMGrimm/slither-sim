@@ -34,6 +34,27 @@ measurements may require the original archives.
 
 Tests are under `tests/`, fixtures under `tests/fixtures/`. Run `cargo test --locked`.
 
+## Movement and geometry
+
+The historical source is `slither-arena-rs` commit
+`c2fb7285febb4273034e30699dc880715a334423`. Its research notes
+`movement-fidelity.md`, `speed-equations.md`, `circle-eating-investigation.md`,
+`official-collisions-20261003.md` and `body-geometry.md` explain the fitted turning,
+speed, pickup, collision and contraction choices. The corresponding packaged
+fixtures are listed above; full original studies are not distributed here.
+
+The October 23 recheck reproduced all 1,567 retained fixed-size speed ramps from
+three hash-matched validation archives. This supports those slopes, not growth
+during a ramp. Collision geometry comes from the Android offline client; the
+simulator moves all snakes before resolving collisions, while that client moves
+and tests each snake in sequence. Online move/test phasing remains unverified.
+Three selected near-rim prey removal projections agree with the rim within five
+units; recipient removals do not establish global deletion or its activation rule.
+
+For ecology/radius counterexamples and receipt policies, see
+[host fidelity](host-fidelity.md). Keep physical world state, reconstructed client
+state and renderer prediction distinct when interpreting a regression.
+
 ## Provisional defaults
 
 - Kiosk penalty is on. Set `config.kiosk.enabled: false` for motion replays where

@@ -604,8 +604,10 @@ export class Bot {
     };
     ws.onerror = event => {
       if (this.stopped) return;
+      let message = event.message;
+      if (typeof message !== 'string' || !message) message = event.error?.message;
       this.rec.meta({ event: 'socket-error', life: this.lives,
-        message: typeof event.message === 'string' ? event.message.slice(0, 512) : null });
+        message: typeof message === 'string' ? message.slice(0, 512) : null });
     };
   }
   send(bytes) {

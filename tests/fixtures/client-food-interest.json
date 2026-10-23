@@ -112,5 +112,11 @@
       "anchor_age_ms": 7,
       "sct": 21
     }
-  ]
+  ],
+  "announcements": {
+    "F": 1513,
+    "emptyF": 0,
+    "W": 0,
+    "selection": "All incoming F/W packets in the same complete source archive. Empty F means command length 3. Absence is descriptive, not a promise that other servers never use W. First food in an already empty subscription remains an implementation choice."
+  }
 }

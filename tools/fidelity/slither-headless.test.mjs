@@ -1399,6 +1399,10 @@ test('connection open timing and bounded socket errors are recorded', t => {
   bot.ws.onerror({ message: 'x'.repeat(1000) });
   assert.equal(events.at(-1).event, 'socket-error');
   assert.equal(events.at(-1).message.length, 512);
+  bot.ws.onerror({ message: '', error: new Error('upgrade failed') });
+  assert.equal(events.at(-1).message, 'upgrade failed');
+  bot.ws.onerror({ error: new Error('y'.repeat(1000)) });
+  assert.equal(events.at(-1).message.length, 512);
 });
 
 test('stopping detaches socket errors and queued callbacks cannot write after finalization', async t => {

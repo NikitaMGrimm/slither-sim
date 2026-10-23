@@ -31,3 +31,6 @@ Read README.md and the relevant API guide before changing behavior; consult
 - Offline tests must not contact outside game servers.
   Do not collect from outside servers, publish releases or change
   visibility, collaborators or licensing without the owner's authorization.
+- Keep a rule's rationale beside its owning code, linking the canonical evidence
+  note/fixture. Distinguish measured behavior, protocol/client constants and models;
+  preserve counterexamples. See [evidence placement](CONTRIBUTING.md#rationale-and-evidence).
