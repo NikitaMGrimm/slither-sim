@@ -164,6 +164,18 @@ sessions/times/servers and preserve every planned stratum, failed attempt and
 inconclusive result. Distinguish server generation from broadcast filtering and
 received state from reconstructed state.
 
+For clients recorded in the same process, verify shared batch, `timeOrigin` and
+collector source before comparing their caches on the common monotonic receipt
+clock. At time T, consume only each stream's packet prefix received by T, keeping
+packet order and separate field ages. Never subtract independent connection
+elapsed clocks or let later packets refresh an earlier pose. Local cache absence
+is meaningful only against a positively retained peer reference; it is not world
+absence. Any later continuity checks select the sample retrospectively and must
+stay separate from causal state reconstruction. Shared receipt time does not
+establish simultaneous server geometry or one-way latency. The
+[exploratory receipt-time recheck](host-fidelity-recheck-20261023.md#exploratory-common-receipt-time-replay)
+records a bounded example and its missing validation coverage.
+
 ## Package and submit
 
 ```sh
