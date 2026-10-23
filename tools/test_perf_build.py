@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -177,6 +179,46 @@ class Targets(unittest.TestCase):
             build.binaries["perf_baseline"].write_bytes(b"replaced")
             with self.assertRaisesRegex(RuntimeError, "changed after the build record"):
                 build.verify()
+
+
+class Commands(unittest.TestCase):
+    def test_timeout_kills_the_whole_process_tree(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            beat, pid = root / "heartbeat", root / "grandchild.pid"
+            grandchild = ("import os, sys, time\n"
+                          "open(sys.argv[2], 'w').write(str(os.getpid()))\n"
+                          "while True:\n"
+                          "    open(sys.argv[1], 'a').write('.')\n"
+                          "    time.sleep(0.02)\n")
+            child = ("import subprocess, sys, time\n"
+                     f"subprocess.Popen([sys.executable, '-c', {grandchild!r}, {str(beat)!r}, {str(pid)!r}])\n"
+                     "time.sleep(60)\n")
+            log = root / "command.log"
+            started = time.perf_counter()
+            try:
+                self.assertEqual(perf_build.command([sys.executable, "-c", child], root, log, timeout=1.5), -1)
+                self.assertLess(time.perf_counter() - started, 30)
+                self.assertIn("TimeoutExpired", log.read_text())
+                if not pid.exists():
+                    self.skipTest("grandchild did not start within the timeout")
+                size = beat.stat().st_size
+                time.sleep(0.3)
+                self.assertEqual(beat.stat().st_size, size, "grandchild still running after the timeout")
+            finally:
+                if pid.exists():
+                    kill(int(pid.read_text()))
+
+
+def kill(pid):
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, check=False)
+    else:
+        import signal
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
 
 
 if __name__ == "__main__":

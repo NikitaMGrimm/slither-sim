@@ -40,16 +40,46 @@ def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS):
     return result.stdout.strip()
 
 
+def stop_tree(process):
+    """Kill the child and its descendants, then reap the child.
+
+    subprocess.run's timeout kills only the immediate child; cargo's rustc and linker
+    descendants would keep writing into a target whose lock is about to be released.
+    """
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                           capture_output=True, timeout=30, check=False)
+        else:
+            import signal
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    if process.poll() is None:
+        process.kill()
+    process.wait(timeout=30)
+
+
 def command(args, cwd, log, environment=None, timeout=600):
     """Run a logged child; return its exit code, or -1 if it could not run or timed out."""
     with log.open("w", encoding="utf-8", newline="\n") as stream:
         try:
-            result = subprocess.run(args, cwd=cwd, env=environment, stdout=stream,
-                                    stderr=subprocess.STDOUT, text=True, timeout=timeout, check=False)
-            return result.returncode
-        except (OSError, subprocess.TimeoutExpired) as error:
+            # A separate POSIX session lets stop_tree signal every descendant at once.
+            process = subprocess.Popen(args, cwd=cwd, env=environment, stdout=stream, stderr=subprocess.STDOUT,
+                                       text=True, start_new_session=os.name != "nt")
+        except OSError as error:
             stream.write(f"\n{type(error).__name__}: {error}\n")
             return -1
+        try:
+            return process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            stop_tree(process)
+            stream.write(f"\n{type(error).__name__}: {error}\n")
+            return -1
+        except BaseException:
+            stop_tree(process)
+            raise
 
 
 @dataclass(frozen=True)
