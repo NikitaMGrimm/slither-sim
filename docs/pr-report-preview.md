@@ -43,6 +43,9 @@ Before posting, the publisher checks the artifact's PR/repository/head/merge
 identity, current open PR head and target, and prior published run/attempt.
 The current target is resolved through the branch API; the PR's `base.sha` can
 retain an older snapshot even when the merge checkout uses a newer target.
+If concurrent work advances the target along the same history, the pinned
+comparison is published and Details records the newer target. Older PR heads
+and rewritten or diverged target histories are still skipped.
 Only the named same-repository branch can run it. Measurement jobs have read-only
 repository access; the separate publisher has comment write access and treats
 downloaded artifacts only as data. Both use pinned actions and leave checkout

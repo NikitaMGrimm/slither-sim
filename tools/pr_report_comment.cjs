@@ -24,13 +24,21 @@ async function publish({ github, context, core, directory }) {
   if (!Number.isSafeInteger(run) || run <= 0 || !Number.isSafeInteger(attempt) || attempt <= 0) {
     throw new Error('Invalid workflow run identity');
   }
+  let currentTarget = report.base;
   const fresh = async () => {
     const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: event.number });
     if (pr.state !== 'open' || pr.head.sha !== report.head || pr.head.repo.full_name !== repository ||
         pr.head.ref !== 'ci/report-preview') return false;
     // PR base.sha can retain an older snapshot after the target branch moves.
     const { data: target } = await github.rest.repos.getBranch({ owner, repo, branch: pr.base.ref });
-    return target.commit.sha === report.base;
+    currentTarget = target.commit.sha;
+    if (currentTarget === report.base) return true;
+    // Results stay pinned to the measured base when concurrent work advances it.
+    // A rewritten or diverged target no longer belongs to this comparison.
+    const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+      owner, repo, basehead: `${report.base}...${currentTarget}`, per_page: 1,
+    });
+    return comparison.status === 'ahead';
   };
   if (!(await fresh())) {
     core.info('Skipping stale comparison: the PR head or target changed, or PR closed');
@@ -52,6 +60,10 @@ async function publish({ github, context, core, directory }) {
   if (!(await fresh())) {
     core.info('Skipping comparison superseded while preparing the comment');
     return;
+  }
+  if (currentTarget !== report.base) {
+    body = body.replace('\n</details>',
+      `\n- Target advanced to \`${currentTarget.slice(0, 8)}\` during this run; results use base \`${report.base.slice(0, 8)}\`.\n\n</details>`);
   }
   const data = { owner, repo, body };
   const response = previous

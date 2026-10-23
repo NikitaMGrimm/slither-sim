@@ -8,19 +8,21 @@ const publish = require('./pr_report_comment.cjs');
 const head = 'a'.repeat(40), base = 'b'.repeat(40), merge = 'c'.repeat(40);
 const marker = '<!-- slither-report-preview -->';
 const bot = { login: 'github-actions[bot]', type: 'Bot' };
-function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotBase = liveBase, reportOverride = {}, fork = false } = {}) {
+function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotBase = liveBase,
+                      targetHistory = 'diverged', reportOverride = {}, fork = false } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-comment-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true }));
   const report = { schema: 1, repository: 'owner/repo', pr: 27, head, base, merge, ...reportOverride };
   fs.writeFileSync(path.join(directory, 'report.json'), JSON.stringify(report));
-  fs.writeFileSync(path.join(directory, 'report.md'), `${marker}\n## Comparison\nMeasured report`);
+  fs.writeFileSync(path.join(directory, 'report.md'), `${marker}\n## Comparison\nMeasured report\n<details><summary>Details</summary>\n\n</details>`);
   const calls = [];
   const context = { repo: { owner: 'owner', repo: 'repo' }, sha: merge, payload: { pull_request: {
     number: 27, head: { sha: head, ref: 'ci/report-preview', repo: { full_name: fork ? 'fork/repo' : 'owner/repo' } }
   } } };
   const github = { paginate: async () => previous, rest: {
     pulls: { get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'ci/report-preview', repo: { full_name: 'owner/repo' } }, base: { sha: snapshotBase, ref: 'target' } } }) },
-    repos: { getBranch: async () => ({ data: { commit: { sha: liveBase } } }) },
+    repos: { getBranch: async () => ({ data: { commit: { sha: liveBase } } }),
+      compareCommitsWithBasehead: async () => ({ data: { status: targetHistory } }) },
     issues: { listComments: {},
       createComment: async x => { calls.push(['create', x]); return { data: { html_url: 'created' } }; },
       updateComment: async x => { calls.push(['update', x]); return { data: { html_url: 'updated' } }; }
@@ -51,12 +53,25 @@ test('rejects fork, forged target PR and mismatched merge identities', async t =
     assert.equal(f.calls.length, 0);
   }
 });
-test('does not overwrite a newer head or changed target', async t => {
+test('does not overwrite a newer head or rewritten target', async t => {
   for (const options of [{ liveHead: base }, { liveBase: head }]) {
     const f = fixture(t, options);
     await publish(f.args);
     assert.equal(f.calls.length, 0);
   }
+});
+test('publishes a pinned comparison when the target advances and records its identity', async t => {
+  const f = fixture(t, { liveBase: merge, targetHistory: 'ahead' });
+  await publish(f.args);
+  assert.equal(f.calls.length, 1);
+  assert.match(f.calls[0][1].body, /Target advanced to `cccccccc` during this run; results use base `bbbbbbbb`/);
+  const details = f.calls[0][1].body.split('<details>')[1].split('</details>')[0];
+  assert.match(details, /Target advanced/);
+});
+test('rejects targets rewound behind the measured base', async t => {
+  const f = fixture(t, { liveBase: merge, targetHistory: 'behind' });
+  await publish(f.args);
+  assert.equal(f.calls.length, 0);
 });
 test('publishes when the live target matches despite an older PR base snapshot', async t => {
   const f = fixture(t, { snapshotBase: head });
