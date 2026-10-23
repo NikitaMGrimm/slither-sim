@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Move crossing acquisition's near waypoint inward and hold achieved endpoints
+  for observation; retain commanded hold offsets and release timing in metadata.
+
 - Require fresh reference geometry before crossing endpoints advance; separate
   the initial approach from completed legs and retain exact endpoint witnesses.
   Record the paired visibility recheck's model failures without retuning physics.
