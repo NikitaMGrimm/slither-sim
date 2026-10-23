@@ -3,7 +3,7 @@
 use serde_json::Value;
 use slither_sim::{
     client::{
-        ClientFrame, ClientState, ClientStatus,
+        ClientFrame, ClientState, ClientStatus, MAX_FRAME_MINIMAP_CELLS,
         protocol::{action_packets, split_frame},
     },
     physics, *,
@@ -826,6 +826,107 @@ fn minimap_snapshots_and_deltas_are_transactional() {
     assert!(close(map.age_seconds, 0.25, 1e-12));
     assert!(frame.received.minimap.valid);
     assert_eq!(frame.received.minimap.age_seconds, map.age_seconds);
+}
+
+#[test]
+fn minimap_frame_budget_covers_every_family_and_resets_per_frame() {
+    assert_eq!(MAX_FRAME_MINIMAP_CELLS, 5 * 512 * 512);
+    let fill64 = [b'M', 0, 64];
+    let fill32 = [b'U', 0, 32];
+    let extra_cell = [b'L', 0, 0, 1];
+    for (packet, cells) in [
+        (&[b'M', 2, 0][..], 512 * 512),
+        // U clamps 600 to 512 before charging.
+        (&[b'U', 2, 88][..], 512 * 512),
+        (&b"V"[..], 512 * 512),
+        (&b"u"[..], 80 * 80),
+        (&[b'L', 0, 2, 0][..], 512 * 512),
+        (&[b'L', 4, 2, 0][..], 5 * 512 * 512),
+    ] {
+        let mut client = Client::new();
+        client.send(&straight(9, 0.));
+        client.send(&[b'M', 2, 0, 0x40]);
+        let mut packets = vec![packet; MAX_FRAME_MINIMAP_CELLS / cells];
+        if packet[0] == b'u' {
+            // 204 legacy maps leave 5,120 cells: 64² + 32² fills the budget.
+            assert_eq!(MAX_FRAME_MINIMAP_CELLS % cells, 64 * 64 + 32 * 32);
+            packets.extend([&fill64[..], &fill32[..]]);
+        } else {
+            assert_eq!(MAX_FRAME_MINIMAP_CELLS % cells, 0);
+        }
+        let frame = bundled(&packets);
+        for _ in 0..2 {
+            client.state.receive_frame(&frame, client.time).unwrap();
+        }
+        let before = client.frame();
+        packets.insert(0, &[b'h', 0, 9, 0x40, 0, 0]);
+        packets.push(&extra_cell);
+        let error = client
+            .state
+            .receive_frame(&bundled(&packets), client.time + 0.1)
+            .unwrap_err();
+        assert!(error.contains("cell work limit"), "{packet:?}: {error}");
+        assert_eq!(client.frame(), before, "{packet:?}");
+    }
+}
+
+#[test]
+fn repeated_minimap_snapshots_reject_the_whole_frame() {
+    let mut client = Client::new();
+    client.send(&straight(9, 0.));
+    client.send(&[b'L', 2, 0, 2, 0x40, 0x20]);
+    let before = client.frame();
+    let snapshots = vec![&[b'M', 2, 0][..]; 8];
+    let error = client
+        .state
+        .receive_frame(&bundled(&snapshots), client.time + 0.1)
+        .unwrap_err();
+    assert!(error.contains("cell work limit"), "{error}");
+    assert_eq!(client.frame(), before);
+    // A failed admission does not consume the next frame's budget.
+    client
+        .state
+        .receive_frame(&bundled(&snapshots[..5]), client.time)
+        .unwrap();
+    assert_eq!(client.frame().minimap.unwrap().side, 512);
+}
+
+#[test]
+fn mixed_minimap_families_keep_packet_order_and_late_error_atomicity() {
+    let packets: &[&[u8]] = &[
+        &[b'M', 0, 2, 0x40],
+        &[b'U', 0, 2, 0x20],
+        &[b'V', 0x40],
+        &[b'u', 0x40],
+        &[b'V', 0x40],
+        &[b'L', 2, 0, 2, 0x40, 0x20],
+        &[b'V', 0x40],
+        &[b'V', 0x40],
+    ];
+    let mut sequential = Client::new();
+    let mut together = Client::new();
+    for packet in packets {
+        sequential.send(packet);
+    }
+    together
+        .state
+        .receive_frame(&bundled(packets), together.time)
+        .unwrap();
+    let before = together.frame();
+    assert_eq!(before, sequential.frame());
+    assert_eq!(before.minimap.as_ref().unwrap().cells, [0, 0, 1, 0]);
+    let teams = before.hud.minimap_teams.as_ref().unwrap();
+    assert_eq!(teams.layers, [vec![0, 0, 0, 1], vec![0, 0, 1, 0]]);
+    let appearance = straight(9, 0.);
+    let error = together
+        .state
+        .receive_frame(
+            &bundled(&[&appearance, &[b'M', 0, 2, 0x40], &[b'V', 255]]),
+            together.time + 0.1,
+        )
+        .unwrap_err();
+    assert!(error.contains("Truncated minimap run"), "{error}");
+    assert_eq!(together.frame(), before);
 }
 
 #[test]
