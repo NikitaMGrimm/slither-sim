@@ -15,6 +15,11 @@ from perf_baseline import command_output, digest, native
 
 WORKLOADS = {"step-default": 100000, "step-food": 10000, "step-body": 50000,
              "observe": 1000, "portable": 5000, "protocol": 5000}
+DEFAULT_CASES = tuple(WORKLOADS)
+# Explicit opt-in: these require examples/perf_observation.rs on both runtimes.
+WORKLOADS.update({"observe-dense": 1000, "observe-compact": 500,
+                  "observe-wide": 10000, "observe-strip": 1000,
+                  "observe-one": 10000, "observe-empty": 100000})
 
 
 def main():
@@ -23,7 +28,7 @@ def main():
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repeats", type=int, default=5)
-    parser.add_argument("--cases", nargs="+", choices=tuple(WORKLOADS), default=list(WORKLOADS))
+    parser.add_argument("--cases", nargs="+", choices=tuple(WORKLOADS), default=list(DEFAULT_CASES))
     args = parser.parse_args()
     if not 1 <= args.repeats <= 10:
         parser.error("repeats must be 1..10")
@@ -43,7 +48,7 @@ def main():
                     "workloads": {case: WORKLOADS[case] for case in args.cases},
                     "repeats": args.repeats, "warmup_repetitions": 1,
                     "order": "alternate label order per repetition and case; adjacent matched pairs",
-                    "notes": "Native wall excludes setup/reset/output drop; process CPU includes them. Quiet agreement and build identities recorded in report."}
+                    "notes": "Native wall excludes setup/reset/output drop; process CPU includes them. Observation harness separately reports outputDrop wall intervals. Quiet agreement and build identities recorded in report."}
         (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
         with (args.output / "results.jsonl").open("w", encoding="utf-8", newline="\n") as output:
             for repetition in range(-1, args.repeats):

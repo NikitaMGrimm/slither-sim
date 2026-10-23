@@ -92,6 +92,56 @@ fn selected_observations_match_individual_and_indexed_batches_without_mutation()
 }
 
 #[test]
+fn observations_follow_dead_only_selection_and_later_public_mutation() {
+    let mut world = Simulator::new(
+        7,
+        Config {
+            radius: 3000.,
+            food_count: 1500,
+            ambient_food: AmbientFoodConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    for slot in 0..32 {
+        world.add(slot.to_string(), slot, 32).unwrap();
+        world.snakes[slot].alive = false;
+    }
+    let before = snapshot(&world);
+    for flags in [[false; 32], [true; 32]] {
+        let observations = world.observe_selected(&flags).unwrap();
+        assert_eq!(observations.len(), 32);
+        assert!(observations.iter().all(Option::is_none));
+    }
+    let observations = world.observe_all();
+    assert_eq!(observations.len(), 32);
+    assert!(observations.iter().all(Option::is_none));
+    assert!(world.observe_selected(&[false; 31]).is_err());
+    assert_eq!(snapshot(&world), before);
+
+    // Reuse the same slots, food length and virtual time after an empty batch.
+    world.snakes[31].alive = true;
+    world.food[0].x = world.snakes[31].head.x;
+    world.food[0].y = world.snakes[31].head.y;
+    let mut selected = [false; 32];
+    selected[31] = true;
+    let batch = world.observe_selected(&selected).unwrap();
+    assert!(batch[..31].iter().all(Option::is_none));
+    assert_eq!(
+        serde_json::to_value(batch[31].as_ref().unwrap()).unwrap(),
+        serde_json::to_value(world.observe(31).unwrap()).unwrap()
+    );
+    let retained = serde_json::to_value(&batch).unwrap();
+    world.food[0].x += 10_000.;
+    let changed = world.observe_selected(&selected).unwrap();
+    assert_ne!(retained, serde_json::to_value(&changed).unwrap());
+    assert_eq!(retained, serde_json::to_value(&batch).unwrap());
+}
+
+#[test]
 fn supplied_body_clearance_checks_intermediate_edges_heads_and_bounds() {
     let mut world = empty_world();
     world.config.radius = 3000.;
