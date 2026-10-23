@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   measure:
-    name: Advisory measurements
+    name: Measurements
     if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/report-preview'
     runs-on: windows-latest
     timeout-minutes: 25
@@ -31,7 +31,7 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           REPORT_DIRECTORY: ${{ runner.temp }}/pr-report
         run: python tools/pr_report.py --output "$env:REPORT_DIRECTORY" --head "$env:PR_HEAD"
-      - name: Retain results and failed attempts
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -41,9 +41,8 @@ jobs:
           retention-days: 14
 
   comment:
-    name: Update advisory PR comment
+    name: Update PR comment
     needs: measure
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/report-preview'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

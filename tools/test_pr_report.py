@@ -74,12 +74,15 @@ test same_name ... ok
                   "platform": "Test platform", "errors": ["release build unavailable"],
                   "fidelity": pr_report.metric_rows(metric(1), None), "removed_tests": ["physics::removed"]}
         text = pr_report.render(report)
-        self.assertIn("| Unavailable |", text)
-        self.assertIn("| 1.000000 | — | Unavailable | 6 |", text)
-        self.assertIn("0 fixed; 0 regressed; 0 unavailable", text)
+        self.assertIn("| ⚠️ Unavailable |", text)
+        self.assertIn("| 1.000000 | — | ⚠️ Unavailable | 6 |", text)
+        self.assertNotIn("🟢 Passed", text)
         self.assertIn("removal is not counted as a fix", text)
         self.assertIn("**Incomplete:** release build unavailable", text)
-        self.assertTrue(text.startswith("> [!NOTE]\n> 🤖 **GPT 6.1 Sol writing on behalf of NikitaMGrimm**"))
+        self.assertTrue(text.startswith(pr_report.MARKER + "\n## Comparison\n"))
+        self.assertNotIn("[!NOTE]", text)
+        self.assertNotIn("on behalf of", text)
+        self.assertNotIn("do not block merging", text)
         self.assertEqual(pr_report.cell("a|b\nc`d"), "a\\|b c'd")
 
     def test_displayed_costs_come_from_the_same_pair_as_the_paired_delta(self):
@@ -106,14 +109,42 @@ test same_name ... ok
                   "platform": "Test platform", "expected_tests": expected,
                   "tests": {"baseline": completed, "candidate": completed}}
         text = pr_report.render(report)
-        self.assertIn("3/22 pass; 19 unavailable", text)
-        self.assertIn("0 fixed; 0 regressed; 19 unavailable", text)
+        self.assertIn("3/22; 19 unavailable", text)
+        self.assertIn("⚠️ 19 unavailable", text)
         self.assertIn("**Incomplete report:**", text)
         self.assertNotIn("3/3 pass", text)
 
     def test_suite_inventory_includes_ignored_tests_and_excludes_helpers(self):
         source = '#[test]\nfn normal() {}\n#[test]\n#[ignore = "reason"]\nfn ignored() {}\nfn helper() {}'
         self.assertEqual(pr_report.test_names(source), {"normal", "ignored"})
+
+    def test_color_cues_preserve_mixed_metrics_and_uncertainty(self):
+        performance = [{"case": case, "metric": metric_name, "baseline": 1, "candidate": ratio,
+                        "ratio": ratio, "ratio_min": ratio, "ratio_max": ratio, "reading": reading}
+                       for case, metric_name, ratio, reading in (
+                           ("observe", "process CPU", .8, "Faster"),
+                           ("protocol", "operation wall", 1.2, "Slower"),
+                           ("portable", "process CPU", 1.01, "Inconclusive"))]
+        report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40,
+                  "run_url": "https://example.invalid/run", "platform": "Test platform", "performance": performance}
+        text = pr_report.render(report)
+        self.assertIn("observe (process CPU)", text)
+        self.assertIn("protocol (operation wall)", text)
+        self.assertIn("🟢 Faster", text)
+        self.assertIn("🔴 Slower", text)
+        self.assertIn("🟡 Inconclusive", text)
+        visible, details = text.split("<details>", 1)
+        self.assertNotIn("display heuristic", visible)
+        self.assertIn("display heuristic", details)
+
+    def test_unchanged_failures_and_ignored_cases_are_not_green_passes(self):
+        report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40,
+                  "run_url": "https://example.invalid/run", "platform": "Test platform", "expected_tests": ["physics::case"]}
+        for outcome, result in (("FAILED", "🔴 1 failing"), ("ignored", "⚪ Unchanged")):
+            report["tests"] = {side: {"physics::case": outcome} for side in ("baseline", "candidate")}
+            text = pr_report.render(report)
+            self.assertIn(result, text)
+            self.assertNotIn("🟢 Passed", text)
 
 
 if __name__ == "__main__":

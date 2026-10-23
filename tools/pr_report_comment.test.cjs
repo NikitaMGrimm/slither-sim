@@ -13,7 +13,7 @@ function fixture(t, { previous = [], liveHead = head, liveBase = base, reportOve
   t.after(() => fs.rmSync(directory, { recursive: true }));
   const report = { schema: 1, repository: 'owner/repo', pr: 27, head, base, merge, ...reportOverride };
   fs.writeFileSync(path.join(directory, 'report.json'), JSON.stringify(report));
-  fs.writeFileSync(path.join(directory, 'report.md'), `> [!NOTE]\n${marker}\nMeasured report`);
+  fs.writeFileSync(path.join(directory, 'report.md'), `${marker}\n## Comparison\nMeasured report`);
   const calls = [];
   const context = { repo: { owner: 'owner', repo: 'repo' }, sha: merge, payload: { pull_request: {
     number: 27, head: { sha: head, ref: 'ci/report-preview', repo: { full_name: fork ? 'fork/repo' : 'owner/repo' } }

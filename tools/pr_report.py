@@ -126,34 +126,43 @@ def cell(value):
     return str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ").replace("`", "'")
 
 
+def status(reading):
+    icon = {"Faster": "🟢", "Lower error": "🟢", "Equal": "🟢",
+            "Slower": "🔴", "Higher error": "🔴", "Inconclusive": "🟡",
+            "Changed": "🟡", "Unavailable": "⚠️"}.get(reading, "⚪")
+    return f"{icon} {reading}"
+
+
 def render(report):
-    lines = ["> [!NOTE]", "> 🤖 **GPT 6.1 Sol writing on behalf of NikitaMGrimm**", "", MARKER,
-             "## PR comparison preview", "", "**Advisory — these measurements do not block merging.**", "",
-             f"Target `{report['base'][:12]}` → proposed merge `{report['merge'][:12]}` "
-             f"(PR head `{report['head'][:12]}`).", "",
-             f"[Actions run and downloadable raw results]({report['run_url']}) · {cell(report['platform'])}", "",
-             "### Performance", "", "Same release harness, seed and workload; lower cost is better.", "",
-             "| Workload | Metric (ms/op) | Target¹ | PR¹ | Paired Δ | Pair range | Reading |",
-             "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
-    for row in report.get("performance", []):
-        lines.append(f"| {row['case']} | {row['metric']} | {row['baseline']:.5f} | {row['candidate']:.5f} | "
-                     f"{(row['ratio'] - 1) * 100:+.1f}% | {(row['ratio_min'] - 1) * 100:+.1f}% to "
-                     f"{(row['ratio_max'] - 1) * 100:+.1f}% | {row['reading']} |")
-    if not report.get("performance"):
-        lines.append("| Unavailable | See retained logs | — | — | — | — | Incomplete |")
-    lines += ["", "Three alternating pairs after warmup. Δ is the median paired ratio. ¹Target/PR show the "
-              "actual times from that median-ratio pair. Faster/slower requires a ≥5% median shift and consistent direction across "
-              "all pairs. This is a display heuristic, not statistical significance. Process CPU includes "
-              "setup/teardown; operation wall excludes them. Hosted-runner noise remains.", "",
-              "### Regression and fidelity", "", "Identical selected test sources and fixtures are used on both runtimes.", "",
-              "| Measurement | Target | PR | Change / result | Cases |",
+    performance = report.get("performance", [])
+    metrics = {row["metric"] for row in performance}
+    units = f"{next(iter(metrics)).capitalize()}, ms/op." if len(metrics) == 1 else "Time per operation, ms."
+    lines = [MARKER, "## Comparison", "",
+             f"Base `{report['base'][:8]}` → merge `{report['merge'][:8]}` · [Run and data]({report['run_url']})", "",
+             "### Performance", "", units, "",
+             "| Workload | Base | PR | Change | Result |",
+             "| --- | ---: | ---: | ---: | --- |"]
+    for row in performance:
+        label = row["case"] + (f" ({row['metric']})" if len(metrics) > 1 else "")
+        lines.append(f"| {cell(label)} | {row['baseline']:.5f} | {row['candidate']:.5f} | "
+                     f"{(row['ratio'] - 1) * 100:+.1f}% | {status(row['reading'])} |")
+    if not performance:
+        lines.append("| — | — | — | — | ⚠️ Unavailable |")
+    lines += ["", "### Regression and fidelity", "",
+              "RMSE: turns in rad/s; speed ramps in protocol speed/s.", "",
+              "| Measurement | Base | PR | Result | Cases |",
               "| --- | ---: | ---: | --- | ---: |"]
+    labels = {"turn-large-rmse": "Turn error · large snakes", "turn-small-rmse": "Turn error · small snakes",
+              "speed-ramp-rmse:run3-large-radius-20260927": "Speed ramp · large radius",
+              "speed-ramp-rmse:run3-single-20260927": "Speed ramp · single",
+              "speed-ramp-rmse:visibility-covariates-20260928": "Speed ramp · visibility"}
     for row in report.get("fidelity", []):
         a, b = row["baseline"], row["candidate"]
         ref = b or a
         av = f"{a['value']:.6f}" if a else "—"
         bv = f"{b['value']:.6f}" if b else "—"
-        lines.append(f"| {cell(ref['label'])} ({cell(ref['unit'])}) | {av} | {bv} | {row['reading']} | {ref['samples']} |")
+        label = labels.get(row["id"], f"{ref['label']} ({ref['unit']})")
+        lines.append(f"| {cell(label)} | {av} | {bv} | {status(row['reading'])} | {ref['samples']} |")
     before, after = report.get("tests", {}).get("baseline", {}), report.get("tests", {}).get("candidate", {})
     names = sorted(set(report.get("expected_tests", [])) | before.keys() | after.keys())
     changes = {kind: sum(transition(before.get(n), after.get(n)) == kind for n in names)
@@ -162,38 +171,56 @@ def render(report):
         if not names:
             return "Unavailable"
         missing = sum(name not in values for name in names)
-        value = f"{sum(values.get(name) == 'ok' for name in names)}/{len(names)} pass"
+        value = f"{sum(values.get(name) == 'ok' for name in names)}/{len(names)}"
         return value + (f"; {missing} unavailable" if missing else "")
 
-    lines.append(f"| Selected Rust regressions | {passed(before)} | {passed(after)} | "
-                 f"{changes['fixed']} fixed; {changes['regressed']} regressed; {changes['unavailable']} unavailable; "
-                 f"{changes['changed']} other changes | {len(names)} |")
+    test_result = [f"{icon} {changes[key]} {label}" for key, icon, label in (
+        ("fixed", "🟢", "fixed"), ("regressed", "🔴", "regressed"),
+        ("unavailable", "⚠️", "unavailable"), ("changed", "🟡", "changed")) if changes[key]]
+    if not test_result:
+        failing = sum(after.get(name) == "FAILED" for name in names)
+        if not names:
+            test_result = ["⚠️ Unavailable"]
+        elif failing:
+            test_result = [f"🔴 {failing} failing"]
+        elif all(after.get(name) == "ok" for name in names):
+            test_result = ["🟢 Passed"]
+        else:
+            test_result = ["⚪ Unchanged"]
+    lines.append(f"| Regression tests | {passed(before)} | {passed(after)} | {' · '.join(test_result)} | {len(names)} |")
     traces = report.get("traces", [])
     equal = sum(row["reading"] == "Equal" for row in traces)
-    lines.append(f"| Canonical state traces | Reference | {equal}/{len(traces)} equal | "
-                 "Different means behavior changed; requires review | 32 iterations/case |")
+    trace_status = ("Unavailable" if not traces or any(t["reading"] == "Unavailable" for t in traces)
+                    else "Equal" if equal == len(traces) else "Changed")
+    lines.append(f"| State traces | Reference | {equal}/{len(traces)} equal | {status(trace_status)} | {len(traces)} |")
     if report.get("errors") or changes["unavailable"]:
-        lines += ["", "**Incomplete report:** missing executions or collection errors are retained in the artifact and detailed below."]
-    lines += ["", "Error values are residuals on selected recorded fixtures, not an overall accuracy percentage. "
-              "Turn cases are duration weighted; speed-ramp cases are grouped by capture source. "
-              "Trace equality covers these cases only.", "", "<details><summary>Test details, suite changes and limitations</summary>", ""]
+        lines += ["", "⚠️ **Incomplete report:** see details for missing results."]
+    lines += ["", "<details><summary>Details</summary>", "",
+              f"- PR head: `{report['head']}`. Runner: {cell(report['platform'])}.",
+              "- Three alternating pairs after warmup. Base/PR costs come from the median-ratio pair.",
+              "- Faster/slower requires a ≥5% median shift with the same direction in every pair. This is a display heuristic, not statistical significance.",
+              "- Process CPU includes setup/teardown; operation wall time excludes them.",
+              "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
+              "- Turn errors are duration weighted; speed ramps are grouped by source. Each state trace covers 32 iterations. Changed traces indicate changed behavior."]
+    for row in performance:
+        lines.append(f"- `{row['case']}` paired change range: {(row['ratio_min'] - 1) * 100:+.1f}% to {(row['ratio_max'] - 1) * 100:+.1f}%.")
     for name in names:
         if before.get(name) != after.get(name) or after.get(name) != "ok":
             lines.append(f"- `{cell(name)}`: {before.get(name, 'unavailable')} → {after.get(name, 'unavailable')} "
                          f"({transition(before.get(name), after.get(name))}).")
     for change in report.get("suite_changes", []):
-        lines.append(f"- Selected suite input differs from target: `{cell(change)}`; both runtimes use the PR-pinned version.")
+        lines.append(f"- PR-pinned input changed: `{cell(change)}`.")
     for name in report.get("removed_tests", []):
         lines.append(f"- Test removed from selected PR sources: `{cell(name)}`; removal is not counted as a fix.")
     for name in report.get("added_tests", []):
-        lines.append(f"- Test added to selected PR sources: `{cell(name)}`; evaluated on both runtimes.")
+        lines.append(f"- Added test: `{cell(name)}`; evaluated on both runtimes.")
     for trace in traces:
-        lines.append(f"- `{trace['case']}` trace: {trace['reading']}.")
+        if trace["reading"] != "Equal":
+            lines.append(f"- `{trace['case']}` trace: {trace['reading']}.")
     for error in report.get("errors", []):
-        lines.append(f"- **Incomplete:** {cell(error)}. See retained logs; missing results are not passes or zero error.")
+        lines.append(f"- **Incomplete:** {cell(error)}.")
     lines += ["- Experimental same-repository PR publisher; fork PRs are skipped.",
-              "- Fixture, harness and binary hashes, individual timings and test logs are in the run artifact.",
-              "- Existing required correctness checks are separate and unchanged.", "", "</details>", ""]
+              "- Raw results, hashes and logs are linked above.", "", "</details>", ""]
     return "\n".join(lines)
 
 

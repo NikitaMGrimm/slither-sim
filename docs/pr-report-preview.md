@@ -36,6 +36,9 @@ including cases absent from both execution logs after an abort. The table marks
 those cases unavailable and labels the report incomplete.
 
 The comment is updated in place, keyed by a hidden marker and bot author.
+It is generated automatically from the measurements, with no model call or
+agent byline. Colored status dots distinguish improvements, regressions and
+inconclusive changes; methodology and diagnostics are collapsed under Details.
 Before posting, the publisher checks the artifact's PR/repository/head/merge
 identity, current open PR head and target, and prior published run/attempt.
 Only the named same-repository branch can run it. Measurement jobs have read-only
