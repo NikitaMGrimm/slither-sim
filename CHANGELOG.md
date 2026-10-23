@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+## [0.2.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.0...v0.2.1) - 2026-10-23
+
+### Added
+
+- *(tools)* add isolated observation phase diagnostics ([#34](https://github.com/NikitaMGrimm/slither-sim/pull/34))
+
+### Fixed
+
+- *(performance)* separate reconnect metrics and clarify workload guides ([#40](https://github.com/NikitaMGrimm/slither-sim/pull/40))
+- *(performance)* share a deadline across matched runs ([#38](https://github.com/NikitaMGrimm/slither-sim/pull/38))
+- bound aggregate minimap decoding work per frame ([#30](https://github.com/NikitaMGrimm/slither-sim/pull/30))
+- reject unrepresentable prey sizes in client worlds ([#28](https://github.com/NikitaMGrimm/slither-sim/pull/28))
+- *(ci)* start protected checks for release bot PRs ([#33](https://github.com/NikitaMGrimm/slither-sim/pull/33))
+- *(client)* bound minimap rasterization work ([#26](https://github.com/NikitaMGrimm/slither-sim/pull/26))
+- *(client)* bound food sector clear work ([#24](https://github.com/NikitaMGrimm/slither-sim/pull/24))
+
+### Other
+
+- summarize unreleased changes and embedding guidance ([#36](https://github.com/NikitaMGrimm/slither-sim/pull/36))
+- *(performance)* cover retained clients and native seekers ([#37](https://github.com/NikitaMGrimm/slither-sim/pull/37))
+- *(ci)* reduce PR comparison overhead ([#35](https://github.com/NikitaMGrimm/slither-sim/pull/35))
+- publish performance and fidelity comparisons on PRs ([#27](https://github.com/NikitaMGrimm/slither-sim/pull/27))
+- *(observation)* skip unused batch indexes ([#32](https://github.com/NikitaMGrimm/slither-sim/pull/32))
+- baseline standalone workloads and index collision bounds ([#25](https://github.com/NikitaMGrimm/slither-sim/pull/25))
+- automate patch releases with a 12-hour cooldown ([#29](https://github.com/NikitaMGrimm/slither-sim/pull/29))
+
 Changes since 0.2.0, available from Git until the next release.
 
 - Bound food-sector clearing in bundled client frames, including preflight
