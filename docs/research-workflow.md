@@ -106,6 +106,55 @@ studies retain their declared duration and scientific/control settings.
 Low-level paired-death and feeding-shape collectors still need their own matching
 coordinator and attempt accounting.
 
+### Controlled snake and food routes
+
+The managed workflow also accepts these separate acquisition scenarios:
+
+```json
+{"scenario": "paired-snake", "bots": 2, "seconds": 480,
+ "mode": "crossing", "direction": "x"}
+```
+
+The direct-snake route uses A's own received pose as a reference while B moves
+between fixed near/far waypoints. It keeps running when the peer disappears from
+an opponent cache; that disappearance is an observable outcome. Plans require
+exactly two clients, an explicit crossing direction and 1–3,600 seconds.
+Directions are normalized: the 800/2,300-unit rail offsets are Euclidean,
+including diagonals. A nominally orbits an 80-unit reference circle; B holds each
+achieved endpoint for two seconds. These settings and safety margins are
+acquisition controls, not recovered server visibility rules.
+
+Only B records canonical `paired-snake-endpoint` witnesses. Initial approach is
+excluded from completed legs. A shared trial binds identities, center and axis;
+`paired-snake-trial-end` records abandonment or capture-end censoring before
+reset. Avoidance interruptions, actual anchors, cache membership, intended and
+sent headings remain available for analysis. Counters and intended waypoints
+alone do not certify an uninterrupted traversal or fresh causal query.
+Both own anchors must remain within the 150 ms operational freshness limit
+during approach, holds and travel. A stale anchor abandons the trial with
+`own_anchor_stale` and suppresses new heading commands until fresh reference
+state returns. This is separate from opponent-cache absence.
+
+```json
+{"scenario": "food-lanes", "bots": 1, "seconds": 480}
+```
+
+The food route uses one client for 1–480 seconds, with no paired mode/direction.
+It selects one interior site, then schedules eight reciprocal passes in A/B/B/A
+lane blocks, 75 units apart within one 300-unit sector row. The first four slots
+are preassigned calibration and the last four holdout; approach and transfers
+are excluded. Route failure retains missing slots and stops without reconnecting
+or selecting a replacement site. `food-lane-phase-end` records achieved endpoints
+and interruptions; `food-lane-route-end` preserves the terminal outcome.
+
+Both scenarios use the standard recorder, source/plan pins, managed attempt
+ledger and audit/package commands. The driver can complete an intact recording
+of an aborted route. Inspect the route outcome and packet-derived denominators
+separately from integrity status before scaling a study. Fit/validation splits,
+freshness screens and required coverage belong in the frozen analysis plan.
+Food announcements and explicit clears describe delivery episodes; unannounced
+empty sectors never establish a known subscription or global food absence.
+
 For two-client visibility crossings, the paired-prey collector supports fixed
 `x`, `y`, `diagonal-positive` and `diagonal-negative` directions:
 

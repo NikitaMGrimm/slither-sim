@@ -37,7 +37,7 @@
           "additionalProperties": false
         },
         "origin": {"type": "string", "pattern": "^https?://[^/?#\\s]+$"},
-        "scenario": {"enum": ["forage", "boost", "ownpellets", "spawn", "movement", "preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe", "paired-prey"]},
+        "scenario": {"enum": ["forage", "boost", "ownpellets", "spawn", "movement", "preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe", "paired-prey", "paired-snake", "food-lanes"]},
         "seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600},
         "bots": {"type": "integer", "minimum": 1, "maximum": 3},
         "mode": {"enum": ["overlap", "crossing"]},
@@ -45,7 +45,7 @@
       },
       "allOf": [
         {
-          "if": {"properties": {"scenario": {"const": "paired-prey"}}},
+          "if": {"properties": {"scenario": {"enum": ["paired-prey", "paired-snake"]}}},
           "then": {
             "required": ["mode"],
             "properties": {"bots": {"const": 2}, "seconds": {"minimum": 1, "maximum": 3600}}
@@ -55,6 +55,14 @@
         {
           "if": {"required": ["direction"]},
           "then": {"required": ["mode"], "properties": {"mode": {"const": "crossing"}}}
+        },
+        {
+          "if": {"properties": {"scenario": {"const": "food-lanes"}}},
+          "then": {"properties": {"bots": {"const": 1}, "seconds": {"minimum": 1, "maximum": 480}}}
+        },
+        {
+          "if": {"properties": {"scenario": {"const": "paired-snake"}}},
+          "then": {"required": ["direction"], "properties": {"mode": {"const": "crossing"}}}
         }
       ],
       "additionalProperties": false
