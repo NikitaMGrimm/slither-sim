@@ -178,6 +178,8 @@ Ranked next work, considering measured cost, scope and parity risk:
    recording and frame copies before optimizing. The initial tape is too short
    to characterize long-lived reconstruction or minimap delta costs.
 
+For the longer follow-up workload, see [retained client processing](performance-clients.md).
+
 ## First optimization: collision bounds lookup
 
 The runtime change in `src/simulator.rs` indexes body bounds by stable snake slot,
@@ -198,6 +200,9 @@ Reproduce the comparison with fresh output storage and copied executables:
 ```sh
 python -B tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/CANDIDATE --output outputs/perf-comparison
 ```
+
+For an optional shared time limit and retained incomplete results, see
+[comparison deadlines](performance-deadlines.md).
 
 The runner fixes longer per-case iteration counts below and preserves raw paired
 rows. Ratios are medians of each matched candidate/baseline ratio; lower is less

@@ -18,15 +18,18 @@ These are local engineering fixtures, not official-server presets.
 cargo build --release --locked --example perf_client_retained -j 2
 ```
 
-Copy the executable into a new owned output directory and record its SHA-256,
-actual runtime/harness source, toolchain, platform and build command before use.
+Copy the executable to `outputs/retained-client/bin/` in a new owned output
+directory and record its SHA-256, actual runtime/harness source, toolchain,
+platform and build command before use.
 The embedded source label identifies fixture construction history only. The
 caller must pin the actual binary and runtime separately.
 
 ```sh
-perf_client_retained step_all 384
-perf_client_retained next_frame 384
+./outputs/retained-client/bin/perf_client_retained step_all 384
+./outputs/retained-client/bin/perf_client_retained next_frame 384
 ```
+
+On Windows, use `./outputs/retained-client/bin/perf_client_retained.exe`.
 
 Each invocation creates a fresh world. `--iterations N` permits one to eight
 worlds with the same seed. `step_all` supplies controls for every playing slot;
