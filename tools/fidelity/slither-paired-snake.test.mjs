@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import zlib from 'node:zlib';
 import { Writable } from 'node:stream';
 import { createHash } from 'node:crypto';
 import { Bot, World, Recorder, headingDanger } from './slither-headless.mjs';
@@ -465,6 +468,33 @@ function memoryRecorders(context) {
   });
   return rows;
 }
+
+test('paired-snake capture writes readable gzip archives for both clients', async context => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-paired-snake-'));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const out = path.join(directory, 'capture'), controller = new AbortController();
+  context.mock.method(Bot.prototype, 'connect', function () {
+    this.joins = 1;
+    if (this.index !== 1) return;
+    this.pair.update(100, poses('x', 1, 600), worlds());
+    this.pair.update(200, [null, null], worlds());
+    controller.abort('synthetic loss');
+  });
+  await recordPair({ out, server: '127.0.0.1:444', direction: 'x' }, controller.signal);
+  for (const index of [0, 1]) {
+    const text = zlib.gunzipSync(fs.readFileSync(path.join(out, `bot${index}.jsonl.gz`))).toString('utf8');
+    const rows = text.trimEnd().split('\n').map(JSON.parse);
+    assert.equal(rows[0].type, 'header');
+    assert.equal(rows[0].scenario, 'paired-snake');
+    assert.equal(rows[0].botIndex, index);
+    const ended = rows.filter(row => row.event === 'paired-snake-trial-end');
+    assert.equal(ended.length, 1);
+    assert.equal(ended[0].reason, 'pair_unavailable');
+    assert.equal(ended[0].botIndex, index);
+    assert.equal(rows.at(-1).event, 'capture-interrupted');
+    assert.equal(rows.at(-1).collectorSourcesUnchanged, true);
+  }
+});
 
 test('one same-process source batch uses paired-snake options and both trial-end recipients without movement', async context => {
   const saved = memoryRecorders(context);
