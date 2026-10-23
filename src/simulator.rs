@@ -932,17 +932,17 @@ impl Simulator {
         // Index the few eater circles, then visit food in reverse order; ties go to the
         // nearest head, then the lexically smaller id.
         const CELL: f64 = 256.0;
-        let indexed =
-            self.config.food_index && eaters.len().saturating_mul(self.food.len()) >= 32000;
-        // The dense grid lists exactly the eaters whose cover holds a pellet's cell.
-        // Circles it cannot index fall back to the hashed buckets below.
-        let dense = indexed
+        // The dense grid lists exactly the eaters whose cover holds a pellet's cell,
+        // so it agrees with both paths below. They remain for circles it cannot index.
+        let dense = self.config.food_index
             && self.eater_grid.build(
                 eaters
                     .iter()
                     .map(|&(_, center, radius, _)| (center, radius)),
             );
-        let indexed = indexed && !dense;
+        let indexed = !dense
+            && self.config.food_index
+            && eaters.len().saturating_mul(self.food.len()) >= 32000;
         let groups = eaters.len().div_ceil(64);
         // Hash collisions add candidates only; they can never remove a real candidate.
         let bucket = |x: i64, y: i64| {
