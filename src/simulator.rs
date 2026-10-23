@@ -1,4 +1,5 @@
 use crate::bounds_index::BoundsIndex;
+use crate::food_grid::FoodCache;
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
@@ -299,6 +300,8 @@ pub struct Simulator {
     prey_outward: HashSet<u64>,
     prey_motion_clock: f64,
     radius_update_index: usize,
+    #[serde(skip)]
+    food_cache: FoodCache,
 }
 impl Simulator {
     /// Set ambient placement attempts per second, preserving fractional refill credit.
@@ -345,18 +348,26 @@ impl Simulator {
             prey_outward: HashSet::new(),
             prey_motion_clock: 0.0,
             radius_update_index: 0,
+            food_cache: FoodCache::default(),
         };
         world.update_radius(0.0);
         world.food.reserve(world.config.food_count);
-        let mut occupied = world.config.ambient_food.enabled.then(HashMap::new);
+        world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
         // candidate is not retried, so crowded small worlds can start below it.
         for _ in 0..world.config.food_count {
             let f = world.new_food();
-            if admit_ambient_food(&f, &world.config.ambient_food, &mut occupied) {
+            if admit_ambient_food(
+                &f,
+                &world.config.ambient_food,
+                &mut world.food_cache,
+                &world.food,
+            ) {
+                world.food_cache.push(&f);
                 world.food.push(f);
             }
         }
+        world.food_cache.end();
         for _ in 0..world.config.prey.count {
             world.spawn_prey();
         }
@@ -665,9 +676,9 @@ impl Simulator {
             .map(|s| head_tip(s.head, s.heading, s.segments))
             .collect();
         let mut boundary_deaths = Vec::new();
-        // Construct only if an actual positive-size boost emission is attempted.
-        // Earlier admitted drops in this same step then share its capacity.
-        let mut boost_occupied: Option<HashMap<(i64, i64), usize>> = None;
+        // Every food edit from here to the refill is mirrored into the cache, so
+        // occupancy is compared with the food list at most once per step.
+        self.food_cache.begin();
         for &i in &alive {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
@@ -714,32 +725,14 @@ impl Simulator {
                         let y = tail.y + (self.random.next() - 0.5) * jitter;
                         let pellet = Self::pellet(Point { x, y }, size, Origin::Boost);
                         if c.emit_boost_food {
-                            let admitted = if c.boost_food.enabled {
-                                let occupied = boost_occupied.get_or_insert_with(|| {
-                                    let mut occupied = HashMap::<(i64, i64), usize>::new();
-                                    for food in &self.food {
-                                        *occupied
-                                            .entry(food_cell(
-                                                food.x,
-                                                food.y,
-                                                c.boost_food.cell_size,
-                                            ))
-                                            .or_default() += 1;
-                                    }
-                                    occupied
-                                });
-                                let count = occupied
-                                    .entry(food_cell(pellet.x, pellet.y, c.boost_food.cell_size))
-                                    .or_default();
-                                if *count >= c.boost_food.max_per_cell {
-                                    false
-                                } else {
-                                    *count += 1;
-                                    true
-                                }
-                            } else {
-                                true
-                            };
+                            // Earlier admitted drops in this same step share the capacity.
+                            let admitted = !c.boost_food.enabled
+                                || self.food_cache.has_room(
+                                    &self.food,
+                                    &pellet,
+                                    c.boost_food.cell_size,
+                                    c.boost_food.max_per_cell,
+                                );
                             if admitted {
                                 if let Some(events) = &mut self.food_spawn_events {
                                     events.push(FoodSpawnEvent {
@@ -747,6 +740,7 @@ impl Simulator {
                                         food: pellet.clone(),
                                     });
                                 }
+                                self.food_cache.push(&pellet);
                                 self.food.push(pellet);
                             }
                         }
@@ -1002,6 +996,7 @@ impl Simulator {
             }
         }
         if any_eaten {
+            self.food_cache.remove(&eaten);
             let mut i = 0;
             self.food.retain(|_| {
                 let keep = !eaten[i];
@@ -1027,38 +1022,25 @@ impl Simulator {
             let interval = 1.0 / replenish;
             self.ambient_clock += dt;
             if self.ambient_clock + 1e-12 >= interval {
-                let mut ambient_food_count = self
-                    .food
-                    .iter()
-                    .filter(|f| f.origin == Some(Origin::Ambient))
-                    .count();
-                // Food can be edited externally. Rebuild once for this refill
-                // batch and include every origin in the shared cell occupancy.
-                let mut occupied =
-                    (self.config.ambient_food.enabled && ambient_food_count < target).then(|| {
-                        let mut occupied = HashMap::<(i64, i64), usize>::new();
-                        for food in &self.food {
-                            *occupied
-                                .entry(food_cell(
-                                    food.x,
-                                    food.y,
-                                    self.config.ambient_food.cell_size,
-                                ))
-                                .or_default() += 1;
-                        }
-                        occupied
-                    });
+                let mut ambient_food_count = self.food_cache.ambient(&self.food);
                 while self.ambient_clock + 1e-12 >= interval {
                     self.ambient_clock -= interval;
                     if ambient_food_count < target {
                         let f = self.new_food();
-                        if admit_ambient_food(&f, &self.config.ambient_food, &mut occupied) {
+                        // Cell occupancy includes every origin.
+                        if admit_ambient_food(
+                            &f,
+                            &self.config.ambient_food,
+                            &mut self.food_cache,
+                            &self.food,
+                        ) {
                             if let Some(events) = &mut self.food_spawn_events {
                                 events.push(FoodSpawnEvent {
                                     source: None,
                                     food: f.clone(),
                                 });
                             }
+                            self.food_cache.push(&f);
                             self.food.push(f);
                             ambient_food_count += 1;
                         }
@@ -1066,6 +1048,7 @@ impl Simulator {
                 }
             }
         }
+        self.food_cache.end();
         if PROFILE {
             profile.ambient_seconds += clock.unwrap().elapsed().as_secs_f64();
             profile.ticks += 1;
@@ -1357,17 +1340,11 @@ impl Simulator {
     fn death_food(&mut self, index: usize) -> usize {
         let s = &self.snakes[index];
         let density = &self.config.death_food;
-        // Current food is publicly mutable, and earlier deaths this same tick
-        // are already present. Rebuild occupancy for each death.
-        let mut occupied = density.enabled.then(|| {
-            let mut occupied = HashMap::<(i64, i64), usize>::new();
-            for food in &self.food {
-                *occupied
-                    .entry(food_cell(food.x, food.y, density.cell_size))
-                    .or_default() += 1;
-            }
-            occupied
-        });
+        // Occupancy counts current food, including earlier deaths this same tick.
+        let outside_step = !self.food_cache.is_open();
+        if outside_step {
+            self.food_cache.begin();
+        }
         let mut count = 0;
         // Ordered official packets favor independent coordinate offsets in a
         // square; 15 is an empirical half-width (see death-jitter-audit.md).
@@ -1382,13 +1359,15 @@ impl Simulator {
                 size,
                 Origin::Death,
             );
-            if let Some(occupied) = occupied.as_mut() {
-                let cell = food_cell(pellet.x, pellet.y, density.cell_size);
-                let occupancy = occupied.entry(cell).or_default();
-                if *occupancy >= density.max_per_cell {
-                    continue;
-                }
-                *occupancy += 1;
+            if density.enabled
+                && !self.food_cache.has_room(
+                    &self.food,
+                    &pellet,
+                    density.cell_size,
+                    density.max_per_cell,
+                )
+            {
+                continue;
             }
             if let Some(events) = &mut self.food_spawn_events {
                 events.push(FoodSpawnEvent {
@@ -1396,8 +1375,12 @@ impl Simulator {
                     food: pellet.clone(),
                 });
             }
+            self.food_cache.push(&pellet);
             self.food.push(pellet);
             count += 1;
+        }
+        if outside_step {
+            self.food_cache.end();
         }
         count
     }
@@ -1406,19 +1389,10 @@ impl Simulator {
 fn admit_ambient_food(
     food: &Food,
     config: &AmbientFoodConfig,
-    occupied: &mut Option<HashMap<(i64, i64), usize>>,
+    cache: &mut FoodCache,
+    current: &[Food],
 ) -> bool {
-    let Some(occupied) = occupied else {
-        return true;
-    };
-    let count = occupied
-        .entry(food_cell(food.x, food.y, config.cell_size))
-        .or_default();
-    if *count >= config.max_per_cell {
-        return false;
-    }
-    *count += 1;
-    true
+    !config.enabled || cache.has_room(current, food, config.cell_size, config.max_per_cell)
 }
 
 /// Whether `segment_distance(origin, a, b) > radius` follows from both ends lying
@@ -1431,10 +1405,6 @@ fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
         || (a.x < -limit && b.x < -limit)
         || (a.y > limit && b.y > limit)
         || (a.y < -limit && b.y < -limit)
-}
-
-fn food_cell(x: f64, y: f64, size: f64) -> (i64, i64) {
-    ((x / size).floor() as i64, (y / size).floor() as i64)
 }
 
 fn find_eater<const PROFILE: bool>(
@@ -1471,6 +1441,7 @@ fn find_eater<const PROFILE: bool>(
 #[cfg(test)]
 mod death_food_density_tests {
     use super::*;
+    use crate::food_grid::food_cell;
 
     fn world(enabled: bool) -> Simulator {
         let mut world = Simulator::new(
