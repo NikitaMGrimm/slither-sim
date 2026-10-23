@@ -177,6 +177,70 @@ outside Git. For external data, note its source and sharing restrictions in `REP
 Review must trace claims to exact windows, alternatives and held-out checks;
 byte integrity alone cannot establish a scientific conclusion.
 
+## Compare contributed evidence
+
+Copy [comparison.json](../evidence/templates/comparison.json). Replace its dummy
+digests and acquisition rationale, and name every planned baseline/candidate
+bundle. Each bundle must contain exactly one complete acquisition batch under
+the existing audited bundle format. Concurrent bots, reconnects and packets do
+not add independent samples. The template lists only one placeholder per cohort;
+it needs six eligible batches per cohort before testing. Its effect/exposure
+thresholds are illustrative choices, not measured server tolerances.
+
+Freeze metrics, effect thresholds, sampling/size/boost strata and exclusions
+before confirmatory acquisition; preserve the declaration with that study.
+Retrospective comparisons remain exploratory. A digest does not prove when a
+plan was written or that acquisition batches are independent/exchangeable.
+
+Place local bundle paths relative to the submission file, then run offline:
+
+```sh
+uv run --locked --only-group tools python tools/fidelity/compare_evidence.py path/to/comparison.json --output outputs/comparison
+```
+
+The tool verifies every bundle, recomputes capture audits and packet summaries
+with this checkout's tools, and records their hashes. Bundled scripts/analysis
+are never executed. Duplicate archives, payloads or capture/batch IDs, overlapping
+same-server acquisitions, and changed collector/setup/scenario/origin/framing
+make cohorts incomparable. Recorded size/control options are compared too
+(endpoint and nickname excluded). Match other conditions in the declared design;
+metadata cannot remove hidden population, behavior or network confounding.
+
+Available scalar summaries are combined `M`/`V` server-gap medians, leaderboard
+server-gap medians, known-prey update server-gap medians, updates per known-prey
+second, and mean measured ping RTT. Eligible epoch summaries are averaged per
+client, then clients within a batch; batches receive equal weight. `minSamples`
+gates each epoch's gap count, known prey update count, or each client's RTT count.
+Missing client/batch exposure makes that metric inconclusive, not zero. Each
+eligible metric needs `minUnits` batches in both cohorts.
+
+Two-sided label-permutation tests compare the batch scalar means, enumerating
+all labelings when affordable or using fixed-seed random permutations with the
+conservative `(extreme+1)/(draws+1)` estimate. Holm adjustment includes every
+declared metric, assigning untestable metrics p=1. A signal needs both adjusted
+p at or below `alpha` and the declared minimum absolute mean shift. These choices
+follow standard [permutation-test conventions](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html);
+they do not establish exchangeability or sensitivity to every distribution change.
+
+`report.json` retains every bundle identity, declaration, batch value, missing
+exposure, effect and p-value; `REPORT.md` summarizes the outcome. Results are
+`drift_detected`, `no_drift_detected`, `inconclusive` or `incomparable`, always
+scientifically unreviewed. No detected drift is not equivalence; drift can come
+from reporting or acquisition changes. This is a screening tool, not proof of
+new physics, and does not automatically replace a baseline, fixture or rule.
+Unsupported protocols require a separately reviewed decoder update.
+
+For CI, publish a submission JSON and its pinned bundles on public GitHub release
+or attachment hosts; a raw GitHub JSON URL also works for the submission. Replace
+local `source` paths with immutable HTTPS asset URLs and compute each SHA-256.
+Submit those identities through the [evidence issue](../.github/ISSUE_TEMPLATE/evidence.yml).
+A maintainer runs **Evidence comparison** from the default branch with the
+submission URL and digest. The manual workflow uses read-only permissions,
+trusted checkout code, bounded HTTPS downloads with checked redirects, and no
+bundled code execution. It uploads the JSON/Markdown report for review; a drift
+or inconclusive result is an artifact, not an automatic scientific pass/fail.
+Ordinary PR CI tests this pipeline offline without downloading contributed data.
+
 ## Fixture and protocol evolution
 
 Keep bounded selected cases in `tests/fixtures/`; keep full recordings and study
@@ -202,6 +266,13 @@ If an expectation was wrong, document its independent correction and preserve th
 original evidence. Deprecating a case requires a reason tied to the supported
 contract or invalid evidence, with a replacement or retained rejection test where
 applicable. A passing decoder cross-check is not independent proof of its model.
+
+Keep a measured calibration gate tied to its recorded corpus. Test configurable
+mechanisms with deliberately synthetic parameters, so a new supported default
+does not require changing many unrelated lifecycle tests. Protocol bytes,
+rejection cases, invariants and frozen-corpus selection checks stay explicit.
+New conflicting observations need a new corpus and explained regime/supersession;
+replacing old data merely to make the current model pass hides a regression.
 
 For a new regression, retain a small selected raw packet/window with the archive
 SHA-256, record indices, wire version, decoder identity and selection rule. Derive

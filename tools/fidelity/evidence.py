@@ -434,7 +434,9 @@ def package_study(study, output):
     return manifest
 
 
-def verify_bundle(path):
+@contextmanager
+def verified_bundle(path):
+    """Yield a checked snapshot; consumers never execute its bundled sources."""
     with tempfile.TemporaryDirectory(prefix="slither-evidence-verify-") as temporary:
         root = Path(temporary)
         names, directories, spellings = set(), set(), {}
@@ -489,6 +491,11 @@ def verify_bundle(path):
             raise ValueError("manifest identity differs from the frozen plan")
         if manifest["audit"] != audit_study(root):
             raise ValueError("manifest audit differs from recomputed capture checks")
+        yield root, manifest
+
+
+def verify_bundle(path):
+    with verified_bundle(path) as (_, manifest):
         return manifest
 
 

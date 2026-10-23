@@ -37,6 +37,10 @@ the source owner and its callers, then start with the matching test.
   uncertainty and held-out validation where applicable. State why a method does
   not apply rather than adding a ceremonial requirement.
 
+The [evidence comparison workflow](docs/research-workflow.md#compare-contributed-evidence)
+screens contributed bundles for declared reporting differences. Its statistical
+report supports review; it neither approves physics changes nor replaces fixtures.
+
 Keep bounded, selected [regression fixtures](docs/research-workflow.md#fixture-and-protocol-evolution)
 in Git and full recordings, credentials and generated outputs outside it. Use
 Conventional Commits and LF; avoid unrelated formatting. Run the
