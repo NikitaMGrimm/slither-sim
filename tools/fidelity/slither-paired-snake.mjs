@@ -13,6 +13,7 @@ export const PAIR_SNAKE = Object.freeze({
   nearOffset: 800, farOffset: 2300, endpointHoldMs: 2000,
   endpointAnchorFreshMs: 150, endpointTolerance: 120, crossTrackTolerance: 180,
   // Engineering pause bounds; neither extends endpoint or scientific freshness.
+  // R7 failures: docs/host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7.
   controlAnchorMaxAgeMs: 500, pairedReacquireMs: 1000,
   minArenaGap: 700, maxPairSeparation: 3000, legTimeoutMs: 30000,
   sampleMs: 100, targetTickMs: 25,

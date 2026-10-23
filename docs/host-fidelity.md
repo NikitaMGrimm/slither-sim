@@ -70,9 +70,11 @@ transition denominators are zero. Saved control telemetry shows route divergence
 and deaths after initial arrivals; it supplies no subscription correction.
 
 The later [exploratory R7 pilots](host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7)
-preserve a further direct-snake replay rejection and an avoidance-aborted food
-route with zero qualified entries. Completed recording integrity did not yield
-the planned scientific denominators. No numerical visibility policy changed.
+preserve a direct-snake replay rejection and an avoidance-aborted food route
+with zero qualified entries. A separately amended retrospective replay produced
+702 qualified received-cache comparisons from one batch, while the original
+route still had zero endpoints. This supplies conditional observations, with
+no validated replacement visibility rule or numerical policy change.
 
 Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.

@@ -414,6 +414,47 @@ anchor-age gate, so correcting site selection alone cannot make them eligible.
 These observations support better acquisition screening, not a relaxed danger
 cutoff or food visibility rule.
 
+### Separate retrospective received-cache derivative
+
+After the lifecycle diagnostic, a separate retrospective amendment admitted
+only the two exact member hashes and their explained terminal counter values.
+The amendment SHA-256 is
+`c6d5e4cbad53e50b4228a112e21e4748838998e15c840cd14df70d8b8e9cfedb`;
+its reviewed runner freeze is
+`c8438cbadb0460e9c67d967ffdc62057db16af2500806c4464d3ead23f73bf5d`.
+The seven original runtime files, entire 200-ms invocation grid, causal packet
+prefixes, geometry/freshness/history/incarnation/death/survival screens and
+resource caps remained unchanged. This analysis was prepared after inspecting
+lifecycle and control metadata; it is exploratory, not blinded validation.
+
+The replay committed 702 survival-qualified comparisons from 2,400 grid
+opportunities, across 45 fixed ten-second bins: 354 locally present and 348
+locally absent observations of A by B. The bins use Euclidean distance from B's
+head to A's received body, with both own streams supplying fresh geometry.
+
+| Distance, world units | Present | Absent |
+| --- | ---: | ---: |
+| [0, 500) | 212 | 0 |
+| [500, 1,000) | 139 | 0 |
+| [1,000, 1,500) | 3 | 10 |
+| [1,500, 2,000) | 0 | 24 |
+| [2,000, 2,500) | 0 | 29 |
+| [2,500, infinity) | 0 | 285 |
+
+Two local appearance receipts qualified; no non-death exit qualified. These
+are recipient events, not physical births or a controlled threshold crossing.
+One batch, repeated entities, retrospective admission and survival selection
+limit inference. The table is not an accuracy estimate, a fitted boundary or
+evidence of authoritative simultaneous geometry.
+
+Saved-row consistency checks reconciled all counts, checked 2,808 causal
+field-prefix/age witnesses and 1,404 incoming-freshness witnesses, and recomputed
+all 702 point-to-polyline distances with a separate calculation. This verifies saved analysis
+consistency, without another raw replay or native-host validation. Every payload
+and terminal receipt is labelled retrospective, original result `INCOMPLETE`,
+no fitting and no scaling authorization. The original rejection and zero-endpoint
+route failure remain unchanged; no numerical policy was selected or promoted.
+
 Full plans, acquisition bundles, exact-member completion manifests, original
 failures, source reviews and reports remain outside Git under
 `outputs/visibility-scale-20261023-r7`. Source/synthetic verification established
