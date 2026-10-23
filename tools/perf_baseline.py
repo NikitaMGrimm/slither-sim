@@ -27,8 +27,13 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def command_output(*args):
-    return subprocess.check_output(args, cwd=ROOT, text=True, timeout=COMMAND_TIMEOUT_SECONDS).strip()
+def command_output(*args, deadline=None):
+    timeout = COMMAND_TIMEOUT_SECONDS
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.perf_counter())
+        if timeout <= 0:
+            raise TimeoutError("performance run deadline exceeded before metadata command")
+    return subprocess.check_output(args, cwd=ROOT, text=True, timeout=timeout).strip()
 
 
 def process_metrics(process):
@@ -134,15 +139,21 @@ def percentiles(values):
             for name, q in (("p50", .5), ("p95", .95), ("p99", .99), ("max", 1))}
 
 
-def native(executable, case, iterations, stderr_path, profile=False):
+def native(executable, case, iterations, stderr_path, profile=False, *, deadline=None):
     args = [str(executable), case, str(iterations)] + (["--profile"] if profile else [])
     started = time.perf_counter()
+    child_deadline = min(started + 120, deadline) if deadline is not None else started + 120
+    if child_deadline <= started:
+        raise TimeoutError("performance run deadline exceeded before native child")
     with ExitStack() as cleanup:
         errors = cleanup.enter_context(stderr_path.open("wb"))
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
         cleanup.callback(close_child, process)
-        line = Lines(process.stdout).read(started + 120)
-        process.wait(timeout=max(.1, started + 120 - time.perf_counter()))
+        line = Lines(process.stdout).read(child_deadline)
+        process.wait(timeout=max(.1 if deadline is None else 0.0,
+                                 child_deadline - time.perf_counter()))
+        if deadline is not None and time.perf_counter() >= deadline:
+            raise TimeoutError("performance run deadline exceeded during native child")
         wall = time.perf_counter() - started
         metrics = process_metrics(process)
         if process.returncode:
@@ -165,7 +176,8 @@ def capture_trace(executable, case, iterations, directory):
         size = 0
         deadline = time.perf_counter() + 120
         with (directory / f"{case}.jsonl.gz").open("wb") as raw:
-            with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as output:
+            # Parity hashes uncompressed bytes; favor faster capture over archive size.
+            with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1, mtime=0) as output:
                 while True:
                     try:
                         line = reader.read(deadline) + b"\n"
