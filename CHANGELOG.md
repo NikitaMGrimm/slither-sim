@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23
+
+### Added
+
+- [**breaking**] make the official model the default ([#43](https://github.com/NikitaMGrimm/slither-sim/pull/43))
+
+### Other
+
+- publish manual releases and reset the automatic timer
+- clarify fidelity gaps and simplify navigation ([#46](https://github.com/NikitaMGrimm/slither-sim/pull/46))
+- measure PRs only when measured inputs change ([#44](https://github.com/NikitaMGrimm/slither-sim/pull/44))
+- separate maintained guides from research records ([#41](https://github.com/NikitaMGrimm/slither-sim/pull/41))
+
 ### Changed
 
 - **Breaking Rust API:** replace `Config::realistic(n)` with `Config::official(n)`.
