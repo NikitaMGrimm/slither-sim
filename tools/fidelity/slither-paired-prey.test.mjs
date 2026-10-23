@@ -875,3 +875,82 @@ test('capture headers and provenance freeze direction and identify automated cli
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+// This is a deterministic control rehearsal, not a server-physics model. Exact
+// fresh anchors and no obstacles isolate the collector and actual sent commands.
+// Keep these synthetic rates independent of measured default calibration.
+function rehearseCrossing(direction, sign, preyVelocity) {
+  const synthetic = { stepMs: 25, speed: 160, turnRate: 3, maxMs: 45000 };
+  const vectors = { x: [1, 0], y: [0, 1],
+    'diagonal-positive': [1, 1], 'diagonal-negative': [1, -1] };
+  const [dx, dy] = vectors[direction].map(v => v * sign);
+  const state = new PairPreyState('crossing', direction);
+  const target = prey(7, 0, 1, 21600, 21600);
+  const ends = [], endpoints = [];
+  state.onTrialEnd = row => ends.push(row);
+  const bots = [0, 1].map(index => {
+    const bot = new PairPreyBot({ scenario: 'movement' }, index,
+      { meta(row) { if (row.crossingEndpoint) endpoints.push(row.crossingEndpoint); }, frame() {} });
+    const offset = index ? CROSSING.nearOffset : CROSSING.followerOffset;
+    const me = { id: index + 1, pts: [{ x: target.x + dx * offset, y: target.y + dy * offset }],
+      sct: 6, fam: .2, ang: Math.atan2(dy, dx), sp: synthetic.speed * .032, t: 0 };
+    bot.pair = state; bot.lives = 1;
+    bot.world.self = me.id; bot.world.grd = 21600; bot.world.radius = 21000;
+    bot.world.snakes.set(me.id, me); bot.world.prey.set(target.id, target);
+    let sent = null;
+    bot.ws = { readyState: 1, send(bytes) {
+      if (bytes.length === 1 && bytes[0] <= 250) sent = bytes[0] * 2 * Math.PI / 251;
+    } };
+    return { bot, me, commandedHeading: () => sent };
+  });
+  for (let now = 0; now <= synthetic.maxMs; now += synthetic.stepMs) {
+    const snapshots = bots.map(({ me }) => ({ id: me.id, life: 1, ...me.pts[0],
+      anchorAgeMs: 0, peerVisible: true, prey: [target] }));
+    state.update(now, snapshots, bots.map(({ bot }) => bot.world));
+    for (const { bot, me } of bots) {
+      me.t = now; bot.lastReceivedAt = now;
+      bot.tick(now);
+      assert.equal(bot.boost, false);
+      assert.equal(bot.movementIntent.interruption, null);
+    }
+    if (state.crossing?.completedLegs === 2) {
+      assert.deepEqual(ends, []);
+      assert.equal(state.crossing.endpointVisits, 3);
+      assert.equal(state.crossing.sign, sign);
+      assert.equal(endpoints.length, 3, 'one canonical witness per achieved endpoint');
+      assert.deepEqual(endpoints.map(e => e.completed), [false, true, true]);
+      assert.deepEqual(endpoints.map(e => e.end.offset),
+        [CROSSING.nearOffset, CROSSING.farOffset, CROSSING.nearOffset]);
+      for (const [index, endpoint] of endpoints.entries()) {
+        if (index === 0) continue;
+        assert.ok(endpoint.end.t - endpoint.start.t > CROSSING.endpointHoldMs);
+        assert.deepEqual(endpoint.start, endpoints[index - 1].end);
+      }
+      return;
+    }
+    for (const { me, commandedHeading } of bots) {
+      const commanded = commandedHeading();
+      if (commanded !== null) {
+        const difference = commanded - me.ang;
+        const shortest = Math.atan2(Math.sin(difference), Math.cos(difference));
+        const limit = synthetic.turnRate * synthetic.stepMs / 1000;
+        me.ang += Math.max(-limit, Math.min(limit, shortest));
+      }
+      const distance = synthetic.speed * synthetic.stepMs / 1000;
+      me.pts[0].x += distance * Math.cos(me.ang);
+      me.pts[0].y += distance * Math.sin(me.ang);
+    }
+    target.x += preyVelocity.x * synthetic.stepMs / 1000;
+    target.y += preyVelocity.y * synthetic.stepMs / 1000;
+    target.t = now + synthetic.stepMs;
+  }
+  assert.fail(`synthetic crossing did not complete: ${JSON.stringify({ direction, sign, preyVelocity, ends })}`);
+}
+
+test('sent controls complete synthetic cardinal and diagonal round trips', async context => {
+  for (const direction of ['x', 'y', 'diagonal-positive', 'diagonal-negative'])
+    for (const sign of [-1, 1])
+      for (const [motion, velocity] of [['stationary', { x: 0, y: 0 }], ['moving', { x: 32, y: -24 }]])
+        await context.test(`${direction} sign ${sign} ${motion}`, () =>
+          rehearseCrossing(direction, sign, velocity));
+});

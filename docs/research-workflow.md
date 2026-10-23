@@ -146,6 +146,12 @@ as completed legs; their source-pinned recordings retain that historical meaning
 These endpoint checks do not establish continuous geometry, avoidance-free travel,
 clock alignment, peer continuity or held-out coverage; analysis must still check them.
 
+The paired collector tests also rehearse complete near/far round trips using the
+actual quantized, rate-limited sent commands. Their point robots have explicit
+synthetic speed/turn settings, exact fresh anchors and no obstacles; stationary
+and moving targets cover both signs of each route. This protects control wiring
+without tying it to measured physics defaults or claiming live acquisition success.
+
 Raw frames retain direction, bytes and monotonic send/receipt timestamps. Metadata
 pins the plan/collector sources, wall-clock origin, connection/life boundaries,
 ping sends/replies/RTT and censored requests, including post-death observation.
