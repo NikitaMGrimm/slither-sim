@@ -12,6 +12,8 @@ Changes since 0.2.0, available from Git until the next release.
 - Index collision body bounds by stable snake slot and skip observation-index
   construction when no selected snake is alive. Add reproducible offline
   workloads, full-state parity traces and [fixture-specific performance reports](docs/performance.md).
+- Add isolated observation-phase diagnostics, retained-client workloads and
+  optional whole-comparison deadlines with retained incomplete-run evidence.
 - Automate compatible patch-release preparation and publication with a 12-hour
   cooldown and protected checks for release-bot PRs; see [releasing](docs/releasing.md).
 - Add informational performance and fidelity comparisons to PR CI. Synthetic
