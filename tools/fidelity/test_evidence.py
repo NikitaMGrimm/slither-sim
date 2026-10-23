@@ -56,6 +56,78 @@ class EvidenceTests(unittest.TestCase):
         records[-1]["integrity"].update(sha256=evidence.sha256(prefix), payloadBytes=len(prefix))
         path.write_bytes(gzip.compress(prefix + (json.dumps(records[-1]) + "\n").encode()))
 
+    def complete_paired(self, edit=None):
+        self.plan["capture"].update(scenario="paired-prey", bots=2, mode="crossing",
+                                    direction="diagonal-positive", seconds=480)
+        self.plan_source.write_text(json.dumps(self.plan), encoding="utf-8")
+        self.study = evidence.create_study(self.plan_source, self.directory / "paired-study")
+        self.base["planSha256"] = evidence.sha256((self.study / "plan.json").read_bytes())
+        helper = capture_fixture.CaptureQualityTests()
+        helper.setUp()
+        self.addCleanup(helper.doCleanups)
+        driver = evidence._digest_file(evidence.ROOT / "tools/fidelity/slither-paired-prey.mjs")
+        headless = evidence._digest_file(evidence.ROOT / "tools/fidelity/slither-headless.mjs")
+        batch = helper.header()["captureProvenance"]["captureBatchId"]
+        captures = []
+        for i in range(2):
+            header = helper.header(batch, i, 2)
+            header.update(dataOrigin="local-simulator", mode="crossing", direction="diagonal-positive",
+                          server=dict(self.plan["capture"]["server"]))
+            header["captureProvenance"].update(collectorSha256=driver, headlessSha256=headless,
+                planSha256=self.base["planSha256"], options={k: self.plan["capture"][k]
+                    for k in ("scenario", "seconds", "bots", "mode", "direction")})
+            if edit:
+                edit(header)
+            archive = helper.write(helper.records(header), name=f"bot{i}.gz",
+                mutate=lambda receipt: receipt.update(collectorEndSha256=driver, headlessEndSha256=headless))
+            name = f"raw/bot{i}.jsonl.gz"
+            (self.study / name).write_bytes(archive.read_bytes())
+            captures.append(name)
+        evidence.append_event(self.study, self.event("started"))
+        evidence.append_event(self.study, self.event("finished", captures=captures))
+
+    def test_paired_route_plan_bounds_and_applicability(self):
+        good = {**self.plan["capture"], "scenario": "paired-prey", "bots": 2,
+                "mode": "crossing", "direction": "x", "seconds": 480}
+        evidence.validate({**self.plan, "capture": good}, "study-plan")
+        invalid = [{**good, key: value} for key, value in (
+            ("bots", 1), ("bots", 3), ("seconds", 481), ("seconds", .5),
+            ("mode", "overlap"), ("mode", "unknown"), ("direction", "unknown"),
+            ("scenario", "movement"))]
+        invalid.append({k: v for k, v in good.items() if k != "mode"})
+        for capture in invalid:
+            with self.subTest(capture=capture), self.assertRaises(ValueError):
+                evidence.validate({**self.plan, "capture": capture}, "study-plan")
+
+    def test_paired_capture_audits_and_packages_the_two_member_batch(self):
+        self.complete_paired()
+        self.assertEqual(evidence.audit_study(self.study)["status"], "verified")
+        bundle = self.directory / "paired.tar.gz"
+        manifest = evidence.package_study(self.study, bundle)
+        self.assertEqual(manifest, evidence.verify_bundle(bundle))
+        self.assertEqual(manifest["audit"]["captures"], 2)
+
+    def test_paired_route_options_and_headers_must_match_the_plan(self):
+        for field, value, location in (("direction", "x", "options"),
+                                       ("mode", "overlap", "options"),
+                                       ("direction", "x", "header"),
+                                       ("mode", "overlap", "header")):
+            with self.subTest(field=field, location=location):
+                temporary = self.directory / f"case-{field}-{location}"
+                temporary.mkdir()
+                previous = self.directory
+                self.directory = temporary
+                try:
+                    def edit(header):
+                        target = header["captureProvenance"]["options"] if location == "options" else header
+                        target[field] = value
+                    self.complete_paired(edit)
+                    report = evidence.audit_study(self.study)
+                    self.assertEqual(report["status"], "quarantined")
+                    self.assertIn("capture_config_mismatch:raw/bot0.jsonl.gz", report["issues"])
+                finally:
+                    self.directory = previous
+
     def test_plan_bytes_are_frozen_and_no_existing_output_is_overwritten(self):
         self.assertEqual((self.study / "plan.json").read_bytes(), self.plan_source.read_bytes())
         digest = (self.study / "plan.sha256").read_bytes()

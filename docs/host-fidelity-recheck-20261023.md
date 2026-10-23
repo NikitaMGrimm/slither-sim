@@ -251,3 +251,33 @@ receipt age does not bound hidden serialization delay. Calibration remains empty
 cardinal acquisition absent, and repeated-transition, size and boost coverage
 inadequate. No threshold or timer was scored, fitted or selected, and no numerical
 subscription correction or production validation follows.
+
+## Prospective receipt study stopped at preflight
+
+R5 prospectively froze the common receipt-cache method with the 650-unit near
+waypoint and two-second relative hold. Independent software review found no
+supported defects, and 45 synthetic tests passed. The plan SHA-256 is
+`8a9e99775a40fc09c9977736a19e16754d224cea8c7a9553dbc9fab9c1263922`;
+the final analyzer freeze is
+`79ae17b400fed65b296ba218574918c59086b87eb14029361c9b3cdbfeee644c`.
+
+The sole 12-second preflight joined once and retained an integrity-verified gzip
+with 1,402 incoming frames and a `capture-end` receipt. Its SHA-256 is
+`e840aa3cbd72a968398092d6bddac018c56d9cf0f5e51e99b25e2c7bb2b48692`.
+The main-owned post-capture helper then called an object method on a frame-array
+record. It failed before durably saving the child exit status. The offline audit
+preserves the recording's integrity result; it does not reconstruct the missing
+process result. The frozen failure rule stopped both dependent paired runs,
+without replacements. This was an operational helper failure, not evidence of a
+server or visibility defect.
+
+The frozen analyzer accepted the closed empty input manifest and reported zero
+paired runs, legs, cache exposures or transitions. No candidate was selected;
+all required coverage remains missing. Original sources, plans, failed helper,
+completion/stop receipts, offline audit and empty analysis remain outside Git in
+`outputs/visibility-receipt-20261023-r5`. R4 results remain unchanged. This phase
+does not test the receipt-cache method empirically or justify a numerical rule.
+
+Future paired plans can use the managed `collect.py` workflow. It records the
+process outcome before auditing, handles metadata objects and frame arrays
+through the shared audit, and preserves a failed attempt rather than replacing it.

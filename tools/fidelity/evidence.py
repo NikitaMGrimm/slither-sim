@@ -378,6 +378,10 @@ def audit_study(study):
                 issues.append(f"capture_config_mismatch:{name}")
             if options.get("origin") != expected.get("origin"):
                 issues.append(f"capture_config_mismatch:{name}")
+            if expected["scenario"] == "paired-prey" and any(
+                    options.get(key) != expected.get(key) or header.get(key) != expected.get(key)
+                    for key in ("mode", "direction")):
+                issues.append(f"capture_config_mismatch:{name}")
     by_name = {capture["path"]: capture for capture in report["captures"]}
     for event in ends.values():
         members = [by_name[name].get("provenance") for name in event["captures"] if name in by_name]

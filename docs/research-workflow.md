@@ -73,7 +73,9 @@ Each invocation durably reserves one attempt; there are no automatic retries or
 replacement captures. Limits are 1–3 clients and 3,600 seconds per attempt; the
 template uses one client for 60 seconds. Scenario-specific client counts are
 validated. The wrapper passes the endpoint/Origin, saves stdout/stderr in `logs/`,
-and stops the child after the duration plus 30 seconds for draining.
+and stops the child after the duration plus 30 seconds for draining. It saves
+the process exit status in `attempts.jsonl` before auditing the recordings; an
+audit exception does not erase that outcome or make the attempt available again.
 
 Failures, cancellation and timeout remain in the ledger, including incomplete gzip
 files. Exit zero alone is not successful acquisition. Other advertised protocols
@@ -81,8 +83,23 @@ are quarantined with their raw bytes retained; `setupSignatures[].protocolVersio
 records the observed version. Unsupported login challenges fail without executing
 JavaScript and require a reviewed parser update.
 
-Low-level paired death/prey and feeding-shape collectors need their own matching
-coordinator and attempt accounting; the managed wrapper does not cover those modes.
+For paired-prey acquisition, set these fields in the plan's `capture` object
+alongside its server and optional Origin, then use the same `init`, `collect`,
+`audit` and `pack` commands:
+
+```json
+{"scenario": "paired-prey", "bots": 2, "seconds": 480,
+ "mode": "crossing", "direction": "diagonal-positive"}
+```
+
+Paired plans require exactly two clients, 1–480 seconds and an explicit `mode`
+of `overlap` or `crossing`. A fixed `direction` is optional for crossing and
+invalid for overlap. Audits compare the recorded mode/direction against the frozen
+plan as well as checking both members and source hashes. A completed capture
+does not certify a valid crossing or statistical coverage.
+
+Low-level paired-death and feeding-shape collectors still need their own matching
+coordinator and attempt accounting.
 
 For two-client visibility crossings, the paired-prey collector supports fixed
 `x`, `y`, `diagonal-positive` and `diagonal-negative` directions:
@@ -122,6 +139,8 @@ ping sends/replies/RTT and censored requests, including post-death observation.
 Server elapsed headers give a separate received clock. The audit derives RTT and
 arrival-gap summaries from those same frames; no second timing log is needed.
 These clocks cannot identify one-way latency or hidden processing ticks.
+JSONL metadata records are objects; frame records are three-element arrays.
+Use the shared audit/decoder rather than treating every record as an object.
 
 ## Inspect, analyze and reproduce
 
