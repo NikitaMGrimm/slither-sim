@@ -124,8 +124,9 @@ export function safePreyWaypoint(own, prey, target) {
 }
 
 export class PairPreyState {
-  constructor(mode = 'overlap', direction = null) {
+  constructor(mode = 'overlap', direction = null, onTrialEnd = null) {
     this.mode = mode; this.direction = validateDirection(mode, direction);
+    this.onTrialEnd = onTrialEnd;
     this.crossingTrial = 0; this.reset();
   }
   crossingFrame(p, first, second, center) {
@@ -137,7 +138,27 @@ export class PairPreyState {
     const fromA = crossingProjection(unsigned, first.x - p.x, first.y - p.y).along;
     return { axis, direction, sign: Math.sign(fromB || fromA) || 1 };
   }
-  reset() {
+  endTrial(now, reason) {
+    const c = this.crossing;
+    if (!c) return;
+    // Sampled state can skip a reset and reacquisition in the same update, and
+    // dead/disconnected clients do not run movement(). Preserve the old trial
+    // before clearing it; this describes collector control, not server policy.
+    this.onTrialEnd?.({ event: 'paired-prey-trial-end', endedAt: now, reason,
+      pairIdentities: [...this.identities], targetId: this.target.id,
+      targetGenerations: [...this.target.generations], crossingTrial: c.trial,
+      crossingSelectedAt: c.selectedAt, crossingLeg: c.leg,
+      crossingLegStartedAt: c.legStarted,
+      crossingHoldUntil: c.holdUntil, crossingHeldOffset: c.holdOffset,
+      endpointVisits: c.endpointVisits, completedLegs: c.completedLegs });
+  }
+  clearTarget(now, reason, phase = 'search') {
+    this.endTrial(now, reason);
+    this.target = null; this.navigationPrey = null;
+    this.crossing = null; this.phase = phase; this.reason = reason;
+  }
+  reset(now, reason) {
+    this.endTrial(now, reason);
     this.identities = null;
     this.phase = 'waiting';
     this.target = null;
@@ -152,9 +173,10 @@ export class PairPreyState {
   }
   update(now, snapshots, worlds) {
     const [first, second] = snapshots;
-    if (!first || !second) { if (this.identities) this.reset(); return; }
+    if (!first || !second) { if (this.identities) this.reset(now, 'pair_unavailable'); return; }
     const identities = snapshots.map((s, i) => `${i}/${s.life}/${s.id}`);
-    if (this.identities && identities.some((id, i) => id !== this.identities[i])) this.reset();
+    if (this.identities && identities.some((id, i) => id !== this.identities[i]))
+      this.reset(now, 'pair_identity_changed');
     if (this.mode === 'crossing') this.crossingSnapshots = snapshots;
     if (!this.identities) {
       this.identities = identities;
@@ -170,9 +192,7 @@ export class PairPreyState {
     this.pairDistance = Math.hypot(first.x - second.x, first.y - second.y);
     const separationLimit = this.mode === 'crossing' ? CROSSING.maxPairSeparation : PAIR_PREY.separationLimit;
     if (this.pairDistance > separationLimit && this.phase !== 'rendezvous') {
-      this.target = null; this.navigationPrey = null;
-      this.crossing = null;
-      this.phase = 'rendezvous'; this.reason = 'pair_separated';
+      this.clearTarget(now, 'pair_separated', 'rendezvous');
     }
     if (this.phase === 'rendezvous' && this.pairDistance <= PAIR_PREY.rendezvousDistance &&
         first.peerVisible && second.peerVisible) {
@@ -183,18 +203,13 @@ export class PairPreyState {
       const observations = snapshots.map(s => s.prey.find(p => p.id === this.target.id));
       if (this.mode === 'crossing' && (!observations[0] ||
           now - observations[0].t > CROSSING.primaryFreshMs)) {
-        this.target = null; this.navigationPrey = null;
-        this.crossing = null; this.phase = 'search'; this.reason = 'primary_visibility_lost';
+        this.clearTarget(now, 'primary_visibility_lost');
       } else if (observations.some((p, i) => p &&
           (this.mode !== 'crossing' || i === 0) && this.target.generations[i] !== null &&
           p.generation !== this.target.generations[i])) {
-        this.target = null; this.navigationPrey = null;
-        this.crossing = null;
-        this.phase = 'search'; this.reason = 'prey_generation_changed';
+        this.clearTarget(now, 'prey_generation_changed');
       } else if (observations.every(p => !p) && now - this.lastSeenAt > PAIR_PREY.staleMs) {
-        this.target = null; this.navigationPrey = null;
-        this.crossing = null;
-        this.phase = 'search'; this.reason = 'prey_lost';
+        this.clearTarget(now, 'prey_lost');
       } else {
         if (this.mode === 'crossing' && observations[1] &&
             this.target.generations[1] !== null &&
@@ -215,8 +230,7 @@ export class PairPreyState {
           const arenaGap = radius - Math.hypot(p.x - worlds[0].grd, p.y - worlds[0].grd);
           if (arenaGap < CROSSING.minArenaGap || this.direction &&
               farEndpointArenaGap(p, c, worlds[0].grd, radius) < CROSSING.minArenaGap - CROSSING.farOffset) {
-            this.target = null; this.navigationPrey = null;
-            this.crossing = null; this.phase = 'search'; this.reason = 'rim_margin_lost';
+            this.clearTarget(now, 'rim_margin_lost');
           } else {
           const measured = crossingProjection(c, snapshots[1].x - p.x, snapshots[1].y - p.y);
           c.actualAxisDistance = measured.along;
@@ -257,8 +271,7 @@ export class PairPreyState {
             // its hold; a dwell timer never establishes packet visibility.
             c.holdOffset = goal; c.holdUntil = now + CROSSING.endpointHoldMs;
           } else if (!holding && now - c.legStarted > CROSSING.legTimeoutMs) {
-            this.target = null; this.navigationPrey = null;
-            this.crossing = null; this.phase = 'search'; this.reason = 'crossing_leg_timeout';
+            this.clearTarget(now, 'crossing_leg_timeout');
           }
           }
         }
@@ -495,7 +508,10 @@ export async function recordPair({ out, server, seconds = PAIR_PREY.maxSeconds, 
   if (!ip || !Number.isInteger(port) || port < 1 || port > 65535) throw Error('invalid server');
   const batch = createCaptureBatch({ seconds, mode, ...(direction ? { direction } : {}),
     server, scenario: 'paired-prey', plan, origin }, 2, COLLECTOR_SOURCE);
-  const state = new PairPreyState(mode, direction), bots = [], recorders = [];
+  const bots = [], recorders = [];
+  const state = new PairPreyState(mode, direction, row => {
+    recorders.forEach((rec, botIndex) => rec.meta({ ...row, botIndex }));
+  });
   let timer, deadline, onAbort, completed = false, failure = null;
   const collectorTiming = { targetTickMs: 25, ticks: 0, lateTicks: 0, maxTickGapMs: 0 };
   let lastTick = performance.now();

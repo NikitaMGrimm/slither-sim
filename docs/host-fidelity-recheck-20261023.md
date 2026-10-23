@@ -281,3 +281,65 @@ does not test the receipt-cache method empirically or justify a numerical rule.
 Future paired plans can use the managed `collect.py` workflow. It records the
 process outcome before auditing, handles metadata objects and frame arrays
 through the shared audit, and preserves a failed attempt rather than replacing it.
+
+## Managed paired follow-up (R6)
+
+R6 used the merged managed workflow at `7bc380ec2f198bbb99ac2c4c2f96e4185d09109b`.
+The bounded phase completed one 480-second cardinal-x pair followed by one
+480-second diagonal-positive pair, with two clients each, no preflight and no
+replacements or extensions. Both durable child outcomes and wrappers exited
+successfully. All four captures passed source, plan, UUID/member, ledger, gzip
+and capture-end checks. R5 remains closed with its failed helper preserved.
+
+The receipt-cache method, candidates, continuity/freshness screens, 650/1,850
+waypoints, two-second hold and chronological split remained unchanged. The common
+plan SHA-256 is
+`d80586f62327d7a985529e94d888e3e7673c4b1d42f7de9a70410ff071368dcf`;
+the final analyzer freeze is
+`76880f9c6597e5cb3c6e5086147d1449a886d1f921fe1cc98b2754bd295e11f4`.
+Seventy-one synthetic tests passed before acquisition; they verify software
+behavior, not empirical route coverage.
+
+| Run | Completed endpoint-to-endpoint legs | Qualified / rejected completed legs | Excluded initial visits | Calibration / held-out legs | Qualified queries / transitions |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Cardinal x | 0 | 0 / 0 | 2 | 0 / 0 | 0 / 0 |
+| Diagonal positive | 0 | 0 / 0 | 1 | 0 / 0 | 0 / 0 |
+
+The frozen adapter ran once successfully. Three initial arrivals had no achieved
+opposite starting endpoint; none was relabelled as a leg. Candidate error rates
+are undefined and every selection is null. All 16 coverage cells and 112 stratum
+cells lack support. Query-level screens have no scored rows to evaluate; their
+empty exclusion counters do not establish that those screens passed. Fifty-four
+causal field-prefix/age checks passed for the three explicitly excluded arrival
+witnesses. These snapshots do not supply missing comparisons.
+
+The final receipt SHA-256 is
+`5df3b364005d32e97bda4d3b272aee6161aa6224247aa130fb5c5262e0462434`;
+it pins the 16 final artifacts and the completed manifest
+`850b3715ad3008dfea79533aab18ccaf7690cbf576b110914f562d31f65043d6`.
+That manifest retains the four capture and two ledger hashes. All 82 freeze pins
+and 73 prior preservation pins remained unchanged. Full plans, captures, ledgers,
+standard acquisition bundles, reports and witnesses remain outside Git under
+`outputs/managed-visibility-20261023-r6`.
+
+A separate retrospective control-metadata diagnostic found three cardinal and
+eight diagonal trial IDs. It did not rerun candidate scoring or admit incidental
+exposures. For the three initial arrivals:
+
+- Cardinal trial 1 reached near at receipt time 45,104.525 ms. Its last follow
+  sample at 55,136.347 ms has B about 2,618 units off the route and the reference
+  outside its endpoint geometry. The next sample is search; the old collector
+  did not serialize its reset reason, so that reason is unidentified here.
+- Cardinal trial 2 reached near at 90,563.5883 ms. The primary's death observation
+  starts at 93,430.097 ms, less than a second after the planned hold ended.
+- Diagonal trial 6 reached near at 364,483.8007 ms. B's death observation starts
+  at 366,306.024 ms, before its planned hold deadline of 366,483.8007 ms.
+
+These are same-process local receipt/control timestamps, not authoritative
+geometry, death-cause or latency measurements. Metadata diagnostics and selected
+record witnesses are retained in `control-diagnostic/`. They establish no
+specific steering defect or numerical physics correction. The later collector
+adds explicit trial-abandonment events because sampled phase/target rows could
+lose the reason during reset and same-update reacquisition. This instrumentation
+does not retroactively classify old resets or change steering or scientific gates.
+No further acquisition was scheduled, and no visibility model was promoted.
