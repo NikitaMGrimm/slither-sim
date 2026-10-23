@@ -22,7 +22,6 @@ const EPISODE_TICKS: usize = 1000;
 const MAX_ITERATIONS: usize = 100_000;
 const PLACEMENT_ATTEMPTS: usize = 4096;
 const RESPAWN_ATTEMPTS: usize = 64;
-/// A slot without a clear pose waits this many ticks before trying again.
 const RESPAWN_RETRY_TICKS: usize = 4;
 /// Long samples restore the warmed scene so death history and drift stay bounded.
 const EPOCH_OPERATIONS: usize = 4096;
@@ -177,7 +176,7 @@ struct Scenario {
     bot: Option<Operation>,
 }
 
-/// Hosted-client lives on `SimulatorBackend`, timed through `step_all`.
+/// In-process client lives on `SimulatorBackend`, timed through `step_all`.
 struct ClientScenario {
     id: &'static str,
     world: World,
@@ -1363,7 +1362,8 @@ impl Lifecycle {
 }
 
 /// Fails the run unless the steady-state lifecycle was exercised within warmup
-/// plus the default trace window, so every mode checks the same deterministic prefix.
+/// plus the default trace window (or the whole run when shorter), so every mode
+/// checks the same deterministic prefix.
 fn check_validity(
     case: &str,
     operations: usize,
