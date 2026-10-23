@@ -343,3 +343,80 @@ adds explicit trial-abandonment events because sampled phase/target rows could
 lose the reason during reset and same-update reacquisition. This instrumentation
 does not retroactively classify old resets or change steering or scientific gates.
 No further acquisition was scheduled, and no visibility model was promoted.
+
+## Exploratory route pilots (R7)
+
+R7 used bounded managed invocations to investigate the acquisition losses before
+spending a larger collection budget. Each plan reserved one invocation, with no
+replacement or extension. The prior frozen results remain unchanged.
+
+The prey-dependent pilot completed with zero endpoint witnesses. A separate
+causal replay examined all seven `primary_visibility_lost` trial ends: every
+target was already absent from bot0's cache following an explicit three-byte
+`y` removal. None was merely a still-cached target whose update was old. These
+recipient removals do not identify global prey deletion or visibility geometry.
+
+The subsequent direct-snake pilot used two clients for 480 seconds, a fixed
+reference orbit and an 800/2,300-unit rail. Its plan SHA-256 is
+`19f18d416ceeb4c78c1352229fd1efbff0725f5f2e9e73c53d5b3ef1931be455`;
+the analyzer freeze is
+`c74d7fe87ad596652338ff7b66aa024ed563c54808b3b480818234fda29af698`.
+The process and durable attempt completed successfully. Both protocol-19 members
+passed source, plan, membership, gzip and capture-end integrity checks, and the
+standard evidence bundle verified.
+
+The frozen replay rejected both terminal `failures: 1` counters under its
+zero-failure admission rule. It retained an `INCOMPLETE.json` receipt and
+published no successful query, transition or route denominators. Acquisition
+integrity and analyzer admission are separate results; this rejection is not an
+empty successful analysis. The original freeze and rejected output are preserved.
+
+A separate metadata-only diagnostic reconstructed both counters from the preceding
+short post-death connections. Opening another connection did not reset them;
+the final live connections retained the value for another 58.8 and 54.1 seconds.
+All twelve recorded socket-error callbacks followed explicit post-death client
+close requests. Their underlying cause remains unidentified. Capture-stop did
+not increment the counters. No receive-error, receive-timeout or exhausted
+connection-failure event was recorded. This explains the counter's lifecycle
+meaning without changing the frozen admission result.
+
+Route feasibility failed independently: 645 deduplicated trials all ended with
+`own_anchor_stale`, with zero endpoint witnesses or reported completed legs.
+Selected-to-ended times were 24.2451–168.3364 ms, median 53.9019 ms. Either own
+anchor crossing the collector's 150 ms threshold reset the whole trial; no trial
+survived even one prescribed two-second hold. These correlated control witnesses
+identify an acquisition problem, not a visibility boundary or official cadence.
+
+The separate food-lane diagnostic froze one client with a 480-second maximum,
+eight preassigned passes and unchanged packet-prefix/history screens. Its plan
+SHA-256 is
+`8da5558728aa08df416693d6a59665c6029a741e7092f6e4fc8d29c7a954870f`;
+the analyzer freeze is
+`09db117affed86cbddb91d15a48641bf3ab651be9bca62c715ae7202fd12e49d`.
+Avoidance aborted the first pass after about 13 seconds and ended the invocation.
+The complete recording, managed audit and evidence bundle verified. The frozen
+analyzer completed with `inconclusive_no_fit`: zero completed passes, all eight
+slots missing, and zero eligible entry, clear and matched-group denominators.
+
+The ordered ledger separately counted 109 nonempty `F` listings, 44 clears of
+previously listed sectors and 28 unambiguous positive reintroductions after a
+clear. These are receipt censuses; they do not supply the missing qualified
+entry denominator, empty-sector subscriptions or independent trials. No new
+food geometry or cleanup schedule was fitted.
+
+A separate received-client control reconstruction identified the food abort's
+specific trigger: intended-route danger reached 0.20801 against the 0.2 veto,
+while the discarded forager direction had zero danger. The initial site screen
+checked opponent heads; one head passed at 866.09 units, while its received body
+was only 212.54 units from a planned lane. The veto was justified under the
+collector's heuristic. All 28 positive reintroductions also failed the unchanged
+anchor-age gate, so correcting site selection alone cannot make them eligible.
+These observations support better acquisition screening, not a relaxed danger
+cutoff or food visibility rule.
+
+Full plans, acquisition bundles, exact-member completion manifests, original
+failures, source reviews and reports remain outside Git under
+`outputs/visibility-scale-20261023-r7`. Source/synthetic verification established
+analyzer readiness; these live route outcomes establish no validated numerical
+visibility correction. Larger acquisition remains gated on achieved route and
+qualified comparison coverage.

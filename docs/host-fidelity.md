@@ -69,6 +69,11 @@ completed an endpoint-to-endpoint leg. All calibration, held-out, query and
 transition denominators are zero. Saved control telemetry shows route divergence
 and deaths after initial arrivals; it supplies no subscription correction.
 
+The later [exploratory R7 pilots](host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7)
+preserve a further direct-snake replay rejection and an avoidance-aborted food
+route with zero qualified entries. Completed recording integrity did not yield
+the planned scientific denominators. No numerical visibility policy changed.
+
 Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
