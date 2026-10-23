@@ -139,6 +139,44 @@ trace bytes between identically built harnesses. These ordinary finite fixtures
 do not cover all numerical/index boundaries; JSON cannot distinguish every
 nonfinite floating-point payload.
 
+## Isolated phase diagnostics
+
+`tools/perf_observation_phases.py` prepares source snapshots without building or
+running them. It instruments the actual observation implementation in a generated
+snapshot; the shipped runtime and original fixture remain unchanged. The recipe
+accepts reviewed source shapes and refuses existing output paths. For the current
+reviewed shape, use the full public commit:
+
+```powershell
+uv run --project C:/Users/Nikita/slither-sim --locked --only-group tools --no-sync --offline python -B tools/perf_observation_phases.py --commit 20dd3aff5574af0270d8ad2c1e93f9001e8f1142 --output C:/Users/Nikita/.t3/scratch/observation-phases-new
+```
+
+Choose a new absolute local output directory outside every checkout. Preparation
+retains the exact exported source hashes, recipe, resource and instrumentation
+patch. Both snapshots omit only the registration of the unexported `portable_bot`
+example. `COMMANDS.txt` contains explicit offline core-only builds, complete trace
+comparisons, and separate profiles. Builds use distinct targets and jobs=2; build
+and workload deadlines are 600 and 120 seconds. These are direct-child timeouts,
+without OS CPU/memory caps. No dependency installation or environment tuning is
+performed. Retain failed attempts rather than overwriting them.
+
+The counters report index visits, food candidates/accepted copies, own/opponent
+body anchors and stable empty batches. Wall intervals distinguish index setup,
+indexed food filtering, accepted-index ordering and copying. Linear food and
+prey/opponent predicates and copies remain interleaved. The inclusive batch
+interval contains its nested phases, clock/counter overhead and temporary/index
+destruction; returned-output destruction is reported separately by the harness.
+Do not sum inclusive and nested intervals or use these profiles as comparative
+timings. Trace mode disables profiling sessions and compares complete bytes.
+
+Parent validation passed five preparation tests, all 50 root Python tests, both
+generated release builds, and all six complete two-iteration baseline/instrumented
+trace comparisons. The original scalar-observation assertions also passed. The
+same source received an independent read-only review with no findings; that
+review did not execute checks. Numeric/mutation coverage remains limited to the
+existing finite fixtures. The prepared source tree and raw trace proof are
+retained outside Git under the performance workstream's owned outputs.
+
 ## Remaining investigation
 
 1. Attribute dense materialization to candidate filtering, accepted-index
