@@ -2,6 +2,7 @@
 
 import base64
 import gzip
+import hashlib
 import importlib.util
 import json
 import math
@@ -463,6 +464,41 @@ class PrepareReplayArchiveTest(unittest.TestCase):
         clip = self.export()  # Setup and spawn both arrive at 100 ms.
         self.assertAlmostEqual(clip["controls"][0]["time"], 0.05)
         self.assertEqual([row["time"] for row in clip["observations"]], [0.1, 0.2])
+
+    def test_provenance_pins_protocol_tools_and_audit_limit(self):
+        clip = self.export()
+        provenance = clip["provenance"]
+        self.assertEqual(clip["schema_version"], 1)
+        self.assertEqual(provenance["wire_protocol"], 19)
+        self.assertEqual(
+            provenance["decoder_sha256"], hashlib.sha256(Path(sp.__file__).read_bytes()).hexdigest()
+        )
+        self.assertEqual(
+            provenance["exporter_sha256"],
+            hashlib.sha256(Path(replay.__file__).read_bytes()).hexdigest(),
+        )
+        self.assertEqual(provenance["capture_audit"], "not-performed-by-exporter")
+
+    def test_other_protocol_is_rejected_instead_of_labelled_as_19(self):
+        setup = bytearray(base64.b64decode(self.records[1][2])[2:])
+        setup[23] = 11
+        self.records[1] = self.frame(0, setup, 100.0)
+        with self.assertRaisesRegex(ValueError, "Unsupported protocol version 11"):
+            self.export()
+
+    def test_source_digest_identifies_decoded_bytes_if_original_is_replaced(self):
+        self.write_archive()
+        source = self.path.read_bytes()
+        original_read = sp.read
+
+        def replace_after_read(snapshot):
+            yield from original_read(snapshot)
+            self.path.write_bytes(b"replacement after archive decode")
+
+        with patch.object(replay.sp, "read", side_effect=replace_after_read):
+            clip = replay.export(self.path, 1, 0.2, 0.25, "test")
+        self.assertEqual(clip["provenance"]["sha256"], hashlib.sha256(source).hexdigest())
+        self.assertNotEqual(self.path.read_bytes(), source)
 
     def test_rejects_regressed_incoming_receipt_clock(self):
         self.records[6][1] = 250.0

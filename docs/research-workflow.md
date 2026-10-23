@@ -280,6 +280,14 @@ expected fields with the existing decoder or replay exporter, label that derivat
 then have the focused test consume the fixture. Keep the full audited study outside
 Git; the [worked study](../tools/fidelity/worked_study.py) demonstrates this path.
 
+The standalone replay exporter hashes and decodes one temporary archive snapshot.
+Its schema-1 `provenance` retains the archive, selected window/connection, wire
+protocol and decoder/exporter source digests. These additional metadata fields
+leave replay values unchanged; older fixtures keep their original provenance.
+The exporter checks gzip completion and window coverage, but does not perform
+the full capture/study audit. Its output labels that limit explicitly; audit the
+study separately before treating the derivative as evidence.
+
 ## Offline checks
 
 Run focused tests for the changed owner first (see the
