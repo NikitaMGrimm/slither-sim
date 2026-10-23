@@ -124,6 +124,16 @@ impl SimulationConfig {
         ] {
             encode::speed_u16(speed).map_err(|error| format!("Prey {error}"))?;
         }
+        // Appearances encode size in one byte of fifth-units. Check the spawn
+        // grid, allowing range endpoints above 51 that still only produce 51.
+        if self
+            .world
+            .prey
+            .size_steps()
+            .is_some_and(|(_, upper)| upper > f64::from(u8::MAX))
+        {
+            return Err("Protocol-19 simulation supports prey sizes up to 51".into());
+        }
         if !(1..=128).contains(&self.agents) || self.controlled_slot >= self.agents {
             return Err("Simulation needs 1 to 128 agents and a controlled slot among them".into());
         }

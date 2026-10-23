@@ -81,6 +81,14 @@ The decoder retains at most 4,096 snake slots, 4,096 body anchors per snake,
 Updates exceeding these limits fail before changing the frame's received state;
 network backends disconnect on that error. Reconnect clears retained entities.
 
+Minimap decoding also admits at most 1,310,720 logical grid cells per frame,
+enough for the largest supported team snapshot (four 512×512 layers plus their
+union). M, V and U each charge `side²`; legacy u charges `80²`; L charges
+`(teamCount + 1) × side²`, including its union. This local resource limit bounds
+repeated full-grid work even for empty snapshots or deltas. Exceeding it rejects
+the whole frame before committing received state; each new frame has a fresh
+budget. The separate L limit remains 1,048,576 cells across its team layers.
+
 `processingSeconds` is measured bot compute time, between 0 and 2 seconds in
 simulation. It replaces the configured sample for that decision, including when
 no action is sent. Network computation has already elapsed, so the value is

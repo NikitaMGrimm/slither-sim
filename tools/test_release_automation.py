@@ -1,4 +1,5 @@
 import copy
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -110,14 +111,66 @@ class AutomationTests(unittest.TestCase):
                 tag.assert_not_called()
                 merge.assert_not_called()
 
-    def test_missing_ci_dispatch_is_retried_but_existing_run_is_reused(self):
-        for runs in ("", "123"):
-            with patch.object(subprocess, "check_output", return_value=runs), \
-                    patch.object(subprocess, "run") as dispatch:
+    def ci_setup(self, metadata=True):
+        for mocked in (patch.object(automation, "refresh_main"),
+                       patch.object(automation, "git", return_value="b" * 40),
+                       patch.object(release, "github_pages", return_value=self.files),
+                       patch.object(release, "package_at", return_value=self.package),
+                       patch.object(automation, "metadata_only", return_value=metadata)):
+            mocked.start()
+            self.addCleanup(mocked.stop)
+
+    def test_only_pending_native_pr_ci_is_approved(self):
+        self.ci_setup()
+        for conclusion in ("action_required", "", "success", "failure"):
+            with self.subTest(conclusion=conclusion), \
+                    patch.object(subprocess, "check_output", return_value=json.dumps([
+                        {"databaseId": 42, "conclusion": conclusion}])), \
+                    patch.object(release, "github", return_value={
+                        "event": "pull_request", "head_sha": self.pr["head"]["sha"],
+                        "pull_requests": [{"number": self.pr["number"]}]}), \
+                    patch.object(subprocess, "run") as approve:
                 automation.ensure_pr_checks(self.pr)
-                self.assertEqual(dispatch.call_count, 0 if runs else 1)
-                if not runs:
-                    self.assertEqual(dispatch.call_args.args[0][-1], "release-plz-main")
+                self.assertEqual(approve.call_count, 1 if conclusion == "action_required" else 0)
+                if conclusion == "action_required":
+                    self.assertEqual(approve.call_args.args[0], [
+                        "gh", "api", "--method", "POST", "repos/owner/repo/actions/runs/42/approve"])
+
+    def test_source_edits_do_not_receive_ci_approval(self):
+        self.ci_setup(metadata=False)
+        with patch.object(subprocess, "check_output") as lookup, \
+                patch.object(subprocess, "run") as approve:
+            automation.ensure_pr_checks(self.pr)
+            lookup.assert_not_called()
+            approve.assert_not_called()
+
+    def test_ci_approval_rejects_a_different_run_identity(self):
+        self.ci_setup()
+        valid = {"event": "pull_request", "head_sha": self.pr["head"]["sha"],
+                 "pull_requests": [{"number": self.pr["number"]}]}
+        for changes in ({"event": "workflow_dispatch"}, {"head_sha": "c" * 40},
+                        {"pull_requests": [{"number": 99}]}):
+            with self.subTest(changes=changes), \
+                    patch.object(subprocess, "check_output", return_value='[{"databaseId":42,"conclusion":"action_required"}]'), \
+                    patch.object(release, "github", return_value={**valid, **changes}), \
+                    patch.object(subprocess, "run") as approve:
+                with self.assertRaisesRegex(ValueError, "does not match"):
+                    automation.ensure_pr_checks(self.pr)
+                approve.assert_not_called()
+
+    def test_ci_appearance_wait_is_bounded(self):
+        self.ci_setup()
+        for replies, waits, timed_out in ((["[]", '[{"databaseId":42,"conclusion":""}]'], 1, False),
+                                         (["[]"] * 7, 6, True)):
+            with self.subTest(timed_out=timed_out), \
+                    patch.object(subprocess, "check_output", side_effect=replies), \
+                    patch.object(automation.time, "sleep") as sleep:
+                if timed_out:
+                    with self.assertRaises(TimeoutError):
+                        automation.ensure_pr_checks(self.pr)
+                else:
+                    automation.ensure_pr_checks(self.pr)
+                self.assertEqual(sleep.call_count, waits)
 
 
 class GitIntegrationTests(unittest.TestCase):

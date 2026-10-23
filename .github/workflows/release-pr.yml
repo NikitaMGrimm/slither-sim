@@ -44,8 +44,8 @@ jobs:
           version: '0.4.0'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Run checks on the bot branch
+      - name: Start protected PR checks on the bot branch
         if: steps.release.outputs.prs_created == 'true'
         env:
           RELEASE_PR: ${{ steps.release.outputs.pr }}
-        run: python3 tools/release_automation.py dispatch-pr-checks
+        run: python3 tools/release_automation.py start-pr-checks
