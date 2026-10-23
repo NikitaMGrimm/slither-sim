@@ -55,6 +55,14 @@ snake/prey crossings. It identifies collector endpoint-accounting defects, but
 does not supply a validated replacement streaming rule. Food entry/retention and
 the combined cleanup schedule remain approximations, including for small snakes.
 
+The separately frozen corrected-collector follow-up achieved one diagonal route
+leg, but none of its comparison points passed all original freshness/alignment
+gates. Cardinal acquisition failed and was quarantined; the planned extensions
+were not run. Additional food counterexamples remain preserved. The same
+[recheck note](host-fidelity-recheck-20261023.md) records the missing denominators
+and the independent all-map minimap recheck. No numerical subscription rule was
+promoted from these results.
+
 Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
