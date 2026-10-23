@@ -12,7 +12,7 @@ use super::{
         ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MAX_REMOVALS,
         MinimapTeams, SessionIdentifiers, SnakeProfile, SnakeRemoval, TeamRing, TeamScores, latin1,
     },
-    minimap::{Minimap, MinimapDecoder},
+    minimap::{MAX_FRAME_MINIMAP_CELLS, Minimap, MinimapDecoder},
 };
 use crate::{
     Action, Arena, Food, Observation, Point, Snake,
@@ -876,6 +876,7 @@ impl ClientState {
         let mut has_setup = self.session.setup.is_some();
         // Cloned only for frames carrying a minimap packet, then committed whole.
         let mut minimap: Option<MinimapDecoder> = None;
+        let mut minimap_cells = MAX_FRAME_MINIMAP_CELLS;
         for (packet, raw) in parsed.iter().zip(packets) {
             match packet {
                 Packet::Setup(_) if has_setup => {
@@ -888,7 +889,7 @@ impl ClientState {
                 Packet::Minimap(payload) => {
                     minimap
                         .get_or_insert_with(|| self.session.minimap.clone())
-                        .apply(payload, receipt)?;
+                        .apply(payload, receipt, &mut minimap_cells)?;
                 }
                 _ => {}
             }

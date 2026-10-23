@@ -595,7 +595,7 @@ fn cell_runs(p: &mut Vec<u8>, cells: usize, set: impl Fn(usize) -> bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::minimap::MinimapDecoder;
+    use crate::client::minimap::{MAX_FRAME_MINIMAP_CELLS, MinimapDecoder};
 
     #[test]
     fn food_packets_keep_color_origin_and_explicit_eater() {
@@ -750,10 +750,14 @@ mod tests {
             map(side, &[7, 18000]),
         ];
         let mut decoder = MinimapDecoder::default();
-        decoder.apply(&minimap(&frames[0]), 0.).unwrap();
+        let mut budget = MAX_FRAME_MINIMAP_CELLS;
+        decoder
+            .apply(&minimap(&frames[0]), 0., &mut budget)
+            .unwrap();
         for pair in frames.windows(2) {
+            let mut budget = MAX_FRAME_MINIMAP_CELLS;
             decoder
-                .apply(&minimap_delta(&pair[0], &pair[1]).unwrap(), 0.)
+                .apply(&minimap_delta(&pair[0], &pair[1]).unwrap(), 0., &mut budget)
                 .unwrap();
             assert_eq!(decoder.shown.as_ref().unwrap().0, pair[1]);
         }

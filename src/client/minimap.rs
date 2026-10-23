@@ -7,6 +7,17 @@ const LEGACY_SIDE: usize = 80;
 /// Bound on cells retained across one L packet's team layers: four 512-by-512
 /// layers, enough for the client's two-team mode at the maximum side.
 pub const MAX_TEAM_MINIMAP_CELLS: usize = 1 << 20;
+/// Aggregate logical grid cells decoded in one frame. Admit the largest
+/// supported L snapshot (team layers plus union); repeated small packets must
+/// not multiply full-grid work without bound. This is a local resource limit.
+pub const MAX_FRAME_MINIMAP_CELLS: usize = MAX_TEAM_MINIMAP_CELLS + MAX_SIDE * MAX_SIDE;
+
+fn charge_cells(remaining: &mut usize, cells: usize) -> Result<(), String> {
+    *remaining = remaining.checked_sub(cells).ok_or_else(|| {
+        format!("Minimap frame exceeds the {MAX_FRAME_MINIMAP_CELLS}-cell work limit")
+    })?;
+    Ok(())
+}
 
 /// Decode one stock run-length layer of `cells` cells starting at `cursor`, calling
 /// `set` with each occupied index. Bytes of 128 or more skip `k - 128` cells; with
@@ -58,6 +69,17 @@ fn side_at(payload: &[u8], at: usize) -> Result<usize, String> {
         0 => Err("Invalid minimap size".into()),
         side => Ok(side),
     }
+}
+
+fn snapshot_side(payload: &[u8]) -> Result<usize, String> {
+    let bytes = payload
+        .get(1..3)
+        .ok_or("Expected modern M/V minimap packet")?;
+    let side = usize::from(u16::from_be_bytes([bytes[0], bytes[1]]));
+    if !(1..=MAX_SIDE).contains(&side) {
+        return Err("Invalid minimap size".into());
+    }
+    Ok(side)
 }
 
 /// Received minimap state across all stock command families.
@@ -112,10 +134,17 @@ impl MinimapDecoder {
 
     /// Apply one M, V, U, u or L payload including its command byte. Callers
     /// clone the decoder per frame so an error leaves the committed state intact.
-    pub(crate) fn apply(&mut self, payload: &[u8], receipt: f64) -> Result<(), String> {
+    pub(crate) fn apply(
+        &mut self,
+        payload: &[u8],
+        receipt: f64,
+        remaining_cells: &mut usize,
+    ) -> Result<(), String> {
         let command = *payload.first().ok_or("Empty minimap packet")?;
         match command {
             b'M' => {
+                let side = snapshot_side(payload)?;
+                charge_cells(remaining_cells, side * side)?;
                 let map = Minimap::packet(None, payload)?;
                 self.base = Some(map.cells.clone());
                 self.show_modern(map.side, map.cells, receipt);
@@ -130,6 +159,7 @@ impl MinimapDecoder {
                     .modern
                     .as_mut()
                     .ok_or("Minimap delta before full snapshot")?;
+                charge_cells(remaining_cells, base.len())?;
                 let mut toggled = Vec::new();
                 layer(payload, &mut 1, base.len(), true, true, |i| toggled.push(i))?;
                 // V toggles mmdata and paints the modern target. A legacy u
@@ -143,6 +173,7 @@ impl MinimapDecoder {
             }
             b'U' => {
                 let side = side_at(payload, 1)?;
+                charge_cells(remaining_cells, side * side)?;
                 self.resize(side);
                 let mut cells = vec![0; side * side];
                 layer(payload, &mut 3, cells.len(), false, true, |i| cells[i] = 1)?;
@@ -150,6 +181,7 @@ impl MinimapDecoder {
                 self.teams = None;
             }
             b'u' => {
+                charge_cells(remaining_cells, LEGACY_SIDE * LEGACY_SIDE)?;
                 self.resize(LEGACY_SIDE);
                 let mut cells = vec![0; LEGACY_SIDE * LEGACY_SIDE];
                 layer(payload, &mut 1, cells.len(), false, false, |i| cells[i] = 1)?;
@@ -165,6 +197,7 @@ impl MinimapDecoder {
                          {MAX_TEAM_MINIMAP_CELLS}-cell limit"
                     ));
                 }
+                charge_cells(remaining_cells, (usize::from(count) + 1) * side * side)?;
                 self.resize(side);
                 let mut cursor = 4;
                 let mut union = vec![0; side * side];
@@ -343,11 +376,8 @@ impl Minimap {
     /// Decode transactionally: a malformed delta cannot corrupt the last snapshot.
     pub fn packet(previous: Option<&Self>, payload: &[u8]) -> Result<Self, String> {
         let (mut map, mut cursor, delta) = match payload.first() {
-            Some(b'M') if payload.len() >= 3 => {
-                let side = usize::from(u16::from_be_bytes([payload[1], payload[2]]));
-                if !(1..=512).contains(&side) {
-                    return Err("Invalid minimap size".into());
-                }
+            Some(b'M') => {
+                let side = snapshot_side(payload)?;
                 (
                     Self {
                         side,
