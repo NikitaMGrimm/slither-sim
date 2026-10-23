@@ -18,7 +18,7 @@ the source owner and its callers, then start with the matching test.
 | Wire decoder and local host | [Server guide](docs/raw-server.md); `src/client/protocol.rs`, `src/client/server.rs`; `tests/client_protocol.rs`, `tests/client_server.rs` | `cargo test --locked --test client_protocol` |
 | Capture, audit and recorded replay | [Research workflow](docs/research-workflow.md); `tools/fidelity/evidence.py`, `tools/fidelity/prepare-fidelity-replay.py` and adjacent tests; `examples/fidelity_replay.rs` | Matching Python/Node test; `cargo test --locked --example fidelity_replay` for Rust replay |
 | Core library / WASM consumer | [Configuration](docs/configuration.md), `examples/basic.rs`; `src/lib.rs`, `src/observation/mod.rs`; `tests/core_consumer.rs` | `cargo test --locked --no-default-features --test core_consumer`; explicit `wasm` group for target changes |
-| Documentation | Relevant guide and its linked source/examples | Review accuracy and local links; no research dependencies |
+| Documentation | Relevant guide and its linked source/examples | `python -B -m unittest discover -s tools -p test_documentation.py`; no research dependencies |
 
 ## Evidence proportional to the change
 
@@ -72,6 +72,9 @@ instead of maintaining another explanation in a separate agent guide. A short
 comment should identify whether a rule is measured, protocol/client-derived or
 provisional, and point to its canonical note and regression when useful.
 
+Keep current instructions in `docs/`. Put dated studies and selected results in
+`research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; follow the
+[research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) for placement and access labels.
 Keep experimental methods, source/archive hashes, selected windows, failed cases
 and uncertainty in the evidence note/fixture, with full recordings outside Git.
 Tests consume selected fixtures; synthetic cases establish their stated contract.

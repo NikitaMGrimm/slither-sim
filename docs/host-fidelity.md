@@ -49,7 +49,7 @@ zero joins. The dependent crossings were not run; the new route tooling supplies
 no additional visibility validation.
 
 A later explicit-Origin preflight joined, followed by two completed eight-minute
-paired acquisitions. The [paired recheck](host-fidelity-recheck-20261023.md)
+paired acquisitions. The [paired recheck](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
 preserves their hashes, food-model counterexamples and zero eligible controlled
 snake/prey crossings. It identifies collector endpoint-accounting defects, but
 does not supply a validated replacement streaming rule. Food entry/retention and
@@ -59,17 +59,17 @@ The separately frozen corrected-collector follow-up achieved one diagonal route
 leg, but none of its comparison points passed all original freshness/alignment
 gates. Cardinal acquisition failed and was quarantined; the planned extensions
 were not run. Additional food counterexamples remain preserved. The same
-[recheck note](host-fidelity-recheck-20261023.md) records the missing denominators
+[recheck note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md) records the missing denominators
 and the independent all-map minimap recheck. No numerical subscription rule was
 promoted from these results.
 
-The later [managed paired follow-up (R6)](host-fidelity-recheck-20261023.md#managed-paired-follow-up-r6)
+The later [managed paired follow-up (R6)](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#managed-paired-follow-up-r6)
 completed both planned acquisitions and their frozen analysis, but neither pair
 completed an endpoint-to-endpoint leg. All calibration, held-out, query and
 transition denominators are zero. Saved control telemetry shows route divergence
 and deaths after initial arrivals; it supplies no subscription correction.
 
-The later [exploratory R7 pilots](host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7)
+The later [exploratory R7 pilots](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7)
 preserve a direct-snake replay rejection and an avoidance-aborted food route
 with zero qualified entries. A separately amended retrospective replay produced
 702 qualified received-cache comparisons from one batch, while the original
