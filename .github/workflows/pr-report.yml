@@ -24,6 +24,7 @@ on:
       - tools/pr_report.py
       - tools/perf_baseline.py
       - tools/perf_compare.py
+      - tools/perf_build.py
       - .github/workflows/pr-report.yml
 
 permissions:

@@ -1,5 +1,8 @@
 """Regression coverage for unavailable data, paired interpretation and report text."""
 
+import ast
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -11,6 +14,24 @@ import unittest
 from unittest.mock import patch
 
 import pr_report
+from test_perf_baseline import catalog, row
+
+
+def local_imports(directory, module):
+    """The collector and every tools/ module it imports, transitively, without executing them."""
+    found, pending = set(), [module]
+    while pending:
+        name = pending.pop()
+        if name in found or not (directory / f"{name}.py").is_file():
+            continue
+        found.add(name)
+        tree = ast.parse((directory / f"{name}.py").read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                pending += [alias.name.split(".")[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                pending.append(node.module.split(".")[0])
+    return found
 
 
 def metric(value, samples=6, unit="rad/s"):
@@ -35,10 +56,18 @@ class ReportTests(unittest.TestCase):
                 output.mkdir()
                 work = root / "report-work"
                 suffix = ".exe" if os.name == "nt" else ""
-                events, target_paths = [], set()
+                events, target_paths, worktrees = [], set(), []
 
-                def add_worktree(args, **kwargs):
-                    shutil.copytree(checkout, work / "base")
+                def git_or_tool(args, cwd, environment=None, timeout=None):
+                    args = [str(arg) for arg in args]
+                    if args[:3] == ["git", "worktree", "add"]:
+                        worktrees.append(Path(args[4]))
+                        shutil.copytree(checkout, args[4])
+                    elif args[:3] == ["git", "worktree", "remove"]:
+                        shutil.rmtree(args[4])
+                    elif args[:2] == ["git", "rev-parse"]:
+                        return ("t" if args[-1].endswith("{tree}") else "b") * 40
+                    return "synthetic tool"
 
                 def command(args, cwd, log, environment=None, timeout=600):
                     label = "candidate" if cwd == checkout else "baseline"
@@ -69,14 +98,37 @@ class ReportTests(unittest.TestCase):
                 environment = {"GITHUB_REPOSITORY": "owner/repo", "PR_NUMBER": "35",
                                "GITHUB_RUN_ID": "100", "GITHUB_RUN_ATTEMPT": "1",
                                "GITHUB_SERVER_URL": "https://github.com"}
+                listed = catalog([row("step-default", trace=32, legacy=True), row("official-100-step", trace=8),
+                                  row("official-500-step", suite="full")])
+                traced = []
+
+                def trace(binary, case, iterations, directory, *, terminal=False, deadline=None):
+                    traced.append((Path(binary).parent.name, case, iterations, terminal))
+                    return {"sha256": case}
+
                 with patch.object(pr_report, "ROOT", checkout), patch.object(pr_report, "git", side_effect=["c" * 40, "b" * 40, "a" * 40]), \
-                        patch.object(pr_report.subprocess, "run", side_effect=add_worktree), \
+                        patch.object(pr_report.perf_build, "output", side_effect=git_or_tool), \
                         patch.object(pr_report.subprocess, "check_output", return_value="synthetic rustc"), \
-                        patch.object(pr_report, "command", side_effect=command), \
-                        patch.object(pr_report, "CASES", ()), patch.object(pr_report, "performance_rows", return_value=[]), \
-                        patch.dict(os.environ, environment):
+                        patch.object(pr_report.perf_build, "command", side_effect=command), \
+                        patch.object(pr_report, "load_catalog", return_value=listed), \
+                        patch.object(pr_report, "capture_trace", side_effect=trace), \
+                        patch.object(pr_report, "performance_rows", return_value=[]), \
+                        patch.dict(os.environ, environment), contextlib.redirect_stdout(io.StringIO()):
                     report = pr_report.collect(output, "a" * 40)
+                self.assertEqual(worktrees, [work / "baseline"])
+                self.assertFalse(worktrees[0].exists())
                 self.assertEqual(target_paths, {work / "target"})
+                self.assertEqual(report["identities"]["baseline"]["commit"], "b" * 40)
+                if failure:
+                    self.assertEqual([t["reading"] for t in report["traces"]], ["Unavailable"] * 2)
+                else:
+                    self.assertEqual(traced, [(f"bin-{label}", case, window, terminal)
+                                              for case, window, terminal in (("step-default", 32, False),
+                                                                             ("official-100-step", 8, True))
+                                              for label in ("baseline", "candidate")])
+                    self.assertEqual([(t["case"], t["iterations"], t["reading"]) for t in report["traces"]],
+                                     [("step-default", 32, "Equal"), ("official-100-step", 8, "Equal")])
+                    self.assertIn("`official-100-step` 8", pr_report.render({**report, "run_url": "https://example.invalid"}))
                 self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
                 self.assertEqual(events[:3], [("build", "baseline"), ("test", "baseline"), ("clean-release", "baseline")])
                 if failure != "clean-release":
@@ -186,11 +238,13 @@ test same_name ... ok
         matched = lambda name: any(e.fullmatch(name) for e in expressions)
         measured = [p.relative_to(root).as_posix() for directory in ("src", "tests/fixtures")
                     for p in (root / directory).rglob("*") if p.is_file()]
-        measured += [*pr_report.HARNESS, "Cargo.toml", "Cargo.lock", ".github/workflows/pr-report.yml",
-                     *(f"tools/{name}.py" for name in ("pr_report", "perf_baseline", "perf_compare")),
+        collectors = [f"tools/{name}.py" for name in sorted(local_imports(root / "tools", "pr_report"))]
+        self.assertIn("tools/perf_build.py", collectors)
+        measured += [*pr_report.HARNESS, "Cargo.toml", "Cargo.lock", ".github/workflows/pr-report.yml", *collectors,
                      # Cargo and rustup read these if added; none exist yet.
                      "build.rs", ".cargo/config.toml", "rust-toolchain", "rust-toolchain.toml"]
         self.assertEqual([name for name in measured if not matched(name)], [])
+        self.assertEqual([p for p in patterns if p.startswith("tools/") and p not in collectors], [])
         # The publisher always runs default-branch code, so PR edits to it are not measured.
         unmeasured = ["README.md", "CHANGELOG.md", "docs/pr-reports.md", "research/README.md",
                       "tests/spawn.rs", "examples/bot.mjs", "tools/pr_report_comment.cjs",

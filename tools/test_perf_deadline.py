@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 import perf_baseline
 import perf_compare
+from test_perf_baseline import catalog
 
 
 class SharedDeadline(unittest.TestCase):
@@ -115,13 +116,15 @@ class SharedDeadline(unittest.TestCase):
                     "--output", str(output), "--cases", "observe", "--repeats", "1",
                     "--max-wall-seconds", "1"]
             with patch.object(sys, "argv", argv), patch.object(
+                    perf_compare, "load_catalog", return_value=catalog()) as load, patch.object(
                     perf_compare, "command_output", return_value="fixture") as metadata, patch.object(
                     perf_compare, "native", side_effect=result) as native, patch.object(
                     perf_compare.time, "perf_counter", side_effect=lambda: now[0]), contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaises(TimeoutError):
                     perf_compare.main()
             native.assert_called_once()
-            self.assertTrue(all(call.kwargs == {"deadline": 11} for call in metadata.call_args_list))
+            self.assertTrue(all(call.kwargs == {"deadline": 11}
+                                for call in metadata.call_args_list + load.call_args_list))
             self.assertEqual(len((output / "results.jsonl").read_text().splitlines()), 1)
             self.assertFalse((output / "summary.json").exists())
             failure = json.loads((output / "failure.json").read_text())

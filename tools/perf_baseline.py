@@ -1,11 +1,13 @@
 """Bounded release benchmarks; standard library only, no builds or remote servers.
 
 Pass copied, immutable executables, not a shared Cargo target. See docs/performance.md.
+Workloads, default iterations and trace windows come from `perf_baseline --list`.
 """
 
 import argparse
 from contextlib import ExitStack
 import ctypes
+from dataclasses import dataclass
 import gzip
 import hashlib
 import json
@@ -13,13 +15,17 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CASES = ("step-default", "step-food", "step-body", "observe", "portable", "protocol")
+E2E_CASES = ("e2e-client", "e2e-host")
+CATALOG_FORMAT = "slither-perf-catalog-v1"
+SUITES = ("ci", "full")
+NAME = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 COMMAND_TIMEOUT_SECONDS = 30
 # Pin the historical compact workload independently of future gameplay defaults.
 SANDBOX_WORLD = {"radius": 1000, "dynamicRadius": False, "foodCount": 350,
@@ -28,6 +34,148 @@ SANDBOX_WORLD = {"radius": 1000, "dynamicRadius": False, "foodCount": 350,
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def canonical_json(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+@dataclass(frozen=True)
+class Workload:
+    name: str
+    suite: str
+    mode: str
+    operation: str
+    iterations: int
+    trace_iterations: int
+    profile: bool
+    available: bool
+    legacy: bool
+    synthetic: str | None
+    definition: str  # Canonical JSON text keeps the record immutable and hashable.
+    fingerprint: str
+
+    def plan(self):
+        return {"name": self.name, "iterations": self.iterations,
+                "traceIterations": self.trace_iterations}
+
+
+@dataclass(frozen=True)
+class Catalog:
+    networking: bool
+    seed: int
+    workloads: tuple[Workload, ...]
+    sha256: str
+    source: str
+
+    def select(self, cases=None, suite="full"):
+        """Rows in catalog order. A suite skips unavailable rows; named ones must exist and run."""
+        if cases is None:
+            return tuple(w for w in self.workloads
+                         if w.available and (suite == "full" or w.suite == suite))
+        known = {w.name: w for w in self.workloads}
+        unknown = [name for name in cases if name not in known]
+        if unknown:
+            raise ValueError(f"unknown workload(s) {', '.join(unknown)}; "
+                             f"`{self.source} --list` prints the catalog")
+        if len(set(cases)) != len(cases):
+            raise ValueError("duplicate workload names requested")
+        unavailable = [name for name in cases if not known[name].available]
+        if unavailable:
+            raise ValueError(f"workload(s) {', '.join(unavailable)} unavailable in this build "
+                             "(networking feature disabled)")
+        return tuple(known[name] for name in cases)
+
+    def record(self):
+        return {"format": CATALOG_FORMAT, "sha256": self.sha256, "seed": self.seed,
+                "networking": self.networking,
+                "workloads": {w.name: {"suite": w.suite, "mode": w.mode, "operation": w.operation,
+                                       "iterations": w.iterations,
+                                       "traceIterations": w.trace_iterations,
+                                       "profile": w.profile, "available": w.available,
+                                       "legacy": w.legacy, "synthetic": w.synthetic,
+                                       "definitionSha256": w.fingerprint}
+                              for w in self.workloads}}
+
+
+def parse_catalog(line, source="perf_baseline"):
+    """Validate the harness `--list` line at the boundary; later code trusts the records."""
+    def fail(message):
+        raise ValueError(f"invalid workload catalog from {source}: {message}")
+
+    def integer(value, low, high):
+        return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+    raw = (line if isinstance(line, bytes) else line.encode()).strip()
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        fail(f"not JSON ({error})")
+    if not isinstance(value, dict) or value.get("format") != CATALOG_FORMAT or value.get("kind") != "catalog":
+        fail(f"expected kind catalog and format {CATALOG_FORMAT}")
+    if not isinstance(value.get("networking"), bool) or not integer(value.get("seed"), 0, 2**32 - 1):
+        fail("networking must be boolean and seed a u32")
+    rows = value.get("workloads")
+    if not isinstance(rows, list) or not rows:
+        fail("workloads must be a non-empty list")
+    workloads, names = [], set()
+    for row in rows:
+        if not isinstance(row, dict):
+            fail("workload rows must be objects")
+        name = row.get("name")
+        if not isinstance(name, str) or not NAME.fullmatch(name) or name in names:
+            fail(f"workload name {name!r} must be unique and lowercase-hyphenated")
+        names.add(name)
+        if row.get("suite") not in SUITES:
+            fail(f"{name}: suite must be one of {', '.join(SUITES)}")
+        if not all(isinstance(row.get(key), str) and row[key] for key in ("mode", "operation")):
+            fail(f"{name}: mode and operation must be non-empty strings")
+        if not integer(row.get("iterations"), 1, 100000) or not integer(row.get("traceIterations"), 1, 1000):
+            fail(f"{name}: iterations 1..100000 and traceIterations 1..1000 required")
+        if not all(isinstance(row.get(key), bool) for key in ("profile", "available", "legacy")):
+            fail(f"{name}: profile, available and legacy must be boolean")
+        synthetic = row.get("synthetic")
+        if synthetic is not None and not (isinstance(synthetic, str) and synthetic):
+            fail(f"{name}: synthetic must be null or a non-empty label")
+        if not isinstance(row.get("definition"), dict):
+            fail(f"{name}: definition must be an object")
+        definition = canonical_json(row["definition"])
+        workloads.append(Workload(
+            name=name, suite=row["suite"], mode=row["mode"], operation=row["operation"],
+            iterations=row["iterations"], trace_iterations=row["traceIterations"],
+            profile=row["profile"], available=row["available"], legacy=row["legacy"],
+            synthetic=synthetic, definition=definition,
+            fingerprint=hashlib.sha256(definition.encode()).hexdigest()))
+    return Catalog(networking=value["networking"], seed=value["seed"], workloads=tuple(workloads),
+                   sha256=hashlib.sha256(raw).hexdigest(), source=source)
+
+
+def load_catalog(executable, *, deadline=None):
+    timeout = COMMAND_TIMEOUT_SECONDS
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.perf_counter())
+        if timeout <= 0:
+            raise TimeoutError("performance run deadline exceeded before catalog command")
+    # subprocess.run kills and reaps the child when the timeout expires.
+    result = subprocess.run([str(executable), "--list"], stdin=subprocess.DEVNULL,
+                            capture_output=True, timeout=timeout, check=False)
+    lines = result.stdout.splitlines()
+    if result.returncode or len(lines) != 1:
+        detail = result.stderr.decode(errors="replace").strip()[-500:]
+        raise RuntimeError(f"`{executable} --list` exited {result.returncode} with {len(lines)} "
+                           f"stdout lines; expected one catalog line. {detail}".rstrip())
+    return parse_catalog(lines[0], str(executable))
+
+
+def same_plan(selections):
+    """Return the shared plan, or raise unless every label selects equal names, iterations and windows."""
+    plans = {label: [w.plan() for w in selected] for label, selected in selections.items()}
+    first, *others = plans
+    for label in others:
+        if plans[label] != plans[first]:
+            raise ValueError(f"{first} and {label} workload plans differ: "
+                             f"{plans[first]} != {plans[label]}")
+    return plans[first]
 
 
 def command_output(*args, deadline=None):
@@ -166,8 +314,24 @@ def native(executable, case, iterations, stderr_path, profile=False, *, deadline
                 "workload": json.loads(line)}
 
 
-def capture_trace(executable, case, iterations, directory):
+def terminal_record(line, case, iterations):
+    try:
+        record = json.loads(line)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if (isinstance(record, dict) and record.get("kind") == "end" and record.get("case") == case
+            and record.get("operations") == iterations):
+        return record
+    return None
+
+
+def capture_trace(executable, case, iterations, directory, *, terminal=False, deadline=None):
+    """Archive one trace. With `terminal`, EOF alone is incomplete: the last line must be `end`."""
     stderr_path = directory / f"{case}-trace-stderr.txt"
+    started = time.perf_counter()
+    child_deadline = min(started + 120, deadline) if deadline is not None else started + 120
+    if child_deadline <= started:
+        raise TimeoutError("performance run deadline exceeded before trace child")
     with ExitStack() as cleanup:
         errors = cleanup.enter_context(stderr_path.open("wb"))
         process = subprocess.Popen([str(executable), case, str(iterations), "--trace"],
@@ -177,24 +341,28 @@ def capture_trace(executable, case, iterations, directory):
         sha = hashlib.sha256()
         lines = 0
         size = 0
-        deadline = time.perf_counter() + 120
+        last = b""
         with (directory / f"{case}.jsonl.gz").open("wb") as raw:
             # Parity hashes uncompressed bytes; favor faster capture over archive size.
             with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1, mtime=0) as output:
                 while True:
                     try:
-                        line = reader.read(deadline) + b"\n"
+                        last = reader.read(child_deadline)
                     except EOFError:
                         break
+                    line = last + b"\n"
                     output.write(line)
                     sha.update(line)
                     lines += 1
                     size += len(line)
-        process.wait(timeout=max(.1, deadline - time.perf_counter()))
-        if process.returncode or not lines or reader.pending:
-            raise RuntimeError(f"invalid/incomplete {case} trace; see {stderr_path}")
-        return {"case": case, "iterations": iterations, "lines": lines,
-                "uncompressed_bytes": size, "sha256": sha.hexdigest()}
+        process.wait(timeout=max(.1, child_deadline - time.perf_counter()))
+        end = terminal_record(last, case, iterations) if terminal else None
+        if process.returncode or not lines or reader.pending or (terminal and end is None):
+            missing = "; missing terminal end record" if terminal and end is None else ""
+            raise RuntimeError(f"invalid/incomplete {case} trace{missing}; see {stderr_path}")
+        record = {"case": case, "iterations": iterations, "lines": lines,
+                  "uncompressed_bytes": size, "sha256": sha.hexdigest()}
+        return {**record, "end": end} if terminal else record
 
 
 def e2e(executable, steps, hosted, directory):
@@ -296,15 +464,18 @@ def main():
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True, help="new owned output directory")
     parser.add_argument("--repeats", type=int, default=5)
-    parser.add_argument("--iterations", type=int, default=1000)
+    parser.add_argument("--iterations", type=int,
+                        help="override every native workload's catalog sample size")
     parser.add_argument("--e2e-steps", type=int, default=100)
-    parser.add_argument("--trace-iterations", type=int, default=32,
-                        help="separate untimed full-state traces; 0 skips")
-    parser.add_argument("--cases", nargs="+", choices=(*CASES, "e2e-client", "e2e-host"),
-                        default=[*CASES, "e2e-client", "e2e-host"])
+    parser.add_argument("--trace-iterations", type=int,
+                        help="override every catalog trace window; 0 skips traces")
+    parser.add_argument("--cases", nargs="+", metavar="CASE",
+                        help=f"catalog names from `perf_baseline --list` and/or {', '.join(E2E_CASES)}; "
+                             "default: every available catalog workload plus both E2E cases")
     args = parser.parse_args()
-    if not (1 <= args.repeats <= 20 and 1 <= args.iterations <= 100000
-            and 1 <= args.e2e_steps <= 1000 and 0 <= args.trace_iterations <= 1000):
+    if not (1 <= args.repeats <= 20 and 1 <= args.e2e_steps <= 1000
+            and (args.iterations is None or 1 <= args.iterations <= 100000)
+            and (args.trace_iterations is None or 0 <= args.trace_iterations <= 1000)):
         parser.error("repeats 1..20, iterations 1..100000, e2e-steps 1..1000, trace-iterations 0..1000 required")
     args.harness = args.harness.resolve(strict=True)
     args.cli = args.cli.resolve(strict=True)
@@ -320,6 +491,15 @@ def main():
 
 
 def run(args):
+    catalog = load_catalog(args.harness)
+    if args.cases is None:
+        workloads, e2e_cases = catalog.select(), list(E2E_CASES)
+    else:
+        e2e_cases = [case for case in args.cases if case in E2E_CASES]
+        workloads = catalog.select([case for case in args.cases if case not in E2E_CASES])
+    iterations = {w.name: args.iterations or w.iterations for w in workloads}
+    windows = {w.name: w.trace_iterations if args.trace_iterations is None else args.trace_iterations
+               for w in workloads}
     manifest = {
         "schema": "slither-perf-v1", "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source_commit": command_output("git", "rev-parse", "HEAD"),
@@ -332,30 +512,35 @@ def run(args):
         "runner_sha256": digest(__file__), "harness_source_sha256": digest(ROOT / "examples/perf_baseline.rs"),
         "binaries": {str(p): digest(p) for p in (args.harness, args.cli)},
         "arguments": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+        "catalog": catalog.record(),
+        "plan": {"workloads": [{"name": w.name, "iterations": iterations[w.name],
+                                "traceIterations": windows[w.name], "profile": w.profile}
+                               for w in workloads], "e2e": e2e_cases},
         "metric_notes": ["Native workload wall/latency exclude setup; process CPU/wall/peak include setup, teardown and report serialization.",
                          "Windows CPU is kernel+user GetProcessTimes, quantized; peak memory is PeakWorkingSetSize, not private bytes.",
                          "E2E wall and response latency include Python JSON, pipe polling (0.5 ms sleeps), process startup and OS scheduling as applicable.",
                          "Host is real-time, one client plus four bots, stopped after each bounded loopback run; hosted hashes unavailable.",
                          "No CPU affinity or platform tuning. Quiet-window agreement and background load must be recorded separately."]}
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    if args.trace_iterations:
-        traces = [capture_trace(args.harness, case, args.trace_iterations, args.output)
-                  for case in args.cases if case in CASES]
+    traces = [capture_trace(args.harness, w.name, windows[w.name], args.output, terminal=not w.legacy)
+              for w in workloads if windows[w.name]]
+    if traces:
         (args.output / "traces.json").write_text(json.dumps(traces, indent=2) + "\n", encoding="utf-8")
-    profiles = [native(args.harness, case, args.iterations,
-                       args.output / f"{case}-profile-stderr.txt", profile=True)
-                for case in args.cases if case.startswith("step-")]
+    profiles = [native(args.harness, w.name, iterations[w.name],
+                       args.output / f"{w.name}-profile-stderr.txt", profile=True)
+                for w in workloads if w.profile]
     (args.output / "profiles.json").write_text(json.dumps(profiles, indent=2) + "\n", encoding="utf-8")
+    cases = [w.name for w in workloads] + e2e_cases if args.cases is None else args.cases
     with (args.output / "results.jsonl").open("w", encoding="utf-8", newline="\n") as output:
         # One untallied warmup per case. Every repetition runs a fresh process.
         for repetition in range(-1, args.repeats):
-            for case in args.cases:
-                if case.startswith("e2e-"):
+            for case in cases:
+                if case in E2E_CASES:
                     directory = args.output / f"{case}-{repetition}"
                     directory.mkdir()
                     row = e2e(args.cli, args.e2e_steps, case == "e2e-host", directory)
                 else:
-                    row = native(args.harness, case, args.iterations,
+                    row = native(args.harness, case, iterations[case],
                                  args.output / f"{case}-{repetition}-stderr.txt")
                 row["repetition"] = repetition
                 output.write(json.dumps(row, separators=(",", ":")) + "\n")

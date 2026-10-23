@@ -1,7 +1,8 @@
-"""Collect an advisory, fixed-suite PR comparison; standard library only.
+"""Collect an advisory PR comparison over the catalog's ci suite; standard library only.
 
-The worktrees, binaries, logs and failed attempts are retained in fresh owned
-directories. Performance interpretation requires a quiet runner and matched inputs.
+Binaries, logs and failed attempts are retained in fresh owned directories; the
+baseline worktree is removed after the builds. Performance interpretation
+requires a quiet runner and matched inputs.
 """
 
 import argparse
@@ -11,30 +12,18 @@ import os
 from pathlib import Path
 import platform
 import re
-import shutil
 import statistics
 import subprocess
 import sys
 
-from perf_baseline import CASES, capture_trace, digest
+from perf_baseline import capture_trace, digest, load_catalog, same_plan
+import perf_build
+from perf_build import HARNESS, TESTS
+import perf_compare
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTS = ("movement_turns", "physics")
-# PR-pinned harness copied into the baseline; tests/fixtures is copied too.
-HARNESS = ("examples/perf_baseline.rs", "examples/fidelity_metrics.rs", *(f"tests/{name}.rs" for name in TESTS))
 MARKER = "<!-- slither-report-preview -->"
-
-
-def command(args, cwd, log, environment=None, timeout=600):
-    with log.open("w", encoding="utf-8", newline="\n") as output:
-        try:
-            result = subprocess.run(args, cwd=cwd, env=environment, stdout=output,
-                                    stderr=subprocess.STDOUT, text=True, timeout=timeout, check=False)
-            return result.returncode
-        except (OSError, subprocess.TimeoutExpired) as error:
-            output.write(f"\n{type(error).__name__}: {error}\n")
-            return -1
 
 
 def git(*args):
@@ -203,7 +192,10 @@ def render(report):
               "- Faster/slower requires a ≥5% median shift with the same direction in every pair. This is a display heuristic, not statistical significance.",
               "- Process CPU includes setup/teardown; operation wall time excludes them.",
               "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
-              "- Turn errors are duration weighted; speed ramps are grouped by source. Each state trace covers 32 iterations. Changed traces indicate changed behavior."]
+              "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior."]
+    if traces:
+        lines.append("- State trace windows (operations): " + ", ".join(
+            f"`{cell(t['case'])}` {t.get('iterations', '—')}" for t in traces) + ".")
     for row in performance:
         lines.append(f"- `{row['case']}` paired change range: {(row['ratio_min'] - 1) * 100:+.1f}% to {(row['ratio_max'] - 1) * 100:+.1f}%.")
     for name in names:
@@ -237,84 +229,82 @@ def collect(output, head):
               "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               "platform": platform.platform(), "errors": [], "tests": {}, "traces": []}
     work = output.with_name(output.name + "-work")
-    work.mkdir()
-    baseline = work / "base"
-    subprocess.run(["git", "worktree", "add", "--detach", str(baseline), base], cwd=ROOT, check=True, timeout=30)
-    inputs = [*(ROOT / name for name in HARNESS), *sorted((ROOT / "tests/fixtures").rglob("*"))]
-    inputs = [p for p in inputs if p.is_file()]
-    report["inputs"] = {str(p.relative_to(ROOT)).replace("\\", "/"): digest(p) for p in inputs}
-    report["suite_changes"] = [name for name, sha in report["inputs"].items()
-                               if not (baseline / name).is_file() or digest(baseline / name) != sha]
-    report["added_tests"], report["removed_tests"], report["expected_tests"] = [], [], []
-    for name in TESTS:
-        path = Path("tests") / f"{name}.rs"
-        old, new = test_names((baseline / path).read_text()), test_names((ROOT / path).read_text())
-        report["expected_tests"] += [f"{name}::{n}" for n in sorted(new)]
-        report["added_tests"] += [f"{name}::{n}" for n in sorted(new - old)]
-        report["removed_tests"] += [f"{name}::{n}" for n in sorted(old - new)]
-    for path in inputs:
-        destination = baseline / path.relative_to(ROOT)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(path, destination)
-    report["rustc"] = subprocess.check_output(["rustc", "-Vv"], text=True, timeout=30)
     fidelity = {}
-    binaries = {}
-    target = work / "target"
-    for label, checkout in (("baseline", baseline), ("candidate", ROOT)):
-        env = {**os.environ, "CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "2",
-               "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
-        report.setdefault("cargo_locks", {})[label] = digest(checkout / "Cargo.lock")
-        # Package-only clean defaults to dev; explicitly clear release too.
-        # Baseline executables have already been copied out of this target.
-        if label == "candidate" and any(
-                command(["cargo", "clean", "--locked", "--package", "slither-sim", "--profile", profile],
-                        baseline, output / f"candidate-clean-{profile}.log", env)
-                for profile in ("release", "dev")):
-            report["errors"].append("candidate package cleanup failed; candidate measurements unavailable")
-            continue
-        print(f"[{label}] Building release measurement examples", flush=True)
-        build_log = output / f"{label}-build.log"
-        built = command(["cargo", "build", "--release", "--locked", "--example", "perf_baseline", "--example", "fidelity_metrics"], checkout, build_log, env)
+
+    def measured(snapshot, build, environment):
+        label = snapshot.label
         test_log = output / f"{label}-tests.log"
         print(f"[{label}] Running the selected regression suite", flush=True)
-        code = command(["cargo", "test", "--locked", "--no-fail-fast", "--test", "movement_turns", "--test", "physics", "--", "--test-threads=1"], checkout, test_log, env)
+        code = perf_build.command(["cargo", "test", "--locked", "--no-fail-fast", "--test", "movement_turns", "--test", "physics", "--", "--test-threads=1"],
+                                  snapshot.checkout, test_log, environment)
         report["tests"][label] = parse_tests(test_log.read_text(encoding="utf-8"))
         if code:
             report["errors"].append(f"{label} selected tests exited {code}")
-        if built:
-            report["errors"].append(f"{label} release build exited {built}")
-            continue
-        suffix = ".exe" if os.name == "nt" else ""
-        bins = work / f"bin-{label}"
-        bins.mkdir()
-        for name in ("perf_baseline", "fidelity_metrics"):
-            shutil.copy2(target / f"release/examples/{name}{suffix}", bins / f"{name}{suffix}")
-        binaries[label] = bins / f"perf_baseline{suffix}"
-        report.setdefault("binaries", {})[label] = {p.name: digest(p) for p in bins.iterdir()}
+        if build is None:
+            return
         metrics_log = output / f"{label}-fidelity.json"
-        if command([str(bins / f"fidelity_metrics{suffix}"), str(ROOT / "tests/fixtures")], checkout, metrics_log):
+        if perf_build.command([str(build.binaries["fidelity_metrics"]), str(ROOT / "tests/fixtures")], snapshot.checkout, metrics_log):
             report["errors"].append(f"{label} fidelity metrics unavailable")
         else:
             fidelity[label] = json.loads(metrics_log.read_text(encoding="utf-8"))
+
+    with perf_build.Session(ROOT, work) as session:
+        baseline = session.worktree("baseline", base)
+        candidate = perf_build.checkout_snapshot(ROOT, "candidate")
+        report["added_tests"], report["removed_tests"], report["expected_tests"] = [], [], []
+        for name in TESTS:
+            path = Path("tests") / f"{name}.rs"
+            old, new = test_names((baseline.checkout / path).read_text()), test_names((ROOT / path).read_text())
+            report["expected_tests"] += [f"{name}::{n}" for n in sorted(new)]
+            report["added_tests"] += [f"{name}::{n}" for n in sorted(new - old)]
+            report["removed_tests"] += [f"{name}::{n}" for n in sorted(old - new)]
+        baseline = perf_build.overlay(candidate, baseline)
+        report["inputs"], report["suite_changes"] = baseline.inputs, list(baseline.suite_changes)
+        report["rustc"] = subprocess.check_output(["rustc", "-Vv"], text=True, timeout=30)
+        report["cargo_locks"] = {s.label: digest(s.checkout / "Cargo.lock") for s in (baseline, candidate)}
+        builds, errors = perf_build.build_all(
+            [baseline, candidate], perf_build.SharedTarget(work / "target"), ("perf_baseline", "fidelity_metrics"),
+            logs=output, bins=work, hook=measured)
+    report["errors"] += errors
+    report["binaries"] = {label: build.hashes for label, build in builds.items()}
+    report["identities"] = {label: build.record for label, build in builds.items()}
     report["fidelity"] = metric_rows(fidelity.get("baseline"), fidelity.get("candidate"))
-    for case in CASES:
-        print(f"[parity] Capturing {case} traces", flush=True)
+    binaries = {label: build.binaries["perf_baseline"] for label, build in builds.items()}
+    suites = {}
+    for label, binary in binaries.items():
+        try:
+            suites[label] = load_catalog(binary).select(suite="ci")
+        except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as error:
+            report["errors"].append(f"{label} workload catalog: {error}")
+    if len(suites) == 2:
+        try:
+            same_plan(suites)
+        except ValueError as error:
+            report["errors"].append(str(error))
+            suites = {}
+    workloads = suites.get("candidate", suites.get("baseline", ()))
+    report["workloads"] = [w.plan() for w in workloads]
+    for workload in workloads:
+        print(f"[parity] Capturing {workload.name} traces", flush=True)
         hashes = {}
-        for label, binary in binaries.items():
+        for label in suites:
             directory = output / f"traces-{label}"
             directory.mkdir(exist_ok=True)
             try:
-                hashes[label] = capture_trace(binary, case, 32, directory)
+                hashes[label] = capture_trace(binaries[label], workload.name, workload.trace_iterations,
+                                              directory, terminal=not workload.legacy)
             except Exception as error:
-                report["errors"].append(f"{label} {case} trace: {error}")
-        report["traces"].append({"case": case, **hashes, "reading": "Unavailable" if len(hashes) != 2
+                report["errors"].append(f"{label} {workload.name} trace: {error}")
+        report["traces"].append({"case": workload.name, "iterations": workload.trace_iterations, **hashes,
+                                 "reading": "Unavailable" if len(hashes) != 2
                                  else "Equal" if hashes["baseline"]["sha256"] == hashes["candidate"]["sha256"] else "Changed"})
-    if len(binaries) == 2:
+    if len(suites) == 2 and workloads:
         print("[performance] Running three alternating pairs for each workload", flush=True)
         perf = output / "performance"
-        code = command([sys.executable, str(ROOT / "tools/perf_compare.py"), "--baseline", str(binaries["baseline"]),
-                        "--candidate", str(binaries["candidate"]), "--output", str(perf), "--repeats", "3"],
-                       ROOT, output / "performance.log")
+        code = perf_build.command([sys.executable, perf_compare.__file__, "--baseline", str(binaries["baseline"]),
+                                   "--candidate", str(binaries["candidate"]), "--output", str(perf),
+                                   "--repeats", "3", "--suite", "ci"],
+                                  ROOT, output / "performance.log")
         if code:
             report["errors"].append(f"paired performance runner exited {code}")
         else:
