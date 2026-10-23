@@ -188,9 +188,8 @@ struct KnownSnake {
     fam: u32,
     kills: usize,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 struct KnownPrey {
-    grid: [u16; 2],
     motion: [u32; 3],
 }
 
@@ -1239,7 +1238,6 @@ impl SimulatorBackend {
         }
         for (id, prey) in visible {
             let current = KnownPrey {
-                grid: encode::prey_grid(prey.position)?,
                 motion: [
                     encode::angle_u24(prey.heading),
                     encode::angle_u24(prey.target_heading),
@@ -1248,8 +1246,10 @@ impl SimulatorBackend {
             };
             match connection.prey.get(&id) {
                 None => packets.push(encode::prey_appearance(prey)?),
-                Some(known) if *known == current => continue,
                 Some(known) => {
+                    // The stock client extrapolates even when quantization
+                    // leaves the authoritative prey still. Refresh its anchor
+                    // every broadcast or it drifts until a later motion change.
                     packets.push(encode::prey_motion(prey, known.motion != current.motion)?)
                 }
             }
@@ -2152,6 +2152,48 @@ mod tests {
                 .pump(&mut sim, 0)
                 .contains(&encode::sector_clear([key[0], key[1]]))
         );
+    }
+
+    #[test]
+    fn unchanged_prey_positions_still_correct_client_prediction() {
+        let mut config = raw_config(1);
+        config.world.radius = 5000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut sim = RawSimulator::new(7, config, 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey correction");
+        sim.backend.world.snakes[0].alive = false;
+        sim.backend
+            .world
+            .respawn(0, Point::default(), PI, 2)
+            .unwrap();
+        sim.backend.slots[0].control.heading = PI;
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let position = Point { x: 700., y: 700. };
+        sim.backend.world.prey.push(crate::prey::Prey {
+            id: 123,
+            position,
+            heading: PI / 4.,
+            target_heading: PI / 4.,
+            speed: 6.060 / physics::SPEED_UNIT_SECONDS,
+            size: 6.,
+        });
+        sim.backend
+            .world
+            .set_prey_mode(123, crate::prey::PreyMode::Outward)
+            .unwrap();
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        remote.packets.clear();
+        run(&mut sim, &mut [(0, &mut remote)], 30);
+        // Both positive displacements are below one unit per 7 ms tick and
+        // floor to zero, despite the nonzero speed advertised to the client.
+        assert_eq!(sim.backend.world.prey[0].position, position);
+        let reports: Vec<_> = remote.packets.iter().filter(|p| p[0] == b'j').collect();
+        assert_eq!(reports.len(), 5);
+        assert!(reports.iter().all(|p| p.len() == 7));
+        let received = remote.frame(&sim).observation.unwrap();
+        assert!(received.prey[0].position.distance(position) < 8.);
     }
 
     #[test]

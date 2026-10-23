@@ -46,6 +46,11 @@ Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
 
+Prey position corrections are emitted every gameplay broadcast, including when
+the quantized server position is unchanged. The stock client keeps predicting
+from advertised speed; suppressing unchanged reports let rendered prey drift
+away from their collectible server positions and snap back on a later update.
+
 Regression checks: `cargo test --locked` covers sector retention, source-pinned
 entry witnesses, actual eater attribution, whole-body coverage, safe admission,
 minimap geometry, independent timing, death and reconnect.

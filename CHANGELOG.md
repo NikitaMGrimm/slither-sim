@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep correcting predicted prey positions even when authoritative grid/motion
+  is unchanged, preventing drifting ghosts and later snap-backs.
 - Use shared finite 1,500-unit snake/prey coverage and retained food-sector interest;
   restore 136-cell minimaps with an independent clock. Require safe whole-body
   admission for hosted startup, joins and respawns, with no cramped fallback.
