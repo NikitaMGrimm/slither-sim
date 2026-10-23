@@ -92,11 +92,16 @@ alongside its server and optional Origin, then use the same `init`, `collect`,
  "mode": "crossing", "direction": "diagonal-positive"}
 ```
 
-Paired plans require exactly two clients, 1–480 seconds and an explicit `mode`
+Paired plans require exactly two clients, 1–3,600 seconds and an explicit `mode`
 of `overlap` or `crossing`. A fixed `direction` is optional for crossing and
 invalid for overlap. Audits compare the recorded mode/direction against the frozen
 plan as well as checking both members and source hashes. A completed capture
 does not certify a valid crossing or statistical coverage.
+
+The duration ceiling is an operational capture budget, not a server constant.
+The paired CLI and `recordPair` still default to 480 seconds when duration is
+omitted; managed plans require an explicit duration. Historical 480-second
+studies retain their declared duration and scientific/control settings.
 
 Low-level paired-death and feeding-shape collectors still need their own matching
 coordinator and attempt accounting.
