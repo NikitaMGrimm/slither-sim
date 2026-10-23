@@ -36,8 +36,10 @@ cargo build --release --locked --bin slither-sim --example perf_baseline -j 2
 Use task-owned target storage or coordinate use of the existing Cargo target.
 For baseline/candidate source snapshots, use a separate target directory per
 snapshot, including when source files retain old timestamps. Keep the build log,
-absolute source/manifest paths and exact build command with each copied binary;
-a fast cached build alone does not verify that it used the intended snapshot.
+absolute source/manifest paths and exact build command with each copied binary.
+At build time, bind its binary hash to an immutable source identity: a clean
+commit/tree ID or a source-manifest digest covering all compiled inputs and local
+edits. A fast cached build alone does not verify that it used the intended snapshot.
 Copy both executables into a new owned output directory before timing. Do not
 benchmark executables in a shared target that another build can replace. On
 Windows, for example (adjust the source target path if configured):
@@ -62,9 +64,12 @@ Outputs are ignored by Git; preserve relevant results before cleanup. The source
 status and diff hash accompany the commit because the benchmark itself can be an
 addition to the runtime baseline. Build commands/profile and the exact CPU model
 must also be recorded with a report. The runner does not build or infer which
-sources produced an arbitrary executable.
+sources produced an arbitrary executable; its measurement-time checkout hashes
+do not establish the binary's build-time source identity.
 
 A binary hash identifies the copied bytes, not the source that produced them.
+Reject benchmark inputs with missing or mismatched build records before timing;
+the runner does not enforce that provenance check.
 If build provenance is uncertain, retain the attempt as invalid and rebuild in a
 fresh snapshot-specific target before running parity checks and then timings.
 
