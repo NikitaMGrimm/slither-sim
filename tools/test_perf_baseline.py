@@ -8,13 +8,37 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import perf_baseline
 import perf_compare
 
 
 class ProcessFailures(unittest.TestCase):
+    def test_host_cleanup_survives_client_stop_or_pipe_failure(self):
+        for failure in ("stop", "pipe"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                host = Mock(stdin=None, stdout=None, stderr=io.BytesIO(b"fatal witness\n"))
+                client = Mock(stdin=Mock(), stdout=Mock(), stderr=None)
+                host.poll.return_value = 0
+                if failure == "pipe":
+                    client.stdin.close.side_effect = OSError("client cleanup witness")
+
+                def stop(process):
+                    if failure == "stop" and process is client:
+                        raise OSError("client cleanup witness")
+
+                with patch.object(perf_baseline.subprocess, "Popen", side_effect=[host, client]), patch.object(
+                        perf_baseline.Lines, "read", side_effect=[b"Listening on ws://127.0.0.1:1/slither",
+                                                                 TimeoutError("request witness")]), patch.object(
+                        perf_baseline, "stop", side_effect=stop) as stopped:
+                    with self.assertRaisesRegex(OSError, "client cleanup witness"):
+                        perf_baseline.e2e(Path(sys.executable), 1, True, Path(temporary))
+                self.assertEqual(stopped.call_args_list[-1].args, (host,))
+                client.stdout.close.assert_called_once()
+                self.assertTrue(host.stderr.closed)
+                self.assertIn("fatal witness", (Path(temporary) / "host-stderr.txt").read_text())
+
     def test_manifest_command_timeout_is_enforced(self):
         with patch.object(perf_baseline, "COMMAND_TIMEOUT_SECONDS", .05):
             with self.assertRaises(subprocess.TimeoutExpired):

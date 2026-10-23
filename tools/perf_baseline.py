@@ -4,6 +4,7 @@ Pass copied, immutable executables, not a shared Cargo target. See docs/performa
 """
 
 import argparse
+from contextlib import ExitStack
 import ctypes
 import gzip
 import hashlib
@@ -107,6 +108,24 @@ def stop(process):
     if process.poll() is None:
         process.kill()
         process.wait(timeout=10)
+
+
+def close_child(process, reader=None, errors=None):
+    if process is None:
+        return
+    with ExitStack() as pipes:
+        for pipe in (process.stdin, process.stdout, process.stderr):
+            if pipe is not None:
+                pipes.callback(pipe.close)
+        try:
+            stop(process)
+        finally:
+            if reader is not None:
+                if process.poll() is not None:
+                    reader.drain(errors)
+                else:
+                    # A failed stop must not turn diagnostic draining into an unbounded read.
+                    errors.write(reader.pending)
 
 
 def percentiles(values):
@@ -246,18 +265,18 @@ def e2e(executable, steps, hosted, directory):
             result["response_sha256"] = None  # Real-time receipts are intentionally nondeterministic.
         return result
     finally:
-        for child in (process, host):
-            if child is not None:
-                stop(child)
-                if child is host and host_error:
-                    host_reader.drain(host_error)
-                for pipe in (child.stdin, child.stdout, child.stderr):
-                    if pipe is not None:
-                        pipe.close()
-        if host_error:
-            host_error.close()
-        if client_error:
-            client_error.close()
+        try:
+            close_child(process)
+        finally:
+            try:
+                close_child(host, host_reader, host_error)
+            finally:
+                try:
+                    if host_error:
+                        host_error.close()
+                finally:
+                    if client_error:
+                        client_error.close()
 
 
 def main():
