@@ -73,7 +73,10 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 
 For incremental body encoding, `broadcastTicks × world.dt × 437.5` must be
 less than 84 world units. All possible arena radii must be at most 32,000, and
-configured prey speeds must satisfy `round(speed × 32) ≤ 65535`.
+configured prey speeds must satisfy `round(speed × 32) ≤ 65535`. The largest
+attainable prey size on the 0.2-unit spawn grid must not exceed 51, the maximum
+encodable in an appearance packet. Range endpoints may exceed 51 if they still
+only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 
 ## World Config
 
