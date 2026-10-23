@@ -291,7 +291,7 @@ fn contract_body(body: &mut [Point]) {
     }
 }
 pub fn crossed_anchor(_previous: Point, head: Point, last: Point) -> Option<Point> {
-    if head.distance(last) < 42.0 {
+    if head.distance_lt(last, 42.0) {
         return None;
     }
     // The authoritative anchor points along the current head ray when the
