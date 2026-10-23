@@ -1,6 +1,7 @@
-//! Caches for the step's food paths. The cell occupancy cache cannot change a
-//! result: it is compared with `Simulator::food` bit for bit before it is trusted.
-use crate::model::{Food, Origin};
+//! Caches for the step's food paths. Neither one can change a result: the cell
+//! occupancy cache is compared with `Simulator::food` bit for bit before it is
+//! trusted, and the eater grid omits only pickup candidates that cannot qualify.
+use crate::model::{Food, Origin, Point};
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 
@@ -175,9 +176,151 @@ impl FoodCache {
     }
 }
 
+const CELL: f64 = 128.0;
+/// Eaters with center coordinates and radius within this bound are indexed.
+/// Below 2^20 rounding in the cover bounds stays under 1e-9, so the cover
+/// contains every pellet the exact pickup test can accept; see `EaterGrid::build`.
+const REGULAR: f64 = (1u64 << 20) as f64;
+const MAX_CELLS: usize = 1 << 20;
+const NONE: u32 = u32::MAX;
+
+/// Dense grid of pickup circles, with each cell listing eaters in ascending order.
+#[derive(Clone, Default)]
+pub(crate) struct EaterGrid {
+    /// Cell bounds, `[lo, end)`, as exact small integers.
+    lo_x: f64,
+    lo_y: f64,
+    end_x: f64,
+    end_y: f64,
+    lo: (i64, i64),
+    width: usize,
+    heads: Vec<u32>,
+    touched: Vec<u32>,
+    /// (eater, next node) linked lists.
+    nodes: Vec<(u32, u32)>,
+    covers: Vec<[i64; 4]>,
+}
+impl std::fmt::Debug for EaterGrid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EaterGrid").finish_non_exhaustive()
+    }
+}
+impl EaterGrid {
+    /// Index `(center, radius)` circles. Returns false, leaving the grid unusable,
+    /// when a circle is non-finite or too far out or the grid would be too large.
+    ///
+    /// Exactness: a pellet `p` passes the pickup test only if
+    /// `hypot(p.x - c.x, p.y - c.y) <= r`, which, for finite values under 2^20, puts
+    /// `p.x` within `r + 4e-10` of `c.x` after rounding. The cover bound
+    /// `c.x - r - 1e-9` rounds by at most 2.4e-10, so it never excludes such a pellet;
+    /// floor division by a positive cell is monotonic. With finite circles a
+    /// non-finite pellet fails the distance test or gets a NaN distance, which
+    /// never wins. The hashed index uses the same bound, so its result agrees.
+    pub(crate) fn build(&mut self, circles: impl ExactSizeIterator<Item = (Point, f64)>) -> bool {
+        for &i in &self.touched {
+            self.heads[i as usize] = NONE;
+        }
+        self.touched.clear();
+        self.nodes.clear();
+        self.covers.clear();
+        let (mut lo_x, mut lo_y, mut hi_x, mut hi_y) = (i64::MAX, i64::MAX, i64::MIN, i64::MIN);
+        let mut area = 0usize;
+        for (c, r) in circles {
+            if !(r >= 0.0 && c.x.abs() + r <= REGULAR && c.y.abs() + r <= REGULAR) {
+                return false;
+            }
+            let cover = [
+                ((c.x - r - 1e-9) / CELL).floor() as i64,
+                ((c.x + r + 1e-9) / CELL).floor() as i64,
+                ((c.y - r - 1e-9) / CELL).floor() as i64,
+                ((c.y + r + 1e-9) / CELL).floor() as i64,
+            ];
+            lo_x = lo_x.min(cover[0]);
+            hi_x = hi_x.max(cover[1]);
+            lo_y = lo_y.min(cover[2]);
+            hi_y = hi_y.max(cover[3]);
+            area = area
+                .saturating_add(((cover[1] - cover[0] + 1) * (cover[3] - cover[2] + 1)) as usize);
+            self.covers.push(cover);
+        }
+        if self.covers.is_empty() {
+            (lo_x, lo_y, hi_x, hi_y) = (0, 0, -1, -1);
+        }
+        let width = (hi_x - lo_x + 1) as usize;
+        let cells = width * (hi_y - lo_y + 1) as usize;
+        if cells > MAX_CELLS || area > MAX_CELLS || self.covers.len() >= NONE as usize {
+            return false;
+        }
+        if self.heads.len() < cells {
+            self.heads.resize(cells, NONE);
+        }
+        (self.lo_x, self.lo_y) = (lo_x as f64, lo_y as f64);
+        (self.end_x, self.end_y) = ((hi_x + 1) as f64, (hi_y + 1) as f64);
+        self.lo = (lo_x, lo_y);
+        self.width = width;
+        // Prepending in descending eater order leaves each list ascending.
+        for (e, cover) in self.covers.iter().enumerate().rev() {
+            for y in cover[2]..=cover[3] {
+                for x in cover[0]..=cover[1] {
+                    let cell = (x - lo_x) as usize + (y - lo_y) as usize * width;
+                    let head = &mut self.heads[cell];
+                    if *head == NONE {
+                        self.touched.push(cell as u32);
+                    }
+                    self.nodes.push((e as u32, *head));
+                    *head = (self.nodes.len() - 1) as u32;
+                }
+            }
+        }
+        true
+    }
+    /// Eaters whose cover contains `p`'s cell, ascending.
+    pub(crate) fn candidates(&self, p: Point) -> Option<Candidates<'_>> {
+        // `floor` is a library call on baseline x86-64. For an integer bound,
+        // `floor(v) >= lo` iff `v >= lo` and `floor(v) < end` iff `v < end`.
+        let x = p.x / CELL;
+        let y = p.y / CELL;
+        // NaN pellets fall out here; the exact test never picks them either.
+        if !(x >= self.lo_x && x < self.end_x && y >= self.lo_y && y < self.end_y) {
+            return None;
+        }
+        let cell = (floor_small(x) - self.lo.0) as usize
+            + (floor_small(y) - self.lo.1) as usize * self.width;
+        let node = self.heads[cell];
+        (node != NONE).then_some(Candidates {
+            nodes: &self.nodes,
+            node,
+        })
+    }
+}
+
+/// `v.floor() as i64` for `|v| < 2^52`.
+#[inline]
+fn floor_small(v: f64) -> i64 {
+    let t = v as i64;
+    t - i64::from(t as f64 > v)
+}
+
+pub(crate) struct Candidates<'a> {
+    nodes: &'a [(u32, u32)],
+    node: u32,
+}
+impl Iterator for Candidates<'_> {
+    type Item = usize;
+    fn next(&mut self) -> Option<usize> {
+        if self.node == NONE {
+            return None;
+        }
+        let (eater, next) = self.nodes[self.node as usize];
+        self.node = next;
+        Some(eater as usize)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::physics::Bounds;
 
     struct Rng(u64);
     impl Rng {
@@ -285,5 +428,115 @@ mod tests {
             }
             cache.end();
         }
+    }
+
+    fn accepts(p: Point, center: Point, radius: f64) -> bool {
+        Bounds::between(center, center).near(Bounds::between(p, p), radius + 1e-9)
+            && p.distance(center) <= radius
+    }
+
+    #[test]
+    fn eater_grid_lists_every_eater_that_can_accept_a_pellet() {
+        let mut rng = Rng(0x2545_f491_4f6c_dd1d);
+        let mut grid = EaterGrid::default();
+        for round in 0..300 {
+            let spread = [300.0, 3000.0, 3000.0][round % 3];
+            // Far-out clusters exercise rounding near the indexing bound.
+            let offset = [0.0, 0.0, 1e6 - 2000.0][round % 3] * (rng.unit() - 0.5).signum();
+            let circles: Vec<(Point, f64)> = (0..1 + rng.below(40))
+                .map(|_| {
+                    let mut c = Point {
+                        x: offset + (rng.unit() - 0.5) * spread,
+                        y: -offset + (rng.unit() - 0.5) * spread,
+                    };
+                    let r = 36.0 + rng.unit() * 100.0;
+                    if rng.below(2) == 0 {
+                        // Covers starting on a cell edge after rounding.
+                        c.x = (c.x / CELL).round() * CELL + r;
+                    }
+                    (c, r)
+                })
+                .collect();
+            assert!(grid.build(circles.iter().copied()));
+            for _ in 0..400 {
+                let (c, r) = circles[rng.below(circles.len())];
+                let angle = rng.unit() * std::f64::consts::TAU;
+                let mut p = Point {
+                    x: c.x + angle.cos() * r,
+                    y: c.y + angle.sin() * r,
+                };
+                let ulps = |v: f64, rng: &mut Rng| {
+                    f64::from_bits(
+                        v.to_bits()
+                            .wrapping_add(rng.below(7) as u64)
+                            .wrapping_sub(3),
+                    )
+                };
+                match rng.below(5) {
+                    0 | 1 => {
+                        p = Point {
+                            x: ulps(c.x - r, &mut rng),
+                            y: c.y,
+                        }
+                    }
+                    2 => p.x = ulps(p.x, &mut rng),
+                    3 => p.x = (p.x / CELL).round() * CELL - f64::from(rng.below(2) as u8) * 1e-12,
+                    _ if rng.below(4) == 0 => p.y = SPECIAL[rng.below(SPECIAL.len())],
+                    _ => {}
+                }
+                let listed: Vec<usize> = grid.candidates(p).into_iter().flatten().collect();
+                assert!(listed.windows(2).all(|w| w[0] < w[1]));
+                for (e, &(center, radius)) in circles.iter().enumerate() {
+                    if accepts(p, center, radius) && !p.x.is_nan() && !p.y.is_nan() {
+                        assert!(listed.contains(&e), "{p:?} {center:?} {radius}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eater_grid_declines_circles_it_cannot_bound_exactly() {
+        let mut grid = EaterGrid::default();
+        let c = Point { x: 0.0, y: 0.0 };
+        for (center, radius) in [
+            (
+                Point {
+                    x: f64::NAN,
+                    y: 0.0,
+                },
+                36.0,
+            ),
+            (
+                Point {
+                    x: 0.0,
+                    y: f64::INFINITY,
+                },
+                36.0,
+            ),
+            (c, f64::NAN),
+            (c, -1.0),
+            (Point { x: REGULAR, y: 0.0 }, 36.0),
+        ] {
+            assert!(!grid.build([(c, 36.0), (center, radius)].into_iter()));
+        }
+        assert!(!grid.build([(c, 36.0), (Point { x: 9e5, y: 9e5 }, 36.0)].into_iter()));
+        assert!(grid.build([(c, 36.0)].into_iter()));
+        assert!(
+            grid.candidates(Point {
+                x: 0.0,
+                y: f64::NAN
+            })
+            .is_none()
+        );
+        assert_eq!(
+            grid.candidates(Point {
+                x: -1e-300,
+                y: 35.0
+            })
+            .unwrap()
+            .collect::<Vec<_>>(),
+            [0]
+        );
     }
 }

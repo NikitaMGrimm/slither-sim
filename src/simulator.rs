@@ -1,5 +1,5 @@
 use crate::bounds_index::BoundsIndex;
-use crate::food_grid::FoodCache;
+use crate::food_grid::{EaterGrid, FoodCache};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
@@ -302,6 +302,8 @@ pub struct Simulator {
     radius_update_index: usize,
     #[serde(skip)]
     food_cache: FoodCache,
+    #[serde(skip)]
+    eater_grid: EaterGrid,
 }
 impl Simulator {
     /// Set ambient placement attempts per second, preserving fractional refill credit.
@@ -349,6 +351,7 @@ impl Simulator {
             prey_motion_clock: 0.0,
             radius_update_index: 0,
             food_cache: FoodCache::default(),
+            eater_grid: EaterGrid::default(),
         };
         world.update_radius(0.0);
         world.food.reserve(world.config.food_count);
@@ -931,6 +934,15 @@ impl Simulator {
         const CELL: f64 = 256.0;
         let indexed =
             self.config.food_index && eaters.len().saturating_mul(self.food.len()) >= 32000;
+        // The dense grid lists exactly the eaters whose cover holds a pellet's cell.
+        // Circles it cannot index fall back to the hashed buckets below.
+        let dense = indexed
+            && self.eater_grid.build(
+                eaters
+                    .iter()
+                    .map(|&(_, center, radius, _)| (center, radius)),
+            );
+        let indexed = indexed && !dense;
         let groups = eaters.len().div_ceil(64);
         // Hash collisions add candidates only; they can never remove a real candidate.
         let bucket = |x: i64, y: i64| {
@@ -954,48 +966,66 @@ impl Simulator {
                 }
             }
         }
-        let mut indexed_candidates = Vec::with_capacity(eaters.len());
-        let mut eaten = vec![false; self.food.len()];
-        let mut any_eaten = false;
-        for (findex, f) in self.food.iter().enumerate().rev() {
-            let p = f.point();
-            let eater = if indexed {
-                indexed_candidates.clear();
-                let offset =
-                    bucket((p.x / CELL).floor() as i64, (p.y / CELL).floor() as i64) * groups;
-                for g in 0..groups {
-                    let mut mask = grid[offset + g];
-                    while mask != 0 {
-                        indexed_candidates.push(g * 64 + mask.trailing_zeros() as usize);
-                        mask &= mask - 1;
+        // Eating changes only mass, which no pickup test reads, so eaters are found
+        // first and then applied in the same reverse food order.
+        let mut hits = Vec::new();
+        if dense {
+            dense_hits::<PROFILE>(
+                &self.eater_grid,
+                &self.snakes,
+                &eaters,
+                &self.food,
+                &mut hits,
+                profile,
+            );
+        } else {
+            let mut indexed_candidates = Vec::with_capacity(eaters.len());
+            for (findex, f) in self.food.iter().enumerate().rev() {
+                let p = f.point();
+                let eater = if indexed {
+                    indexed_candidates.clear();
+                    let offset =
+                        bucket((p.x / CELL).floor() as i64, (p.y / CELL).floor() as i64) * groups;
+                    for g in 0..groups {
+                        let mut mask = grid[offset + g];
+                        while mask != 0 {
+                            indexed_candidates.push(g * 64 + mask.trailing_zeros() as usize);
+                            mask &= mask - 1;
+                        }
                     }
+                    find_eater::<PROFILE>(
+                        &self.snakes,
+                        p,
+                        indexed_candidates.iter().map(|&e| eaters[e]),
+                        profile,
+                    )
+                } else {
+                    find_eater::<PROFILE>(&self.snakes, p, eaters.iter().copied(), profile)
+                };
+                if let Some(i) = eater {
+                    hits.push((findex, i));
                 }
-                find_eater::<PROFILE>(
-                    &self.snakes,
-                    p,
-                    indexed_candidates.iter().map(|&e| eaters[e]),
-                    profile,
-                )
-            } else {
-                find_eater::<PROFILE>(&self.snakes, p, eaters.iter().copied(), profile)
-            };
-            if let Some(i) = eater {
-                if let Some(events) = &mut self.pickup_events {
-                    events.push(PickupEvent {
-                        eater: i,
-                        item: PickupItem::Food(f.clone()),
-                    });
-                }
-                let s = &mut self.snakes[i];
-                s.fam += f
-                    .size
-                    .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
-                Self::update_mass(s);
-                eaten[findex] = true;
-                any_eaten = true;
             }
         }
-        if any_eaten {
+        for &(findex, i) in &hits {
+            let f = &self.food[findex];
+            if let Some(events) = &mut self.pickup_events {
+                events.push(PickupEvent {
+                    eater: i,
+                    item: PickupItem::Food(f.clone()),
+                });
+            }
+            let s = &mut self.snakes[i];
+            s.fam += f
+                .size
+                .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
+            Self::update_mass(s);
+        }
+        if !hits.is_empty() {
+            let mut eaten = vec![false; self.food.len()];
+            for &(findex, _) in &hits {
+                eaten[findex] = true;
+            }
             self.food_cache.remove(&eaten);
             let mut i = 0;
             self.food.retain(|_| {
@@ -1405,6 +1435,26 @@ fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
         || (a.x < -limit && b.x < -limit)
         || (a.y > limit && b.y > limit)
         || (a.y < -limit && b.y < -limit)
+}
+
+/// Visit food in reverse, recording each pellet's eater.
+fn dense_hits<const PROFILE: bool>(
+    grid: &EaterGrid,
+    snakes: &[Snake],
+    eaters: &[(usize, Point, f64, Bounds)],
+    food: &[Food],
+    hits: &mut Vec<(usize, usize)>,
+    profile: &mut StepProfile,
+) {
+    for (findex, f) in food.iter().enumerate().rev() {
+        let p = f.point();
+        if let Some(candidates) = grid.candidates(p) {
+            let eater = find_eater::<PROFILE>(snakes, p, candidates.map(|e| eaters[e]), profile);
+            if let Some(i) = eater {
+                hits.push((findex, i));
+            }
+        }
+    }
 }
 
 fn find_eater<const PROFILE: bool>(
