@@ -3,6 +3,9 @@ reviews:
   high_level_summary: false
   changed_files_summary: false
   sequence_diagrams: false
+  auto_review:
+    ignore_title_keywords:
+      - "chore(release):"
   path_filters:
     - "!README.md"
     - "!CHANGELOG.md"
