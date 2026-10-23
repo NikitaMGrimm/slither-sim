@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime, timedelta, timezone
 import io
 import json
 import subprocess
@@ -121,6 +122,54 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(release, "fetch", side_effect=[metadata, self.archive()]):
             with self.assertRaisesRegex(ValueError, "checksum"):
                 release.published_commit("slither-sim", "0.1.0")
+
+
+class CooldownTests(unittest.TestCase):
+    now = datetime(2026, 10, 24, 2, 0, tzinfo=timezone.utc)
+
+    def test_interval_boundary_includes_crates_and_every_published_github_release(self):
+        for source in ("crate", "github"):
+            for elapsed, expected in ((timedelta(hours=12) - timedelta(microseconds=1), False),
+                                      (timedelta(hours=12), True), (timedelta(hours=13), True)):
+                with self.subTest(source=source, elapsed=elapsed):
+                    old = (self.now - timedelta(days=2)).isoformat()
+                    recent = (self.now - elapsed).isoformat()
+                    versions = [{"created_at": recent if source == "crate" else old, "yanked": True}]
+                    releases = [{"draft": False, "prerelease": True,
+                                 "published_at": recent if source == "github" else old},
+                                {"draft": True, "published_at": None}]
+                    with patch.object(release, "registry_versions", return_value=versions), \
+                            patch.object(release, "github_pages", return_value=releases), \
+                            patch.dict("os.environ", {"GH_REPO": "owner/repo"}):
+                        self.assertEqual(release.cooldown_ready("slither-sim", self.now), expected)
+
+    def test_missing_malformed_and_unavailable_state_fail_closed(self):
+        cases = ([], [{"created_at": "invalid"}], [{"created_at": "2026-10-23T14:00:00"}])
+        for versions in cases:
+            with self.subTest(versions=versions), \
+                    patch.object(release, "registry_versions", return_value=versions), \
+                    patch.object(release, "github_pages", return_value=[]), \
+                    patch.dict("os.environ", {"GH_REPO": "owner/repo"}):
+                with self.assertRaises(ValueError):
+                    release.cooldown_ready("slither-sim", self.now)
+        with patch.object(release, "registry_versions", side_effect=OSError("offline")):
+            with self.assertRaises(OSError):
+                release.cooldown_ready("slither-sim", self.now)
+
+    def test_bot_merge_ci_dispatch_uses_immutable_tag_and_exact_sha(self):
+        with patch.object(release.subprocess, "check_output", side_effect=["", "", "", "42"]) as lookup, \
+                patch.object(release.subprocess, "run") as run, \
+                patch.object(release.time, "monotonic", return_value=0), \
+                patch.object(release.time, "sleep"):
+            release.require_main_ci("a" * 40, dispatch_ref="v0.2.1")
+            self.assertIn(["gh", "workflow", "run", "checks.yml", "--ref", "v0.2.1"],
+                          [call.args[0] for call in run.call_args_list])
+            dispatched = [call.args[0] for call in lookup.call_args_list
+                          if "workflow_dispatch" in call.args[0]]
+            self.assertEqual(len(dispatched), 2)
+            for command in dispatched:
+                self.assertEqual(command[command.index("--commit") + 1], "a" * 40)
+                self.assertEqual(command[command.index("--branch") + 1], "v0.2.1")
 
 
 if __name__ == "__main__":
