@@ -83,7 +83,8 @@ pub struct SimulationConfig {
     pub minimap_interval_seconds: f64,
     pub minimap_side: usize,
     /// Seconds between leaderboards to each playing connection, starting with
-    /// its own appearance. A local schedule, not a measured official interval.
+    /// its own appearance. The default approximates received cadence; the
+    /// initial phase and exact server scheduler remain unidentified.
     pub leaderboard_interval_seconds: f64,
     /// Offer a world-run record and victory entry. This local rule is not an
     /// established official-server qualification policy.
@@ -115,6 +116,7 @@ impl SimulationConfig {
     pub fn validate(&self) -> Result<(), String> {
         self.world.validate()?;
         self.latency.validate()?;
+        encode::setup(self.world.radius, self.world.prey.turn_rate)?;
         for speed in [
             self.world.prey.cruise_speed,
             self.world.prey.escape_speed,
@@ -191,6 +193,7 @@ struct KnownSnake {
 #[derive(Clone, Debug)]
 struct KnownPrey {
     motion: [u32; 3],
+    reported_at: f64,
 }
 
 /// The physical identity disambiguates food collapsed onto the same wire grid.
@@ -833,7 +836,11 @@ impl SimulatorBackend {
                     connection.setup = true;
                     connection.radius = radius.round() as u32;
                     connection.minimap_at = now;
-                    self.emit(slot, now, &[encode::setup(radius)?])?;
+                    self.emit(
+                        slot,
+                        now,
+                        &[encode::setup(radius, self.world.config.prey.turn_rate)?],
+                    )?;
                 }
                 Uplink::Message(bytes) => match bytes[..] {
                     [heading @ 0..=250] => {
@@ -990,6 +997,7 @@ impl SimulatorBackend {
             self.broadcast()?;
         } else {
             self.minimaps()?;
+            self.leaderboards()?;
         }
         for slot in 0..self.slots.len() {
             self.client_until(slot, now)?;
@@ -1112,6 +1120,28 @@ impl SimulatorBackend {
                 // connection's deadline phase instead of accumulating rounding.
                 deadline + (((now - deadline).max(0.) / interval).floor() + 1.) * interval
             };
+        }
+        Ok(())
+    }
+
+    /// Service HUD deadlines between gameplay broadcasts too. A death waits
+    /// for its game-over broadcast so it cannot leak an unfrozen final rank.
+    fn leaderboards(&mut self) -> Result<(), String> {
+        let now = self.time();
+        let mut board = None;
+        for slot in 0..self.slots.len() {
+            let connection = &self.slots[slot].connection;
+            if !connection.setup
+                || (!self.world.snakes[slot].alive && !connection.over)
+                || !connection.leaderboard_at.is_some_and(|at| now + 1e-9 >= at)
+            {
+                continue;
+            }
+            if board.is_none() {
+                board = Some(Board::new(&self.world, &self.profiles)?);
+            }
+            let packets = self.hud(slot, now, board.as_ref())?;
+            self.emit(slot, now, &packets)?;
         }
         Ok(())
     }
@@ -1243,14 +1273,22 @@ impl SimulatorBackend {
                     encode::angle_u24(prey.target_heading),
                     u32::from(encode::speed_u16(prey.speed)?),
                 ],
+                reported_at: now,
             };
             match connection.prey.get(&id) {
                 None => packets.push(encode::prey_appearance(prey)?),
                 Some(known) => {
-                    // The stock client extrapolates even when quantization
-                    // leaves the authoritative prey still. Refresh its anchor
-                    // every broadcast or it drifts until a later motion change.
-                    packets.push(encode::prey_motion(prey, known.motion != current.motion)?)
+                    let changed = known.motion != current.motion;
+                    // Ordinary receipts cluster near one third second; pulse
+                    // transitions can arrive sooner, but retained gaps never
+                    // fell below 210 ms. This bounded reporting approximation
+                    // keeps corrections even when quantized position is still.
+                    let pulse = known.motion[2] == 11000 || current.motion[2] == 11000;
+                    let interval = if pulse { 0.210 } else { 1. / 3. };
+                    if now + 1e-9 < known.reported_at + interval {
+                        continue;
+                    }
+                    packets.push(encode::prey_motion(prey, changed)?)
                 }
             }
             connection.prey.insert(id, current);
@@ -1284,7 +1322,8 @@ impl SimulatorBackend {
                 board.order.len(),
                 &board.rows,
             ));
-            connection.leaderboard_at = Some(now + interval);
+            connection.leaderboard_at =
+                Some(at + (((now - at).max(0.) / interval).floor() + 1.) * interval);
         }
         if let Some(record) = self
             .record
@@ -2185,15 +2224,101 @@ mod tests {
         sim.backend.broadcast().unwrap();
         remote.pump(&mut sim, 0);
         remote.packets.clear();
-        run(&mut sim, &mut [(0, &mut remote)], 30);
+        let mut report_times = Vec::new();
+        let mut last_report = sim.time();
+        for _ in 0..150 {
+            sim.advance_ticks(1).unwrap();
+            for packet in remote.pump(&mut sim, 0) {
+                if packet[0] == b'j' {
+                    report_times.push(sim.time());
+                    last_report = sim.time();
+                }
+            }
+            let age = sim.time() - last_report;
+            assert!(age < 1. / 3. + 6. * sim.dt());
+            let received = remote.frame(&sim).observation.unwrap();
+            assert!(received.prey[0].position.distance(position) <= 190. * age + 2.);
+        }
         // Both positive displacements are below one unit per 7 ms tick and
         // floor to zero, despite the nonzero speed advertised to the client.
         assert_eq!(sim.backend.world.prey[0].position, position);
         let reports: Vec<_> = remote.packets.iter().filter(|p| p[0] == b'j').collect();
-        assert_eq!(reports.len(), 5);
+        assert_eq!(reports.len(), 3);
         assert!(reports.iter().all(|p| p.len() == 7));
+        let evidence: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/client-reporting-cadence.json"
+        ))
+        .unwrap();
+        let measured = &evidence["preyUpdateGapsMs"];
+        for pair in report_times.windows(2) {
+            let gap_ms = (pair[1] - pair[0]) * 1000.;
+            assert!(
+                (measured["min"].as_f64().unwrap()..=measured["max"].as_f64().unwrap())
+                    .contains(&gap_ms)
+            );
+        }
         let received = remote.frame(&sim).observation.unwrap();
-        assert!(received.prey[0].position.distance(position) < 8.);
+        assert!(received.prey[0].position.distance(position) < 12.);
+    }
+
+    #[test]
+    fn prey_motion_changes_are_bounded_and_visibility_reentry_resets_the_clock() {
+        let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey timing");
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let head = sim.backend.world.snakes[0].head;
+        sim.backend.world.prey.push(crate::prey::Prey {
+            id: 123,
+            position: Point {
+                x: head.x + 700.,
+                y: head.y + 700.,
+            },
+            heading: PI / 4.,
+            target_heading: PI / 4.,
+            speed: 6.060 / physics::SPEED_UNIT_SECONDS,
+            size: 6.,
+        });
+        sim.backend
+            .world
+            .set_prey_mode(123, crate::prey::PreyMode::Outward)
+            .unwrap();
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        let mut reports = Vec::new();
+        for tick in 1..=160 {
+            sim.advance_ticks(1).unwrap();
+            // Continuously changed synthetic motion must not defeat the
+            // reporting lower bound or update the last-sent cache too early.
+            sim.backend.world.prey[0].heading += 0.2;
+            // Exact-11 pulse transitions are the retained shorter-gap stratum.
+            sim.backend.world.prey[0].speed = 11. / physics::SPEED_UNIT_SECONDS;
+            sim.backend.broadcast().unwrap();
+            for packet in remote.pump(&mut sim, 0) {
+                if packet[0] == b'j' {
+                    assert_eq!(packet.len(), 16);
+                    reports.push(sim.time());
+                }
+            }
+            if tick == 1 {
+                assert!(reports.is_empty());
+            }
+        }
+        assert!(reports.len() >= 4);
+        for pair in reports.windows(2) {
+            assert!((0.210 - 1e-9..=0.217 + 1e-9).contains(&(pair[1] - pair[0])));
+        }
+        let prey = sim.backend.world.prey.pop().unwrap();
+        sim.backend.broadcast().unwrap();
+        assert!(
+            remote
+                .pump(&mut sim, 0)
+                .contains(&encode::prey_removal(123, None))
+        );
+        sim.backend.world.prey.push(prey);
+        sim.backend.broadcast().unwrap();
+        let packets = remote.pump(&mut sim, 0);
+        assert!(packets.iter().any(|p| p[0] == b'y' && p.len() == 20));
+        assert!(packets.iter().all(|p| p[0] != b'j'));
     }
 
     #[test]
@@ -2307,7 +2432,11 @@ mod tests {
         let setup = a.pump(&mut sim, 0);
         assert_eq!(
             setup,
-            [encode::setup(sim.backend.world.config.radius).unwrap()]
+            [encode::setup(
+                sim.backend.world.config.radius,
+                sim.backend.world.config.prey.turn_rate
+            )
+            .unwrap()]
         );
         assert!(sim.drain(0).unwrap().is_empty());
         let mut b = Remote::connect(&mut sim, 1, "One");
@@ -2814,11 +2943,11 @@ mod tests {
     #[test]
     fn leaderboards_start_with_own_appearance_and_follow_the_interval() {
         let mut config = raw_config(2);
-        config.leaderboard_interval_seconds = 1.;
+        config.world.radius = 10_000.;
         let mut sim = RawSimulator::new(4, config, 1).unwrap();
         let mut remote = Remote::connect(&mut sim, 0, "Me");
         let mut times = Vec::new();
-        while sim.time() < 5.5 {
+        while sim.time() < 9.5 {
             sim.advance_ticks(1).unwrap();
             let packets = remote.pump(&mut sim, 0);
             if times.is_empty() && packets.iter().any(|p| p[0] == b'l') {
@@ -2843,12 +2972,19 @@ mod tests {
             }
         }
         assert!(times[0] < 0.1);
-        assert_eq!(times.len(), 6);
-        let broadcast = 6. * sim.dt();
-        for pair in times.windows(2) {
-            let gap = pair[1] - pair[0];
-            assert!((1. - 1e-9..1. + broadcast).contains(&gap), "{gap}");
+        assert_eq!(times.len(), 4);
+        for (index, time) in times.iter().enumerate() {
+            let phase_error = time - times[0] - index as f64 * 3.;
+            assert!(
+                (-1e-9..=sim.dt() + 1e-9).contains(&phase_error),
+                "{times:?}"
+            );
         }
+        assert!(
+            times
+                .iter()
+                .any(|time| (time / sim.dt()).round() as u64 % 6 != 0)
+        );
     }
 
     #[test]

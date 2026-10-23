@@ -399,6 +399,7 @@ export async function recordPair({ out, server, seconds = PAIR_PREY.maxSeconds, 
       const rec = new Recorder(path.join(out, `bot${index}.jsonl.gz`), {
         schema: 1, server: { ip, port }, nick, scenario: 'paired-prey',
         mode, botIndex: index, plan: mode === 'crossing' ? { ...PAIR_PREY, ...CROSSING } : PAIR_PREY,
+        ...(batch.dataOrigin ? { dataOrigin: batch.dataOrigin } : {}),
         wall: Date.now(), t: performance.now(), captureProvenance: batch.provenance(index) });
       recorders.push(rec);
       bots.push(new PairPreyBot({ scenario: 'movement', nick, origin }, index, rec));

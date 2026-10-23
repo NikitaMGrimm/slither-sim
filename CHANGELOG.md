@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Match the default prey turn setup to physics; separate leaderboard deadlines
+  and bounded prey reporting from gameplay broadcasts. Add an offline packet
+  census, source-pinned cadence fixture and generic localhost capture workflow;
+  keep recording ping timing through post-death observation and capture shutdown.
 - Keep correcting predicted prey positions even when authoritative grid/motion
   is unchanged, preventing drifting ghosts and later snap-backs.
 - Use shared finite 1,500-unit snake/prey coverage and retained food-sector interest;
@@ -16,8 +20,6 @@
   entry do not trigger lag slowdown; document a local endpoint that survives Play Again.
 - Continue opponent, food and prey updates through the stock death animation,
   preserving broadcast cadence while suppressing repeated death and minimap reports.
-
-## Unreleased
 
 - Keep configured prey sizes positive and within their bounds, ambient food
   inside tiny arenas, and finite extreme respawn poses numerically usable.

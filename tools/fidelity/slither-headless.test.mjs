@@ -844,8 +844,8 @@ test('game-over records through the close handshake without controls or a stale 
   bot.receive(frame([[118], [98, 12, 13, 68]]));
   assert.equal(bot.world.foods.size, 2);
   assert.equal(bot.deathObservation.startedAt, start, 'duplicate game-over cannot extend deadline');
-  assert.equal(sent.length, 0);
-  assert.equal(frames.length, 2);
+  assert.deepEqual(sent.map(p => Array.from(p)), [[251]]);
+  assert.equal(frames.filter(f => f[0] === 'i').length, 2);
   bot.tick(start + DEATH_OBSERVATION_MS);
   bot.tick(start + DEATH_OBSERVATION_MS + 25);
   assert.equal(closes, 1);
@@ -855,10 +855,10 @@ test('game-over records through the close handshake without controls or a stale 
   // A queued incoming frame during closing still belongs in the final receipt.
   bot.receive(frame([[98, 14, 15, 68]]));
   assert.equal(bot.world.foods.size, 3);
-  assert.equal(sent.length, 0);
+  assert.deepEqual(sent.map(p => Array.from(p)), [[251]]);
   now += 10;
   bot.ws.onclose({ code: 1000, reason: '' });
-  const { elapsedMs, ...end } = events.at(-2);
+  const { elapsedMs, ...end } = events.find(e => e.event === 'death-observation-end');
   assert.equal(elapsedMs, DEATH_OBSERVATION_MS + 40);
   assert.deepEqual(end, { event: 'death-observation-end', life: 1,
     reason: 'deadline', serverElapsedMs: 14, framesAfterDeath: 2 });
@@ -1415,7 +1415,10 @@ test('stopping detaches socket errors and queued callbacks cannot write after fi
   const bot = new Bot({ scenario: 'forage' }, 0, recorder);
   bot.connect({ ip: '127.0.0.1', port: 1 });
   const socket = bot.ws, queuedError = socket.onerror;
+  bot.pendingPing = { t: performance.now() };
+  const pendingSentAt = bot.pendingPing.t;
   bot.stop();
+  assert.equal(bot.pendingPing, null);
   assert.equal(socket.onerror, null);
   recorder.finish({ event: 'capture-end' });
   await recorder.close();
@@ -1423,6 +1426,10 @@ test('stopping detaches socket errors and queued callbacks cannot write after fi
   const rows = zlib.gunzipSync(fs.readFileSync(archive)).toString('utf8').trim().split('\n').map(JSON.parse);
   assert.equal(rows.at(-1).event, 'capture-end');
   assert.equal(rows.filter(row => row.event === 'socket-error').length, 0);
+  const censored = rows.filter(row => row.event === 'ping-censored');
+  assert.equal(censored.length, 1);
+  assert.equal(censored[0].sentAt, pendingSentAt);
+  assert(censored[0].waitedMs >= 0);
 });
 
 test('recorder queue overflow is an explicit bounded acquisition failure', async () => {
@@ -1613,7 +1620,7 @@ test('all real collectors emit grouped provenance and exact receipts accepted by
   };
   try {
     const plan = path.join(directory, 'plan.json');
-    const planBytes = Buffer.from('{ "cohort": "offline", "unicode": "雪" }\r\n');
+    const planBytes = Buffer.from('{ "cohort": "offline", "dataOrigin": "local-simulator", "unicode": "雪" }\r\n');
     fs.writeFileSync(plan, planBytes);
     const allFiles = [];
     const cases = [...pairedCollectors, ...[2, 3].map(bots => ({ name: `headless-${bots}`, bots,
@@ -1626,6 +1633,7 @@ test('all real collectors emit grouped provenance and exact receipts accepted by
       const files = Array.from({ length: collector.bots ?? 2 }, (_, index) => path.join(out, `bot${index}.jsonl.gz`));
       allFiles.push(...files);
       const archives = files.map(readCollectorArchive);
+      assert(archives.every(rows => rows[0].dataOrigin === 'local-simulator'));
       const headers = archives.map(rows => rows[0].captureProvenance);
       assert.equal(new Set(headers.map(header => header.captureBatchId)).size, 1);
       assert.equal(new Set(headers.map(header => header.captureId)).size, files.length);

@@ -31,14 +31,17 @@ export function createCaptureBatch(options, botCount, source = COLLECTOR_SOURCE)
     throw new Error('use 1-3 bots');
   const { out, plan, ...acquisitionOptions } = options;
   let planSha256 = null;
+  let dataOrigin;
   if (plan) {
     const planBytes = fs.readFileSync(plan);
     if (planBytes.length > 262144) throw new Error('capture plan exceeds 256 KiB');
-    JSON.parse(planBytes.toString('utf8'));
+    dataOrigin = JSON.parse(planBytes.toString('utf8')).dataOrigin;
+    if (dataOrigin !== undefined && !['local-simulator', 'community-server', 'official-server'].includes(dataOrigin))
+      throw new Error('capture plan has an unsupported dataOrigin');
     planSha256 = createHash('sha256').update(planBytes).digest('hex');
   }
   const captureBatchId = randomUUID();
-  return { provenance(botIndex) {
+  return { dataOrigin, provenance(botIndex) {
     if (!Number.isInteger(botIndex) || botIndex < 0 || botIndex >= botCount)
       throw new Error('invalid bot index');
     return { version: 1, captureBatchId, captureId: randomUUID(), botIndex, botCount,
@@ -606,7 +609,8 @@ export class Bot {
     };
   }
   send(bytes) {
-    if (!this.ws || this.ws.readyState !== 1 || this.deathObservation) return;
+    if (!this.ws || this.ws.readyState !== 1 ||
+        this.deathObservation && !(bytes.length === 1 && bytes[0] === 251)) return;
     const a = Uint8Array.from(bytes);
     const sentAt = performance.now();
     this.ws.send(a);
@@ -679,6 +683,17 @@ export class Bot {
         this.serverClock - observation.serverClock,
       framesAfterDeath: this.frames - observation.frame });
   }
+  ping(now) {
+    if (!this.awaitingPong && now - this.lastPing > 250) {
+      const sentAt = this.send([251]);
+      if (sentAt !== undefined) {
+        this.lastPing = sentAt;
+        this.awaitingPong = true;
+        this.pendingPing = { t: sentAt };
+        this.rec.meta({ event: 'ping-sent', life: this.lives, sentAt });
+      }
+    }
+  }
   tick(now) {
     if (this.stopped) return;
     // Keep recording after game-over, without controls or artificial physics delay.
@@ -689,6 +704,8 @@ export class Bot {
         this.deathObservation.closeRequestedAt = now;
         this.rec.meta({ event: 'death-observation-close-requested', life: this.lives });
         this.ws?.close();
+      } else if (!this.deathObservation.ended && this.deathObservation.closeRequestedAt === undefined) {
+        this.ping(now);
       }
       return;
     }
@@ -716,15 +733,7 @@ export class Bot {
       return;
     }
     if (this.boundaryCensored) return;
-    if (!this.awaitingPong && now - this.lastPing > 250) {
-      const sentAt = this.send([251]);
-      if (sentAt !== undefined) {
-        this.lastPing = sentAt;
-        this.awaitingPong = true;
-        this.pendingPing = { t: sentAt };
-        this.rec.meta({ event: 'ping-sent', life: this.lives, sentAt });
-      }
-    }
+    this.ping(now);
     const choice = chooseHeading(w, now);
     if (!choice) return;
     if (this.opts.scenario === 'ownpellets') this.ownPellets(now, me, choice);
@@ -1421,6 +1430,9 @@ export class Bot {
     if (this.opts.scenario === 'visibilityprobe') this.endVisibilityLeg(performance.now(), 'capture_stop');
     if (this.opts.scenario === 'speedprobe') this.endSpeedTrial(performance.now(), 'capture_stop');
     this.finishDeathObservation('capture-stop');
+    if (this.pendingPing) this.rec.meta({ event: 'ping-censored', life: this.lives,
+      sentAt: this.pendingPing.t, waitedMs: performance.now() - this.pendingPing.t });
+    this.pendingPing = null;
     clearTimeout(this.reconnectTimer);
     if (this.ws) {
       // End the observation window before closing the archive. A delayed close or
@@ -1560,6 +1572,7 @@ export async function record(opts, server, prefix, bots = opts.bots, signal, cap
     for (let i = 0; i < bots; i++) {
       if (signal?.aborted) break;
       const rec = new Recorder(path.join(opts.out, `${prefix}${i}.jsonl.gz`), { schema: 1, server, nick: opts.nick, scenario: opts.scenario, wall: Date.now(), t: performance.now(), clientVersion: CLIENT_VERSION,
+        ...(batch.dataOrigin ? { dataOrigin: batch.dataOrigin } : {}),
         captureProvenance: batch.provenance(i) });
       if (opts.scenario === 'preyprobe') rec.meta({ event: 'prey-probe-plan', ...PREY_PROBE,
         limits: 'one client, bounded capture; other snake and prey inputs not observed' });

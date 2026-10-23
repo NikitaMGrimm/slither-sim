@@ -28,7 +28,7 @@ class CollectTests(unittest.TestCase):
         process.assert_not_called()
         reply = json.loads(output.getvalue())
         self.assertTrue(reply["dryRun"])
-        self.assertIn("127.0.0.1:444", reply["command"])
+        self.assertIn("127.0.0.1:8766", reply["command"])
         self.assertEqual((self.study / "attempts.jsonl").read_bytes(), b"")
         self.assertEqual(list((self.study / "raw").iterdir()), [])
 

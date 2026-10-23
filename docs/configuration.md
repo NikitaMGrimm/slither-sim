@@ -25,8 +25,10 @@ configs require the default-enabled `networking` feature.
 
 Broadcast cadence is a local setting, not an exact recovered official schedule.
 Pongs can be sent between broadcasts. Physics keeps advancing between updates.
-Minimaps have an independent nominal 2.5-second clock, serviced at physics ticks;
-their deadlines do not accumulate gameplay-broadcast rounding.
+Minimaps and leaderboards have independent nominal 2.5/3-second clocks, serviced
+at physics ticks; deadlines do not accumulate gameplay-broadcast rounding. Prey
+position refreshes have their own bounded reporting intervals; see
+[host fidelity](host-fidelity.md#packet-timing).
 
 Ping is a measured round trip, not a target the server needs you to set. Native
 clients send game pings automatically after setup, with at most one outstanding.

@@ -3,7 +3,7 @@
   "studyId": "movement-exploration",
   "title": "Exploratory movement and steering capture",
   "kind": "exploratory",
-  "dataOrigin": "community-server",
+  "dataOrigin": "local-simulator",
   "question": "Which observed steering windows challenge the current turn-rate model?",
   "hypotheses": ["Turn rate depends on snake size and boost state as modeled.", "Clock mapping, input acceptance or a different turn law explains mismatches."],
   "method": "Capture raw inputs and received frames. Export a declared window; compare transmitted anchors with a free simulator replay and report clock/initialization sensitivity.",
@@ -17,7 +17,7 @@
   "validation": "Exploratory only. Any fitted change requires a separate frozen confirmatory plan and held-out acquisition windows.",
   "limitations": ["Client receipts are not complete server state.", "Local send/receipt clocks do not reveal the exact server input-processing tick."],
   "capture": {
-    "server": {"ip": "127.0.0.1", "port": 444},
+    "server": {"ip": "127.0.0.1", "port": 8766},
     "scenario": "movement",
     "seconds": 60,
     "bots": 1

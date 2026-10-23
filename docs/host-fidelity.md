@@ -1,4 +1,4 @@
-# Coverage, spawning and minimap evidence
+# Host fidelity evidence
 
 The October 23 audit traced the historical research into the standalone host.
 The old 500-unit food/snake/prey cutoff and 32-cell minimap were unsuitable
@@ -46,10 +46,39 @@ Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
 
-Prey position corrections are emitted every gameplay broadcast, including when
-the quantized server position is unchanged. The stock client keeps predicting
-from advertised speed; suppressing unchanged reports let rendered prey drift
-away from their collectible server positions and snap back on a later update.
+## Packet timing
+
+The same archive contains 60,019 packets across 32 command families. Counts depend
+on population, movement and recipient exposure; matching total packets per second
+would not establish fidelity. Within known prey lifetimes, 332 consecutive `j`
+gaps have median 338 ms (211–357 ms). Historical reporting/decision studies at the
+source commit above independently constrain ordinary and exact-11-speed pulse
+intervals; their original reports preserve failed fits and unresolved onset.
+
+Prey now receive unconditional position corrections near one third second, even
+when quantized server position is unchanged. Exact-11 pulse transitions may report
+after 210 ms; ordinary turning alone does not accelerate reporting. Opportunities
+are serviced on gameplay broadcasts. These per-recipient clocks, including their
+initialization at appearance, are approximations: the observed lower bound applies
+to consecutive `j`, and an appearance can be followed by `j` sooner. The stock
+client predicts continuously; removing unchanged corrections lets rendered prey
+drift indefinitely. With finite reporting intervals, prediction and render smoothing
+still produce bounded offsets from the quantized collectible position.
+
+Setup advertises the active prey turn rate in reference-frame units: default
+`mamu2=0.029`, matching all five captured setups and the existing
+[recorded setup fixture](../tests/fixtures/client-hud-leaderboard.json).
+Leaderboards use nominal three-second deadlines at physics-tick granularity,
+preserving phase instead of accumulating 3,024 ms broadcast rounding. The 107
+pre-death captured intervals span 2,989–3,029 ms (median 3,009); neither the median
+nor the first-report phase is installed as an exact server constant.
+
+Use the [offline packet census](research-workflow.md#inspect-analyze-and-reproduce)
+to repeat family, length and known-prey cadence checks on new captures. It resets
+histories at connection/appearance/removal boundaries and retains censored exposure.
+The [cadence fixture](../tests/fixtures/client-reporting-cadence.json) is a selected
+epoch's direct census derivative, with source/tool hashes and selection limits;
+the stationary-prey regression checks its ordinary reporting bounds.
 
 Regression checks: `cargo test --locked` covers sector retention, source-pinned
 entry witnesses, actual eater attribution, whole-body coverage, safe admission,

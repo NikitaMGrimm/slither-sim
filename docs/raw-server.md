@@ -141,8 +141,8 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   The stock browser keeps pinging through its death fade; withholding replies
   triggers its lag detector and slows the return to Play Again. Gameplay
   controls remain ignored after game over. This is a local compatibility policy.
-- Opponent, food and prey updates continue at the existing broadcast cadence
-  around the dead player's final position. Game-over and own removal are sent
+- Opponent and food updates continue around the dead player's final position;
+  prey retain their periodic reporting clock. Game-over and own removal are sent
   once; minimap updates stop. Otherwise the browser extrapolates stale opponents
   through the fade. The native bot frame stays dead with no playable observation.
 

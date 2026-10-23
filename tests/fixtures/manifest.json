@@ -35,6 +35,13 @@
       "clientContract": null,
       "dataOrigin": "captured",
       "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/client-reporting-cadence.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
     }
   ]
 }
