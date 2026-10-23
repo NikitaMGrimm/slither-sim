@@ -55,9 +55,16 @@ async function publish({ github, context, core, directory }) {
       !body.startsWith(marker + '\n## Comparison\n') || body.includes('<!-- slither-report-run:')) {
     throw new Error('Report identity, marker or size does not match this PR run');
   }
-  // Fork workflow_run payloads may omit pull_requests. The live PR must still
-  // match this run's head commit, repository ID and branch below.
-  if (run.pull_requests?.length && !run.pull_requests.some(pr => pr.number === report.pr)) {
+  // Fork payloads can omit pull_requests. Include closed PRs in the fallback:
+  // a run from a closed PR must not migrate to another PR reusing its branch.
+  let associated = run.pull_requests || [];
+  if (!associated.length) {
+    associated = (await github.paginate(github.rest.pulls.list, {
+      owner, repo, state: 'all', per_page: 100,
+      head: `${run.head_repository.full_name.split('/')[0]}:${run.head_branch}`,
+    })).filter(pr => pr.head.repo?.id === run.head_repository.id && pr.head.ref === run.head_branch);
+  }
+  if (associated.length !== 1 || associated[0].number !== report.pr) {
     throw new Error('Report PR is not associated with this workflow run');
   }
   const { data: merge } = await github.rest.repos.getCommit({ owner, repo, ref: report.merge });

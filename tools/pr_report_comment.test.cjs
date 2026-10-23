@@ -10,7 +10,7 @@ const marker = '<!-- slither-report-preview -->';
 const bot = { login: 'github-actions[bot]', type: 'Bot' };
 function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotBase = liveBase,
                       targetHistory = 'diverged', reportOverride = {}, runOverride = {},
-                      fork = false, liveRepo, parents, artifacts } = {}) {
+                      fork = false, liveRepo, parents, artifacts, associated } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-comment-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true }));
   const report = { schema: 1, repository: 'owner/repo', pr: 27, head, base, merge, run: 100, attempt: 1, ...reportOverride };
@@ -19,16 +19,18 @@ function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotB
   const calls = [];
   const run = { id: 100, run_attempt: 1, event: 'pull_request', status: 'completed', conclusion: 'success',
     path: '.github/workflows/pr-report.yml', workflow_id: 4, repository: { full_name: 'owner/repo' },
-    head_sha: head, head_branch: 'any-branch', head_repository: { id: fork ? 2 : 1 },
+    head_sha: head, head_branch: 'any-branch', head_repository: { id: fork ? 2 : 1, full_name: fork ? 'fork/repo' : 'owner/repo' },
     pull_requests: fork ? [] : [{ number: 27 }], ...runOverride };
   const context = { repo: { owner: 'owner', repo: 'repo' }, eventName: 'workflow_run',
     payload: { workflow_run: { id: 100, run_attempt: 1, head_sha: head } } };
   const outputs = {};
-  const github = { paginate: async method => method === github.rest.issues.listComments ? previous
+  const github = { paginate: async (method, args) => method === github.rest.issues.listComments ? previous
+    : method === github.rest.pulls.list ? (associated || [{ number: 27, head: { repo: { id: fork ? 2 : 1 }, ref: 'any-branch' } }])
+      .filter(pr => args.state === 'all' || pr.state !== 'closed')
     : artifacts || [{ id: 5, name: 'pr-report-comment', expired: false, size_in_bytes: 1000 }], rest: {
     actions: { getWorkflowRun: async () => ({ data: run }),
       getWorkflow: async () => ({ data: { id: 4 } }), listWorkflowRunArtifacts: {} },
-    pulls: { get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'any-branch', repo: { id: liveRepo ?? (fork ? 2 : 1) } }, base: { sha: snapshotBase, ref: 'target', repo: { full_name: 'owner/repo' } } } }) },
+    pulls: { list: {}, get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'any-branch', repo: { id: liveRepo ?? (fork ? 2 : 1) } }, base: { sha: snapshotBase, ref: 'target', repo: { full_name: 'owner/repo' } } } }) },
     repos: { getBranch: async () => ({ data: { commit: { sha: liveBase } } }),
       getCommit: async () => ({ data: { parents: parents || [{ sha: base }, { sha: head }] } }),
       compareCommitsWithBasehead: async () => ({ data: { status: targetHistory } }) },
@@ -116,6 +118,18 @@ test('fork head repository mismatch cannot publish on another PR', async t => {
   const f = fixture(t, { fork: true, liveRepo: 9 });
   await publish(f.args);
   assert.equal(f.calls.length, 0);
+});
+
+test('empty fork associations reject missing, forged and ambiguous PR identities including closed PRs', async t => {
+  const pr = (number, state = 'open') => ({ number, state, head: { repo: { id: 2 }, ref: 'any-branch' } });
+  for (const associated of [[], [pr(28)], [pr(27), pr(28)], [pr(27, 'closed'), pr(28)]]) {
+    const f = fixture(t, { fork: true, associated });
+    await assert.rejects(publish(f.args));
+    assert.equal(f.calls.length, 0);
+  }
+  const other = fixture(t, { fork: true, associated: [pr(27, 'closed'), pr(28)], reportOverride: { pr: 28 } });
+  await assert.rejects(publish(other.args));
+  assert.equal(other.calls.length, 0);
 });
 
 test('rejects other workflows, repositories, events, conclusions and obsolete attempts', async t => {

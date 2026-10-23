@@ -53,6 +53,10 @@ and reads a bounded comment artifact as data. It never runs PR scripts with its
 comment-write token. Artifact identity, bot authorship and published run metadata
 prevent unrelated or older runs from replacing a newer report. GitHub mentions
 in PR-provided diagnostics are suppressed.
+If GitHub omits the run's PR association for a fork, the source branch must
+identify exactly one PR in this repository, including closed PRs. Ambiguous
+branches cannot publish a comment; their raw measurement artifacts remain
+available. Using a separate branch for each PR avoids this ambiguity.
 
 Both workflows use pinned actions and leave checkout credentials unpersisted.
 No personal token or external benchmarking service is needed. Full measurements,
