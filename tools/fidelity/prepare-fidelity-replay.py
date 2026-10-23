@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import statistics
+import tempfile
 from pathlib import Path
 
 import slither_protocol as sp
@@ -123,7 +124,16 @@ def export(
         raise ValueError("heading history must be at least 3 anchors")
     if heading_source not in ("anchors", "reported"):
         raise ValueError("heading source must be anchors or reported")
-    records = list(sp.read(path))  # EOF also verifies the gzip footer.
+    # Hash and decode the same private snapshot: reopening the original after
+    # decoding could attach a replacement file's identity to these observations.
+    digest = hashlib.sha256()
+    with tempfile.TemporaryFile() as snapshot:
+        with Path(path).open("rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(block)
+                snapshot.write(block)
+        snapshot.seek(0)
+        records = list(sp.read(snapshot))  # EOF also verifies the gzip footer.
     terminal_index = next(
         (
             i
@@ -429,7 +439,11 @@ def export(
         "options": {"boost_drops": "recorded", "sample_interval_seconds": 0.05},
         "provenance": {
             "source": str(path),
-            "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+            "sha256": digest.hexdigest(),
+            "wire_protocol": sp.PROTOCOL_VERSION,
+            "decoder_sha256": hashlib.sha256(Path(sp.__file__).read_bytes()).hexdigest(),
+            "exporter_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "capture_audit": "not-performed-by-exporter",
             "connection": connection,
             "start_server_ms": start,
             "start_after_init_seconds": (start - init_time) / 1000,
@@ -448,6 +462,7 @@ def export(
             "unmodeled_self_prey_pickups": unmodeled_prey_pickups,
             "censored_mass_times": censored_mass_times,
             "limitations": [
+                "Decoder-derived partial replay; complete gzip and window checks do not replace a separate capture/study audit",
                 (
                     f"Initial heading estimated causally from up to {heading_history} preceding anchors; head within-tick overshoot unknown"
                     if heading_source == "anchors"

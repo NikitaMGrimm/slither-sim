@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hash and decode the same replay-source snapshot; retain protocol and tool
+  identities and distinguish replay-window checks from a full evidence audit.
+
 - Compare verified evidence batches with bounded permutation tests and declared
   exposure/effect gates; add manual, read-only CI intake for pinned bundles.
   Keep measured calibration separate from synthetic prey/radius behavior tests.
