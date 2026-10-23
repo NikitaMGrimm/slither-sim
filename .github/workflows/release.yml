@@ -2,7 +2,9 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    paths: ['Cargo.toml', 'Cargo.lock', 'CHANGELOG.md']
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:
@@ -53,6 +55,7 @@ jobs:
           path: release-source
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        if: steps.target.outputs.tag != ''
       - name: Require a main commit with successful CI
         if: steps.target.outputs.tag != ''
         env:
@@ -70,13 +73,13 @@ jobs:
         if: steps.target.outputs.tag != '' && steps.package.outputs.already_published != 'true'
         working-directory: release-source
         run: cargo publish --locked --dry-run --registry crates-io
-      - name: Enforce 12 hours between new publications
+      - name: Check publication cooldown or maintainer release merge
         if: steps.target.outputs.tag != ''
         id: cooldown
         env:
           RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
           RELEASE_TAG: ${{ steps.target.outputs.tag }}
-        run: python3 tools/release.py "$RELEASE_TAG" --commit "$RELEASE_COMMIT" --check-cooldown >> "$GITHUB_OUTPUT"
+        run: python3 tools/release_automation.py publication-ready >> "$GITHUB_OUTPUT"
       - name: Authenticate with crates.io
         if: (github.event_name == 'workflow_dispatch' && inputs.tag == '') || (steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.already_published != 'true')
         id: auth

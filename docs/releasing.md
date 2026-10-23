@@ -6,6 +6,24 @@ packaged files with crates.io: tools-only changes do not force a crate release,
 while packaged docs, tests and examples can. The Python tools version remains
 independent.
 
+## Manual releases
+
+To publish now, manually merge the rolling `chore(release)` PR after its required
+checks pass. This starts publication of that exact version-bump commit, without
+waiting for the automatic cooldown. It works for patch, minor and major bumps.
+CI, package verification, immutable tags and published-source checks still apply.
+
+The manual merge starts a new 12-hour wait for the next automatic merge. For
+example, merging at 08:10 UTC makes the next automatic merge eligible at 20:10
+UTC, even if the upload completes a few minutes after the merge. The hourly job
+acts on that eligibility; GitHub scheduling can delay it. No empty release is made.
+
+The exception requires a same-repository release-bot PR merged by a user, with
+only the manifest version, its lockfile entry and changelog changed. Ordinary
+code merges, bot merges, tags and dispatch inputs do not grant it. Publication
+rechecks that provenance before uploading. A retry retains the original merge
+authorization and source commit rather than selecting a later main revision.
+
 ## Automatic patches
 
 The owner authorizes automatic compatible patch releases. `release.yml` checks
@@ -18,12 +36,14 @@ release PR only when all of these hold:
   protected merge. Only the manifest's version, its lockfile entry and changelog
   may differ. The merge is pinned to the inspected PR head.
 - At least 12 hours have elapsed since the latest crates.io upload or published
-  GitHub Release, including prereleases and yanked crate versions.
+  GitHub Release, including prereleases and yanked versions. For a verified
+  manual release, its merge time replaces that version's upload/publication time
+  as the timer's start. A different, newer publication still resets the wait.
 
 The publisher serializes automatic and tag-triggered runs, verifies CI on the
 exact main commit being released, dry-runs the package and checks the cooldown
-again before uploading. It uses crates.io Trusted Publishing, without a saved
-API token. A scheduled check is an opportunity to release, not a promise of two
+or manual-merge authorization again before uploading. It uses crates.io Trusted
+Publishing, without a saved API token. A scheduled check is an opportunity to release, not a promise of two
 releases per day. There are no empty releases when the package is unchanged.
 
 Bot pushes do not start ordinary push workflows with `GITHUB_TOKEN`. Bot PRs
@@ -45,8 +65,8 @@ that Rust API checks cannot detect, and update affected contract identifiers.
 Physics changes still need their evidence and meaningful changelog notes in the
 original PR. Automated version selection does not establish scientific fidelity.
 
-After a maintainer merges a version bump, the next eligible scheduled run
-publishes its original version-bump commit, even if main advances afterward.
+The manual merge starts publication immediately using its original version-bump
+commit, even if main advances afterward; the same authorization covers retries.
 Do not move version tags or reuse published versions.
 
 ## Connection and recovery
@@ -67,8 +87,9 @@ revoke a token.
 In [Actions → Release](https://github.com/NikitaMGrimm/slither-sim/actions/workflows/release.yml),
 run the workflow on main with an empty `tag` to test authentication only. Use
 `auto` to reconcile immediately, or `vVERSION` to retry a specific existing tag.
-All new uploads retain the 12-hour guard, including manually pushed tags.
-An ineligible run exits without publishing; a later scheduled run retries.
+Tags and dispatch inputs alone do not bypass the 12-hour guard; a verified
+manual release merge does. An ineligible run exits without publishing; a later
+scheduled run retries.
 
 If upload succeeded but GitHub Release creation failed, reconciliation repairs
 that same version before advancing. It verifies the published archive checksum,

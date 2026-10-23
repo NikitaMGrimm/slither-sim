@@ -99,12 +99,46 @@ def version_commit(version):
     commits = git("log", "--first-parent", "--format=%H", "origin/main", "--", "Cargo.toml").splitlines()
     candidate = None
     for commit in commits:
-        if release.package_at(commit)["version"] != version:
+        if release.package_at(commit)["version"] == version:
+            candidate = commit
+        elif candidate is not None:
             break
-        candidate = commit
     if candidate is None:
         raise ValueError("Cannot find the main commit introducing this version")
     return candidate
+
+
+def manual_release_merge(commit):
+    """A maintainer's merge of the bot's metadata-only PR authorizes publication."""
+    parents = git("rev-list", "--parents", "-n", "1", commit).split()
+    if len(parents) < 2:
+        return None
+    parent = parents[1]
+    before = release.package_at(parent)
+    package = release.package_at(commit)
+    if package["version"] == before["version"]:
+        return None
+    associated = release.github_pages(repo_path(f"commits/{commit}/pulls?per_page=100"))
+    candidates = [pr for pr in associated if pr.get("merge_commit_sha") == commit]
+    if len(candidates) != 1:
+        return None
+    pr = release.github(repo_path(f"pulls/{candidates[0]['number']}"))
+    if (not bot_pr(pr) or not pr.get("merged") or pr.get("merge_commit_sha") != commit
+            or not pr.get("merged_at") or (pr.get("merged_by") or {}).get("type") != "User"):
+        return None
+    marker = re.findall(r"<!-- release-plz (\S+) (\S+) (\S+) (\S+) -->", pr["body"] or "")
+    if len(marker) != 1 or marker[0][:3] != (package["name"], before["version"], package["version"]):
+        return None
+    files = set(git("diff", "--name-only", parent, commit).splitlines())
+    if (files == {"Cargo.toml", "Cargo.lock", "CHANGELOG.md"}
+            and metadata_only(parent, commit, before, patch_only=False)):
+        return pr
+
+
+def automatic_ready(package):
+    pr = manual_release_merge(version_commit(package["version"]))
+    manual = {"version": package["version"], "merged_at": pr["merged_at"]} if pr else None
+    return release.cooldown_ready(package["name"], manual_release=manual)
 
 
 def ensure_tag(tag, commit):
@@ -115,6 +149,33 @@ def ensure_tag(tag, commit):
     else:
         release.github(repo_path("git/refs"), "--method", "POST", "-f", f"ref=refs/tags/{tag}",
                        "-f", f"sha={commit}")
+
+
+def publication_target(commit):
+    subprocess.run(["git", "merge-base", "--is-ancestor", commit, "origin/main"],
+                   cwd=release.ROOT, check=True)
+    package = release.package_at(commit)
+    tag = f"v{package['version']}"
+    release.prepare(tag, package, commit)
+    ensure_tag(tag, commit)
+    return {"tag": tag, "commit": commit}
+
+
+def select_merged():
+    refresh_main()
+    commit = git("rev-parse", f"{os.environ['GITHUB_SHA']}^{{commit}}")
+    if manual_release_merge(commit):
+        return publication_target(commit)
+
+
+def publication_ready(tag, commit):
+    package = release.package_at(commit)
+    result = release.prepare(tag, package, commit)
+    # Revalidate the merge at upload time; a dispatch input or tag alone grants no exception.
+    ready = (result["already_published"] == "true" or manual_release_merge(commit) is not None
+             or automatic_ready(release.package_at(f"{commit}^1")))
+    result["ready"] = str(ready).lower()
+    return result
 
 
 def select_automatic():
@@ -130,7 +191,7 @@ def select_automatic():
         commit = release.published_commit(package["name"], previous["num"])
         package = release.package_at(commit)
     elif any(item["num"] == version for item in versions):
-        if not release.cooldown_ready(package["name"]):
+        if not automatic_ready(package):
             return
         merged = merge_patch(package)
         if not merged:
@@ -139,16 +200,10 @@ def select_automatic():
         package = release.package_at(merged)
         commit = merged
     else:
-        if not release.cooldown_ready(package["name"]):
-            return
         commit = version_commit(version)
-    subprocess.run(["git", "merge-base", "--is-ancestor", commit, "origin/main"],
-                   cwd=release.ROOT, check=True)
-    tag = f"v{package['version']}"
-    # Identity and tag checks also apply to same-version recovery.
-    release.prepare(tag, release.package_at(commit), commit)
-    ensure_tag(tag, commit)
-    return {"tag": tag, "commit": commit}
+        if not manual_release_merge(commit) and not automatic_ready(release.package_at(f"{commit}^1")):
+            return
+    return publication_target(commit)
 
 
 def start_pr_checks():
@@ -197,10 +252,16 @@ def ensure_pr_checks(pr):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("select", "prepare", "start-pr-checks"))
+    parser.add_argument("command", choices=("select", "prepare", "start-pr-checks", "publication-ready"))
     args = parser.parse_args()
     if args.command == "start-pr-checks":
         start_pr_checks()
+        return
+    if args.command == "publication-ready":
+        commit = git("rev-parse", f"{os.environ['RELEASE_COMMIT']}^{{commit}}")
+        result = publication_ready(os.environ["RELEASE_TAG"], commit)
+        for key, value in result.items():
+            print(f"{key}={value}")
         return
     if args.command == "prepare":
         package = release.package_at("HEAD")
@@ -212,6 +273,8 @@ def main():
     tag = os.environ.get("RELEASE_TAG", "")
     if event == "schedule" or (event == "workflow_dispatch" and tag == "auto"):
         result = select_automatic()
+    elif event == "push" and os.environ.get("GITHUB_REF") == "refs/heads/main":
+        result = select_merged()
     elif event == "push" or tag:
         if not tag:
             tag = os.environ["GITHUB_REF_NAME"]

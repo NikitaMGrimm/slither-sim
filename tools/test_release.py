@@ -156,6 +156,22 @@ class CooldownTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 release.cooldown_ready("slither-sim", self.now)
 
+    def test_manual_merge_resets_auto_timer_without_waiting_for_upload_completion(self):
+        merge = self.now - timedelta(hours=12)
+        manual = {"version": "0.3.0", "merged_at": merge.isoformat()}
+        versions = [{"num": "0.3.0", "created_at": (merge + timedelta(minutes=3)).isoformat()}]
+        releases = [{"tag_name": "v0.3.0", "draft": False,
+                     "published_at": (merge + timedelta(minutes=5)).isoformat()}]
+        with patch.dict("os.environ", {"GH_REPO": "owner/repo"}), \
+                patch.object(release, "registry_versions", return_value=versions), \
+                patch.object(release, "github_pages", return_value=releases):
+            self.assertFalse(release.cooldown_ready("slither-sim", self.now - timedelta(microseconds=1), manual))
+            self.assertTrue(release.cooldown_ready("slither-sim", self.now, manual))
+            self.assertFalse(release.cooldown_ready("slither-sim", self.now))
+            # A different, newer publication still delays automation.
+            versions.append({"num": "0.3.1", "created_at": self.now.isoformat()})
+            self.assertFalse(release.cooldown_ready("slither-sim", self.now, manual))
+
     def test_bot_merge_ci_dispatch_uses_immutable_tag_and_exact_sha(self):
         with patch.object(release.subprocess, "check_output", side_effect=["", "", "", "42"]) as lookup, \
                 patch.object(release.subprocess, "run") as run, \
