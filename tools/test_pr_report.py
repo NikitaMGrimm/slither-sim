@@ -186,7 +186,7 @@ test same_name ... ok
                              "workload": {"timing": {"wallSeconds": value}}})
         (directory / "summary.json").write_text(json.dumps({"observe": {"pairs": pairs, "iterations": 1000}}))
         (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
-        return pr_report.performance_rows(directory)[0]
+        return pr_report.performance_rows(directory, {"observe"})[0]
 
     def test_mixed_pair_directions_and_small_shifts_stay_inconclusive(self):
         with tempfile.TemporaryDirectory() as name:
@@ -196,6 +196,44 @@ test same_name ... ok
             self.assertEqual(self.performance(directory, [.8, .85, .9])["reading"], "Faster")
             self.assertEqual(self.performance(directory, [1.1, 1.2, 1.3])["reading"], "Slower")
             self.assertEqual(self.performance(directory, [.8, .85, .9], cpu=False)["metric"], "operation wall")
+
+    def test_legacy_rows_use_process_cpu_and_scenario_rows_use_operation_wall(self):
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            # CPU ratios stay near 1 (setup-dominated); the timed operation got 20% faster.
+            pairs = [{"repetition": r, "cpu_ratio_candidate_over_baseline": .99,
+                      "wall_ratio_candidate_over_baseline": .8} for r in range(3)]
+            rows = [{"case": case, "label": label, "repetition": r, "cpu_seconds": 2.0,
+                     "workload": {"timing": {"wallSeconds": 1.0 if label == "baseline" else .8}}}
+                    for case in ("observe", "official-100-bot") for r in range(3)
+                    for label in ("baseline", "candidate")]
+            summary = {case: {"pairs": pairs, "iterations": 100} for case in ("observe", "official-100-bot")}
+            (directory / "summary.json").write_text(json.dumps(summary))
+            (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
+            legacy, scenario = pr_report.performance_rows(directory, {"observe"})
+            self.assertEqual((legacy["metric"], legacy["ratio"], legacy["reading"]), ("process CPU", .99, "Inconclusive"))
+            self.assertEqual((scenario["metric"], scenario["ratio"], scenario["reading"]), ("operation wall", .8, "Faster"))
+            self.assertEqual((scenario["baseline"], scenario["candidate"]), (10.0, 8.0))
+            report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
+                      "platform": "Test platform", "performance": [legacy, scenario]}
+            text = pr_report.render(report)
+            self.assertIn("Time per operation, ms.", text)
+            self.assertIn("| observe (process CPU) |", text)
+            self.assertIn("| official-100-bot (operation wall) |", text)
+            self.assertIn("scenario rows show operation wall time, which excludes placement and warmup", text)
+            # Without legacy rows, no row uses process CPU.
+            self.assertEqual({row["metric"] for row in pr_report.performance_rows(directory, set())}, {"operation wall"})
+
+    def test_single_metric_headers_use_explicit_labels(self):
+        for metric_name, header in (("process CPU", "Process CPU, ms/op."), ("operation wall", "Operation wall, ms/op.")):
+            row = {"case": "observe", "metric": metric_name, "baseline": 1, "candidate": 1, "ratio": 1,
+                   "ratio_min": 1, "ratio_max": 1, "reading": "Inconclusive"}
+            report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
+                      "platform": "Test platform", "performance": [row]}
+            with self.subTest(metric_name):
+                text = pr_report.render(report)
+                self.assertIn(header, text)
+                self.assertNotIn("Process cpu", text)
 
     def test_incomplete_render_does_not_claim_success_and_escapes_table_cells(self):
         report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
@@ -222,7 +260,7 @@ test same_name ... ok
                 multiplier = [1, 2, 100][row["repetition"]]
                 row["cpu_seconds"] *= multiplier
             (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in raw))
-            row = pr_report.performance_rows(directory)[0]
+            row = pr_report.performance_rows(directory, {"observe"})[0]
             self.assertEqual(row["baseline"], 100)
             self.assertEqual(row["candidate"], 100)
             self.assertEqual(row["ratio"], row["candidate"] / row["baseline"])

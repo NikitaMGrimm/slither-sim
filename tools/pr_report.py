@@ -86,13 +86,19 @@ def metric_rows(base, candidate):
     return rows
 
 
-def performance_rows(directory):
+METRIC_LABELS = {"process CPU": "Process CPU", "operation wall": "Operation wall"}
+
+
+def performance_rows(directory, legacy):
+    """Legacy rows keep process CPU for historical comparability. Scenario rows use the
+    harness's operation wall time: their process CPU is dominated by untimed placement
+    and warmup, which would dilute a change in the timed operation."""
     summary = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
     raw = [json.loads(line) for line in (directory / "results.jsonl").read_text(encoding="utf-8").splitlines()]
     result = []
     for case, data in summary.items():
         ratios = [p["cpu_ratio_candidate_over_baseline"] for p in data["pairs"]]
-        use_cpu = all(r is not None and math.isfinite(r) and r > 0 for r in ratios)
+        use_cpu = case in legacy and all(r is not None and math.isfinite(r) and r > 0 for r in ratios)
         if not use_cpu:
             ratios = [p["wall_ratio_candidate_over_baseline"] for p in data["pairs"]]
         if not ratios or not all(math.isfinite(r) and r > 0 for r in ratios):
@@ -127,7 +133,7 @@ def status(reading):
 def render(report):
     performance = report.get("performance", [])
     metrics = {row["metric"] for row in performance}
-    units = f"{next(iter(metrics)).capitalize()}, ms/op." if len(metrics) == 1 else "Time per operation, ms."
+    units = f"{METRIC_LABELS[next(iter(metrics))]}, ms/op." if len(metrics) == 1 else "Time per operation, ms."
     lines = [MARKER, "## Comparison", "",
              f"Base `{report['base'][:8]}` → merge `{report['merge'][:8]}` · [Run and data]({report['run_url']})", "",
              "### Performance", "", units, "",
@@ -190,7 +196,7 @@ def render(report):
               f"- PR head: `{report['head']}`. Runner: {cell(report['platform'])}.",
               "- Three alternating pairs after warmup. Base/PR costs come from the median-ratio pair.",
               "- Faster/slower requires a ≥5% median shift with the same direction in every pair. This is a display heuristic, not statistical significance.",
-              "- Process CPU includes setup/teardown; operation wall time excludes them.",
+              "- Legacy rows show process CPU where available, including setup/teardown; scenario rows show operation wall time, which excludes placement and warmup.",
               "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
               "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior."]
     if traces:
@@ -308,7 +314,7 @@ def collect(output, head):
         if code:
             report["errors"].append(f"paired performance runner exited {code}")
         else:
-            report["performance"] = performance_rows(perf)
+            report["performance"] = performance_rows(perf, {w.name for w in workloads if w.legacy})
     return report
 
 

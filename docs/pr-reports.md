@@ -48,11 +48,15 @@ workload to the harness adds it here without a collector change.
 Three adjacent alternating pairs follow a warmup; raw results are retained.
 The displayed target/PR costs come from the pair with the median ratio, so they
 agree with the paired percentage; they are not separate medians of the costs.
-CPU is process user plus kernel time, including setup/teardown; operation wall
-time excludes them. Values are descriptive hosted-runner measurements. The 5%
-display band and consistent-direction rule are presentation heuristics, not a
-significance test or a production speed guarantee. Small or mixed shifts are
-inconclusive. CPU counters are Windows-only; the runner can fall back to wall.
+The six legacy rows show process CPU (user plus kernel time, including
+setup/teardown) for comparability with earlier reports; CPU counters are
+Windows-only, so they fall back to operation wall elsewhere. Scenario rows show
+the harness's operation wall time, which excludes placement and warmup: their
+untimed setup dominates process CPU and would dilute a change in the timed
+operation. Each row names its metric. Values are descriptive hosted-runner
+measurements. The 5% display band and consistent-direction rule are
+presentation heuristics, not a significance test or a production speed
+guarantee. Small or mixed shifts are inconclusive.
 
 The fidelity table exposes the existing duration-weighted turn residuals and
 speed-ramp residuals by source, with denominators, using the same recorded
