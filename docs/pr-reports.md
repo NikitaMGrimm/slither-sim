@@ -10,7 +10,7 @@ Measured inputs are the simulator sources, Cargo manifests and build
 configuration, the two measurement examples, the selected regression tests and
 fixtures, and the collector scripts and workflow. The `paths` list in
 `pr-report.yml` is authoritative; `tools/test_pr_report.py` checks it against the
-collector's inputs. A PR that changes none of them, such as documentation,
+collector's inputs, including every `tools/` module the collector imports. A PR that changes none of them, such as documentation,
 research records, other tests or other tools, starts no comparison run and gets
 no comment; its correctness checks still run. With no run, the publisher has
 nothing to report, so a skipped PR is not confused with a failed or missing
@@ -32,13 +32,19 @@ same toolchain, after copying the PR's benchmark and fidelity examples, selected
 test sources and fixtures into a fresh, detached baseline worktree. Both runtimes
 therefore see identical measurement code and evidence. Cargo lockfiles can differ
 and their hashes are retained. Compilation failures make results unavailable.
-Both revisions reuse one run-owned Cargo target directory for dependencies.
+Snapshots, the input overlay, builds and identity records come from
+`tools/perf_build.py`, which [local comparisons](performance.md#compare-a-change)
+also use. Both revisions reuse one run-owned Cargo target directory for dependencies.
 After baseline executables are copied and hashed, only the simulator package's
 release and dev build outputs are explicitly cleaned, forcing a fresh candidate
 build without recompiling compatible dependencies. A failed cleanup leaves
 candidate results unavailable.
 
-The performance table reuses the six [baseline workloads](performance.md).
+The performance table and state traces cover the `ci` suite of the PR harness's
+[workload catalog](performance.md#workloads): the six legacy workloads plus
+selected steady-state scenarios, at most ten rows. Both builds must list the same
+plan; otherwise performance and trace results are unavailable. Adding a `ci`
+workload to the harness adds it here without a collector change.
 Three adjacent alternating pairs follow a warmup; raw results are retained.
 The displayed target/PR costs come from the pair with the median ratio, so they
 agree with the paired percentage; they are not separate medians of the costs.
@@ -51,7 +57,9 @@ inconclusive. CPU counters are Windows-only; the runner can fall back to wall.
 The fidelity table exposes the existing duration-weighted turn residuals and
 speed-ramp residuals by source, with denominators, using the same recorded
 fixtures on both runtimes. It also compares named outcomes from `movement_turns`
-and `physics` and six separate 32-iteration canonical traces. Test source changes,
+and `physics` and one canonical trace per `ci` workload over its catalog trace
+window, listed under Details. A scenario trace without its terminal record is
+unavailable rather than equal. Test source changes,
 new tests and removals are disclosed; removed tests are never counted as fixes.
 Ignored tests stay distinct from passes. A changed trace means changed behavior,
 which may be appropriate for a fidelity correction. No overall accuracy score
@@ -105,16 +113,16 @@ cargo run --locked --example fidelity_metrics -- tests/fixtures
 ```
 
 The second command prints JSON with the turn and speed-ramp errors and their
-sample counts. To compare performance, build the same benchmark harness at both
-revisions and keep separate copies of the executables, as described in the
-[performance guide](performance.md). Then use a fresh output directory:
+sample counts. To compare performance against the target branch, use a fresh
+output directory; the [performance guide](performance.md#compare-a-change)
+describes the snapshots, builds and results:
 
 ```sh
-uv run --locked --only-group tools python tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/CANDIDATE --output outputs/perf-comparison
+uv run --locked --only-group tools python -B tools/perf_compare.py --base origin/main --output outputs/perf/my-change
 ```
 
-This saves individual paired timings and a JSON summary. Windows provides CPU
-and wall timings; other systems provide wall timings. The combined report
+This saves parity readings, profiles, individual paired timings and a summary.
+Windows provides CPU and wall timings; other systems provide wall timings. The combined report
 collector currently expects a PR merge checkout and GitHub environment
 variables; these individual measurement commands do not.
 
