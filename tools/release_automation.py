@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import tomllib
 
 import release
@@ -49,13 +50,14 @@ def eligible_patch(pr, package, files, main):
             and {item["filename"] for item in files} == {"Cargo.toml", "Cargo.lock", "CHANGELOG.md"})
 
 
-def metadata_only(main, head, package):
+def metadata_only(main, head, package, patch_only=True):
     subprocess.run(["git", "fetch", "origin", head], cwd=release.ROOT, check=True)
     if git("merge-base", main, head) != main:
         return False
     before = tomllib.loads(git("show", f"{main}:Cargo.toml"))
     after = tomllib.loads(git("show", f"{head}:Cargo.toml"))
-    if not is_patch(package["version"], after["package"]["version"]):
+    proposed = after["package"]["version"]
+    if proposed == package["version"] or (patch_only and not is_patch(package["version"], proposed)):
         return False
     after["package"]["version"] = before["package"]["version"]
     if before != after:
@@ -64,7 +66,7 @@ def metadata_only(main, head, package):
     after_lock = tomllib.loads(git("show", f"{head}:Cargo.lock"))
     for item in after_lock["package"]:
         if item["name"] == package["name"] and "source" not in item:
-            if not is_patch(package["version"], item["version"]):
+            if item["version"] != proposed:
                 return False
             item["version"] = package["version"]
     return before_lock == after_lock
@@ -149,33 +151,56 @@ def select_automatic():
     return {"tag": tag, "commit": commit}
 
 
-def dispatch_pr_checks():
+def start_pr_checks():
     output = json.loads(os.environ["RELEASE_PR"])
     if not output.get("number"):
         return
     pr = release.github(repo_path(f"pulls/{output['number']}"))
     if not bot_pr(pr):
-        raise ValueError("CI dispatch requires a same-repository release bot PR")
+        raise ValueError("CI approval requires a same-repository release bot PR")
     ensure_pr_checks(pr)
 
 
 def ensure_pr_checks(pr):
-    runs = subprocess.check_output([
-        "gh", "run", "list", "--workflow", "checks.yml", "--event", "workflow_dispatch",
-        "--branch", pr["head"]["ref"], "--commit", pr["head"]["sha"],
-        "--limit", "1", "--json", "databaseId", "--jq", ".[0].databaseId // empty",
-    ], cwd=release.ROOT, text=True).strip()
-    if not runs:
-        subprocess.run(["gh", "workflow", "run", "checks.yml", "--ref", pr["head"]["ref"]],
+    if not bot_pr(pr):
+        raise ValueError("CI approval requires a same-repository release bot PR")
+    refresh_main()
+    main = git("rev-parse", "origin/main")
+    files = release.github_pages(repo_path(f"pulls/{pr['number']}/files?per_page=100"))
+    if (pr["base"]["sha"] != main
+            or {item["filename"] for item in files} != {"Cargo.toml", "Cargo.lock", "CHANGELOG.md"}
+            or not metadata_only(main, pr["head"]["sha"], release.package_at(main), patch_only=False)):
+        print("Release PR must contain only current release metadata before CI approval.", file=sys.stderr)
+        return
+    for attempt in range(7):
+        runs = json.loads(subprocess.check_output([
+            "gh", "run", "list", "--workflow", "checks.yml", "--event", "pull_request",
+            "--branch", pr["head"]["ref"], "--commit", pr["head"]["sha"],
+            "--limit", "1", "--json", "databaseId,conclusion",
+        ], cwd=release.ROOT, text=True))
+        if runs:
+            break
+        if attempt == 6:
+            raise TimeoutError("The release PR's Checks run has not appeared; retry preparation")
+        time.sleep(5)
+    if runs[0]["conclusion"] == "action_required":
+        run_id = runs[0]["databaseId"]
+        run = release.github(repo_path(f"actions/runs/{run_id}"))
+        if (run["event"] != "pull_request" or run["head_sha"] != pr["head"]["sha"]
+                or not any(item["number"] == pr["number"] for item in run["pull_requests"])):
+            raise ValueError("Pending CI run does not match the inspected release PR")
+        # GITHUB_TOKEN-created PR runs require approval. Dispatch runs do not satisfy
+        # this repository's strict protected-PR gate; start its real merge CI instead.
+        subprocess.run(["gh", "api", "--method", "POST", repo_path(f"actions/runs/{run_id}/approve")],
                        cwd=release.ROOT, check=True, stdout=sys.stderr)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("select", "prepare", "dispatch-pr-checks"))
+    parser.add_argument("command", choices=("select", "prepare", "start-pr-checks"))
     args = parser.parse_args()
-    if args.command == "dispatch-pr-checks":
-        dispatch_pr_checks()
+    if args.command == "start-pr-checks":
+        start_pr_checks()
         return
     if args.command == "prepare":
         package = release.package_at("HEAD")

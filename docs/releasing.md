@@ -26,9 +26,12 @@ again before uploading. It uses crates.io Trusted Publishing, without a saved
 API token. A scheduled check is an opportunity to release, not a promise of two
 releases per day. There are no empty releases when the package is unchanged.
 
-Bot pushes do not start ordinary push/PR workflows with `GITHUB_TOKEN`.
-Preparation explicitly dispatches checks on the release branch. After the
-protected merge, the publisher tags the selected commit and explicitly
+Bot pushes do not start ordinary push workflows with `GITHUB_TOKEN`. Bot PRs
+start approval-required PR checks. Preparation approves only this repository's
+release-bot run after verifying the branch contains current main plus release
+metadata. This starts the real protected PR checks; a separate dispatched
+branch run does not satisfy that gate. After the protected merge, the publisher
+tags the selected commit and explicitly
 dispatches checks on that tag if no main push run exists. Later main commits
 cannot change the selected release's source. Branch protection remains enabled.
 
