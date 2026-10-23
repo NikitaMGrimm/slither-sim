@@ -95,14 +95,11 @@ one prey. It includes provisional models and is not an exact official replica.
 ## Development
 
 - [Contributing](CONTRIBUTING.md): changes, tests and packaging.
+- [Documentation map](docs/README.md): API guides, research tasks and maintenance.
 - [Research workflow](docs/research-workflow.md): capture, audit and replay tools.
   These separately require uv, Python 3.12 and Node.js 22+ (24 recommended).
-- [Provenance](docs/provenance.md): source hashes and adaptations.
-- [Verification](docs/verification.md): completed checks and coverage limits.
 - [Performance](docs/performance.md): reproducible release workloads.
 - [Research records](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md): dated results and evidence limits.
-- [PR comparisons](docs/pr-reports.md): automatic performance and regression tables.
-- [Releasing](docs/releasing.md): version tags and trusted publishing.
 
 Report bugs in [Issues](https://github.com/NikitaMGrimm/slither-sim/issues), with
 the command, configuration and expected behavior. Add the Rust library with

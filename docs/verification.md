@@ -1,4 +1,8 @@
-# Verification
+# Verification record, October 22, 2026
+
+This is a historical record, not a current test inventory. For checks to run
+today, use the [offline check groups](research-workflow.md#offline-checks).
+For current model limits, use [rules and evidence limits](server-rules.md).
 
 Checks below were recorded on 2026-10-22. Development hashes may predate a
 squashed public history. No remote CI, registry publication or visibility change

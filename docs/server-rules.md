@@ -13,28 +13,53 @@ and the [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/b
 
 [Client presentation](presentation.md) covers pellet palettes separately from
 physical food generation and pickup rules.
-[Host fidelity](host-fidelity.md) records coverage, spawn and minimap corrections
-and the remaining unmeasured server policies.
+[Host fidelity](host-fidelity.md) records the separate snake, prey and food
+receipt rules, spawn and minimap corrections and the remaining unmeasured
+server policies.
 
 Fixtures retain sources, methods and hashes. Original recordings and analysis
 outputs are not distributed; packaged tests run without them, but repeating the
 measurements may require the original archives.
 
-| Rule | Tests and fixtures | Limit |
-| --- | --- | --- |
-| Movement/steering | `physics.rs`, `movement_turns.rs`; `movement-turn-runs.json`, `speed-ramp-validation.json` | About 7 ms server loops; protocol time/speed units differ. |
-| Growth/cruise speed | `cruise_growth_retention.rs`, `speed_state.rs`; `food-growth.json`, `cruise-growth-retention-20260930.json`, `cruise-retention-pair.json` | Retained cruise measured; transitions modelled. |
-| Body anchors | `physics.rs`, `server_body.rs`; `body-updates*.json`, `server-body-snapshots.json` | Client and received-server evidence differ; reconstruction is not universally exact. |
-| Collision | `physics.rs`; `official-collision-cases.json` | Some cases describe client geometry, not observed server hitboxes. |
-| Pickup | `circle_pickup.rs`, `pickup_events.rs`; `boost-circle-food.json` | Selected behavior, not complete coverage. |
-| Death food | `death_food.rs`; `death-food.json`, `death-food-prospective.json`, `death-jitter-fresh.json` | Scatter fits retain count gaps and held-out exceptions. |
-| Food density | `ambient_food.rs`, `boost_food.rs`, `death_food.rs` | Received occupancy cannot isolate generation from broadcast filtering. |
-| Boundary/radius | `boundary.rs`; `boundary-contact.json`, `arena-radius-updates.json` | Sliding is fitted; radius traces are stronger than the population law. |
-| Prey | `prey.rs`, `prey_outward.rs`, `prey_decisions.rs`, `prey_activation.rs`; `prey-*.json` | Speeds constrained; steering, population and departure remain approximate. |
-| Spawning | `spawn.rs` | Radial bands do not determine their probability law; ring starts are synthetic. |
-| Kiosk penalty | `kiosk.rs` and core unit tests | Historical model; current official applicability unverified. |
+| Rule | Tests and fixtures | Limit  |
+| --- | --- | ---  |
+| Movement/steering | `physics.rs`, `movement_turns.rs`; `movement-turn-runs.json`, `speed-ramp-validation.json` | About 7 ms server loops; protocol time/speed units differ.  |
+| Growth/cruise speed | `cruise_growth_retention.rs`, `speed_state.rs`; `food-growth.json`, `cruise-growth-retention-20260930.json`, `cruise-retention-pair.json` | Retained cruise measured; transitions modelled. Fixed-size ramps do not test growth during a ramp.  |
+| Body anchors | `physics.rs`, `server_body.rs`; `body-updates*.json`, `server-body-snapshots.json` | Client and received-server evidence differ; reconstruction is not universally exact.  |
+| Collision | `physics.rs`; `official-collision-cases.json` | Cases specify Android offline-client geometry, not observed server hitboxes; online move/test phasing is unverified.  |
+| Pickup | `circle_pickup.rs`, `pickup_events.rs`; `boost-circle-food.json` | Selected behavior, not complete coverage.  |
+| Death food | `death_food.rs`; `death-food.json`, `death-food-prospective.json`, `death-jitter-fresh.json` | Scatter fits retain count gaps and held-out exceptions.  |
+| Food density | `ambient_food.rs`, `boost_food.rs`, `death_food.rs` | Received occupancy cannot isolate generation from broadcast filtering.  |
+| Boundary/radius | `boundary.rs`; `boundary-contact.json`, `arena-radius-updates.json` | Sliding is fitted; radius traces are stronger than the population law.  |
+| Prey | `prey.rs`, `prey_outward.rs`, `prey_decisions.rs`, `prey_activation.rs`; `prey-*.json` | Speeds constrained; steering, population and departure remain approximate.  |
+| Client receipt | `src/client/visibility.rs`, `src/client/simulation.rs` unit tests; `client-food-interest.json` | Food, snake and prey use separate rules. Food sectors match selected small-snake witnesses, with later counterexamples; snake/prey distances are engineering choices. See [host fidelity](host-fidelity.md).  |
+| Spawning | `spawn.rs` | Radial bands do not determine their probability law; ring starts are synthetic. Own joins include [exceptions](host-fidelity.md) below the 600-unit clearance.  |
+| Kiosk penalty | `kiosk.rs` and core unit tests | Historical model; current official applicability unverified, including under `Config::official(n)`.  |
 
 Tests are under `tests/`, fixtures under `tests/fixtures/`. Run `cargo test --locked`.
+
+## Open contributions
+
+Choose one discriminating case rather than retuning a model to fit its current
+regressions. The limits above define what each case still needs to resolve.
+
+- **Growth/cruise:** record a size change inside a ramp whose candidate predictions
+  differ beyond timing and quantization error.
+- **Collision:** keep the offline-client cases and add a controlled near-miss pass
+  that separates candidate contact boundaries or move/test phasings.
+- **Food density:** separate generation from filtering, such as with paired
+  recipients or controlled consumption against matched sectors, with negative controls.
+- **Boundary/radius:** replay a recorded window with `dynamicRadius:false`, then
+  test a competing [controller](host-fidelity.md#ecology-models) prediction.
+- **Prey:** test one named activation or departure explanation on a retained
+  transition. Recipient arrivals do not estimate global births.
+- **Client receipt:** first obtain a live route with completed legs, then paired
+  present/absent crossings with held-out legs. See the current collector and
+  remaining feasibility gap in [host fidelity](host-fidelity.md).
+- **Spawning:** retain one shareable exception to the 600-unit clearance, with
+  neighbor freshness and corridor attribution.
+- **Kiosk:** design a bounded long stationary interval separating onset from
+  recovery, with own size, displayed score and moving controls, before changing parameters.
 
 ## Movement and geometry
 

@@ -92,8 +92,8 @@ destruction; returned-output destruction is reported separately by the harness.
 Do not sum inclusive and nested intervals or use these profiles as comparative
 timings. Trace mode disables profiling sessions and compares complete bytes.
 
-Parent validation passed five preparation tests, all 61 root Python tests, both
-generated release builds, and all six complete two-iteration baseline/instrumented
+Validation of the pinned snapshot passed five preparation tests, all 61 root Python
+tests, both generated release builds, and all six complete two-iteration baseline/instrumented
 trace comparisons. The original scalar-observation assertions also passed. The
 same source received an independent read-only review with no findings; that
 review did not execute checks. Numeric/mutation coverage remains limited to the
