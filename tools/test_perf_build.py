@@ -243,6 +243,27 @@ class Commands(unittest.TestCase):
         code, _ = self.run_tree("sys.exit(0)\n", timeout=30)
         self.assertEqual(code, 0)
 
+    def test_shim_starts_the_command_only_after_the_release_byte(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = Path(temporary) / "ran"
+            target = [sys.executable, "-c", f"open({str(marker)!r}, 'w').close()"]
+            for name, data in (("EOF", b""), ("wrong byte", b"x"), ("release", perf_build.RELEASE)):
+                with self.subTest(name):
+                    result = subprocess.run([sys.executable, "-I", "-c", perf_build.SHIM, *target],
+                                            input=data, capture_output=True, timeout=30)
+                    released = data == perf_build.RELEASE
+                    self.assertEqual(result.returncode == 0, released, result.stderr)
+                    self.assertEqual(marker.exists(), released)
+
+    @unittest.skipIf(os.name == "nt", "POSIX process-group cleanup")
+    def test_posix_timeout_returns_promptly(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "command.log"
+            started = time.perf_counter()
+            code = perf_build.command([sys.executable, "-c", "import time; time.sleep(60)"], temporary, log, timeout=0.2)
+            self.assertEqual(code, -1)
+            self.assertLess(time.perf_counter() - started, 5)
+
     def test_missing_executable_is_logged(self):
         with tempfile.TemporaryDirectory() as temporary:
             log = Path(temporary) / "command.log"

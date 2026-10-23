@@ -42,8 +42,11 @@ def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS):
 
 # Windows children start through this shim, which spawns the real command only after
 # the parent has assigned it to the job object; nothing can escape the job before that.
+# EOF (a parent that died before assigning) or any other input must not start it.
+RELEASE = b"\n"
 SHIM = ("import subprocess, sys\n"
-        "sys.stdin.buffer.read(1)\n"
+        f"if sys.stdin.buffer.read(1) != {RELEASE!r}:\n"
+        "    sys.exit('not released into the job object; command not started')\n"
         "sys.exit(subprocess.call(sys.argv[1:], stdin=subprocess.DEVNULL))\n")
 
 
@@ -139,7 +142,7 @@ class ProcessTree:
                 raise
             try:
                 self.job.assign(self.process)
-                self.process.stdin.write(b"\n")
+                self.process.stdin.write(RELEASE)
                 self.process.stdin.close()
             except BaseException:
                 self.process.kill()
@@ -156,24 +159,26 @@ class ProcessTree:
         return self.process.wait(timeout=timeout)
 
     def stop(self):
-        """Kill every remaining member regardless of the leader's state, then reap the leader."""
+        """Kill every remaining member regardless of the leader's state, and reap the leader."""
         if self.job:
             self.job.terminate()
             self.job.close()
-        else:
-            import signal
-            try:
-                os.killpg(self.group, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            deadline = time.perf_counter() + 30
-            while time.perf_counter() < deadline:
-                try:
-                    os.killpg(self.group, 0)
-                except (ProcessLookupError, PermissionError):
-                    break
-                time.sleep(0.01)
+            self.process.wait(timeout=30)
+            return
+        import signal
+        try:
+            os.killpg(self.group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        # An unreaped leader stays a zombie member, keeping the group observable.
         self.process.wait(timeout=30)
+        deadline = time.perf_counter() + 30
+        while time.perf_counter() < deadline:
+            try:
+                os.killpg(self.group, 0)
+            except (ProcessLookupError, PermissionError):
+                break
+            time.sleep(0.01)
 
 
 def command(args, cwd, log, environment=None, timeout=600):
