@@ -273,11 +273,11 @@ def main(argv=None):
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--max-wall-seconds", type=float,
                         help="shared metadata/workload deadline; allow up to 10s extra for child cleanup")
-    selection = parser.add_mutually_exclusive_group()
-    selection.add_argument("--suite", choices=SUITES, default="ci",
-                           help="catalog suite: ci rows or every available row (default ci)")
-    selection.add_argument("--cases", nargs="+", metavar="CASE",
-                           help="catalog names from `perf_baseline --list`, or perf_observation cases")
+    parser.add_argument("--suite", choices=SUITES, default="ci",
+                        help="catalog suite: ci rows or every available row (default ci)")
+    parser.add_argument("--cases", nargs="+", metavar="CASE",
+                        help="catalog names from `perf_baseline --list` in any suite, or perf_observation "
+                             "cases; replaces the suite selection")
     parser.add_argument("--no-profiles", action="store_true", help="skip step profiles in --base mode")
     args = parser.parse_args(argv)
     if (args.baseline is None) != (args.candidate is None):

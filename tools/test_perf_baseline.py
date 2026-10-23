@@ -216,6 +216,11 @@ class Comparisons(unittest.TestCase):
                              {"step-default": 100000, "observe": 1000, "official-100-step": 50})
             self.assertEqual(native.call_count, 12)
             self.assertIn("| `observe` | 1000 | — |", (output / "summary.md").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            code, output, _ = self.copied(Path(temporary), [catalog(), catalog()], "--repeats", "1",
+                                          "--suite", "full", "--cases", "sandbox-16-bot")
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads((output / "manifest.json").read_text())["workloads"], {"sandbox-16-bot": 200})
         rows = [row("step-default", iterations=1, trace=32, legacy=True)]
         for name, catalogs, options, message in (
                 ("mismatch", [catalog(), catalog(rows)], ("--cases", "step-default"), "plans differ"),
