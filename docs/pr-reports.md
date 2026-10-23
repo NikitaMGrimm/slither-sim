@@ -69,7 +69,29 @@ Conflicting PRs need their conflicts resolved before a merge checkout can run.
 The publisher workflow must exist on the default branch before GitHub can
 trigger it; see the [workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
-Local focused checks (standard library for the Python reporting code):
+The selected tests and fixture measurements also run locally, without GitHub
+credentials or Actions:
+
+```sh
+cargo test --locked --test movement_turns --test physics
+cargo run --locked --example fidelity_metrics -- tests/fixtures
+```
+
+The second command prints JSON with the turn and speed-ramp errors and their
+sample counts. To compare performance, build the same benchmark harness at both
+revisions and keep separate copies of the executables, as described in the
+[performance guide](performance.md). Then use a fresh output directory:
+
+```sh
+uv run --locked --only-group tools python tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/CANDIDATE --output outputs/perf-comparison
+```
+
+This saves individual paired timings and a JSON summary. Windows provides CPU
+and wall timings; other systems provide wall timings. The combined report
+collector currently expects a PR merge checkout and GitHub environment
+variables; these individual measurement commands do not.
+
+To check the reporting tools themselves:
 
 ```sh
 uv run --locked --only-group tools python -m unittest discover -s tools -p test_pr_report.py
