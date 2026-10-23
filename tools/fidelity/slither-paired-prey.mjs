@@ -18,6 +18,7 @@ export const CROSSING = Object.freeze({
   maxPairSeparation: 2400, minArenaGap: 2200,
   flightBoxRadius: 320,
   endpointTolerance: 120, crossTrackTolerance: 180,
+  endpointAnchorFreshMs: 150, endpointPreyFreshMs: 350,
   legTimeoutMs: 30000, primaryFreshMs: 600,
 });
 // Fixed crossing directions. Offsets scale the unsigned (x, y) components, so a diagonal
@@ -43,6 +44,14 @@ export function crossingProjection(crossing, dx, dy) {
   const d = CROSSING_DIRECTIONS[crossing.direction ?? crossing.axis];
   return { along: crossing.sign * (dx * d.x + dy * d.y) / (d.x * d.x + d.y * d.y),
     crossTrack: dx * d.crossX + dy * d.crossY };
+}
+
+function primaryGeometryReady(crossing, prey, primary) {
+  const dx = primary.x - prey.x, dy = primary.y - prey.y;
+  const projected = crossingProjection(crossing, dx, dy);
+  return Math.abs(projected.along - CROSSING.followerOffset) <= CROSSING.endpointTolerance &&
+    Math.abs(projected.crossTrack) <= CROSSING.crossTrackTolerance &&
+    Math.max(Math.abs(dx), Math.abs(dy)) >= CROSSING.flightBoxRadius;
 }
 
 export function snapshot(bot, peer, now) {
@@ -214,10 +223,25 @@ export class PairPreyState {
           c.actualEuclideanDistance = Math.hypot(snapshots[1].x - p.x,
             snapshots[1].y - p.y);
           const goal = c.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset;
+          // Enforce the study's endpoint geometry and age gates. Reaching B's
+          // waypoint while A is displaced or either pose is stale is insufficient.
+          const fresh = snapshots.every(s => Number.isFinite(s.anchorAgeMs) &&
+            s.anchorAgeMs >= 0 && s.anchorAgeMs <= CROSSING.endpointAnchorFreshMs) &&
+            Number.isFinite(p.t) && now >= p.t && now - p.t <= CROSSING.endpointPreyFreshMs;
           if (Math.abs(c.actualAxisDistance - goal) <= CROSSING.endpointTolerance &&
-              Math.abs(c.actualCrossTrack) <= CROSSING.crossTrackTolerance) {
+              Math.abs(c.actualCrossTrack) <= CROSSING.crossTrackTolerance && fresh &&
+              primaryGeometryReady(c, p, first)) {
+            const endpoint = { t: now, offset: goal, pairIdentities: identities,
+              primary: { x: first.x, y: first.y, anchorAgeMs: first.anchorAgeMs },
+              secondary: { x: second.x, y: second.y, anchorAgeMs: second.anchorAgeMs },
+              prey: { id: p.id, generation: p.generation, x: p.x, y: p.y, t: p.t } };
+            // The first approach has no achieved opposite start. Retain it as
+            // an endpoint visit; count subsequent endpoint-to-endpoint legs.
+            c.lastEndpoint = { start: c.legStart, end: endpoint, completed: c.legStart !== null };
+            if (c.legStart !== null) c.completedLegs++;
+            c.legStart = endpoint; c.endpointVisits++;
             c.leg = c.leg === 'near' ? 'far' : 'near';
-            c.legStarted = now; c.completedLegs++;
+            c.legStarted = now;
           } else if (now - c.legStarted > CROSSING.legTimeoutMs) {
             this.target = null; this.navigationPrey = null;
             this.crossing = null; this.phase = 'search'; this.reason = 'crossing_leg_timeout';
@@ -266,6 +290,7 @@ export class PairPreyState {
         this.crossing = { trial: ++this.crossingTrial, selectedAt: now,
           ...this.crossingFrame(row.prey, snapshots[0], snapshots[1], center),
           leg: 'near', legStarted: now, completedLegs: 0, reentries: 0,
+          endpointVisits: 0, legStart: null, lastEndpoint: null,
           actualAxisDistance: null, actualCrossTrack: null,
           actualBoxDistance: null, actualEuclideanDistance: null };
       }
@@ -354,16 +379,17 @@ export class PairPreyBot extends Bot {
       Math.max(Math.abs(primaryDx), Math.abs(primaryDy));
     const secondaryBoxDistance = secondaryDx === null ? null :
       Math.max(Math.abs(secondaryDx), Math.abs(secondaryDy));
-    const primaryGeometryReady = primaryAxisDistance !== null &&
-      Math.abs(primaryAxisDistance - CROSSING.followerOffset) <= CROSSING.endpointTolerance &&
-      Math.abs(primaryCrossTrack) <= CROSSING.crossTrackTolerance &&
-      primaryBoxDistance >= CROSSING.flightBoxRadius;
+    const primaryReady = primaryAxisDistance !== null &&
+      primaryGeometryReady(crossing, navigationPrey, primary);
+    const endpointChanged = this.lastPairTrial !== crossing?.trial ||
+      this.lastPairEndpoint !== crossing?.endpointVisits;
     if (now - (this.lastPairSample ?? -Infinity) >= PAIR_PREY.observerSampleMs ||
         this.lastPairPhase !== this.pair.phase || this.lastPairTarget !== this.pair.target?.id ||
         this.lastPairLeg !== crossing?.leg || this.lastPairTrial !== crossing?.trial) {
       this.lastPairSample = now; this.lastPairPhase = this.pair.phase;
       this.lastPairTarget = this.pair.target?.id; this.lastPairLeg = crossing?.leg;
       this.lastPairTrial = crossing?.trial;
+      this.lastPairEndpoint = crossing?.endpointVisits;
       this.pendingPairSample = { event: 'paired-prey-state', botIndex: this.index,
         mode: this.pair.mode, life: this.lives, selfId: me.id, serverClock: this.serverClock,
         phase: this.pair.phase, pairDistance: this.pair.pairDistance,
@@ -386,6 +412,9 @@ export class PairPreyBot extends Bot {
         intendedOffset: crossing ? this.index === 0 ? CROSSING.followerOffset :
           crossing.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset : null,
         completedLegs: crossing?.completedLegs ?? null,
+        endpointVisits: crossing?.endpointVisits ?? null,
+        ...(this.index === 1 && endpointChanged && crossing?.lastEndpoint
+          ? { crossingEndpoint: crossing.lastEndpoint } : {}),
         observerReentries: crossing?.reentries ?? null,
         primaryAnchorAgeMs: crossing ? primary?.anchorAgeMs ?? null : null,
         secondaryAnchorAgeMs: crossing ? secondary?.anchorAgeMs ?? null : null,
@@ -395,8 +424,8 @@ export class PairPreyBot extends Bot {
         secondaryPreyBoxDistance: secondaryBoxDistance,
         secondaryPreyAxisDistance: secondaryAxisDistance,
         secondaryPreyCrossTrack: secondaryCrossTrack,
-        primaryGeometryReady: crossing ? primaryGeometryReady : null,
-        crossingGeometryReady: crossing ? primaryGeometryReady &&
+        primaryGeometryReady: crossing ? primaryReady : null,
+        crossingGeometryReady: crossing ? primaryReady &&
           secondaryAxisDistance >= CROSSING.flightBoxRadius &&
           Math.abs(secondaryCrossTrack) <= CROSSING.crossTrackTolerance : null,
         actualPreyBoxDistance: rawDx === null ? null : Math.max(Math.abs(rawDx), Math.abs(rawDy)),

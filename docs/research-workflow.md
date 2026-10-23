@@ -98,6 +98,16 @@ an achieved crossing. Freeze candidate geometry/retention, calibration/held-out
 legs, attempt budget and required coverage before connecting. Preserve failed
 joins and empty cohorts; they cannot validate a new visibility rule.
 
+Crossing endpoint advancement requires the reference near its assigned offset,
+both snake anchors at most 150 ms old and the reference prey report at most
+350 ms old. These are collector/study quality gates, not server constants.
+`endpointVisits` includes the initial approach; `completedLegs` counts subsequent
+legs between achieved endpoints. Observer B records each exact start/end witness
+once in `crossingEndpoint`. Earlier collector versions counted endpoint arrivals
+as completed legs; their source-pinned recordings retain that historical meaning.
+These endpoint checks do not establish continuous geometry, avoidance-free travel,
+clock alignment, peer continuity or held-out coverage; analysis must still check them.
+
 Raw frames retain direction, bytes and monotonic send/receipt timestamps. Metadata
 pins the plan/collector sources, wall-clock origin, connection/life boundaries,
 ping sends/replies/RTT and censored requests, including post-death observation.

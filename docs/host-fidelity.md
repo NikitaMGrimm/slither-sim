@@ -48,6 +48,13 @@ WebSocket. Both attempts retained complete capture files with zero frames and
 zero joins. The dependent crossings were not run; the new route tooling supplies
 no additional visibility validation.
 
+A later explicit-Origin preflight joined, followed by two completed eight-minute
+paired acquisitions. The [paired recheck](host-fidelity-recheck-20261023.md)
+preserves their hashes, food-model counterexamples and zero eligible controlled
+snake/prey crossings. It identifies collector endpoint-accounting defects, but
+does not supply a validated replacement streaming rule. Food entry/retention and
+the combined cleanup schedule remain approximations, including for small snakes.
+
 Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
@@ -102,6 +109,11 @@ would not establish fidelity. Within known prey lifetimes, 332 consecutive `j`
 gaps have median 338 ms (211–357 ms). Historical reporting/decision studies at the
 source commit above independently constrain ordinary and exact-11-speed pulse
 intervals; their original reports preserve failed fits and unresolved onset.
+
+The later paired recheck retains the roughly 338 ms ordinary median, but includes
+one shared 1,614 ms same-prey update gap while other incoming traffic continues.
+Captured extrema are corpus-specific; periodic local correction traffic does not
+recover the official reporting scheduler.
 
 Prey now receive unconditional position corrections near one third second, even
 when quantized server position is unchanged. Exact-11 pulse transitions may report
