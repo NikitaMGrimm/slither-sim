@@ -428,3 +428,290 @@ fn minimap_mapping_preserves_asymmetric_geometry_at_different_centers_and_radii(
         }
     }
 }
+
+// Retained sampler from 0.2.0 for bounded synthetic parity cases, not an
+// official-server rasterization claim. Never run its unbounded extreme inputs.
+fn original_minimap(snakes: &[Snake], arena: &Arena, side: usize) -> Minimap {
+    let mut cells = vec![0; side * side];
+    let grid = |p: Point| Point {
+        x: ((p.x - arena.center.x) / arena.radius + 1.) * side as f64 / 2.,
+        y: ((p.y - arena.center.y) / arena.radius + 1.) * side as f64 / 2.,
+    };
+    for snake in snakes.iter().filter(|s| s.alive) {
+        let mut a = grid(snake.head);
+        for b in std::iter::once(snake.head)
+            .chain(snake.body.iter().copied())
+            .map(grid)
+        {
+            let steps = ((b.x - a.x).abs().max((b.y - a.y).abs()) * 2.)
+                .ceil()
+                .max(1.) as usize;
+            assert!(steps <= 4096, "reference sampler must stay bounded");
+            for k in 0..=steps {
+                let t = k as f64 / steps as f64;
+                let x = (a.x + (b.x - a.x) * t).floor();
+                let y = (a.y + (b.y - a.y) * t).floor();
+                if x >= 0. && y >= 0. && x < side as f64 && y < side as f64 {
+                    cells[y as usize * side + x as usize] = 1;
+                }
+            }
+            a = b;
+        }
+    }
+    Minimap {
+        side,
+        cells,
+        age_seconds: 0.,
+    }
+}
+
+fn edge_snake(a: Point, b: Point) -> Snake {
+    Snake {
+        head: a,
+        body: vec![b],
+        ..snake()
+    }
+}
+
+#[test]
+fn minimap_normal_geometry_matches_the_original_sampler_exactly() {
+    let mut random = 7_u64;
+    let mut unit = || {
+        random ^= random << 13;
+        random ^= random >> 7;
+        random ^= random << 17;
+        (random >> 11) as f64 / (1_u64 << 53) as f64
+    };
+    for side in [1, 8, 136, 512] {
+        for radius in [1e-100, 1., 1000., 1e100] {
+            for center in [Point::default(), Point { x: 400., y: -200. }] {
+                let arena = Arena { center, radius };
+                let mut live = snake();
+                live.body = (0..24)
+                    .map(|_| Point {
+                        x: center.x + (unit() * 1.98 - 0.99) * radius,
+                        y: center.y + (unit() * 1.98 - 0.99) * radius,
+                    })
+                    .collect();
+                live.head = live.body[0];
+                let mut dead = live.clone();
+                dead.alive = false;
+                let snakes = [live, dead];
+                assert_eq!(
+                    Minimap::from_snakes(&snakes, &arena, side),
+                    original_minimap(&snakes, &arena, side),
+                    "side={side}, radius={radius}, center={center:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn minimap_extreme_crossings_have_bounded_visible_geometry() {
+    let line = |x, y| Point { x, y };
+    for side in [1, 8, 136, 512] {
+        for radius in [1e-12, 1e-100, f64::from_bits(1)] {
+            for (a, b, slope) in [
+                (line(-42., 0.), line(42., 0.), 0.),
+                (line(-f64::MAX, 0.), line(f64::MAX, 0.), 0.),
+                (line(-3., -1.), line(6., 2.), 1. / 3.),
+                (line(-1e308, -1e307), line(5e307, 5e306), 0.1),
+                (line(-f64::MAX, -f64::MAX), line(f64::MAX, f64::MAX), 1.),
+            ] {
+                let unit_arena = Arena {
+                    center: Point::default(),
+                    radius: 1.,
+                };
+                let expected = original_minimap(
+                    &[edge_snake(line(-1., -slope), line(1., slope))],
+                    &unit_arena,
+                    side,
+                );
+                for (a, b) in [(a, b), (b, a)] {
+                    let arena = Arena {
+                        center: Point::default(),
+                        radius,
+                    };
+                    let actual = Minimap::from_snakes(&[edge_snake(a, b)], &arena, side);
+                    actual.validate().unwrap();
+                    assert_eq!(
+                        actual, expected,
+                        "side={side}, radius={radius}, a={a:?}, b={b:?}"
+                    );
+                }
+            }
+            for multiplier in [-2., -1., 0., 0.5, 1., 2.] {
+                let offset = radius * multiplier;
+                for swap in [false, true] {
+                    let point = |major, minor| {
+                        if swap {
+                            line(minor, major)
+                        } else {
+                            line(major, minor)
+                        }
+                    };
+                    let unit_arena = Arena {
+                        center: Point::default(),
+                        radius: 1.,
+                    };
+                    let expected = original_minimap(
+                        &[edge_snake(
+                            point(-1., offset / radius),
+                            point(1., offset / radius),
+                        )],
+                        &unit_arena,
+                        side,
+                    );
+                    let arena = Arena {
+                        center: Point::default(),
+                        radius,
+                    };
+                    let actual = Minimap::from_snakes(
+                        &[edge_snake(
+                            point(-f64::MAX, offset),
+                            point(f64::MAX, offset),
+                        )],
+                        &arena,
+                        side,
+                    );
+                    assert_eq!(
+                        actual, expected,
+                        "offset={offset}, radius={radius}, swap={swap}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn minimap_clips_outside_edges_and_keeps_half_open_bounds() {
+    let arena = Arena {
+        center: Point { x: 10., y: 20. },
+        radius: 1.,
+    };
+    for (a, b, expected) in [
+        (
+            Point { x: -1000., y: 20. },
+            Point { x: 1000., y: 20. },
+            (32..40).collect::<Vec<_>>(),
+        ),
+        (
+            Point { x: -1000., y: 22. },
+            Point { x: 1000., y: 22. },
+            vec![],
+        ),
+        (
+            Point { x: -1000., y: 19. },
+            Point { x: 1000., y: 19. },
+            (0..8).collect(),
+        ),
+        (
+            Point { x: -1000., y: 21. },
+            Point { x: 1000., y: 21. },
+            vec![],
+        ),
+        (
+            Point { x: 9., y: -1000. },
+            Point { x: 9., y: 1000. },
+            (0..8).map(|y| y * 8).collect(),
+        ),
+        (
+            Point { x: 11., y: -1000. },
+            Point { x: 11., y: 1000. },
+            vec![],
+        ),
+        (arena.center, arena.center, vec![36]),
+        (
+            Point { x: 1e300, y: 1e300 },
+            Point { x: 1e300, y: 1e300 },
+            vec![],
+        ),
+    ] {
+        let actual = Minimap::from_snakes(&[edge_snake(a, b)], &arena, 8);
+        let marked: Vec<_> = actual
+            .cells
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &v)| (v == 1).then_some(i))
+            .collect();
+        assert_eq!(marked, expected, "a={a:?}, b={b:?}");
+    }
+    let arena = Arena {
+        center: Point {
+            x: -f64::MAX,
+            y: 0.,
+        },
+        radius: f64::MAX,
+    };
+    let map = Minimap::from_snakes(
+        &[edge_snake(arena.center, Point { x: f64::MAX, y: 0. })],
+        &arena,
+        8,
+    );
+    let marked: Vec<_> = (0..64).filter(|&i| map.cells[i] == 1).collect();
+    assert_eq!(marked, [36, 37, 38, 39]);
+}
+
+#[test]
+fn minimap_sampling_threshold_preserves_short_off_map_paths() {
+    let arena = Arena {
+        center: Point::default(),
+        radius: 1.,
+    };
+    for (end, expected_steps) in [(0.875, 15), (1., 16), (1_f64.next_up().next_up(), 17)] {
+        let projected = (end + 1.) * 8. / 2.;
+        assert_eq!((projected * 2.).ceil() as usize, expected_steps);
+        let snakes = [edge_snake(Point { x: -1., y: 0. }, Point { x: end, y: 0. })];
+        assert_eq!(
+            Minimap::from_snakes(&snakes, &arena, 8),
+            original_minimap(&snakes, &arena, 8)
+        );
+    }
+    let tiny = Arena {
+        center: Point::default(),
+        radius: 1e-12,
+    };
+    let map = Minimap::from_snakes(
+        &[edge_snake(Point::default(), Point { x: -42., y: 0. })],
+        &tiny,
+        136,
+    );
+    let marked: Vec<_> = (0..136 * 136).filter(|&i| map.cells[i] == 1).collect();
+    assert_eq!(marked, (68 * 136..=68 * 136 + 68).collect::<Vec<_>>());
+}
+
+#[test]
+fn minimap_oblique_clipping_handles_nonzero_intercept() {
+    let arena = Arena {
+        center: Point::default(),
+        radius: 1.,
+    };
+    let a = Point { x: -10., y: -9.5 };
+    let b = Point { x: 10., y: 10.5 };
+    for transpose in [false, true] {
+        let axes = |p: Point| {
+            if transpose {
+                Point { x: p.y, y: p.x }
+            } else {
+                p
+            }
+        };
+        let expected: Vec<_> = (0..6)
+            .map(|x| {
+                if transpose {
+                    x * 8 + x + 2
+                } else {
+                    (x + 2) * 8 + x
+                }
+            })
+            .collect();
+        for (a, b) in [(a, b), (b, a)] {
+            let map = Minimap::from_snakes(&[edge_snake(axes(a), axes(b))], &arena, 8);
+            let marked: Vec<_> = (0..64).filter(|&i| map.cells[i] == 1).collect();
+            // y=x+0.5 becomes grid y=x+2; the endpoint on y=8 is excluded.
+            assert_eq!(marked, expected);
+        }
+    }
+}
