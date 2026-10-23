@@ -40,46 +40,161 @@ def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS):
     return result.stdout.strip()
 
 
-def stop_tree(process):
-    """Kill the child and its descendants, then reap the child.
+# Windows children start through this shim, which spawns the real command only after
+# the parent has assigned it to the job object; nothing can escape the job before that.
+SHIM = ("import subprocess, sys\n"
+        "sys.stdin.buffer.read(1)\n"
+        "sys.exit(subprocess.call(sys.argv[1:], stdin=subprocess.DEVNULL))\n")
 
-    subprocess.run's timeout kills only the immediate child; cargo's rustc and linker
-    descendants would keep writing into a target whose lock is about to be released.
+
+class Job:
+    """Windows job object that terminates every member, including orphaned descendants."""
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+
+        class Basic(ctypes.Structure):
+            _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                        ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                        ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                        ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD),
+                        ("SchedulingClass", wintypes.DWORD)]
+
+        class Extended(ctypes.Structure):
+            _fields_ = [("BasicLimitInformation", Basic), ("IoInfo", ctypes.c_uint64 * 6),
+                        ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                        ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        class Accounting(ctypes.Structure):
+            _fields_ = [("Times", ctypes.c_int64 * 4), ("TotalPageFaultCount", wintypes.DWORD),
+                        ("TotalProcesses", wintypes.DWORD), ("ActiveProcesses", wintypes.DWORD),
+                        ("TotalTerminatedProcesses", wintypes.DWORD)]
+
+        self.ctypes, self.accounting = ctypes, Accounting
+        kernel = self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        for name in ("SetInformationJobObject", "QueryInformationJobObject"):
+            getattr(kernel, name).argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD] + (
+                [ctypes.c_void_p] if name.startswith("Query") else [])
+        kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        kernel.TerminateJobObject.argtypes = [wintypes.HANDLE, ctypes.c_uint]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.handle = kernel.CreateJobObjectW(None, None)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = Extended()
+        limits.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        self.check(kernel.SetInformationJobObject(self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)))
+
+    def check(self, ok):
+        if not ok:
+            error = self.ctypes.WinError(self.ctypes.get_last_error())
+            self.close()
+            raise error
+
+    def assign(self, process):
+        self.check(self.kernel.AssignProcessToJobObject(self.handle, int(process._handle)))
+
+    def active(self):
+        info = self.accounting()
+        ok = self.kernel.QueryInformationJobObject(self.handle, 1, self.ctypes.byref(info),
+                                                   self.ctypes.sizeof(info), None)
+        return info.ActiveProcesses if ok else 0
+
+    def terminate(self, wait_seconds=30):
+        self.kernel.TerminateJobObject(self.handle, 1)
+        deadline = time.perf_counter() + wait_seconds
+        while self.active() and time.perf_counter() < deadline:
+            time.sleep(0.01)
+
+    def close(self):
+        if self.handle:
+            self.kernel.CloseHandle(self.handle)
+            self.handle = None
+
+
+class ProcessTree:
+    """A child whose descendants never outlive it, whether it exits, times out or is interrupted.
+
+    subprocess.run's timeout kills only the immediate child, and the child may also exit
+    before cleanup; cargo's rustc and linker descendants would then keep writing into a
+    target whose lock is about to be released.
     """
-    if process.poll() is None:
+
+    def __init__(self, args, cwd, environment, stream):
+        args = [str(arg) for arg in args]
         if os.name == "nt":
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
-                           capture_output=True, timeout=30, check=False)
+            executable = shutil.which(args[0], path=(environment or os.environ).get("PATH"))
+            if executable is None:
+                raise FileNotFoundError(f"{args[0]} not found")
+            self.job = Job()
+            try:
+                self.process = subprocess.Popen([sys.executable, "-I", "-c", SHIM, executable, *args[1:]],
+                                                cwd=cwd, env=environment, stdin=subprocess.PIPE,
+                                                stdout=stream, stderr=subprocess.STDOUT)
+            except BaseException:
+                self.job.close()
+                raise
+            try:
+                self.job.assign(self.process)
+                self.process.stdin.write(b"\n")
+                self.process.stdin.close()
+            except BaseException:
+                self.process.kill()
+                self.process.wait()
+                self.job.close()
+                raise
+        else:
+            self.job = None
+            self.process = subprocess.Popen(args, cwd=cwd, env=environment, stdout=stream,
+                                            stderr=subprocess.STDOUT, start_new_session=True)
+            self.group = self.process.pid
+
+    def wait(self, timeout):
+        return self.process.wait(timeout=timeout)
+
+    def stop(self):
+        """Kill every remaining member regardless of the leader's state, then reap the leader."""
+        if self.job:
+            self.job.terminate()
+            self.job.close()
         else:
             import signal
             try:
-                os.killpg(process.pid, signal.SIGKILL)
+                os.killpg(self.group, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-    if process.poll() is None:
-        process.kill()
-    process.wait(timeout=30)
+            deadline = time.perf_counter() + 30
+            while time.perf_counter() < deadline:
+                try:
+                    os.killpg(self.group, 0)
+                except (ProcessLookupError, PermissionError):
+                    break
+                time.sleep(0.01)
+        self.process.wait(timeout=30)
 
 
 def command(args, cwd, log, environment=None, timeout=600):
-    """Run a logged child; return its exit code, or -1 if it could not run or timed out."""
+    """Run a logged child; return its exit code, or -1 if it could not run or timed out.
+
+    No descendant outlives the call on any path.
+    """
     with log.open("w", encoding="utf-8", newline="\n") as stream:
         try:
-            # A separate POSIX session lets stop_tree signal every descendant at once.
-            process = subprocess.Popen(args, cwd=cwd, env=environment, stdout=stream, stderr=subprocess.STDOUT,
-                                       text=True, start_new_session=os.name != "nt")
+            tree = ProcessTree(args, cwd, environment, stream)
         except OSError as error:
             stream.write(f"\n{type(error).__name__}: {error}\n")
             return -1
         try:
-            return process.wait(timeout=timeout)
+            try:
+                return tree.wait(timeout)
+            finally:
+                tree.stop()
         except subprocess.TimeoutExpired as error:
-            stop_tree(process)
             stream.write(f"\n{type(error).__name__}: {error}\n")
             return -1
-        except BaseException:
-            stop_tree(process)
-            raise
 
 
 @dataclass(frozen=True)

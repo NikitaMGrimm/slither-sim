@@ -182,32 +182,72 @@ class Targets(unittest.TestCase):
 
 
 class Commands(unittest.TestCase):
-    def test_timeout_kills_the_whole_process_tree(self):
+    GRANDCHILD = ("import os, sys, time\n"
+                  "open(sys.argv[2], 'w').write(str(os.getpid()))\n"
+                  "while True:\n"
+                  "    open(sys.argv[1], 'a').write('.')\n"
+                  "    time.sleep(0.02)\n")
+
+    def run_tree(self, after_spawn, timeout, stop=None):
+        """Child starts a heartbeating grandchild, waits until it runs, then runs `after_spawn`."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            beat, pid = root / "heartbeat", root / "grandchild.pid"
-            grandchild = ("import os, sys, time\n"
-                          "open(sys.argv[2], 'w').write(str(os.getpid()))\n"
-                          "while True:\n"
-                          "    open(sys.argv[1], 'a').write('.')\n"
-                          "    time.sleep(0.02)\n")
-            child = ("import subprocess, sys, time\n"
-                     f"subprocess.Popen([sys.executable, '-c', {grandchild!r}, {str(beat)!r}, {str(pid)!r}])\n"
-                     "time.sleep(60)\n")
+            beat, pid, release = root / "heartbeat", root / "grandchild.pid", root / "release"
+            child = ("import os, subprocess, sys, time\n"
+                     f"beat, pid, release = {str(beat)!r}, {str(pid)!r}, {str(release)!r}\n"
+                     f"subprocess.Popen([sys.executable, '-c', {self.GRANDCHILD!r}, beat, pid])\n"
+                     "while not os.path.exists(pid):\n"
+                     "    time.sleep(0.01)\n" + after_spawn)
             log = root / "command.log"
-            started = time.perf_counter()
+            original = perf_build.ProcessTree.stop
+
+            def delayed(tree):
+                stop(tree, pid, release)
+                original(tree)
+
             try:
-                self.assertEqual(perf_build.command([sys.executable, "-c", child], root, log, timeout=1.5), -1)
-                self.assertLess(time.perf_counter() - started, 30)
-                self.assertIn("TimeoutExpired", log.read_text())
+                with patch.object(perf_build.ProcessTree, "stop", delayed) if stop else contextlib.nullcontext():
+                    code = perf_build.command([sys.executable, "-c", child], root, log, timeout=timeout)
                 if not pid.exists():
-                    self.skipTest("grandchild did not start within the timeout")
+                    self.skipTest("grandchild did not start")
                 size = beat.stat().st_size
                 time.sleep(0.3)
-                self.assertEqual(beat.stat().st_size, size, "grandchild still running after the timeout")
+                self.assertEqual(beat.stat().st_size, size, "grandchild outlived command()")
+                return code, log.read_text()
             finally:
                 if pid.exists():
                     kill(int(pid.read_text()))
+
+    def test_timeout_kills_the_whole_process_tree(self):
+        code, log = self.run_tree("time.sleep(60)\n", timeout=1.5)
+        self.assertEqual(code, -1)
+        self.assertIn("TimeoutExpired", log)
+
+    def test_descendants_die_when_the_child_exits_between_timeout_and_cleanup(self):
+        def child_exits_first(tree, pid, release):
+            # The timeout has fired with the child alive; let it exit before cleanup runs.
+            deadline = time.perf_counter() + 10
+            while not pid.exists() and time.perf_counter() < deadline:
+                time.sleep(0.01)
+            release.write_text("")
+            while tree.process.poll() is None and time.perf_counter() < deadline:
+                time.sleep(0.01)
+            self.assertIsNotNone(tree.process.poll(), "child did not exit before cleanup")
+
+        code, log = self.run_tree("while not os.path.exists(release):\n    time.sleep(0.01)\n",
+                                  timeout=0.5, stop=child_exits_first)
+        self.assertEqual(code, -1)
+        self.assertIn("TimeoutExpired", log)
+
+    def test_descendants_die_when_the_child_exits_normally(self):
+        code, _ = self.run_tree("sys.exit(0)\n", timeout=30)
+        self.assertEqual(code, 0)
+
+    def test_missing_executable_is_logged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "command.log"
+            self.assertEqual(perf_build.command(["slither-perf-missing-executable"], temporary, log), -1)
+            self.assertIn("Error", log.read_text())
 
 
 def kill(pid):
