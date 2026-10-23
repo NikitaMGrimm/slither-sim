@@ -497,14 +497,18 @@ class ProcessFailures(unittest.TestCase):
                                           "uncompressed_bytes": len(emitted),
                                           "sha256": hashlib.sha256(emitted).hexdigest()})
 
-    def test_scenario_traces_require_a_matching_terminal_record(self):
-        snapshot = json.dumps({"kind": "operation", "tick": 1}).encode() + b"\n"
-        end = lambda **fields: json.dumps({"kind": "end", "case": "CASE", "operations": 2,
-                                           "physicsTicks": 2, **fields}).encode() + b"\n"
-        children = {"complete": (snapshot + end(), None), "eof only": (snapshot, "missing terminal end"),
-                    "short window": (snapshot + end(operations=1), "missing terminal end"),
-                    "other case": (snapshot + end(case="other"), "missing terminal end"),
-                    "end not last": (end() + snapshot, "missing terminal end")}
+    def test_scenario_traces_require_end_then_report(self):
+        record = lambda **fields: json.dumps({"case": "CASE", **fields}).encode() + b"\n"
+        step = record(kind="step", iteration=0)
+        end = lambda **fields: record(**{"kind": "end", "operations": 2, "physicsTicks": 2, **fields})
+        report = record(kind="report", format="slither-perf-baseline-v1")
+        children = {"complete": (step + end() + report, None),
+                    "eof only": (step, "missing terminal end"),
+                    "no report": (step + end(), "missing terminal end"),
+                    "report without end": (step + report, "missing terminal end"),
+                    "short window": (step + end(operations=1) + report, "missing terminal end"),
+                    "other case": (step + end(case="other") + report, "missing terminal end"),
+                    "end not last": (end() + step + report, "missing terminal end")}
         for name, (emitted, error) in children.items():
             with self.subTest(name), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
@@ -516,10 +520,32 @@ class ProcessFailures(unittest.TestCase):
                 if error:
                     with self.assertRaisesRegex(RuntimeError, f"invalid/incomplete .*{error}"):
                         perf_baseline.capture_trace(sys.executable, case, 2, root, terminal=True)
+                    # Legacy capture keeps accepting any complete child output.
+                    self.assertNotIn("end", perf_baseline.capture_trace(sys.executable, case, 2, root))
                     continue
-                record = perf_baseline.capture_trace(sys.executable, case, 2, root, terminal=True)
-                self.assertEqual((record["lines"], record["end"]["physicsTicks"]), (2, 2))
-                self.assertNotIn("end", perf_baseline.capture_trace(sys.executable, case, 2, root))
+                result = perf_baseline.capture_trace(sys.executable, case, 2, root, terminal=True)
+                self.assertEqual((result["lines"], result["end"]["physicsTicks"]), (3, 2))
+
+    def test_multi_megabyte_lines_are_buffered_in_linear_time(self):
+        # Synthetic 64 MiB line in 64 KiB reads. Growing one bytes object per chunk took
+        # about 5 s here (32 GiB copied); joining once per line takes well under 0.1 s.
+        size, chunk = 64 << 20, 64 << 10
+        data = memoryview(b"x" * size + b"\ntail")
+        offsets = iter(range(0, len(data), chunk))
+
+        class Pipe:
+            def fileno(self):
+                return -1
+
+        reader = perf_baseline.Lines(Pipe())
+        reader.available = lambda: chunk
+        with patch.object(perf_baseline.os, "read",
+                          side_effect=lambda fd, count: bytes(data[next(offsets, len(data)):][:count])):
+            started = time.perf_counter()
+            line = reader.read(time.perf_counter() + 60)
+            elapsed = time.perf_counter() - started
+        self.assertEqual((len(line), reader.pending), (size, b"tail"))
+        self.assertLess(elapsed, 1.5)
 
     def test_timeout_terminates_and_waits_for_child(self):
         processes = []

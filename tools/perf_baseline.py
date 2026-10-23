@@ -224,33 +224,47 @@ class Lines:
         self.pipe = pipe
         self.pending = b""
 
+    def available(self):
+        if os.name == "nt":
+            import msvcrt
+            from ctypes import wintypes
+            available = wintypes.DWORD()
+            peek = ctypes.WinDLL("kernel32", use_last_error=True).PeekNamedPipe
+            peek.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                             ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+            ok = peek(msvcrt.get_osfhandle(self.pipe.fileno()), None, 0,
+                      None, ctypes.byref(available), None)
+            if not ok:
+                raise EOFError("child pipe closed")
+            return available.value
+        import select
+        return 65536 if select.select([self.pipe], [], [], 0)[0] else 0
+
     def read(self, deadline):
-        while b"\n" not in self.pending:
-            if time.perf_counter() >= deadline:
-                raise TimeoutError("child response deadline exceeded")
-            if os.name == "nt":
-                import msvcrt
-                from ctypes import wintypes
-                available = wintypes.DWORD()
-                peek = ctypes.WinDLL("kernel32", use_last_error=True).PeekNamedPipe
-                peek.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
-                                 ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
-                ok = peek(msvcrt.get_osfhandle(self.pipe.fileno()), None, 0,
-                          None, ctypes.byref(available), None)
-                if not ok:
-                    raise EOFError("child pipe closed")
-                count = available.value
-            else:
-                import select
-                count = 65536 if select.select([self.pipe], [], [], 0)[0] else 0
-            if count:
-                chunk = os.read(self.pipe.fileno(), min(count, 65536))
-                if not chunk:
-                    raise EOFError("child pipe closed")
-                self.pending += chunk
-            else:
-                time.sleep(0.0005)
-        line, self.pending = self.pending.split(b"\n", 1)
+        # Join chunks once per line and scan only new bytes: growing one bytes object
+        # is quadratic for the multi-megabyte lines of large scenario traces.
+        chunks, size = [self.pending], len(self.pending)
+        index = self.pending.find(b"\n")
+        try:
+            while index < 0:
+                if time.perf_counter() >= deadline:
+                    raise TimeoutError("child response deadline exceeded")
+                count = self.available()
+                if count:
+                    chunk = os.read(self.pipe.fileno(), min(count, 65536))
+                    if not chunk:
+                        raise EOFError("child pipe closed")
+                    found = chunk.find(b"\n")
+                    if found >= 0:
+                        index = size + found
+                    chunks.append(chunk)
+                    size += len(chunk)
+                else:
+                    time.sleep(0.0005)
+        finally:
+            if len(chunks) > 1:
+                self.pending = b"".join(chunks)
+        line, self.pending = self.pending[:index], self.pending[index + 1:]
         return line
 
     def drain(self, output):
@@ -314,19 +328,29 @@ def native(executable, case, iterations, stderr_path, profile=False, *, deadline
                 "workload": json.loads(line)}
 
 
-def terminal_record(line, case, iterations):
+def small_record(line):
+    # Terminal records are small; never parse a multi-megabyte snapshot line here.
+    if len(line) > 1 << 20:
+        return None
     try:
         record = json.loads(line)
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
-    if (isinstance(record, dict) and record.get("kind") == "end" and record.get("case") == case
-            and record.get("operations") == iterations):
-        return record
+    return record if isinstance(record, dict) else None
+
+
+def terminal_record(previous, last, case, iterations):
+    """Scenario traces end with `end` (matching case and operation count), then the report."""
+    end, report = small_record(previous), small_record(last)
+    if (end and report and end.get("kind") == "end" and end.get("case") == case
+            and end.get("operations") == iterations
+            and report.get("kind") == "report" and report.get("case") == case):
+        return end
     return None
 
 
 def capture_trace(executable, case, iterations, directory, *, terminal=False, deadline=None):
-    """Archive one trace. With `terminal`, EOF alone is incomplete: the last line must be `end`."""
+    """Archive one trace. With `terminal`, EOF alone is incomplete: `end` and the report must close it."""
     stderr_path = directory / f"{case}-trace-stderr.txt"
     started = time.perf_counter()
     child_deadline = min(started + 120, deadline) if deadline is not None else started + 120
@@ -341,22 +365,23 @@ def capture_trace(executable, case, iterations, directory, *, terminal=False, de
         sha = hashlib.sha256()
         lines = 0
         size = 0
-        last = b""
+        previous = last = b""
         with (directory / f"{case}.jsonl.gz").open("wb") as raw:
             # Parity hashes uncompressed bytes; favor faster capture over archive size.
             with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1, mtime=0) as output:
                 while True:
                     try:
-                        last = reader.read(child_deadline)
+                        line = reader.read(child_deadline)
                     except EOFError:
                         break
-                    line = last + b"\n"
-                    output.write(line)
-                    sha.update(line)
+                    previous, last = last, line
+                    for part in (line, b"\n"):
+                        output.write(part)
+                        sha.update(part)
                     lines += 1
-                    size += len(line)
+                    size += len(line) + 1
         process.wait(timeout=max(.1, child_deadline - time.perf_counter()))
-        end = terminal_record(last, case, iterations) if terminal else None
+        end = terminal_record(previous, last, case, iterations) if terminal else None
         if process.returncode or not lines or reader.pending or (terminal and end is None):
             missing = "; missing terminal end record" if terminal and end is None else ""
             raise RuntimeError(f"invalid/incomplete {case} trace{missing}; see {stderr_path}")
