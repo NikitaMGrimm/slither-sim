@@ -123,6 +123,19 @@ an achieved crossing. Freeze candidate geometry/retention, calibration/held-out
 legs, attempt budget and required coverage before connecting. Preserve failed
 joins and empty cohorts; they cannot validate a new visibility rule.
 
+When an active crossing trial is abandoned, both archives retain a
+`paired-prey-trial-end` event before clearing its state, including on the same
+update as reacquisition or when a client cannot run movement. `endedAt` is the
+coordinator's monotonic update time; the enclosing `t` is the recorder time.
+The event preserves the old pair/target/trial identities, leg, hold and endpoint
+counts. Its `reason` describes the collector branch: `pair_unavailable` does not
+distinguish death from disconnection, and `primary_visibility_lost` means the
+primary cache is absent or too old. Neither proves a server subscription change.
+Match the event across recipients by trial and `endedAt`; it is one shared
+control event, not two independent observations. A trial still active at capture
+end is right-censored. Older source-pinned archives lack these events; do not
+infer their reset reasons from a later phase name.
+
 Crossing endpoint advancement requires the reference near its assigned offset,
 both snake anchors at most 150 ms old and the reference prey report at most
 350 ms old. These are collector/study quality gates, not server constants.

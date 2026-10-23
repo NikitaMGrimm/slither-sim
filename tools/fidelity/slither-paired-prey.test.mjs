@@ -525,6 +525,120 @@ test('crossing rejects stale primary prey and opens a new trial after leg timeou
   assert.equal(state.crossing.completedLegs, 0);
 });
 
+test('crossing retains the old trial end when the same update reacquires prey', () => {
+  const events = [];
+  const state = new PairPreyState('crossing', 'y', row => events.push(row));
+  const sample = (t, generation) => state.update(t, [
+    pose(1, 22000, 22050, [prey(7, t, generation, 22000, 21600)]),
+    pose(2, 22000, 22100),
+  ], worlds);
+  sample(100, 1);
+  sample(200, 2);
+  assert.equal(state.crossing.trial, 2);
+  assert.equal(state.reason, null, 'reacquisition clears the sampled state reason');
+  assert.deepEqual(events, [{ event: 'paired-prey-trial-end', endedAt: 200,
+    reason: 'prey_generation_changed', pairIdentities: ['0/1/1', '1/1/2'],
+    targetId: 7, targetGenerations: [1, null], crossingTrial: 1,
+    crossingSelectedAt: 100, crossingLeg: 'near', crossingLegStartedAt: 100,
+    crossingHoldUntil: null, crossingHeldOffset: null,
+    endpointVisits: 0, completedLegs: 0 }]);
+  sample(300, 2);
+  assert.equal(events.length, 1, 'ongoing trials emit no repeated end');
+  assert.deepEqual(events[0].targetGenerations, [1, null]);
+});
+
+test('crossing records each abandonment before its trial state is cleared', () => {
+  const a = t => pose(1, 22000, 22050, [prey(7, t, 1, 22000, 21600)]);
+  const b = () => pose(2, 22000, 22100);
+  const cases = [
+    ['pair_unavailable', 200, () => [a(200), null]],
+    ['pair_identity_changed', 200, () => [a(200), { ...b(), life: 2 }]],
+    ['pair_separated', 200, () => [a(200), pose(2, 25000, 22100)]],
+    ['primary_visibility_lost', 200, () => [pose(1, 22000, 22050), b()]],
+    ['primary_visibility_lost', 100 + CROSSING.primaryFreshMs + 1, () => [a(100), b()]],
+    ['rim_margin_lost', 200, () => [pose(1, 22000, 22050,
+      [prey(7, 200, 1, 42500, 21600)]), b()]],
+    ['crossing_leg_timeout', 100 + CROSSING.legTimeoutMs + 1,
+      () => [a(100 + CROSSING.legTimeoutMs + 1), b()]],
+  ];
+  for (const [reason, time, snapshots] of cases) {
+    const events = [], state = new PairPreyState('crossing', 'y', row => events.push(row));
+    state.update(100, [a(100), b()], worlds);
+    state.update(time, snapshots(), worlds);
+    assert.equal(events.length, 1, reason);
+    assert.equal(events[0].reason, reason);
+    assert.equal(events[0].endedAt, time);
+    assert.equal(events[0].crossingTrial, 1);
+    assert.equal(events[0].targetId, 7);
+    assert.deepEqual(events[0].pairIdentities, ['0/1/1', '1/1/2']);
+    assert.equal(events[0].endpointVisits, 0);
+    assert.equal(events[0].completedLegs, 0);
+  }
+});
+
+test('pair loss during the endpoint hold keeps the achieved visit without inventing a leg', () => {
+  const events = [], state = new PairPreyState('crossing', 'y', row => events.push(row));
+  const a = t => pose(1, 22000, 22050, [prey(7, t, 1, 22000, 21600)]);
+  const b = () => pose(2, 22000, 21600 + CROSSING.nearOffset);
+  state.update(100, [a(100), b()], worlds);
+  state.update(200, [a(200), b()], worlds);
+  state.update(300, [null, b()], worlds);
+  state.update(400, [null, b()], worlds);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].reason, 'pair_unavailable');
+  assert.equal(events[0].crossingLeg, 'far');
+  assert.equal(events[0].crossingHeldOffset, CROSSING.nearOffset);
+  assert.equal(events[0].crossingHoldUntil, 200 + CROSSING.endpointHoldMs);
+  assert.equal(events[0].endpointVisits, 1);
+  assert.equal(events[0].completedLegs, 0);
+});
+
+test('overlap target loss emits no crossing trial event', () => {
+  const events = [], state = new PairPreyState('overlap', null, row => events.push(row));
+  state.update(100, [pose(1, 21200, 21600, [prey(7)]), pose(2, 21800, 21600)], worlds);
+  state.update(3000, [pose(1, 21200, 21600), pose(2, 21800, 21600)], worlds);
+  assert.equal(state.reason, 'prey_lost');
+  assert.deepEqual(events, []);
+});
+
+test('trial end reaches both archives even when neither client runs movement', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-paired-prey-trial-end-'));
+  const originalConnect = Bot.prototype.connect;
+  const controller = new AbortController();
+  Bot.prototype.connect = function () {
+    this.joins = 1;
+    if (this.index !== 1) return;
+    this.pair.update(100, [pose(1, 22000, 22050, [prey(7, 100, 1, 22000, 21600)]),
+      pose(2, 22000, 22100)], worlds);
+    this.pair.update(200, [null, null], worlds);
+    controller.abort('synthetic pair loss');
+  };
+  try {
+    const out = path.join(directory, 'capture');
+    await recordPair({ out, server: '127.0.0.1:444', seconds: 60,
+      mode: 'crossing', direction: 'y' }, controller.signal);
+    const events = [0, 1].map(index => {
+      const rows = zlib.gunzipSync(fs.readFileSync(path.join(out, `bot${index}.jsonl.gz`)))
+        .toString('utf8').trim().split('\n').map(text => JSON.parse(text));
+      assert.equal(rows.filter(r => r.event === 'paired-prey-state').length, 0);
+      const ended = rows.filter(r => r.event === 'paired-prey-trial-end');
+      assert.equal(ended.length, 1);
+      assert.equal(ended[0].botIndex, index);
+      return ended[0];
+    });
+    for (const row of events) {
+      assert.equal(row.endedAt, 200);
+      assert.equal(row.reason, 'pair_unavailable');
+      assert.equal(row.crossingTrial, 1);
+      assert.equal(row.targetId, 7);
+      assert.equal(row.completedLegs, 0);
+    }
+  } finally {
+    Bot.prototype.connect = originalConnect;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('CLI requires bounded duration, explicit server and fresh output', async () => {
   assert.deepEqual(parseArgs(['--out', 'fresh', '--server', '127.0.0.1:444']),
     { out: 'fresh', server: '127.0.0.1:444', seconds: 480, mode: 'overlap' });

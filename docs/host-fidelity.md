@@ -63,6 +63,12 @@ were not run. Additional food counterexamples remain preserved. The same
 and the independent all-map minimap recheck. No numerical subscription rule was
 promoted from these results.
 
+The later [managed paired follow-up (R6)](host-fidelity-recheck-20261023.md#managed-paired-follow-up-r6)
+completed both planned acquisitions and their frozen analysis, but neither pair
+completed an endpoint-to-endpoint leg. All calibration, held-out, query and
+transition denominators are zero. Saved control telemetry shows route divergence
+and deaths after initial arrivals; it supplies no subscription correction.
+
 Radius, ecology and prey population remain configurable models. The provisional
 `Config::realistic(n)` population law is not promoted to host truth by this audit.
 Full raw recordings and local audit outputs stay outside the source package.
