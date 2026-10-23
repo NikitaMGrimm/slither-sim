@@ -19,6 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ("step-default", "step-food", "step-body", "observe", "portable", "protocol")
+COMMAND_TIMEOUT_SECONDS = 30
 
 
 def digest(path):
@@ -26,7 +27,7 @@ def digest(path):
 
 
 def command_output(*args):
-    return subprocess.check_output(args, cwd=ROOT, text=True).strip()
+    return subprocess.check_output(args, cwd=ROOT, text=True, timeout=COMMAND_TIMEOUT_SECONDS).strip()
 
 
 def process_metrics(process):
@@ -293,7 +294,8 @@ def run(args):
         "schema": "slither-perf-v1", "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source_commit": command_output("git", "rev-parse", "HEAD"),
         "source_status": command_output("git", "status", "--short"),
-        "source_diff_sha256": hashlib.sha256(subprocess.check_output(["git", "diff", "HEAD"], cwd=ROOT)).hexdigest(),
+        "source_diff_sha256": hashlib.sha256(subprocess.check_output(
+            ["git", "diff", "HEAD"], cwd=ROOT, timeout=COMMAND_TIMEOUT_SECONDS)).hexdigest(),
         "rustc": command_output("rustc", "-Vv"), "cargo": command_output("cargo", "-V"),
         "python": sys.version, "platform": platform.platform(), "cpu": platform.processor(),
         "logical_cpus": os.cpu_count(), "cargo_lock_sha256": digest(ROOT / "Cargo.lock"),

@@ -31,20 +31,20 @@ def main():
                 "candidate": args.candidate.resolve(strict=True)}
     hashes = {key: digest(path) for key, path in binaries.items()}
     args.output.mkdir(parents=True, exist_ok=False)
-    manifest = {"schema": "slither-perf-compare-v1",
-                "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "source_commit": command_output("git", "rev-parse", "HEAD"),
-                "source_status": command_output("git", "status", "--short"),
-                "rustc": command_output("rustc", "-Vv"),
-                "harnesses": {key: {"path": str(path), "sha256": hashes[key]}
-                              for key, path in binaries.items()},
-                "workloads": {case: WORKLOADS[case] for case in args.cases},
-                "repeats": args.repeats, "warmup_repetitions": 1,
-                "order": "alternate label order per repetition and case; adjacent matched pairs",
-                "notes": "Native wall excludes setup/reset/output drop; process CPU includes them. Quiet agreement and build identities recorded in report."}
-    (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     rows = []
     try:
+        manifest = {"schema": "slither-perf-compare-v1",
+                    "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "source_commit": command_output("git", "rev-parse", "HEAD"),
+                    "source_status": command_output("git", "status", "--short"),
+                    "rustc": command_output("rustc", "-Vv"),
+                    "harnesses": {key: {"path": str(path), "sha256": hashes[key]}
+                                  for key, path in binaries.items()},
+                    "workloads": {case: WORKLOADS[case] for case in args.cases},
+                    "repeats": args.repeats, "warmup_repetitions": 1,
+                    "order": "alternate label order per repetition and case; adjacent matched pairs",
+                    "notes": "Native wall excludes setup/reset/output drop; process CPU includes them. Quiet agreement and build identities recorded in report."}
+        (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
         with (args.output / "results.jsonl").open("w", encoding="utf-8", newline="\n") as output:
             for repetition in range(-1, args.repeats):
                 for case_index, case in enumerate(args.cases):
