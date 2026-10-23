@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Compare verified evidence batches with bounded permutation tests and declared
+  exposure/effect gates; add manual, read-only CI intake for pinned bundles.
+  Keep measured calibration separate from synthetic prey/radius behavior tests.
+
 - Keep empty food subscriptions internal and send per-connection minimap XOR
   deltas when shorter. Add fixed diagonal collection routes and clarify the
   source/evidence boundary, ecology models and offline collision rationale.

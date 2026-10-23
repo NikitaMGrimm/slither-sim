@@ -25,6 +25,16 @@ fn world() -> Simulator {
     w.snakes[0].body = vec![Point::default(), Point { x: -42., y: 0. }];
     w
 }
+/// Synthetic prey speeds, distinct from the measured defaults, so mechanism tests
+/// follow their inputs. One 7 ms tick moves 0.875, 1.54 and 2.66 units.
+fn synthetic_prey() -> PreyConfig {
+    PreyConfig {
+        cruise_speed: 125.,
+        escape_speed: 220.,
+        sprint_speed: 380.,
+        ..PreyConfig::default()
+    }
+}
 #[test]
 fn spawned_prey_respect_positive_representable_size_bounds() {
     for (size, max_size) in [
@@ -331,9 +341,10 @@ fn relative_sweep_catches_fast_crossing_and_dead_snakes_cannot_eat() {
 #[test]
 fn threats_set_prey_flight_speed_and_unthreatened_prey_wanders_deterministically() {
     let mut w = world();
+    w.config.prey = synthetic_prey();
     w.prey.push(entity(200., 120.));
     w.step(&[Some(Action::default())]).unwrap();
-    assert_eq!(w.prey[0].speed, 6.153 / 0.032);
+    assert_eq!(w.prey[0].speed, w.config.prey.escape_speed);
     assert_eq!(w.prey[0].position.x, 201.);
     w.snakes[0].alive = false;
     let mut other = w.clone();
@@ -347,36 +358,42 @@ fn threats_set_prey_flight_speed_and_unthreatened_prey_wanders_deterministically
 }
 #[test]
 fn prey_speed_modes_apply_before_the_next_motion_tick() {
+    let p = synthetic_prey();
     for (old_speed, live_threat, boosting, expected_speed, expected_dx) in [
-        (3.8, true, false, 6.153, 1.),
-        (3.8, true, true, 10.997, 2.),
-        (10.997, true, false, 6.153, 1.),
-        (6.153, false, false, 3.8, 0.),
-        (10.997, false, false, 3.8, 0.),
+        (p.cruise_speed, true, false, p.escape_speed, 1.),
+        (p.cruise_speed, true, true, p.sprint_speed, 2.),
+        (p.sprint_speed, true, false, p.escape_speed, 1.),
+        (p.escape_speed, false, false, p.cruise_speed, 0.),
+        (p.sprint_speed, false, false, p.cruise_speed, 0.),
     ] {
         let mut w = world();
+        w.config.prey = p.clone();
         w.snakes[0].alive = live_threat;
         w.snakes[0].segments = if boosting { 50 } else { 2 };
         w.snakes[0].fam = 0.5;
         Simulator::update_mass(&mut w.snakes[0]);
         w.snakes[0].speed = if boosting { 14. / 0.032 } else { 5.79 / 0.032 };
-        w.prey.push(entity(200., old_speed / 0.032));
+        w.prey.push(entity(200., old_speed));
         w.step(&[Some(Action {
             heading: 0.,
             boost: boosting,
         })])
         .unwrap();
         assert_eq!(w.prey.len(), 1);
-        assert_eq!(w.prey[0].speed, expected_speed / 0.032);
+        assert_eq!(w.prey[0].speed, expected_speed);
         assert_eq!(w.prey[0].position.x, 200. + expected_dx);
     }
 }
 
 #[test]
 fn prey_flights_use_ordinary_speed_unless_the_threat_is_boosting() {
+    let p = PreyConfig {
+        flee_half_width: 2000.,
+        ..synthetic_prey()
+    };
     let run = |boost, cruise: f64| {
         let mut w = world();
-        w.config.prey.flee_half_width = 2000.;
+        w.config.prey = p.clone();
         w.snakes[0].segments = 50;
         w.snakes[0].fam = 0.5;
         w.snakes[0].speed = cruise;
@@ -389,7 +406,7 @@ fn prey_flights_use_ordinary_speed_unless_the_threat_is_boosting() {
             .collect();
         w.snakes[0].heading = std::f64::consts::PI;
         Simulator::update_mass(&mut w.snakes[0]);
-        w.prey.push(entity(200., 3.8 / 0.032));
+        w.prey.push(entity(200., p.cruise_speed));
         for _ in 0..200 {
             w.step(&[Some(Action {
                 heading: std::f64::consts::PI,
@@ -401,27 +418,23 @@ fn prey_flights_use_ordinary_speed_unless_the_threat_is_boosting() {
         w.prey[0].speed
     };
     assert!(
-        (run(false, physics::base_speed(50))
-            - PreyConfig::default().flight_speed(physics::base_speed(50)))
-        .abs()
+        (run(false, physics::base_speed(50)) - p.flight_speed(physics::base_speed(50))).abs()
             < 1e-9
     );
     // Idle growth retains the old physical cruise; prey responds to actual speed.
     assert!(
-        (run(false, physics::base_speed(2))
-            - PreyConfig::default().flight_speed(physics::base_speed(2)))
-        .abs()
-            < 1e-9
+        (run(false, physics::base_speed(2)) - p.flight_speed(physics::base_speed(2))).abs() < 1e-9
     );
-    assert!((run(true, physics::base_speed(50)) - 10.997 / 0.032).abs() < 1e-9);
+    assert!((run(true, physics::base_speed(50)) - p.sprint_speed).abs() < 1e-9);
 }
 #[test]
-fn flight_speed_interpolates_and_clamps_recorded_endpoints() {
-    let p = PreyConfig::default();
-    assert!((p.flight_speed(5.79 / 0.032) - 6.153 / 0.032).abs() < 1e-12);
-    assert!((p.flight_speed(14. / 0.032) - 10.997 / 0.032).abs() < 1e-12);
+fn flight_speed_interpolates_and_clamps_configured_endpoints() {
+    // Snake protocol speeds 5.79 and 14 anchor the interpolation.
+    let p = synthetic_prey();
+    assert!((p.flight_speed(5.79 / 0.032) - p.escape_speed).abs() < 1e-12);
+    assert!((p.flight_speed(14. / 0.032) - p.sprint_speed).abs() < 1e-12);
     let midpoint = ((5.79 + 14.) / 2.) / 0.032;
-    assert!((p.flight_speed(midpoint) - (6.153 + 10.997) / 2. / 0.032).abs() < 1e-12);
+    assert!((p.flight_speed(midpoint) - (p.escape_speed + p.sprint_speed) / 2.).abs() < 1e-12);
     assert_eq!(p.flight_speed(0.), p.escape_speed);
     assert_eq!(p.flight_speed(20. / 0.032), p.sprint_speed);
 }
@@ -435,6 +448,16 @@ fn interpolated_flight_speed_matches_raw_official_packet_fixture() {
         "282834351bce3a5e9c5bdf342b179a6ea1634eacca450b98c7924a52c7cf669a"
     );
     let p = PreyConfig::default();
+    // The first packets in the slowest and full-boost bands calibrate the endpoints.
+    for (name, index, snake_speed) in [("low", 0, 5.79), ("high", 5, 14.)] {
+        let case = &fixture["cases"][index];
+        assert_eq!(case["snake_speed"].as_f64().unwrap(), snake_speed, "{name}");
+        let observed = case["prey_speed"].as_f64().unwrap();
+        assert!(
+            (p.flight_speed(snake_speed / 0.032) * 0.032 - observed).abs() < 1e-12,
+            "{name} endpoint"
+        );
+    }
     let errors: Vec<_> = fixture["cases"]
         .as_array()
         .unwrap()

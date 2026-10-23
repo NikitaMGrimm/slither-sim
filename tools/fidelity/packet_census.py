@@ -120,6 +120,8 @@ class Segment:
         self.entities, self.episodes = {}, {}
         self.prey_counts = Counter()
         self.prey_server_gaps, self.prey_receipt_gaps = Gaps(budget), Gaps(budget)
+        self.map_server_gaps, self.map_receipt_gaps = Gaps(budget), Gaps(budget)
+        self.previous_map_server = self.previous_map_receipt = None
 
     def finish_episode(self, prey_id, reason, server, receipt):
         start_server, start_receipt, _, _ = self.episodes.pop(prey_id)
@@ -178,6 +180,12 @@ class Segment:
 
     def packet(self, packet, server, receipt):
         command, length = packet[0], len(packet)
+        if command in (ord("M"), ord("V")):
+            if self.previous_map_server is not None and server is not None:
+                self.map_server_gaps.add(server - self.previous_map_server)
+            if self.previous_map_receipt is not None:
+                self.map_receipt_gaps.add(receipt - self.previous_map_receipt)
+            self.previous_map_server, self.previous_map_receipt = server, receipt
         family = (command, length)
         if family not in self.families:
             if self.budget.families >= MAX_FAMILIES:
@@ -236,6 +244,8 @@ class Segment:
                     commands=[dict(command=label(c), **v.summary()) for c, v in sorted(self.commands.items())],
                     families=[dict(command=label(c), length=n, **v.summary())
                               for (c, n), v in sorted(self.families.items())],
+                    minimapUpdateGapsMs=dict(server=self.map_server_gaps.summary(),
+                                             receipt=self.map_receipt_gaps.summary()),
                     prey=dict(counts=dict(self.prey_counts), knownEpisodes=exposure(totals, self.raw_framing),
                               updateGapsMs=dict(server=self.prey_server_gaps.summary(),
                                                 receipt=self.prey_receipt_gaps.summary()),

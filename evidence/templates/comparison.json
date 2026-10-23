@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "comparisonId": "reporting-comparison",
+  "independence": "Replace with the acquisition design: one separately acquired batch per bundle; explain remaining session/server dependence.",
+  "context": "Replace with matched scenario, size/boost strata, controls, duration, population and network conditions, and disclose differences.",
+  "alpha": 0.05,
+  "minUnits": 6,
+  "resamples": 4095,
+  "seed": 7,
+  "metrics": [
+    {"id": "minimap-gap", "name": "minimapServerGapMs", "minEffect": 10, "minSamples": 10},
+    {"id": "leaderboard-gap", "name": "leaderboardServerGapMs", "minEffect": 10, "minSamples": 10},
+    {"id": "prey-gap", "name": "preyServerGapMs", "minEffect": 10, "minSamples": 10},
+    {"id": "prey-report-rate", "name": "preyUpdatesPerKnownSecond", "minEffect": 0.1, "minSamples": 10},
+    {"id": "ping-rtt", "name": "pingRttMs", "minEffect": 10, "minSamples": 10}
+  ],
+  "baseline": [
+    {"source": "bundles/baseline-01.tar.gz", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+  ],
+  "candidate": [
+    {"source": "bundles/candidate-01.tar.gz", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"}
+  ]
+}

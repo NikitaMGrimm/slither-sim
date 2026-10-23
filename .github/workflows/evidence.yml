@@ -1,0 +1,52 @@
+name: Evidence comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission_url:
+        description: HTTPS URL of a schema-1 comparison submission on a public GitHub host
+        required: true
+        type: string
+      submission_sha256:
+        description: Lowercase SHA-256 of the submission bytes
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: Compare evidence
+    # The comparison code and this definition must come from the default branch.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.8.6'
+          python-version: '3.12'
+          enable-cache: false
+      - run: uv sync --locked --only-group tools
+      # The report is evidence for review, not approval; inputs reach the tool only through env.
+      - name: Fetch and compare
+        timeout-minutes: 15
+        env:
+          SUBMISSION_URL: ${{ inputs.submission_url }}
+          SUBMISSION_SHA256: ${{ inputs.submission_sha256 }}
+        run: >-
+          uv run --locked --only-group tools python -I tools/fidelity/fetch_evidence.py
+          --submission-url "$SUBMISSION_URL" --sha256 "$SUBMISSION_SHA256"
+          --output "$RUNNER_TEMP/evidence-report"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: evidence-report
+          path: ${{ runner.temp }}/evidence-report
+          if-no-files-found: warn
+          retention-days: 30

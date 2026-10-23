@@ -44,6 +44,22 @@ def command(segment, name, length=None):
 
 
 class PacketCensusTests(unittest.TestCase):
+    def test_minimap_cadence_combines_full_and_delta_and_resets_at_setup(self):
+        report = pc.census(self.archive([
+            self.connect(1), incoming(10, setup(), appearance(4), b"M\x00\x01\x40"),
+            incoming(2510, b"V", elapsed=2500),
+            incoming(5010, b"M\x00\x01\x00", elapsed=2500),
+            self.connect(6000), incoming(6010, setup(), appearance(8), b"M\x00\x01\x40"),
+            incoming(8510, b"V", elapsed=2500),
+            dict(type="meta", event="capture-end", t=9000, frames=5),
+        ], terminal=None))
+        first, second = report["connections"]
+        self.assertEqual(first["minimapUpdateGapsMs"]["server"],
+                         dict(n=2, min=2500, median=2500, p95=2500, max=2500))
+        self.assertEqual(first["minimapUpdateGapsMs"]["receipt"], first["minimapUpdateGapsMs"]["server"])
+        self.assertEqual(second["minimapUpdateGapsMs"]["server"]["n"], 1)
+        self.assertEqual(command(first, "M")["gapsMs"]["server"]["median"], 5000)
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

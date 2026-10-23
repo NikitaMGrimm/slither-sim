@@ -293,12 +293,13 @@ fn original_received_radius_trace_replays_without_moving_the_center() {
         serde_json::from_str(include_str!("fixtures/arena-radius-updates.json")).unwrap();
     let updates: Vec<RadiusUpdate> = serde_json::from_value(fixture["updates"].clone()).unwrap();
     assert_eq!(updates.len(), 790);
+    let initial_radius = fixture["initial_radius"].as_f64().unwrap();
     let last = *updates.last().unwrap();
     let mut w = Simulator::new(
         1,
         Config {
             food_count: 0,
-            radius: 12250.,
+            radius: initial_radius,
             radius_updates: updates,
             ..Config::default()
         },
@@ -307,7 +308,7 @@ fn original_received_radius_trace_replays_without_moving_the_center() {
     while w.time < last.time {
         w.step(&[]).unwrap();
     }
-    assert_eq!(w.config.radius, 11901.);
+    assert_eq!(w.config.radius, last.radius);
     w.add("center-check", 0, 1).unwrap();
     assert_eq!(w.observe(0).unwrap().arena.center, Point::default());
 }
