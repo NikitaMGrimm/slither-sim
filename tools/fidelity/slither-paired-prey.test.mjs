@@ -10,7 +10,7 @@ import { CROSSING, PAIR_PREY, PairPreyState, PairPreyBot, snapshot, preyOffset,
   recordPair } from './slither-paired-prey.mjs';
 
 const pose = (id, x, y, prey = [], extra = {}) =>
-  ({ id, life: 1, x, y, peerVisible: true, prey, ...extra });
+  ({ id, life: 1, x, y, anchorAgeMs: 0, peerVisible: true, prey, ...extra });
 const prey = (id, t = 100, generation = 1, x = 21600, y = 21600) =>
   ({ id, t, generation, x, y, sp: 6.06 });
 const worlds = [new World(), new World()];
@@ -229,14 +229,91 @@ test('crossing freezes tangent axis and advances only from measured near/far end
   assert.equal(state.crossing.leg, 'near');
   sample(300, 22000, 22400);
   assert.equal(state.crossing.leg, 'far');
-  assert.equal(state.crossing.completedLegs, 1);
+  assert.equal(state.crossing.completedLegs, 0);
   sample(400, 22000, 23100);
   assert.equal(state.crossing.leg, 'far');
   sample(500, 22000, 23450);
   assert.equal(state.crossing.leg, 'near');
-  assert.equal(state.crossing.completedLegs, 2);
+  assert.equal(state.crossing.completedLegs, 1);
   assert.equal(state.crossing.axis, 'y');
   assert.equal(CROSSING.maxPairSeparation, 2400);
+});
+
+test('crossing does not advance at B endpoint until the reference geometry is ready', () => {
+  const state = new PairPreyState('crossing');
+  const a = (time, y) => pose(1, 22000, y, [prey(7, time, 1, 22000, 21600)]);
+  state.update(100, [a(100, 22050), pose(2, 22000, 22100)], worlds);
+  state.update(200, [a(200, 21800), pose(2, 22000, 22400)], worlds);
+  assert.equal(state.crossing.leg, 'near');
+  assert.equal(state.crossing.completedLegs, 0);
+  state.update(300, [a(300, 22050), pose(2, 22000, 22400)], worlds);
+  assert.equal(state.crossing.leg, 'far');
+});
+
+test('initial approach arms a leg without claiming an achieved opposite starting endpoint', () => {
+  const state = new PairPreyState('crossing');
+  const sample = (time, y) => state.update(time,
+    [pose(1, 22000, 22050, [prey(7, time, 1, 22000, 21600)]),
+      pose(2, 22000, y)], worlds);
+  sample(100, 22100);
+  sample(200, 22400);
+  assert.equal(state.crossing.completedLegs, 0);
+  sample(300, 23450);
+  assert.equal(state.crossing.completedLegs, 1);
+});
+
+test('crossing endpoints require fresh known anchors and primary prey', () => {
+  for (const [aAge, bAge, preyAge] of [[151, 0, 0], [0, 151, 0],
+    [undefined, 0, 0], [0, null, 0], [0, 0, 351], [0, 0, -1]]) {
+    const state = new PairPreyState('crossing');
+    const a = (time, age) => pose(1, 22000, 22050,
+      [prey(7, time, 1, 22000, 21600)], { anchorAgeMs: age });
+    state.update(100, [a(100, 0), pose(2, 22000, 22100)], worlds);
+    state.update(500, [a(500 - preyAge, aAge),
+      pose(2, 22000, 22400, [], { anchorAgeMs: bAge })], worlds);
+    assert.equal(state.crossing.leg, 'near');
+    assert.equal(state.crossing.endpointVisits, 0);
+    state.update(600, [a(250, 150),
+      pose(2, 22000, 22400, [], { anchorAgeMs: 150 })], worlds);
+    assert.equal(state.crossing.leg, 'far', 'inclusive frozen endpoint boundaries');
+    assert.equal(state.crossing.endpointVisits, 1);
+  }
+});
+
+test('endpoint metadata preserves exact start/end witnesses once on the route observer', () => {
+  const state = new PairPreyState('crossing');
+  const sample = (time, y, life = 1) => state.update(time,
+    [pose(1, 22000, 22050, [prey(7, time, 1, 22000, 21600)]),
+      pose(2, 22000, y, [], { life })], worlds);
+  sample(100, 22100);
+  sample(200, 22400);
+  const events = [], bot = new PairPreyBot({ scenario: 'movement' }, 1,
+    { meta(row) { events.push(row); }, frame() {} });
+  bot.pair = state; bot.lives = 1;
+  bot.ws = { readyState: 1, send() {} }; bot.lastReceivedAt = 1e9;
+  bot.world.self = 2; bot.world.grd = 21600;
+  const setHead = (y, t) => bot.world.snakes.set(2,
+    { id: 2, pts: [{ x: 22000, y }], sct: 6, fam: .2, ang: 0, sp: 5.7, t });
+  setHead(22400, 200); bot.tick(250); bot.tick(350);
+  let endpoints = events.filter(e => e.crossingEndpoint);
+  assert.equal(endpoints.length, 1);
+  assert.equal(endpoints[0].crossingEndpoint.completed, false);
+  assert.equal(endpoints[0].crossingEndpoint.start, null);
+  assert.equal(endpoints[0].crossingEndpoint.end.t, 200);
+  sample(400, 23450);
+  setHead(23450, 400); bot.tick(450);
+  endpoints = events.filter(e => e.crossingEndpoint);
+  assert.equal(endpoints.length, 2);
+  const leg = endpoints[1].crossingEndpoint;
+  assert.equal(leg.completed, true);
+  assert.equal(leg.start.t, 200); assert.equal(leg.end.t, 400);
+  assert.equal(leg.start.offset, 800); assert.equal(leg.end.offset, 1850);
+  assert.equal(endpoints[1].completedLegs, 1);
+  assert.equal(endpoints[1].endpointVisits, 2);
+  assert.deepEqual(leg.end.pairIdentities, ['0/1/1', '1/1/2']);
+  sample(500, 22100, 2);
+  assert.equal(state.crossing.completedLegs, 0);
+  assert.equal(state.crossing.lastEndpoint, null);
 });
 
 test('crossing selection keeps the primary outside the flight box on the assigned side', () => {
@@ -417,7 +494,7 @@ test('fixed diagonal legs complete only at measured on-route endpoints', () => {
   assert.equal(state.crossing.leg, 'near');
   sample(200, 22800, 22400);
   assert.equal(state.crossing.leg, 'far');
-  assert.equal(state.crossing.completedLegs, 1);
+  assert.equal(state.crossing.completedLegs, 0);
   assert.equal(state.crossing.actualAxisDistance, 800);
   assert.equal(state.crossing.actualCrossTrack, 0);
   sample(300, 24300, 23000); // Along 1850 but 636 off the route.
@@ -427,7 +504,7 @@ test('fixed diagonal legs complete only at measured on-route endpoints', () => {
   assert.equal(state.crossing.leg, 'far');
   sample(400, 23800, 23500);
   assert.equal(state.crossing.leg, 'near');
-  assert.equal(state.crossing.completedLegs, 2);
+  assert.equal(state.crossing.completedLegs, 1);
   assert.equal(state.crossing.direction, 'diagonal-positive');
 });
 

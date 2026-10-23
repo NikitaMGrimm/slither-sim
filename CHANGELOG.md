@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Require fresh reference geometry before crossing endpoints advance; separate
+  the initial approach from completed legs and retain exact endpoint witnesses.
+  Record the paired visibility recheck's model failures without retuning physics.
+
 - Hash and decode the same replay-source snapshot; retain protocol and tool
   identities and distinguish replay-window checks from a full evidence audit.
 

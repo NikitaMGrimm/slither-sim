@@ -1297,10 +1297,10 @@ impl SimulatorBackend {
                 None => packets.push(encode::prey_appearance(prey)?),
                 Some(known) => {
                     let changed = known.motion != current.motion;
-                    // Ordinary receipts cluster near one third second; pulse
-                    // transitions can arrive sooner, but retained gaps never
-                    // fell below 210 ms. This bounded reporting approximation
-                    // keeps corrections even when quantized position is still.
+                    // Ordinary receipts cluster near one third second. The
+                    // 210 ms pulse guard is an engineering choice, not a
+                    // universal receipt bound; see docs/host-fidelity.md.
+                    // Keep corrections even when quantized position is still.
                     let pulse = known.motion[2] == 11000 || current.motion[2] == 11000;
                     let interval = if pulse { 0.210 } else { 1. / 3. };
                     if now + 1e-9 < known.reported_at + interval {
