@@ -188,10 +188,11 @@ impl<'a> Observer<'a> {
                 marks.resize(w.food.len().div_ceil(64), 0);
                 let mut count = 0;
                 let mut first = usize::MAX;
-                let mut mark = |i: usize| {
-                    marks[i / 64] |= 1 << (i % 64);
-                    count += 1;
-                    first = first.min(i / 64);
+                // Branch-free: about half the candidates are visible, unpredictably.
+                let mut mark = |i: usize, seen: bool| {
+                    marks[i / 64] |= u64::from(seen) << (i % 64);
+                    count += usize::from(seen);
+                    first = first.min(if seen { i / 64 } else { usize::MAX });
                 };
                 let (lo, hi) = (grid.col(b.min.x), grid.col(b.max.x));
                 for row in grid.row(b.min.y)..=grid.row(b.max.y) {
@@ -199,15 +200,15 @@ impl<'a> Observer<'a> {
                     let span =
                         grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
                     for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
-                        if visible(p) {
-                            mark(i as usize);
-                        }
+                        // The same pure conjunction as `visible`, without short-circuits.
+                        let seen = ((p.x - me.head.x).abs() <= vision)
+                            & ((p.y - me.head.y).abs() <= vision)
+                            & p.distance_le(me.head, vision);
+                        mark(i as usize, seen);
                     }
                 }
                 for &i in &grid.outliers {
-                    if visible(w.food[i as usize].point()) {
-                        mark(i as usize);
-                    }
+                    mark(i as usize, visible(w.food[i as usize].point()));
                 }
                 // Ascending bit order restores the original food order.
                 let mut food = Vec::with_capacity(count);
