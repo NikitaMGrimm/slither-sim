@@ -91,7 +91,15 @@ For two-client visibility crossings, the paired-prey collector supports fixed
 node tools/fidelity/slither-paired-prey.mjs --out outputs/paired-diagonal --server 127.0.0.1:8766 --seconds 480 --mode crossing --direction diagonal-positive --plan path/to/paired-plan.json
 ```
 
-Offsets are max-axis distances; diagonal `(800,800)` is about 1,131 units away.
+Offsets are max-axis distances. The current near offset is 650 (about 919 units
+on a diagonal), the far offset is 1,850, and the reference offset is 450. After
+recording an endpoint, B keeps that relative waypoint for two seconds before the
+next traversal. `crossingHeldOffset` and `crossingHoldUntil` describe the hold;
+`intendedOffset` records the commanded offset even when `crossingLeg` already
+names the upcoming leg. These are acquisition controls, not measured server
+ranges or timers. Older source-pinned runs retain their 800-unit near waypoint
+and immediate reversal.
+
 The logs retain projected along-route/cross-track distances, visibility, freshness,
 interruptions and completed legs. An intended route or phase name is not proof of
 an achieved crossing. Freeze candidate geometry/retention, calibration/held-out

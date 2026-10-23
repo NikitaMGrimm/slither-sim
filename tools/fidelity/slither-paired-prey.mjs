@@ -14,7 +14,10 @@ export const PAIR_PREY = Object.freeze({
   minArenaGap: 650, maxSeconds: 480,
 });
 export const CROSSING = Object.freeze({
-  nearOffset: 800, farOffset: 1850, followerOffset: 450,
+  // Study waypoints, not server ranges: 650 is nominally inside the 1000-unit
+  // circular candidate on diagonals, with 200 units from the reference offset.
+  nearOffset: 650, farOffset: 1850, followerOffset: 450,
+  endpointHoldMs: 2000,
   maxPairSeparation: 2400, minArenaGap: 2200,
   flightBoxRadius: 320,
   endpointTolerance: 120, crossTrackTolerance: 180,
@@ -75,7 +78,7 @@ export function preyOffset(prey, center, sign) {
 
 export function crossingOffset(prey, crossing, observer) {
   const offset = observer === 0 ? CROSSING.followerOffset :
-    crossing.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset;
+    crossing.holdOffset ?? (crossing.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset);
   const d = CROSSING_DIRECTIONS[crossing.direction ?? crossing.axis];
   return { x: prey.x + crossing.sign * offset * d.x, y: prey.y + crossing.sign * offset * d.y };
 }
@@ -83,7 +86,7 @@ export function crossingOffset(prey, crossing, observer) {
 // A fixed direction may point the far endpoint outward. Keep it at least as far inside as
 // an outward cardinal far endpoint is at the minimum prey gap (minArenaGap - farOffset).
 export function farEndpointArenaGap(prey, crossing, center, radius) {
-  const far = crossingOffset(prey, { ...crossing, leg: 'far' }, 1);
+  const far = crossingOffset(prey, { ...crossing, leg: 'far', holdOffset: null }, 1);
   return radius - Math.hypot(far.x - center, far.y - center);
 }
 
@@ -222,13 +225,20 @@ export class PairPreyState {
             Math.abs(snapshots[1].y - p.y));
           c.actualEuclideanDistance = Math.hypot(snapshots[1].x - p.x,
             snapshots[1].y - p.y);
+          const released = c.holdUntil !== null && now >= c.holdUntil;
+          if (released) {
+            c.holdUntil = null; c.holdOffset = null;
+          }
+          const holding = c.holdUntil !== null;
           const goal = c.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset;
           // Enforce the study's endpoint geometry and age gates. Reaching B's
           // waypoint while A is displaced or either pose is stale is insufficient.
           const fresh = snapshots.every(s => Number.isFinite(s.anchorAgeMs) &&
             s.anchorAgeMs >= 0 && s.anchorAgeMs <= CROSSING.endpointAnchorFreshMs) &&
             Number.isFinite(p.t) && now >= p.t && now - p.t <= CROSSING.endpointPreyFreshMs;
-          if (Math.abs(c.actualAxisDistance - goal) <= CROSSING.endpointTolerance &&
+          // State updates precede bot controls; emit the released waypoint
+          // before another update can accept its endpoint.
+          if (!released && !holding && Math.abs(c.actualAxisDistance - goal) <= CROSSING.endpointTolerance &&
               Math.abs(c.actualCrossTrack) <= CROSSING.crossTrackTolerance && fresh &&
               primaryGeometryReady(c, p, first)) {
             const endpoint = { t: now, offset: goal, pairIdentities: identities,
@@ -242,7 +252,11 @@ export class PairPreyState {
             c.legStart = endpoint; c.endpointVisits++;
             c.leg = c.leg === 'near' ? 'far' : 'near';
             c.legStarted = now;
-          } else if (now - c.legStarted > CROSSING.legTimeoutMs) {
+            // Observe at the achieved waypoint before the next traversal. The
+            // next exact leg still starts at this recorded endpoint, including
+            // its hold; a dwell timer never establishes packet visibility.
+            c.holdOffset = goal; c.holdUntil = now + CROSSING.endpointHoldMs;
+          } else if (!holding && now - c.legStarted > CROSSING.legTimeoutMs) {
             this.target = null; this.navigationPrey = null;
             this.crossing = null; this.phase = 'search'; this.reason = 'crossing_leg_timeout';
           }
@@ -291,6 +305,7 @@ export class PairPreyState {
           ...this.crossingFrame(row.prey, snapshots[0], snapshots[1], center),
           leg: 'near', legStarted: now, completedLegs: 0, reentries: 0,
           endpointVisits: 0, legStart: null, lastEndpoint: null,
+          holdOffset: null, holdUntil: null,
           actualAxisDistance: null, actualCrossTrack: null,
           actualBoxDistance: null, actualEuclideanDistance: null };
       }
@@ -385,10 +400,12 @@ export class PairPreyBot extends Bot {
       this.lastPairEndpoint !== crossing?.endpointVisits;
     if (now - (this.lastPairSample ?? -Infinity) >= PAIR_PREY.observerSampleMs ||
         this.lastPairPhase !== this.pair.phase || this.lastPairTarget !== this.pair.target?.id ||
-        this.lastPairLeg !== crossing?.leg || this.lastPairTrial !== crossing?.trial) {
+        this.lastPairLeg !== crossing?.leg || this.lastPairTrial !== crossing?.trial ||
+        this.lastPairHold !== crossing?.holdUntil) {
       this.lastPairSample = now; this.lastPairPhase = this.pair.phase;
       this.lastPairTarget = this.pair.target?.id; this.lastPairLeg = crossing?.leg;
       this.lastPairTrial = crossing?.trial;
+      this.lastPairHold = crossing?.holdUntil;
       this.lastPairEndpoint = crossing?.endpointVisits;
       this.pendingPairSample = { event: 'paired-prey-state', botIndex: this.index,
         mode: this.pair.mode, life: this.lives, selfId: me.id, serverClock: this.serverClock,
@@ -409,8 +426,10 @@ export class PairPreyBot extends Bot {
         ...(this.pair.direction ? { crossingDirection: this.pair.direction } : {}),
         crossingTrial: crossing?.trial ?? null, crossingSelectedAt: crossing?.selectedAt ?? null,
         crossingLegStartedAt: crossing?.legStarted ?? null,
+        crossingHoldUntil: crossing?.holdUntil ?? null,
+        crossingHeldOffset: crossing?.holdOffset ?? null,
         intendedOffset: crossing ? this.index === 0 ? CROSSING.followerOffset :
-          crossing.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset : null,
+          crossing.holdOffset ?? (crossing.leg === 'near' ? CROSSING.nearOffset : CROSSING.farOffset) : null,
         completedLegs: crossing?.completedLegs ?? null,
         endpointVisits: crossing?.endpointVisits ?? null,
         ...(this.index === 1 && endpointChanged && crossing?.lastEndpoint
