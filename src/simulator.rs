@@ -1,4 +1,4 @@
-use crate::collision_index::CollisionIndex;
+use crate::bounds_index::BoundsIndex;
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
@@ -817,7 +817,7 @@ impl Simulator {
                 .map(|&j| bodies[j].expect("living snake has bounds"))
                 .collect();
             let longest = order.iter().map(|&j| self.snakes[j].segments).max();
-            (CollisionIndex::new(&bounds), longest.unwrap_or(0))
+            (BoundsIndex::new(&bounds), longest.unwrap_or(0))
         });
         let mut candidates = vec![];
         let mut dead: Vec<(usize, Option<usize>, DeathReason)> = vec![];
@@ -834,7 +834,7 @@ impl Simulator {
             let indexed = index.as_ref().is_some_and(|(index, longest)| {
                 // Scale grows with segments, so this bounds every pair's reach below.
                 let reach = 3.666 * collision_distance(s.segments, *longest);
-                index.candidates(tip, reach, &mut candidates)
+                index.candidates(probe, reach, &mut candidates)
             });
             let test = |j: usize, profile: &mut StepProfile| {
                 if i == j || fallen[j] {
@@ -1204,6 +1204,33 @@ impl Simulator {
                 })
             })
             .collect();
+        // Index each living snake's swept circle path for many prey. Beyond the
+        // largest radius plus one unit, a sweep's both ends lie past the
+        // `sweep_misses` limit on one axis, so skipped pairs never eat. The
+        // magnitude cap keeps rounding far inside that unit.
+        const MAGNITUDE: f64 = 1e7;
+        let small = |b: &Bounds| {
+            [b.min.x, b.min.y, b.max.x, b.max.y]
+                .iter()
+                .all(|v| v.abs() <= MAGNITUDE)
+        };
+        let mut slots = vec![];
+        let mut sweeps = vec![];
+        let mut reach = 0.0f64;
+        for (i, circle) in circles.iter().enumerate() {
+            if let Some((center, radius, lead)) = *circle {
+                let from = Point {
+                    x: previous[i].x + lead.x,
+                    y: previous[i].y + lead.y,
+                };
+                slots.push(i);
+                sweeps.push(Bounds::between(from, center));
+                reach = reach.max(radius + 1.0);
+            }
+        }
+        let index = (slots.len() * self.prey.len() >= 512 && sweeps.iter().all(small))
+            .then(|| BoundsIndex::new(&sweeps));
+        let mut candidates = vec![];
         self.prey.retain_mut(|prey| {
             let old = prey.position;
             // Ordinary decisions are per prey, with independently phased first
@@ -1228,31 +1255,42 @@ impl Simulator {
                 prey.position.y *= ratio;
             }
             // Sweep relative motion, so fast prey cannot tunnel through a mouth.
-            let eater = circles
-                .iter()
-                .enumerate()
-                .filter_map(|(i, circle)| {
-                    // Swept from the previous head's circle to the current one.
-                    let (center, radius, lead) = (*circle)?;
-                    let a = Point {
-                        x: old.x - previous[i].x - lead.x,
-                        y: old.y - previous[i].y - lead.y,
-                    };
-                    let b = Point {
-                        x: prey.position.x - center.x,
-                        y: prey.position.y - center.y,
-                    };
-                    if sweep_misses(a, b, radius) {
-                        return None;
-                    }
-                    let d = segment_distance(Point::default(), a, b);
-                    (d <= radius).then_some((i, d))
-                })
-                .min_by(|(i, a), (j, b)| {
-                    a.total_cmp(b)
-                        .then_with(|| self.snakes[*i].id.cmp(&self.snakes[*j].id))
-                })
-                .map(|(i, _)| i);
+            let sweep = |i: usize| {
+                // Swept from the previous head's circle to the current one.
+                let (center, radius, lead) = circles[i]?;
+                let a = Point {
+                    x: old.x - previous[i].x - lead.x,
+                    y: old.y - previous[i].y - lead.y,
+                };
+                let b = Point {
+                    x: prey.position.x - center.x,
+                    y: prey.position.y - center.y,
+                };
+                if sweep_misses(a, b, radius) {
+                    return None;
+                }
+                let d = segment_distance(Point::default(), a, b);
+                (d <= radius).then_some((i, d))
+            };
+            let nearest = |(i, a): &(usize, f64), (j, b): &(usize, f64)| {
+                a.total_cmp(b)
+                    .then_with(|| self.snakes[*i].id.cmp(&self.snakes[*j].id))
+            };
+            let query = Bounds::between(old, prey.position);
+            let indexed = index.as_ref().is_some_and(|index| {
+                small(&query) && index.candidates(query, reach, &mut candidates)
+            });
+            // Both visit slots in ascending order, so ties resolve as before.
+            let eater = if indexed {
+                candidates
+                    .iter()
+                    .rev()
+                    .filter_map(|&k| sweep(slots[k as usize]))
+                    .min_by(nearest)
+            } else {
+                (0..circles.len()).filter_map(sweep).min_by(nearest)
+            }
+            .map(|(i, _)| i);
             if let Some(i) = eater {
                 self.prey_decision_times.remove(&prey.id);
                 self.prey_outward.remove(&prey.id);
@@ -1550,5 +1588,67 @@ mod prey_sweep_tests {
             }
         }
         assert!(rejected > 100_000);
+    }
+}
+
+#[cfg(test)]
+mod prey_index_tests {
+    use super::*;
+
+    #[test]
+    fn sweeps_outside_the_index_reach_always_miss() {
+        let mut state = 0xdead_beef_u64;
+        let mut unit = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut skipped = 0;
+        for i in 0..400_000 {
+            let magnitude = [1e3, 1e5, 1e7][i % 3] * (2.0 * unit() - 1.0);
+            let previous = Point {
+                x: magnitude,
+                y: -magnitude * unit(),
+            };
+            let lead = Point {
+                x: (unit() - 0.5) * 400.0,
+                y: (unit() - 0.5) * 400.0,
+            };
+            let from = Point {
+                x: previous.x + lead.x,
+                y: previous.y + lead.y,
+            };
+            let center = Point {
+                x: from.x + (unit() - 0.5) * 20.0,
+                y: from.y + (unit() - 0.5) * 20.0,
+            };
+            let radius = 36.0 + unit() * 95.0;
+            // Prey paths straddle the index reach around the circle path.
+            let offset = (radius + 1.0) * (0.9 + unit() * 0.3);
+            let angle = unit() * std::f64::consts::TAU;
+            let old = Point {
+                x: from.x + offset * angle.cos(),
+                y: from.y + offset * angle.sin(),
+            };
+            let position = Point {
+                x: old.x + (unit() - 0.5) * 4.0,
+                y: old.y + (unit() - 0.5) * 4.0,
+            };
+            if Bounds::between(from, center).near(Bounds::between(old, position), radius + 1.0) {
+                continue;
+            }
+            skipped += 1;
+            let a = Point {
+                x: old.x - previous.x - lead.x,
+                y: old.y - previous.y - lead.y,
+            };
+            let b = Point {
+                x: position.x - center.x,
+                y: position.y - center.y,
+            };
+            assert!(sweep_misses(a, b, radius), "{a:?} {b:?} {radius}");
+        }
+        assert!(skipped > 10_000, "{skipped}");
     }
 }

@@ -1,8 +1,8 @@
-//! Conservative broad phase for head-to-body collision candidates.
+//! Conservative broad phase over axis-aligned bounds.
 //!
-//! The narrow phase keeps the exact bounds test and `strikes`; this index only
-//! skips snakes whose bounds cannot pass that bounds test, so resolution is
-//! unchanged. Snakes are hashed into coarse cells by their body bounds; a hash
+//! Callers keep their exact narrow tests; this index only skips items whose
+//! bounds cannot be within a given reach of a query box, so results are
+//! unchanged. Items are hashed into coarse cells by their bounds; a hash
 //! collision adds candidates and never removes one.
 use crate::physics::Bounds;
 
@@ -10,7 +10,7 @@ const CELL: f64 = 512.0;
 /// Bounds spanning more cells than this per axis stay in an always-tested list.
 const MAX_SPAN: i64 = 16;
 
-pub(crate) struct CollisionIndex {
+pub(crate) struct BoundsIndex {
     mask: usize,
     starts: Vec<u32>,
     entries: Vec<u32>,
@@ -35,8 +35,8 @@ fn span(b: &Bounds) -> Span {
         .then_some((lx, hx, ly, hy))
 }
 
-impl CollisionIndex {
-    /// `bounds[k]` belongs to collision-order position `k`.
+impl BoundsIndex {
+    /// `bounds[k]` belongs to item `k`.
     pub(crate) fn new(bounds: &[Bounds]) -> Self {
         let spans: Vec<Span> = bounds.iter().map(span).collect();
         let cells: usize = spans
@@ -83,17 +83,17 @@ impl CollisionIndex {
         }
     }
 
-    /// Collect, in descending position order without duplicates, every position
-    /// whose bounds could satisfy `bounds.near(point, r)` for any `r <= reach`.
-    /// Returns false when the probe region is too large or not finite; the
-    /// caller must then test every position.
-    pub(crate) fn candidates(&self, point: crate::Point, reach: f64, out: &mut Vec<u32>) -> bool {
+    /// Collect, in descending item order without duplicates, every item whose
+    /// bounds could satisfy `bounds.near(query, r)` for any `r <= reach`.
+    /// Returns false when the query region is too large or not finite; the
+    /// caller must then test every item.
+    pub(crate) fn candidates(&self, query: Bounds, reach: f64, out: &mut Vec<u32>) -> bool {
         out.clear();
-        // `near` compares against `point -/+ r`; these bounds contain that range
-        // because rounding is monotone and `r <= reach`.
-        let (lx, hx) = (cell(point.x - reach), cell(point.x + reach));
-        let (ly, hy) = (cell(point.y - reach), cell(point.y + reach));
-        if !(point.finite() && reach.is_finite())
+        // `near` compares against `query.min - r` and `query.max + r`; these
+        // cells contain that range because rounding is monotone and `r <= reach`.
+        let (lx, hx) = (cell(query.min.x - reach), cell(query.max.x + reach));
+        let (ly, hy) = (cell(query.min.y - reach), cell(query.max.y + reach));
+        if !(query.min.finite() && query.max.finite() && reach.is_finite())
             || hx.saturating_sub(lx) >= MAX_SPAN
             || hy.saturating_sub(ly) >= MAX_SPAN
         {
@@ -150,18 +150,26 @@ mod tests {
                 bounds[3].max.x = f64::NAN;
                 bounds[5].min.y = f64::NEG_INFINITY;
             }
-            let index = CollisionIndex::new(&bounds);
+            let index = BoundsIndex::new(&bounds);
             for _ in 0..200 {
                 let point = Point {
                     x: (unit() - 0.5) * 2.4e4,
                     y: (unit() - 0.5) * 2.4e4,
                 };
                 let reach = unit() * 400.0;
-                assert!(index.candidates(point, reach, &mut out));
+                let extent = if unit() < 0.5 { 0.0 } else { unit() * 900.0 };
+                let query = Bounds::between(
+                    point,
+                    Point {
+                        x: point.x + (unit() - 0.5) * extent,
+                        y: point.y + (unit() - 0.5) * extent,
+                    },
+                );
+                assert!(index.candidates(query, reach, &mut out));
                 assert!(out.windows(2).all(|w| w[0] > w[1]));
                 for (k, b) in bounds.iter().enumerate() {
-                    if b.near(Bounds::between(point, point), reach) {
-                        assert!(out.contains(&(k as u32)), "{k} {b:?} {point:?} {reach}");
+                    if b.near(query, reach) {
+                        assert!(out.contains(&(k as u32)), "{k} {b:?} {query:?} {reach}");
                     }
                 }
             }
@@ -169,7 +177,7 @@ mod tests {
                 x: f64::NAN,
                 y: 0.0,
             };
-            assert!(!index.candidates(nan, 10.0, &mut out));
+            assert!(!index.candidates(Bounds::between(nan, nan), 10.0, &mut out));
         }
     }
 }
