@@ -1,6 +1,8 @@
 """Regression checks for failure diagnostics and temporary child cleanup."""
 
 from pathlib import Path
+import gzip
+import hashlib
 import io
 import json
 import subprocess
@@ -137,6 +139,35 @@ class ProcessFailures(unittest.TestCase):
             with self.assertRaises(EOFError):
                 perf_baseline.native(sys.executable, str(script), 1, errors)
             self.assertIn("failure witness", errors.read_text())
+
+    def test_trace_archive_preserves_child_bytes_and_retains_failures(self):
+        # Synthetic child output, not simulator traces: spans several pipe reads and has UTF-8.
+        emitted = b"".join(json.dumps({"tick": i, "state": "x" * (i % 97), "note": "\u00e9"},
+                                      ensure_ascii=False).encode() + b"\n" for i in range(3000))
+        line_end = emitted.index(b"\n") + 1
+        children = {"valid": ("data", 0), "failed": (f"data[:{line_end}]", 3),
+                    "incomplete": (f"data[:{line_end + 5}]", 0)}
+        for name, (written, code) in children.items():
+            with self.subTest(child=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / "trace.bin").write_bytes(emitted)
+                script = root / f"{name}.py"
+                script.write_text("from pathlib import Path\nimport sys\n"
+                                  "data = (Path(__file__).parent / 'trace.bin').read_bytes()\n"
+                                  "sys.stderr.write('failure witness')\n"
+                                  f"sys.stdout.buffer.write({written})\nsys.exit({code})\n")
+                if name != "valid":
+                    with self.assertRaisesRegex(RuntimeError, "invalid/incomplete"):
+                        perf_baseline.capture_trace(sys.executable, str(script), 1, root)
+                    self.assertEqual(Path(f"{script}-trace-stderr.txt").read_text(), "failure witness")
+                    continue
+                record = perf_baseline.capture_trace(sys.executable, str(script), 1, root)
+                archive = Path(f"{script}.jsonl.gz").read_bytes()
+                self.assertEqual(gzip.decompress(archive), emitted)
+                self.assertEqual(archive[4:8], bytes(4))
+                self.assertEqual(record, {"case": str(script), "iterations": 1, "lines": 3000,
+                                          "uncompressed_bytes": len(emitted),
+                                          "sha256": hashlib.sha256(emitted).hexdigest()})
 
     def test_timeout_terminates_and_waits_for_child(self):
         processes = []

@@ -12,6 +12,11 @@ same toolchain, after copying the PR's benchmark and fidelity examples, selected
 test sources and fixtures into a fresh, detached baseline worktree. Both runtimes
 therefore see identical measurement code and evidence. Cargo lockfiles can differ
 and their hashes are retained. Compilation failures make results unavailable.
+Both revisions reuse one run-owned Cargo target directory for dependencies.
+After baseline executables are copied and hashed, only the simulator package's
+release and dev build outputs are explicitly cleaned, forcing a fresh candidate
+build without recompiling compatible dependencies. A failed cleanup leaves
+candidate results unavailable.
 
 The performance table reuses the six [baseline workloads](performance.md).
 Three adjacent alternating pairs follow a warmup; raw results are retained.
@@ -63,13 +68,37 @@ No personal token or external benchmarking service is needed. Full measurements,
 input/binary hashes, traces and logs remain in a separate artifact for 14 days,
 including partial output on failure. The publisher downloads only the small
 comment artifact. Broken report generation remains visible as a failed job.
+Full-state trace archives use gzip level 1 to reduce untimed compression work;
+parity still hashes every uncompressed byte. Archive sizes can therefore grow.
 
 GitHub's usual approval policy still applies to first-time fork contributors.
 Conflicting PRs need their conflicts resolved before a merge checkout can run.
 The publisher workflow must exist on the default branch before GitHub can
 trigger it; see the [workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
-Local focused checks (standard library for the Python reporting code):
+The selected tests and fixture measurements also run locally, without GitHub
+credentials or Actions:
+
+```sh
+cargo test --locked --test movement_turns --test physics
+cargo run --locked --example fidelity_metrics -- tests/fixtures
+```
+
+The second command prints JSON with the turn and speed-ramp errors and their
+sample counts. To compare performance, build the same benchmark harness at both
+revisions and keep separate copies of the executables, as described in the
+[performance guide](performance.md). Then use a fresh output directory:
+
+```sh
+uv run --locked --only-group tools python tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/CANDIDATE --output outputs/perf-comparison
+```
+
+This saves individual paired timings and a JSON summary. Windows provides CPU
+and wall timings; other systems provide wall timings. The combined report
+collector currently expects a PR merge checkout and GitHub environment
+variables; these individual measurement commands do not.
+
+To check the reporting tools themselves:
 
 ```sh
 uv run --locked --only-group tools python -m unittest discover -s tools -p test_pr_report.py
