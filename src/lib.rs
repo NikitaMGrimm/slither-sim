@@ -5,6 +5,7 @@
 pub mod boundary;
 #[cfg(feature = "networking")]
 pub mod client;
+mod collision_index;
 pub mod kiosk;
 pub mod model;
 pub mod observation;

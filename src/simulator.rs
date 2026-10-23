@@ -1,3 +1,4 @@
+use crate::collision_index::CollisionIndex;
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
@@ -809,6 +810,16 @@ impl Simulator {
         // resolution after moving all snakes; online move/test phasing is unverified.
         let mut order = alive.clone();
         order.sort_unstable_by_key(|&i| self.joins[i]);
+        // Small worlds test every pair faster than they build an index.
+        let index = (order.len() >= 32).then(|| {
+            let bounds: Vec<Bounds> = order
+                .iter()
+                .map(|&j| bodies[j].expect("living snake has bounds"))
+                .collect();
+            let longest = order.iter().map(|&j| self.snakes[j].segments).max();
+            (CollisionIndex::new(&bounds), longest.unwrap_or(0))
+        });
+        let mut candidates = vec![];
         let mut dead: Vec<(usize, Option<usize>, DeathReason)> = vec![];
         let mut fallen = vec![false; self.snakes.len()];
         for &i in &order {
@@ -820,7 +831,12 @@ impl Simulator {
             let s = &self.snakes[i];
             let tip = head_tip(s.head, s.heading, s.segments);
             let probe = Bounds::between(tip, tip);
-            let killer = order.iter().rev().copied().find(|&j| {
+            let indexed = index.as_ref().is_some_and(|(index, longest)| {
+                // Scale grows with segments, so this bounds every pair's reach below.
+                let reach = 3.666 * collision_distance(s.segments, *longest);
+                index.candidates(tip, reach, &mut candidates)
+            });
+            let test = |j: usize, profile: &mut StepProfile| {
                 if i == j || fallen[j] {
                     return false;
                 }
@@ -840,7 +856,17 @@ impl Simulator {
                     .into_iter()
                     .chain(other.body.iter().copied());
                 strikes(last_tips[i], tip, s.heading, s.segments, segments, line)
-            });
+            };
+            // Both visit positions newest first; the index omits only snakes
+            // whose bounds fail the test above.
+            let killer = if indexed {
+                candidates
+                    .iter()
+                    .map(|&k| order[k as usize])
+                    .find(|&j| test(j, profile))
+            } else {
+                order.iter().rev().copied().find(|&j| test(j, profile))
+            };
             if killer.is_some() {
                 dead.push((i, killer, DeathReason::Body));
                 fallen[i] = true;
