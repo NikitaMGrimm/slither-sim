@@ -69,7 +69,8 @@ class Catalog:
     source: str
 
     def select(self, cases=None, suite="full"):
-        """Rows in catalog order. A suite skips unavailable rows; named ones must exist and run."""
+        """Suite selections keep catalog order and skip unavailable rows; named cases keep
+        request order and must exist and be available."""
         if cases is None:
             return tuple(w for w in self.workloads
                          if w.available and (suite == "full" or w.suite == suite))

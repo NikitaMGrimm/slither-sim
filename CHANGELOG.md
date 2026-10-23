@@ -10,6 +10,11 @@
   official in-process client path, with deaths, death food and respawns inside the
   measured and traced windows. The six historical cases and their traces are unchanged.
   See [performance workloads](docs/performance-workloads.md).
+- Compare a base ref with the working tree in one command:
+  `tools/perf_compare.py --base REF` freezes both source snapshots, builds them
+  in separate targets, checks full-state trace parity, records phase profiles and
+  runs paired timings. Runners and PR comparisons take workloads, sample sizes
+  and trace windows from the catalog; PR CI times and traces its `ci` suite.
 
 ## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23
 
