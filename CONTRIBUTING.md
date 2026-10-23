@@ -19,6 +19,7 @@ the source owner and its callers, then start with the matching test.
 | Wire decoder and local host | [Server guide](docs/raw-server.md); `src/client/protocol.rs`, `src/client/server.rs`; `tests/client_protocol.rs`, `tests/client_server.rs` | `cargo test --locked --test client_protocol` |
 | Capture, audit and recorded replay | [Research workflow](docs/research-workflow.md); `tools/fidelity/evidence.py`, `tools/fidelity/prepare-fidelity-replay.py` and adjacent tests; `examples/fidelity_replay.rs` | Matching Python/Node test; `cargo test --locked --example fidelity_replay` for Rust replay |
 | Core library / WASM consumer | [Configuration](docs/configuration.md), `examples/basic.rs`; `src/lib.rs`, `src/observation/mod.rs`; `tests/core_consumer.rs` | `cargo test --locked --no-default-features --test core_consumer`; explicit `wasm` group for target changes |
+| Simulator or client performance | [Performance](docs/performance.md), [workloads](docs/performance-workloads.md); `examples/perf_baseline.rs`, `tools/perf_compare.py`, `tools/perf_build.py`; `tools/test_perf_*.py` | `uv run --locked --only-group tools python -B tools/perf_compare.py --base origin/main --output outputs/perf/NAME` (output parity, then paired timings) |
 | Documentation | Relevant guide and its linked source/examples | `python -B -m unittest discover -s tools -p test_documentation.py`; no research dependencies |
 
 ## Evidence proportional to the change
