@@ -50,7 +50,7 @@ test same_name ... ok
     def performance(self, directory, ratios, cpu=True):
         pairs, rows = [], []
         for repetition, ratio in enumerate(ratios):
-            pairs.append({"cpu_ratio_candidate_over_baseline": ratio if cpu else None,
+            pairs.append({"repetition": repetition, "cpu_ratio_candidate_over_baseline": ratio if cpu else None,
                           "wall_ratio_candidate_over_baseline": ratio})
             for label, value in (("baseline", 1), ("candidate", ratio)):
                 rows.append({"case": "observe", "label": label, "repetition": repetition,
@@ -82,8 +82,38 @@ test same_name ... ok
         self.assertTrue(text.startswith("> [!NOTE]\n> 🤖 **GPT 6.1 Sol writing on behalf of NikitaMGrimm**"))
         self.assertEqual(pr_report.cell("a|b\nc`d"), "a\\|b c'd")
 
+    def test_displayed_costs_come_from_the_same_pair_as_the_paired_delta(self):
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            self.performance(directory, [1.1, .9, 1.0])
+            raw = [json.loads(line) for line in (directory / "results.jsonl").read_text().splitlines()]
+            for row in raw:
+                multiplier = [1, 2, 100][row["repetition"]]
+                row["cpu_seconds"] *= multiplier
+            (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in raw))
+            row = pr_report.performance_rows(directory)[0]
+            self.assertEqual(row["baseline"], 100)
+            self.assertEqual(row["candidate"], 100)
+            self.assertEqual(row["ratio"], row["candidate"] / row["baseline"])
+
     def test_publisher_identity_and_staleness_regressions(self):
         subprocess.run(["node", "--test", str(Path(__file__).with_name("pr_report_comment.test.cjs"))], check=True)
+
+    def test_aborted_test_binary_keeps_its_missing_cases_in_the_denominator(self):
+        completed = {f"movement_turns::{name}": "ok" for name in ("a", "b", "c")}
+        expected = list(completed) + [f"physics::case{index}" for index in range(19)]
+        report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
+                  "platform": "Test platform", "expected_tests": expected,
+                  "tests": {"baseline": completed, "candidate": completed}}
+        text = pr_report.render(report)
+        self.assertIn("3/22 pass; 19 unavailable", text)
+        self.assertIn("0 fixed; 0 regressed; 19 unavailable", text)
+        self.assertIn("**Incomplete report:**", text)
+        self.assertNotIn("3/3 pass", text)
+
+    def test_suite_inventory_includes_ignored_tests_and_excludes_helpers(self):
+        source = '#[test]\nfn normal() {}\n#[test]\n#[ignore = "reason"]\nfn ignored() {}\nfn helper() {}'
+        self.assertEqual(pr_report.test_names(source), {"normal", "ignored"})
 
 
 if __name__ == "__main__":

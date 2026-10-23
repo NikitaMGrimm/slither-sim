@@ -62,6 +62,10 @@ def transition(base, candidate):
     return "unchanged" if base == candidate else "changed"
 
 
+def test_names(text):
+    return set(re.findall(r"#\[test\]\s*(?:#\[[^\]]*\]\s*)*fn\s+(\w+)", text))
+
+
 def metric_rows(base, candidate):
     def index(report):
         if report is None:
@@ -106,12 +110,12 @@ def performance_rows(directory):
         # A display heuristic for exploratory hosted timings, not a significance test.
         reading = ("Faster" if ratio < .95 and max(ratios) < 1
                    else "Slower" if ratio > 1.05 and min(ratios) > 1 else "Inconclusive")
+        representative = sorted(zip(ratios, data["pairs"]), key=lambda pair: pair[0])[len(ratios) // 2][1]
         values = {}
         for label in ("baseline", "candidate"):
-            samples = [r for r in raw if r["case"] == case and r["label"] == label and r["repetition"] >= 0]
-            values[label] = statistics.median(
-                r["cpu_seconds"] if use_cpu else r["workload"]["timing"]["wallSeconds"] for r in samples
-            ) * 1000 / data["iterations"]
+            sample = next(r for r in raw if r["case"] == case and r["label"] == label
+                          and r["repetition"] == representative["repetition"])
+            values[label] = (sample["cpu_seconds"] if use_cpu else sample["workload"]["timing"]["wallSeconds"]) * 1000 / data["iterations"]
         result.append({"case": case, "metric": "process CPU" if use_cpu else "operation wall",
                        **values, "ratio": ratio, "ratio_min": min(ratios), "ratio_max": max(ratios),
                        "pairs": len(ratios), "reading": reading})
@@ -129,7 +133,7 @@ def render(report):
              f"(PR head `{report['head'][:12]}`).", "",
              f"[Actions run and downloadable raw results]({report['run_url']}) · {cell(report['platform'])}", "",
              "### Performance", "", "Same release harness, seed and workload; lower cost is better.", "",
-             "| Workload | Metric (ms/op) | Target | PR | Paired Δ | Pair range | Reading |",
+             "| Workload | Metric (ms/op) | Target¹ | PR¹ | Paired Δ | Pair range | Reading |",
              "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
     for row in report.get("performance", []):
         lines.append(f"| {row['case']} | {row['metric']} | {row['baseline']:.5f} | {row['candidate']:.5f} | "
@@ -137,8 +141,8 @@ def render(report):
                      f"{(row['ratio_max'] - 1) * 100:+.1f}% | {row['reading']} |")
     if not report.get("performance"):
         lines.append("| Unavailable | See retained logs | — | — | — | — | Incomplete |")
-    lines += ["", "Three alternating pairs after warmup. Δ is the median paired ratio; target/PR columns are "
-              "separate medians. Faster/slower requires a ≥5% median shift and consistent direction across "
+    lines += ["", "Three alternating pairs after warmup. Δ is the median paired ratio. ¹Target/PR show the "
+              "actual times from that median-ratio pair. Faster/slower requires a ≥5% median shift and consistent direction across "
               "all pairs. This is a display heuristic, not statistical significance. Process CPU includes "
               "setup/teardown; operation wall excludes them. Hosted-runner noise remains.", "",
               "### Regression and fidelity", "", "Identical selected test sources and fixtures are used on both runtimes.", "",
@@ -151,10 +155,16 @@ def render(report):
         bv = f"{b['value']:.6f}" if b else "—"
         lines.append(f"| {cell(ref['label'])} ({cell(ref['unit'])}) | {av} | {bv} | {row['reading']} | {ref['samples']} |")
     before, after = report.get("tests", {}).get("baseline", {}), report.get("tests", {}).get("candidate", {})
-    names = sorted(before.keys() | after.keys())
+    names = sorted(set(report.get("expected_tests", [])) | before.keys() | after.keys())
     changes = {kind: sum(transition(before.get(n), after.get(n)) == kind for n in names)
                for kind in ("fixed", "regressed", "unavailable", "changed", "unchanged")}
-    passed = lambda values: f"{sum(v == 'ok' for v in values.values())}/{len(values)} pass" if values else "Unavailable"
+    def passed(values):
+        if not names:
+            return "Unavailable"
+        missing = sum(name not in values for name in names)
+        value = f"{sum(values.get(name) == 'ok' for name in names)}/{len(names)} pass"
+        return value + (f"; {missing} unavailable" if missing else "")
+
     lines.append(f"| Selected Rust regressions | {passed(before)} | {passed(after)} | "
                  f"{changes['fixed']} fixed; {changes['regressed']} regressed; {changes['unavailable']} unavailable; "
                  f"{changes['changed']} other changes | {len(names)} |")
@@ -162,6 +172,8 @@ def render(report):
     equal = sum(row["reading"] == "Equal" for row in traces)
     lines.append(f"| Canonical state traces | Reference | {equal}/{len(traces)} equal | "
                  "Different means behavior changed; requires review | 32 iterations/case |")
+    if report.get("errors") or changes["unavailable"]:
+        lines += ["", "**Incomplete report:** missing executions or collection errors are retained in the artifact and detailed below."]
     lines += ["", "Error values are residuals on selected recorded fixtures, not an overall accuracy percentage. "
               "Turn cases are duration weighted; speed-ramp cases are grouped by capture source. "
               "Trace equality covers these cases only.", "", "<details><summary>Test details, suite changes and limitations</summary>", ""]
@@ -204,11 +216,11 @@ def collect(output, head):
     report["inputs"] = {str(p.relative_to(ROOT)).replace("\\", "/"): digest(p) for p in inputs}
     report["suite_changes"] = [name for name, sha in report["inputs"].items()
                                if not (baseline / name).is_file() or digest(baseline / name) != sha]
-    report["added_tests"], report["removed_tests"] = [], []
+    report["added_tests"], report["removed_tests"], report["expected_tests"] = [], [], []
     for name in TESTS:
         path = Path("tests") / f"{name}.rs"
-        names = lambda text: set(re.findall(r"#\[test\]\s*fn\s+(\w+)", text))
-        old, new = names((baseline / path).read_text()), names((ROOT / path).read_text())
+        old, new = test_names((baseline / path).read_text()), test_names((ROOT / path).read_text())
+        report["expected_tests"] += [f"{name}::{n}" for n in sorted(new)]
         report["added_tests"] += [f"{name}::{n}" for n in sorted(new - old)]
         report["removed_tests"] += [f"{name}::{n}" for n in sorted(old - new)]
     for path in inputs:
@@ -222,9 +234,11 @@ def collect(output, head):
         env = {**os.environ, "CARGO_TARGET_DIR": str(work / f"target-{label}"), "CARGO_BUILD_JOBS": "2",
                "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
         report.setdefault("cargo_locks", {})[label] = digest(checkout / "Cargo.lock")
+        print(f"[{label}] Building release measurement examples", flush=True)
         build_log = output / f"{label}-build.log"
         built = command(["cargo", "build", "--release", "--locked", "--example", "perf_baseline", "--example", "fidelity_metrics"], checkout, build_log, env)
         test_log = output / f"{label}-tests.log"
+        print(f"[{label}] Running the selected regression suite", flush=True)
         code = command(["cargo", "test", "--locked", "--no-fail-fast", "--test", "movement_turns", "--test", "physics", "--", "--test-threads=1"], checkout, test_log, env)
         report["tests"][label] = parse_tests(test_log.read_text(encoding="utf-8"))
         if code:
@@ -246,6 +260,7 @@ def collect(output, head):
             fidelity[label] = json.loads(metrics_log.read_text(encoding="utf-8"))
     report["fidelity"] = metric_rows(fidelity.get("baseline"), fidelity.get("candidate"))
     for case in CASES:
+        print(f"[parity] Capturing {case} traces", flush=True)
         hashes = {}
         for label, binary in binaries.items():
             directory = output / f"traces-{label}"
@@ -257,6 +272,7 @@ def collect(output, head):
         report["traces"].append({"case": case, **hashes, "reading": "Unavailable" if len(hashes) != 2
                                  else "Equal" if hashes["baseline"]["sha256"] == hashes["candidate"]["sha256"] else "Changed"})
     if len(binaries) == 2:
+        print("[performance] Running three alternating pairs for each workload", flush=True)
         perf = output / "performance"
         code = command([sys.executable, str(ROOT / "tools/perf_compare.py"), "--baseline", str(binaries["baseline"]),
                         "--candidate", str(binaries["candidate"]), "--output", str(perf), "--repeats", "3"],

@@ -15,6 +15,8 @@ and their hashes are retained. Compilation failures make results unavailable.
 
 The performance table reuses the six [baseline workloads](performance.md).
 Three adjacent alternating pairs follow a warmup; raw results are retained.
+The displayed target/PR costs come from the pair with the median ratio, so they
+agree with the paired percentage; they are not separate medians of the costs.
 CPU is process user plus kernel time, including setup/teardown; operation wall
 time excludes them. Values are descriptive hosted-runner measurements. The 5%
 display band and consistent-direction rule are presentation heuristics, not a
@@ -29,6 +31,9 @@ new tests and removals are disclosed; removed tests are never counted as fixes.
 Ignored tests stay distinct from passes. A changed trace means changed behavior,
 which may be appropriate for a fidelity correction. No overall accuracy score
 or empirical claim about unmeasured server mechanics is produced.
+The denominator includes every declared test in these two selected source files,
+including cases absent from both execution logs after an abort. The table marks
+those cases unavailable and labels the report incomplete.
 
 The comment is updated in place, keyed by a hidden marker and bot author.
 Before posting, the publisher checks the artifact's PR/repository/head/merge
