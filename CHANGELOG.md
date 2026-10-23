@@ -9,7 +9,7 @@
   The JSON protocol identifiers remain unchanged.
 - Publish the current evidence-constrained host defaults: finite 1,500-unit
   snake/prey coverage, retained food sectors, 136-cell minimaps and independent
-  reporting clocks. The compact default arena and provisional ecology remain
+  minimap/leaderboard clocks. The compact default arena and provisional ecology remain
   explicit; no exact official-server preset or overall accuracy is claimed.
 - Retain paired-snake targets through bounded stale-pose pauses without granting
   clean-route credit, and screen food-route corridors against complete received
@@ -37,8 +37,8 @@
   deltas when shorter. Add fixed diagonal collection routes and clarify the
   source/evidence boundary, ecology models and offline collision rationale.
 
-- Match the default prey turn setup to physics; separate leaderboard deadlines
-  and bounded prey reporting from gameplay broadcasts. Add an offline packet
+- Match the default prey turn setup to physics; give leaderboards independent
+  deadlines and bound prey reporting on gameplay broadcasts. Add an offline packet
   census, source-pinned cadence fixture and generic localhost capture workflow;
   keep recording ping timing through post-death observation and capture shutdown.
 - Keep correcting predicted prey positions even when authoritative grid/motion
