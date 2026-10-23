@@ -966,10 +966,14 @@ impl Simulator {
                     .iter()
                     .filter(|f| f.origin == Some(Origin::Ambient))
                     .count();
-                // Food can be edited externally. Rebuild once for this refill
-                // batch and include every origin in the shared cell occupancy.
-                let mut occupied =
-                    (self.config.ambient_food.enabled && ambient_food_count < target).then(|| {
+                // Use the loop's exact next comparison: a single attempt needs
+                // only its candidate cell, while a batch shares a rebuilt map.
+                // Both paths include every origin and reconcile public edits.
+                let single_attempt = self.ambient_clock - interval + 1e-12 < interval;
+                let mut occupied = (!single_attempt
+                    && self.config.ambient_food.enabled
+                    && ambient_food_count < target)
+                    .then(|| {
                         let mut occupied = HashMap::<(i64, i64), usize>::new();
                         for food in &self.food {
                             *occupied
@@ -986,7 +990,19 @@ impl Simulator {
                     self.ambient_clock -= interval;
                     if ambient_food_count < target {
                         let f = self.new_food();
-                        if admit_ambient_food(&f, &self.config.ambient_food, &mut occupied) {
+                        let admitted = if single_attempt && self.config.ambient_food.enabled {
+                            let density = &self.config.ambient_food;
+                            let cell = food_cell(f.x, f.y, density.cell_size);
+                            self.food
+                                .iter()
+                                .filter(|food| food_cell(food.x, food.y, density.cell_size) == cell)
+                                .take(density.max_per_cell)
+                                .count()
+                                < density.max_per_cell
+                        } else {
+                            admit_ambient_food(&f, &self.config.ambient_food, &mut occupied)
+                        };
+                        if admitted {
                             if let Some(events) = &mut self.food_spawn_events {
                                 events.push(FoodSpawnEvent {
                                     source: None,

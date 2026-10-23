@@ -135,6 +135,58 @@ fn rejected_candidates_consume_rng_and_refill_interval_without_retries() {
 }
 
 #[test]
+fn single_attempts_and_a_batch_keep_admission_rng_and_event_order() {
+    for enabled in [false, true] {
+        let mut singles = tiny_world(enabled, 0, 100.0);
+        let mut batch = tiny_world(enabled, 0, 100.0);
+        singles.config.food_count = 3;
+        batch.config.food_count = 3;
+        batch.config.dt = 0.03;
+        singles.food_spawn_events = Some(Vec::new());
+        batch.food_spawn_events = Some(Vec::new());
+        let mut events = Vec::new();
+        for _ in 0..3 {
+            singles.step(&[]).unwrap();
+            events.extend(singles.food_spawn_events.as_ref().unwrap().clone());
+        }
+        batch.step(&[]).unwrap();
+        assert_eq!(singles.food, batch.food);
+        assert_eq!(events, *batch.food_spawn_events.as_ref().unwrap());
+        assert_eq!(singles.food.len(), if enabled { 2 } else { 3 });
+
+        // Rejections and reaching the target must spend exactly the same draws.
+        for world in [&mut singles, &mut batch] {
+            world.config.dt = 0.01;
+            world.config.ambient_food.enabled = false;
+            world.food.clear();
+            world.step(&[]).unwrap();
+        }
+        assert_eq!(singles.food, batch.food);
+    }
+}
+
+#[test]
+fn epsilon_due_boundary_preserves_single_and_batch_capacity() {
+    for intervals in [1.0, 2.0] {
+        for offset in [-2.0e-12, -0.5e-12, 0.0, 0.5e-12, 2.0e-12] {
+            let mut world = tiny_world(true, 0, 100.0);
+            world.config.food_count = 5;
+            world.config.dt = intervals * 0.01 + offset;
+            world.food_spawn_events = Some(Vec::new());
+            world.step(&[]).unwrap();
+            let expected = if offset + 1e-12 >= 0.0 {
+                intervals as usize
+            } else {
+                intervals as usize - 1
+            };
+            assert_eq!(world.food.len(), expected);
+            assert_eq!(world.food_spawn_events.as_ref().unwrap().len(), expected);
+            assert!(world.food.iter().all(|f| f.origin == Some(Origin::Ambient)));
+        }
+    }
+}
+
+#[test]
 fn tuning_validation_and_config_round_trip() {
     let mut config = Config::default();
     for cell_size in [0.0, -1.0, f64::NAN, f64::INFINITY] {
