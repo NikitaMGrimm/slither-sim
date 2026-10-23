@@ -21,8 +21,8 @@ GitHub matches the filter against the whole PR diff. Once a PR changes a measure
 input, every later push is measured, including documentation-only pushes, so the
 comment follows the current head and target. If a later push reverts every
 measured change, no new run starts and the existing comment keeps its recorded
-PR head. GitHub's [path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
-consider only the first 300 changed files, so a larger PR can go unmeasured.
+PR head. GitHub's [path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#git-diff-comparisons)
+consider only the first 3,000 files of a diff, so a larger PR can go unmeasured.
 Drafts are measured on every push, so marking one ready does not repeat the run.
 
 Each PR update measures the merge commit against its first parent (the exact
