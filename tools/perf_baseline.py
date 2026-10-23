@@ -137,9 +137,10 @@ def percentiles(values):
 def native(executable, case, iterations, stderr_path, profile=False):
     args = [str(executable), case, str(iterations)] + (["--profile"] if profile else [])
     started = time.perf_counter()
-    errors = stderr_path.open("wb")
-    process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
-    try:
+    with ExitStack() as cleanup:
+        errors = cleanup.enter_context(stderr_path.open("wb"))
+        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
+        cleanup.callback(close_child, process)
         line = Lines(process.stdout).read(started + 120)
         process.wait(timeout=max(.1, started + 120 - time.perf_counter()))
         wall = time.perf_counter() - started
@@ -149,23 +150,20 @@ def native(executable, case, iterations, stderr_path, profile=False):
         return {"case": case, "command": args, "process_wall_seconds": wall,
                 **metrics, "exit_code": process.returncode, "stderr": str(stderr_path),
                 "workload": json.loads(line)}
-    finally:
-        stop(process)
-        process.stdout.close()
-        errors.close()
 
 
 def capture_trace(executable, case, iterations, directory):
     stderr_path = directory / f"{case}-trace-stderr.txt"
-    errors = stderr_path.open("wb")
-    process = subprocess.Popen([str(executable), case, str(iterations), "--trace"],
-                               stdout=subprocess.PIPE, stderr=errors)
-    reader = Lines(process.stdout)
-    sha = hashlib.sha256()
-    lines = 0
-    size = 0
-    deadline = time.perf_counter() + 120
-    try:
+    with ExitStack() as cleanup:
+        errors = cleanup.enter_context(stderr_path.open("wb"))
+        process = subprocess.Popen([str(executable), case, str(iterations), "--trace"],
+                                   stdout=subprocess.PIPE, stderr=errors)
+        cleanup.callback(close_child, process)
+        reader = Lines(process.stdout)
+        sha = hashlib.sha256()
+        lines = 0
+        size = 0
+        deadline = time.perf_counter() + 120
         with (directory / f"{case}.jsonl.gz").open("wb") as raw:
             with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as output:
                 while True:
@@ -182,10 +180,6 @@ def capture_trace(executable, case, iterations, directory):
             raise RuntimeError(f"invalid/incomplete {case} trace; see {stderr_path}")
         return {"case": case, "iterations": iterations, "lines": lines,
                 "uncompressed_bytes": size, "sha256": sha.hexdigest()}
-    finally:
-        stop(process)
-        process.stdout.close()
-        errors.close()
 
 
 def e2e(executable, steps, hosted, directory):

@@ -15,6 +15,64 @@ import perf_compare
 
 
 class ProcessFailures(unittest.TestCase):
+    def test_native_and_trace_close_handles_after_stop_or_pipe_failure(self):
+        class CloseFailure(io.BytesIO):
+            def close(self):
+                if not self.closed:
+                    super().close()
+                    raise OSError("cleanup witness")
+
+        for entry in ("native", "trace"):
+            for failure in ("stop", "pipe"):
+                with self.subTest(entry=entry, failure=failure), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    stdout = CloseFailure() if failure == "pipe" else io.BytesIO()
+                    child = Mock(stdin=None, stdout=stdout, stderr=None)
+                    opened_errors = []
+
+                    def spawn(*args, **kwargs):
+                        opened_errors.append(kwargs["stderr"])
+                        return child
+
+                    try:
+                        with patch.object(perf_baseline.subprocess, "Popen", side_effect=spawn), patch.object(
+                                perf_baseline.Lines, "read", side_effect=TimeoutError("read witness")), patch.object(
+                                perf_baseline, "stop", side_effect=OSError("cleanup witness") if failure == "stop" else None):
+                            with self.assertRaisesRegex(OSError, "cleanup witness"):
+                                if entry == "native":
+                                    perf_baseline.native(Path(sys.executable), "observe", 1, root / "stderr.txt")
+                                else:
+                                    perf_baseline.capture_trace(Path(sys.executable), "observe", 1, root)
+                        self.assertEqual(len(opened_errors), 1)
+                        self.assertEqual([stdout.closed, opened_errors[0].closed], [True, True])
+                    finally:
+                        stdout.close()
+                        for errors in opened_errors:
+                            errors.close()
+
+    def test_native_and_trace_close_stderr_after_spawn_failure(self):
+        for entry in ("native", "trace"):
+            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                opened_errors = []
+
+                def spawn(*args, **kwargs):
+                    opened_errors.append(kwargs["stderr"])
+                    raise OSError("spawn witness")
+
+                try:
+                    with patch.object(perf_baseline.subprocess, "Popen", side_effect=spawn):
+                        with self.assertRaisesRegex(OSError, "spawn witness"):
+                            if entry == "native":
+                                perf_baseline.native(Path(sys.executable), "observe", 1, root / "stderr.txt")
+                            else:
+                                perf_baseline.capture_trace(Path(sys.executable), "observe", 1, root)
+                    self.assertEqual(len(opened_errors), 1)
+                    self.assertTrue(opened_errors[0].closed)
+                finally:
+                    for errors in opened_errors:
+                        errors.close()
+
     def test_host_cleanup_survives_client_stop_or_pipe_failure(self):
         for failure in ("stop", "pipe"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
