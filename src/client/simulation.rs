@@ -235,6 +235,27 @@ impl std::ops::Index<&[u8; 2]> for SectorFood {
     }
 }
 
+/// Listings a connection holds, in ascending sector order.
+#[derive(Clone, Debug, Default)]
+struct KnownSectors(Vec<([u8; 2], Arc<SectorFood>)>);
+#[cfg(test)]
+impl KnownSectors {
+    fn get(&self, sector: &[u8; 2]) -> Option<&Arc<SectorFood>> {
+        let index = self.0.binary_search_by_key(sector, |(key, _)| *key).ok()?;
+        Some(&self.0[index].1)
+    }
+    fn contains_key(&self, sector: &[u8; 2]) -> bool {
+        self.get(sector).is_some()
+    }
+}
+#[cfg(test)]
+impl std::ops::Index<&[u8; 2]> for KnownSectors {
+    type Output = SectorFood;
+    fn index(&self, sector: &[u8; 2]) -> &SectorFood {
+        self.get(sector).expect("known sector")
+    }
+}
+
 /// Server and transport state of one connection.
 #[derive(Clone, Debug, Default)]
 struct Connection {
@@ -252,7 +273,7 @@ struct Connection {
     setup_at: Option<f64>,
     header_ms: u64,
     snakes: BTreeMap<usize, KnownSnake>,
-    food: BTreeMap<[u8; 2], Arc<SectorFood>>,
+    food: KnownSectors,
     food_interest: SectorInterest,
     prey: BTreeMap<u16, KnownPrey>,
     radius: u32,
@@ -411,10 +432,12 @@ pub struct SimulatorBackend {
     /// Exact pickup positions since the last broadcast, before buffers reset.
     food_eaters: BTreeMap<(u64, u64), u16>,
     prey_eaters: BTreeMap<u16, u16>,
-    /// Listings of the subscribed sectors at the last broadcast. An unchanged
-    /// listing keeps its allocation, so a connection already holding it can
-    /// skip the comparison.
-    food_sectors: BTreeMap<[u8; 2], Arc<SectorFood>>,
+    /// Listings of the subscribed sectors at the last broadcast, indexed by
+    /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
+    /// so a connection already holding it can skip the comparison.
+    food_sectors: Vec<Option<Arc<SectorFood>>>,
+    /// Sectors listed at the last broadcast.
+    listed: Vec<u16>,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
@@ -450,7 +473,8 @@ impl SimulatorBackend {
             food_presentation: FoodPresentation::new(seed, config.agents),
             food_eaters: BTreeMap::new(),
             prey_eaters: BTreeMap::new(),
-            food_sectors: BTreeMap::new(),
+            food_sectors: Vec::new(),
+            listed: Vec::new(),
             slots: Vec::with_capacity(config.agents),
             world,
             config,
@@ -1119,32 +1143,31 @@ impl SimulatorBackend {
     /// List the food of every sector a connection subscribes to. Each wire cell
     /// shows its first pellet in world order.
     fn sync_food_sectors(&mut self) -> Result<(), String> {
-        let sector_index = |sector: [u8; 2]| usize::from(u16::from_be_bytes(sector));
-        let mut wanted = vec![false; 1 << 16];
-        for slot in &self.slots {
-            if slot.connection.setup {
-                for &sector in slot.connection.food_interest.subscribed() {
-                    wanted[sector_index(sector)] = true;
+        let mut buckets = vec![u32::MAX; 1 << 16];
+        let mut sectors = Vec::new();
+        for slot in self.slots.iter().filter(|slot| slot.connection.setup) {
+            for &sector in slot.connection.food_interest.subscribed() {
+                let index = u16::from_be_bytes(sector);
+                if buckets[usize::from(index)] == u32::MAX {
+                    buckets[usize::from(index)] = sectors.len() as u32;
+                    sectors.push(index);
                 }
             }
         }
-        let mut buckets = vec![u32::MAX; 1 << 16];
-        let mut sectors = Vec::new();
-        for (index, _) in wanted.iter().enumerate().filter(|(_, wanted)| **wanted) {
-            buckets[index] = sectors.len() as u32;
-            sectors.push(index as u16);
-        }
-        let mut listings = vec![Vec::new(); sectors.len()];
+        let mut entries = Vec::new();
+        let mut starts = vec![0_usize; sectors.len() + 1];
         for food in &self.world.food {
             let key = encode::food_key(food.point())?;
-            let bucket = buckets[sector_index([key[0], key[1]])];
+            let bucket = buckets[usize::from(u16::from_be_bytes([key[0], key[1]]))];
             if bucket == u32::MAX {
                 continue;
             }
             let size = food
                 .size
                 .unwrap_or_else(|| (food.value / physics::nutrition(1., 2.)).max(0.).sqrt());
-            listings[bucket as usize].push((
+            starts[bucket as usize + 1] += 1;
+            entries.push((
+                bucket,
                 [key[2], key[3]],
                 KnownFood {
                     point: food.point(),
@@ -1156,23 +1179,43 @@ impl SimulatorBackend {
                 },
             ));
         }
-        let previous = std::mem::take(&mut self.food_sectors);
-        self.food_sectors = sectors
-            .into_iter()
-            .zip(listings)
-            .map(|(index, mut listing)| {
-                // Stable, so deduplication keeps the earliest pellet.
-                listing.sort_by_key(|(offset, _)| *offset);
-                listing.dedup_by_key(|(offset, _)| *offset);
-                let listing = SectorFood(listing);
-                let sector = index.to_be_bytes();
-                let shared = match previous.get(&sector) {
-                    Some(old) if **old == listing => old.clone(),
-                    _ => Arc::new(listing),
-                };
-                (sector, shared)
-            })
-            .collect();
+        for bucket in 1..starts.len() {
+            starts[bucket] += starts[bucket - 1];
+        }
+        // Counting sort by sector, keeping world order within each sector.
+        let mut order = vec![0_u32; entries.len()];
+        let mut next = starts.clone();
+        for (index, &(bucket, ..)) in entries.iter().enumerate() {
+            order[next[bucket as usize]] = index as u32;
+            next[bucket as usize] += 1;
+        }
+        let table = &mut self.food_sectors;
+        table.resize(1 << 16, None);
+        for &index in &self.listed {
+            if buckets[usize::from(index)] == u32::MAX {
+                table[usize::from(index)] = None;
+            }
+        }
+        let mut run = Vec::new();
+        for (bucket, &index) in sectors.iter().enumerate() {
+            run.clear();
+            run.extend(
+                order[starts[bucket]..starts[bucket + 1]]
+                    .iter()
+                    .map(|&entry| {
+                        let (_, offset, food) = entries[entry as usize];
+                        (offset, food)
+                    }),
+            );
+            // Stable, so deduplication keeps the earliest pellet of each wire cell.
+            run.sort_by_key(|(offset, _)| *offset);
+            run.dedup_by_key(|(offset, _)| *offset);
+            let listing = &mut table[usize::from(index)];
+            if listing.as_ref().is_none_or(|old| old.0 != run) {
+                *listing = Some(Arc::new(SectorFood(run.clone())));
+            }
+        }
+        self.listed = sectors;
         Ok(())
     }
 
@@ -1827,53 +1870,59 @@ fn changes(
 /// `sectors` lists every subscribed sector.
 fn food_updates(
     packets: &mut Vec<Vec<u8>>,
-    known_food: &mut BTreeMap<[u8; 2], Arc<SectorFood>>,
+    known: &mut KnownSectors,
     subscribed: &BTreeSet<[u8; 2]>,
-    sectors: &BTreeMap<[u8; 2], Arc<SectorFood>>,
+    sectors: &[Option<Arc<SectorFood>>],
     eaten: &BTreeSet<[u8; 2]>,
     eaters: &BTreeMap<(u64, u64), u16>,
 ) {
-    let left: Vec<_> = known_food
-        .keys()
-        .filter(|sector| !subscribed.contains(*sector))
-        .copied()
-        .collect();
-    for sector in left {
-        known_food.remove(&sector);
-        packets.push(encode::sector_clear(sector));
+    let held = std::mem::take(&mut known.0);
+    let mut subscriptions = subscribed.iter().peekable();
+    for (sector, _) in &held {
+        while subscriptions.next_if(|next| *next < sector).is_some() {}
+        if subscriptions.peek() != Some(&sector) {
+            packets.push(encode::sector_clear(*sector));
+        }
     }
+    let mut held = held.into_iter().peekable();
+    known.0.reserve(subscribed.len());
     for &sector in subscribed {
-        let current = &sectors[&sector];
+        while held.next_if(|(old, _)| *old < sector).is_some() {}
+        let previous = held
+            .next_if(|(old, _)| *old == sector)
+            .map(|(_, food)| food);
+        let current = sectors[usize::from(u16::from_be_bytes(sector))]
+            .as_ref()
+            .expect("subscribed sectors are listed");
         let key = |offset: [u8; 2]| [sector[0], sector[1], offset[0], offset[1]];
-        match known_food.get_mut(&sector) {
+        match previous {
             None => {
                 let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
                 if !foods.is_empty() {
                     packets.extend(encode::food_sector(sector, &foods));
                 }
-                known_food.insert(sector, current.clone());
             }
             // The same listing without a pickup at its points sends nothing.
-            Some(known) if Arc::ptr_eq(known, current) && !eaten.contains(&sector) => {}
-            Some(known) => {
-                for (offset, food) in &known.0 {
+            Some(previous) if Arc::ptr_eq(&previous, current) && !eaten.contains(&sector) => {}
+            Some(previous) => {
+                for (offset, food) in &previous.0 {
                     let eater = eaters.get(&food_identity(food.point)).copied();
                     if current.get(offset) != Some(food) || eater.is_some() {
                         packets.push(encode::food_remove(key(*offset), eater));
                     }
                 }
                 for (offset, food) in &current.0 {
-                    if known.get(offset) != Some(food)
-                        || known
+                    if previous.get(offset) != Some(food)
+                        || previous
                             .get(offset)
                             .is_some_and(|old| eaters.contains_key(&food_identity(old.point)))
                     {
                         packets.push(encode::food_add(key(*offset), food.style));
                     }
                 }
-                *known = current.clone();
             }
         }
+        known.0.push((sector, current.clone()));
     }
 }
 
@@ -1929,14 +1978,12 @@ mod tests {
         eaters: &BTreeMap<(u64, u64), u16>,
         subscribed: &BTreeSet<[u8; 2]>,
     ) {
-        let listings = subscribed
-            .iter()
-            .map(|sector| {
-                let food = sectors.get(sector).into_iter().flatten();
-                let listing = SectorFood(food.map(|(offset, food)| (*offset, *food)).collect());
-                (*sector, Arc::new(listing))
-            })
-            .collect();
+        let mut listings = vec![None; 1 << 16];
+        for sector in subscribed {
+            let food = sectors.get(sector).into_iter().flatten();
+            let listing = SectorFood(food.map(|(offset, food)| (*offset, *food)).collect());
+            listings[usize::from(u16::from_be_bytes(*sector))] = Some(Arc::new(listing));
+        }
         food_updates(
             packets,
             &mut connection.food,
@@ -1959,10 +2006,11 @@ mod tests {
                 snake_food: false,
             },
         };
-        let listing = Arc::new(SectorFood(vec![([rx, ry], food)]));
-        let sectors = BTreeMap::from([([sx, sy], listing)]);
+        let mut sectors = vec![None; 1 << 16];
+        sectors[usize::from(u16::from_be_bytes([sx, sy]))] =
+            Some(Arc::new(SectorFood(vec![([rx, ry], food)])));
         let subscribed = BTreeSet::from([[sx, sy]]);
-        let mut known = BTreeMap::new();
+        let mut known = KnownSectors::default();
         let mut packets = Vec::new();
         let none = BTreeMap::new();
         food_updates(
