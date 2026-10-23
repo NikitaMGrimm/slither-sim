@@ -1,9 +1,9 @@
-# PR comparison experiment
+# Automatic PR comparisons
 
-The `ci/report-preview` branch tests an advisory Actions comment on its draft PR.
-Keep `@coderabbitai ignore` in that PR's description throughout the experiment;
-do not change the repository's CodeRabbit configuration. This workflow neither
-merges changes nor joins the existing `Required checks` dependency list.
+Every opened, updated, reopened or ready-for-review PR runs a performance and
+regression comparison, including draft PRs and forks. One Actions comment is
+updated in place. These measurements are advisory; the report workflow is
+separate from `Required checks`, and numerical regressions do not block merging.
 
 Each PR update measures the merge commit against its first parent (the exact
 target revision used for that merge). The report records that pair and the PR
@@ -46,18 +46,24 @@ retain an older snapshot even when the merge checkout uses a newer target.
 If concurrent work advances the target along the same history, the pinned
 comparison is published and Details records the newer target. Older PR heads
 and rewritten or diverged target histories are still skipped.
-Only the named same-repository branch can run it. Measurement jobs have read-only
-repository access; the separate publisher has comment write access and treats
-downloaded artifacts only as data. Both use pinned actions and leave checkout
-credentials unpersisted. No personal token or external benchmarking service is
-needed. All measurements, input/binary hashes, traces and logs are uploaded for
-14 days, including partial output on failure. Numerical deltas do not fail the
-job; broken report generation remains visible.
+The `PR comparison` workflow has read-only repository access. Its separate
+`workflow_run` publisher loads code only from the default branch, verifies the
+originating workflow, run attempt, PR head/repository/branch and merge parents,
+and reads a bounded comment artifact as data. It never runs PR scripts with its
+comment-write token. Artifact identity, bot authorship and published run metadata
+prevent unrelated or older runs from replacing a newer report. GitHub mentions
+in PR-provided diagnostics are suppressed.
 
-This branch-only publisher deliberately skips forks. A production fork publisher
-would use a trusted `workflow_run` workflow already installed on the default
-branch, with validation of originating runs and artifact data. This experiment
-does not install anything on `main` or prove that future fork path.
+Both workflows use pinned actions and leave checkout credentials unpersisted.
+No personal token or external benchmarking service is needed. Full measurements,
+input/binary hashes, traces and logs remain in a separate artifact for 14 days,
+including partial output on failure. The publisher downloads only the small
+comment artifact. Broken report generation remains visible as a failed job.
+
+GitHub's usual approval policy still applies to first-time fork contributors.
+Conflicting PRs need their conflicts resolved before a merge checkout can run.
+The publisher workflow must exist on the default branch before GitHub can
+trigger it; see the [workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
 Local focused checks (standard library for the Python reporting code):
 
@@ -66,7 +72,9 @@ uv run --locked --only-group tools python -m unittest discover -s tools -p test_
 cargo test --locked --example fidelity_metrics --test movement_turns --test physics
 ```
 
-Real performance collection belongs on the isolated Actions runner while other
-agents use the shared desktop. Full local timing is not required to edit/report
-the workflow. To verify updating, push another change to the experiment branch
-and check that the existing comment ID is retained with the new head and run.
+Performance comparisons need a quiet machine with matched builds and inputs.
+Full local timing is not required to edit the reporting workflow. After a push,
+the existing PR comment should retain its ID and identify the new head and run.
+Repeated runs rebuild both revisions and retain full-state parity traces; the
+wall-clock duration therefore includes compilation and serialization as well as
+the timed workloads. Simulator speed alone does not predict report duration.

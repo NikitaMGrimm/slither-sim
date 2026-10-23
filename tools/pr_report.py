@@ -1,7 +1,7 @@
 """Collect an advisory, fixed-suite PR comparison; standard library only.
 
 The worktrees, binaries, logs and failed attempts are retained in fresh owned
-directories. Only GitHub-hosted runs are intended for performance interpretation.
+directories. Performance interpretation requires a quiet runner and matched inputs.
 """
 
 import argparse
@@ -219,7 +219,7 @@ def render(report):
             lines.append(f"- `{trace['case']}` trace: {trace['reading']}.")
     for error in report.get("errors", []):
         lines.append(f"- **Incomplete:** {cell(error)}.")
-    lines += ["- Experimental same-repository PR publisher; fork PRs are skipped.",
+    lines += ["- Measurements use PR code and the selected fixtures; inspect the raw data for any disputed result.",
               "- Raw results, hashes and logs are linked above.", "", "</details>", ""]
     return "\n".join(lines)
 
@@ -231,6 +231,7 @@ def collect(output, head):
         raise ValueError("checkout must be the PR merge commit for the expected head")
     report = {"schema": 1, "base": base, "head": head, "merge": merge,
               "repository": os.environ["GITHUB_REPOSITORY"], "pr": int(os.environ["PR_NUMBER"]),
+              "run": int(os.environ["GITHUB_RUN_ID"]), "attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
               "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               "platform": platform.platform(), "errors": [], "tests": {}, "traces": []}
     work = output.with_name(output.name + "-work")
