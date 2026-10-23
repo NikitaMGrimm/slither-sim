@@ -65,6 +65,7 @@ class FakeCompare:
 class CheckUrlTests(unittest.TestCase):
     def test_accepts_release_downloads_signed_assets_and_raw_manifests(self):
         for url in (BASELINE, SIGNED, "https://github.com:443/owner/repo/releases/download/v1/a.zip",
+                    "https://github.com/user-attachments/files/12345/evidence.tar.gz",
                     "https://objects.githubusercontent.com/github-production-release-asset-2e65be/1/x?X-Amz=1",
                     "https://user-attachments.githubusercontent.com/assets/0f3c-uuid"):
             self.assertEqual(fetch_evidence.check_url(url, fetch_evidence.BUNDLE), url)
@@ -81,6 +82,7 @@ class CheckUrlTests(unittest.TestCase):
             "https://localhost/owner/repo/releases/download/v1/a.zip",
             "https://github.com.evil.example/owner/repo/releases/download/v1/a.zip",
             "https://github.com/owner/repo/archive/refs/heads/main.zip",
+            "https://github.com/user-attachments/files/not-a-number/evidence.tar.gz",
             "https://github.com/owner/repo/releases/latest/download/a.zip",
             "https://github.com/owner/repo/releases/download/v1/a.zip?token=1",
             "https://github.com/owner/repo/releases/download/../a.zip",
@@ -99,6 +101,35 @@ class CheckUrlTests(unittest.TestCase):
 
 
 class FetchTests(unittest.TestCase):
+    def test_download_rechecks_budget_between_partial_reads_and_before_connect(self):
+        class Response:
+            status = 200
+            headers = {}
+            def __init__(self):
+                self.parts = iter((b"a", b"b", b""))
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def read(self, _):
+                raise AssertionError("fill-to-size read must not hide deadline checks")
+            def read1(self, _):
+                return next(self.parts)
+        opener = mock.Mock()
+        opener.open.return_value = Response()
+        with mock.patch.object(fetch_evidence, "make_opener", return_value=opener):
+            sink = io.BytesIO()
+            fetch_evidence.download(MANIFEST_URL, fetch_evidence.MANIFEST, 100, sha256(b"ab"),
+                                    sink, None, fetch_evidence.Budget())
+            self.assertEqual(sink.getvalue(), b"ab")
+            expired = fetch_evidence.Budget()
+            expired.deadline = 0
+            opener.open.reset_mock()
+            with self.assertRaisesRegex(ValueError, "seconds"):
+                fetch_evidence.download(MANIFEST_URL, fetch_evidence.MANIFEST, 100, sha256(b"ab"),
+                                        io.BytesIO(), None, expired)
+            opener.open.assert_not_called()
+
     def test_ci_isolated_python_can_import_the_trusted_sibling_tools(self):
         result = subprocess.run([sys.executable, "-I", str(Path(fetch_evidence.__file__)), "--help"],
                                 capture_output=True, text=True, check=False)

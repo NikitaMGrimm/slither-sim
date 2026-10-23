@@ -37,6 +37,7 @@ CHUNK = 64 * 1024
 SHA256 = re.compile(r"[0-9a-f]{64}")
 SEGMENT = re.compile(r"[A-Za-z0-9._~%+=-]+")
 RELEASE = re.compile(r"/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/releases/download/[^/]+/[^/]+")
+ATTACHMENT = re.compile(r"/user-attachments/files/[0-9]+/[^/]+")
 # Release download and attachment hosts serve signed, short-lived redirect targets.
 CDN_HOSTS = {
     "release-assets.githubusercontent.com": "github-production-",
@@ -69,7 +70,7 @@ def check_url(url, role):
     if (not path.startswith("/") or re.search(r"%(2[ef]|5c)", path, re.IGNORECASE)
             or any(not SEGMENT.fullmatch(segment) or segment in (".", "..") for segment in segments)):
         raise ValueError("URL path contains unexpected segments")
-    if host == "github.com" and not parts.query and RELEASE.fullmatch(path):
+    if host == "github.com" and not parts.query and (RELEASE.fullmatch(path) or ATTACHMENT.fullmatch(path)):
         return url
     if host == "raw.githubusercontent.com" and role == MANIFEST and not parts.query:
         if len(segments) >= 4 and segments[-1].endswith(".json"):
@@ -119,6 +120,7 @@ class Budget:
 def download(url, role, limit, expected, sink, transport, budget):
     """Stream url into sink, bounded by limit and budget, and require the exact SHA-256 expected."""
     check_url(url, role)
+    budget.take(0)
     request = urllib.request.Request(url, headers={"User-Agent": "slither-sim-evidence", "Accept-Encoding": "identity"})
     digest = hashlib.sha256()
     size = 0
@@ -129,7 +131,10 @@ def download(url, role, limit, expected, sink, transport, budget):
             length = response.headers.get("Content-Length")
             if length is not None and (not length.isdigit() or int(length) > limit):
                 raise ValueError(f"download exceeds {limit} bytes")
-            while chunk := response.read(CHUNK):
+            # HTTPResponse.read(n) can wait to fill n across many socket reads.
+            # read1 returns after one buffered read so the deadline is revisited.
+            read = getattr(response, "read1", response.read)
+            while chunk := read(CHUNK):
                 size += len(chunk)
                 if size > limit:
                     raise ValueError(f"download exceeds {limit} bytes")

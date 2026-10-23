@@ -152,12 +152,15 @@ def _summarize_bundle(path, expected_sha, metrics):
             identities.append({key: capture[key] for key in ("archiveSha256", "payloadSha256")})
             identities[-1].update({key: provenance[key] for key in ("captureId", "captureBatchId")})
             profiles.append(dict(collector=provenance["collectorSha256"],
+                                 # Endpoint/nickname identify acquisition, while
+                                 # origin, size targets and controls can change it.
+                                 options={k: v for k, v in provenance["options"].items()
+                                          if k not in {"server", "nick"}},
                                  setup=capture["setupSignatures"],
                                  framing=sorted({e["framing"] for e in report["connections"] if e["wireVersion"] == 19})))
             intervals.append(dict(server=capture["header"]["server"], start=capture["wallStartMs"], end=capture["wallEndMs"]))
         capture_plan = dict(plan["capture"])
         capture_plan.pop("server")
-        capture_plan.pop("origin", None)
         profile = dict(capture=capture_plan, dataOrigin=plan["dataOrigin"],
                        kind=plan["kind"], acquisition=profiles[0])
         if any(p != profiles[0] for p in profiles):

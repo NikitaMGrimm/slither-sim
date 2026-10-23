@@ -202,7 +202,8 @@ The tool verifies every bundle, recomputes capture audits and packet summaries
 with this checkout's tools, and records their hashes. Bundled scripts/analysis
 are never executed. Duplicate archives, payloads or capture/batch IDs, overlapping
 same-server acquisitions, and changed collector/setup/scenario/origin/framing
-make cohorts incomparable. Match other conditions in the declared design;
+make cohorts incomparable. Recorded size/control options are compared too
+(endpoint and nickname excluded). Match other conditions in the declared design;
 metadata cannot remove hidden population, behavior or network confounding.
 
 Available scalar summaries are combined `M`/`V` server-gap medians, leaderboard
@@ -217,7 +218,7 @@ Two-sided label-permutation tests compare the batch scalar means, enumerating
 all labelings when affordable or using fixed-seed random permutations with the
 conservative `(extreme+1)/(draws+1)` estimate. Holm adjustment includes every
 declared metric, assigning untestable metrics p=1. A signal needs both adjusted
-p below `alpha` and the declared minimum absolute mean shift. These choices
+p at or below `alpha` and the declared minimum absolute mean shift. These choices
 follow standard [permutation-test conventions](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html);
 they do not establish exchangeability or sensitivity to every distribution change.
 

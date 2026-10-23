@@ -141,6 +141,36 @@ class ComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SHA-256"):
             ce.summarize_bundle(bundle, "0" * 64, submission()["metrics"])
 
+    def test_verified_bundles_keep_origin_and_recorded_size_control_options(self):
+        bundles = []
+        for index, (origin, segments) in enumerate((("http://localhost:8080", 6),
+                                                   ("http://localhost:8081", 6),
+                                                   ("http://localhost:8080", 100))):
+            helper = evidence_fixture.EvidenceTests()
+            helper.setUp()
+            self.addCleanup(helper.doCleanups)
+            # Create a new frozen study instead of rewriting an existing plan.
+            helper.plan["capture"]["origin"] = origin
+            helper.plan_source.write_text(json.dumps(helper.plan), encoding="utf-8")
+            helper.study = evidence.create_study(helper.plan_source, helper.directory / "with-origin")
+            helper.base["planSha256"] = evidence.sha256((helper.study / "plan.json").read_bytes())
+            helper.complete()
+            def edit(header):
+                header["wall"] += index * 10000
+                header["captureProvenance"]["options"].update(origin=origin, movementMinSegments=segments)
+            helper.rewrite_capture_header(edit)
+            bundle = helper.directory / "cohort.tar.gz"
+            evidence.package_study(helper.study, bundle)
+            bundles.append((bundle, ce.pc.sha256(bundle)))
+        for bundle, digest in bundles[1:]:
+            value = submission()
+            value["baseline"][0]["sha256"] = bundles[0][1]
+            value["candidate"][0]["sha256"] = digest
+            resolved = {value["baseline"][0]["source"]: bundles[0][0], value["candidate"][0]["source"]: bundle}
+            result = ce.compare_submission(value, resolved, submission_sha256="b" * 64)
+            self.assertEqual(result["status"], "incomparable")
+            self.assertIn("collector_setup_scenario_origin_or_framing_changed", result["reasons"])
+
     def test_complete_capture_to_bundle_to_batch_comparison_detects_synthetic_change(self):
         # Independent synthetic invocations, not actual server evidence. Unlike
         # the scalar unit tests above, every value here is decoded from raw j.
