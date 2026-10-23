@@ -272,7 +272,7 @@ struct Connection {
     /// Headers difference quantized absolute times, so rounding never drifts.
     setup_at: Option<f64>,
     header_ms: u64,
-    snakes: BTreeMap<usize, KnownSnake>,
+    snakes: KnownSnakes,
     food: KnownSectors,
     food_interest: SectorInterest,
     prey: BTreeMap<u16, KnownPrey>,
@@ -1345,7 +1345,7 @@ impl SimulatorBackend {
         for i in order {
             let snake = &world.snakes[i];
             let life = self.slots[i].life;
-            let wanted = physics::quantize_heading(self.slots[i].control.heading);
+            let control = self.slots[i].control.heading;
             let eligible = snake.alive && (i == slot || covered(head, snake, bounds[i], vision));
             let own = i == slot;
             let id = i as u16;
@@ -1354,6 +1354,7 @@ impl SimulatorBackend {
             let known = connection.snakes.get_mut(&i);
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
+                    let wanted = physics::quantize_heading(control);
                     changes(&mut packets, own, id, known, snake, wanted, profile)?;
                 }
                 (Some(known), false) => {
@@ -1363,6 +1364,7 @@ impl SimulatorBackend {
                 }
                 (None, false) => {}
                 (known, true) => {
+                    let wanted = physics::quantize_heading(control);
                     if known.is_some() {
                         packets.push(encode::removal(id, true));
                     }
@@ -1727,6 +1729,27 @@ impl KnownSnake {
             fam: encode::fam_u24(snake.fam),
             kills: snake.kills,
         })
+    }
+}
+
+/// What one connection has been told about each snake slot.
+#[derive(Clone, Debug, Default)]
+struct KnownSnakes(Vec<Option<KnownSnake>>);
+impl KnownSnakes {
+    fn contains_key(&self, slot: &usize) -> bool {
+        self.0.get(*slot).is_some_and(Option::is_some)
+    }
+    fn get_mut(&mut self, slot: &usize) -> Option<&mut KnownSnake> {
+        self.0.get_mut(*slot)?.as_mut()
+    }
+    fn remove(&mut self, slot: &usize) -> Option<KnownSnake> {
+        self.0.get_mut(*slot)?.take()
+    }
+    fn insert(&mut self, slot: usize, known: KnownSnake) {
+        if self.0.len() <= slot {
+            self.0.resize(slot + 1, None);
+        }
+        self.0[slot] = Some(known);
     }
 }
 
