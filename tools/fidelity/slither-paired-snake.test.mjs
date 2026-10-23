@@ -131,6 +131,13 @@ test('stale own or paired reference skips heading delivery despite fresh non-pos
     assert.equal(a.sent.filter(bytes => bytes.length === 1 && bytes[0] <= 250).length, 0);
     assert.equal(events.find(e => e.event === 'paired-snake-control-skipped').reason, 'own_anchor_stale');
     assert.equal(a.bot.boost, false);
+    a.me.t = a.bot.lastReceivedAt = 10025;
+    state.update(10025, poses('x', 1, 600, { peerVisible: false }), worlds());
+    assert.equal(state.phase, 'rendezvous');
+    assert.equal(state.reason, null);
+    a.bot.tick(10025);
+    assert.ok(a.sent.some(bytes => bytes.length === 1 && bytes[0] <= 250),
+      'fresh recovery resumes rendezvous controls without joining old endpoints');
   }
 });
 

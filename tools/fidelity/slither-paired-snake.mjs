@@ -130,6 +130,7 @@ export class PairSnakeState {
       this.reset(now, 'own_anchor_stale');
       this.snapshots = snapshots; return;
     }
+    if (this.reason === 'own_anchor_stale') this.reason = null;
     const identities = snapshots.map((s, i) => `${i}/${s.life}/${s.id}`);
     if (this.identities && identities.some((id, i) => id !== this.identities[i]))
       this.reset(now, 'pair_identity_changed');
