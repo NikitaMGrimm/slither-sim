@@ -438,6 +438,8 @@ pub struct SimulatorBackend {
     food_sectors: Vec<Option<Arc<SectorFood>>>,
     /// Sectors listed at the last broadcast.
     listed: Vec<u16>,
+    /// Scratch sector-to-bucket table, all `u32::MAX` between broadcasts.
+    food_buckets: Vec<u32>,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
@@ -475,6 +477,7 @@ impl SimulatorBackend {
             prey_eaters: BTreeMap::new(),
             food_sectors: Vec::new(),
             listed: Vec::new(),
+            food_buckets: Vec::new(),
             slots: Vec::with_capacity(config.agents),
             world,
             config,
@@ -1143,7 +1146,9 @@ impl SimulatorBackend {
     /// List the food of every sector a connection subscribes to. Each wire cell
     /// shows its first pellet in world order.
     fn sync_food_sectors(&mut self) -> Result<(), String> {
-        let mut buckets = vec![u32::MAX; 1 << 16];
+        // Taken so an early error drops a partly filled table.
+        let mut buckets = std::mem::take(&mut self.food_buckets);
+        buckets.resize(1 << 16, u32::MAX);
         let mut sectors = Vec::new();
         for slot in self.slots.iter().filter(|slot| slot.connection.setup) {
             for &sector in slot.connection.food_interest.subscribed() {
@@ -1215,6 +1220,10 @@ impl SimulatorBackend {
                 *listing = Some(Arc::new(SectorFood(run.clone())));
             }
         }
+        for &index in &sectors {
+            buckets[usize::from(index)] = u32::MAX;
+        }
+        self.food_buckets = buckets;
         self.listed = sectors;
         Ok(())
     }
