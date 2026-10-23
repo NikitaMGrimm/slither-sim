@@ -16,10 +16,12 @@ official preset determined solely by bot count.
 Snake, prey and food subscriptions are separate questions. For snakes and
 prey, the next step is route feasibility, not a new rule. All 645 deduplicated
 trials in the latest direct-snake [route pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7)
-ended on a stale own anchor with zero endpoint witnesses. The current
+ended on a stale own anchor with zero endpoint witnesses. That live attempt used
+the earlier collector, which reset trials once an own anchor exceeded 150 ms.
+The current
 [controlled-route collector](research-workflow.md#controlled-snake-and-food-routes)
-instead pauses through bounded staleness; offline tests cover that pause, but no
-live route has used it yet. A live route with completed legs should precede
+instead pauses through bounded staleness; offline tests cover that pause, not
+live route completion. A live route with completed legs should precede
 paired present/absent crossings with held-out legs. Ready collection software and
 completed acquisitions do not establish a rule; zero qualified exposures can
 neither select nor reject one.
