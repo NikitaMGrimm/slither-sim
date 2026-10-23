@@ -12,7 +12,7 @@ fn tiny_world(enabled: bool, food_count: usize, rate: f64) -> Simulator {
                 enabled,
                 ..AmbientFoodConfig::default()
             },
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap()
@@ -136,7 +136,7 @@ fn rejected_candidates_consume_rng_and_refill_interval_without_retries() {
 
 #[test]
 fn tuning_validation_and_config_round_trip() {
-    let mut config = Config::default();
+    let mut config = Config::sandbox();
     for cell_size in [0.0, -1.0, f64::NAN, f64::INFINITY] {
         config.ambient_food.cell_size = cell_size;
         assert!(Simulator::new(1, config.clone()).is_err());
@@ -156,7 +156,7 @@ fn tuning_validation_and_config_round_trip() {
     }
     assert_eq!(world.food.len(), 4);
 
-    let mut old = serde_json::to_value(Config::default()).unwrap();
+    let mut old = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("ambientFood");
     let restored: Config = serde_json::from_value(old).unwrap();
     assert!(restored.ambient_food.enabled);

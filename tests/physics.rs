@@ -103,7 +103,7 @@ fn scene() -> Simulator {
         Config {
             food_count: 0,
             radius: 10000.0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -416,7 +416,7 @@ fn collision_death_kill_and_food_ties() {
         1,
         Config {
             food_count: 0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();

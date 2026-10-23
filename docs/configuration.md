@@ -59,7 +59,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
-| `world` | `Config::default()` | World settings below. |
+| `world` | `Config::official(1)` | World settings below. |
 | `agents` | `1` | Slots, 1–128; overridden by the host. |
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, 1–1000. |
@@ -82,11 +82,11 @@ only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
-| `radius` | `1000` | Positive finite arena radius. |
-| `dynamicRadius` | `false` | Enable the provisional population-driven boundary model. |
+| `radius` | `670` | Positive finite arena radius. |
+| `dynamicRadius` | `true` | Enable the provisional population-driven boundary model. |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
-| `foodCount` | `350` | Ambient food target/startup placement attempts, at most 100,000. Admission limits can reduce placement. |
-| `ambientReplenishPerSecond` | `5` | Ambient placement attempts/s below target, 0–10,000. |
+| `foodCount` | `109` | Ambient food target/startup placement attempts, at most 100,000. Admission limits can reduce placement. |
+| `ambientReplenishPerSecond` | `≈1.60456356` | Ambient placement attempts/s below target, 0–10,000. |
 | `dt` | `0.007` | Positive finite physics step, at most 0.032 s. |
 | `foodIndex` | `true` | Accelerate food lookup; disable for differential debugging. |
 | `emitBoostFood` | `true` | Emit boost pellets; disabling preserves boost cost and random-stream consumption. |
@@ -100,35 +100,57 @@ only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 | `boostFood` | Defaults below | Boost-food admission limit. |
 
 `radiusUpdates` sets radius at each supplied sample, overriding the model at that
-tick. For recorded replay, leave `dynamicRadius` false to avoid model changes
+tick. For recorded replay, set `dynamicRadius` false to avoid model changes
 between samples. See [rules and evidence limits](server-rules.md).
 
-### The two Rust configuration helpers
+The world and prey defaults are `Config::official(1)`.
 
-Both return the same `Config` type:
+### Official and sandbox
 
-| Helper | Result |
+Both Rust constructors return the same `Config` type:
+
+| Constructor | Result |
 | --- | --- |
-| `Config::default()` | Compact fixed arena: radius 1000, food target 350, 5 ambient attempts/s. |
-| `Config::realistic(n)` | Starts at radius `670 × sqrt(max(n, 1))`, enables dynamic radius, and scales food target/rate to about 7 pellets and 0.1024 attempts/s per 300×300 sector. Other fields keep their defaults. |
+| `Config::official(n)` | Radius `r = 670 × sqrt(max(n, 1))` with dynamic radius; food target `floor(7πr² / 90,000)` and refill `0.1024πr² / 90,000` attempts/s (per 300×300 sector: about 7 pellets, 0.1024 attempts/s); prey target `max(1, round(πr² / 10,000,000))`. |
+| `Config::sandbox()` | `Config::official(1)` with radius 1000, fixed boundary, food target 350, 5 ambient attempts/s and no prey. |
 
-The second helper is a provisional model, not a verified official-server preset.
-It does not change ping, broadcasts or decision timing. Those belong to
-`SimulationConfig`, which wraps either world configuration:
+`Config::default()`, omitted JSON fields, `SimulationConfig` and `host` use
+`Config::official(1)`. It is the best current approximation, not an exact
+official replica. It keeps the provisional kiosk penalty, food cell limits, rim
+sliding, retained boost speed and radius model; the sandbox shares them. No model
+coefficients were retuned. The [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
+records the evidence and limits.
+
+`n` initializes radius, food and prey targets; it does not spawn snakes. With
+dynamic radius, the living population then drives the radius (unoccupied remote
+slots do not count); food and prey targets are not rescaled. One snake is a
+deliberately small start, not a typical official lobby; request
+`Config::official(n)` or set world fields explicitly for larger scenes.
+
+The prey density of one per 10 million square units is a working assumption,
+not a calibrated global population. Received density near recorded recipients,
+about 0.04–0.18 per million square units, is a lead rather than a census; the
+official prey population remains unresolved.
+
+Neither constructor changes ping, broadcasts or decision timing. Those belong to
+`SimulationConfig`, which wraps either world:
 
 ```rust
 use slither_sim::{Config, client::{HostConfig, SimulationConfig}};
 
 let simulation = SimulationConfig {
-    world: Config::default(), // Or Config::realistic(8).
+    world: Config::official(8), // Or Config::sandbox().
     ..Default::default()
 };
 let host = HostConfig { simulation, ..Default::default() };
 ```
 
-There is no named preset selector in JSON or the CLI. `host` defaults to
-`Config::default()`. With dynamic radius enabled, only living snakes count;
-unoccupied remote slots do not.
+There is no named preset selector in JSON or the CLI. For the compact sandbox,
+set its fields explicitly:
+
+```json
+{"radius": 1000, "dynamicRadius": false, "foodCount": 350, "ambientReplenishPerSecond": 5, "prey": {"count": 0}}
+```
 
 ### Prey
 
@@ -141,7 +163,7 @@ use an 8 ms reference. These conversion scales are separate from `world.dt`.
 
 | Field under `prey` | Default | Meaning |
 | --- | --- | --- |
-| `count` | `0` | Target population, at most 10,000; zero disables initial spawning/replenishment. |
+| `count` | `1` | Target population, at most 10,000; zero disables initial spawning/replenishment. |
 | `cruiseSpeed` | `118.75` | Roaming speed (`3.8 / 0.032`). |
 | `escapeSpeed` | `192.28125` | Flight target near a minimum-speed snake (`6.153 / 0.032`). |
 | `sprintSpeed` | `343.65625` | Flight target near a full-boost snake (`10.997 / 0.032`). |

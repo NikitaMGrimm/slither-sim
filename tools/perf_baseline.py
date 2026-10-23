@@ -21,6 +21,9 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ("step-default", "step-food", "step-body", "observe", "portable", "protocol")
 COMMAND_TIMEOUT_SECONDS = 30
+# Pin the historical compact workload independently of future gameplay defaults.
+SANDBOX_WORLD = {"radius": 1000, "dynamicRadius": False, "foodCount": 350,
+                 "ambientReplenishPerSecond": 5, "prey": {"count": 0}}
 
 
 def digest(path):
@@ -209,7 +212,8 @@ def e2e(executable, steps, hosted, directory):
             host_error = (directory / "host-stderr.txt").open("wb")
             config = directory / "host-config.json"
             config.write_text(json.dumps({"bind": "127.0.0.1:0", "seed": 7,
-                                          "maxClients": 1, "bots": 4}), encoding="utf-8")
+                                          "maxClients": 1, "bots": 4,
+                                          "simulation": {"world": SANDBOX_WORLD}}), encoding="utf-8")
             host = subprocess.Popen([str(executable), "host", "--config", str(config)],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             host_reader = Lines(host.stderr)
@@ -219,7 +223,8 @@ def e2e(executable, steps, hosted, directory):
                 raise RuntimeError(announcement)
             request = {"op": "network", "config": {"url": announcement.split(" on ", 1)[1]}}
         else:
-            request = {"op": "simulation", "seed": 7, "config": {"agents": 8}}
+            request = {"op": "simulation", "seed": 7,
+                       "config": {"agents": 8, "world": SANDBOX_WORLD}}
         client_error = (directory / "client-stderr.txt").open("wb")
         process = subprocess.Popen([str(executable), "client"], stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=client_error, bufsize=0)

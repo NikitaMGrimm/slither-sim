@@ -17,6 +17,31 @@ import perf_compare
 
 
 class ProcessFailures(unittest.TestCase):
+    def test_e2e_workloads_pin_the_historical_world_without_launching_children(self):
+        expected = {"radius": 1000, "dynamicRadius": False, "foodCount": 350,
+                    "ambientReplenishPerSecond": 5, "prey": {"count": 0}}
+        for hosted in (False, True):
+            with self.subTest(hosted=hosted), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                client = Mock(stdin=Mock(), stdout=io.BytesIO(), stderr=None, returncode=0)
+                host = Mock(stdin=None, stdout=None, stderr=io.BytesIO())
+                host.poll.return_value = None
+                replies = [json.dumps({"protocol": "slither-client-json-v1", "result": {}}).encode(),
+                           json.dumps({"protocol": "slither-client-json-v1",
+                                       "result": {"frame": {"status": "waiting"}}}).encode()]
+                if hosted:
+                    replies.insert(0, b"Listening on ws://127.0.0.1:1/slither")
+                with patch.object(perf_baseline.subprocess, "Popen", side_effect=[host, client] if hosted else [client]), patch.object(
+                        perf_baseline.Lines, "read", side_effect=replies), patch.object(
+                        perf_baseline, "stop"), patch.object(perf_baseline, "process_metrics", return_value={}):
+                    perf_baseline.e2e(Path(sys.executable), 1, hosted, root)
+                request = json.loads(client.stdin.write.call_args_list[0].args[0])
+                if hosted:
+                    world = json.loads((root / "host-config.json").read_text())["simulation"]["world"]
+                else:
+                    world = request["config"]["world"]
+                self.assertEqual(world, expected)
+
     def test_native_and_trace_close_handles_after_stop_or_pipe_failure(self):
         class CloseFailure(io.BytesIO):
             def close(self):

@@ -90,7 +90,7 @@ impl BoostFoodConfig {
 pub struct Config {
     /// Boundary radius; the starting radius when `dynamicRadius` is set.
     pub radius: f64,
-    /// Enable the provisional population-driven boundary model (see `Config::realistic`).
+    /// Enable the population-driven boundary model used by [`Config::official`].
     pub dynamic_radius: bool,
     pub vision: f64,
     /// Global ambient pellet target; boost and death do not count against it.
@@ -121,20 +121,39 @@ pub struct Config {
 }
 impl Default for Config {
     fn default() -> Self {
+        Self::official(1)
+    }
+}
+/// Protocol sector area used by the modeled official ecology below.
+const SECTOR_AREA: f64 = 300.0 * 300.0;
+impl Config {
+    /// Best-current official-server approximation, initialized for `snakes`.
+    /// Includes provisional models; this is not an identified server preset.
+    /// Radius and food use the existing population model. Prey uses an explicit
+    /// working estimate of one per ten million square units, with at least one.
+    /// Received prey density does not establish a global census; see
+    /// docs/configuration.md#official-and-sandbox.
+    pub fn official(snakes: usize) -> Self {
+        let radius = population_radius(snakes);
+        let area = PI * radius * radius;
+        let sectors = area / SECTOR_AREA;
         Self {
-            radius: 1000.0,
-            dynamic_radius: false,
+            radius,
+            dynamic_radius: true,
             // A finite receipt approximation: the paired visibility census
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
             // Exact server entry/exit geometry and size scaling remain unknown.
             vision: 1500.0,
-            food_count: 350,
-            ambient_replenish_per_second: 5.0,
+            food_count: (7.0 * sectors) as usize,
+            ambient_replenish_per_second: 0.1024 * sectors,
             dt: LOOP_SECONDS,
             food_index: true,
             emit_boost_food: true,
             speed_model: SpeedModel::default(),
-            prey: PreyConfig::default(),
+            prey: PreyConfig {
+                count: (area / 10_000_000.0).round().max(1.0) as usize,
+                ..PreyConfig::default()
+            },
             radius_updates: vec![],
             boundary_mode: crate::BoundaryMode::default(),
             kiosk: KioskConfig::default(),
@@ -143,23 +162,22 @@ impl Default for Config {
             boost_food: BoostFoodConfig::default(),
         }
     }
-}
-/// Protocol sector area used to scale the provisional ecology helper below.
-const SECTOR_AREA: f64 = 300.0 * 300.0;
-impl Config {
-    /// Provisional population-scaled arena and food ecology, not an official preset.
-    /// Received food mixes origins and subscriptions; it does not identify global
-    /// startup density or refill attempts. Prey stays disabled until configured.
-    /// See docs/host-fidelity.md#ecology-models for evidence and counterexamples.
-    pub fn realistic(snakes: usize) -> Self {
-        let radius = population_radius(snakes);
-        let sectors = PI * radius * radius / SECTOR_AREA;
+
+    /// Compact fixed-size scene using the official mechanics and model settings.
+    /// Population-dependent radius changes are disabled; food and prey counts are
+    /// fixed for inexpensive examples and controlled tests. Prey can be enabled
+    /// explicitly with `prey.count`.
+    pub fn sandbox() -> Self {
         Self {
-            radius,
-            dynamic_radius: true,
-            food_count: (7.0 * sectors) as usize,
-            ambient_replenish_per_second: 0.1024 * sectors,
-            ..Self::default()
+            radius: 1000.0,
+            dynamic_radius: false,
+            food_count: 350,
+            ambient_replenish_per_second: 5.0,
+            prey: PreyConfig {
+                count: 0,
+                ..PreyConfig::default()
+            },
+            ..Self::official(1)
         }
     }
     pub fn validate(&self) -> Result<(), String> {
@@ -1345,7 +1363,7 @@ mod death_food_density_tests {
                     enabled,
                     ..DeathFoodConfig::default()
                 },
-                ..Config::default()
+                ..Config::sandbox()
             },
         )
         .unwrap();

@@ -49,7 +49,9 @@ pub struct PreyConfig {
 impl Default for PreyConfig {
     fn default() -> Self {
         Self {
-            count: 0,
+            // One moving edible entity even in the smallest official world.
+            // Config::official scales its initial target; sandbox opts out.
+            count: 1,
             cruise_speed: 3.8 / SPEED_UNIT_SECONDS,
             escape_speed: 6.153 / SPEED_UNIT_SECONDS,
             sprint_speed: 10.997 / SPEED_UNIT_SECONDS,

@@ -4,8 +4,10 @@ Mechanics combine protocol-19 measurements, client constants and explicit models
 The official server is closed source; packet agreement does not establish its
 full algorithms.
 
-`Config::default()` uses a 1,000-unit arena. `Config::realistic(n)` scales arena
-and ecology using a provisional population model.
+`Config::default()` is `Config::official(1)`, the best current approximation
+including the provisional models below; `Config::sandbox()` is a compact fixed
+arena with the same mechanics. See [official and sandbox](configuration.md#official-and-sandbox)
+and the [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md).
 
 ## Packaged regression evidence
 
@@ -61,7 +63,8 @@ state and renderer prediction distinct when interpreting a regression.
   this unverified penalty should not affect trajectories.
 - Each 75-unit food cell admits up to 2 ambient, 9 boost and 22 death pellets.
   Rejected boost emission still spends mass; these limits remain inferred.
-- Dynamic radius is optional; `radiusUpdates` traces override the population model.
+- Dynamic radius is on by default; `radiusUpdates` traces override the population model.
+- The default prey target is a working density assumption, not a measured census.
 - Sliding and hard-boundary modes are available.
 - Prey behavior includes an outward replay mode whose official trigger is unknown.
 

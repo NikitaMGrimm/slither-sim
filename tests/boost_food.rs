@@ -7,7 +7,7 @@ fn scene(snakes: usize) -> Simulator {
             food_count: 0,
             ambient_replenish_per_second: 0.0,
             radius: 10_000.0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -119,7 +119,7 @@ fn configurable_threshold_public_edits_and_settings() {
     }
     assert_eq!(world.food.len(), 5);
 
-    let mut config = Config::default();
+    let mut config = Config::sandbox();
     for cell_size in [0.0, -1.0, f64::NAN, f64::INFINITY] {
         config.boost_food.cell_size = cell_size;
         assert!(Simulator::new(1, config.clone()).is_err());
@@ -128,7 +128,7 @@ fn configurable_threshold_public_edits_and_settings() {
     config.boost_food.max_per_cell = 0;
     assert!(Simulator::new(1, config).is_err());
 
-    let mut old = serde_json::to_value(Config::default()).unwrap();
+    let mut old = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("boostFood");
     let restored: Config = serde_json::from_value(old).unwrap();
     assert!(restored.boost_food.enabled);

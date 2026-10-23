@@ -71,7 +71,10 @@ impl Drop for Running {
 }
 
 fn config(max_clients: usize, bots: usize) -> HostConfig {
-    let mut simulation = SimulationConfig::default();
+    let mut simulation = SimulationConfig {
+        world: slither_sim::Config::sandbox(),
+        ..Default::default()
+    };
     // Every snake is covered, so all players receive each other.
     simulation.world.vision = 3000.;
     HostConfig {
