@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -173,6 +174,28 @@ test same_name ... ok
             self.assertEqual(row["baseline"], 100)
             self.assertEqual(row["candidate"], 100)
             self.assertEqual(row["ratio"], row["candidate"] / row["baseline"])
+
+    def test_workflow_paths_cover_every_measured_input_and_skip_documentation(self):
+        root = pr_report.ROOT
+        workflow = (root / ".github/workflows/pr-report.yml").read_text(encoding="utf-8")
+        block = re.search(r"^    paths:\n((?:      - .+\n)+)", workflow, re.MULTILINE)[1]
+        patterns = [line.removeprefix("      - ") for line in block.splitlines()]
+        # Only GitHub's * (one path segment) and ** (any depth) are used here.
+        self.assertFalse([p for p in patterns if re.search(r"[?\[\]!+]", p)])
+        expressions = [re.compile(re.escape(p).replace(r"\*\*", ".*").replace(r"\*", "[^/]*")) for p in patterns]
+        matched = lambda name: any(e.fullmatch(name) for e in expressions)
+        measured = [p.relative_to(root).as_posix() for directory in ("src", "tests/fixtures")
+                    for p in (root / directory).rglob("*") if p.is_file()]
+        measured += [*pr_report.HARNESS, "Cargo.toml", "Cargo.lock", ".github/workflows/pr-report.yml",
+                     *(f"tools/{name}.py" for name in ("pr_report", "perf_baseline", "perf_compare")),
+                     # Cargo and rustup read these if added; none exist yet.
+                     "build.rs", ".cargo/config.toml", "rust-toolchain", "rust-toolchain.toml"]
+        self.assertEqual([name for name in measured if not matched(name)], [])
+        # The publisher always runs default-branch code, so PR edits to it are not measured.
+        unmeasured = ["README.md", "CHANGELOG.md", "docs/pr-reports.md", "research/README.md",
+                      "tests/spawn.rs", "examples/bot.mjs", "tools/pr_report_comment.cjs",
+                      ".github/workflows/pr-report-comment.yml", ".github/workflows/checks.yml"]
+        self.assertEqual([name for name in unmeasured if matched(name)], [])
 
     def test_publisher_identity_and_staleness_regressions(self):
         subprocess.run(["node", "--test", str(Path(__file__).with_name("pr_report_comment.test.cjs"))], check=True)

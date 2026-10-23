@@ -1,9 +1,29 @@
 # Automatic PR comparisons
 
-Every opened, updated, reopened or ready-for-review PR runs a performance and
-regression comparison, including draft PRs and forks. One Actions comment is
-updated in place. These measurements are advisory; the report workflow is
-separate from `Required checks`, and numerical regressions do not block merging.
+A PR that changes a measured input runs a performance and regression comparison
+when it is opened, updated or reopened, including draft PRs and forks. One
+Actions comment is updated in place. These measurements are advisory; the report
+workflow is separate from `Required checks`, and numerical regressions do not
+block merging.
+
+Measured inputs are the simulator sources, Cargo manifests and build
+configuration, the two measurement examples, the selected regression tests and
+fixtures, and the collector scripts and workflow. The `paths` list in
+`pr-report.yml` is authoritative; `tools/test_pr_report.py` checks it against the
+collector's inputs. A PR that changes none of them, such as documentation,
+research records, other tests or other tools, starts no comparison run and gets
+no comment; its correctness checks still run. With no run, the publisher has
+nothing to report, so a skipped PR is not confused with a failed or missing
+artifact. Keep `Measurements` out of required checks: GitHub would leave a
+required but filtered workflow waiting on every skipped PR.
+
+GitHub matches the filter against the whole PR diff. Once a PR changes a measured
+input, every later push is measured, including documentation-only pushes, so the
+comment follows the current head and target. If a later push reverts every
+measured change, no new run starts and the existing comment keeps its recorded
+PR head. GitHub's [path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#git-diff-comparisons)
+consider only the first 3,000 files of a diff, so a larger PR can go unmeasured.
+Drafts are measured on every push, so marking one ready does not repeat the run.
 
 Each PR update measures the merge commit against its first parent (the exact
 target revision used for that merge). The report records that pair and the PR

@@ -1,8 +1,30 @@
 name: PR comparison
 
 on:
+  # Drafts are measured, so ready_for_review would repeat the same head.
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
+    # Inputs that can change a measured binary, test or fixture result, or the
+    # collector itself. GitHub matches the whole PR diff, so once a PR touches
+    # one of these every later push is measured. Other PRs create no run, so the
+    # publisher never sees them. tools/test_pr_report.py checks this list.
+    paths:
+      - src/**
+      - Cargo.toml
+      - Cargo.lock
+      - build.rs
+      - .cargo/**
+      - rust-toolchain
+      - rust-toolchain.toml
+      - examples/perf_baseline.rs
+      - examples/fidelity_metrics.rs
+      - tests/movement_turns.rs
+      - tests/physics.rs
+      - tests/fixtures/**
+      - tools/pr_report.py
+      - tools/perf_baseline.py
+      - tools/perf_compare.py
+      - .github/workflows/pr-report.yml
 
 permissions:
   contents: read

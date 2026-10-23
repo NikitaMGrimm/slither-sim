@@ -21,6 +21,8 @@ from perf_baseline import CASES, capture_trace, digest
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ("movement_turns", "physics")
+# PR-pinned harness copied into the baseline; tests/fixtures is copied too.
+HARNESS = ("examples/perf_baseline.rs", "examples/fidelity_metrics.rs", *(f"tests/{name}.rs" for name in TESTS))
 MARKER = "<!-- slither-report-preview -->"
 
 
@@ -238,8 +240,7 @@ def collect(output, head):
     work.mkdir()
     baseline = work / "base"
     subprocess.run(["git", "worktree", "add", "--detach", str(baseline), base], cwd=ROOT, check=True, timeout=30)
-    inputs = [ROOT / "examples/perf_baseline.rs", ROOT / "examples/fidelity_metrics.rs",
-              *(ROOT / "tests" / f"{name}.rs" for name in TESTS), *sorted((ROOT / "tests/fixtures").rglob("*"))]
+    inputs = [*(ROOT / name for name in HARNESS), *sorted((ROOT / "tests/fixtures").rglob("*"))]
     inputs = [p for p in inputs if p.is_file()]
     report["inputs"] = {str(p.relative_to(ROOT)).replace("\\", "/"): digest(p) for p in inputs}
     report["suite_changes"] = [name for name, sha in report["inputs"].items()
