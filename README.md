@@ -99,6 +99,7 @@ See [configuration](docs/configuration.md) for each default and
 - [Provenance](docs/provenance.md): source hashes and adaptations.
 - [Verification](docs/verification.md): completed checks and coverage limits.
 - [Performance](docs/performance.md): reproducible release workloads and measured costs.
+- [PR comparisons](docs/pr-reports.md): automatic performance and regression tables.
 - [Releasing](docs/releasing.md): version tags and trusted publishing.
 
 Report bugs in [Issues](https://github.com/NikitaMGrimm/slither-sim/issues), with

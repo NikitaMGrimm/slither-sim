@@ -165,7 +165,8 @@ def capture_trace(executable, case, iterations, directory):
         size = 0
         deadline = time.perf_counter() + 120
         with (directory / f"{case}.jsonl.gz").open("wb") as raw:
-            with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as output:
+            # Parity hashes uncompressed bytes; favor faster capture over archive size.
+            with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1, mtime=0) as output:
                 while True:
                     try:
                         line = reader.read(deadline) + b"\n"
