@@ -128,6 +128,7 @@ mod retained {
         operation: Meter,
         controlled_send: Meter,
         extra_frames: Meter,
+        reconnect_frames: Meter,
         drain: Meter,
         replay: Meter,
         replay_frames: Meter,
@@ -140,6 +141,7 @@ mod retained {
                 "operation": self.operation.report(),
                 "nextFrameControlledActionSubmission": self.controlled_send.report(),
                 "additionalBackendFrames": self.extra_frames.report(),
+                "manualReconnectFrames": self.reconnect_frames.report(),
                 "drainAllSlotRecords": self.drain.report(),
                 "applyAllSlotRecords": self.replay.report(),
                 "materializeAllReplayFrames": self.replay_frames.report(),
@@ -626,7 +628,7 @@ mod retained {
                         .reconnect
                         .call(!args.trace, || run.backend.reconnect_slot(0))?;
                     run.current = timing
-                        .extra_frames
+                        .reconnect_frames
                         .call(!args.trace, || frames(&run.backend))?;
                     run.checkpoint(&mut timing, &args, &mut out,
                         json!({"phase": "manualReconnect", "iteration": iteration, "afterDecision": decision, "slot": 0}),
