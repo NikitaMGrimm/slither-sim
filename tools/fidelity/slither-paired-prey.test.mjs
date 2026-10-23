@@ -645,10 +645,53 @@ test('CLI requires bounded duration, explicit server and fresh output', async ()
   assert.equal(parseArgs(['--out', 'fresh', '--server', '127.0.0.1:444',
     '--mode', 'crossing']).mode, 'crossing');
   assert.throws(() => parseArgs(['--out', 'a', '--out', 'b']), /repeated/);
-  await assert.rejects(recordPair({ out: 'unused', server: '127.0.0.1:444', seconds: 481 }), /1..480/);
+  for (const seconds of [0, .5, -1, 3600.1, 3601, NaN, Infinity, -Infinity, '480', null])
+    await assert.rejects(recordPair({ out: 'unused', server: '127.0.0.1:444', seconds }), /1\.\.3600/);
   await assert.rejects(recordPair({ out: 'unused', server: '127.0.0.1:0', seconds: 1 }), /invalid server/);
   await assert.rejects(recordPair({ out: 'unused', server: '127.0.0.1:444',
     mode: 'invalid' }), /mode overlap\|crossing/);
+});
+
+test('paired duration budgets preserve defaults and reach deadlines and both archives', async context => {
+  assert.equal(PAIR_PREY.defaultSeconds, 480);
+  assert.equal(PAIR_PREY.maxSeconds, 3600);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-paired-prey-duration-'));
+  const delays = [];
+  context.mock.method(Bot.prototype, 'connect', function () { this.joins = 1; });
+  context.mock.method(globalThis, 'setTimeout', (callback, delay) => {
+    delays.push(delay);
+    queueMicrotask(callback);
+    return undefined;
+  });
+  try {
+    for (const mode of ['overlap', 'crossing']) {
+      for (const seconds of [undefined, 1, 480, 481, 3600]) {
+        const out = path.join(directory, `${mode}-${seconds ?? 'default'}`);
+        const expected = seconds ?? 480;
+        const options = { out, server: '127.0.0.1:444', mode };
+        if (seconds !== undefined) {
+          const parsed = parseArgs(['--out', out, '--server', options.server,
+            '--mode', mode, '--seconds', String(seconds)]);
+          assert.equal(parsed.seconds, seconds);
+          options.seconds = parsed.seconds;
+        }
+        const result = await recordPair(options);
+        assert.deepEqual(result.map(bot => bot.joins), [1, 1]);
+        assert.equal(delays.at(-1), expected * 1000);
+        for (const index of [0, 1]) {
+          const rows = zlib.gunzipSync(fs.readFileSync(path.join(out, `bot${index}.jsonl.gz`)))
+            .toString('utf8').trim().split('\n').map(text => JSON.parse(text));
+          assert.equal(rows[0].captureProvenance.options.seconds, expected);
+          assert.equal(rows.at(-1).event, 'capture-end');
+          assert.equal(rows.at(-1).requestedSeconds, expected);
+        }
+      }
+    }
+    assert.equal(delays.length, 10);
+  } finally {
+    assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir()));
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 const crossingSample = (state, index, x, y, now) => {

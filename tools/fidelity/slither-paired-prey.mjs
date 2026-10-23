@@ -11,7 +11,9 @@ export const PAIR_PREY = Object.freeze({
   rendezvousDistance: 650, separationLimit: 1300,
   preyOffset: 450, targetHoldRadius: 80,
   staleMs: 2500, observerSampleMs: 100,
-  minArenaGap: 650, maxSeconds: 480,
+  minArenaGap: 650,
+  // Operational capture budgets, not server constants; omitted durations stay 480s.
+  defaultSeconds: 480, maxSeconds: 3600,
 });
 export const CROSSING = Object.freeze({
   // Study waypoints, not server ranges: 650 is nominally inside the 1000-unit
@@ -491,14 +493,14 @@ export function parseArgs(argv) {
   const mode = args['--mode'] ?? 'overlap', direction = validateDirection(mode, args['--direction']);
   return { out: args['--out'], server: args['--server'],
     ...(args['--origin'] ? { origin: validateOrigin(args['--origin']) } : {}),
-    seconds: Number(args['--seconds'] ?? PAIR_PREY.maxSeconds),
+    seconds: Number(args['--seconds'] ?? PAIR_PREY.defaultSeconds),
     mode, ...(direction ? { direction } : {}), ...(args['--plan'] ? { plan: args['--plan'] } : {}) };
 }
 
-export async function recordPair({ out, server, seconds = PAIR_PREY.maxSeconds, mode = 'overlap', direction, plan, origin }, signal) {
+export async function recordPair({ out, server, seconds = PAIR_PREY.defaultSeconds, mode = 'overlap', direction, plan, origin }, signal) {
   if (signal?.aborted) return [];
   if (!out || !server || !Number.isFinite(seconds) || seconds < 1 || seconds > PAIR_PREY.maxSeconds)
-    throw Error('use --out, --server ip:port and 1..480 seconds');
+    throw Error(`use --out, --server ip:port and 1..${PAIR_PREY.maxSeconds} seconds`);
   if (!['overlap', 'crossing'].includes(mode)) throw Error('use --mode overlap|crossing');
   direction = validateDirection(mode, direction);
   origin = validateOrigin(origin);

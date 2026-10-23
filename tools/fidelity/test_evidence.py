@@ -1,12 +1,16 @@
+import contextlib
 import gzip
 import hashlib
 import io
 import json
 from pathlib import Path
+import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import collect
 import evidence
 import test_capture_quality as capture_fixture
 
@@ -89,15 +93,45 @@ class EvidenceTests(unittest.TestCase):
     def test_paired_route_plan_bounds_and_applicability(self):
         good = {**self.plan["capture"], "scenario": "paired-prey", "bots": 2,
                 "mode": "crossing", "direction": "x", "seconds": 480}
-        evidence.validate({**self.plan, "capture": good}, "study-plan")
+        for seconds in (1, 480, 481, 3600):
+            with self.subTest(seconds=seconds):
+                evidence.validate({**self.plan, "capture": {**good, "seconds": seconds}}, "study-plan")
         invalid = [{**good, key: value} for key, value in (
-            ("bots", 1), ("bots", 3), ("seconds", 481), ("seconds", .5),
+            ("bots", 1), ("bots", 3), ("seconds", 3601), ("seconds", 3600.1),
+            ("seconds", 0), ("seconds", .5), ("seconds", -1), ("seconds", "480"),
             ("mode", "overlap"), ("mode", "unknown"), ("direction", "unknown"),
             ("scenario", "movement"))]
         invalid.append({k: v for k, v in good.items() if k != "mode"})
+        invalid.append({k: v for k, v in good.items() if k != "seconds"})
         for capture in invalid:
             with self.subTest(capture=capture), self.assertRaises(ValueError):
                 evidence.validate({**self.plan, "capture": capture}, "study-plan")
+
+    @patch("collect.shutil.which", return_value="node")
+    def test_paired_duration_dry_run_preserves_declared_seconds_without_launch(self, _which):
+        for seconds in (480, 3600):
+            with self.subTest(seconds=seconds):
+                plan = {**self.plan, "capture": {**self.plan["capture"],
+                    "scenario": "paired-prey", "bots": 2, "seconds": seconds,
+                    "mode": "crossing", "direction": "diagonal-positive"}}
+                source = self.directory / f"paired-{seconds}.json"
+                source.write_text(json.dumps(plan), encoding="utf-8")
+                study = evidence.create_study(source, self.directory / f"paired-{seconds}")
+                with patch.object(sys, "argv", ["collect.py", str(study), "--dry-run"]), \
+                        patch("collect.subprocess.Popen") as process, \
+                        contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(collect.main(), 0)
+                process.assert_not_called()
+                reply = json.loads(output.getvalue())
+                self.assertTrue(reply["dryRun"])
+                command = reply["command"]
+                self.assertEqual(Path(command[1]).name, "slither-paired-prey.mjs")
+                self.assertEqual(command[command.index("--seconds") + 1], str(seconds))
+                self.assertEqual(command[command.index("--mode") + 1], "crossing")
+                self.assertEqual(command[command.index("--direction") + 1], "diagonal-positive")
+                self.assertEqual(evidence.read_plan(study)["capture"]["seconds"], seconds)
+                self.assertEqual((study / "attempts.jsonl").read_bytes(), b"")
+                self.assertEqual(list((study / "raw").iterdir()), [])
 
     def test_paired_capture_audits_and_packages_the_two_member_batch(self):
         self.complete_paired()
