@@ -660,7 +660,9 @@ fn minimap_sampling_threshold_preserves_short_off_map_paths() {
         center: Point::default(),
         radius: 1.,
     };
-    for end in [1_f64.next_down(), 1., 1_f64.next_up()] {
+    for (end, expected_steps) in [(0.875, 15), (1., 16), (1_f64.next_up().next_up(), 17)] {
+        let projected = (end + 1.) * 8. / 2.;
+        assert_eq!((projected * 2.).ceil() as usize, expected_steps);
         let snakes = [edge_snake(Point { x: -1., y: 0. }, Point { x: end, y: 0. })];
         assert_eq!(
             Minimap::from_snakes(&snakes, &arena, 8),
@@ -678,4 +680,38 @@ fn minimap_sampling_threshold_preserves_short_off_map_paths() {
     );
     let marked: Vec<_> = (0..136 * 136).filter(|&i| map.cells[i] == 1).collect();
     assert_eq!(marked, (68 * 136..=68 * 136 + 68).collect::<Vec<_>>());
+}
+
+#[test]
+fn minimap_oblique_clipping_handles_nonzero_intercept() {
+    let arena = Arena {
+        center: Point::default(),
+        radius: 1.,
+    };
+    let a = Point { x: -10., y: -9.5 };
+    let b = Point { x: 10., y: 10.5 };
+    for transpose in [false, true] {
+        let axes = |p: Point| {
+            if transpose {
+                Point { x: p.y, y: p.x }
+            } else {
+                p
+            }
+        };
+        let expected: Vec<_> = (0..6)
+            .map(|x| {
+                if transpose {
+                    x * 8 + x + 2
+                } else {
+                    (x + 2) * 8 + x
+                }
+            })
+            .collect();
+        for (a, b) in [(a, b), (b, a)] {
+            let map = Minimap::from_snakes(&[edge_snake(axes(a), axes(b))], &arena, 8);
+            let marked: Vec<_> = (0..64).filter(|&i| map.cells[i] == 1).collect();
+            // y=x+0.5 becomes grid y=x+2; the endpoint on y=8 is excluded.
+            assert_eq!(marked, expected);
+        }
+    }
 }
