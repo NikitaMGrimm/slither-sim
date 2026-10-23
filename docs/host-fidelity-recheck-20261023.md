@@ -212,3 +212,42 @@ No numerical production correction follows from this stopped phase. In
 particular, a 300-unit wire-sector grid or the simulator's provisional 75-unit
 food-admission cells does not identify the recipient's subscription geometry,
 cleanup scheduler or size scaling.
+
+## Exploratory common receipt-time replay
+
+A separate retrospective derivative checked whether the valid R4 leg contained
+useful received-cache comparisons without requiring nearby byte-identical packets
+to align the two connection clocks. Source and provenance establish that both
+clients shared one Node process, capture batch and `performance.timeOrigin`.
+The original 33 alignment windows lacked shared-packet brackets; no populated
+window showed offset disagreement. The original frozen zero-query result remains
+unchanged; this derivative uses a different, explicitly exploratory query grid.
+
+At 27 grid times, spaced 200 ms across the same half-open leg, each stream was
+replayed only through packets already received at that time. Position, body and
+motion field ages remain separate. Fixed freshness, reference history, identity,
+transition and retrospective survival screens leave 154 correlated object/query
+exposures at 11 grid times: 113 snake and 41 prey rows, with 21 present and
+133 absent local-cache labels. All qualified prey rows are local-absence cases.
+Three snake transition receipts qualify, including one nondeath exit/reentry;
+no prey transition qualifies. These are received-cache observations against a
+positive peer reference, not simultaneous authoritative world states.
+
+The plan acknowledges earlier raw inspection. It was frozen with the executable,
+tests and dependencies before additional raw replay. Nineteen synthetic tests
+passed, and saved-output verification checked 5,693 field-prefix/age assertions.
+The parent independently reran those tests and reproduced the saved checks without
+reopening the recordings. The plan SHA-256 is
+`f35e7f5cff77c9514e4d22b81816a72eb8c26109f739e7c9e9bdd5748205eb68`;
+the replay SHA-256 is
+`5d3467146ae78fd36a391436d929573bf89d42695115475f3c64d557841bef3a`.
+Full source, pins, rows, exclusions and packet witnesses remain outside Git in
+`outputs/qualified-crossings-20261023-r4/analysis-agent/clock-design/receipt-exploration`.
+
+Later event/continuity receipts supply guards and survival selection only; they
+never fill earlier coordinates or omitted fields. The selection can be biased
+toward retained episodes. Body geometry uses the pinned historical reconstruction;
+receipt age does not bound hidden serialization delay. Calibration remains empty,
+cardinal acquisition absent, and repeated-transition, size and boost coverage
+inadequate. No threshold or timer was scored, fitted or selected, and no numerical
+subscription correction or production validation follows.
