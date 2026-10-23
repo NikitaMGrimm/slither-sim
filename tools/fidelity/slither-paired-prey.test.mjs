@@ -72,6 +72,26 @@ test('near holds keep checking the future far arena margin before release', () =
   }
 });
 
+test('hold release cannot credit the opposite endpoint before its control update', () => {
+  const state = new PairPreyState('crossing', 'y');
+  const sample = (t, offset) => state.update(t, [
+    pose(1, 22000, 22050, [prey(7, t, 1, 22000, 21600)]),
+    pose(2, 22000, 21600 + offset),
+  ], worlds);
+  sample(100, CROSSING.nearOffset); sample(200, CROSSING.nearOffset);
+  const release = 200 + CROSSING.endpointHoldMs;
+  sample(release, CROSSING.farOffset);
+  assert.equal(state.crossing.holdUntil, null);
+  assert.equal(state.crossing.holdOffset, null);
+  assert.equal(state.crossing.completedLegs, 0);
+  assert.equal(state.crossing.endpointVisits, 1);
+  assert.deepEqual(crossingOffset(prey(7, release, 1, 22000, 21600), state.crossing, 1),
+    { x: 22000, y: 21600 + CROSSING.farOffset });
+  sample(release + 25, CROSSING.farOffset);
+  assert.equal(state.crossing.completedLegs, 1);
+  assert.equal(state.crossing.lastEndpoint.end.t, release + 25);
+});
+
 test('pair snapshots retain the raw snake anchor age', () => {
   const bot = new PairPreyBot({ scenario: 'movement' }, 0, { meta() {} });
   const peer = new PairPreyBot({ scenario: 'movement' }, 1, { meta() {} });
@@ -314,6 +334,8 @@ test('initial approach arms a leg without claiming an achieved opposite starting
       pose(2, 22000, y)], worlds);
   sample(100, 22100);
   sample(200, nearY);
+  assert.equal(state.crossing.completedLegs, 0);
+  sample(200 + CROSSING.endpointHoldMs, nearY);
   assert.equal(state.crossing.completedLegs, 0);
   sample(2300, 23450);
   assert.equal(state.crossing.completedLegs, 1);

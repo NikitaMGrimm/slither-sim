@@ -225,7 +225,8 @@ export class PairPreyState {
             Math.abs(snapshots[1].y - p.y));
           c.actualEuclideanDistance = Math.hypot(snapshots[1].x - p.x,
             snapshots[1].y - p.y);
-          if (c.holdUntil !== null && now >= c.holdUntil) {
+          const released = c.holdUntil !== null && now >= c.holdUntil;
+          if (released) {
             c.holdUntil = null; c.holdOffset = null;
           }
           const holding = c.holdUntil !== null;
@@ -235,7 +236,9 @@ export class PairPreyState {
           const fresh = snapshots.every(s => Number.isFinite(s.anchorAgeMs) &&
             s.anchorAgeMs >= 0 && s.anchorAgeMs <= CROSSING.endpointAnchorFreshMs) &&
             Number.isFinite(p.t) && now >= p.t && now - p.t <= CROSSING.endpointPreyFreshMs;
-          if (!holding && Math.abs(c.actualAxisDistance - goal) <= CROSSING.endpointTolerance &&
+          // State updates precede bot controls; emit the released waypoint
+          // before another update can accept its endpoint.
+          if (!released && !holding && Math.abs(c.actualAxisDistance - goal) <= CROSSING.endpointTolerance &&
               Math.abs(c.actualCrossTrack) <= CROSSING.crossTrackTolerance && fresh &&
               primaryGeometryReady(c, p, first)) {
             const endpoint = { t: now, offset: goal, pairIdentities: identities,
