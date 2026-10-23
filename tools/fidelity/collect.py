@@ -20,13 +20,14 @@ def capture_command(study, output, node="node"):
     address = ipaddress.ip_address(capture["server"]["ip"])
     if address.version != 4:
         raise ValueError("this collector requires an explicit IPv4 server")
-    if capture["scenario"] in ("preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe") and capture["bots"] != 1:
+    if capture["scenario"] in ("preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe", "food-lanes") and capture["bots"] != 1:
         raise ValueError("this scenario requires exactly one client")
     executable = shutil.which(node)
     if executable is None:
         raise ValueError(f"Node executable not found: {node}")
-    paired = capture["scenario"] == "paired-prey"
-    driver = "slither-paired-prey.mjs" if paired else "slither-headless.mjs"
+    paired = capture["scenario"] in ("paired-prey", "paired-snake")
+    food_lanes = capture["scenario"] == "food-lanes"
+    driver = f"slither-{capture['scenario']}.mjs" if paired or food_lanes else "slither-headless.mjs"
     command = [
         executable, str(evidence.ROOT / "tools/fidelity" / driver),
         "--out", str(output), "--plan", str(study / "plan.json"),
@@ -37,7 +38,7 @@ def capture_command(study, output, node="node"):
         command.extend(["--mode", capture["mode"]])
         if "direction" in capture:
             command.extend(["--direction", capture["direction"]])
-    else:
+    elif not food_lanes:
         command.extend(["--bots", str(capture["bots"]), "--scenario", capture["scenario"]])
     if "origin" in capture:
         command.extend(["--origin", capture["origin"]])

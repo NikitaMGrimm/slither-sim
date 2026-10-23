@@ -66,6 +66,41 @@ class CollectTests(unittest.TestCase):
                     self.assertEqual(command[command.index("--direction") + 1], direction)
 
     @patch("collect.shutil.which", return_value="node")
+    def test_paired_snake_dispatches_the_explicit_direction_without_headless_flags(self, _which):
+        for direction in ("x", "y", "diagonal-positive", "diagonal-negative"):
+            with self.subTest(direction=direction):
+                plan = evidence.read_plan(self.study)
+                plan["capture"].update(scenario="paired-snake", bots=2, seconds=1800,
+                                       mode="crossing", direction=direction)
+                source = self.directory / "snake-plan.json"
+                source.write_text(json.dumps(plan), encoding="utf-8")
+                study = evidence.create_study(source, self.directory / f"snake-{direction}")
+                command = collect.capture_command(study, self.directory / "unused")
+                self.assertEqual(Path(command[1]).name, "slither-paired-snake.mjs")
+                self.assertEqual(command[command.index("--seconds") + 1], "1800")
+                self.assertEqual(command[command.index("--direction") + 1], direction)
+                self.assertEqual(command[command.index("--mode") + 1], "crossing")
+                self.assertNotIn("--bots", command)
+                self.assertNotIn("--scenario", command)
+
+    @patch("collect.shutil.which", return_value="node")
+    def test_food_lanes_dispatches_the_fixed_single_client_driver(self, _which):
+        plan = evidence.read_plan(self.study)
+        plan["capture"].update(scenario="food-lanes", bots=1, seconds=480,
+                               origin="http://localhost:8080")
+        source = self.directory / "food-lanes-plan.json"
+        source.write_text(json.dumps(plan), encoding="utf-8")
+        study = evidence.create_study(source, self.directory / "food-lanes")
+        command = collect.capture_command(study, self.directory / "unused")
+        self.assertEqual(Path(command[1]).name, "slither-food-lanes.mjs")
+        self.assertEqual(command[command.index("--seconds") + 1], "480")
+        self.assertEqual(command[command.index("--origin") + 1], "http://localhost:8080")
+        self.assertNotIn("--bots", command)
+        self.assertNotIn("--scenario", command)
+        self.assertNotIn("--mode", command)
+        self.assertEqual((study / "attempts.jsonl").read_bytes(), b"")
+
+    @patch("collect.shutil.which", return_value="node")
     def test_audit_failure_keeps_finished_exit_code_and_consumes_attempt(self, _which):
         process = Mock()
         process.wait.return_value = process.returncode = 0
