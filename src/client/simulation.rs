@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     f64::consts::TAU,
+    sync::Arc,
 };
 
 /// Messages in flight per direction of one connection before the run fails.
@@ -213,6 +214,27 @@ struct KnownFood {
     style: encode::FoodStyle,
 }
 
+/// One sector's food by wire offset, in ascending offset order.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct SectorFood(Vec<([u8; 2], KnownFood)>);
+impl SectorFood {
+    fn get(&self, offset: &[u8; 2]) -> Option<&KnownFood> {
+        let index = self.0.binary_search_by_key(offset, |(key, _)| *key).ok()?;
+        Some(&self.0[index].1)
+    }
+    #[cfg(test)]
+    fn contains_key(&self, offset: &[u8; 2]) -> bool {
+        self.get(offset).is_some()
+    }
+}
+#[cfg(test)]
+impl std::ops::Index<&[u8; 2]> for SectorFood {
+    type Output = KnownFood;
+    fn index(&self, offset: &[u8; 2]) -> &KnownFood {
+        self.get(offset).expect("food at offset")
+    }
+}
+
 /// Server and transport state of one connection.
 #[derive(Clone, Debug, Default)]
 struct Connection {
@@ -230,7 +252,7 @@ struct Connection {
     setup_at: Option<f64>,
     header_ms: u64,
     snakes: BTreeMap<usize, KnownSnake>,
-    food: BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
+    food: BTreeMap<[u8; 2], Arc<SectorFood>>,
     food_interest: SectorInterest,
     prey: BTreeMap<u16, KnownPrey>,
     radius: u32,
@@ -389,6 +411,10 @@ pub struct SimulatorBackend {
     /// Exact pickup positions since the last broadcast, before buffers reset.
     food_eaters: BTreeMap<(u64, u64), u16>,
     prey_eaters: BTreeMap<u16, u16>,
+    /// Listings of the subscribed sectors at the last broadcast. An unchanged
+    /// listing keeps its allocation, so a connection already holding it can
+    /// skip the comparison.
+    food_sectors: BTreeMap<[u8; 2], Arc<SectorFood>>,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
@@ -424,6 +450,7 @@ impl SimulatorBackend {
             food_presentation: FoodPresentation::new(seed, config.agents),
             food_eaters: BTreeMap::new(),
             prey_eaters: BTreeMap::new(),
+            food_sectors: BTreeMap::new(),
             slots: Vec::with_capacity(config.agents),
             world,
             config,
@@ -1031,25 +1058,16 @@ impl SimulatorBackend {
         }
         // Dead clients still render the world during the stock death fade;
         // withholding deltas leaves opponents extrapolating stale motion.
-        let mut sectors: BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>> = BTreeMap::new();
-        for food in &self.world.food {
-            let key = encode::food_key(food.point())?;
-            let size = food
-                .size
-                .unwrap_or_else(|| (food.value / physics::nutrition(1., 2.)).max(0.).sqrt());
-            sectors
-                .entry([key[0], key[1]])
-                .or_default()
-                .entry([key[2], key[3]])
-                .or_insert(KnownFood {
-                    point: food.point(),
-                    style: encode::FoodStyle {
-                        color: self.food_presentation.color(food),
-                        size: encode::food_size(size),
-                        snake_food: matches!(food.origin, Some(Origin::Boost | Origin::Death)),
-                    },
-                });
+        for (slot, snake) in self.slots.iter_mut().zip(&self.world.snakes) {
+            if slot.connection.setup {
+                // Also covers explicit diagnostic broadcasts between physics ticks.
+                slot.connection
+                    .food_interest
+                    .advance(snake.head, snake.heading, now);
+            }
         }
+        self.sync_food_sectors()?;
+        let eaten = eaten_sectors(&self.food_eaters);
         let bounds: Vec<[f64; 4]> = self
             .world
             .snakes
@@ -1083,7 +1101,7 @@ impl SimulatorBackend {
                 let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
-            let mut packets = self.updates(slot, now, &sectors, &bounds)?;
+            let mut packets = self.updates(slot, now, &eaten, &bounds)?;
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
             let live_board = board.as_ref().filter(|_| alive || was_over);
@@ -1095,6 +1113,66 @@ impl SimulatorBackend {
         self.food_eaters.clear();
         self.prey_eaters.clear();
         self.minimaps()?;
+        Ok(())
+    }
+
+    /// List the food of every sector a connection subscribes to. Each wire cell
+    /// shows its first pellet in world order.
+    fn sync_food_sectors(&mut self) -> Result<(), String> {
+        let sector_index = |sector: [u8; 2]| usize::from(u16::from_be_bytes(sector));
+        let mut wanted = vec![false; 1 << 16];
+        for slot in &self.slots {
+            if slot.connection.setup {
+                for &sector in slot.connection.food_interest.subscribed() {
+                    wanted[sector_index(sector)] = true;
+                }
+            }
+        }
+        let mut buckets = vec![u32::MAX; 1 << 16];
+        let mut sectors = Vec::new();
+        for (index, _) in wanted.iter().enumerate().filter(|(_, wanted)| **wanted) {
+            buckets[index] = sectors.len() as u32;
+            sectors.push(index as u16);
+        }
+        let mut listings = vec![Vec::new(); sectors.len()];
+        for food in &self.world.food {
+            let key = encode::food_key(food.point())?;
+            let bucket = buckets[sector_index([key[0], key[1]])];
+            if bucket == u32::MAX {
+                continue;
+            }
+            let size = food
+                .size
+                .unwrap_or_else(|| (food.value / physics::nutrition(1., 2.)).max(0.).sqrt());
+            listings[bucket as usize].push((
+                [key[2], key[3]],
+                KnownFood {
+                    point: food.point(),
+                    style: encode::FoodStyle {
+                        color: self.food_presentation.color(food),
+                        size: encode::food_size(size),
+                        snake_food: matches!(food.origin, Some(Origin::Boost | Origin::Death)),
+                    },
+                },
+            ));
+        }
+        let previous = std::mem::take(&mut self.food_sectors);
+        self.food_sectors = sectors
+            .into_iter()
+            .zip(listings)
+            .map(|(index, mut listing)| {
+                // Stable, so deduplication keeps the earliest pellet.
+                listing.sort_by_key(|(offset, _)| *offset);
+                listing.dedup_by_key(|(offset, _)| *offset);
+                let listing = SectorFood(listing);
+                let sector = index.to_be_bytes();
+                let shared = match previous.get(&sector) {
+                    Some(old) if **old == listing => old.clone(),
+                    _ => Arc::new(listing),
+                };
+                (sector, shared)
+            })
+            .collect();
         Ok(())
     }
 
@@ -1179,7 +1257,7 @@ impl SimulatorBackend {
         &mut self,
         slot: usize,
         now: f64,
-        sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
+        eaten: &BTreeSet<[u8; 2]>,
         bounds: &[[f64; 4]],
     ) -> Result<Vec<Vec<u8>>, String> {
         let world = &self.world;
@@ -1268,16 +1346,14 @@ impl SimulatorBackend {
             }
         }
         let connection = &mut self.slots[slot].connection;
-        // Also covers explicit diagnostic broadcasts between physics ticks.
-        connection.food_interest.advance(me.head, me.heading, now);
-        let food_subscriptions = connection.food_interest.subscribed().clone();
         food_updates(
             &mut packets,
-            connection,
-            sectors,
+            &mut connection.food,
+            connection.food_interest.subscribed(),
+            &self.food_sectors,
+            eaten,
             &self.food_eaters,
-            &food_subscriptions,
-        )?;
+        );
         let mut visible = BTreeMap::new();
         for prey in &world.prey {
             if prey.position.distance(head) <= vision {
@@ -1748,43 +1824,45 @@ fn changes(
 
 /// Keep empty subscriptions internally. Retained receipts introduce food with
 /// nonempty `F`, then births/pickups; see docs/host-fidelity.md#food-sector-delivery.
+/// `sectors` lists every subscribed sector.
 fn food_updates(
     packets: &mut Vec<Vec<u8>>,
-    connection: &mut Connection,
-    sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
-    eaters: &BTreeMap<(u64, u64), u16>,
+    known_food: &mut BTreeMap<[u8; 2], Arc<SectorFood>>,
     subscribed: &BTreeSet<[u8; 2]>,
-) -> Result<(), String> {
-    let left: Vec<_> = connection
-        .food
+    sectors: &BTreeMap<[u8; 2], Arc<SectorFood>>,
+    eaten: &BTreeSet<[u8; 2]>,
+    eaters: &BTreeMap<(u64, u64), u16>,
+) {
+    let left: Vec<_> = known_food
         .keys()
         .filter(|sector| !subscribed.contains(*sector))
         .copied()
         .collect();
     for sector in left {
-        connection.food.remove(&sector);
+        known_food.remove(&sector);
         packets.push(encode::sector_clear(sector));
     }
-    let empty = BTreeMap::new();
     for &sector in subscribed {
-        let current = sectors.get(&sector).unwrap_or(&empty);
+        let current = &sectors[&sector];
         let key = |offset: [u8; 2]| [sector[0], sector[1], offset[0], offset[1]];
-        match connection.food.get_mut(&sector) {
+        match known_food.get_mut(&sector) {
             None => {
-                let foods: Vec<_> = current.iter().map(|(k, v)| (*k, v.style)).collect();
+                let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
                 if !foods.is_empty() {
                     packets.extend(encode::food_sector(sector, &foods));
                 }
-                connection.food.insert(sector, current.clone());
+                known_food.insert(sector, current.clone());
             }
+            // The same listing without a pickup at its points sends nothing.
+            Some(known) if Arc::ptr_eq(known, current) && !eaten.contains(&sector) => {}
             Some(known) => {
-                for (offset, food) in known.iter() {
+                for (offset, food) in &known.0 {
                     let eater = eaters.get(&food_identity(food.point)).copied();
                     if current.get(offset) != Some(food) || eater.is_some() {
                         packets.push(encode::food_remove(key(*offset), eater));
                     }
                 }
-                for (offset, food) in current {
+                for (offset, food) in &current.0 {
                     if known.get(offset) != Some(food)
                         || known
                             .get(offset)
@@ -1793,11 +1871,24 @@ fn food_updates(
                         packets.push(encode::food_add(key(*offset), food.style));
                     }
                 }
-                known.clone_from(current);
+                *known = current.clone();
             }
         }
     }
-    Ok(())
+}
+
+/// Sectors that may hold a pellet at an eaten position.
+fn eaten_sectors(eaters: &BTreeMap<(u64, u64), u16>) -> BTreeSet<[u8; 2]> {
+    eaters
+        .keys()
+        .filter_map(|&(x, y)| {
+            let point = Point {
+                x: f64::from_bits(x),
+                y: f64::from_bits(y),
+            };
+            encode::food_key(point).ok().map(|key| [key[0], key[1]])
+        })
+        .collect()
 }
 
 fn food_identity(point: Point) -> (u64, u64) {
@@ -1830,6 +1921,88 @@ fn seek(frame: &ClientFrame) -> Option<f64> {
 mod tests {
     use super::*;
 
+    /// Diff against freshly allocated listings, as after a changed broadcast.
+    fn diff_food(
+        packets: &mut Vec<Vec<u8>>,
+        connection: &mut Connection,
+        sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
+        eaters: &BTreeMap<(u64, u64), u16>,
+        subscribed: &BTreeSet<[u8; 2]>,
+    ) {
+        let listings = subscribed
+            .iter()
+            .map(|sector| {
+                let food = sectors.get(sector).into_iter().flatten();
+                let listing = SectorFood(food.map(|(offset, food)| (*offset, *food)).collect());
+                (*sector, Arc::new(listing))
+            })
+            .collect();
+        food_updates(
+            packets,
+            &mut connection.food,
+            subscribed,
+            &listings,
+            &eaten_sectors(eaters),
+            eaters,
+        );
+    }
+
+    #[test]
+    fn a_retained_listing_still_reports_pickups_at_its_points() {
+        let point = Point { x: 650., y: -149. };
+        let [sx, sy, rx, ry] = encode::food_key(point).unwrap();
+        let food = KnownFood {
+            point,
+            style: encode::FoodStyle {
+                color: 3,
+                size: 20,
+                snake_food: false,
+            },
+        };
+        let listing = Arc::new(SectorFood(vec![([rx, ry], food)]));
+        let sectors = BTreeMap::from([([sx, sy], listing)]);
+        let subscribed = BTreeSet::from([[sx, sy]]);
+        let mut known = BTreeMap::new();
+        let mut packets = Vec::new();
+        let none = BTreeMap::new();
+        food_updates(
+            &mut packets,
+            &mut known,
+            &subscribed,
+            &sectors,
+            &eaten_sectors(&none),
+            &none,
+        );
+        assert_eq!(packets.len(), 1);
+        packets.clear();
+        food_updates(
+            &mut packets,
+            &mut known,
+            &subscribed,
+            &sectors,
+            &eaten_sectors(&none),
+            &none,
+        );
+        assert!(packets.is_empty());
+        // A co-located refill keeps an equal listing; the pickup still animates.
+        let eaters = BTreeMap::from([(food_identity(point), 4)]);
+        food_updates(
+            &mut packets,
+            &mut known,
+            &subscribed,
+            &sectors,
+            &eaten_sectors(&eaters),
+            &eaters,
+        );
+        assert_eq!(
+            packets,
+            [
+                encode::food_remove([sx, sy, rx, ry], Some(4)),
+                encode::food_add([sx, sy, rx, ry], food.style)
+            ]
+        );
+    }
+
     #[test]
     fn food_replacement_removes_the_old_item_with_its_actual_eater() {
         let point = Point::default();
@@ -1853,26 +2026,24 @@ mod tests {
         let mut connection = Connection::default();
         let mut sectors = BTreeMap::from([([sx, sy], BTreeMap::from([([rx, ry], first)]))]);
         let mut packets = Vec::new();
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &BTreeMap::new(),
             &BTreeSet::from([[sx, sy]]),
-        )
-        .unwrap();
+        );
         assert!(packets.contains(&vec![b'F', sx, sy, 3, rx, ry, 20]));
         sectors.get_mut(&[sx, sy]).unwrap().insert([rx, ry], second);
         let eaters = BTreeMap::from([(food_identity(point), 2)]);
         packets.clear();
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &eaters,
             &BTreeSet::from([[sx, sy]]),
-        )
-        .unwrap();
+        );
         assert_eq!(
             packets,
             [
@@ -1881,14 +2052,13 @@ mod tests {
             ]
         );
         packets.clear();
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &BTreeMap::new(),
             &BTreeSet::from([[sx, sy]]),
-        )
-        .unwrap();
+        );
         assert!(packets.is_empty());
     }
 
@@ -1935,14 +2105,13 @@ mod tests {
         let mut packets = Vec::new();
         let sectors = BTreeMap::new();
         let eaters = BTreeMap::new();
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &eaters,
             &BTreeSet::from([[108, 108]]),
-        )
-        .unwrap();
+        );
         let evidence: serde_json::Value = serde_json::from_str(include_str!(
             "../../tests/fixtures/client-food-interest.json"
         ))
@@ -1952,23 +2121,21 @@ mod tests {
         assert!(packets.is_empty());
         assert!(connection.food.contains_key(&[108, 108]));
         packets.clear();
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &eaters,
             &BTreeSet::from([[108, 108]]),
-        )
-        .unwrap();
+        );
         assert!(packets.is_empty());
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &eaters,
             &BTreeSet::from([[110, 108]]),
-        )
-        .unwrap();
+        );
         assert_eq!(packets, [vec![b'w', 108, 108]]);
         packets.clear();
         // Food arriving after an empty subscription is a birth, not a new
@@ -1983,14 +2150,13 @@ mod tests {
             },
         };
         let sectors = BTreeMap::from([([110, 108], BTreeMap::from([([0, 0], food)]))]);
-        food_updates(
+        diff_food(
             &mut packets,
             &mut connection,
             &sectors,
             &eaters,
             &BTreeSet::from([[110, 108]]),
-        )
-        .unwrap();
+        );
         assert_eq!(packets, [encode::food_add([110, 108, 0, 0], food.style)]);
     }
     use std::f64::consts::PI;
