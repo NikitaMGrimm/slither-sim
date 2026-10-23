@@ -59,9 +59,9 @@ and counted the initial partial approach. For example, cardinal trial 6's
 200.9 ms old and its reference-geometry flag was false. The collector correction
 now requires the study's endpoint geometry/age gates, distinguishes the initial
 approach, and logs exact endpoint witnesses. Offline regressions reproduce both
-old defects. No subsequent acquisition validates the corrected route's yield;
+old defects. The separately frozen R4 follow-up below achieved one route leg;
 continuous geometry, avoidance, alignment and held-out coverage remain analysis
-requirements.
+requirements, and it recovered no numerical subscription rule.
 
 ## Food model counterexamples
 
@@ -128,3 +128,87 @@ Thus the earlier fixture's extrema are corpus-specific, and one third second is
 not a universal reporting upper bound. Local periodic corrections remain an
 engineering choice that prevents unbounded client prediction drift. No new
 reporting timer or physics rule follows from this outlier.
+
+## Independent minimap recheck
+
+A later offline recheck decoded every minimap in these same four completed R3
+archives using the two retained independent Python decoders. They agreed on all
+737 maps: 451 full `M` and 286 XOR `V`, each 136×136. All 20 connection/setup
+sequences started with `M`; no delta lacked a base. The 717 within-connection
+server-clock gaps span 2,499–2,509 ms, with median 2,504 ms. No maps followed the
+16 observed deaths; the final connection in each stream is right-censored.
+These are correlated recipient observations from two acquisition batches.
+
+The analyzer SHA-256 is
+`f205186e9da856e11645083cd34c0037a628df7c4895ed651de76d815b7e6a34`.
+Its dependencies were pinned before raw opening. Six Python smoke checks,
+all-map dual decoding, archive hashes and the frame/packet/epoch census
+reconciliations passed. The report and original packet/bitmap-hash witnesses are
+retained under `outputs/qualified-crossings-20261023-r4/minimap-agent`.
+
+Source inspection found native support for every received map form and correct
+connection-base resets. This recheck ran no native code. It supplies no functional
+minimap correction and does not identify full-world raster filtering, tiny-snake
+treatment, boundary pixels, first-report phase or the official full/delta choice.
+The original 134-map comparison remains a separate preserved result.
+
+## Corrected-collector follow-up (R4)
+
+The next study, `visibility-qualified-endpoints-20261023-r4`, froze its collector,
+analyzers, seven instantaneous/48 temporal candidates and scientific gates before
+opening new inputs. Its plan SHA-256 is
+`0494909aadb6cdc2665701e5cbd172ca457311598622c41e0a706cb766b81e50`.
+The changed acquisition condition was the endpoint-accounting correction, rather
+than a different visibility threshold.
+
+One diagonal-positive pair completed 480 seconds and passed gzip, capture-end,
+source/provenance and batch-membership checks. Its two archive SHA-256 values are
+`764972a11f825a908a8c5250cb2ac4d8b7d9391c706fcdbebcc9d8df676b0ac2`
+and `1a2d81117ac0a674829ce7897ad5a102c1f042cc5823c7d054fb5270a5ab7260`.
+The pair contains 96,418 incoming frames and 218,309 logical packets across
+30 command families. Both observers belong to one acquisition batch.
+
+The cardinal invocation exited unsuccessfully immediately afterward, leaving two
+empty archives and an empty log. Neither contains a join or usable observation;
+the cause remains unidentified. Both are quarantined. The frozen stop rule ended
+acquisition, so neither extension pair was invoked and no replacement was made.
+The offline paired-CLI signal/drain regression passed afterward; it does not
+explain that failed invocation.
+
+Four completed endpoint witnesses were recorded, separately from four initial
+approaches. Three completed legs were excluded for recorded avoidance. One
+5,317.3629 ms far-to-near leg passed the sampled geometry/continuity screen.
+The frozen chronological split consequently has zero calibration legs and one
+held-out leg. Of its 50 query opportunities, 17 fail own-pose freshness and 33
+fail the original packet-based clock-alignment window. Both entity classes have
+zero eligible query/transition denominators; no candidate was selected. Cardinal,
+size and boost validation are also absent. A completed route does not itself
+validate an entry distance or retention law.
+
+The unchanged food analysis gives these separate recipient results:
+
+| Recipient | Classifier disagreements / exposures | Schedule-proxy disagreements / exposures | Screened entries outside classifier |
+| --- | ---: | ---: | ---: |
+| bot0 | 6 / 3,504 | 91 / 3,504 | 54 / 351 |
+| bot1 | 59 / 4,304 | 129 / 4,304 | 49 / 372 |
+
+Seven selected witness entries across five raw frames were verified. Examples
+include sector removal at predicted last-touch ages 0 ms and 24 ms, and retention
+at 2,605 ms. Counterexamples persist in the history-continuous stratum. These are
+conditional discrepancies under the received-pose reconstruction, not native
+execution failures, independent trials or a recovered cleanup timer. Empty/absent
+subscription denominators and food calibration/held-out coverage remain missing.
+
+The endpoint adapter SHA-256 is
+`f9c29f80e1218ab49062becaf62db2d9008217323b27a25483745bc8c2504aa9`;
+24 synthetic checks passed before raw opening. The food adapter SHA-256 is
+`2fcccc22a7b2aad3dd57dafb6e2dc04af7d9cd2f2667aea2ed7cbeea854bd297`;
+11 checks passed before input inspection. Original R3 and older counterexamples
+remain unchanged. Full sources, archives, main audit/stop receipts, exclusions,
+packet summaries and both analysis reports remain outside Git under
+`outputs/qualified-crossings-20261023-r4`.
+
+No numerical production correction follows from this stopped phase. In
+particular, a 300-unit wire-sector grid or the simulator's provisional 75-unit
+food-admission cells does not identify the recipient's subscription geometry,
+cleanup scheduler or size scaling.
