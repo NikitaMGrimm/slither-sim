@@ -11,7 +11,16 @@ official preset determined solely by bot count.
 | Snakes | Complete centerline intersects `world.vision`, default 1,500, for native and browser clients. | Paired receipts reject 500 and whole-world streaming. A 1,500-unit circle reduces missed presence, but is an engineering compromise; entry/exit geometry, retention and size scaling remain unresolved. |
 | Prey | Same configurable distance, independently checked as points; actual pickups include eater IDs. | The 500 cutoff also misses received prey. A shared numeric default does not establish a shared official subscription algorithm. |
 | Hosted spawning | Radial-lattice candidates; complete newborn corridor must clear living heads and body edges by 600 units. No cramped fallback. | Own joins support a large exclusion zone, with exceptions below 600. This is conservative admission, not a recovered universal rule or invulnerability. Native initial test rings remain synthetic. |
-| Minimap | 136×136 global living centerlines, full `M` or XOR `V`, nominal 2.5 s deadlines serviced every physics tick. Stop maps after death; reset on reconnect. | Resolution and cadence are measured. Center/radius mapping agrees with the stock marker. Exact raster filtering and official full/delta selection are unknown. |
+| Minimap | 136×136 global living centerlines, full `M` or XOR `V`, nominal 2.5 s deadlines serviced every physics tick. Stop maps after death; reset on reconnect. | Resolution and cadence are measured. Center/radius mapping agrees with the stock marker. Decoding received maps checks wire reconstruction; exact raster filtering and official full/delta selection are unknown. |
+
+Snake, prey and food subscriptions are separate questions. For snakes and
+prey, the useful next step is route feasibility, not a new rule: every trial in
+the latest direct-snake [route pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7)
+reset on a stale own anchor before its first hold. Diagnose such resets offline
+with the [controlled-route workflow](research-workflow.md#controlled-snake-and-food-routes)
+and its collector tests before planning paired present/absent crossings with
+held-out legs. Ready collection software and completed acquisitions do not
+establish a rule; zero qualified exposures can neither select nor reject one.
 
 ## Rechecked evidence
 
