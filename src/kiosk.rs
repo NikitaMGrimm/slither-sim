@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn historical_twenty_minute_grace_has_no_effect_before_its_boundary() {
-        let mut world = Simulator::new(1, Config::default()).unwrap();
+        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
         world.add("player", 0, 1).unwrap();
         let snake = &mut world.snakes[0];
         snake.segments = 380;
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn physical_boost_below_floor_cannot_create_new_score_credit() {
-        let mut world = Simulator::new(1, Config::default()).unwrap();
+        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
         world.add("player", 0, 1).unwrap();
         let snake = &mut world.snakes[0];
         let mass = mass_for_score(8_450.0);

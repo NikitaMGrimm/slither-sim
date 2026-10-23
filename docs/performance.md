@@ -6,10 +6,13 @@ baseline for each comparison; historical results are linked below.
 
 All native cases use seed 7 and the 7 ms physics tick. Overrides describe workload
 complexity; they do not change package defaults.
+The compact native client/protocol and Python E2E cases explicitly retain the
+sandbox world. The historical `step-default` name also refers to that fixture,
+independently of the official gameplay default.
 
 | Case | Work per iteration |
 | --- | --- |
-| `step-default` | One tick, four ring-start snakes, default world/350 food attempts. |
+| `step-default` | One tick, four ring-start snakes, `Config::sandbox()` world/350 food attempts. |
 | `step-food` | One tick, 32 ring-start snakes, radius 6,000, 12,000 food attempts. |
 | `step-body` | One tick, 64 separated 128-anchor bodies, radius 12,000, 350 food attempts. Primarily bounds and rejected pairs. |
 | `observe` | `observe_all` on an immutable world: 32 snakes with 32 anchors each, 12,000 food attempts and eight prey. |

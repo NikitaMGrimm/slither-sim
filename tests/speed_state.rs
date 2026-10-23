@@ -7,7 +7,7 @@ fn world() -> Simulator {
             radius: 100_000.,
             food_count: 0,
             ambient_replenish_per_second: 0.,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();

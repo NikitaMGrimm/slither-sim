@@ -175,13 +175,13 @@ fn controls(world: &Simulator, centers: &[Point], orbit: f64, tick: usize) -> Ve
 
 fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
     let (agents, mut config) = match case {
-        "step-default" => (4, Config::default()),
+        "step-default" => (4, Config::sandbox()),
         "step-food" | "observe" => (
             32,
             Config {
                 radius: 6000.0,
                 food_count: 12_000,
-                ..Config::default()
+                ..Config::sandbox()
             },
         ),
         "step-body" => (
@@ -189,7 +189,7 @@ fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
             Config {
                 radius: 12_000.0,
                 food_count: 350,
-                ..Config::default()
+                ..Config::sandbox()
             },
         ),
         _ => return Err("Unknown core case".into()),
@@ -415,9 +415,21 @@ mod portable {
             SimulationConfig {
                 agents: AGENTS,
                 record_wire,
+                world: Config::sandbox(),
                 ..SimulationConfig::default()
             },
         )
+    }
+
+    #[test]
+    fn client_workload_retains_the_compact_fixture() {
+        let backend = backend(false).unwrap();
+        let world = &backend.world().config;
+        assert_eq!(world.radius, 1000.);
+        assert!(!world.dynamic_radius);
+        assert_eq!(world.food_count, 350);
+        assert_eq!(world.prey.count, 0);
+        assert_eq!(backend.slots(), 8);
     }
 
     fn frames(backend: &SimulatorBackend) -> Result<Vec<ClientFrame>, String> {

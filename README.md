@@ -85,10 +85,11 @@ The defaults combine measured movement and protocol constants with approximate
 visibility, spawning and ecology. They include the current coverage, food-sector,
 minimap and reporting corrections; see [host fidelity](docs/host-fidelity.md).
 
-The default world is a compact sandbox: radius 1,000, fixed boundary and no
-spawned prey. `Config::realistic(n)` scales the arena and food using a provisional
-population model. Neither configuration is a verified official-server preset.
-See [configuration](docs/configuration.md) for each default and
+The default world is `Config::official(1)`: the best current approximation of an
+official server, initialized for one snake, with dynamic radius, scaled food and
+one prey. It includes provisional models and is not an exact official replica.
+`Config::sandbox()` keeps the same mechanics in a compact fixed arena. See
+[official and sandbox](docs/configuration.md#official-and-sandbox) for both and
 [rules and evidence limits](docs/server-rules.md) for what has been measured.
 
 ## Development

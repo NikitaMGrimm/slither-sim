@@ -6,7 +6,7 @@ fn recorded_boost_food_preserves_debits_motion_and_random_state() {
         radius: 50000.0,
         food_count: 0,
         ambient_replenish_per_second: 0.0,
-        ..Config::default()
+        ..Config::sandbox()
     };
     assert!(config.emit_boost_food);
     let old: Config = serde_json::from_str("{}").unwrap();

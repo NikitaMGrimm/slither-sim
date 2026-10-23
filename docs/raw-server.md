@@ -35,6 +35,7 @@ Save as `arena.json`:
   "simulation": {
     "world": {
       "radius": 1500,
+      "dynamicRadius": false,
       "foodCount": 550,
       "ambientReplenishPerSecond": 8.04,
       "dt": 0.007,
@@ -78,9 +79,9 @@ between the complete newborn body and living heads/bodies. Crowded admission
 waits or fails without near-contact fallback. This conservative model is not an
 identified official exclusion rule.
 
-Rust callers can use `Config::default()` or `Config::realistic(n)`. The latter
-scales radius and ecology with a provisional population model, rather than
-reproducing an official server configuration.
+The host world defaults to `Config::official(1)`; Rust callers can choose
+`Config::official(n)` or `Config::sandbox()`. Neither is an exact official server
+configuration; see [official and sandbox](configuration.md#official-and-sandbox).
 
 ## VPS use
 

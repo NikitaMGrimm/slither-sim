@@ -2,11 +2,11 @@ use slither_sim::{physics::*, *};
 
 #[test]
 fn death_density_settings_validate_and_round_trip() {
-    let mut config = Config::default();
+    let mut config = Config::sandbox();
     config.death_food.cell_size = 0.0;
     assert!(Simulator::new(1, config).is_err());
 
-    let mut old = serde_json::to_value(Config::default()).unwrap();
+    let mut old = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("deathFood");
     let restored: Config = serde_json::from_value(old).unwrap();
     assert!(restored.death_food.enabled);
@@ -41,7 +41,7 @@ fn collision_reports_actual_retained_food_for_default_tuned_and_disabled_limits(
                     max_per_cell: capacity,
                     ..DeathFoodConfig::default()
                 },
-                ..Config::default()
+                ..Config::sandbox()
             },
         )
         .unwrap();
@@ -74,7 +74,7 @@ fn death_scatter_matches_recorded_square_support_and_tail_first_order() {
             Config {
                 food_count: 0,
                 ambient_replenish_per_second: 0.,
-                ..Config::default()
+                ..Config::sandbox()
             },
         )
         .unwrap();

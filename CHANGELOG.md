@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+
+- **Breaking Rust API:** replace `Config::realistic(n)` with `Config::official(n)`.
+  `Config::default()` and omitted JSON world settings now select the official
+  approximation, with population-driven radius and nonzero prey. Existing kiosk,
+  food-admission, sliding-boundary and retained-speed models remain enabled.
+  Use `Config::sandbox()` or explicit JSON settings for the previous compact,
+  fixed-radius scene. Model estimates and their limitations remain documented;
+  no exact official-server equivalence is claimed.
+
 ## [0.2.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.0...v0.2.1) - 2026-10-23
 
 ### Added

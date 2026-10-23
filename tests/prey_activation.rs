@@ -16,7 +16,7 @@ fn world() -> Simulator {
         42,
         Config {
             food_count: 0,
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap()

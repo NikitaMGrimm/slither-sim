@@ -413,7 +413,7 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
         food_count: 0,
         ambient_replenish_per_second: 0.0,
         dt: DT,
-        ..Config::default()
+        ..Config::sandbox()
     };
     config.prey.count = 0;
     config.kiosk.enabled = false;

@@ -169,7 +169,7 @@ fn illustrative_growth_anchors_match_retained_simulator_and_reject_direct_speed(
                 enabled: false,
                 ..KioskConfig::default()
             },
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();

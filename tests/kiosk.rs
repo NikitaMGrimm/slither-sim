@@ -16,7 +16,7 @@ fn world() -> Simulator {
                 recovery_per_second: 2.0,
                 ..KioskConfig::default()
             },
-            ..Config::default()
+            ..Config::sandbox()
         },
     )
     .unwrap();
@@ -149,7 +149,7 @@ fn respawn_discards_kiosk_credit_and_old_config_remains_readable() {
     step(&mut world, 3);
     assert_eq!(world.snakes[0].score, score(2, 0.0));
 
-    let mut old: serde_json::Value = serde_json::to_value(Config::default()).unwrap();
+    let mut old: serde_json::Value = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("kiosk");
     let restored: Config = serde_json::from_value(old).unwrap();
     assert!(restored.kiosk.enabled);

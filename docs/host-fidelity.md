@@ -77,7 +77,8 @@ route still had zero endpoints. This supplies conditional observations, with
 no validated replacement visibility rule or numerical policy change.
 
 Radius, ecology and prey population remain configurable models. The provisional
-`Config::realistic(n)` population law is not promoted to host truth by this audit.
+population law now used by `Config::official(n)` is not promoted to host truth by
+this audit.
 Full raw recordings and local audit outputs stay outside the source package.
 
 ## Food sector delivery
@@ -104,9 +105,9 @@ rule and raster filtering remain unknown.
 
 ## Ecology models
 
-`Config::realistic(n)` is a provisional helper, including its population-scaled
-radius, food target/refill and radial food profile. It keeps the default zero prey;
-choose `world.prey.count` explicitly for a playable scenario. Received arrivals
+The default `Config::official(n)` ecology is provisional: its population-scaled
+radius, food target/refill, radial food profile and working prey density; see
+[official and sandbox](configuration.md#official-and-sandbox). Received arrivals
 and occupancy cannot identify rejected generation attempts, global counts or
 startup seeding. The earlier ambient replacement association did not survive a
 later matched-sector check, so it supplies no refill retuning.

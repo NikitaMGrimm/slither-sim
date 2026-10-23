@@ -76,7 +76,7 @@ fn world(case: &str) -> Result<Simulator, String> {
         radius,
         food_count,
         vision: 1500.0,
-        ..Config::default()
+        ..Config::sandbox()
     };
     config.prey.count = 8;
     // SYNTHETIC override: retain 2000 compact pellets to exercise batch indexing.
