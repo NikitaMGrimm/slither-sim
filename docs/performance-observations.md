@@ -147,11 +147,13 @@ snapshot; the shipped runtime and original fixture remain unchanged. The recipe
 accepts reviewed source shapes and refuses existing output paths. For the current
 reviewed shape, use the full public commit:
 
-```powershell
-uv run --project C:/Users/Nikita/slither-sim --locked --only-group tools --no-sync --offline python -B tools/perf_observation_phases.py --commit 20dd3aff5574af0270d8ad2c1e93f9001e8f1142 --output C:/Users/Nikita/.t3/scratch/observation-phases-new
+```sh
+uv run --project "REPO_ROOT" --locked --only-group tools --no-sync --offline python -B tools/perf_observation_phases.py --commit 20dd3aff5574af0270d8ad2c1e93f9001e8f1142 --output "NEW_ABS_OUTPUT_DIR"
 ```
 
-Choose a new absolute local output directory outside every checkout. Preparation
+Replace `REPO_ROOT` with the tools-environment checkout and `NEW_ABS_OUTPUT_DIR`
+with a new absolute local output directory outside every checkout. The requested
+commit must exist locally; preparation does not fetch history. Preparation
 retains the exact exported source hashes, recipe, resource and instrumentation
 patch. Both snapshots omit only the registration of the unexported `portable_bot`
 example. `COMMANDS.txt` contains explicit offline core-only builds, complete trace
