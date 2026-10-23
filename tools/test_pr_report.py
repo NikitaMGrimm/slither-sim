@@ -187,7 +187,9 @@ test same_name ... ok
         measured = [p.relative_to(root).as_posix() for directory in ("src", "tests/fixtures")
                     for p in (root / directory).rglob("*") if p.is_file()]
         measured += [*pr_report.HARNESS, "Cargo.toml", "Cargo.lock", ".github/workflows/pr-report.yml",
-                     *(f"tools/{name}.py" for name in ("pr_report", "perf_baseline", "perf_compare"))]
+                     *(f"tools/{name}.py" for name in ("pr_report", "perf_baseline", "perf_compare")),
+                     # Cargo and rustup read these if added; none exist yet.
+                     "build.rs", ".cargo/config.toml", "rust-toolchain", "rust-toolchain.toml"]
         self.assertEqual([name for name in measured if not matched(name)], [])
         # The publisher always runs default-branch code, so PR edits to it are not measured.
         unmeasured = ["README.md", "CHANGELOG.md", "docs/pr-reports.md", "research/README.md",
