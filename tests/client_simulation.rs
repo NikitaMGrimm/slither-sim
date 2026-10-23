@@ -3,8 +3,9 @@
 use slither_sim::{
     Action,
     client::{
-        Backend, ClientFrame, ClientState, ClientStatus, SimulationConfig, SimulatorBackend,
-        WireEvent, WireRecord, latency::LatencyConfig, protocol::split_frame, replay_record,
+        Backend, ClientFrame, ClientState, ClientStatus, HostConfig, SimulationConfig,
+        SimulatorBackend, WireEvent, WireRecord, latency::LatencyConfig, protocol::split_frame,
+        replay_record,
     },
     physics,
 };
@@ -498,6 +499,54 @@ fn prey_speed_validation_matches_the_wire_rounding_boundary() {
         // The core simulator retains its broader configuration range.
         assert!(config.world.validate().is_ok());
         assert_eq!(config.validate().is_ok(), accepted);
+    }
+}
+
+#[test]
+fn prey_size_validation_checks_attainable_wire_sizes() {
+    let mut config = SimulationConfig::default();
+    for (size, max_size, accepted) in [
+        (51., 51., true),
+        (51., 51.01, true),
+        (51., f64::from_bits(51.2_f64.to_bits() - 1), true),
+        (51., 51.2, false),
+        (51.2, 51.2, false),
+        (60., 60., false),
+    ] {
+        config.world.prey.size = size;
+        config.world.prey.max_size = max_size;
+        // The core simulator retains its broader configuration range.
+        assert!(config.world.validate().is_ok());
+        assert_eq!(config.validate().is_ok(), accepted, "{size}..={max_size}");
+        let host = HostConfig {
+            simulation: config.clone(),
+            ..Default::default()
+        };
+        assert_eq!(
+            host.validate().is_ok(),
+            accepted,
+            "host {size}..={max_size}"
+        );
+    }
+}
+
+#[test]
+fn accepted_prey_size_matches_the_received_appearance() {
+    for (size, max_size, expected) in [(0.2, 0.2, 0.2), (51., 51., 51.), (51., 51.01, 51.)] {
+        let mut config = SimulationConfig::default();
+        config.world.food_count = 0;
+        config.world.vision = 3000.;
+        config.world.prey.count = 1;
+        config.world.prey.size = size;
+        config.world.prey.max_size = max_size;
+        let mut backend = SimulatorBackend::new(7, config).unwrap();
+        backend.advance_ticks(6).unwrap();
+        let authoritative = &backend.world().prey;
+        let received = backend.frame().unwrap().observation.unwrap().prey;
+        assert_eq!(authoritative.len(), 1);
+        assert_eq!(received.len(), 1);
+        assert_eq!(authoritative[0].size, expected);
+        assert_eq!(received[0].size, authoritative[0].size);
     }
 }
 
