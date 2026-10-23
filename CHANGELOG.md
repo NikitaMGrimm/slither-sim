@@ -28,8 +28,6 @@
 - baseline standalone workloads and index collision bounds ([#25](https://github.com/NikitaMGrimm/slither-sim/pull/25))
 - automate patch releases with a 12-hour cooldown ([#29](https://github.com/NikitaMGrimm/slither-sim/pull/29))
 
-Changes since 0.2.0, available from Git until the next release.
-
 - Bound food-sector clearing in bundled client frames, including preflight
   validation, to avoid repeatedly scanning unrelated retained food.
 - Bound minimap rasterization for extreme geometry while preserving ordinary
