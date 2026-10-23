@@ -11,6 +11,8 @@ and ecology using a provisional population model.
 
 [Client presentation](presentation.md) covers pellet palettes separately from
 physical food generation and pickup rules.
+[Host fidelity](host-fidelity.md) records coverage, spawn and minimap corrections
+and the remaining unmeasured server policies.
 
 Fixtures retain sources, methods and hashes. Original recordings and analysis
 outputs are not distributed; packaged tests run without them, but repeating the

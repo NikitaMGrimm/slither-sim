@@ -451,6 +451,7 @@ fn interpolated_flight_speed_matches_raw_official_packet_fixture() {
 #[test]
 fn raw_visibility_keeps_moving_entities_separate_from_food() {
     let mut w = world();
+    w.config.vision = 500.;
     w.prey.extend([entity(100., 120.), entity(600., 120.)]);
     let o = w.observe(0).unwrap();
     assert_eq!(o.prey.len(), 1);

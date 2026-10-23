@@ -402,3 +402,29 @@ fn minimap_from_snakes_rasterizes_only_live_bodies() {
     let marked: Vec<_> = (0..16).filter(|&i| map.cells[i] == 1).collect();
     assert_eq!(marked, [9, 10]);
 }
+
+#[test]
+fn minimap_mapping_preserves_asymmetric_geometry_at_different_centers_and_radii() {
+    for (center, radius) in [
+        (Point::default(), 1000.),
+        (Point { x: 400., y: -200. }, 2000.),
+    ] {
+        let point = |x, y| Point {
+            x: center.x + x * radius,
+            y: center.y + y * radius,
+        };
+        let mut live = snake();
+        live.head = point(0.5, -0.25);
+        live.body = vec![point(-0.5, -0.25), point(-0.5, 0.5)];
+        let map = Minimap::from_snakes(&[live], &Arena { center, radius }, 136);
+        // Literal cells from the stock marker's normalized coordinate mapping.
+        // This pins the local centerline model, not official raster thickness.
+        for y in 0..136 {
+            for x in 0..136 {
+                let expected =
+                    y == 51 && (34..=102).contains(&x) || x == 34 && (51..=102).contains(&y);
+                assert_eq!(map.cells[y * 136 + x], u8::from(expected), "{x},{y}");
+            }
+        }
+    }
+}

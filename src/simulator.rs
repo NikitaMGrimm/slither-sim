@@ -124,7 +124,10 @@ impl Default for Config {
         Self {
             radius: 1000.0,
             dynamic_radius: false,
-            vision: 500.0,
+            // A finite receipt approximation: the paired visibility census
+            // rejects 500, while 1500 substantially reduces missed snakes/prey.
+            // Exact server entry/exit geometry and size scaling remain unknown.
+            vision: 1500.0,
             food_count: 350,
             ambient_replenish_per_second: 5.0,
             dt: LOOP_SECONDS,

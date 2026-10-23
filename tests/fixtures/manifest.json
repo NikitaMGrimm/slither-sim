@@ -28,6 +28,13 @@
       "clientContract": null,
       "dataOrigin": "captured",
       "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/client-food-interest.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
     }
   ]
 }

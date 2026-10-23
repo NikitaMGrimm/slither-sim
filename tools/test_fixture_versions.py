@@ -113,6 +113,15 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assertEqual(entry["wireProtocol"], 19)
         self.assertEqual(fixture["frame"]["settings"]["protocol"], entry["wireProtocol"])
 
+    def test_protocol19_food_interest_receipts(self):
+        entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")
+        self.assertEqual(entry["wireProtocol"], 19)
+        self.assertEqual(fixture["wireProtocol"], 19)
+        self.assertEqual(entry["dataOrigin"], fixture["dataOrigin"])
+        self.assertIsNone(entry["clientContract"])
+        self.assertEqual(len(fixture["source"]["sha256"]), 64)
+        self.assertTrue(fixture["entries"])
+
 
 if __name__ == "__main__":
     unittest.main()

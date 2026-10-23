@@ -20,6 +20,8 @@ fixture. Those expectations check decoder consistency; they are not official
 server state or proof of server origin. The contract example instead has both
 origins set to `synthetic`; its protocol field is example metadata, not captured
 wire evidence. This inventory does not duplicate source hashes.
+`client-food-interest.json` contains selected decoded receipt/pose witnesses,
+with source identity and selection limits, rather than full raw frames.
 
 ## Changing a protocol or contract
 

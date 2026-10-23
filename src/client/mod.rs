@@ -18,6 +18,7 @@ pub mod received;
 pub mod server;
 pub mod simulation;
 pub mod transport;
+mod visibility;
 
 pub use hud::{
     ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MinimapTeams,

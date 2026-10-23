@@ -153,7 +153,7 @@ selects header-free framing, including bundled packets. Body contraction outside
 See the [configuration reference](configuration.md) for all world, simulation,
 latency and network fields, their defaults and limits.
 
-Defaults: one snake, six 7 ms ticks per decision/broadcast, 32×32 minimap every
+Defaults: one snake, six 7 ms ticks per decision/broadcast, 136×136 minimap every
 2.5 seconds, leaderboard on entry/every 3 seconds and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.
 
@@ -173,7 +173,8 @@ actions. Reconnect starts a new life at a clear spawn while other snakes continu
 
 Visibility, minimap rasterization and body presentation remain approximations;
 reconstruction differs from the stock renderer's smoothing. See
-[rules and limits](server-rules.md). Use the [host](raw-server.md) to exercise
+[coverage evidence](host-fidelity.md) and [rules and limits](server-rules.md).
+Use the [host](raw-server.md) to exercise
 real sockets; the native backend delivers protocol bytes inside the process.
 
 ### Recording and network bounds

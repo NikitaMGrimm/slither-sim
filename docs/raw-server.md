@@ -64,12 +64,17 @@ at zero for normal remote use. Client processing delay is not simulated twice.
 
 ### Presets
 
-There are no named host/JSON presets; omitted settings use the compact defaults.
-Remote clients receive all living snakes so native bot coverage cannot clip the
-stock browser's viewport. This is a compact-host policy, not a measured official
-subscription envelope; larger worlds incur more snake traffic. Food sectors and
-prey keep `world.vision` coverage, as do all native bot observations. The browser
-does not send its viewport or zoom to this host.
+There are no named host/JSON presets; omitted settings use the documented defaults.
+Native and remote clients share finite snake/prey coverage (`world.vision`, default
+1,500). Snakes remain visible while any centerline segment is covered. Food uses
+a separate 45-sector entry stencil with heading lead and temporal retention.
+These are approximations with [measured constraints and known gaps](host-fidelity.md);
+the browser does not send its viewport or zoom to this host.
+
+Human joins and hosted bot lives, including startup, request 600-unit clearance
+between the complete newborn body and living heads/bodies. Crowded admission
+waits or fails without near-contact fallback. This conservative model is not an
+identified official exclusion rule.
 
 Rust callers can use `Config::default()` or `Config::realistic(n)`. The latter
 scales radius and ecology with a provisional population model, rather than
@@ -120,6 +125,9 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 - `k`: simulator collision-attributed kills.
 - `W` then `F`: sector entry, including empty sectors; `w` clears on exit.
   Bot food coverage comes from `F`/`w`, not the browser's `W` display list.
+- `M`: a full 136×136 global minimap on an independent nominal 2.5-second clock.
+  Living heads and body centerlines are rasterized; the stock client draws its
+  own player marker. Exact official pixel filtering and `M`/`V` selection are unknown.
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.

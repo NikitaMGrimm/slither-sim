@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-- Keep browser-host opponents streamed beyond native bot coverage and make
-  synthetic world-run records/victory entry opt-in (`localRecords`, default false).
+- Use shared finite 1,500-unit snake/prey coverage and retained food-sector interest;
+  restore 136-cell minimaps with an independent clock. Require safe whole-body
+  admission for hosted startup, joins and respawns, with no cramped fallback.
+- Make synthetic world-run records/victory entry opt-in (`localRecords`, default false).
 
 - Restore source-linked pellet palettes, persistent ambient colors, birth types
   and explicit pickup attribution from the earlier client presentation layer.

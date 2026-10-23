@@ -411,9 +411,12 @@ pub(crate) fn prey_motion(prey: &Prey, full: bool) -> Result<Vec<u8>, String> {
     }
     Ok(p)
 }
-pub(crate) fn prey_removal(id: u16) -> Vec<u8> {
+pub(crate) fn prey_removal(id: u16, eater: Option<u16>) -> Vec<u8> {
     let mut p = vec![b'y'];
     p.extend(u16be(id));
+    if let Some(eater) = eater {
+        p.extend(u16be(eater));
+    }
     p
 }
 
@@ -571,6 +574,8 @@ mod tests {
 
     #[test]
     fn food_packets_keep_color_origin_and_explicit_eater() {
+        assert_eq!(prey_removal(123, Some(2)), [b'y', 0, 123, 0, 2]);
+        assert_eq!(prey_removal(123, None), [b'y', 0, 123]);
         let ambient = FoodStyle {
             color: 7,
             size: 35,
@@ -643,7 +648,7 @@ mod tests {
 
     #[test]
     fn minimap_round_trips_through_the_client_decoder() {
-        for (side, pattern) in [(1, 1), (7, 3), (32, 5), (40, 97), (512, 4093)] {
+        for (side, pattern) in [(1, 1), (7, 3), (32, 5), (40, 97), (136, 173), (512, 4093)] {
             let cells: Vec<u8> = (0..side * side)
                 .map(|i| u8::from(i % pattern == 0 && i % 3 != 1))
                 .collect();

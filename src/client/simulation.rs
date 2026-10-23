@@ -7,17 +7,18 @@
 //! and congestion delay messages but never reorder them. Configured delays stay
 //! private: a client only measures its pings and knows its own reply time.
 //!
-//! Native visibility uses approximate circular coverage: a
+//! Snake/prey visibility uses approximate circular coverage: a
 //! snake is covered while any part of its centerline is within `world.vision` of
-//! the client's head, food arrives by 300-unit sectors intersecting that circle
-//! and prey within it. A covered snake appears once per entry or life; afterwards
-//! only changed anchors, tail removals, mass and motion fields are sent. Remote
-//! browser clients receive all living snakes; their viewport/zoom is unknown.
+//! the client's head, and prey within it. Food uses a separate retained
+//! 300-unit-sector interest model. A covered snake appears once per entry or
+//! life; afterwards only changed anchors, tail removals, mass and motion fields
+//! are sent. Native and remote recipients use the same coverage policies.
 use super::{
     Backend, ClientFrame, ClientState, ClientStatus, Minimap, WireEvent, WireRecord, encode,
     latency::{LatencyConfig, Link, Random},
     presentation::FoodPresentation,
     protocol,
+    visibility::SectorInterest,
 };
 use crate::{
     Action, Config, Simulator,
@@ -100,7 +101,9 @@ impl Default for SimulationConfig {
             decision_ticks: 6,
             broadcast_ticks: 6,
             minimap_interval_seconds: 2.5,
-            minimap_side: 32,
+            // Retained protocol-19 minimap receipts and the earlier browser
+            // bridge use 136 cells per side; 32 was a local backend shortcut.
+            minimap_side: 136,
             leaderboard_interval_seconds: 3.,
             local_records: false,
             latency: LatencyConfig::default(),
@@ -216,6 +219,7 @@ struct Connection {
     header_ms: u64,
     snakes: BTreeMap<usize, KnownSnake>,
     food: BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
+    food_interest: SectorInterest,
     prey: BTreeMap<u16, KnownPrey>,
     radius: u32,
     minimap_at: f64,
@@ -370,6 +374,7 @@ pub struct SimulatorBackend {
     food_presentation: FoodPresentation,
     /// Exact pickup positions since the last broadcast, before buffers reset.
     food_eaters: BTreeMap<(u64, u64), u16>,
+    prey_eaters: BTreeMap<u16, u16>,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
@@ -395,13 +400,16 @@ impl SimulatorBackend {
         world.pickup_events = Some(Vec::new());
         for slot in 0..config.agents {
             world.add(slot.to_string(), slot, config.agents)?;
-            world.snakes[slot].alive = slot >= remote;
+            // Native experiments retain their synthetic ring initialization.
+            // Hosted lives enter through the same admission rule as rejoins.
+            world.snakes[slot].alive = remote == 0;
         }
         let mut backend = Self {
             random: Random::new(u64::from(seed) ^ 0x6c61_7465_6e63_7900),
             spawn_random: Random::new(u64::from(seed) ^ 0x7370_6177_6e00),
             food_presentation: FoodPresentation::new(seed, config.agents),
             food_eaters: BTreeMap::new(),
+            prey_eaters: BTreeMap::new(),
             slots: Vec::with_capacity(config.agents),
             world,
             config,
@@ -436,6 +444,14 @@ impl SimulatorBackend {
             });
             if remote {
                 continue;
+            }
+            if backend.remote > 0 {
+                if let Ok((head, heading)) = backend.spawn_pose(slot) {
+                    backend.world.respawn(slot, head, heading, 2)?;
+                    backend.slots[slot].control.heading = heading;
+                }
+                // A crowded host leaves the slot dead; the normal background
+                // lifecycle retries admission after its first death report.
             }
             backend.connect(slot)?;
             backend.client_until(slot, 0.)?;
@@ -632,7 +648,11 @@ impl SimulatorBackend {
                 x: angle.cos() * distance,
                 y: angle.sin() * distance,
             };
-            if self.world.spawn_is_clear(head, heading, 2, 0.) {
+            // Restore the earlier browser lobby's separation model. Own-join
+            // receipts support a large exclusion zone, but do not identify the
+            // exact official test. Never fall back to near-contact placement
+            // when the compact arena is crowded: defer this spawn instead.
+            if self.world.spawn_is_clear(head, heading, 2, 600.) {
                 pose = Some((head, heading));
                 break;
             }
@@ -930,11 +950,19 @@ impl SimulatorBackend {
             self.food_presentation.births(std::slice::from_ref(event))?;
         }
         for event in self.world.pickup_events.as_deref().unwrap_or(&[]) {
-            if let PickupItem::Food(food) = &event.item {
-                self.food_presentation.picked_up(food)?;
-                self.food_eaters
-                    .entry(food_identity(food.point()))
+            if let PickupItem::Prey(prey) = &event.item {
+                self.prey_eaters
+                    .entry(encode::prey_id(prey))
                     .or_insert(event.eater as u16);
+            }
+            if let PickupItem::Food(food) = &event.item {
+                // Only the oldest co-located lifetime is on the wire. Eating
+                // a hidden newer pellet must not animate that visible pellet.
+                if self.food_presentation.picked_up(food)? {
+                    self.food_eaters
+                        .entry(food_identity(food.point()))
+                        .or_insert(event.eater as u16);
+                }
             }
         }
         for event in births.iter().filter(|event| event.source.is_none()) {
@@ -943,6 +971,13 @@ impl SimulatorBackend {
         self.settle_lives();
         self.tick += 1;
         let now = self.time();
+        for (slot, snake) in self.slots.iter_mut().zip(&self.world.snakes) {
+            if slot.connection.setup {
+                slot.connection
+                    .food_interest
+                    .advance(snake.head, snake.heading, now);
+            }
+        }
         for slot in &mut self.slots {
             // A decision that sent nothing is complete once its duration elapses.
             if slot
@@ -954,6 +989,8 @@ impl SimulatorBackend {
         }
         if self.tick % self.config.broadcast_ticks as u64 == 0 {
             self.broadcast()?;
+        } else {
+            self.minimaps()?;
         }
         for slot in 0..self.slots.len() {
             self.client_until(slot, now)?;
@@ -970,6 +1007,7 @@ impl SimulatorBackend {
         self.food_presentation.sync(&self.world.food)?;
         if !self.slots.iter().any(|slot| slot.connection.setup) {
             self.food_eaters.clear();
+            self.prey_eaters.clear();
             return Ok(());
         }
         // Dead clients still render the world during the stock death fade;
@@ -1004,7 +1042,6 @@ impl SimulatorBackend {
                 )
             })
             .collect();
-        let mut minimap = None;
         let mut board = None;
         for slot in 0..self.slots.len() {
             let connection = &self.slots[slot].connection;
@@ -1027,18 +1064,7 @@ impl SimulatorBackend {
                 let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
-            if alive && minimap.is_none() && now + 1e-9 >= self.slots[slot].connection.minimap_at {
-                let arena = Arena {
-                    center: Point::default(),
-                    radius: self.world.config.radius,
-                };
-                minimap = Some(Minimap::from_snakes(
-                    &self.world.snakes,
-                    &arena,
-                    self.config.minimap_side,
-                ));
-            }
-            let mut packets = self.updates(slot, now, &sectors, &bounds, minimap.as_ref())?;
+            let mut packets = self.updates(slot, now, &sectors, &bounds)?;
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
             let live_board = board.as_ref().filter(|_| alive || was_over);
@@ -1048,6 +1074,46 @@ impl SimulatorBackend {
             }
         }
         self.food_eaters.clear();
+        self.prey_eaters.clear();
+        self.minimaps()?;
+        Ok(())
+    }
+
+    /// Maps have their own nominal clock; gameplay broadcasts must not round
+    /// 2.5-second map deadlines up to 2.52 seconds on every update.
+    fn minimaps(&mut self) -> Result<(), String> {
+        let now = self.time();
+        let interval = self.config.minimap_interval_seconds;
+        let mut map = None;
+        for slot in 0..self.slots.len() {
+            let connection = &self.slots[slot].connection;
+            if !connection.setup
+                || !self.world.snakes[slot].alive
+                || !connection.snakes.contains_key(&slot)
+                || now + 1e-9 < connection.minimap_at
+            {
+                continue;
+            }
+            let deadline = connection.minimap_at;
+            if map.is_none() {
+                map = Some(Minimap::from_snakes(
+                    &self.world.snakes,
+                    &Arena {
+                        center: Point::default(),
+                        radius: self.world.config.radius,
+                    },
+                    self.config.minimap_side,
+                ));
+            }
+            self.emit(slot, now, &[encode::minimap(map.as_ref().unwrap())])?;
+            self.slots[slot].connection.minimap_at = if deadline == 0. {
+                now + interval
+            } else {
+                // Skip missed opportunities in bounded time, preserving the
+                // connection's deadline phase instead of accumulating rounding.
+                deadline + (((now - deadline).max(0.) / interval).floor() + 1.) * interval
+            };
+        }
         Ok(())
     }
 
@@ -1058,7 +1124,6 @@ impl SimulatorBackend {
         now: f64,
         sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
         bounds: &[[f64; 4]],
-        minimap: Option<&Minimap>,
     ) -> Result<Vec<Vec<u8>>, String> {
         let world = &self.world;
         let me = &world.snakes[slot];
@@ -1097,18 +1162,13 @@ impl SimulatorBackend {
             packets.push(encode::radius(world.config.radius)?);
         }
         let vision = world.config.vision;
-        // The browser does not report its viewport or zoom. Keep living snakes
-        // streamed rather than clipping them at the native receipt radius.
-        // Food sectors and prey retain their separate bounded coverage policy.
-        let whole_snakes = self.slots[slot].remote;
         let head = me.head;
         let order = std::iter::once(slot).chain((0..world.snakes.len()).filter(|&i| i != slot));
         for i in order {
             let snake = &world.snakes[i];
             let life = self.slots[i].life;
             let wanted = physics::quantize_heading(self.slots[i].control.heading);
-            let eligible = snake.alive
-                && (whole_snakes || i == slot || covered(head, snake, bounds[i], vision));
+            let eligible = snake.alive && (i == slot || covered(head, snake, bounds[i], vision));
             let own = i == slot;
             let id = i as u16;
             let profile = self.profiles.get(i).unwrap_or(&NATIVE_PROFILE);
@@ -1151,13 +1211,15 @@ impl SimulatorBackend {
             }
         }
         let connection = &mut self.slots[slot].connection;
+        // Also covers explicit diagnostic broadcasts between physics ticks.
+        connection.food_interest.advance(me.head, me.heading, now);
+        let food_subscriptions = connection.food_interest.subscribed().clone();
         food_updates(
             &mut packets,
             connection,
             sectors,
             &self.food_eaters,
-            head,
-            vision,
+            &food_subscriptions,
         )?;
         let mut visible = BTreeMap::new();
         for prey in &world.prey {
@@ -1173,7 +1235,7 @@ impl SimulatorBackend {
             .collect();
         for id in gone {
             connection.prey.remove(&id);
-            packets.push(encode::prey_removal(id));
+            packets.push(encode::prey_removal(id, self.prey_eaters.get(&id).copied()));
         }
         for (id, prey) in visible {
             let current = KnownPrey {
@@ -1192,10 +1254,6 @@ impl SimulatorBackend {
                 }
             }
             connection.prey.insert(id, current);
-        }
-        if let Some(map) = minimap.filter(|_| me.alive && now + 1e-9 >= connection.minimap_at) {
-            packets.push(encode::minimap(map));
-            connection.minimap_at = now + self.config.minimap_interval_seconds;
         }
         Ok(packets)
     }
@@ -1287,8 +1345,7 @@ impl SimulatorBackend {
 /// One shared world whose leading slots are external protocol-19 clients.
 ///
 /// Remote slots exchange exact WebSocket payloads through the same server-side
-/// scheduling and encoders as native slots, with whole-world snake streaming
-/// instead of native circular snake coverage. This process never
+/// scheduling, coverage and encoders as native slots. This process never
 /// decodes their frames, pings for them or models their processing: a remote
 /// client's compute time has already elapsed in real time. Configured latency
 /// still delays both directions in order. Remaining slots are background food
@@ -1629,27 +1686,8 @@ fn food_updates(
     connection: &mut Connection,
     sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
     eaters: &BTreeMap<(u64, u64), u16>,
-    head: Point,
-    vision: f64,
+    subscribed: &BTreeSet<[u8; 2]>,
 ) -> Result<(), String> {
-    let size = f64::from(encode::SECTOR_SIZE);
-    let x = head.x + f64::from(encode::GRID_CENTER);
-    let y = head.y + f64::from(encode::GRID_CENTER);
-    let range = |center: f64| {
-        let low = ((center - vision) / size).floor().clamp(0., 255.) as u8;
-        let high = ((center + vision) / size).floor().clamp(0., 255.) as u8;
-        low..=high
-    };
-    let mut subscribed = BTreeSet::new();
-    for sx in range(x) {
-        for sy in range(y) {
-            let dx = (x - x.clamp(f64::from(sx) * size, (f64::from(sx) + 1.) * size)).abs();
-            let dy = (y - y.clamp(f64::from(sy) * size, (f64::from(sy) + 1.) * size)).abs();
-            if dx.hypot(dy) <= vision {
-                subscribed.insert([sx, sy]);
-            }
-        }
-    }
     let left: Vec<_> = connection
         .food
         .keys()
@@ -1661,7 +1699,7 @@ fn food_updates(
         packets.push(encode::sector_clear(sector));
     }
     let empty = BTreeMap::new();
-    for sector in subscribed {
+    for &sector in subscribed {
         let current = sectors.get(&sector).unwrap_or(&empty);
         let key = |offset: [u8; 2]| [sector[0], sector[1], offset[0], offset[1]];
         match connection.food.get_mut(&sector) {
@@ -1752,15 +1790,21 @@ mod tests {
             &mut connection,
             &sectors,
             &BTreeMap::new(),
-            point,
-            10.,
+            &BTreeSet::from([[sx, sy]]),
         )
         .unwrap();
         assert!(packets.contains(&vec![b'F', sx, sy, 3, rx, ry, 20]));
         sectors.get_mut(&[sx, sy]).unwrap().insert([rx, ry], second);
         let eaters = BTreeMap::from([(food_identity(point), 2)]);
         packets.clear();
-        food_updates(&mut packets, &mut connection, &sectors, &eaters, point, 10.).unwrap();
+        food_updates(
+            &mut packets,
+            &mut connection,
+            &sectors,
+            &eaters,
+            &BTreeSet::from([[sx, sy]]),
+        )
+        .unwrap();
         assert_eq!(
             packets,
             [
@@ -1774,8 +1818,7 @@ mod tests {
             &mut connection,
             &sectors,
             &BTreeMap::new(),
-            point,
-            10.,
+            &BTreeSet::from([[sx, sy]]),
         )
         .unwrap();
         assert!(packets.is_empty());
@@ -1829,8 +1872,7 @@ mod tests {
             &mut connection,
             &sectors,
             &eaters,
-            Point::default(),
-            10.,
+            &BTreeSet::from([[108, 108]]),
         )
         .unwrap();
         assert_eq!(packets, [vec![b'W', 108, 108], vec![b'F', 108, 108]]);
@@ -1840,8 +1882,7 @@ mod tests {
             &mut connection,
             &sectors,
             &eaters,
-            Point::default(),
-            10.,
+            &BTreeSet::from([[108, 108]]),
         )
         .unwrap();
         assert!(packets.is_empty());
@@ -1850,8 +1891,7 @@ mod tests {
             &mut connection,
             &sectors,
             &eaters,
-            Point { x: 600., y: 0. },
-            10.,
+            &BTreeSet::from([[110, 108]]),
         )
         .unwrap();
         assert_eq!(
@@ -1877,25 +1917,49 @@ mod tests {
     }
 
     #[test]
-    fn browser_snakes_stay_streamed_beyond_native_coverage_until_death() {
+    fn hosted_and_native_snakes_use_finite_whole_body_coverage() {
         let mut config = raw_config(3);
-        config.world.vision = 1.;
+        config.world.radius = 6000.;
+        config.world.vision = Config::default().vision;
+        assert_eq!(config.world.vision, 1500.);
         let mut sim = RawSimulator::new(7, config, 1).unwrap();
         let mut remote = Remote::connect(&mut sim, 0, "Browser");
-        run(&mut sim, &mut [(0, &mut remote)], 12);
-        assert_eq!(sim.backend.world.config.vision, 1.);
-        let head = sim.backend.world.snakes[0].head;
-        for i in 1..3 {
-            let snake = &sim.backend.world.snakes[i];
-            assert!(snake.head.distance(head) > 500.);
-            assert!(sim.backend.slots[0].connection.snakes.contains_key(&i));
+        for (slot, x) in [(0, 0.), (1, 1000.), (2, 4000.)] {
+            sim.backend.world.snakes[slot].alive = false;
+            sim.backend
+                .world
+                .respawn(slot, Point { x, y: 0. }, 0., 2)
+                .unwrap();
+            sim.backend.slots[slot].control.heading = 0.;
         }
-        // Background bots keep the original receipt radius.
-        assert!(!sim.backend.slots[1].connection.snakes.contains_key(&0));
+        run(&mut sim, &mut [(0, &mut remote)], 12);
+        assert!(sim.backend.slots[0].connection.snakes.contains_key(&1));
+        assert!(!sim.backend.slots[0].connection.snakes.contains_key(&2));
+        assert!(sim.backend.slots[1].connection.snakes.contains_key(&0));
+        assert!(!sim.backend.slots[1].connection.snakes.contains_key(&2));
+
+        // A distant head does not hide a snake whose tail reaches the view.
+        sim.backend.world.snakes[2].alive = false;
+        sim.backend
+            .world
+            .respawn(2, Point { x: 2500., y: 0. }, 0., 40)
+            .unwrap();
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        assert!(sim.backend.slots[0].connection.snakes.contains_key(&2));
+        for point in &mut sim.backend.world.snakes[2].body {
+            point.x += 3000.;
+        }
+        sim.backend.world.snakes[2].head.x += 3000.;
+        sim.backend.broadcast().unwrap();
+        assert!(
+            remote
+                .pump(&mut sim, 0)
+                .contains(&encode::removal(2, false))
+        );
         sim.backend.world.snakes[1].alive = false;
         sim.backend.broadcast().unwrap();
         assert!(remote.pump(&mut sim, 0).contains(&encode::removal(1, true)));
-        assert!(!sim.backend.slots[0].connection.snakes.contains_key(&1));
     }
 
     #[test]
@@ -1904,16 +1968,224 @@ mod tests {
         let mut a = Remote::connect(&mut sim, 0, "A");
         let mut b = Remote::connect(&mut sim, 1, "B");
         run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 12);
-        let food = sim.backend.world.food[0].clone();
+        let food = sim
+            .backend
+            .world
+            .food
+            .iter()
+            .find(|food| {
+                let key = encode::food_key(food.point()).unwrap();
+                (0..2).all(|slot| {
+                    sim.backend.slots[slot]
+                        .connection
+                        .food
+                        .get(&[key[0], key[1]])
+                        .is_some_and(|sector| sector.contains_key(&[key[2], key[3]]))
+                        && food.point().distance(sim.backend.world.snakes[slot].head) > 100.
+                })
+            })
+            .expect("shared ground food")
+            .clone();
         let key = encode::food_key(food.point()).unwrap();
         let style = |sim: &RawSimulator, slot: usize| {
             sim.backend.slots[slot].connection.food[&[key[0], key[1]]][&[key[2], key[3]]].style
         };
         let original = style(&sim, 0);
         assert_eq!(original, style(&sim, 1));
+        let previous_head = sim.backend.world.snakes[1].head;
         let mut b = Remote::connect(&mut sim, 1, "New life");
+        // Hold the observer location for this subscription/color regression;
+        // random new spawn locations can legitimately see a different sector.
+        let snake = &mut sim.backend.world.snakes[1];
+        let delta = Point {
+            x: previous_head.x - snake.head.x,
+            y: previous_head.y - snake.head.y,
+        };
+        snake.head = previous_head;
+        for point in &mut snake.body {
+            point.x += delta.x;
+            point.y += delta.y;
+        }
         run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 6);
         assert_eq!(original, style(&sim, 1));
+    }
+
+    #[test]
+    fn hosted_background_lives_use_safe_admission_from_startup() {
+        for seed in 1..=16 {
+            let mut config = raw_config(5);
+            config.world.radius = 3000.;
+            let mut sim = RawSimulator::new(seed, config, 1).unwrap();
+            assert!(!sim.backend.world.snakes[0].alive);
+            for slot in 1..5 {
+                let snake = sim.backend.world.snakes[slot].clone();
+                assert!(snake.alive, "seed {seed}, slot {slot}");
+                sim.backend.world.snakes[slot].alive = false;
+                assert!(sim.backend.world.spawn_is_clear(
+                    snake.head,
+                    snake.heading,
+                    snake.segments,
+                    600.
+                ));
+                sim.backend.world.snakes[slot].alive = true;
+            }
+        }
+    }
+
+    #[test]
+    fn background_respawn_cannot_appear_close_to_a_living_player() {
+        for seed in 1..=32 {
+            let mut sim = SimulatorBackend::new(seed, raw_config(2)).unwrap();
+            sim.world.snakes[1].alive = false;
+            sim.reconnect_slot(1).unwrap();
+            let new_life = sim.world.snakes[1].clone();
+            // Check the complete new body against the existing player's head
+            // and body, rather than only preventing overlap at the new head.
+            sim.world.snakes[1].alive = false;
+            assert!(
+                sim.world
+                    .spawn_is_clear(new_life.head, new_life.heading, 2, 600.),
+                "seed {seed}"
+            );
+        }
+    }
+
+    #[test]
+    fn minimaps_keep_their_own_clock_and_reset_after_death_and_reconnect() {
+        let mut config = raw_config(1);
+        config.world.radius = 10_000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut sim = RawSimulator::new(7, config, 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Map");
+        // Keep this timing fixture away from the rim and random food.
+        sim.backend.world.snakes[0].alive = false;
+        sim.backend
+            .world
+            .respawn(0, Point::default(), 0., 2)
+            .unwrap();
+        sim.backend.slots[0].control = Action {
+            heading: 0.,
+            boost: false,
+        };
+        let mut times = Vec::new();
+        for _ in 0..760 {
+            sim.advance_ticks(1).unwrap();
+            for packet in remote.pump(&mut sim, 0) {
+                if packet[0] == b'M' {
+                    assert_eq!(&packet[1..3], &136_u16.to_be_bytes());
+                    times.push(sim.time());
+                }
+            }
+        }
+        assert_eq!(times.len(), 3);
+        for pair in times.windows(2) {
+            assert!(((pair[1] - pair[0]) - 2.5).abs() <= sim.dt() + 1e-9);
+        }
+        assert!(
+            times
+                .iter()
+                .any(|time| (time / sim.dt()).round() as u64 % 6 != 0)
+        );
+
+        sim.backend.world.snakes[0].alive = false;
+        sim.advance_ticks(400).unwrap();
+        assert!(remote.pump(&mut sim, 0).iter().all(|p| p[0] != b'M'));
+        let mut next_life = Remote::connect(&mut sim, 0, "New map");
+        run(&mut sim, &mut [(0, &mut next_life)], 7);
+        assert!(next_life.packets.iter().any(|p| p[0] == b'M'));
+    }
+
+    #[test]
+    fn retained_food_keeps_updating_after_leaving_the_entry_region() {
+        let mut config = raw_config(1);
+        config.world.radius = 5000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut sim = RawSimulator::new(7, config, 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Food");
+        sim.backend.world.snakes[0].alive = false;
+        sim.backend
+            .world
+            .respawn(0, Point::default(), 0., 2)
+            .unwrap();
+        sim.backend.slots[0].control = Action {
+            heading: 0.,
+            boost: false,
+        };
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let food = crate::Food {
+            x: 750.,
+            y: 0.,
+            value: 1.,
+            size: Some(2.),
+            origin: None,
+        };
+        let key = encode::food_key(food.point()).unwrap();
+        sim.backend.world.food.push(food);
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        assert!(
+            sim.backend.slots[0].connection.food[&[key[0], key[1]]].contains_key(&[key[2], key[3]])
+        );
+
+        // Synthetic pose change isolates retention from navigation and pickup.
+        sim.backend.world.snakes[0].alive = false;
+        sim.backend
+            .world
+            .respawn(0, Point { x: 3000., y: 0. }, 0., 2)
+            .unwrap();
+        sim.advance_ticks(1).unwrap();
+        sim.backend.world.food[0].size = Some(3.);
+        sim.backend.broadcast().unwrap();
+        let changed = remote.pump(&mut sim, 0);
+        assert!(
+            changed
+                .iter()
+                .any(|p| matches!(p[0], b'f' | b'b') && p[1..5] == key)
+        );
+        assert!(!changed.contains(&encode::sector_clear([key[0], key[1]])));
+        sim.advance_ticks(450).unwrap();
+        assert!(sim.backend.world.snakes[0].alive);
+        assert!(
+            remote
+                .pump(&mut sim, 0)
+                .contains(&encode::sector_clear([key[0], key[1]]))
+        );
+    }
+
+    #[test]
+    fn prey_pickup_reports_the_actual_eater_without_inventing_one_for_visibility_exit() {
+        let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey");
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let snake = &sim.backend.world.snakes[0];
+        let (position, _) =
+            physics::pickup_circle(snake.head, snake.heading, snake.speed, snake.segments);
+        let prey = crate::prey::Prey {
+            id: 123,
+            position,
+            heading: 0.,
+            target_heading: 0.,
+            speed: 118.75,
+            size: 6.,
+        };
+        sim.backend.world.prey.push(prey.clone());
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        run(&mut sim, &mut [(0, &mut remote)], 6);
+        assert!(remote.packets.contains(&encode::prey_removal(123, Some(0))));
+
+        sim.backend.world.prey.push(prey);
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        sim.backend.world.prey.clear();
+        sim.backend.broadcast().unwrap();
+        assert!(
+            remote
+                .pump(&mut sim, 0)
+                .contains(&encode::prey_removal(123, None))
+        );
     }
     fn profile(nickname: &str) -> PlayerAppearance {
         PlayerAppearance {
@@ -2452,7 +2724,9 @@ mod tests {
 
     #[test]
     fn leaderboard_ranks_living_snakes_with_slot_ties() {
-        let mut sim = RawSimulator::new(1, raw_config(13), 2).unwrap();
+        let mut config = raw_config(13);
+        config.world.radius = 3000.;
+        let mut sim = RawSimulator::new(1, config, 2).unwrap();
         let mut zero = Remote::connect(&mut sim, 0, "Zero");
         run(&mut sim, &mut [(0, &mut zero)], 7);
         // Slot 1 never connected and slot 4 is dead: neither is counted.

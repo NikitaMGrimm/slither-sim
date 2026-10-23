@@ -217,7 +217,8 @@ impl FoodPresentation {
 
     /// The simulator visits food in reverse insertion order before ambient
     /// replenishment. Consume those lifetimes before assigning refill births.
-    pub(super) fn picked_up(&mut self, food: &Food) -> Result<(), String> {
+    /// Return whether the removed lifetime was the visible, oldest pellet.
+    pub(super) fn picked_up(&mut self, food: &Food) -> Result<bool, String> {
         let key = identity(food);
         let colors = self
             .colors
@@ -226,10 +227,11 @@ impl FoodPresentation {
         colors
             .pop_back()
             .ok_or("Picked-up food has no remaining lifetime")?;
-        if colors.is_empty() {
+        let visible = colors.is_empty();
+        if visible {
             self.colors.remove(&key);
         }
-        Ok(())
+        Ok(visible)
     }
 
     /// Call after births and a successful sync of the current world food.
@@ -541,9 +543,9 @@ mod tests {
         }
         presentation.sync(&[item.clone(), item.clone()]).unwrap();
         assert_eq!(presentation.color(&item), 3);
-        presentation.picked_up(&item).unwrap();
+        assert!(!presentation.picked_up(&item).unwrap());
         assert_eq!(presentation.color(&item), 3);
-        presentation.picked_up(&item).unwrap();
+        assert!(presentation.picked_up(&item).unwrap());
         // Replenishment after pickup starts a new lifetime at the same point.
         births(&mut presentation, 1, std::slice::from_ref(&item));
         assert_eq!(presentation.color(&item), 7);
