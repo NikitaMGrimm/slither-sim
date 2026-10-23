@@ -98,12 +98,17 @@ traces contain:
 1. An `initial` full snapshot after placement.
 2. One light `warmup` line per tick: actions, deaths, respawns, events, world
    statistics and the harness RNG state. Then a `warmed` full snapshot.
-3. One full snapshot per measured operation (`step`, `bot` or client `decision`),
-   with its actions, deaths and respawns. `-bot` lines include the observations;
-   client lines include frames and wire records.
+3. One line per measured operation (`step`, `bot` or client `decision`) with its
+   actions, deaths, respawns and a full snapshot. `-bot` lines include the
+   observations; client lines include frames and wire records.
 4. An `epoch` snapshot whenever the warmed scene is restored.
 5. A terminal `end` record with the operation count, physics ticks and lifecycle
    counts, followed by the usual report line. A trace without `end` is incomplete.
+
+Snapshots and warmup statistics are taken right after the operation, before dead
+slots respawn: respawning resets a slot's per-life state, which would otherwise
+hide changes to a just-died snake from parity comparison. Scenario respawn records
+carry each new pose and length; client slots reconnect before the next decision.
 
 ## Adding a workload
 

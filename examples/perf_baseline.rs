@@ -1578,6 +1578,19 @@ impl Scene {
     }
 }
 
+/// Captures post-operation state, then runs the untimed lifecycle. Respawning resets
+/// a just-died slot's per-life state, so a later capture would hide its changes
+/// from parity traces.
+fn settle<T>(
+    scene: &mut Scene,
+    tick: usize,
+    lifecycle: &mut Lifecycle,
+    capture: impl FnOnce(&Simulator) -> Result<T, String>,
+) -> Result<(T, Boundary), String> {
+    let captured = capture(&scene.world)?;
+    Ok((captured, scene.boundary(tick, lifecycle)?))
+}
+
 fn run_scenario(
     args: &Args,
     scenario: &Scenario,
@@ -1601,7 +1614,9 @@ fn run_scenario(
         let actions = controller.actions(&scene.world, tick);
         scene.step(&actions, None)?;
         tick += 1;
-        let boundary = scene.boundary(tick, &mut warm)?;
+        let (stats, boundary) = settle(&mut scene, tick, &mut warm, |world| {
+            Ok(args.trace.then(|| json!(WorldStats::from_world(world))))
+        })?;
         warm_population.record(&scene.world);
         if args.trace {
             let mut record = boundary.json();
@@ -1610,7 +1625,7 @@ fn run_scenario(
             record["actions"] = json!(actions);
             record["pickupEvents"] = json!(pickups(&scene.world));
             record["foodSpawnEvents"] = json!(births(&scene.world));
-            record["stats"] = json!(WorldStats::from_world(&scene.world));
+            record["stats"] = json!(stats);
             record["random"] = json!(scene.random.0);
             line(out, record)?;
         }
@@ -1661,7 +1676,9 @@ fn run_scenario(
         })?;
         black_box(&scene.world);
         tick += 1;
-        let boundary = scene.boundary(tick, &mut lifecycle)?;
+        let (snapshot, boundary) = settle(&mut scene, tick, &mut lifecycle, |world| {
+            args.trace.then(|| world_events(world)).transpose()
+        })?;
         population.record(&scene.world);
         if args.trace {
             let mut record = boundary.json();
@@ -1670,7 +1687,7 @@ fn run_scenario(
             record["tick"] = json!(tick);
             record["actions"] = json!(actions);
             record["random"] = json!(scene.random.0);
-            record["snapshot"] = world_events(&scene.world)?;
+            record["snapshot"] = json!(snapshot);
             if bot {
                 record["observations"] = json!(observations);
             }
@@ -1950,6 +1967,34 @@ mod tests {
         }
         assert!(first.body_deaths > 0 && first.respawns > 0);
         assert_eq!(profile.ticks, 400);
+    }
+
+    #[test]
+    fn operation_snapshots_precede_respawns() {
+        let mut scene = Scene::place(&SMALL).unwrap();
+        let mut lifecycle = Lifecycle::default();
+        for tick in 0..2000 {
+            let actions = SMALL.controller.actions(&scene.world, tick);
+            scene.step(&actions, None).unwrap();
+            if let Some(death) = scene.world.deaths.get(scene.cursor) {
+                let victim: usize = death.victim.parse().unwrap();
+                let mut changed = scene.clone();
+                changed.world.snakes[victim].heading += 1.0;
+                let record = |scene: &mut Scene| {
+                    let (snapshot, boundary) =
+                        settle(scene, tick + 1, &mut Lifecycle::default(), world_events).unwrap();
+                    assert!(boundary.respawns.iter().any(|r| r.0 == victim));
+                    (snapshot, scene.world.snakes[victim].heading)
+                };
+                let (original, respawned) = record(&mut scene);
+                let (mutated, respawned_after_change) = record(&mut changed);
+                assert_eq!(respawned, respawned_after_change, "respawn resets the slot");
+                assert_ne!(original, mutated, "snapshot keeps the dead slot's state");
+                return;
+            }
+            scene.boundary(tick + 1, &mut lifecycle).unwrap();
+        }
+        panic!("no death within 2000 ticks");
     }
 
     #[test]
