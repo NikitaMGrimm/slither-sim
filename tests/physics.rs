@@ -506,3 +506,42 @@ fn head_on_contact_kills_only_the_earlier_joined_snake() {
     // A respawned life joins after every current one.
     assert_eq!(head_on(true), [("1".into(), Some("0".into()))]);
 }
+
+#[test]
+fn collision_bounds_follow_sparse_slots_and_respawn_join_order() {
+    for respawn_first in [false, true] {
+        let mut world = scene();
+        world.add("unused", 0, 1).unwrap();
+        world.add("2", 0, 1).unwrap();
+        world.snakes[1].alive = false;
+        if respawn_first {
+            world.snakes[0].alive = false;
+            world.respawn(0, Point::default(), 0.0, 2).unwrap();
+        }
+        world.snakes[2].head = Point { x: 60.0, y: 1.0 };
+        world.snakes[2].body = vec![Point { x: 60.0, y: 1.0 }, Point { x: 102.0, y: 1.0 }];
+        world.snakes[2].heading = PI;
+        let actions = [
+            Some(Action::default()),
+            None,
+            Some(Action {
+                heading: PI,
+                boost: false,
+            }),
+        ];
+        for _ in 0..100 {
+            world.step(&actions).unwrap();
+            if !world.deaths.is_empty() {
+                break;
+            }
+        }
+        let expected = if respawn_first {
+            ("2", "0")
+        } else {
+            ("0", "2")
+        };
+        assert_eq!(world.deaths.len(), 1);
+        assert_eq!(world.deaths[0].victim, expected.0);
+        assert_eq!(world.deaths[0].killer.as_deref(), Some(expected.1));
+    }
+}

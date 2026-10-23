@@ -771,15 +771,19 @@ impl Simulator {
             profile.movement_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
         }
-        let bodies: Vec<(usize, Bounds, usize)> = alive
+        // Stable-slot indexing avoids searching the living list for every pair.
+        let bodies: Vec<Option<Bounds>> = self
+            .snakes
             .iter()
-            .map(|&i| {
-                let s = &self.snakes[i];
+            .map(|s| {
+                if !s.alive {
+                    return None;
+                }
                 let mut bounds = Bounds::between(s.head, s.head);
                 for &p in &s.body {
                     bounds.include(p);
                 }
-                (i, bounds, s.segments)
+                Some(bounds)
             })
             .collect();
         // The offline Android client resolves collisions oldest first against
@@ -802,7 +806,9 @@ impl Simulator {
                 if i == j || fallen[j] {
                     return false;
                 }
-                let (_, other_bounds, segments) = bodies[alive.binary_search(&j).unwrap()];
+                let other_bounds = bodies[j].expect("living snake has bounds");
+                let other = &self.snakes[j];
+                let segments = other.segments;
                 if PROFILE {
                     profile.body_pairs += 1;
                 }
@@ -812,7 +818,6 @@ impl Simulator {
                 if PROFILE {
                     profile.segment_tests += self.snakes[j].body.len() as u64;
                 }
-                let other = &self.snakes[j];
                 let line = [head_tip(other.head, other.heading, segments), other.head]
                     .into_iter()
                     .chain(other.body.iter().copied());

@@ -1,0 +1,1564 @@
+{
+  "schema": "slither-perf-comparison-report-v1",
+  "runtime_baseline": "bb56d947df3c9a91e9331824981e4d4adf1cab34",
+  "baseline_harness_commit": "3129fcf011df5fa5361280ce700ffcc62baf587e",
+  "candidate_commit": "67db506",
+  "classification": "matched exploratory comparison on a shared desktop; demonstrated gain limited to long-body fixture",
+  "machine_and_build": "Same machine/toolchain/Cargo.lock and release flags as performance-baseline-20261023.json; same harness source; only src/simulator.rs runtime delta",
+  "quiet_window": "2026-10-23 approximately 14:38:23-14:40:15 UTC; both peers agreed no heavy local work, no builds/tests/traces in measurement",
+  "manifest": {
+    "schema": "slither-perf-compare-v1",
+    "utc": "2026-10-23T14:38:28Z",
+    "source_commit": "67db5064b63c98db473d069aba9a7710eb3ac7bb",
+    "source_status": "M docs/performance-baseline-20261023.json",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-pc-windows-msvc\nrelease: 1.99.0\nLLVM version: 23.1.1",
+    "harnesses": {
+      "baseline": {
+        "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\perf_baseline.exe",
+        "sha256": "1e2d4f034445f33c359e8b571c75d3941f9d24f3371c1cc634065b75a0dd2d5b"
+      },
+      "candidate": {
+        "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-candidate\\bin\\perf_baseline.exe",
+        "sha256": "a8cfd369648de6013ebeab6355f588f7647dfefd1e66ea758bcf41190a7f2f84"
+      }
+    },
+    "workloads": {
+      "step-default": 100000,
+      "step-food": 10000,
+      "step-body": 50000,
+      "observe": 1000,
+      "portable": 5000,
+      "protocol": 5000
+    },
+    "repeats": 5,
+    "warmup_repetitions": 1,
+    "order": "alternate label order per repetition and case; adjacent matched pairs",
+    "notes": "Native wall excludes setup/reset/output drop; process CPU includes them. Quiet agreement and build identities recorded in report."
+  },
+  "raw_results_sha256": "c5f9cf0122acdc2a75a1f8e234ac2402d4a3b46b057e1e17d909f7cf8057e72e",
+  "summary": {
+    "step-default": {
+      "iterations": 100000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 1.6673919011069178,
+          "cpu_ratio_candidate_over_baseline": 1.3181818181818181
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 0.9946694570870812,
+          "cpu_ratio_candidate_over_baseline": 1.0
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.9649358883326976,
+          "cpu_ratio_candidate_over_baseline": 1.1666666666666667
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 0.9372974624004521,
+          "cpu_ratio_candidate_over_baseline": 0.9285714285714286
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.9438160916319287,
+          "cpu_ratio_candidate_over_baseline": 1.0
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 0.9649358883326976,
+      "median_cpu_ratio_candidate_over_baseline": 1.0
+    },
+    "step-food": {
+      "iterations": 10000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 1.528937897206984,
+          "cpu_ratio_candidate_over_baseline": 0.9659090909090909
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 1.2362639150257333,
+          "cpu_ratio_candidate_over_baseline": 1.1290322580645162
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.9909799448795337,
+          "cpu_ratio_candidate_over_baseline": 1.0
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 1.0206300400175052,
+          "cpu_ratio_candidate_over_baseline": 0.9666666666666667
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.9388313992136933,
+          "cpu_ratio_candidate_over_baseline": 0.9322033898305084
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 1.0206300400175052,
+      "median_cpu_ratio_candidate_over_baseline": 0.9666666666666667
+    },
+    "step-body": {
+      "iterations": 50000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.6354808605334351,
+          "cpu_ratio_candidate_over_baseline": 0.6257668711656442
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 0.6929376679158167,
+          "cpu_ratio_candidate_over_baseline": 0.7164179104477612
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.714170819302656,
+          "cpu_ratio_candidate_over_baseline": 0.7251908396946565
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 0.7034226298856103,
+          "cpu_ratio_candidate_over_baseline": 0.7238805970149254
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.6993097322357548,
+          "cpu_ratio_candidate_over_baseline": 0.7028985507246377
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 0.6993097322357548,
+      "median_cpu_ratio_candidate_over_baseline": 0.7164179104477612
+    },
+    "observe": {
+      "iterations": 1000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.9797816696891203,
+          "cpu_ratio_candidate_over_baseline": 0.989010989010989
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 0.9630370463943015,
+          "cpu_ratio_candidate_over_baseline": 0.9438202247191011
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 1.022629115192754,
+          "cpu_ratio_candidate_over_baseline": 1.0235294117647058
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 1.0140059944131594,
+          "cpu_ratio_candidate_over_baseline": 1.0238095238095237
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.9894569356446113,
+          "cpu_ratio_candidate_over_baseline": 0.9662921348314607
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 0.9894569356446113,
+      "median_cpu_ratio_candidate_over_baseline": 0.989010989010989
+    },
+    "portable": {
+      "iterations": 5000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.9460171988097543,
+          "cpu_ratio_candidate_over_baseline": 0.9425287356321839
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 1.0115181612372666,
+          "cpu_ratio_candidate_over_baseline": 1.0263157894736843
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.9594188973614005,
+          "cpu_ratio_candidate_over_baseline": 0.963855421686747
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 1.0134527826803004,
+          "cpu_ratio_candidate_over_baseline": 1.0
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.8520923099031948,
+          "cpu_ratio_candidate_over_baseline": 0.9117647058823529
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 0.9594188973614005,
+      "median_cpu_ratio_candidate_over_baseline": 0.963855421686747
+    },
+    "protocol": {
+      "iterations": 5000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.9786043708944283,
+          "cpu_ratio_candidate_over_baseline": 1.0333333333333334
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 1.0015031853098761,
+          "cpu_ratio_candidate_over_baseline": 0.9666666666666667
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.9917826906420639,
+          "cpu_ratio_candidate_over_baseline": 0.9666666666666667
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 1.062076822302368,
+          "cpu_ratio_candidate_over_baseline": 1.103448275862069
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 1.0166005696502185,
+          "cpu_ratio_candidate_over_baseline": 0.9375
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 1.0015031853098761,
+      "median_cpu_ratio_candidate_over_baseline": 0.9666666666666667
+    }
+  },
+  "trace_parity": {
+    "all_six_32_iteration_traces": [
+      {
+        "case": "step-default",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 4743305,
+        "sha256": "ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637"
+      },
+      {
+        "case": "step-food",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 114800471,
+        "sha256": "0eee1305d2e0a445be70814a286c353e0756a72651dca349140c3afa4b64b359"
+      },
+      {
+        "case": "step-body",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 26851960,
+        "sha256": "d7b24f0a388770c68d5076a05bdd77bb3494e56a941b6bd4342cc3b34b45f585"
+      },
+      {
+        "case": "observe",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 210419560,
+        "sha256": "408f33f5a44f5460cf1190e04f2f8f4e0dd05ef5777b9ed3a3d17d06e4d5643f"
+      },
+      {
+        "case": "portable",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 26783570,
+        "sha256": "27cdcff90e1e806a20ef0ec12e35cb84ce2cdaa62980d8a0f6e88cb6e42d8d4b"
+      },
+      {
+        "case": "protocol",
+        "iterations": 32,
+        "lines": 289,
+        "uncompressed_bytes": 17913466,
+        "sha256": "a22849e7124629f6950b7ce769acdb8da93fca0b6df920cf5ca592d7c9906110"
+      }
+    ],
+    "extended_portable_128_decisions": {
+      "baseline": {
+        "case": "portable",
+        "iterations": 128,
+        "lines": 130,
+        "uncompressed_bytes": 109291847,
+        "sha256": "978ef2aa18257ca4ef7a05d508656d28aa8c4655a296c285a084f8dec358ecf1"
+      },
+      "candidate": {
+        "case": "portable",
+        "iterations": 128,
+        "lines": 130,
+        "uncompressed_bytes": 109291847,
+        "sha256": "978ef2aa18257ca4ef7a05d508656d28aa8c4655a296c285a084f8dec358ecf1"
+      }
+    },
+    "comparison": "All SHA256 values exactly match baseline uncompressed canonical JSONL; no telemetry fields removed. Unordered JSON keys and internal prey_outward set canonicalized."
+  },
+  "verification": [
+    "focused sparse-slot/respawn collision regression passed",
+    "tools/check.py rust passed: fmt, default/core-only all-target tests, doctests, Clippy -Dwarnings, basic example",
+    "3 stdlib runner failure/cleanup regressions passed",
+    "independent read-only source review no findings for final runtime/runner/comparison; execution parent-verified"
+  ],
+  "samples": [
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.6114740000339225,
+      "cpu_seconds": 0.34375,
+      "peak_working_set_bytes": 6021120,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0200839,
+          "p50": 2.8e-06,
+          "p95": 8.9e-06,
+          "p99": 2.07e-05
+        },
+        "operationsPerSecond": 223906.89772046683,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.44661420000041036
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.9551088999724016,
+      "cpu_seconds": 0.453125,
+      "peak_working_set_bytes": 6037504,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0693029,
+          "p50": 2.7e-06,
+          "p95": 1.65e-05,
+          "p99": 2.91e-05
+        },
+        "operationsPerSecond": 134285.70546121977,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.7446809000000294
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 2.5179421000066213,
+      "cpu_seconds": 1.328125,
+      "peak_working_set_bytes": 7090176,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0799649,
+          "p50": 0.0001068,
+          "p95": 0.000638,
+          "p99": 0.001467
+        },
+        "operationsPerSecond": 4527.633163916874,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 2.2086594999999867
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 1.4714660000172444,
+      "cpu_seconds": 1.375,
+      "peak_working_set_bytes": 7098368,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0055674,
+          "p50": 0.0001123,
+          "p95": 0.0004033,
+          "p99": 0.0009597
+        },
+        "operationsPerSecond": 6922.469928963668,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.4445711000000045
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 2.57022319996031,
+      "cpu_seconds": 2.546875,
+      "peak_working_set_bytes": 5988352,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0040232,
+          "p50": 4.54e-05,
+          "p95": 8.44e-05,
+          "p99": 0.0001259
+        },
+        "operationsPerSecond": 19894.15117923539,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 2.513301500000047
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 1.6464588000089861,
+      "cpu_seconds": 1.59375,
+      "peak_working_set_bytes": 5910528,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0011716,
+          "p50": 2.48e-05,
+          "p95": 5.57e-05,
+          "p99": 7.97e-05
+        },
+        "operationsPerSecond": 31305.665386264893,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.597155000000003
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.4216826999909244,
+      "cpu_seconds": 1.40625,
+      "peak_working_set_bytes": 8015872,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0031373,
+          "p50": 0.0013634,
+          "p95": 0.0017423,
+          "p99": 0.0019667
+        },
+        "operationsPerSecond": 729.7617721885165,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3703101999999994
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.4504967000102624,
+      "cpu_seconds": 1.421875,
+      "peak_working_set_bytes": 8024064,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0035467,
+          "p50": 0.0013898,
+          "p95": 0.0018142,
+          "p99": 0.0021002
+        },
+        "operationsPerSecond": 715.007207630156,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3985873000000009
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.3737679999903776,
+      "cpu_seconds": 1.359375,
+      "peak_working_set_bytes": 8019968,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.001302,
+          "p50": 0.0002306,
+          "p95": 0.0004033,
+          "p99": 0.0006007
+        },
+        "operationsPerSecond": 3841.180699050328,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3016831000000006
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.2954321000142954,
+      "cpu_seconds": 1.28125,
+      "peak_working_set_bytes": 8032256,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0016582,
+          "p50": 0.0002226,
+          "p95": 0.0003652,
+          "p99": 0.0005423
+        },
+        "operationsPerSecond": 4060.370893767224,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.231414599999998
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.49053740000817925,
+      "cpu_seconds": 0.484375,
+      "peak_working_set_bytes": 6914048,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0003937,
+          "p50": 6.5e-05,
+          "p95": 0.0001757,
+          "p99": 0.0002272
+        },
+        "operationsPerSecond": 11768.94824204866,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.4248468000000001
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.5024595999857411,
+      "cpu_seconds": 0.46875,
+      "peak_working_set_bytes": 6930432,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 0,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0004075,
+          "p50": 6.6e-05,
+          "p95": 0.0001733,
+          "p99": 0.0002374
+        },
+        "operationsPerSecond": 11517.144190499119,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.43413539999999906
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.235453300003428,
+      "cpu_seconds": 0.234375,
+      "peak_working_set_bytes": 6008832,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0015233,
+          "p50": 1.4e-06,
+          "p95": 3.1e-06,
+          "p99": 1.22e-05
+        },
+        "operationsPerSecond": 467146.95602339966,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.21406540000014673
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.23482250003144145,
+      "cpu_seconds": 0.234375,
+      "peak_working_set_bytes": 5963776,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0001961,
+          "p50": 1.5e-06,
+          "p95": 3.1e-06,
+          "p99": 1.19e-05
+        },
+        "operationsPerSecond": 464656.8091276775,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.21521259999984674
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.9738478999934159,
+      "cpu_seconds": 0.96875,
+      "peak_working_set_bytes": 7081984,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0038359,
+          "p50": 7.06e-05,
+          "p95": 0.0002107,
+          "p99": 0.0006168
+        },
+        "operationsPerSecond": 10529.023410967668,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.9497557000000014
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 1.1929969000048004,
+      "cpu_seconds": 1.09375,
+      "peak_working_set_bytes": 7168000,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0040863,
+          "p50": 7.68e-05,
+          "p95": 0.0003604,
+          "p99": 0.0009428
+        },
+        "operationsPerSecond": 8516.808816464161,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.1741487000000077
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 1.5162363999988884,
+      "cpu_seconds": 1.5,
+      "peak_working_set_bytes": 5910528,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0002068,
+          "p50": 2.39e-05,
+          "p95": 5.23e-05,
+          "p99": 6.8e-05
+        },
+        "operationsPerSecond": 34162.09668911854,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.4636104000000159
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 2.1577727000112645,
+      "cpu_seconds": 2.09375,
+      "peak_working_set_bytes": 5861376,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0004418,
+          "p50": 3.54e-05,
+          "p95": 6.51e-05,
+          "p99": 9.31e-05
+        },
+        "operationsPerSecond": 23672.203610872442,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 2.112181900000025
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.390418299997691,
+      "cpu_seconds": 1.390625,
+      "peak_working_set_bytes": 7917568,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0025852,
+          "p50": 0.0013765,
+          "p95": 0.0016668,
+          "p99": 0.0020627
+        },
+        "operationsPerSecond": 749.691782965729,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3338814999999986
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.3308699000044726,
+      "cpu_seconds": 1.3125,
+      "peak_working_set_bytes": 8024064,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0021535,
+          "p50": 0.0011724,
+          "p95": 0.0016005,
+          "p99": 0.0017797
+        },
+        "operationsPerSecond": 778.4661927312593,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.2845772999999991
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.305586399976164,
+      "cpu_seconds": 1.21875,
+      "peak_working_set_bytes": 8167424,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0016463,
+          "p50": 0.0002212,
+          "p95": 0.0003802,
+          "p99": 0.0006412
+        },
+        "operationsPerSecond": 4037.7441866174277,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.2383152000000006
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.2917179000214674,
+      "cpu_seconds": 1.1875,
+      "peak_working_set_bytes": 7946240,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0016036,
+          "p50": 0.0002196,
+          "p95": 0.0003672,
+          "p99": 0.0005848
+        },
+        "operationsPerSecond": 4084.2515751937235,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.2242145000000009
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.48784600000362843,
+      "cpu_seconds": 0.46875,
+      "peak_working_set_bytes": 6959104,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0008016,
+          "p50": 6.27e-05,
+          "p95": 0.0001741,
+          "p99": 0.000246
+        },
+        "operationsPerSecond": 11945.210663346252,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.4185777999999988
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.4848547999863513,
+      "cpu_seconds": 0.453125,
+      "peak_working_set_bytes": 6905856,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 1,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0004792,
+          "p50": 6.48e-05,
+          "p95": 0.000168,
+          "p99": 0.0002209
+        },
+        "operationsPerSecond": 11927.28174863495,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.41920699999999905
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.22450989997014403,
+      "cpu_seconds": 0.1875,
+      "peak_working_set_bytes": 5951488,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.00015,
+          "p50": 1.5e-06,
+          "p95": 3.1e-06,
+          "p99": 1.15e-05
+        },
+        "operationsPerSecond": 488079.39294659084,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.20488469999990908
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.2175606000237167,
+      "cpu_seconds": 0.21875,
+      "peak_working_set_bytes": 5988352,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0002397,
+          "p50": 1.4e-06,
+          "p95": 2.9e-06,
+          "p99": 1.14e-05
+        },
+        "operationsPerSecond": 505815.3591840573,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.19770060000019052
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.9092408000142314,
+      "cpu_seconds": 0.875,
+      "peak_working_set_bytes": 7139328,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0010922,
+          "p50": 6.7e-05,
+          "p95": 0.0001909,
+          "p99": 0.0006018
+        },
+        "operationsPerSecond": 11183.934680453214,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.8941396999999971
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.9172384000266902,
+      "cpu_seconds": 0.875,
+      "peak_working_set_bytes": 7102464,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0012042,
+          "p50": 7e-05,
+          "p95": 0.0001662,
+          "p99": 0.0005937
+        },
+        "operationsPerSecond": 11083.054973171831,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.9022782999999978
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 2.0810584999853745,
+      "cpu_seconds": 2.046875,
+      "peak_working_set_bytes": 5898240,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0002546,
+          "p50": 3.52e-05,
+          "p95": 6.41e-05,
+          "p99": 8.16e-05
+        },
+        "operationsPerSecond": 24544.216356678415,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 2.037139799999976
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 1.4996490000048652,
+      "cpu_seconds": 1.484375,
+      "peak_working_set_bytes": 5914624,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0007643,
+          "p50": 2.38e-05,
+          "p95": 5.12e-05,
+          "p99": 6.81e-05
+        },
+        "operationsPerSecond": 34367.43100291375,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.4548658000000316
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.3813392000156455,
+      "cpu_seconds": 1.359375,
+      "peak_working_set_bytes": 8028160,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0031407,
+          "p50": 0.0012491,
+          "p95": 0.0016725,
+          "p99": 0.0019055
+        },
+        "operationsPerSecond": 751.0332903767336,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3314988999999982
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.3479417000198737,
+      "cpu_seconds": 1.328125,
+      "peak_working_set_bytes": 7974912,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0056598,
+          "p50": 0.0012162,
+          "p95": 0.0015917,
+          "p99": 0.0018466
+        },
+        "operationsPerSecond": 768.0285092182618,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3020350000000007
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.3080017999745905,
+      "cpu_seconds": 1.296875,
+      "peak_working_set_bytes": 7991296,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0019119,
+          "p50": 0.0002229,
+          "p95": 0.0003714,
+          "p99": 0.000517
+        },
+        "operationsPerSecond": 4038.418933141786,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.2381083000000024
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.253030099964235,
+      "cpu_seconds": 1.25,
+      "peak_working_set_bytes": 8163328,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0012699,
+          "p50": 0.0002169,
+          "p95": 0.0003441,
+          "p99": 0.0005143
+        },
+        "operationsPerSecond": 4209.234302397284,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.1878645000000003
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.4517894000164233,
+      "cpu_seconds": 0.453125,
+      "peak_working_set_bytes": 6914048,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0003585,
+          "p50": 6.16e-05,
+          "p95": 0.0001483,
+          "p99": 0.0001821
+        },
+        "operationsPerSecond": 12922.504515769217,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.3869218999999996
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.45529569999780506,
+      "cpu_seconds": 0.46875,
+      "peak_working_set_bytes": 6922240,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 2,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0004017,
+          "p50": 6.18e-05,
+          "p95": 0.0001522,
+          "p99": 0.0001868
+        },
+        "operationsPerSecond": 12816.316298483815,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.3901276999999997
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.20734309998806566,
+      "cpu_seconds": 0.203125,
+      "peak_working_set_bytes": 5959680,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0001526,
+          "p50": 1.4e-06,
+          "p95": 2.7e-06,
+          "p99": 1.12e-05
+        },
+        "operationsPerSecond": 525598.7621093723,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.19025920000015317
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.2216657000244595,
+      "cpu_seconds": 0.21875,
+      "peak_working_set_bytes": 6012928,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0001602,
+          "p50": 1.5e-06,
+          "p95": 2.8e-06,
+          "p99": 1.14e-05
+        },
+        "operationsPerSecond": 492642.38596593356,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.20298699999986408
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.9308371999650262,
+      "cpu_seconds": 0.9375,
+      "peak_working_set_bytes": 7102464,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0012777,
+          "p50": 7.02e-05,
+          "p95": 0.0001935,
+          "p99": 0.0005896
+        },
+        "operationsPerSecond": 10905.44056071409,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.9169735000000034
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.9541508000111207,
+      "cpu_seconds": 0.90625,
+      "peak_working_set_bytes": 7184384,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0023418,
+          "p50": 6.74e-05,
+          "p95": 0.0002337,
+          "p99": 0.0006489
+        },
+        "operationsPerSecond": 10685.00840963592,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.9358906999999954
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 1.5105665999581106,
+      "cpu_seconds": 1.515625,
+      "peak_working_set_bytes": 5918720,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0002975,
+          "p50": 2.39e-05,
+          "p95": 5.23e-05,
+          "p99": 6.77e-05
+        },
+        "operationsPerSecond": 34103.580896456224,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.4661217000000022
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 2.129863900016062,
+      "cpu_seconds": 2.09375,
+      "peak_working_set_bytes": 5849088,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0050613,
+          "p50": 3.52e-05,
+          "p95": 6.46e-05,
+          "p99": 8.81e-05
+        },
+        "operationsPerSecond": 23989.2305627019,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 2.084268600000004
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.33321040001465,
+      "cpu_seconds": 1.3125,
+      "peak_working_set_bytes": 8024064,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0023267,
+          "p50": 0.0011726,
+          "p95": 0.0015937,
+          "p99": 0.001875
+        },
+        "operationsPerSecond": 777.8083197177993,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.285663799999999
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.3493805000325665,
+      "cpu_seconds": 1.34375,
+      "peak_working_set_bytes": 7987200,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0021398,
+          "p50": 0.0011979,
+          "p95": 0.0016387,
+          "p99": 0.0018523
+        },
+        "operationsPerSecond": 767.0648142153678,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3036708000000001
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.2838548999861814,
+      "cpu_seconds": 1.25,
+      "peak_working_set_bytes": 8224768,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0013879,
+          "p50": 0.00022,
+          "p95": 0.0003676,
+          "p99": 0.0005519
+        },
+        "operationsPerSecond": 4106.102341480216,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.2176998000000023
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.2693469999940135,
+      "cpu_seconds": 1.25,
+      "peak_working_set_bytes": 8056832,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0011643,
+          "p50": 0.0002176,
+          "p95": 0.0003569,
+          "p99": 0.0005285
+        },
+        "operationsPerSecond": 4161.340843943222,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.2015358000000014
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.46925379999447614,
+      "cpu_seconds": 0.453125,
+      "peak_working_set_bytes": 6934528,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0004783,
+          "p50": 6.3e-05,
+          "p95": 0.0001582,
+          "p99": 0.0001839
+        },
+        "operationsPerSecond": 12415.364460472993,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.40272679999999883
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.49625229998491704,
+      "cpu_seconds": 0.5,
+      "peak_working_set_bytes": 6807552,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 3,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0004772,
+          "p50": 6.69e-05,
+          "p95": 0.0001661,
+          "p99": 0.0002039
+        },
+        "operationsPerSecond": 11689.704736761874,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.4277268000000001
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.2189154999796301,
+      "cpu_seconds": 0.203125,
+      "peak_working_set_bytes": 5984256,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0001714,
+          "p50": 1.5e-06,
+          "p95": 2.7e-06,
+          "p99": 1.14e-05
+        },
+        "operationsPerSecond": 501834.70769148966,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.1992687999999324
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-default",
+      "process_wall_seconds": 0.20767139998497441,
+      "cpu_seconds": 0.203125,
+      "peak_working_set_bytes": 5955584,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0001571,
+          "p50": 1.4e-06,
+          "p95": 2.3e-06,
+          "p99": 1.11e-05
+        },
+        "operationsPerSecond": 531708.149649981,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.18807310000012067
+      },
+      "iterations": 100000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.8826413999777287,
+      "cpu_seconds": 0.859375,
+      "peak_working_set_bytes": 7172096,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0012968,
+          "p50": 6.64e-05,
+          "p95": 0.0001494,
+          "p99": 0.0005889
+        },
+        "operationsPerSecond": 11526.414218984633,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.8675724999999961
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-food",
+      "process_wall_seconds": 0.9419509000144899,
+      "cpu_seconds": 0.921875,
+      "peak_working_set_bytes": 7106560,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.005252,
+          "p50": 7.02e-05,
+          "p95": 0.0002019,
+          "p99": 0.0006163
+        },
+        "operationsPerSecond": 10821.359589125952,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.9240983000000008
+      },
+      "iterations": 10000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 2.1829010999645106,
+      "cpu_seconds": 2.15625,
+      "peak_working_set_bytes": 5804032,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0023198,
+          "p50": 3.54e-05,
+          "p95": 6.73e-05,
+          "p99": 9.63e-05
+        },
+        "operationsPerSecond": 23404.778291450148,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 2.1363159000000094
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "step-body",
+      "process_wall_seconds": 1.5392983999918215,
+      "cpu_seconds": 1.515625,
+      "peak_working_set_bytes": 5849088,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0011165,
+          "p50": 2.4e-05,
+          "p95": 5.28e-05,
+          "p99": 6.98e-05
+        },
+        "operationsPerSecond": 33468.400642191846,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.493946499999992
+      },
+      "iterations": 50000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.3680534000159241,
+      "cpu_seconds": 1.34375,
+      "peak_working_set_bytes": 8028160,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0020763,
+          "p50": 0.001235,
+          "p95": 0.0016609,
+          "p99": 0.0018704
+        },
+        "operationsPerSecond": 756.061743933532,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3226432999999977
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "observe",
+      "process_wall_seconds": 1.3850942999706604,
+      "cpu_seconds": 1.390625,
+      "peak_working_set_bytes": 8028160,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0023062,
+          "p50": 0.0012849,
+          "p95": 0.0016973,
+          "p99": 0.0018695
+        },
+        "operationsPerSecond": 748.0905363105934,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3367366000000012
+      },
+      "iterations": 1000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.7031151999835856,
+      "cpu_seconds": 1.59375,
+      "peak_working_set_bytes": 8200192,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0040536,
+          "p50": 0.0002837,
+          "p95": 0.0005378,
+          "p99": 0.0009954
+        },
+        "operationsPerSecond": 3097.148888619094,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.6143879999999993
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "portable",
+      "process_wall_seconds": 1.4545941000105813,
+      "cpu_seconds": 1.453125,
+      "peak_working_set_bytes": 8151040,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0014788,
+          "p50": 0.0002446,
+          "p95": 0.0004265,
+          "p99": 0.0006401
+        },
+        "operationsPerSecond": 3634.757470080862,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 1.3756075999999984
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.5175822000019252,
+      "cpu_seconds": 0.46875,
+      "peak_working_set_bytes": 6828032,
+      "exit_code": 0,
+      "label": "candidate",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0005931,
+          "p50": 6.69e-05,
+          "p95": 0.0001637,
+          "p99": 0.0002383
+        },
+        "operationsPerSecond": 11566.925071772765,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.4322670000000002
+      },
+      "iterations": 5000
+    },
+    {
+      "case": "protocol",
+      "process_wall_seconds": 0.4982293999637477,
+      "cpu_seconds": 0.5,
+      "peak_working_set_bytes": 6914048,
+      "exit_code": 0,
+      "label": "baseline",
+      "repetition": 4,
+      "timing": {
+        "latencySeconds": {
+          "max": 0.0008243,
+          "p50": 6.63e-05,
+          "p95": 0.0001616,
+          "p99": 0.000228
+        },
+        "operationsPerSecond": 11758.942617065588,
+        "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+        "wallSeconds": 0.4252082999999992
+      },
+      "iterations": 5000
+    }
+  ]
+}
