@@ -4,7 +4,8 @@ Keep each PR focused on one problem. For larger features or interface changes,
 discuss the scope with the maintainer before starting; small fixes can go straight
 to a PR. Use one task, branch and worktree; preserve other contributors' work.
 Start with the [API guides](README.md#choose-an-interface) and
-[rules and limits](docs/server-rules.md).
+[rules and limits](docs/server-rules.md), or use the [documentation map](docs/README.md)
+to find a research or maintenance task.
 
 ## Find the change
 

@@ -5,6 +5,15 @@ before starting. Existing evidence can support mechanics corrections; routine
 tool/API fixes need a reproducer and regression, not a new study. New empirical
 or fitted claims need the complete relevant study and its limitations.
 
+Go directly to the task you need:
+
+- [Try the offline demonstration](#try-the-complete-offline-workflow).
+- [Plan a measurement](#plan-a-real-measurement), including [controlled routes](#controlled-snake-and-food-routes).
+- [Audit, analyze and replay](#inspect-analyze-and-reproduce).
+- [Package and submit](#package-and-submit) or [compare contributed bundles](#compare-contributed-evidence).
+- [Evolve a fixture or protocol](#fixture-and-protocol-evolution).
+- [Run offline checks](#offline-checks); documentation and Rust-only work can start there.
+
 For the evidence workflow below, use Python 3.12, uv, Rust 1.86+ and Node.js 22+
 (24 recommended). Rust-only and documentation work can skip this setup:
 
