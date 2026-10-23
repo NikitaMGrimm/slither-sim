@@ -265,7 +265,10 @@ class SectorEventsTests(unittest.TestCase):
         self.assertIsNone(event.source.server_ms)
         for replacement in ({}, dict(receipt_ms=107), dict(record_index=-1),
                             dict(frame_index=0), dict(receipt_ms=float("nan")),
-                            dict(server_ms=-1), dict(receipt_ms=None)):
+                            dict(server_ms=-1), dict(receipt_ms=None),
+                            dict(record_index=12, frame_index=2, receipt_ms=107),
+                            dict(record_index=11, frame_index=2),
+                            dict(record_index=12, frame_index=1)):
             with self.subTest(replacement=replacement):
                 previous = copy.deepcopy(vars(self.ledger))
                 with self.assertRaises(ValueError):
