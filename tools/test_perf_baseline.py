@@ -502,34 +502,78 @@ class ProcessFailures(unittest.TestCase):
                                           "uncompressed_bytes": len(emitted),
                                           "sha256": hashlib.sha256(emitted).hexdigest()})
 
-    def test_scenario_traces_require_end_then_report(self):
-        record = lambda **fields: json.dumps({"case": "CASE", **fields}).encode() + b"\n"
-        step = record(kind="step", iteration=0)
-        end = lambda **fields: record(**{"kind": "end", "operations": 2, "physicsTicks": 2, **fields})
-        report = record(kind="report", format="slither-perf-baseline-v1")
-        children = {"complete": (step + end() + report, None),
-                    "eof only": (step, "missing terminal end"),
-                    "no report": (step + end(), "missing terminal end"),
-                    "report without end": (step + report, "missing terminal end"),
-                    "short window": (step + end(operations=1) + report, "missing terminal end"),
-                    "other case": (step + end(case="other") + report, "missing terminal end"),
-                    "end not last": (end() + step + report, "missing terminal end")}
-        for name, (emitted, error) in children.items():
+    @staticmethod
+    def scenario(case="CASE", n=3, kind="step", **changes):
+        """Synthetic scenario record sequence shaped like the harness's; `changes` replaces parts."""
+        line = lambda **fields: json.dumps(fields, sort_keys=True).encode()
+        parts = {"initial": [line(kind="initial", case=case)],
+                 "warmup": [line(kind="warmup", tick=t) for t in range(2)],
+                 "warmed": [line(kind="warmed")],
+                 "operations": [line(kind=kind, iteration=i) for i in range(n)],
+                 "end": [line(kind="end", case=case, operations=n, physicsTicks=n)],
+                 "report": [line(kind="report", case=case, iterations=n, mode="trace")]}
+        parts.update(changes)
+        return [record for name in parts for record in parts[name]]
+
+    def test_scenario_sequence_requires_every_stage_in_order(self):
+        line = lambda **fields: json.dumps(fields, sort_keys=True).encode()
+        step = lambda i: line(kind="step", iteration=i)
+        valid = {"step": self.scenario(), "bot": self.scenario(kind="bot"),
+                 "decision": self.scenario(kind="decision"), "no warmup ticks": self.scenario(warmup=[]),
+                 "epoch between operations": self.scenario(operations=[step(0), line(kind="epoch"), step(1), step(2)])}
+        invalid = {
+            "only end and report": (self.scenario(initial=[], warmup=[], warmed=[], operations=[]), "expected initial"),
+            "missing initial": (self.scenario(initial=[]), "expected initial"),
+            "missing warmed": (self.scenario(warmed=[]), "expected warmup or warmed"),
+            "operation before warmed": (self.scenario(warmup=[step(0)]), "expected warmup or warmed"),
+            "skipped iteration": (self.scenario(operations=[step(0), step(2), step(3)]), "expected operation 1"),
+            "duplicated iteration": (self.scenario(operations=[step(0), step(0), step(1)]), "expected operation 1"),
+            "too few operations": (self.scenario(operations=[step(0), step(1)]), "end after 2 of 3"),
+            "too many operations": (self.scenario(operations=[step(0), step(1), step(2), step(3)]), "expected operation 3 of 3"),
+            "end count": (self.scenario(end=[line(kind="end", case="CASE", operations=2)]), "end after 3 of 3"),
+            "end case": (self.scenario(end=[line(kind="end", case="other", operations=3)]), "case 'other'"),
+            "missing end": (self.scenario(end=[]), "unexpected 'report'"),
+            "missing report": (self.scenario(report=[]), "while expecting report"),
+            "report case": (self.scenario(report=[line(kind="report", case="other", iterations=3, mode="trace")]), "trace-mode report"),
+            "report count": (self.scenario(report=[line(kind="report", case="CASE", iterations=2, mode="trace")]), "trace-mode report"),
+            "report mode": (self.scenario(report=[line(kind="report", case="CASE", iterations=3, mode="timing")]), "trace-mode report"),
+            "after report": (self.scenario() + [step(3)], "after the report"),
+            "not json": (self.scenario(warmup=[b"{"]), "not JSON"),
+        }
+        for name, records in valid.items():
+            with self.subTest(name):
+                sequence = perf_baseline.TraceSequence("CASE", 3)
+                for record in records:
+                    sequence.feed(record)
+                self.assertIsNone(sequence.finish())
+                self.assertEqual(sequence.end["operations"], 3)
+        for name, (records, message) in invalid.items():
+            with self.subTest(name):
+                sequence = perf_baseline.TraceSequence("CASE", 3)
+                for record in records:
+                    sequence.feed(record)
+                self.assertIn(message, sequence.finish() or "")
+
+    def test_capture_validates_scenarios_and_keeps_legacy_capture_unchanged(self):
+        incomplete = self.scenario(initial=[], warmup=[], warmed=[], operations=[])
+        for name, records, error in (("complete", self.scenario(n=2), None),
+                                     ("end and report only", incomplete, "expected initial")):
             with self.subTest(name), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 script = root / "child.py"
                 case = str(script)
+                emitted = b"".join(record + b"\n" for record in records)
                 (root / "trace.bin").write_bytes(emitted.replace(b'"CASE"', json.dumps(case).encode()))
                 script.write_text("from pathlib import Path\nimport sys\n"
                                   "sys.stdout.buffer.write((Path(__file__).parent / 'trace.bin').read_bytes())\n")
                 if error:
                     with self.assertRaisesRegex(RuntimeError, f"invalid/incomplete .*{error}"):
-                        perf_baseline.capture_trace(sys.executable, case, 2, root, terminal=True)
-                    # Legacy capture keeps accepting any complete child output.
-                    self.assertNotIn("end", perf_baseline.capture_trace(sys.executable, case, 2, root))
-                    continue
-                result = perf_baseline.capture_trace(sys.executable, case, 2, root, terminal=True)
-                self.assertEqual((result["lines"], result["end"]["physicsTicks"]), (3, 2))
+                        perf_baseline.capture_trace(sys.executable, case, 3, root, terminal=True)
+                else:
+                    result = perf_baseline.capture_trace(sys.executable, case, 2, root, terminal=True)
+                    self.assertEqual((result["lines"], result["end"]["operations"]), (len(records), 2))
+                # Legacy rows have no scenario sequence; any complete child output is archived.
+                self.assertNotIn("end", perf_baseline.capture_trace(sys.executable, case, 3, root))
 
     def test_multi_megabyte_lines_are_buffered_in_linear_time(self):
         # Synthetic 64 MiB line in 64 KiB reads. Growing one bytes object per chunk took

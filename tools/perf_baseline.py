@@ -336,29 +336,77 @@ def native(executable, case, iterations, stderr_path, profile=False, *, deadline
                 "workload": json.loads(line)}
 
 
-def small_record(line):
-    # Terminal records are small; never parse a multi-megabyte snapshot line here.
-    if len(line) > 1 << 20:
-        return None
-    try:
-        record = json.loads(line)
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    return record if isinstance(record, dict) else None
+class TraceSequence:
+    """Streaming check of a scenario trace's record order, one parsed line at a time.
 
+    initial, warmup*, warmed, then operations numbered 0..N-1 (epoch records may
+    appear between them), end (operations == N), and the trace-mode report last.
+    Without this, two identically truncated streams could hash Equal.
+    """
 
-def terminal_record(previous, last, case, iterations):
-    """Scenario traces end with `end` (matching case and operation count), then the report."""
-    end, report = small_record(previous), small_record(last)
-    if (end and report and end.get("kind") == "end" and end.get("case") == case
-            and end.get("operations") == iterations
-            and report.get("kind") == "report" and report.get("case") == case):
-        return end
-    return None
+    OPERATIONS = ("step", "bot", "decision")
+
+    def __init__(self, case, iterations):
+        self.case = case
+        self.iterations = iterations
+        self.state = "initial"
+        self.operations = 0
+        self.records = 0
+        self.end = None
+        self.error = None
+
+    def fail(self, message):
+        self.error = f"record {self.records}: {message}"
+
+    def feed(self, line):
+        self.records += 1
+        if self.error:
+            return
+        try:
+            record = json.loads(line)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return self.fail("not JSON")
+        kind = record.get("kind") if isinstance(record, dict) else None
+        if self.state == "initial":
+            if kind != "initial":
+                return self.fail(f"expected initial, found {kind!r}")
+            self.state = "warmup"
+        elif self.state == "warmup":
+            if kind == "warmed":
+                self.state = "operations"
+            elif kind != "warmup":
+                return self.fail(f"expected warmup or warmed, found {kind!r}")
+        elif self.state == "operations":
+            if kind in self.OPERATIONS:
+                if record.get("iteration") != self.operations or self.operations >= self.iterations:
+                    return self.fail(f"expected operation {self.operations} of {self.iterations}, "
+                                     f"found iteration {record.get('iteration')!r}")
+                self.operations += 1
+            elif kind == "end":
+                if (self.operations != self.iterations or record.get("case") != self.case
+                        or record.get("operations") != self.iterations):
+                    return self.fail(f"end after {self.operations} of {self.iterations} operations "
+                                     f"(case {record.get('case')!r}, operations {record.get('operations')!r})")
+                self.end = record
+                self.state = "report"
+            elif kind != "epoch":
+                return self.fail(f"unexpected {kind!r} among operations")
+        elif self.state == "report":
+            if (kind != "report" or record.get("case") != self.case
+                    or record.get("iterations") != self.iterations or record.get("mode") != "trace"):
+                return self.fail("expected the trace-mode report for this case and window")
+            self.state = "done"
+        else:
+            return self.fail("record after the report")
+
+    def finish(self):
+        if not self.error and self.state != "done":
+            self.error = f"stream ended while expecting {self.state}"
+        return self.error
 
 
 def capture_trace(executable, case, iterations, directory, *, terminal=False, deadline=None):
-    """Archive one trace. With `terminal`, EOF alone is incomplete: `end` and the report must close it."""
+    """Archive one trace. With `terminal`, the whole scenario record sequence must validate."""
     stderr_path = directory / f"{case}-trace-stderr.txt"
     started = time.perf_counter()
     child_deadline = min(started + 120, deadline) if deadline is not None else started + 120
@@ -373,7 +421,7 @@ def capture_trace(executable, case, iterations, directory, *, terminal=False, de
         sha = hashlib.sha256()
         lines = 0
         size = 0
-        previous = last = b""
+        sequence = TraceSequence(case, iterations) if terminal else None
         with (directory / f"{case}.jsonl.gz").open("wb") as raw:
             # Parity hashes uncompressed bytes; favor faster capture over archive size.
             with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1, mtime=0) as output:
@@ -382,20 +430,21 @@ def capture_trace(executable, case, iterations, directory, *, terminal=False, de
                         line = reader.read(child_deadline)
                     except EOFError:
                         break
-                    previous, last = last, line
+                    if sequence:
+                        sequence.feed(line)
                     for part in (line, b"\n"):
                         output.write(part)
                         sha.update(part)
                     lines += 1
                     size += len(line) + 1
         process.wait(timeout=max(.1, child_deadline - time.perf_counter()))
-        end = terminal_record(previous, last, case, iterations) if terminal else None
-        if process.returncode or not lines or reader.pending or (terminal and end is None):
-            missing = "; missing terminal end record" if terminal and end is None else ""
-            raise RuntimeError(f"invalid/incomplete {case} trace{missing}; see {stderr_path}")
+        error = sequence.finish() if sequence else None
+        if process.returncode or not lines or reader.pending or error:
+            detail = f"; {error}" if error else ""
+            raise RuntimeError(f"invalid/incomplete {case} trace{detail}; see {stderr_path}")
         record = {"case": case, "iterations": iterations, "lines": lines,
                   "uncompressed_bytes": size, "sha256": sha.hexdigest()}
-        return {**record, "end": end} if terminal else record
+        return {**record, "end": sequence.end} if terminal else record
 
 
 def e2e(executable, steps, hosted, directory):
