@@ -8,7 +8,7 @@ const publish = require('./pr_report_comment.cjs');
 const head = 'a'.repeat(40), base = 'b'.repeat(40), merge = 'c'.repeat(40);
 const marker = '<!-- slither-report-preview -->';
 const bot = { login: 'github-actions[bot]', type: 'Bot' };
-function fixture(t, { previous = [], liveHead = head, liveBase = base, reportOverride = {}, fork = false } = {}) {
+function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotBase = liveBase, reportOverride = {}, fork = false } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-comment-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true }));
   const report = { schema: 1, repository: 'owner/repo', pr: 27, head, base, merge, ...reportOverride };
@@ -19,7 +19,8 @@ function fixture(t, { previous = [], liveHead = head, liveBase = base, reportOve
     number: 27, head: { sha: head, ref: 'ci/report-preview', repo: { full_name: fork ? 'fork/repo' : 'owner/repo' } }
   } } };
   const github = { paginate: async () => previous, rest: {
-    pulls: { get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'ci/report-preview', repo: { full_name: 'owner/repo' } }, base: { sha: liveBase } } }) },
+    pulls: { get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'ci/report-preview', repo: { full_name: 'owner/repo' } }, base: { sha: snapshotBase, ref: 'target' } } }) },
+    repos: { getBranch: async () => ({ data: { commit: { sha: liveBase } } }) },
     issues: { listComments: {},
       createComment: async x => { calls.push(['create', x]); return { data: { html_url: 'created' } }; },
       updateComment: async x => { calls.push(['update', x]); return { data: { html_url: 'updated' } }; }
@@ -56,6 +57,12 @@ test('does not overwrite a newer head or changed target', async t => {
     await publish(f.args);
     assert.equal(f.calls.length, 0);
   }
+});
+test('publishes when the live target matches despite an older PR base snapshot', async t => {
+  const f = fixture(t, { snapshotBase: head });
+  await publish(f.args);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0][0], 'create');
 });
 test('older runs, attempts and duplicate execution do not overwrite results', async t => {
   for (const saved of [{ run: 101, attempt: 1 }, { run: 100, attempt: 2 }, { run: 100, attempt: 1 }]) {

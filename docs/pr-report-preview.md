@@ -41,6 +41,8 @@ agent byline. Colored status dots distinguish improvements, regressions and
 inconclusive changes; methodology and diagnostics are collapsed under Details.
 Before posting, the publisher checks the artifact's PR/repository/head/merge
 identity, current open PR head and target, and prior published run/attempt.
+The current target is resolved through the branch API; the PR's `base.sha` can
+retain an older snapshot even when the merge checkout uses a newer target.
 Only the named same-repository branch can run it. Measurement jobs have read-only
 repository access; the separate publisher has comment write access and treats
 downloaded artifacts only as data. Both use pinned actions and leave checkout
