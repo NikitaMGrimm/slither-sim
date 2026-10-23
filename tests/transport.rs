@@ -15,6 +15,8 @@ fn exchange(requests: &[Value]) -> Vec<Value> {
         .lines()
         .map(|line| {
             let reply: Value = serde_json::from_str(line).unwrap();
+            // Replies keep the canonical bytes of a sorted-key `Value`.
+            assert_eq!(serde_json::to_string(&reply).unwrap(), line);
             assert_eq!(reply["protocol"], transport::PROTOCOL);
             assert_ne!(reply.get("result").is_some(), reply.get("error").is_some());
             reply
