@@ -14,15 +14,15 @@ official preset determined solely by bot count.
 | Minimap | 136×136 global living centerlines, full `M` or XOR `V`, nominal 2.5 s deadlines serviced every physics tick. Stop maps after death; reset on reconnect. | Resolution and cadence are measured. Center/radius mapping agrees with the stock marker. Decoding received maps checks wire reconstruction; exact raster filtering and official full/delta selection are unknown. |
 
 Snake, prey and food subscriptions are separate questions. For snakes and
-prey, the useful next step is route feasibility, not a new rule: every trial in
-the latest direct-snake [route pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7)
-reset on a stale own anchor before its first hold. The current
+prey, the next step is route feasibility, not a new rule. All 645 deduplicated
+trials in the latest direct-snake [route pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7)
+ended on a stale own anchor with zero endpoint witnesses. The current
 [controlled-route collector](research-workflow.md#controlled-snake-and-food-routes)
-instead pauses through bounded staleness. Offline tests cover that behavior,
-but no live route has been recorded with it yet; a live route with completed
-legs should precede paired present/absent crossings with held-out legs. Ready
-collection software and completed acquisitions do not establish a rule; zero
-qualified exposures can neither select nor reject one.
+instead pauses through bounded staleness; offline tests cover that pause, but no
+live route has used it yet. A live route with completed legs should precede
+paired present/absent crossings with held-out legs. Ready collection software and
+completed acquisitions do not establish a rule; zero qualified exposures can
+neither select nor reject one.
 
 ## Rechecked evidence
 
@@ -46,46 +46,43 @@ Two independent decoders agreed on all 134 received maps (122 `M`, 12 `V`), all
 nominal 2.5-second deadlines every physics tick avoids the old recurring
 2,520 ms broadcast rounding; it does not install 2,504 ms as a server constant.
 
-The paired snake/prey comparison used hash-verified strict-crossing archives.
-Its retrospective holdout lacked enough aligned transitions to validate a
-threshold or timer. A subsequent bounded two-client attempt failed before either
-client joined; both interrupted archives remain retained and establish no new
-visibility result. Exact subscription recovery still needs successful paired
-crossings with present/absent intervals and held-out legs.
+Snake/prey visibility attempts preserve their failures; the
+[study archive](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md) records every phase. None validated a replacement
+subscription rule or numerical policy change:
 
-The next frozen cardinal/diagonal plan stopped at its one-client preflight:
-neither the retained endpoint nor a disclosed current-list endpoint opened a
-WebSocket. Both attempts retained complete capture files with zero frames and
-zero joins. The dependent crossings were not run; the new route tooling supplies
-no additional visibility validation.
-
-A later explicit-Origin preflight joined, followed by two completed eight-minute
-paired acquisitions. The [paired recheck](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
-preserves their hashes, food-model counterexamples and zero eligible controlled
-snake/prey crossings. It identifies collector endpoint-accounting defects, but
-does not supply a validated replacement streaming rule. Food entry/retention and
-the combined cleanup schedule remain approximations, including for small snakes.
-
-The separately frozen corrected-collector follow-up achieved one diagonal route
-leg, but none of its comparison points passed all original freshness/alignment
-gates. Cardinal acquisition failed and was quarantined; the planned extensions
-were not run. Additional food counterexamples remain preserved. The same
-[recheck note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md) records the missing denominators
-and the independent all-map minimap recheck. No numerical subscription rule was
-promoted from these results.
-
-The later [managed paired follow-up (R6)](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#managed-paired-follow-up-r6)
-completed both planned acquisitions and their frozen analysis, but neither pair
-completed an endpoint-to-endpoint leg. All calibration, held-out, query and
-transition denominators are zero. Saved control telemetry shows route divergence
-and deaths after initial arrivals; it supplies no subscription correction.
-
-The later [exploratory R7 pilots](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7)
-preserve a direct-snake replay rejection and an avoidance-aborted food route
-with zero qualified entries. A separately amended retrospective replay produced
-702 qualified received-cache comparisons from one batch, while the original
-route still had zero endpoints. This supplies conditional observations, with
-no validated replacement visibility rule or numerical policy change.
+- **Historical strict-crossing comparison:** hash-verified archives; its
+  retrospective holdout lacked enough aligned transitions to validate a threshold
+  or timer. A subsequent bounded two-client attempt failed before either client
+  joined; both interrupted archives remain retained and establish no new
+  visibility result.
+- **Cardinal/diagonal plan:** stopped at its one-client preflight. Neither the
+  retained endpoint nor a disclosed current-list endpoint opened a WebSocket; both
+  attempts retained complete capture files with zero frames and zero joins. The
+  dependent crossings were not run; the new route tooling supplies no additional
+  visibility validation.
+- **[Paired recheck](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#acquisition-and-source-identity):** a later
+  explicit-Origin preflight joined, followed by two completed eight-minute paired
+  acquisitions. The report preserves their hashes, food-model counterexamples and
+  zero eligible controlled snake/prey crossings. It identifies collector
+  endpoint-accounting defects, but does not supply a validated replacement
+  streaming rule. Food entry/retention and the combined cleanup schedule remain
+  approximations, including for small snakes.
+- **[Corrected-collector follow-up (R4)](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#corrected-collector-follow-up-r4):**
+  separately frozen; one diagonal route leg, but none of its comparison points passed all original
+  freshness/alignment gates. Cardinal acquisition failed and was quarantined; the
+  planned extensions were not run. Additional food counterexamples remain
+  preserved. The same note records the missing denominators and the independent
+  all-map minimap recheck.
+- **[Managed paired follow-up (R6)](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#managed-paired-follow-up-r6):** completed
+  both planned acquisitions and their frozen analysis, but neither pair completed
+  an endpoint-to-endpoint leg. All calibration, held-out, query and transition
+  denominators are zero. Saved control telemetry shows route divergence and deaths
+  after initial arrivals; it supplies no subscription correction.
+- **[Exploratory R7 pilots](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7):** a direct-snake
+  replay rejection and an avoidance-aborted food route with zero qualified entries.
+  A separately amended retrospective replay produced 702 qualified received-cache
+  comparisons from one batch, while the original route still had zero endpoints;
+  these are conditional observations.
 
 Radius, ecology and prey population remain configurable models. The provisional
 population law now used by `Config::official(n)` is not promoted to host truth by
