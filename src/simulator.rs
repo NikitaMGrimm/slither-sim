@@ -1188,6 +1188,22 @@ impl Simulator {
         if self.prey.is_empty() && p.count == 0 {
             return;
         }
+        // The same pickup circle as food. Eating prey changes only mass, so each
+        // living snake's circle and lead stay fixed for this whole phase.
+        let circles: Vec<Option<(Point, f64, Point)>> = self
+            .snakes
+            .iter()
+            .map(|s| {
+                s.alive.then(|| {
+                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                    let lead = Point {
+                        x: center.x - s.head.x,
+                        y: center.y - s.head.y,
+                    };
+                    (center, radius, lead)
+                })
+            })
+            .collect();
         self.prey.retain_mut(|prey| {
             let old = prey.position;
             // Ordinary decisions are per prey, with independently phased first
@@ -1212,18 +1228,12 @@ impl Simulator {
                 prey.position.y *= ratio;
             }
             // Sweep relative motion, so fast prey cannot tunnel through a mouth.
-            let eater = self
-                .snakes
+            let eater = circles
                 .iter()
                 .enumerate()
-                .filter(|(_, s)| s.alive)
-                .filter_map(|(i, s)| {
-                    // The same pickup circle as food, swept from the previous head.
-                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                    let lead = Point {
-                        x: center.x - s.head.x,
-                        y: center.y - s.head.y,
-                    };
+                .filter_map(|(i, circle)| {
+                    // Swept from the previous head's circle to the current one.
+                    let (center, radius, lead) = (*circle)?;
                     let a = Point {
                         x: old.x - previous[i].x - lead.x,
                         y: old.y - previous[i].y - lead.y,
@@ -1232,6 +1242,9 @@ impl Simulator {
                         x: prey.position.x - center.x,
                         y: prey.position.y - center.y,
                     };
+                    if sweep_misses(a, b, radius) {
+                        return None;
+                    }
                     let d = segment_distance(Point::default(), a, b);
                     (d <= radius).then_some((i, d))
                 })
@@ -1338,6 +1351,18 @@ fn admit_ambient_food(
     }
     *count += 1;
     true
+}
+
+/// Whether `segment_distance(origin, a, b) > radius` follows from both ends lying
+/// beyond `radius` on one side of an axis. The computed closest point stays within
+/// a few ulps of the segment's bounding box and `hypot` is at least its larger
+/// coordinate, so the margin covers rounding. NaN comparisons never skip.
+fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
+    let limit = radius + 1e-9 * (radius + a.x.abs() + a.y.abs() + b.x.abs() + b.y.abs());
+    (a.x > limit && b.x > limit)
+        || (a.x < -limit && b.x < -limit)
+        || (a.y > limit && b.y > limit)
+        || (a.y < -limit && b.y < -limit)
 }
 
 fn food_cell(x: f64, y: f64, size: f64) -> (i64, i64) {
@@ -1484,5 +1509,46 @@ mod death_food_density_tests {
         assert_eq!(food_cell(-37.5, -37.5, 75.0), (-1, -1));
         assert_eq!(world.death_food(0), 22);
         assert_eq!(world.food.len(), 44);
+    }
+}
+
+#[cfg(test)]
+mod prey_sweep_tests {
+    use super::*;
+
+    #[test]
+    fn rejected_sweeps_are_beyond_the_pickup_radius() {
+        let mut state = 0x1234_5678_9abc_u64;
+        let mut unit = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut rejected = 0;
+        for i in 0..400_000 {
+            let scale = [1.0, 50.0, 1e4, 1e9][i % 4];
+            let radius = 36.0 + unit() * 95.0;
+            let mut a = Point {
+                x: (unit() - 0.5) * scale,
+                y: (unit() - 0.5) * scale,
+            };
+            let b = Point {
+                x: a.x + (unit() - 0.5) * scale,
+                y: a.y + (unit() - 0.5) * scale,
+            };
+            if i % 1000 == 7 {
+                a.x = [f64::NAN, f64::INFINITY, -f64::INFINITY][i % 3];
+            }
+            if sweep_misses(a, b, radius) {
+                rejected += 1;
+                let distance = segment_distance(Point::default(), a, b);
+                assert!(
+                    distance > radius || distance.is_nan(),
+                    "{a:?} {b:?} {radius}"
+                );
+            }
+        }
+        assert!(rejected > 100_000);
     }
 }
