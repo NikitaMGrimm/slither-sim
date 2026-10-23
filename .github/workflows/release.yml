@@ -3,7 +3,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  schedule:
+    - cron: '23 * * * *'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'auto to reconcile, vVERSION to retry a release, or empty to test authentication'
+        required: false
+        default: ''
 
 permissions: {}
 
@@ -18,50 +25,88 @@ jobs:
   release:
     if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: write
-      actions: read
+      actions: write
+      pull-requests: write
       id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
+      - name: Select a release or finish an interrupted publication
+        id: target
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python3 tools/release_automation.py select >> "$GITHUB_OUTPUT"
+      - name: Check out the selected source separately from the automation
+        if: steps.target.outputs.tag != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.target.outputs.commit }}
+          path: release-source
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       - name: Require a main commit with successful CI
+        if: steps.target.outputs.tag != ''
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: python3 tools/release.py --check-ci
+          RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+        run: python3 tools/release.py --check-ci --commit "$RELEASE_COMMIT" --ci-ref "$RELEASE_TAG"
       - name: Check tag and published identity
-        if: github.event_name == 'push'
+        if: steps.target.outputs.tag != ''
         id: package
-        run: python3 tools/release.py "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+        run: python3 tools/release.py "$RELEASE_TAG" --commit "$RELEASE_COMMIT" >> "$GITHUB_OUTPUT"
       - name: Verify package
-        if: github.event_name == 'push' && steps.package.outputs.already_published != 'true'
+        if: steps.target.outputs.tag != '' && steps.package.outputs.already_published != 'true'
+        working-directory: release-source
         run: cargo publish --locked --dry-run --registry crates-io
+      - name: Enforce 12 hours between new publications
+        if: steps.target.outputs.tag != ''
+        id: cooldown
+        env:
+          RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+        run: python3 tools/release.py "$RELEASE_TAG" --commit "$RELEASE_COMMIT" --check-cooldown >> "$GITHUB_OUTPUT"
       - name: Authenticate with crates.io
-        if: github.event_name == 'workflow_dispatch' || steps.package.outputs.already_published != 'true'
+        if: (github.event_name == 'workflow_dispatch' && inputs.tag == '') || (steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.already_published != 'true')
         id: auth
         uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
       - name: Publish crate
-        if: github.event_name == 'push' && steps.package.outputs.already_published != 'true'
+        if: steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.already_published != 'true'
+        working-directory: release-source
         run: cargo publish --locked --registry crates-io
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: steps.cooldown.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PRERELEASE: ${{ steps.package.outputs.prerelease }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            args=(--verify-tag --title "$GITHUB_REF_NAME" --generate-notes)
+          if draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft); then
+            if [[ "$draft" == 'true' ]]; then
+              gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE"
+            fi
+          else
+            args=(--verify-tag --title "$RELEASE_TAG" --generate-notes)
             if [[ "$PRERELEASE" == 'true' ]]; then args+=(--prerelease); fi
-            gh release create "$GITHUB_REF_NAME" "${args[@]}"
+            gh release create "$RELEASE_TAG" "${args[@]}"
           fi
+      - name: Refresh release preparation after publication
+        if: steps.cooldown.outputs.ready == 'true'
+        run: gh workflow run release-pr.yml --ref main
       - name: Confirm connection
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
         run: echo 'Trusted publishing authenticated successfully. No crate or release was published.'
