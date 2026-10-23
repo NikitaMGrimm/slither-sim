@@ -67,11 +67,17 @@ def registry_versions(name):
     return json.loads(fetch(f"{REGISTRY}/{name}"))["versions"]
 
 
-def cooldown_ready(name, now=None):
+def cooldown_ready(name, now=None, manual_release=None):
     versions = registry_versions(name)
     releases = github_pages(f"repos/{os.environ['GH_REPO']}/releases?per_page=100")
-    timestamps = [item["created_at"] for item in versions]
-    timestamps.extend(item["published_at"] for item in releases if not item["draft"])
+    # A verified manual release starts the automatic timer at merge, not upload completion.
+    manual = manual_release or {}
+    timestamps = [manual["merged_at"] if manual and item.get("num") == manual["version"] else item["created_at"]
+                  for item in versions]
+    timestamps.extend(manual["merged_at"] if manual and item.get("tag_name") == f"v{manual['version']}"
+                      else item["published_at"] for item in releases if not item["draft"])
+    if manual_release:
+        timestamps.append(manual["merged_at"])
     if not timestamps:
         raise ValueError("Cannot establish the previous publication time")
     times = [datetime.fromisoformat(value.replace("Z", "+00:00")) for value in timestamps]

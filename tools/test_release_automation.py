@@ -1,4 +1,5 @@
 import copy
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -104,12 +105,32 @@ class AutomationTests(unittest.TestCase):
                     patch.object(release, "package_at", return_value={**self.package, "version": version}), \
                     patch.object(release, "registry_versions", return_value=[{"num": "0.2.0"}]), \
                     patch.object(release, "github_pages", return_value=[{"tag_name": "v0.2.0", "draft": False}]), \
-                    patch.object(release, "cooldown_ready", return_value=False), \
+                    patch.object(automation, "automatic_ready", return_value=False), \
+                    patch.object(automation, "manual_release_merge", return_value=None), \
+                    patch.object(automation, "version_commit", return_value="c" * 40), \
                     patch.object(automation, "ensure_tag") as tag, \
                     patch.object(automation, "merge_patch") as merge:
                 self.assertIsNone(automation.select_automatic())
                 tag.assert_not_called()
                 merge.assert_not_called()
+
+    def test_automatic_retry_keeps_a_manual_merge_authorization(self):
+        package = {**self.package, "version": "0.3.0"}
+        commit = "c" * 40
+        with patch.object(automation, "refresh_main"), \
+                patch.object(release, "package_at", return_value=package), \
+                patch.object(release, "registry_versions", return_value=[{"num": "0.2.0"}]), \
+                patch.object(release, "github_pages", return_value=[{"tag_name": "v0.2.0", "draft": False}]), \
+                patch.object(automation, "version_commit", return_value=commit), \
+                patch.object(automation, "manual_release_merge", return_value={"merged_at": "2026-10-24T08:00:00Z"}), \
+                patch.object(automation, "automatic_ready") as clock, \
+                patch.object(release, "prepare") as identity, \
+                patch.object(automation, "ensure_tag") as tag, \
+                patch.object(subprocess, "run"):
+            self.assertEqual(automation.select_automatic(), {"tag": "v0.3.0", "commit": commit})
+            clock.assert_not_called()
+            identity.assert_called_once_with("v0.3.0", package, commit)
+            tag.assert_called_once_with("v0.3.0", commit)
 
     def ci_setup(self, metadata=True):
         for mocked in (patch.object(automation, "refresh_main"),
@@ -187,17 +208,20 @@ class GitIntegrationTests(unittest.TestCase):
             lock = 'version = 4\n[[package]]\nname = "slither-sim"\nversion = "0.2.0"\n'
             (root / "Cargo.toml").write_text(manifest)
             (root / "Cargo.lock").write_text(lock)
+            (root / "CHANGELOG.md").write_text("Initial\n")
             git("add", ".")
             git("commit", "--quiet", "-m", "initial")
             base = git("rev-parse", "HEAD")
             (root / "Cargo.toml").write_text(manifest.replace("0.2.0", "0.2.1"))
             (root / "Cargo.lock").write_text(lock.replace("0.2.0", "0.2.1"))
+            (root / "CHANGELOG.md").write_text("Release 0.2.1\n")
             git("commit", "--quiet", "-am", "version bump")
             bump = git("rev-parse", "HEAD")
             (root / "Cargo.toml").write_text((root / "Cargo.toml").read_text() + 'description = "later"\n')
             git("commit", "--quiet", "-am", "later main change")
             git("update-ref", "refs/remotes/origin/main", "HEAD")
             self.assertEqual(automation.version_commit("0.2.1"), bump)
+            self.assertEqual(automation.version_commit("0.2.0"), base)
             # The only mocked Git operation is network fetch; all ancestry and TOML comparisons are real.
             original_run = subprocess.run
 
@@ -210,6 +234,151 @@ class GitIntegrationTests(unittest.TestCase):
                 self.assertTrue(automation.metadata_only(base, bump, AutomationTests.package))
                 self.assertFalse(automation.metadata_only(base, "HEAD", AutomationTests.package))
                 self.assertFalse(automation.metadata_only(bump, base, {**AutomationTests.package, "version": "0.2.1"}))
+                pr = {
+                    "number": 1, "user": {"login": "github-actions[bot]"}, "draft": False,
+                    "head": {"repo": {"full_name": "owner/repo"}, "ref": "release-plz-main"},
+                    "base": {"ref": "main"}, "merged": True, "merge_commit_sha": bump,
+                    "merged_by": {"type": "User"}, "merged_at": "2026-10-24T08:00:00Z",
+                    "body": "<!-- release-plz slither-sim 0.2.0 0.2.1 compatible -->",
+                }
+                with patch.dict("os.environ", {"GH_REPO": "owner/repo"}), \
+                        patch.object(release, "github_pages", return_value=[pr]), \
+                        patch.object(release, "github", return_value=pr):
+                    self.assertEqual(automation.manual_release_merge(bump), pr)
+                    self.assertIsNone(automation.manual_release_merge(base))
+
+
+class ManualReleaseTests(unittest.TestCase):
+    commit = "c" * 40
+    parent = "b" * 40
+
+    def setUp(self):
+        self.before = {"name": "slither-sim", "version": "0.2.1", "publish": ["crates-io"]}
+        self.package = {**self.before, "version": "0.3.0"}
+        self.files = "Cargo.toml\nCargo.lock\nCHANGELOG.md"
+        self.pr = {
+            "number": 42, "user": {"login": "github-actions[bot]"}, "draft": False,
+            "head": {"repo": {"full_name": "owner/repo"}, "ref": "release-plz-main"},
+            "base": {"ref": "main"}, "merged": True, "merge_commit_sha": self.commit,
+            "merged_by": {"type": "User"}, "merged_at": "2026-10-24T08:00:00Z",
+            "body": "<!-- release-plz slither-sim 0.2.1 0.3.0 incompatible -->",
+        }
+        patches = (
+            patch.dict("os.environ", {"GH_REPO": "owner/repo"}),
+            patch.object(automation, "git", side_effect=self.git),
+            patch.object(release, "package_at", side_effect=lambda rev:
+                         self.before if rev in (self.parent, f"{self.commit}^1") else self.package),
+            patch.object(release, "github_pages", side_effect=lambda *_: [self.pr]),
+            patch.object(release, "github", side_effect=lambda *_: self.pr),
+            patch.object(automation, "metadata_only", return_value=True),
+        )
+        for item in patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def git(self, *args):
+        if args == ("rev-list", "--parents", "-n", "1", self.commit):
+            return f"{self.commit} {self.parent}"
+        if args == ("diff", "--name-only", self.parent, self.commit):
+            return self.files
+        raise AssertionError(f"Unexpected git call: {args}")
+
+    def test_manual_patch_minor_and_major_merges_authorize_the_exact_release(self):
+        for version in ("0.2.2", "0.3.0", "1.0.0"):
+            with self.subTest(version=version):
+                self.package["version"] = version
+                self.pr["body"] = f"<!-- release-plz slither-sim 0.2.1 {version} incompatible -->"
+                self.assertEqual(automation.manual_release_merge(self.commit), self.pr)
+
+    def test_ordinary_code_and_untrusted_or_bot_merges_grant_no_exception(self):
+        valid = copy.deepcopy(self.pr)
+        changes = ({"merged": False}, {"merged_by": {"type": "Bot"}}, {"merged_by": None},
+                   {"merged_at": None}, {"merge_commit_sha": "d" * 40},
+                   {"user": {"login": "someone"}}, {"draft": True},
+                   {"head": {"repo": {"full_name": "fork/repo"}, "ref": "release-plz-main"}},
+                   {"head": {"repo": {"full_name": "owner/repo"}, "ref": "feature/other"}},
+                   {"base": {"ref": "develop"}}, {"body": ""},
+                   {"body": "<!-- release-plz other 0.2.1 0.3.0 compatible -->"},
+                   {"body": "<!-- release-plz slither-sim 0.2.0 0.3.0 compatible -->"},
+                   {"body": "<!-- release-plz slither-sim 0.2.1 0.4.0 compatible -->"})
+        for change in changes:
+            with self.subTest(change=change):
+                self.pr = {**copy.deepcopy(valid), **change}
+                self.assertIsNone(automation.manual_release_merge(self.commit))
+        self.pr = valid
+        self.package["version"] = self.before["version"]
+        with patch.object(release, "github_pages") as api:
+            self.assertIsNone(automation.manual_release_merge(self.commit))
+            api.assert_not_called()
+
+    def test_source_edits_and_ambiguous_associations_are_rejected(self):
+        self.files += "\nsrc/lib.rs"
+        self.assertIsNone(automation.manual_release_merge(self.commit))
+        self.files = "Cargo.toml\nCargo.lock\nCHANGELOG.md"
+        with patch.object(automation, "metadata_only", return_value=False):
+            self.assertIsNone(automation.manual_release_merge(self.commit))
+        for associated in ([], [self.pr, self.pr]):
+            with patch.object(release, "github_pages", return_value=associated):
+                self.assertIsNone(automation.manual_release_merge(self.commit))
+
+    def test_automatic_timer_uses_the_verified_manual_merge_time(self):
+        with patch.object(automation, "version_commit", return_value=self.commit), \
+                patch.object(release, "cooldown_ready", return_value=False) as clock:
+            self.assertFalse(automation.automatic_ready(self.package))
+            clock.assert_called_once_with("slither-sim", manual_release={
+                "version": "0.3.0", "merged_at": "2026-10-24T08:00:00Z"})
+
+    def test_upload_gate_keeps_identity_checks_and_only_skips_delay_for_a_manual_merge(self):
+        for published, manual, elapsed, expected in ((True, False, False, "true"),
+                                                     (False, True, False, "true"),
+                                                     (False, False, False, "false"),
+                                                     (False, False, True, "true")):
+            with self.subTest(published=published, manual=manual, elapsed=elapsed), \
+                    patch.object(release, "prepare", return_value={"already_published": str(published).lower()}) as identity, \
+                    patch.object(automation, "manual_release_merge", return_value=self.pr if manual else None) as auth, \
+                    patch.object(automation, "automatic_ready", return_value=elapsed) as clock:
+                self.assertEqual(automation.publication_ready("v0.3.0", self.commit)["ready"], expected)
+                identity.assert_called_once_with("v0.3.0", self.package, self.commit)
+                self.assertEqual(auth.call_count, 0 if published else 1)
+                self.assertEqual(clock.call_count, 0 if published or manual else 1)
+                if not published and not manual:
+                    clock.assert_called_once_with(self.before)
+        with patch.object(release, "prepare", side_effect=ValueError("identity mismatch")), \
+                patch.object(automation, "manual_release_merge") as auth:
+            with self.assertRaisesRegex(ValueError, "identity mismatch"):
+                automation.publication_ready("v0.3.0", self.commit)
+            auth.assert_not_called()
+
+    def test_manual_selection_uses_the_push_commit_even_after_main_advances(self):
+        with patch.dict("os.environ", {"GITHUB_SHA": self.commit}), \
+                patch.object(automation, "refresh_main"), \
+                patch.object(automation, "git", return_value=self.commit) as git, \
+                patch.object(automation, "manual_release_merge", return_value=self.pr) as auth, \
+                patch.object(automation, "publication_target", return_value={"commit": self.commit}) as target:
+            self.assertEqual(automation.select_merged(), {"commit": self.commit})
+            git.assert_called_once_with("rev-parse", f"{self.commit}^{{commit}}")
+            auth.assert_called_once_with(self.commit)
+            target.assert_called_once_with(self.commit)
+            auth.return_value = None
+            target.reset_mock()
+            self.assertIsNone(automation.select_merged())
+            target.assert_not_called()
+
+    def test_main_push_is_routed_to_merge_validation_and_tags_keep_their_identity(self):
+        for ref, selected in (("refs/heads/main", True), ("refs/tags/v0.3.0", False)):
+            with self.subTest(ref=ref), \
+                    patch.dict("os.environ", {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": ref,
+                                              "GITHUB_REF_NAME": "v0.3.0", "RELEASE_TAG": ""}), \
+                    patch("sys.argv", ["release_automation.py", "select"]), \
+                    patch("sys.stdout", new_callable=io.StringIO) as output, \
+                    patch.object(automation, "select_merged", return_value={
+                        "tag": "v0.3.0", "commit": self.commit}) as merged, \
+                    patch.object(automation, "git", return_value=self.commit), \
+                    patch.object(automation, "select_automatic") as automatic:
+                automation.main()
+                self.assertIn(f"commit={self.commit}", output.getvalue())
+                self.assertEqual(merged.call_count, int(selected))
+                automatic.assert_not_called()
 
 
 if __name__ == "__main__":
