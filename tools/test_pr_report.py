@@ -1,10 +1,13 @@
 """Regression coverage for unavailable data, paired interpretation and report text."""
 
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import pr_report
 
@@ -15,6 +18,78 @@ def metric(value, samples=6, unit="rad/s"):
 
 
 class ReportTests(unittest.TestCase):
+    def test_shared_build_outputs_are_copied_before_clean_and_failures_never_reuse_them(self):
+        for failure in (None, "clean-release", "clean-dev", "candidate-build"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                checkout = root / "checkout"
+                for directory in ("examples", "tests/fixtures"):
+                    (checkout / directory).mkdir(parents=True, exist_ok=True)
+                for name in ("perf_baseline", "fidelity_metrics"):
+                    (checkout / f"examples/{name}.rs").write_text("// synthetic harness\n")
+                for name in pr_report.TESTS:
+                    (checkout / f"tests/{name}.rs").write_text("#[test]\nfn synthetic() {}\n")
+                (checkout / "Cargo.lock").write_text("# synthetic lock\n")
+                output = root / "report"
+                output.mkdir()
+                work = root / "report-work"
+                suffix = ".exe" if os.name == "nt" else ""
+                events, target_paths = [], set()
+
+                def add_worktree(args, **kwargs):
+                    shutil.copytree(checkout, work / "base")
+
+                def command(args, cwd, log, environment=None, timeout=600):
+                    label = "candidate" if cwd == checkout else "baseline"
+                    if args[0] == "cargo":
+                        target = Path(environment["CARGO_TARGET_DIR"])
+                        target_paths.add(target)
+                        if args[1] == "clean":
+                            profile = args[args.index("--profile") + 1] if "--profile" in args else "dev"
+                            events.append(("clean-" + profile, label))
+                            self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
+                            log.write_text("synthetic clean result\n")
+                            return int(failure == "clean-" + profile)
+                        events.append((args[1], label))
+                        if args[1] == "build":
+                            log.write_text("synthetic build result\n")
+                            if label == "candidate" and failure == "candidate-build":
+                                return 1  # Old target files deliberately remain present.
+                            directory = target / "release/examples"
+                            directory.mkdir(parents=True, exist_ok=True)
+                            for name in ("perf_baseline", "fidelity_metrics"):
+                                (directory / (name + suffix)).write_bytes(label.encode())
+                        else:
+                            log.write_text("Running tests/physics.rs\ntest synthetic ... ok\n")
+                    elif Path(args[0]).name == "fidelity_metrics" + suffix:
+                        log.write_text(json.dumps(metric(1)))
+                    return 0
+
+                environment = {"GITHUB_REPOSITORY": "owner/repo", "PR_NUMBER": "35",
+                               "GITHUB_RUN_ID": "100", "GITHUB_RUN_ATTEMPT": "1",
+                               "GITHUB_SERVER_URL": "https://github.com"}
+                with patch.object(pr_report, "ROOT", checkout), patch.object(pr_report, "git", side_effect=["c" * 40, "b" * 40, "a" * 40]), \
+                        patch.object(pr_report.subprocess, "run", side_effect=add_worktree), \
+                        patch.object(pr_report.subprocess, "check_output", return_value="synthetic rustc"), \
+                        patch.object(pr_report, "command", side_effect=command), \
+                        patch.object(pr_report, "CASES", ()), patch.object(pr_report, "performance_rows", return_value=[]), \
+                        patch.dict(os.environ, environment):
+                    report = pr_report.collect(output, "a" * 40)
+                self.assertEqual(target_paths, {work / "target"})
+                self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
+                self.assertEqual(events[:3], [("build", "baseline"), ("test", "baseline"), ("clean-release", "baseline")])
+                if failure != "clean-release":
+                    self.assertEqual(events[3], ("clean-dev", "baseline"))
+                if failure:
+                    self.assertTrue(report["errors"])
+                    self.assertNotIn("candidate", report["binaries"])
+                    self.assertFalse((work / "bin-candidate").exists())
+                    if failure.startswith("clean-"):
+                        self.assertNotIn(("build", "candidate"), events)
+                else:
+                    self.assertEqual((work / f"bin-candidate/perf_baseline{suffix}").read_bytes(), b"candidate")
+                    self.assertFalse(report["errors"])
+
     def test_missing_data_and_changed_denominators_are_not_improvements(self):
         self.assertEqual(pr_report.metric_rows(metric(2), None)[0]["reading"], "Unavailable")
         self.assertEqual(pr_report.metric_rows(metric(2), metric(1, samples=5))[0]["reading"], "Unavailable")
