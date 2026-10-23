@@ -10,9 +10,9 @@
 //! See docs/presentation.md for evidence and limits; these choices do not establish
 //! new empirical claims and do not define a prey palette.
 
-use std::collections::{HashMap, VecDeque};
-use std::hash::{BuildHasherDefault, Hasher};
+use std::collections::VecDeque;
 
+use super::fast_hash::FastMap;
 use super::latency::Random;
 use crate::model::{Food, Origin};
 use crate::simulator::FoodSpawnEvent;
@@ -104,25 +104,7 @@ fn custom_food_color(color: u8) -> Option<u8> {
     })
 }
 
-/// Fast hashing of exact position bits. Map iteration order is never
-/// observed, so the hasher affects only speed.
-#[derive(Default)]
-struct BitsHasher(u64);
-impl Hasher for BitsHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
-            self.write_u64(u64::from(byte));
-        }
-    }
-    fn write_u64(&mut self, value: u64) {
-        let product = u128::from(self.0 ^ value) * 0x9e37_79b9_7f4a_7c15;
-        self.0 = product as u64 ^ (product >> 64) as u64;
-    }
-    fn finish(&self) -> u64 {
-        self.0
-    }
-}
-type BitsMap<V> = HashMap<(u64, u64), V, BuildHasherDefault<BitsHasher>>;
+type BitsMap<V> = FastMap<(u64, u64), V>;
 
 fn identity(food: &Food) -> (u64, u64) {
     let bits = |value: f64| if value == 0. { 0 } else { value.to_bits() };

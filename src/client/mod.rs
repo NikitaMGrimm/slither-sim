@@ -8,6 +8,7 @@ use std::time::Instant;
 
 pub mod challenge;
 mod encode;
+mod fast_hash;
 pub mod hud;
 pub mod latency;
 pub mod minimap;

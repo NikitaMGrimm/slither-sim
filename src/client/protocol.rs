@@ -8,6 +8,7 @@
 use super::{
     CONTRACT, CategoryKnowledge, ClientFrame, ClientStatus, ClientTiming, ReceivedField,
     ReceivedMetadata, ReceivedTracker, SentCommand, ServerSettings,
+    fast_hash::{FastMap, FastSet},
     hud::{
         ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MAX_REMOVALS,
         MinimapTeams, SessionIdentifiers, SnakeProfile, SnakeRemoval, TeamRing, TeamScores, latin1,
@@ -19,7 +20,7 @@ use crate::{
     physics::{self, SPEED_UNIT_SECONDS},
     prey::Prey,
 };
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::f64::consts::TAU;
 
 pub const PROTOCOL_VERSION: u8 = 19;
@@ -40,7 +41,7 @@ const MAX_RECEIVED_FOOD: usize = 131_072;
 struct FoodBudget<'a> {
     base: &'a BTreeMap<u32, Food>,
     updates: BTreeMap<u32, bool>,
-    cleared_sectors: HashSet<u16>,
+    cleared_sectors: FastSet<u16>,
     count: usize,
 }
 impl FoodBudget<'_> {
@@ -720,7 +721,7 @@ struct Session {
     setup_receipt: Option<f64>,
     server_time: Option<f64>,
     setup: Option<Setup>,
-    sides: HashMap<u16, Side>,
+    sides: FastMap<u16, Side>,
     free_slots: Vec<usize>,
     slot_count: usize,
     self_id: Option<u16>,
@@ -756,7 +757,7 @@ pub struct ClientState {
     tracker: ReceivedTracker,
     session: Session,
     /// Per-id life counters; kept across reconnects so ids never repeat a life.
-    incarnations: HashMap<u16, u64>,
+    incarnations: FastMap<u16, u64>,
     life: u64,
     local: Option<f64>,
     processing: f64,
@@ -924,7 +925,7 @@ impl ClientState {
             .map(|slot| self.tracker.snake(slot).map_or(0, |snake| snake.body.len()))
             .collect();
         let mut total: usize = lengths.iter().sum();
-        let mut bodies: HashMap<_, _> = self
+        let mut bodies: FastMap<_, _> = self
             .session
             .sides
             .iter()
@@ -948,7 +949,7 @@ impl ClientState {
         let mut food = FoodBudget {
             base: &self.session.food,
             updates: BTreeMap::new(),
-            cleared_sectors: HashSet::new(),
+            cleared_sectors: FastSet::default(),
             count: self.session.food.len(),
         };
         for packet in packets {
