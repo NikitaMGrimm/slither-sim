@@ -19,7 +19,7 @@ use crate::{
     physics::{self, SPEED_UNIT_SECONDS},
     prey::Prey,
 };
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::f64::consts::TAU;
 
 pub const PROTOCOL_VERSION: u8 = 19;
@@ -39,16 +39,15 @@ const MAX_RECEIVED_FOOD: usize = 131_072;
 
 struct FoodBudget<'a> {
     base: &'a BTreeMap<u32, Food>,
-    updates: HashMap<u32, bool>,
+    updates: BTreeMap<u32, bool>,
+    cleared_sectors: HashSet<u16>,
     count: usize,
 }
 impl FoodBudget<'_> {
     fn set(&mut self, id: u32, present: bool) -> Result<(), String> {
-        let previous = self
-            .updates
-            .get(&id)
-            .copied()
-            .unwrap_or_else(|| self.base.contains_key(&id));
+        let previous = self.updates.get(&id).copied().unwrap_or_else(|| {
+            !self.cleared_sectors.contains(&((id >> 16) as u16)) && self.base.contains_key(&id)
+        });
         if present && !previous {
             if self.count == MAX_RECEIVED_FOOD {
                 return Err("Received food limit exceeded".into());
@@ -61,24 +60,27 @@ impl FoodBudget<'_> {
         Ok(())
     }
 
-    fn clear_sector(&mut self, sx: u8, sy: u8) -> Result<(), String> {
+    fn clear_sector(&mut self, sx: u8, sy: u8) {
         let first = food_id(sx, sy, 0, 0);
         let last = food_id(sx, sy, 255, 255);
-        let ids: Vec<_> = self
-            .base
-            .range(first..=last)
-            .map(|(&id, _)| id)
-            .chain(
-                self.updates
-                    .keys()
-                    .copied()
-                    .filter(|id| (first..=last).contains(id)),
-            )
-            .collect();
-        for id in ids {
-            self.set(id, false)?;
+        // Visit original pellets only on the first clear; later clears must not
+        // rescan deleted base entries or resurrect them after an insertion.
+        if self.cleared_sectors.insert(u16::from_be_bytes([sx, sy])) {
+            self.count -= self
+                .base
+                .range(first..=last)
+                .filter(|(id, _)| !self.updates.contains_key(id))
+                .count();
         }
-        Ok(())
+        let updates: Vec<_> = self
+            .updates
+            .range(first..=last)
+            .map(|(&id, &present)| (id, present))
+            .collect();
+        for (id, present) in updates {
+            self.count -= usize::from(present);
+            self.updates.remove(&id);
+        }
     }
 }
 
@@ -944,7 +946,8 @@ impl ClientState {
         let mut last_eaten = self.session.last_eaten_sector;
         let mut food = FoodBudget {
             base: &self.session.food,
-            updates: HashMap::new(),
+            updates: BTreeMap::new(),
+            cleared_sectors: HashSet::new(),
             count: self.session.food.len(),
         };
         for packet in packets {
@@ -1052,7 +1055,7 @@ impl ClientState {
                         food.set(food_id(sx, sy, *rx, *ry), false)?;
                     }
                 }
-                Packet::ClearSector(sx, sy) => food.clear_sector(*sx, *sy)?,
+                Packet::ClearSector(sx, sy) => food.clear_sector(*sx, *sy),
                 _ => {}
             }
             if total > MAX_RECEIVED_BODY_POINTS {
@@ -1218,9 +1221,16 @@ impl ClientState {
             }
             Packet::ClearSector(sx, sy) => {
                 session.food_at = Some(receipt);
-                session
+                // Sector bytes form a contiguous key range. Repeated clears of
+                // empty sectors must not scan unrelated retained food.
+                let ids: Vec<_> = session
                     .food
-                    .retain(|&id, _| id >> 16 != u32::from(sx) << 8 | u32::from(sy));
+                    .range(food_id(sx, sy, 0, 0)..=food_id(sx, sy, 255, 255))
+                    .map(|(&id, _)| id)
+                    .collect();
+                for id in ids {
+                    session.food.remove(&id);
+                }
             }
             Packet::PreyAppear(id, (x, y), size, wanted, heading, speed) => {
                 session.prey_at = Some(receipt);

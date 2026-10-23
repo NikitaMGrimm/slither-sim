@@ -85,12 +85,7 @@ fn retained_food_limit_counts_unique_ids_and_releases_cleared_sectors() {
     let mut client = Client::new();
     client.send(&straight(9, 0.));
     for sx in 0..2 {
-        let mut packet = vec![b'F', sx, 0];
-        for rx in 0..=255 {
-            for ry in 0..=255 {
-                packet.extend([0, rx, ry, 5]);
-            }
-        }
+        let packet = food_sector(sx, 0, 65_536);
         client.send(&packet);
         client.send(&packet); // Replacement packets do not add retained entities.
     }
@@ -115,6 +110,91 @@ fn retained_food_limit_counts_unique_ids_and_releases_cleared_sectors() {
     client.send(&straight(9, 0.));
     client.send(&pellet);
     assert_eq!(client.frame().observation.unwrap().food.len(), 1);
+}
+
+// Synthetic protocol-19 food IDs, ordered by their sector-local coordinates.
+fn food_sector(sx: u8, sy: u8, count: usize) -> Vec<u8> {
+    let mut packet = vec![b'F', sx, sy];
+    for id in 0..count {
+        packet.extend([0, (id >> 8) as u8, id as u8, 5]);
+    }
+    packet
+}
+
+#[test]
+fn repeated_sector_clears_preserve_unrelated_food_at_the_retention_limit() {
+    let mut client = Client::new();
+    client.send(&straight(9, 0.));
+    for sx in 0..2 {
+        client.send(&food_sector(sx, 0, 65_536));
+    }
+    let before = client.frame();
+    let empty_clear = [b'w', 2, 0];
+    let replacement = [b'f', 0, 0, 0, 0, 5];
+    let mut packets = vec![empty_clear.as_slice(); 65_536];
+    // The replacement also exercises food-budget preflight for the whole frame.
+    packets.push(&replacement);
+    let frame = bundled(&packets);
+    assert!(frame.len() < 1 << 20);
+    client.state.receive_frame(&frame, client.time).unwrap();
+    assert_eq!(client.frame(), before);
+
+    let occupied_clear = [b'w', 0, 0];
+    let addition = [b'f', 2, 0, 0, 0, 5];
+    let mut packets = vec![occupied_clear.as_slice(); 65_536];
+    packets.push(&addition);
+    client
+        .state
+        .receive_frame(&bundled(&packets), client.time)
+        .unwrap();
+    let food = client.frame().observation.unwrap().food;
+    assert_eq!(food.len(), 65_537);
+    assert_eq!(food[..65_536], before.observation.unwrap().food[65_536..]);
+}
+
+#[test]
+fn sector_clear_preflight_preserves_packet_order_and_failure_atomicity() {
+    let mut client = Client::new();
+    client.send(&straight(9, 0.));
+    client.send(&food_sector(0, 0, 65_536));
+    client.send(&food_sector(255, 254, 65_534));
+    client.send(&[b'F', 255, 255, 0, 255, 254, 5, 0, 255, 255, 5]);
+    let before = client.frame().observation.unwrap().food;
+    assert_eq!(before.len(), 131_072);
+
+    let clear = [b'w', 255, 255];
+    let first = [b'f', 255, 255, 255, 254, 25];
+    let last = [b'f', 255, 255, 255, 255, 15];
+    let packets: &[&[u8]] = &[
+        &[b'c', 255, 255, 255, 254],     // Overlay false before the first clear.
+        &[b'f', 255, 255, 255, 255, 10], // Overlay true replaces a base pellet.
+        &clear,
+        &clear,
+        &last,
+        &[b'f', 255, 254, 20], // Short addition uses the previous food sector.
+        &[b'C', 255, 254],     // Short removal uses the previous eaten sector.
+        &clear,
+        &first,
+        &last,
+    ];
+    client
+        .state
+        .receive_frame(&bundled(packets), client.time)
+        .unwrap();
+    let after = client.frame().observation.unwrap().food;
+    assert_eq!(after.len(), 131_072);
+    assert_eq!(after[..131_070], before[..131_070]);
+    assert_eq!(after[131_070].size, Some(5.));
+    assert_eq!(after[131_071].size, Some(3.));
+
+    let before = client.frame();
+    let overflow = bundled(&[&[b'e', 64], &clear, &first, &last, &[b'f', 1, 0, 0, 0, 5]]);
+    let error = client
+        .state
+        .receive_frame(&overflow, client.time)
+        .unwrap_err();
+    assert!(error.contains("food limit"));
+    assert_eq!(client.frame(), before);
 }
 
 fn u24(value: u32) -> [u8; 3] {
