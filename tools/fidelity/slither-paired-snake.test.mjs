@@ -126,7 +126,8 @@ test('stale own or paired reference skips heading delivery despite fresh non-pos
     a.bot.peers = b.bot.peers = [a.bot, b.bot];
     a.bot.lastReceivedAt = 10000;
     a.me.t = stalePeer ? 10000 : 100;
-    if (stalePeer) state.update(10000, poses('x', 1, 600, {}, { anchorAgeMs: 9900 }), worlds());
+    state.update(10000, poses('x', 1, 600,
+      stalePeer ? {} : { anchorAgeMs: 9900 }, stalePeer ? { anchorAgeMs: 9900 } : {}), worlds());
     a.bot.tick(10000);
     assert.equal(a.sent.filter(bytes => bytes.length === 1 && bytes[0] <= 250).length, 0);
     assert.equal(events.find(e => e.event === 'paired-snake-control-skipped').reason, 'own_anchor_stale');
