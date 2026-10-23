@@ -1,0 +1,1674 @@
+{
+  "schema": "slither-perf-report-v1",
+  "runtime_baseline": "bb56d947df3c9a91e9331824981e4d4adf1cab34",
+  "classification": "exploratory baseline, high wall-time variance; no speedup comparison",
+  "machine": "AMD Ryzen 7 9800X3D, 8 cores / 16 logical CPUs, Windows 11 Pro 10.0.26200, approximately 31 GiB physical memory",
+  "build_command": "CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=<owned-worktree>/target cargo build --release --locked --bin slither-sim --example perf_baseline",
+  "build_flags": "repository release profile: thin LTO, codegen-units=1; no RUSTFLAGS or affinity changes",
+  "quiet_window": "2026-10-23 14:28-14:30 UTC approximately; health and research peers agreed no CPU-heavy jobs; machine not guaranteed idle; pre-run aggregate CPU reading 10 percent",
+  "manifest": {
+    "schema": "slither-perf-v1",
+    "utc": "2026-10-23T14:28:02Z",
+    "source_commit": "3129fcf011df5fa5361280ce700ffcc62baf587e",
+    "source_status": "",
+    "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-pc-windows-msvc\nrelease: 1.99.0\nLLVM version: 23.1.1",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+    "python": "3.12.9 (main, Feb 12 2025, 14:52:31) [MSC v.1942 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "logical_cpus": 16,
+    "cargo_lock_sha256": "b339349397407d58c1eed22ab086e8047c5733037a16efddaaea6498ab70457e",
+    "runner_sha256": "6147aeb43b63cb2743051f6c2e8a657065d1cfc499e8b0899f88f6e3c760689d",
+    "harness_source_sha256": "5e3fd70ddaaa5bb9f9c212d731047474abfd9eb7a23ff7a9932517ce4fbc7ec8",
+    "binaries": {
+      "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\perf_baseline.exe": "1e2d4f034445f33c359e8b571c75d3941f9d24f3371c1cc634065b75a0dd2d5b",
+      "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\slither-sim.exe": "1613591c81a6c662b94e1181ec5e471756845a605b8fef7d0b3297c05708f77a"
+    },
+    "arguments": {
+      "harness": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\perf_baseline.exe",
+      "cli": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\slither-sim.exe",
+      "output": "outputs\\perf-bb56d94\\baseline-1",
+      "repeats": 3,
+      "iterations": 1000,
+      "e2e_steps": 100,
+      "trace_iterations": 32,
+      "cases": [
+        "step-default",
+        "step-food",
+        "step-body",
+        "observe",
+        "portable",
+        "protocol",
+        "e2e-client",
+        "e2e-host"
+      ]
+    },
+    "metric_notes": [
+      "Native workload wall/latency exclude setup; process CPU/wall/peak include setup, teardown and report serialization.",
+      "Windows CPU is kernel+user GetProcessTimes, quantized; peak memory is PeakWorkingSetSize, not private bytes.",
+      "E2E wall and response latency include Python JSON, pipe polling (0.5 ms sleeps), process startup and OS scheduling as applicable.",
+      "Host is real-time, one client plus four bots, stopped after each bounded loopback run; hosted hashes unavailable.",
+      "No CPU affinity or platform tuning. Quiet-window agreement and background load must be recorded separately."
+    ]
+  },
+  "raw_results_sha256": "ad82f7821dc3c44544a2daf59b60d5aaa3474d0a42a03d615e6d7b86a4bac55a",
+  "traces": [
+    {
+      "case": "step-default",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 4743305,
+      "sha256": "ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637"
+    },
+    {
+      "case": "step-food",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 114800471,
+      "sha256": "0eee1305d2e0a445be70814a286c353e0756a72651dca349140c3afa4b64b359"
+    },
+    {
+      "case": "step-body",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 26851960,
+      "sha256": "d7b24f0a388770c68d5076a05bdd77bb3494e56a941b6bd4342cc3b34b45f585"
+    },
+    {
+      "case": "observe",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 210419560,
+      "sha256": "408f33f5a44f5460cf1190e04f2f8f4e0dd05ef5777b9ed3a3d17d06e4d5643f"
+    },
+    {
+      "case": "portable",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 26783570,
+      "sha256": "27cdcff90e1e806a20ef0ec12e35cb84ce2cdaa62980d8a0f6e88cb6e42d8d4b"
+    },
+    {
+      "case": "protocol",
+      "iterations": 32,
+      "lines": 289,
+      "uncompressed_bytes": 17913466,
+      "sha256": "a22849e7124629f6950b7ce769acdb8da93fca0b6df920cf5ca592d7c9906110"
+    }
+  ],
+  "phase_profiles": [
+    {
+      "case": "step-default",
+      "command": [
+        "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\perf_baseline.exe",
+        "step-default",
+        "1000",
+        "--profile"
+      ],
+      "process_wall_seconds": 0.011841600004117936,
+      "cpu_seconds": 0.015625,
+      "peak_working_set_bytes": 4902912,
+      "exit_code": 0,
+      "stderr": "outputs\\perf-bb56d94\\baseline-1\\step-default-profile-stderr.txt",
+      "workload": {
+        "case": "step-default",
+        "details": {
+          "bodyShape": "Simulator::add ring starts",
+          "config": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 5.0,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 350,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 0,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 1000.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          },
+          "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+          "eventBuffersEnabled": true,
+          "final": {
+            "ambientFood": 315,
+            "arenaRadius": 1000.0,
+            "boostFood": 20,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 335,
+            "living": 4,
+            "livingSegments": 9,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 4,
+            "time": 6.999999999999879
+          },
+          "initial": {
+            "ambientFood": 324,
+            "arenaRadius": 1000.0,
+            "boostFood": 0,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 324,
+            "living": 4,
+            "livingSegments": 8,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 4,
+            "time": 0.0
+          },
+          "profile": {
+            "ambientSeconds": 0.00038110000000000075,
+            "bodyPairs": 12000,
+            "collisionSeconds": 0.0001840000000000028,
+            "deathSeconds": 2.469999999999996e-05,
+            "foodPairs": 1308600,
+            "foodSeconds": 0.0013748999999999873,
+            "movementSeconds": 0.00041860000000000486,
+            "pickupTests": 348,
+            "preySeconds": 2.939999999999991e-05,
+            "segmentTests": 0,
+            "ticks": 1000
+          },
+          "progress": {
+            "deathsAcrossEpisodes": 0,
+            "episodeLimitPhysicsTicks": 1000,
+            "finalEpisodeTicks": 1000,
+            "minimumFoodAtOperationBoundaries": 316,
+            "minimumLivingAtOperationBoundaries": 4,
+            "physicsTicks": 1000,
+            "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+            "resets": 0
+          }
+        },
+        "format": "slither-perf-baseline-v1",
+        "iterations": 1000,
+        "kind": "report",
+        "mode": "profile",
+        "operation": "step_profiled",
+        "release": true,
+        "seed": 7,
+        "timing": {
+          "latencySeconds": {
+            "max": 2.63e-05,
+            "p50": 2.3e-06,
+            "p95": 2.9e-06,
+            "p99": 1.26e-05
+          },
+          "operationsPerSecond": 357385.36864301295,
+          "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+          "wallSeconds": 0.002798099999999959
+        }
+      }
+    },
+    {
+      "case": "step-food",
+      "command": [
+        "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\perf_baseline.exe",
+        "step-food",
+        "1000",
+        "--profile"
+      ],
+      "process_wall_seconds": 0.10810419998597354,
+      "cpu_seconds": 0.09375,
+      "peak_working_set_bytes": 6725632,
+      "exit_code": 0,
+      "stderr": "outputs\\perf-bb56d94\\baseline-1\\step-food-profile-stderr.txt",
+      "workload": {
+        "case": "step-food",
+        "details": {
+          "bodyShape": "Simulator::add ring starts",
+          "config": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 5.0,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 12000,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 0,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 6000.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          },
+          "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+          "eventBuffersEnabled": true,
+          "final": {
+            "ambientFood": 11133,
+            "arenaRadius": 6000.0,
+            "boostFood": 80,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 11213,
+            "living": 32,
+            "livingSegments": 69,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 32,
+            "time": 6.999999999999879
+          },
+          "initial": {
+            "ambientFood": 11321,
+            "arenaRadius": 6000.0,
+            "boostFood": 0,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 11321,
+            "living": 32,
+            "livingSegments": 64,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 32,
+            "time": 0.0
+          },
+          "profile": {
+            "ambientSeconds": 0.019445699999999927,
+            "bodyPairs": 992000,
+            "collisionSeconds": 0.005616800000000008,
+            "deathSeconds": 2.5099999999999956e-05,
+            "foodPairs": 2590908,
+            "foodSeconds": 0.06206969999999998,
+            "movementSeconds": 0.008759999999999988,
+            "pickupTests": 2695,
+            "preySeconds": 3.0799999999999936e-05,
+            "segmentTests": 0,
+            "ticks": 1000
+          },
+          "progress": {
+            "deathsAcrossEpisodes": 0,
+            "episodeLimitPhysicsTicks": 1000,
+            "finalEpisodeTicks": 1000,
+            "minimumFoodAtOperationBoundaries": 11213,
+            "minimumLivingAtOperationBoundaries": 32,
+            "physicsTicks": 1000,
+            "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+            "resets": 0
+          }
+        },
+        "format": "slither-perf-baseline-v1",
+        "iterations": 1000,
+        "kind": "report",
+        "mode": "profile",
+        "operation": "step_profiled",
+        "release": true,
+        "seed": 7,
+        "timing": {
+          "latencySeconds": {
+            "max": 0.0012068,
+            "p50": 7e-05,
+            "p95": 0.0001568,
+            "p99": 0.0006387
+          },
+          "operationsPerSecond": 10318.266943884115,
+          "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+          "wallSeconds": 0.0969154999999999
+        }
+      }
+    },
+    {
+      "case": "step-body",
+      "command": [
+        "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-baseline\\outputs\\perf-bb56d94\\bin\\perf_baseline.exe",
+        "step-body",
+        "1000",
+        "--profile"
+      ],
+      "process_wall_seconds": 0.060134499974083155,
+      "cpu_seconds": 0.0625,
+      "peak_working_set_bytes": 5312512,
+      "exit_code": 0,
+      "stderr": "outputs\\perf-bb56d94\\baseline-1\\step-body-profile-stderr.txt",
+      "workload": {
+        "case": "step-body",
+        "details": {
+          "bodyShape": "64 separated 128-anchor serpentine bodies; local 400-unit orbits",
+          "config": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 5.0,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 350,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 0,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 12000.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          },
+          "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+          "eventBuffersEnabled": true,
+          "final": {
+            "ambientFood": 350,
+            "arenaRadius": 12000.0,
+            "boostFood": 512,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 862,
+            "living": 64,
+            "livingSegments": 8192,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 64,
+            "time": 6.999999999999879
+          },
+          "initial": {
+            "ambientFood": 350,
+            "arenaRadius": 12000.0,
+            "boostFood": 0,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 350,
+            "living": 64,
+            "livingSegments": 8192,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 64,
+            "time": 0.0
+          },
+          "profile": {
+            "ambientSeconds": 0.00038230000000000056,
+            "bodyPairs": 4032000,
+            "collisionSeconds": 0.0323935000000005,
+            "deathSeconds": 2.6399999999999944e-05,
+            "foodPairs": 7568929,
+            "foodSeconds": 0.011961299999999935,
+            "movementSeconds": 0.005301599999999997,
+            "pickupTests": 131,
+            "preySeconds": 3.3799999999999975e-05,
+            "segmentTests": 0,
+            "ticks": 1000
+          },
+          "progress": {
+            "deathsAcrossEpisodes": 0,
+            "episodeLimitPhysicsTicks": 1000,
+            "finalEpisodeTicks": 1000,
+            "minimumFoodAtOperationBoundaries": 350,
+            "minimumLivingAtOperationBoundaries": 64,
+            "physicsTicks": 1000,
+            "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+            "resets": 0
+          }
+        },
+        "format": "slither-perf-baseline-v1",
+        "iterations": 1000,
+        "kind": "report",
+        "mode": "profile",
+        "operation": "step_profiled",
+        "release": true,
+        "seed": 7,
+        "timing": {
+          "latencySeconds": {
+            "max": 0.0001496,
+            "p50": 3.66e-05,
+            "p95": 9.3e-05,
+            "p99": 0.0001121
+          },
+          "operationsPerSecond": 19714.76675459449,
+          "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+          "wallSeconds": 0.0507234000000001
+        }
+      }
+    }
+  ],
+  "cases": {
+    "step-default": {
+      "workload": {
+        "bodyShape": "Simulator::add ring starts",
+        "config": {
+          "ambientFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 2
+          },
+          "ambientReplenishPerSecond": 5.0,
+          "boostFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 9
+          },
+          "boundaryMode": "sliding",
+          "deathFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 22
+          },
+          "dt": 0.007,
+          "dynamicRadius": false,
+          "emitBoostFood": true,
+          "foodCount": 350,
+          "foodIndex": true,
+          "kiosk": {
+            "enabled": true,
+            "floorScore": 8500.0,
+            "graceSeconds": 1200.0,
+            "recoveryPerSecond": 0.005519633948746724,
+            "scoreDecayPerSecond": 0.0002759816974373362,
+            "shrinkPerSecond": 0.005519633948746724,
+            "stationaryRadius": 800.0
+          },
+          "prey": {
+            "count": 0,
+            "cruiseSpeed": 118.74999999999999,
+            "escapeSpeed": 192.28124999999997,
+            "fleeHalfWidth": 320.0,
+            "maxSize": 9.2,
+            "nutritionFactor": 30.0,
+            "respawnSeconds": 1.0,
+            "size": 6.0,
+            "sprintSpeed": 343.65625,
+            "turnRate": 3.625
+          },
+          "radius": 1000.0,
+          "radiusUpdates": [],
+          "speedModel": "retained_progress",
+          "vision": 1500.0
+        },
+        "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+        "eventBuffersEnabled": true,
+        "final": {
+          "ambientFood": 315,
+          "arenaRadius": 1000.0,
+          "boostFood": 20,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 335,
+          "living": 4,
+          "livingSegments": 9,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 4,
+          "time": 6.999999999999879
+        },
+        "initial": {
+          "ambientFood": 324,
+          "arenaRadius": 1000.0,
+          "boostFood": 0,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 324,
+          "living": 4,
+          "livingSegments": 8,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 4,
+          "time": 0.0
+        },
+        "profile": null,
+        "progress": {
+          "deathsAcrossEpisodes": 0,
+          "episodeLimitPhysicsTicks": 1000,
+          "finalEpisodeTicks": 1000,
+          "minimumFoodAtOperationBoundaries": 316,
+          "minimumLivingAtOperationBoundaries": 4,
+          "physicsTicks": 1000,
+          "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+          "resets": 0
+        }
+      },
+      "samples": [
+        {
+          "case": "step-default",
+          "process_wall_seconds": 0.013966600003186613,
+          "cpu_seconds": 0.015625,
+          "peak_working_set_bytes": 4874240,
+          "exit_code": 0,
+          "repetition": 0,
+          "timing": {
+            "latencySeconds": {
+              "max": 3.33e-05,
+              "p50": 1.8e-06,
+              "p95": 4.1e-06,
+              "p99": 1.53e-05
+            },
+            "operationsPerSecond": 397630.1244582259,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.002514900000000019
+          }
+        },
+        {
+          "case": "step-default",
+          "process_wall_seconds": 0.10434319998603314,
+          "cpu_seconds": 0.015625,
+          "peak_working_set_bytes": 4902912,
+          "exit_code": 0,
+          "repetition": 1,
+          "timing": {
+            "latencySeconds": {
+              "max": 4.17e-05,
+              "p50": 2.6e-06,
+              "p95": 3.7e-06,
+              "p99": 1.84e-05
+            },
+            "operationsPerSecond": 337803.6009863853,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.0029603000000000108
+          }
+        },
+        {
+          "case": "step-default",
+          "process_wall_seconds": 0.04073390003759414,
+          "cpu_seconds": 0.015625,
+          "peak_working_set_bytes": 4857856,
+          "exit_code": 0,
+          "repetition": 2,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0021148,
+              "p50": 2.9e-06,
+              "p95": 4.9e-06,
+              "p99": 2.02e-05
+            },
+            "operationsPerSecond": 171553.06994218595,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.005829100000000023
+          }
+        }
+      ]
+    },
+    "step-food": {
+      "workload": {
+        "bodyShape": "Simulator::add ring starts",
+        "config": {
+          "ambientFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 2
+          },
+          "ambientReplenishPerSecond": 5.0,
+          "boostFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 9
+          },
+          "boundaryMode": "sliding",
+          "deathFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 22
+          },
+          "dt": 0.007,
+          "dynamicRadius": false,
+          "emitBoostFood": true,
+          "foodCount": 12000,
+          "foodIndex": true,
+          "kiosk": {
+            "enabled": true,
+            "floorScore": 8500.0,
+            "graceSeconds": 1200.0,
+            "recoveryPerSecond": 0.005519633948746724,
+            "scoreDecayPerSecond": 0.0002759816974373362,
+            "shrinkPerSecond": 0.005519633948746724,
+            "stationaryRadius": 800.0
+          },
+          "prey": {
+            "count": 0,
+            "cruiseSpeed": 118.74999999999999,
+            "escapeSpeed": 192.28124999999997,
+            "fleeHalfWidth": 320.0,
+            "maxSize": 9.2,
+            "nutritionFactor": 30.0,
+            "respawnSeconds": 1.0,
+            "size": 6.0,
+            "sprintSpeed": 343.65625,
+            "turnRate": 3.625
+          },
+          "radius": 6000.0,
+          "radiusUpdates": [],
+          "speedModel": "retained_progress",
+          "vision": 1500.0
+        },
+        "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+        "eventBuffersEnabled": true,
+        "final": {
+          "ambientFood": 11133,
+          "arenaRadius": 6000.0,
+          "boostFood": 80,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 11213,
+          "living": 32,
+          "livingSegments": 69,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 32,
+          "time": 6.999999999999879
+        },
+        "initial": {
+          "ambientFood": 11321,
+          "arenaRadius": 6000.0,
+          "boostFood": 0,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 11321,
+          "living": 32,
+          "livingSegments": 64,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 32,
+          "time": 0.0
+        },
+        "profile": null,
+        "progress": {
+          "deathsAcrossEpisodes": 0,
+          "episodeLimitPhysicsTicks": 1000,
+          "finalEpisodeTicks": 1000,
+          "minimumFoodAtOperationBoundaries": 11213,
+          "minimumLivingAtOperationBoundaries": 32,
+          "physicsTicks": 1000,
+          "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+          "resets": 0
+        }
+      },
+      "samples": [
+        {
+          "case": "step-food",
+          "process_wall_seconds": 0.11615630000596866,
+          "cpu_seconds": 0.109375,
+          "peak_working_set_bytes": 6922240,
+          "exit_code": 0,
+          "repetition": 0,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0011154,
+              "p50": 7.19e-05,
+              "p95": 0.0001919,
+              "p99": 0.0006848
+            },
+            "operationsPerSecond": 9625.2968200907,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.10389289999999989
+          }
+        },
+        {
+          "case": "step-food",
+          "process_wall_seconds": 0.11372660001507029,
+          "cpu_seconds": 0.109375,
+          "peak_working_set_bytes": 6922240,
+          "exit_code": 0,
+          "repetition": 1,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0010713,
+              "p50": 7.08e-05,
+              "p95": 0.0002102,
+              "p99": 0.0007179
+            },
+            "operationsPerSecond": 9832.396961396036,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.10170460000000008
+          }
+        },
+        {
+          "case": "step-food",
+          "process_wall_seconds": 0.19022029999177903,
+          "cpu_seconds": 0.171875,
+          "peak_working_set_bytes": 6684672,
+          "exit_code": 0,
+          "repetition": 2,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0023322,
+              "p50": 0.0001153,
+              "p95": 0.0008157,
+              "p99": 0.0011648
+            },
+            "operationsPerSecond": 5980.321155206681,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.16721509999999987
+          }
+        }
+      ]
+    },
+    "step-body": {
+      "workload": {
+        "bodyShape": "64 separated 128-anchor serpentine bodies; local 400-unit orbits",
+        "config": {
+          "ambientFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 2
+          },
+          "ambientReplenishPerSecond": 5.0,
+          "boostFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 9
+          },
+          "boundaryMode": "sliding",
+          "deathFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 22
+          },
+          "dt": 0.007,
+          "dynamicRadius": false,
+          "emitBoostFood": true,
+          "foodCount": 350,
+          "foodIndex": true,
+          "kiosk": {
+            "enabled": true,
+            "floorScore": 8500.0,
+            "graceSeconds": 1200.0,
+            "recoveryPerSecond": 0.005519633948746724,
+            "scoreDecayPerSecond": 0.0002759816974373362,
+            "shrinkPerSecond": 0.005519633948746724,
+            "stationaryRadius": 800.0
+          },
+          "prey": {
+            "count": 0,
+            "cruiseSpeed": 118.74999999999999,
+            "escapeSpeed": 192.28124999999997,
+            "fleeHalfWidth": 320.0,
+            "maxSize": 9.2,
+            "nutritionFactor": 30.0,
+            "respawnSeconds": 1.0,
+            "size": 6.0,
+            "sprintSpeed": 343.65625,
+            "turnRate": 3.625
+          },
+          "radius": 12000.0,
+          "radiusUpdates": [],
+          "speedModel": "retained_progress",
+          "vision": 1500.0
+        },
+        "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+        "eventBuffersEnabled": true,
+        "final": {
+          "ambientFood": 350,
+          "arenaRadius": 12000.0,
+          "boostFood": 512,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 862,
+          "living": 64,
+          "livingSegments": 8192,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 64,
+          "time": 6.999999999999879
+        },
+        "initial": {
+          "ambientFood": 350,
+          "arenaRadius": 12000.0,
+          "boostFood": 0,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 350,
+          "living": 64,
+          "livingSegments": 8192,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 64,
+          "time": 0.0
+        },
+        "profile": null,
+        "progress": {
+          "deathsAcrossEpisodes": 0,
+          "episodeLimitPhysicsTicks": 1000,
+          "finalEpisodeTicks": 1000,
+          "minimumFoodAtOperationBoundaries": 350,
+          "minimumLivingAtOperationBoundaries": 64,
+          "physicsTicks": 1000,
+          "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+          "resets": 0
+        }
+      },
+      "samples": [
+        {
+          "case": "step-body",
+          "process_wall_seconds": 0.055575800011865795,
+          "cpu_seconds": 0.0625,
+          "peak_working_set_bytes": 5341184,
+          "exit_code": 0,
+          "repetition": 0,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0002166,
+              "p50": 3.61e-05,
+              "p95": 7.4e-05,
+              "p99": 9.69e-05
+            },
+            "operationsPerSecond": 22565.468064221328,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.04431549999999999
+          }
+        },
+        {
+          "case": "step-body",
+          "process_wall_seconds": 0.0556936000357382,
+          "cpu_seconds": 0.0625,
+          "peak_working_set_bytes": 5337088,
+          "exit_code": 0,
+          "repetition": 1,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0002076,
+              "p50": 3.58e-05,
+              "p95": 6.81e-05,
+              "p99": 0.0001348
+            },
+            "operationsPerSecond": 22546.338361918333,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.0443531
+          }
+        },
+        {
+          "case": "step-body",
+          "process_wall_seconds": 0.1434218999929726,
+          "cpu_seconds": 0.046875,
+          "peak_working_set_bytes": 5304320,
+          "exit_code": 0,
+          "repetition": 2,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0173441,
+              "p50": 6.33e-05,
+              "p95": 0.0001383,
+              "p99": 0.0003982
+            },
+            "operationsPerSecond": 9201.426589178396,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.10867879999999988
+          }
+        }
+      ]
+    },
+    "observe": {
+      "workload": {
+        "bodyShape": "32 radial 32-anchor bodies and eight prey; immutable world",
+        "config": {
+          "ambientFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 2
+          },
+          "ambientReplenishPerSecond": 5.0,
+          "boostFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 9
+          },
+          "boundaryMode": "sliding",
+          "deathFood": {
+            "cellSize": 75.0,
+            "enabled": true,
+            "maxPerCell": 22
+          },
+          "dt": 0.007,
+          "dynamicRadius": false,
+          "emitBoostFood": true,
+          "foodCount": 12000,
+          "foodIndex": true,
+          "kiosk": {
+            "enabled": true,
+            "floorScore": 8500.0,
+            "graceSeconds": 1200.0,
+            "recoveryPerSecond": 0.005519633948746724,
+            "scoreDecayPerSecond": 0.0002759816974373362,
+            "shrinkPerSecond": 0.005519633948746724,
+            "stationaryRadius": 800.0
+          },
+          "prey": {
+            "count": 8,
+            "cruiseSpeed": 118.74999999999999,
+            "escapeSpeed": 192.28124999999997,
+            "fleeHalfWidth": 320.0,
+            "maxSize": 9.2,
+            "nutritionFactor": 30.0,
+            "respawnSeconds": 1.0,
+            "size": 6.0,
+            "sprintSpeed": 343.65625,
+            "turnRate": 3.625
+          },
+          "radius": 6000.0,
+          "radiusUpdates": [],
+          "speedModel": "retained_progress",
+          "vision": 1500.0
+        },
+        "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
+        "eventBuffersEnabled": true,
+        "final": {
+          "ambientFood": 11321,
+          "arenaRadius": 6000.0,
+          "boostFood": 0,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 11321,
+          "living": 32,
+          "livingSegments": 1024,
+          "physicsTickMs": 7.0,
+          "prey": 8,
+          "spawned": 32,
+          "time": 0.0
+        },
+        "initial": {
+          "ambientFood": 11321,
+          "arenaRadius": 6000.0,
+          "boostFood": 0,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 11321,
+          "living": 32,
+          "livingSegments": 1024,
+          "physicsTickMs": 7.0,
+          "prey": 8,
+          "spawned": 32,
+          "time": 0.0
+        },
+        "profile": null,
+        "progress": {
+          "deathsAcrossEpisodes": 0,
+          "episodeLimitPhysicsTicks": 1000,
+          "finalEpisodeTicks": 0,
+          "minimumFoodAtOperationBoundaries": 11321,
+          "minimumLivingAtOperationBoundaries": 32,
+          "physicsTicks": 0,
+          "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+          "resets": 0
+        }
+      },
+      "samples": [
+        {
+          "case": "observe",
+          "process_wall_seconds": 1.572316600009799,
+          "cpu_seconds": 1.421875,
+          "peak_working_set_bytes": 8028160,
+          "exit_code": 0,
+          "repetition": 0,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0105463,
+              "p50": 0.0014747,
+              "p95": 0.0020462,
+              "p99": 0.0027354
+            },
+            "operationsPerSecond": 659.0266584850696,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 1.5173893000000018
+          }
+        },
+        {
+          "case": "observe",
+          "process_wall_seconds": 1.7894351999857463,
+          "cpu_seconds": 1.59375,
+          "peak_working_set_bytes": 8028160,
+          "exit_code": 0,
+          "repetition": 1,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.024176,
+              "p50": 0.0015081,
+              "p95": 0.002543,
+              "p99": 0.0045799
+            },
+            "operationsPerSecond": 583.0861971077404,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 1.7150123000000013
+          }
+        },
+        {
+          "case": "observe",
+          "process_wall_seconds": 2.0883361999876797,
+          "cpu_seconds": 1.765625,
+          "peak_working_set_bytes": 7974912,
+          "exit_code": 0,
+          "repetition": 2,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0243453,
+              "p50": 0.0017332,
+              "p95": 0.0033281,
+              "p99": 0.0066326
+            },
+            "operationsPerSecond": 500.8591236548051,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 1.9965693999999998
+          }
+        }
+      ]
+    },
+    "portable": {
+      "workload": {
+        "config": {
+          "agents": 8,
+          "broadcastTicks": 6,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "congestion": {
+              "durationSeconds": 0.0,
+              "extraSeconds": [
+                0.0,
+                0.0
+              ],
+              "followProbability": 0.0,
+              "followSeconds": 0.0,
+              "ratePerSecond": 0.0,
+              "shape": 1.0
+            },
+            "jitterSeconds": 0.0,
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5
+          },
+          "leaderboardIntervalSeconds": 3.0,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.5,
+          "minimapSide": 136,
+          "recordWire": true,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 5.0,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 350,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 0,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 1000.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        },
+        "final": {
+          "ambientFood": 312,
+          "arenaRadius": 1000.0,
+          "boostFood": 6,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 318,
+          "living": 8,
+          "livingSegments": 16,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 8,
+          "time": 0.1680000000000001
+        },
+        "frameScope": "all eight slots; no BotRunner or automatic background controller",
+        "initial": {
+          "ambientFood": 324,
+          "arenaRadius": 1000.0,
+          "boostFood": 0,
+          "deathFood": 0,
+          "deaths": 0,
+          "food": 324,
+          "living": 8,
+          "livingSegments": 16,
+          "physicsTickMs": 7.0,
+          "prey": 0,
+          "spawned": 8,
+          "time": 0.0
+        },
+        "progress": {
+          "deathsAcrossEpisodes": 0,
+          "episodeLimitPhysicsTicks": 1000,
+          "finalEpisodeTicks": 24,
+          "minimumFoodAtOperationBoundaries": 309,
+          "minimumLivingAtOperationBoundaries": 8,
+          "physicsTicks": 6000,
+          "resetPolicy": "before next operation if any snake died or episode would exceed tick limit",
+          "resets": 6
+        },
+        "recordDrainTimed": false,
+        "wireRecording": true
+      },
+      "samples": [
+        {
+          "case": "portable",
+          "process_wall_seconds": 0.6656651999801397,
+          "cpu_seconds": 0.4375,
+          "peak_working_set_bytes": 7434240,
+          "exit_code": 0,
+          "repetition": 0,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.012988,
+              "p50": 0.0004379,
+              "p95": 0.0013983,
+              "p99": 0.002759
+            },
+            "operationsPerSecond": 1664.5748509373245,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.6007539999999991
+          }
+        },
+        {
+          "case": "portable",
+          "process_wall_seconds": 0.5371418999857269,
+          "cpu_seconds": 0.4375,
+          "peak_working_set_bytes": 7434240,
+          "exit_code": 0,
+          "repetition": 1,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0040148,
+              "p50": 0.0004119,
+              "p95": 0.000838,
+              "p99": 0.0019458
+            },
+            "operationsPerSecond": 2068.386654272891,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.4834686000000007
+          }
+        },
+        {
+          "case": "portable",
+          "process_wall_seconds": 0.7266282999771647,
+          "cpu_seconds": 0.46875,
+          "peak_working_set_bytes": 7282688,
+          "exit_code": 0,
+          "repetition": 2,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0293941,
+              "p50": 0.000401,
+              "p95": 0.0008705,
+              "p99": 0.0059163
+            },
+            "operationsPerSecond": 1598.510955075127,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.6255822000000005
+          }
+        }
+      ]
+    },
+    "protocol": {
+      "workload": {
+        "decoderResets": 1000,
+        "finalReceived": {
+          "bodyAnchors": 16,
+          "food": 302,
+          "knownSnakeRecords": 8,
+          "life": 1,
+          "livingVisible": 8,
+          "localTime": 0.336,
+          "prey": 0,
+          "status": "playing"
+        },
+        "initialReceived": {
+          "bodyAnchors": 0,
+          "food": 0,
+          "knownSnakeRecords": 0,
+          "life": 0,
+          "livingVisible": 0,
+          "localTime": 0.0,
+          "prey": 0,
+          "status": "disconnected"
+        },
+        "physicsTicksPerformedInMeasuredRegion": 0,
+        "processingSeconds": 0.0,
+        "processingSource": "fixed zero; no BotRunner measurements",
+        "tape": {
+          "config": {
+            "agents": 8,
+            "broadcastTicks": 6,
+            "controlledSlot": 0,
+            "decisionTicks": 6,
+            "latency": {
+              "congestion": {
+                "durationSeconds": 0.0,
+                "extraSeconds": [
+                  0.0,
+                  0.0
+                ],
+                "followProbability": 0.0,
+                "followSeconds": 0.0,
+                "ratePerSecond": 0.0,
+                "shape": 1.0
+              },
+              "jitterSeconds": 0.0,
+              "processingJitterSeconds": 0.0,
+              "processingSeconds": [
+                0.0,
+                0.0
+              ],
+              "roundTripSeconds": [],
+              "roundTripSpread": 0.0,
+              "roundTripWeights": [],
+              "uplinkShare": 0.5
+            },
+            "leaderboardIntervalSeconds": 3.0,
+            "localRecords": false,
+            "minimapIntervalSeconds": 2.5,
+            "minimapSide": 136,
+            "recordWire": true,
+            "world": {
+              "ambientFood": {
+                "cellSize": 75.0,
+                "enabled": true,
+                "maxPerCell": 2
+              },
+              "ambientReplenishPerSecond": 5.0,
+              "boostFood": {
+                "cellSize": 75.0,
+                "enabled": true,
+                "maxPerCell": 9
+              },
+              "boundaryMode": "sliding",
+              "deathFood": {
+                "cellSize": 75.0,
+                "enabled": true,
+                "maxPerCell": 22
+              },
+              "dt": 0.007,
+              "dynamicRadius": false,
+              "emitBoostFood": true,
+              "foodCount": 350,
+              "foodIndex": true,
+              "kiosk": {
+                "enabled": true,
+                "floorScore": 8500.0,
+                "graceSeconds": 1200.0,
+                "recoveryPerSecond": 0.005519633948746724,
+                "scoreDecayPerSecond": 0.0002759816974373362,
+                "shrinkPerSecond": 0.005519633948746724,
+                "stationaryRadius": 800.0
+              },
+              "prey": {
+                "count": 0,
+                "cruiseSpeed": 118.74999999999999,
+                "escapeSpeed": 192.28124999999997,
+                "fleeHalfWidth": 320.0,
+                "maxSize": 9.2,
+                "nutritionFactor": 30.0,
+                "respawnSeconds": 1.0,
+                "size": 6.0,
+                "sprintSpeed": 343.65625,
+                "turnRate": 3.625
+              },
+              "radius": 1000.0,
+              "radiusUpdates": [],
+              "speedModel": "retained_progress",
+              "vision": 1500.0
+            }
+          },
+          "decisionGroups": 8,
+          "finalWorld": {
+            "ambientFood": 309,
+            "arenaRadius": 1000.0,
+            "boostFood": 6,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 315,
+            "living": 8,
+            "livingSegments": 16,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 8,
+            "time": 0.33600000000000024
+          },
+          "framesPerIteration": 9,
+          "initialWorld": {
+            "ambientFood": 324,
+            "arenaRadius": 1000.0,
+            "boostFood": 0,
+            "deathFood": 0,
+            "deaths": 0,
+            "food": 324,
+            "living": 8,
+            "livingSegments": 16,
+            "physicsTickMs": 7.0,
+            "prey": 0,
+            "spawned": 8,
+            "time": 0.0
+          },
+          "records": 24,
+          "sourcePhysicsTicks": 48,
+          "sourceSlot": 0,
+          "synthetic": true,
+          "wireBytes": 2556
+        }
+      },
+      "samples": [
+        {
+          "case": "protocol",
+          "process_wall_seconds": 0.2996761000249535,
+          "cpu_seconds": 0.25,
+          "peak_working_set_bytes": 6832128,
+          "exit_code": 0,
+          "repetition": 0,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.003091,
+              "p50": 0.0001989,
+              "p95": 0.0004719,
+              "p99": 0.0010409
+            },
+            "operationsPerSecond": 4498.510543159156,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.22229580000000018
+          }
+        },
+        {
+          "case": "protocol",
+          "process_wall_seconds": 0.3024880000157282,
+          "cpu_seconds": 0.234375,
+          "peak_working_set_bytes": 6897664,
+          "exit_code": 0,
+          "repetition": 1,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0045352,
+              "p50": 0.0001927,
+              "p95": 0.0004951,
+              "p99": 0.0010315
+            },
+            "operationsPerSecond": 4486.268429590708,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.2229024
+          }
+        },
+        {
+          "case": "protocol",
+          "process_wall_seconds": 0.26009689999045804,
+          "cpu_seconds": 0.21875,
+          "peak_working_set_bytes": 6815744,
+          "exit_code": 0,
+          "repetition": 2,
+          "timing": {
+            "latencySeconds": {
+              "max": 0.0043341,
+              "p50": 0.0001757,
+              "p95": 0.0003187,
+              "p99": 0.0007869
+            },
+            "operationsPerSecond": 5280.168374009109,
+            "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
+            "wallSeconds": 0.18938790000000003
+          }
+        }
+      ]
+    },
+    "e2e-client": {
+      "samples": [
+        {
+          "case": "e2e-client",
+          "steps": 100,
+          "playing_frames": 100,
+          "wall_seconds": 0.5283885000390001,
+          "response_latency_seconds": {
+            "p50": 0.004705999977886677,
+            "p95": 0.007711099984589964,
+            "p99": 0.010254399967379868,
+            "max": 0.011706800025422126
+          },
+          "response_sha256": "732412c20450be87b05607d11798542e502da22b2f02656e8a80ae64c0690a77",
+          "client": {
+            "cpu_seconds": 0.296875,
+            "peak_working_set_bytes": 8880128,
+            "exit_code": 0
+          },
+          "repetition": 0
+        },
+        {
+          "case": "e2e-client",
+          "steps": 100,
+          "playing_frames": 100,
+          "wall_seconds": 1.1641592999803834,
+          "response_latency_seconds": {
+            "p50": 0.00891640002373606,
+            "p95": 0.024694900028407574,
+            "p99": 0.030968800012487918,
+            "max": 0.03889669995987788
+          },
+          "response_sha256": "732412c20450be87b05607d11798542e502da22b2f02656e8a80ae64c0690a77",
+          "client": {
+            "cpu_seconds": 0.265625,
+            "peak_working_set_bytes": 8900608,
+            "exit_code": 0
+          },
+          "repetition": 1
+        },
+        {
+          "case": "e2e-client",
+          "steps": 100,
+          "playing_frames": 100,
+          "wall_seconds": 1.2124952000449412,
+          "response_latency_seconds": {
+            "p50": 0.006123600003775209,
+            "p95": 0.03889090003212914,
+            "p99": 0.05574719997821376,
+            "max": 0.0644686000305228
+          },
+          "response_sha256": "732412c20450be87b05607d11798542e502da22b2f02656e8a80ae64c0690a77",
+          "client": {
+            "cpu_seconds": 0.203125,
+            "peak_working_set_bytes": 8921088,
+            "exit_code": 0
+          },
+          "repetition": 2
+        }
+      ]
+    },
+    "e2e-host": {
+      "samples": [
+        {
+          "case": "e2e-host",
+          "steps": 100,
+          "playing_frames": 100,
+          "wall_seconds": 4.952454200014472,
+          "response_latency_seconds": {
+            "p50": 0.046359999978449196,
+            "p95": 0.0719692999846302,
+            "p99": 0.10730699996929616,
+            "max": 0.1657818999956362
+          },
+          "response_sha256": null,
+          "client": {
+            "cpu_seconds": 0.171875,
+            "peak_working_set_bytes": 8130560,
+            "exit_code": 0
+          },
+          "host": {
+            "cpu_seconds": 0.0625,
+            "peak_working_set_bytes": 6594560,
+            "exit_code": 1,
+            "shutdown": "terminated and waited by runner"
+          },
+          "repetition": 0
+        },
+        {
+          "case": "e2e-host",
+          "steps": 100,
+          "playing_frames": 100,
+          "wall_seconds": 4.874749400012661,
+          "response_latency_seconds": {
+            "p50": 0.04584410000825301,
+            "p95": 0.056531099951826036,
+            "p99": 0.0683269000146538,
+            "max": 0.13683700002729893
+          },
+          "response_sha256": null,
+          "client": {
+            "cpu_seconds": 0.109375,
+            "peak_working_set_bytes": 8101888,
+            "exit_code": 0
+          },
+          "host": {
+            "cpu_seconds": 0.046875,
+            "peak_working_set_bytes": 6574080,
+            "exit_code": 1,
+            "shutdown": "terminated and waited by runner"
+          },
+          "repetition": 1
+        },
+        {
+          "case": "e2e-host",
+          "steps": 100,
+          "playing_frames": 99,
+          "wall_seconds": 4.722232600033749,
+          "response_latency_seconds": {
+            "p50": 0.04587669996544719,
+            "p95": 0.04951640003127977,
+            "p99": 0.054399400018155575,
+            "max": 0.06860539998160675
+          },
+          "response_sha256": null,
+          "client": {
+            "cpu_seconds": 0.203125,
+            "peak_working_set_bytes": 8024064,
+            "exit_code": 0
+          },
+          "host": {
+            "cpu_seconds": 0.078125,
+            "peak_working_set_bytes": 6598656,
+            "exit_code": 1,
+            "shutdown": "terminated and waited by runner"
+          },
+          "repetition": 2
+        }
+      ]
+    }
+  }
+}

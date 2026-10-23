@@ -95,6 +95,12 @@ class Lines:
         line, self.pending = self.pending.split(b"\n", 1)
         return line
 
+    def drain(self, output):
+        """Preserve read-ahead bytes, then drain the pipe after the child stops."""
+        output.write(self.pending)
+        self.pending = b""
+        output.write(self.pipe.read())
+
 
 def stop(process):
     if process.poll() is None:
@@ -167,6 +173,7 @@ def e2e(executable, steps, hosted, directory):
     host = None
     process = None
     host_error = None
+    host_reader = None
     client_error = None
     started = time.perf_counter()
     deadline = started + 60
@@ -179,7 +186,8 @@ def e2e(executable, steps, hosted, directory):
                                           "maxClients": 1, "bots": 4}), encoding="utf-8")
             host = subprocess.Popen([str(executable), "host", "--config", str(config)],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            announcement = Lines(host.stderr).read(deadline).decode().strip()
+            host_reader = Lines(host.stderr)
+            announcement = host_reader.read(deadline).decode().strip()
             host_error.write((announcement + "\n").encode())
             if not announcement.startswith("Listening on ws://127.0.0.1:"):
                 raise RuntimeError(announcement)
@@ -241,7 +249,7 @@ def e2e(executable, steps, hosted, directory):
             if child is not None:
                 stop(child)
                 if child is host and host_error:
-                    host_error.write(host.stderr.read())
+                    host_reader.drain(host_error)
                 for pipe in (child.stdin, child.stdout, child.stderr):
                     if pipe is not None:
                         pipe.close()

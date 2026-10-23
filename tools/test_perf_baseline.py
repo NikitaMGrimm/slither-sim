@@ -1,9 +1,11 @@
 """Regression checks for failure diagnostics and temporary child cleanup."""
 
 from pathlib import Path
+import io
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +13,19 @@ import perf_baseline
 
 
 class ProcessFailures(unittest.TestCase):
+    def test_host_diagnostics_keep_bytes_read_with_announcement(self):
+        witness = b"Listening on ws://127.0.0.1:1/slither\nfatal witness\n"
+        with subprocess.Popen([sys.executable, "-c", f"import os; os.write(2, {witness!r})"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.PIPE) as process:
+            process.wait(timeout=10)
+            reader = perf_baseline.Lines(process.stderr)
+            announcement = reader.read(time.perf_counter() + 10)
+            self.assertEqual(reader.pending, b"fatal witness\n")
+            output = io.BytesIO()
+            output.write(announcement + b"\n")
+            reader.drain(output)
+            self.assertEqual(output.getvalue(), witness)
+
     def test_early_exit_retains_stderr(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
