@@ -149,7 +149,8 @@ pub fn multiplier(mass: f64) -> f64 {
 pub fn nutrition(size: f64, mass: f64) -> f64 {
     size * size * NUTRITION * multiplier(mass)
 }
-/// Mass removed per boost pellet before its +-7% jitter; fitted 0.0812 (1 - sct/430)^1.66.
+/// Base mass per boost pellet; fitted 0.0812 (1 - sct/430)^1.66.
+/// The simulator applies a `[0.94, 1.08)` jitter multiplier, capped by remaining mass.
 pub fn boost_cost(segments: usize) -> f64 {
     0.0812
         * (1.0 - segments as f64 / MAX_SEGMENTS as f64)
