@@ -15,7 +15,12 @@ use tungstenite::{
     stream::MaybeTlsStream,
 };
 
+use super::simulation::MAX_NICKNAME;
+
+/// Largest accepted server message; a local resource budget matching the
+/// simulator's frames.
 const MAX_MESSAGE_BYTES: usize = 1 << 20;
+/// Retained wire record bytes before the backend fails; drain to continue.
 const MAX_RECORD_BYTES: usize = 32 << 20;
 /// Each decision reads the socket at least this long, so a bot behind its
 /// schedule still receives traffic. A polling policy, not a protocol rule.
@@ -101,9 +106,7 @@ impl NetworkConfig {
                 ));
             }
         }
-        if self.nickname.chars().count() > 24 || self.nickname.chars().any(|c| c as u32 > 255) {
-            return Err("Nickname must have at most 24 Latin-1 characters".into());
-        }
+        login_packet(&self.nickname, self.skin)?;
         if self.custom_skin.len() > 255 {
             return Err("Custom skin must have at most 255 bytes".into());
         }
@@ -116,8 +119,11 @@ impl NetworkConfig {
 
 /// Build the protocol-19 login, without executing any downloaded client code.
 pub fn login_packet(nickname: &str, skin: u8) -> Result<Vec<u8>, String> {
-    if nickname.chars().count() > 24 || nickname.chars().any(|c| c as u32 > 255) {
-        return Err("Nickname must have at most 24 Latin-1 characters".into());
+    if nickname.chars().count() > MAX_NICKNAME || nickname.chars().any(|c| c as u32 > 255) {
+        return Err(format!(
+            "Nickname must have at most {MAX_NICKNAME} Latin-1 characters, as the stock \
+             client allows"
+        ));
     }
     let name: Vec<_> = nickname.chars().map(|c| c as u8).collect();
     let mut packet = vec![

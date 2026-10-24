@@ -14,7 +14,7 @@
 //! accepted.
 use super::{
     SimulationConfig, challenge,
-    simulation::{MAX_VICTORY_TEXT, PlayerAppearance, RawSimulator},
+    simulation::{MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, RawSimulator},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,16 +35,22 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
+// The budgets and timeouts below are host resource policies, not protocol or
+// physics limits.
 /// Largest accepted client message or frame. Logins with a custom skin are the
 /// largest stock-client messages and stay far below this.
 const MAX_INPUT_BYTES: usize = 4 << 10;
+/// Output batched per socket write.
 const WRITE_BUFFER_BYTES: usize = 16 << 10;
 /// Queued output beyond this closes the connection as too slow.
 const MAX_SEND_BUFFER_BYTES: usize = 1 << 20;
 /// Connections that have not joined, including those being closed.
 const MAX_PENDING: usize = 32;
+/// Fairness budgets per poll, so one busy listener or socket cannot starve
+/// physics or the other connections.
 const MAX_ACCEPTS_PER_POLL: usize = 16;
 const MAX_READS_PER_POLL: usize = 32;
+/// Lifecycle deadlines from acceptance: upgrade, login and close handshakes.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(10);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(1);
@@ -55,8 +61,11 @@ const MAX_CATCHUP_TICKS: u64 = 8;
 const MAX_BACKLOG_SECONDS: f64 = 0.25;
 /// Longest sleep in `run`, so socket service never waits a long tick.
 const MAX_IDLE: Duration = Duration::from_millis(5);
-const MAX_NICKNAME: usize = 24;
-const MAX_CUSTOM_SKIN: usize = 255;
+/// Appearances carry the custom skin after a u8 length.
+const MAX_CUSTOM_SKIN: usize = u8::MAX as usize;
+/// WebSocket control frames carry at most 125 payload bytes (RFC 6455 5.5),
+/// two of which hold the close code.
+const MAX_CLOSE_REASON: usize = 125 - 2;
 /// Printable letters only: both accepted replies stay valid stock-client text.
 const CHALLENGE_LITERAL: (&[u8; 5], &[u8; 22]) = (b"Slith", b"erSimLocalHostChalleng");
 
@@ -569,8 +578,7 @@ impl Open {
     fn reject(&mut self, game: &mut Game, now: Instant, reason: &str) -> Result<(), String> {
         self.release(game)?;
         self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
-        // Close reasons are limited to 123 bytes on the wire.
-        let mut end = reason.len().min(120);
+        let mut end = reason.len().min(MAX_CLOSE_REASON);
         while !reason.is_char_boundary(end) {
             end -= 1;
         }

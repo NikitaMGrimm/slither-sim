@@ -35,12 +35,14 @@ use std::{
 };
 
 /// Messages in flight per direction of one connection before the run fails.
+/// A local resource budget; the protocol has no such field.
 const MAX_IN_FLIGHT: usize = 4096;
 /// Fit the host's 1 MiB send buffer and native client's message limit, leaving
 /// room for the largest unmasked WebSocket header.
 const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
 /// Retained wire bytes per slot before the run fails; drain to continue. Each
-/// record also counts a fixed overhead so empty events stay bounded.
+/// record also counts a fixed overhead so empty events stay bounded. A local
+/// resource budget.
 const MAX_RECORD_BYTES: usize = 32 << 20;
 const RECORD_OVERHEAD: usize = 32;
 /// Front anchors searched for a known snake's previous front. Contraction runs
@@ -49,6 +51,8 @@ const RECORD_OVERHEAD: usize = 32;
 /// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
 /// snake in full.
 const FRESH_ANCHORS: usize = 4;
+/// Clear-pose draws per spawn before waiting for a later tick. Placement
+/// policy: a clear pose may exist after this many failures.
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
@@ -56,10 +60,13 @@ const SPAWN_ATTEMPTS: usize = 64;
 const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
 /// Snake IDs are the slots, sent as u16.
 pub(crate) const MAX_AGENTS: usize = u16::MAX as usize + 1;
-const MAX_NICKNAME: usize = 24;
+/// Stock-client compatibility: its nickname input keeps 24 characters, while
+/// the u8 length field could carry 255 Latin-1 bytes.
+pub(crate) const MAX_NICKNAME: usize = 24;
 /// Rows the stock leaderboard shows.
 const LEADERBOARD_ROWS: usize = 10;
-/// The stock client's victory input keeps 140 ASCII characters.
+/// Stock-client compatibility: its victory input keeps 140 ASCII characters;
+/// the record packet carries the remainder without a length field.
 pub(crate) const MAX_VICTORY_TEXT: usize = 140;
 static NATIVE_PROFILE: PlayerAppearance = PlayerAppearance {
     nickname: Vec::new(),
@@ -157,8 +164,11 @@ impl SimulationConfig {
         {
             return Err("Leaderboard interval must be positive".into());
         }
-        if !(1..=512).contains(&self.minimap_side) {
-            return Err("Minimap side must be 1 through 512".into());
+        if !(1..=super::minimap::MAX_SIDE).contains(&self.minimap_side) {
+            return Err(format!(
+                "Minimap side must be 1 through {}: the stock client clamps larger sides",
+                super::minimap::MAX_SIDE
+            ));
         }
         let largest = self
             .world
