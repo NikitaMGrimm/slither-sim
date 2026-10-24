@@ -49,6 +49,25 @@ Run from the checkout after building. Python 3.11+ is optional; the example uses
 only its standard library. On Windows, use `py -3` if needed. Rust users can
 embed the simulator directly; see [the basic example](examples/basic.rs).
 
+### Download a release
+
+Without Rust, download an archive from a [release](https://github.com/NikitaMGrimm/slither-sim/releases).
+Each holds the `slither-sim` CLI and the [C ABI](docs/c-api.md) library with its
+header, for Linux x86-64 and ARM64 (glibc 2.17+), macOS (Apple silicon and
+Intel) and Windows x86-64. `SHA256SUMS` lists their checksums.
+
+```sh
+curl -LO https://github.com/NikitaMGrimm/slither-sim/releases/latest/download/slither-sim-x86_64-unknown-linux-gnu.tar.gz
+tar -xzf slither-sim-x86_64-unknown-linux-gnu.tar.gz
+echo '{"op":"reset","agents":1}' | slither-sim-x86_64-unknown-linux-gnu/slither-sim serve
+```
+
+The macOS and Windows builds are unsigned. On macOS, a browser download is
+quarantined; clear it with `xattr -dr com.apple.quarantine` on the extracted
+folder. On Windows, unblock the `.zip` before extracting (Properties → Unblock,
+or `Unblock-File` in PowerShell), or choose More info → Run anyway if
+SmartScreen stops the CLI.
+
 ## Try the WebSocket server
 
 Start a shared world in one terminal:

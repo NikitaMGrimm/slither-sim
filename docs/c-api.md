@@ -15,9 +15,14 @@ python examples/ffi_bot.py --steps 200
 
 The `ffi/` workspace member builds `slither_sim_ffi.dll` on Windows,
 `libslither_sim_ffi.so` on Linux or `libslither_sim_ffi.dylib` on macOS in
-`target/release`, plus a static library. It is not published; build it from a
-checkout. The hand-written header is
+`target/release`, plus a static library. It is not on crates.io. The
+hand-written header is
 [`ffi/include/slither_sim.h`](https://github.com/NikitaMGrimm/slither-sim/blob/main/ffi/include/slither_sim.h).
+
+[Release archives](../README.md#download-a-release) include the shared library,
+the header and, on Windows, the `slither_sim_ffi.dll.lib` import library, for
+Linux (glibc 2.17+), macOS and Windows. They are unsigned. Pass the extracted
+library to the example with `--library`.
 
 The [Python example](../examples/ffi_bot.py) uses only `ctypes` from the standard
 library. It makes the same decisions as the [JSON controller](../examples/bot.py)

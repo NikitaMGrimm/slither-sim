@@ -75,6 +75,31 @@ release stays complete and the next version proceeds normally. To repair it,
 dispatch Release with `vVERSION`; files already on PyPI are skipped, so a partial
 upload completes. A source fix needs a new version.
 
+## Release binaries
+
+The same run also attaches prebuilt archives to the GitHub Release.
+`release-binaries.yml` builds the `slither-sim` CLI and the `slither-sim-ffi`
+shared library for Linux x86-64 and ARM64, macOS arm64 and x86-64 and Windows
+x86-64. Each archive (`slither-sim-TARGET.tar.gz`, or `.zip` on Windows) also
+holds the C header, LICENSE and a short README. Linux builds run in the
+manylinux2014 container, so they need glibc 2.17+; the build fails if either file
+requires a newer symbol. Windows builds link the C runtime statically. Each runner
+tests its extracted archive with a `serve` reset and step and with
+`examples/ffi_bot.py`. PRs that change the workflow build the same archives. The
+builds are not signed or notarized.
+
+The `release-assets` job, the only one with write access, runs only when all
+five builds succeed. It deletes any existing `SHA256SUMS`, replaces the archives
+with `gh release upload --clobber` and uploads the new `SHA256SUMS` last.
+Replacement is per file, so an interrupted upload can leave a partial or mixed
+archive set without a `SHA256SUMS`, but never with a stale one. Like the Python
+upload, it is not part of release completion: a failure leaves the crate release
+complete, and the next version proceeds normally. To repair it, dispatch Release
+with `vVERSION`. The rerun rebuilds every archive from the tagged commit and
+replaces the uploaded set and its checksums. It also retries the Python upload,
+which skips files already on PyPI; either upload can fail without stopping the
+other.
+
 ## Incompatible changes
 
 Within `0.x`, incompatible Rust changes require a minor bump, such as `0.3.0`.

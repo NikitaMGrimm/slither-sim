@@ -1,7 +1,8 @@
 # Geometric controller: slither-sim-json-v2
 
-Run `slither-sim serve`. One controller owns a session of independent worlds and
-all their player slots. Send UTF-8 JSON objects, one per stdin line; read one
+Run `slither-sim serve`, from a checkout with `cargo run --release --locked -- serve`
+or from a [release archive](../README.md#download-a-release) without Rust. One
+controller owns a session of independent worlds and all their player slots. Send UTF-8 JSON objects, one per stdin line; read one
 stdout reply per request. EOF stops the process. Rust callers can drive the
 same sessions [in-process](#in-process-sessions) or use the library directly.
 
