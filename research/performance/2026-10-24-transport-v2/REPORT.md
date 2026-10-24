@@ -52,7 +52,7 @@ mode order rotates between repeats. Tables give medians in ms per step.
 
 | | v1 | v2 |
 | --- | --- | --- |
-| Runtime source | `0d367f6f98b94c046684bc8bf70d17e860fea5e9` | `64a368c4a4bcff032fb359b9befc03d5e6003e2f` (`feat/serve-v2`) |
+| Runtime source | `0d367f6f98b94c046684bc8bf70d17e860fea5e9` | `64a368c4a4bcff032fb359b9befc03d5e6003e2f` (`feat/serve-v2`; its runtime source is unchanged in `2e7e387`, the #61 squash merge) |
 | Release binary SHA-256 | `0496255da103d135ec025fd2d782f212ac49cd8fc81aab6e0eb0bffcc41344de` | `6c9833c5954c33d5a1d547a7355938b628c05ca811083f8f1f78389671c7a2aa` |
 | `perf_transport.py` blob | `329a4eec73ce408282b22de460cde87a3c55545e` | `219d68048055d4fc1fc7b0649d55e768f9b32d0c` |
 | Client blobs (`.py`, `.mjs`) | `26da369c…`, `aa0415d7…` | `d720ca82…`, `7c2900bd…` |
