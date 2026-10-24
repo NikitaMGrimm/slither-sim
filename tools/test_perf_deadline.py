@@ -46,9 +46,10 @@ class SharedDeadline(unittest.TestCase):
                 script.write_text(f"import sys\nsys.stdout.buffer.write({payload!r})\n"
                                   f"sys.stdout.buffer.flush()\n{ending}\n", encoding="utf-8")
                 executable = sys._base_executable  # Avoid the Windows venv launcher child.
+                budget = 1 if exception is TimeoutError else 30
                 with self.assertRaises(exception):
                     perf_baseline.native(executable, str(script), 1, errors,
-                                         deadline=perf_baseline.time.perf_counter() + 1)
+                                         deadline=perf_baseline.time.perf_counter() + budget)
                 stdout = errors.with_suffix(".stdout.bin")
                 self.assertEqual(stdout.read_bytes(), payload)
                 failure = json.loads(errors.with_suffix(".failure.json").read_text())
