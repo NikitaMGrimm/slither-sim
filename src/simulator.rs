@@ -205,16 +205,18 @@ impl Config {
                 lead / BOOST_SPEED
             ));
         }
-        // Prey advance in LOOP_SECONDS substeps, and one tick's count (the dt
-        // plus a carried clock below one substep) must fit in usize. That bound,
-        // about 1.29e17 s on 64-bit targets, also keeps a tick of boost travel,
-        // dt × BOOST_SPEED, far inside f64, so heads stay finite.
-        if (self.dt + 2.0 * LOOP_SECONDS) / LOOP_SECONDS >= usize::MAX as f64 {
+        // Prey advance in LOOP_SECONDS substeps and boosting snakes drop food
+        // every BOOST_DROP_SECONDS, so one tick counts dt plus a carried clock
+        // below one period of each. Counting the shorter period below
+        // `max_tick_count` keeps both counts exact integers that fit usize,
+        // about 6.3e13 s on 64-bit targets. It also keeps a tick of boost
+        // travel, dt × BOOST_SPEED, far inside f64, so heads stay finite.
+        if (self.dt + 2.0 * LOOP_SECONDS) / LOOP_SECONDS >= max_tick_count() {
             return Err(format!(
                 "dt {} is too long: prey advance in {LOOP_SECONDS} s substeps, and one \
-                 tick's substep count must fit in usize (at most {})",
+                 tick's count of them must be an exact integer that fits usize (below {})",
                 self.dt,
-                usize::MAX
+                max_tick_count()
             ));
         }
         self.prey.validate()?;
@@ -854,9 +856,16 @@ impl Simulator {
             }
             s.speed = speed.step(boosting, s.segments, c.dt, c.speed_model);
             if boosting {
-                let mut elapsed = state.clock + c.dt;
-                while elapsed >= BOOST_DROP_SECONDS && state.active {
-                    elapsed -= BOOST_DROP_SECONDS;
+                let elapsed = state.clock + c.dt;
+                // Counted, not subtracted until the clock runs out: at a long dt
+                // the subtraction stops changing the clock, and a 430-segment
+                // snake's boost costs no mass, so nothing else ends the loop.
+                // With at most one drop, as at any measured dt, this matches
+                // that subtraction exactly.
+                let (drops, rest) = drops_in(elapsed);
+                let mut dropped = 0;
+                while dropped < drops && state.active {
+                    dropped += 1;
                     let tail = s.body.last().copied().unwrap_or(s.head);
                     let mult = multiplier(s.segments as f64 + s.fam);
                     let cost = (s.segments as f64 - 2.0 + s.fam)
@@ -896,7 +905,11 @@ impl Simulator {
                         state.exhausted = true;
                     }
                 }
-                state.clock = elapsed;
+                state.clock = if dropped == drops {
+                    rest
+                } else {
+                    elapsed - dropped as f64 * BOOST_DROP_SECONDS
+                };
             } else {
                 state.clock = 0.0;
             }
@@ -1611,6 +1624,30 @@ impl std::fmt::Debug for StepBuffers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StepBuffers").finish_non_exhaustive()
     }
+}
+
+/// Largest per-tick count of a fixed-period event that is an exact f64 integer
+/// and fits usize.
+fn max_tick_count() -> f64 {
+    (2f64)
+        .powi(f64::MANTISSA_DIGITS as i32)
+        .min(usize::MAX as f64)
+}
+
+/// Boost drops due in `elapsed` seconds and the clock left after them. The dt
+/// bound keeps the count below `max_tick_count`; the corrections make the
+/// rest lie in `0..BOOST_DROP_SECONDS` despite rounding.
+fn drops_in(elapsed: f64) -> (usize, f64) {
+    let mut drops = (elapsed / BOOST_DROP_SECONDS).floor();
+    let mut rest = elapsed - drops * BOOST_DROP_SECONDS;
+    if rest < 0.0 && drops > 0.0 {
+        drops -= 1.0;
+        rest += BOOST_DROP_SECONDS;
+    } else if rest >= BOOST_DROP_SECONDS {
+        drops += 1.0;
+        rest -= BOOST_DROP_SECONDS;
+    }
+    (drops as usize, rest.max(0.0))
 }
 
 /// Add `gain` to `s`'s mass, or record why not when the sum overflows f64.

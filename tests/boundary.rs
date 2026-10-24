@@ -386,9 +386,24 @@ fn sliding_steps_are_bounded_by_the_contact_lead_not_a_literal() {
 }
 
 #[test]
-fn hard_steps_are_bounded_by_representable_prey_substeps() {
-    let limit = physics::LOOP_SECONDS * usize::MAX as f64;
-    let config = |dt| Config {
+fn hard_steps_are_bounded_by_exact_tick_counts() {
+    // Prey substeps per tick must be an exact f64 integer that fits usize.
+    let exact = 2f64.powi(53).min(usize::MAX as f64);
+    let limit = physics::LOOP_SECONDS * exact;
+    let error = long_config(1e308).validate().unwrap_err();
+    assert!(error.contains("substep"), "{error}");
+    assert!(long_config(limit * 1.001).validate().is_err());
+    // One tick just inside the bound keeps the head finite.
+    let mut world = Simulator::new(1, long_config(limit * 0.999)).unwrap();
+    world.add("a", 0, 1).unwrap();
+    world.step(&[Some(Action::default())]).unwrap();
+    let head = world.snakes[0].head;
+    assert!(head.x.is_finite() && head.y.is_finite());
+    assert!(head.distance(Point::default()) > 1e15);
+}
+
+fn long_config(dt: f64) -> Config {
+    Config {
         dt,
         boundary_mode: BoundaryMode::Hard,
         food_count: 0,
@@ -398,15 +413,43 @@ fn hard_steps_are_bounded_by_representable_prey_substeps() {
             ..PreyConfig::default()
         },
         ..Config::sandbox()
-    };
-    let error = config(1e308).validate().unwrap_err();
-    assert!(error.contains("substep"), "{error}");
-    assert!(config(limit * 1.001).validate().is_err());
-    // One tick just inside the bound keeps the head finite.
-    let mut world = Simulator::new(1, config(limit * 0.999)).unwrap();
+    }
+}
+
+/// A boosting snake of `segments` respawned at the center, after one step.
+fn boosted(dt: f64, segments: usize) -> Simulator {
+    let mut config = long_config(dt);
+    config.radius = 1e6;
+    config.boost_food.enabled = false;
+    let mut world = Simulator::new(1, config).unwrap();
     world.add("a", 0, 1).unwrap();
-    world.step(&[Some(Action::default())]).unwrap();
-    let head = world.snakes[0].head;
-    assert!(head.x.is_finite() && head.y.is_finite());
-    assert!(head.distance(Point::default()) > 1e19);
+    world.snakes[0].alive = false;
+    world
+        .respawn_body(0, vec![Point::default(); segments], 0.)
+        .unwrap();
+    world
+        .step(&[Some(Action {
+            heading: 0.,
+            boost: true,
+        })])
+        .unwrap();
+    world
+}
+
+#[test]
+fn long_boost_steps_count_their_drops() {
+    // A 430-segment boost costs no mass, and at dt 1e16 subtracting the 0.155 s
+    // drop period no longer changed the clock, so the drop loop never ended.
+    let error = long_config(1e16).validate().unwrap_err();
+    assert!(error.contains("exact integer"), "{error}");
+    let world = boosted(100., 430);
+    assert!(world.time == 100.);
+    // A drop is due at once and then every 0.155 s: floor((0.155 + 1) / 0.155).
+    let world = boosted(1., 100);
+    let drops = world
+        .food
+        .iter()
+        .filter(|food| food.origin == Some(Origin::Boost))
+        .count();
+    assert_eq!(drops, 7);
 }
