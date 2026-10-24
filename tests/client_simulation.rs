@@ -195,6 +195,18 @@ fn jitter_and_congestion_never_reorder_either_stream() {
 }
 
 #[test]
+fn a_two_second_round_trip_is_reported_as_measured() {
+    // Tick rounding puts the measured RTT just above the configured 2 s,
+    // which a fixed 2 s acceptance window used to discard.
+    let mut backend = SimulatorBackend::new(2, config(1, LatencyConfig::fixed(2.))).unwrap();
+    backend.advance_ticks((7. / DT) as usize).unwrap();
+    let timing = backend.frame().unwrap().timing;
+    let ping = timing.ping_seconds.unwrap();
+    assert!((2. ..=2. + DT + 1e-9).contains(&ping), "{ping}");
+    assert!(timing.ping_range_seconds.is_some());
+}
+
+#[test]
 fn ping_is_measured_from_delivered_pongs_not_configured() {
     let mut latency = LatencyConfig::fixed(0.1);
     let mut backend = SimulatorBackend::new(2, config(1, latency.clone())).unwrap();

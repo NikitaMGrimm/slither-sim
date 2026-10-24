@@ -28,7 +28,6 @@ const MAX_SENT_COMMANDS: usize = 64;
 const PING_RANGE_SECONDS: f64 = 5.;
 /// The stock client sends a game ping only after more than 250 ms.
 const PING_INTERVAL_SECONDS: f64 = 0.25;
-const MAX_PING_SECONDS: f64 = 2.;
 /// Bound on motion reports retained between anchors for head extrapolation.
 const MAX_MOTION_STEPS: usize = 256;
 /// The stock `setMscps` extends its score tables by this many repeated entries.
@@ -1342,8 +1341,10 @@ impl ClientState {
             }
             Packet::Pong => {
                 if let Some(sent) = session.pending_ping.take() {
+                    // Any delay is a measurement: a slow link or congestion can
+                    // exceed any fixed window, and the pong carries no RTT.
                     let rtt = receipt - sent;
-                    if (0. ..=MAX_PING_SECONDS).contains(&rtt) {
+                    if rtt >= 0. {
                         session.ping = Some(rtt);
                         session.pongs.push_back((receipt, rtt));
                     }
