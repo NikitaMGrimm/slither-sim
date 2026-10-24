@@ -94,7 +94,10 @@ impl HostConfig {
     }
 
     fn world_config(&self) -> Result<SimulationConfig, String> {
-        let agents = self.max_clients.saturating_add(self.bots);
+        let agents = self
+            .max_clients
+            .checked_add(self.bots)
+            .ok_or("maxClients + bots must fit in usize")?;
         if self.max_clients == 0 || agents > MAX_AGENTS {
             return Err(format!(
                 "Host needs 1 or more maxClients and at most {MAX_AGENTS} clients plus bots"
@@ -278,10 +281,13 @@ impl Host {
     pub fn run(&mut self) -> Result<(), String> {
         loop {
             self.poll()?;
-            let next = (self.ticks + self.deferred + 1) as f64 * self.dt;
-            let wait = Duration::from_secs_f64(next)
-                .saturating_sub(self.epoch.elapsed())
-                .min(MAX_IDLE);
+            // Tiny steps can saturate the tick counts; then only poll.
+            let next = (self.ticks.checked_add(self.deferred))
+                .and_then(|ticks| ticks.checked_add(1))
+                .and_then(|ticks| Duration::try_from_secs_f64(ticks as f64 * self.dt).ok());
+            let wait = next.map_or(Duration::ZERO, |next| {
+                next.saturating_sub(self.epoch.elapsed()).min(MAX_IDLE)
+            });
             if !wait.is_zero() {
                 thread::sleep(wait);
             }
@@ -289,6 +295,7 @@ impl Host {
     }
 
     fn due_ticks(&mut self, now: Instant) -> u64 {
+        // Casts saturate, and ticks + deferred never exceeds an earlier schedule.
         let scheduled = (now.duration_since(self.epoch).as_secs_f64() / self.dt) as u64;
         let backlog = scheduled.saturating_sub(self.deferred + self.ticks);
         let limit = (MAX_BACKLOG_SECONDS / self.dt).ceil() as u64;
@@ -629,6 +636,16 @@ mod tests {
         assert_eq!(solved.len(), 27);
         assert_ne!(literal, solved);
         assert!(solved.iter().all(u8::is_ascii_alphabetic));
+    }
+
+    #[test]
+    fn overflowing_client_and_bot_counts_are_errors() {
+        let config = HostConfig {
+            max_clients: usize::MAX,
+            bots: 1,
+            ..HostConfig::default()
+        };
+        assert!(config.validate().unwrap_err().contains("maxClients + bots"));
     }
 
     #[test]

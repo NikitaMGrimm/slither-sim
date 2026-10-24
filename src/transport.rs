@@ -92,9 +92,14 @@ fn reply(result: &impl Serialize) -> Vec<u8> {
 
 /// `{"protocol":..,"result":{<head>"worlds":[<frames>]}}`, where `head` holds any
 /// members that sort before `worlds`, each followed by a comma.
-fn worlds_reply(head: &[u8], frames: &[Vec<u8>]) -> Vec<u8> {
-    let length = frames.iter().map(|frame| frame.len() + 1).sum::<usize>() + head.len() + 64;
-    let mut out = Vec::with_capacity(length);
+fn worlds_reply(head: &[u8], frames: &[Vec<u8>]) -> Result<Vec<u8>, String> {
+    let length = frames.iter().try_fold(head.len() + 64, |sum, frame| {
+        sum.checked_add(frame.len() + 1)
+    });
+    let mut out = Vec::new();
+    length
+        .and_then(|length| out.try_reserve_exact(length).ok())
+        .ok_or("The reply does not fit in memory")?;
     out.extend_from_slice(b"{\"protocol\":");
     out.extend_from_slice(&serde_json::to_vec(PROTOCOL).expect("strings serialize"));
     out.extend_from_slice(b",\"result\":{");
@@ -107,7 +112,7 @@ fn worlds_reply(head: &[u8], frames: &[Vec<u8>]) -> Vec<u8> {
         out.extend_from_slice(frame);
     }
     out.extend_from_slice(b"]}}");
-    out
+    Ok(out)
 }
 
 struct WorldState {
@@ -119,7 +124,7 @@ struct WorldState {
 impl WorldState {
     /// Holds the validated actions for up to `decision_ticks` ticks, stopping
     /// once every snake has died, then collects the new frame.
-    fn advance(&mut self, decision_ticks: usize) {
+    fn advance(&mut self, decision_ticks: usize) -> Result<(), String> {
         let previous_deaths = self.world.deaths.len();
         let mut ticks = 0;
         for _ in 0..decision_ticks {
@@ -130,7 +135,7 @@ impl WorldState {
             ticks += 1;
         }
         self.frame
-            .collect(&self.world, ticks, &self.world.deaths[previous_deaths..]);
+            .collect(&self.world, ticks, &self.world.deaths[previous_deaths..])
     }
 }
 
@@ -139,6 +144,18 @@ struct Run {
     agents: usize,
     decision_ticks: usize,
 }
+
+/// The first failure of `results`, naming its world.
+fn each_ok<R>(results: Vec<Result<R, String>>) -> Result<Vec<R>, String> {
+    results
+        .into_iter()
+        .enumerate()
+        .map(|(index, result)| result.map_err(|error| format!("World {index}: {error}")))
+        .collect()
+}
+
+/// Worlds have advanced when their frame fails, so the session cannot continue.
+const ENDED: &str = "; the session has ended, reset to continue";
 
 /// `work` on every world, on the rayon pool when there are several. Worlds are
 /// independent and results return in world order, so replies never depend on it.
@@ -185,7 +202,8 @@ impl Session {
     /// the new frames with [`Session::frame`]. `headings` and `boosts` hold
     /// one entry per agent slot of every world, world-major: slot `s` of world
     /// `w` is entry `w * agents + s`. A NaN heading means no action, which only
-    /// dead slots may give. Invalid steps change nothing.
+    /// dead slots may give. Invalid steps change nothing. A frame column that
+    /// overflows its `u32` type ends the session after the worlds advanced.
     pub fn step(&mut self, headings: &[f64], boosts: &[bool]) -> Result<(), String> {
         let run = self.current.as_mut().ok_or("Reset first")?;
         let need = run.worlds.len() * run.agents;
@@ -216,8 +234,13 @@ impl Session {
                 .map_err(|error| format!("World {index}: {error}"))?;
         }
         let decision_ticks = run.decision_ticks;
-        each_world(&mut run.worlds, |state| state.advance(decision_ticks));
-        Ok(())
+        let result = each_ok(each_world(&mut run.worlds, |state| {
+            state.advance(decision_ticks)
+        }));
+        result.map(|_| ()).map_err(|error| {
+            self.current = None;
+            error + ENDED
+        })
     }
 
     /// World `world`'s frame after the latest reset or step, or `None` before
@@ -269,8 +292,15 @@ impl Session {
                          1..{MAX_DECISION_TICKS} decisionTicks"
                     ));
                 }
+                // The typed step and the C ABI index slots world-major.
+                worlds
+                    .checked_mul(agents)
+                    .ok_or("worlds * agents must fit in usize")?;
                 // Construct completely before replacing a working session.
-                let mut built = Vec::with_capacity(worlds);
+                let mut built = Vec::new();
+                built
+                    .try_reserve_exact(worlds)
+                    .map_err(|_| format!("{worlds} worlds do not fit in memory"))?;
                 for index in 0..worlds {
                     let mut world =
                         Simulator::new(seed.wrapping_add(index as u32), (*config).clone())?;
@@ -279,10 +309,10 @@ impl Session {
                     }
                     built.push(world);
                 }
-                // Earlier frames keep their buffers for the new worlds.
-                let mut frames = self
-                    .current
-                    .take()
+                // Earlier frames keep their buffers for the new worlds, unless
+                // a frame could fail and lose the previous session with them.
+                let reuse = built.iter().all(frame::fits);
+                let mut frames = (if reuse { self.current.take() } else { None })
                     .map(|run| run.worlds.into_iter().map(|state| state.frame))
                     .into_iter()
                     .flatten();
@@ -294,10 +324,10 @@ impl Session {
                         actions: Vec::new(),
                     })
                     .collect();
-                let frames = each_world(&mut states, |state| {
-                    state.frame.collect(&state.world, 0, &[]);
-                    state.frame.encode()
-                });
+                let frames = each_ok(each_world(&mut states, |state| {
+                    state.frame.collect(&state.world, 0, &[])?;
+                    Ok(state.frame.encode())
+                }))?;
                 let mut head = b"\"config\":".to_vec();
                 head.extend_from_slice(
                     &crate::json::to_vec(&states[0].world.config).expect("configs serialize"),
@@ -305,7 +335,7 @@ impl Session {
                 head.extend_from_slice(
                     format!(",\"decisionTicks\":{decision_ticks},\"seed\":{seed},").as_bytes(),
                 );
-                let result = worlds_reply(&head, &frames);
+                let result = worlds_reply(&head, &frames)?;
                 self.current = Some(Run {
                     worlds: states,
                     agents,
@@ -345,11 +375,17 @@ impl Session {
                         .map_err(|error| format!("World {index}: {error}"))?;
                 }
                 let decision_ticks = run.decision_ticks;
-                let frames = each_world(&mut run.worlds, |state| {
-                    state.advance(decision_ticks);
-                    state.frame.encode()
-                });
-                Ok(worlds_reply(b"", &frames))
+                let frames = each_ok(each_world(&mut run.worlds, |state| {
+                    state.advance(decision_ticks)?;
+                    Ok(state.frame.encode())
+                }));
+                match frames {
+                    Ok(frames) => worlds_reply(b"", &frames),
+                    Err(error) => {
+                        self.current = None;
+                        Err(error + ENDED)
+                    }
+                }
             }
             Request::Snapshot { world } => {
                 let run = self.current.as_ref().ok_or("Reset first")?;
