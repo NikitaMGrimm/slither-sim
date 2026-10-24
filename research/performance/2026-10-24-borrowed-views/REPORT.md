@@ -91,7 +91,9 @@ operations, alternating paired runs and reported spread.
 
 One machine and one bot loop (nearest food and head) were measured; bots that
 read little, or that walk opponent bodies, were not. Peak memory was not
-measured, and the reviewer did not reproduce the timings.
+measured, and the reviewer did not reproduce the timings. The per-run reports
+and traces were not kept and are unavailable; the table holds the recorded
+summaries, and the commands below regenerate them.
 
 ## Reproduction
 
@@ -101,7 +103,8 @@ git switch --detach a8a457e
 git am /tmp/borrowed-views.patch
 cargo build --release --locked --example perf_baseline
 target/release/examples/perf_baseline dome-proxy-96-nearest-observe 900
-target/release/examples/perf_baseline dome-proxy-96-nearest-sight 900 --parallel
+target/release/examples/perf_baseline dome-proxy-96-nearest-sight 900
 ```
 
-`perf_baseline --list` prints the catalog.
+Add `--parallel` to both commands for the parallel rows, and use `official-128`
+with 800 iterations for the other world. `perf_baseline --list` prints the catalog.
