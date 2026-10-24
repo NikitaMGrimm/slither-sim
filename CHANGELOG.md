@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## [0.3.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.0...v0.3.1) - 2026-10-24
+
+### Added
+
+- *(observation)* refill observation buffers with observe_all_into ([#58](https://github.com/NikitaMGrimm/slither-sim/pull/58))
+- *(observation)* split large observation batches over the rayon pool ([#56](https://github.com/NikitaMGrimm/slither-sim/pull/56))
+- *(tools)* compare a base ref with the working tree in one command ([#49](https://github.com/NikitaMGrimm/slither-sim/pull/49))
+- *(performance)* add steady-state workloads and a --list catalog ([#48](https://github.com/NikitaMGrimm/slither-sim/pull/48))
+
+### Other
+
+- *(simulator)* reuse per-step buffers between steps ([#57](https://github.com/NikitaMGrimm/slither-sim/pull/57))
+- *(transport)* write JSON replies without building a Value tree ([#55](https://github.com/NikitaMGrimm/slither-sim/pull/55))
+- *(client)* share food sector listings and index known snakes by slot ([#54](https://github.com/NikitaMGrimm/slither-sim/pull/54))
+- *(observation)* index batch observation food in a 2D grid ([#53](https://github.com/NikitaMGrimm/slither-sim/pull/53))
+- *(simulator)* track food occupancy and pickup candidates across a step ([#52](https://github.com/NikitaMGrimm/slither-sim/pull/52))
+- *(simulator)* add exact broad phases for collisions and prey pickup ([#51](https://github.com/NikitaMGrimm/slither-sim/pull/51))
+
 ### Added
 
 - List benchmark workloads with `perf_baseline --list` from one registration table.
