@@ -1,7 +1,7 @@
 //! Local process transport. Each connection controls one independent world.
-use crate::{Action, Config, Simulator};
-use serde::Deserialize;
-use serde_json::{Value, json};
+use crate::{Action, Config, DeathEvent, Food, Observation, Prey, Simulator, Snake};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::io::{self, BufRead, Write};
 
 pub const PROTOCOL: &str = "slither-sim-json-v1";
@@ -52,6 +52,43 @@ enum Request {
     Snapshot {},
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResetReply<'a> {
+    seed: u32,
+    config: &'a Config,
+    decision_ticks: usize,
+    observations: Vec<Option<Observation>>,
+    time: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StepReply<'a> {
+    observations: Vec<Option<Observation>>,
+    deaths: &'a [DeathEvent],
+    time: f64,
+    elapsed_seconds: f64,
+    ticks: usize,
+    living: usize,
+}
+
+#[derive(Serialize)]
+struct SnapshotReply<'a> {
+    config: &'a Config,
+    time: f64,
+    snakes: &'a [Snake],
+    food: &'a [Food],
+    prey: &'a [Prey],
+    deaths: &'a [DeathEvent],
+}
+
+/// Replies keep the sorted-key bytes of the `serde_json::Value` they were once
+/// built through; see `crate::json`.
+fn reply(result: &impl Serialize) -> Vec<u8> {
+    crate::json::reply(PROTOCOL, result)
+}
+
 struct WorldSession {
     world: Simulator,
     decision_ticks: usize,
@@ -63,15 +100,15 @@ struct Session {
 }
 
 impl Session {
-    fn handle(&mut self, request: Request) -> Result<Value, String> {
+    fn handle(&mut self, request: Request) -> Result<Vec<u8>, String> {
         match request {
-            Request::Info {} => Ok(json!({
+            Request::Info {} => Ok(reply(&json!({
                 "version": env!("CARGO_PKG_VERSION"),
                 "defaultConfig": Config::default(),
                 "defaultDecisionTicks": default_decision_ticks(),
                 "maxAgents": 128,
                 "maxDecisionTicks": 1000,
-            })),
+            }))),
             Request::Reset {
                 seed,
                 agents,
@@ -86,12 +123,12 @@ impl Session {
                 for slot in 0..agents {
                     world.add(slot.to_string(), slot, agents)?;
                 }
-                let result = json!({
-                    "seed": seed,
-                    "config": world.config,
-                    "decisionTicks": decision_ticks,
-                    "observations": world.observe_all(),
-                    "time": world.time,
+                let result = reply(&ResetReply {
+                    seed,
+                    config: &world.config,
+                    decision_ticks,
+                    observations: world.observe_all(),
+                    time: world.time,
                 });
                 self.current = Some(WorldSession {
                     world,
@@ -122,32 +159,35 @@ impl Session {
                     session.world.advance_validated(&actions);
                     ticks += 1;
                 }
-                Ok(json!({
-                    "observations": session.world.observe_all(),
-                    "deaths": session.world.deaths[previous_deaths..],
-                    "time": session.world.time,
-                    "elapsedSeconds": session.world.time - start,
-                    "ticks": ticks,
-                    "living": session.world.living(),
+                Ok(reply(&StepReply {
+                    observations: session.world.observe_all(),
+                    deaths: &session.world.deaths[previous_deaths..],
+                    time: session.world.time,
+                    elapsed_seconds: session.world.time - start,
+                    ticks,
+                    living: session.world.living(),
                 }))
             }
             Request::Observe { slot } => {
                 let world = &self.current.as_ref().ok_or("Reset first")?.world;
                 let snake = world.snakes.get(slot).ok_or("Unknown agent slot")?;
-                Ok(
-                    json!({"observation": if snake.alive { Some(world.observe(slot)?) } else { None }}),
-                )
+                let observation = if snake.alive {
+                    Some(world.observe(slot)?)
+                } else {
+                    None
+                };
+                Ok(reply(&json!({ "observation": observation })))
             }
             Request::Snapshot {} => {
                 let world = &self.current.as_ref().ok_or("Reset first")?.world;
                 // Deliberately exclude hidden RNG/control state from this debug view.
-                Ok(json!({
-                    "config": world.config,
-                    "time": world.time,
-                    "snakes": world.snakes,
-                    "food": world.food,
-                    "prey": world.prey,
-                    "deaths": world.deaths,
+                Ok(reply(&SnapshotReply {
+                    config: &world.config,
+                    time: world.time,
+                    snakes: &world.snakes,
+                    food: &world.food,
+                    prey: &world.prey,
+                    deaths: &world.deaths,
                 }))
             }
         }
@@ -169,10 +209,10 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
             .map_err(|error| error.to_string())
             .and_then(|request| session.handle(request));
         let reply = match result {
-            Ok(result) => json!({"protocol": PROTOCOL, "result": result}),
-            Err(error) => json!({"protocol": PROTOCOL, "error": error}),
+            Ok(reply) => reply,
+            Err(error) => crate::json::error_reply(PROTOCOL, &error),
         };
-        serde_json::to_writer(&mut output, &reply)?;
+        output.write_all(&reply)?;
         output.write_all(b"\n")?;
         output.flush()?;
     }
