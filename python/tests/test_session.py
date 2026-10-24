@@ -328,10 +328,6 @@ class ErrorTests(unittest.TestCase):
             self.assertIn(message, str(caught.exception))
             self.assertEqual((session.worlds, session.agents), (WORLDS, AGENTS))
             self.assertEqual(fingerprint(session), before)
-        # Only raw JSON can repeat a key; configs reject it like other fields.
-        reply = session.request('{"op":"reset","config":{"radius":700,"radius":800}}')
-        self.assertIn("duplicate field `radius`", reply["error"])
-        self.assertEqual(fingerprint(session), before)
 
     def test_reset_errors_match_json_errors(self):
         typed, encoded = Session(), Session()

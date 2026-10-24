@@ -6,7 +6,7 @@ use crate::profiling::StepProfile;
 use crate::{model::*, physics::*};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::f64::consts::{FRAC_PI_2, PI, TAU};
+use std::f64::consts::{PI, TAU};
 use std::time::Instant;
 
 /// Provisional density limit inferred from received death-food packets.
@@ -165,9 +165,8 @@ pub struct Config {
     /// many seconds, across the slot's lives. `None` keeps no kill score.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kill_score_seconds: Option<f64>,
-    /// Least displayed score: new lives start at the least mass that displays
-    /// it, and boosting or the kiosk penalty never shrink a snake below that
-    /// mass. Read when a world is created.
+    /// Least displayed score that boosting or the kiosk penalty can shrink a
+    /// snake to; at or below its mass, boosting is free. Read when a world is created.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_score: Option<u32>,
 }
@@ -184,6 +183,7 @@ impl Serialize for Config {
 impl<'de> Deserialize<'de> for Config {
     /// Fields given beside `preset` replace its values; nested objects merge
     /// field by field. Without a preset, omitted fields use `Config::official(1)`.
+    /// Input passes through `serde_json::Value`, so a repeated key keeps its last value.
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::Error;
         use serde_json::{Map, Value};
@@ -197,9 +197,7 @@ impl<'de> Deserialize<'de> for Config {
                 }
             }
         }
-        let Unique(Value::Object(mut fields)) = deserializer.deserialize_map(UniqueVisitor)? else {
-            return Err(D::Error::custom("invalid type, expected struct Config"));
-        };
+        let mut fields = Map::deserialize(deserializer)?;
         let fields = match fields.remove("preset") {
             None => fields,
             Some(preset) => {
@@ -216,64 +214,19 @@ impl<'de> Deserialize<'de> for Config {
         Config::deserialize(Value::Object(fields)).map_err(D::Error::custom)
     }
 }
-/// A JSON value whose objects, at every depth, reject duplicate keys, as the
-/// derived deserializers do; a plain `Value` would keep the last one.
-struct Unique(serde_json::Value);
-struct UniqueVisitor;
-impl<'de> Deserialize<'de> for Unique {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_any(UniqueVisitor)
+/// Whether segment `a`-`b` passes within `radius` of the center. Coordinates
+/// are first divided by their largest magnitude, so a tiny path's squared
+/// length cannot underflow to zero and look like a point.
+fn reaches_center(a: Point, b: Point, radius: f64) -> bool {
+    let scale = a.x.abs().max(a.y.abs()).max(b.x.abs()).max(b.y.abs());
+    if scale == 0.0 {
+        return radius > 0.0;
     }
-}
-impl<'de> serde::de::Visitor<'de> for UniqueVisitor {
-    type Value = Unique;
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("struct Config")
-    }
-    fn visit_bool<E>(self, v: bool) -> Result<Unique, E> {
-        Ok(Unique(v.into()))
-    }
-    fn visit_i64<E>(self, v: i64) -> Result<Unique, E> {
-        Ok(Unique(v.into()))
-    }
-    fn visit_u64<E>(self, v: u64) -> Result<Unique, E> {
-        Ok(Unique(v.into()))
-    }
-    fn visit_f64<E>(self, v: f64) -> Result<Unique, E> {
-        Ok(Unique(v.into()))
-    }
-    fn visit_str<E>(self, v: &str) -> Result<Unique, E> {
-        Ok(Unique(v.into()))
-    }
-    fn visit_unit<E>(self) -> Result<Unique, E> {
-        Ok(Unique(serde_json::Value::Null))
-    }
-    fn visit_none<E>(self) -> Result<Unique, E> {
-        Ok(Unique(serde_json::Value::Null))
-    }
-    fn visit_some<D: serde::Deserializer<'de>>(self, d: D) -> Result<Unique, D::Error> {
-        Unique::deserialize(d)
-    }
-    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Unique, A::Error> {
-        let mut items = Vec::new();
-        while let Some(Unique(item)) = seq.next_element()? {
-            items.push(item);
-        }
-        Ok(Unique(items.into()))
-    }
-    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Unique, A::Error> {
-        let mut fields = serde_json::Map::new();
-        while let Some(key) = map.next_key::<String>()? {
-            if fields.contains_key(&key) {
-                return Err(serde::de::Error::custom(format_args!(
-                    "duplicate field `{key}`"
-                )));
-            }
-            let Unique(value) = map.next_value()?;
-            fields.insert(key, value);
-        }
-        Ok(Unique(fields.into()))
-    }
+    let unit = |p: Point| Point {
+        x: p.x / scale,
+        y: p.y / scale,
+    };
+    segment_distance(Point::default(), unit(a), unit(b)) * scale < radius
 }
 /// Distance every spawn anchor keeps from the wall.
 const SPAWN_WALL_MARGIN: f64 = 60.0;
@@ -399,14 +352,14 @@ impl Config {
         if pit.is_some_and(|pit| !(pit > 0.0 && pit < self.radius)) {
             return Err("pit.radius must be positive and less than radius, so the pit lies inside the arena".into());
         }
+        // A new life's tail lies one anchor outward from its head.
+        let margin = SPAWN_WALL_MARGIN + 42.0;
         if self.spawn_radius.is_some_and(|spawn| {
-            !(spawn >= 0.0
-                && spawn < self.radius - SPAWN_WALL_MARGIN
-                && pit.is_none_or(|pit| spawn > pit))
+            !(spawn >= 0.0 && spawn < self.radius - margin && pit.is_none_or(|pit| spawn > pit))
         }) {
             return Err(format!(
-                "spawnRadius must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
-                 radius, the wall margin every spawn keeps"
+                "spawnRadius must lie outside pit.radius and more than {margin} inside radius, \
+                 so a new life's outward tail keeps the {SPAWN_WALL_MARGIN}-unit spawn wall margin"
             ));
         }
         if self
@@ -421,8 +374,9 @@ impl Config {
         let scores = MassFloor::score_range();
         if self.min_score.is_some_and(|score| !scores.contains(&score)) {
             return Err(format!(
-                "minScore must be from a newborn's displayed {} to {}, the most a \
-                 {MAX_SEGMENTS}-segment snake displays, so a snake can be built at it",
+                "minScore must be from a newborn's displayed {} to {}, the score at \
+                 {MAX_SEGMENTS} segments, where the score table ends and larger snakes \
+                 display less, so growth never falls below the floor",
                 scores.start(),
                 scores.end()
             ));
@@ -679,46 +633,28 @@ impl Simulator {
             x: a.cos() * distance,
             y: a.sin() * distance,
         };
-        // Two segments face inward; a `minScore` body follows the ring counterclockwise.
-        let (body, heading) = if self.spawn_segments() > 2 {
-            let (body, heading) = self.spawn_body(head, a + FRAC_PI_2);
-            // A floor body too long for its ring falls back to straight anchors.
-            if body
-                .iter()
-                .any(|p| p.distance(Point::default()) >= self.config.radius)
-            {
-                return Err(
-                    "minScore spawn body extends outside arena; lower minScore or enlarge radius"
-                        .into(),
-                );
-            }
-            (body, heading)
-        } else {
-            let tail = Point {
-                x: head.x + a.cos() * 42.0,
-                y: head.y + a.sin() * 42.0,
-            };
-            (vec![head, tail], a + PI)
-        };
-        let segments = body.len();
-        let mut snake = Snake {
+        self.snakes.push(Snake {
             id,
             head,
-            body,
-            heading,
-            speed: base_speed(segments),
-            radius: 0.0,
-            length: 0.0,
-            segments,
-            fam: self.min_mass.map_or(0.0, |floor| floor.fam),
-            score: 0.0,
+            body: vec![
+                head,
+                Point {
+                    x: head.x + a.cos() * 42.0,
+                    y: head.y + a.sin() * 42.0,
+                },
+            ],
+            heading: a + PI,
+            speed: base_speed(2),
+            radius: 14.5,
+            length: 2.0,
+            segments: 2,
+            fam: 0.0,
+            score: score(2, 0.0),
             kills: 0,
             alive: true,
-        };
-        Self::update_mass(&mut snake);
-        self.snakes.push(snake);
+        });
         self.boosts.push(Boost::default());
-        self.speeds.push(SpeedState::idle(base_speed(segments)));
+        self.speeds.push(SpeedState::idle(base_speed(2)));
         self.kiosks.push(KioskState::default());
         self.pit_entered.push(false);
         self.kill_times.push(VecDeque::new());
@@ -772,32 +708,6 @@ impl Simulator {
             active_boost_seconds: b.active_boost_seconds,
             boost_mass_spent: b.boost_mass_spent,
         })
-    }
-    /// Segments of a new life: two, or the `minScore` floor's.
-    pub fn spawn_segments(&self) -> usize {
-        self.min_mass.map_or(2, |floor| floor.segments)
-    }
-    /// Head-first body and heading of a new life of `spawn_segments` with its
-    /// head at `head`. Two segments lie straight behind `heading`. A larger
-    /// `minScore` body follows the circle through `head` around the center,
-    /// turning the way `heading` leans, so it keeps the head's distance from
-    /// the wall and pit; it is straight if that circle is too small to hold it.
-    /// Pass the result to `body_is_clear` and `respawn_body`.
-    pub fn spawn_body(&self, head: Point, heading: f64) -> (Vec<Point>, f64) {
-        let segments = self.spawn_segments();
-        if let Some(ring) = (segments > 2)
-            .then(|| crate::spawn::ring_body(head, heading, segments))
-            .flatten()
-        {
-            return ring;
-        }
-        let body = (0..segments)
-            .map(|i| Point {
-                x: head.x - heading.cos() * 42.0 * i as f64,
-                y: head.y - heading.sin() * 42.0 * i as f64,
-            })
-            .collect();
-        (body, heading)
     }
     /// Calibrated spawn exclusion, not collision immunity. Check the whole new
     /// body so its tail cannot appear in front of an existing player either.
@@ -883,8 +793,6 @@ impl Simulator {
     /// Respawn a dead slot with a supplied head-first body (2..=430 finite anchors).
     /// Every anchor must be inside the arena. Resets the same per-life state as
     /// `respawn`; call `body_is_clear` separately if placement needs exclusion.
-    /// With `minScore`, the body needs at least `spawn_segments` anchors; at
-    /// exactly that many, the life starts at the floor's score.
     pub fn respawn_body(
         &mut self,
         index: usize,
@@ -905,13 +813,6 @@ impl Simulator {
         {
             return Err("Spawn body extends outside arena".into());
         }
-        let floor = self.min_mass;
-        if let Some(floor) = floor.filter(|floor| body.len() < floor.segments) {
-            return Err(format!(
-                "minScore needs a spawn body of at least {} segments",
-                floor.segments
-            ));
-        }
         let s = &mut self.snakes[index];
         s.head = body[0];
         s.segments = body.len();
@@ -923,9 +824,7 @@ impl Simulator {
             heading
         };
         s.speed = base_speed(s.segments);
-        s.fam = floor
-            .filter(|floor| floor.segments == s.segments)
-            .map_or(0.0, |floor| floor.fam);
+        s.fam = 0.0;
         s.kills = 0;
         s.alive = true;
         Self::update_mass(s);
@@ -1060,15 +959,19 @@ impl Simulator {
                     elapsed -= BOOST_DROP_SECONDS;
                     let tail = s.body.last().copied().unwrap_or(s.head);
                     let mult = multiplier(s.segments as f64 + s.fam);
-                    // Food comes only from removed mass: nothing at the floor and a
-                    // smaller pellet for a partial step down to it.
-                    let available = floor.map_or(s.segments as f64 - 2.0 + s.fam, |floor| {
-                        floor.excess(s.segments, s.fam)
-                    });
-                    let cost =
-                        available.min(boost_cost(s.segments) * (0.94 + 0.14 * self.random.next()));
-                    let removed = remove_mass(&mut s.segments, &mut s.fam, cost, floor);
-                    state.boost_mass_spent += cost;
+                    let cost = boost_cost(s.segments) * (0.94 + 0.14 * self.random.next());
+                    // A `minScore` floor removes only mass above it but keeps the
+                    // pellet's normal size, so boosting at or below the floor drops
+                    // free food: a mode design choice, see docs/configuration.md#battledome.
+                    let (cost, spent) = match floor {
+                        None => {
+                            let cost = cost.min(s.segments as f64 - 2.0 + s.fam);
+                            (cost, cost)
+                        }
+                        Some(floor) => (cost, cost.min(floor.excess(s.segments, s.fam))),
+                    };
+                    let removed = remove_mass(&mut s.segments, &mut s.fam, spent, floor);
+                    state.boost_mass_spent += spent;
                     s.body.truncate(s.body.len() - removed);
                     let size = ((cost * 0.95 / (NUTRITION * mult)).sqrt() * 5.0).floor() / 5.0;
                     if size > 0.0 {
@@ -1123,8 +1026,8 @@ impl Simulator {
                 // A mode rule, not an official mechanic: docs/configuration.md#battledome.
                 // The swept head-center path counts, so the rule does not depend on
                 // dt: crossing the pit or clipping its edge within a tick also kills.
-                let touched = self.pit_entered[i]
-                    || segment_distance(Point::default(), previous[i], s.head) < pit.radius;
+                let touched =
+                    self.pit_entered[i] || reaches_center(previous[i], s.head, pit.radius);
                 if touched {
                     if s.head.distance_lt(Point::default(), pit.radius) {
                         self.pit_entered[i] = true;
@@ -1271,12 +1174,12 @@ impl Simulator {
                 }
             }
             let food = match reason {
-                DeathReason::Body => self.death_food(i),
+                // Pit deaths drop normal death food: a mode design choice,
+                // see docs/configuration.md#battledome.
+                DeathReason::Body | DeathReason::Pit => self.death_food(i),
                 // Outward browser controls produced no drops, including from
                 // body anchors still inside the arena. See ecology evidence.
                 DeathReason::Boundary => 0,
-                // A mode rule: pit deaths drop no food, like the outer wall.
-                DeathReason::Pit => 0,
             };
             self.deaths.push(DeathEvent {
                 time: self.time,

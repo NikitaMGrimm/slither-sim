@@ -100,10 +100,10 @@ only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 | `deathFood` | Defaults below | Death-food admission limit. |
 | `ambientFood` | Defaults below | Ambient-food admission limit. |
 | `boostFood` | Defaults below | Boost-food admission limit. |
-| `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary. A snake whose head center has been inside (distance `< r`) dies with reason `pit`, dropping no food, when its head center reaches `r` again. Each tick tests the head center's swept path, so crossing the pit or clipping its edge within one tick also kills. Each life starts outside it. |
-| `spawnRadius` | `null` | Fixed head distance of new lives, `0 ≤ d < radius - 60` (the wall margin every spawn keeps) and `d > pit.radius`. Ring joins keep their angles; the host draws a uniform angle. `null` keeps the official radial grid. |
+| `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary. A snake whose head center has been inside (distance `< r`) dies with reason `pit` when its head center reaches `r` again, dropping normal death food. Each tick tests the head center's swept path, so crossing the pit or clipping its edge within one tick also kills. Each life starts outside it. |
+| `spawnRadius` | `null` | Fixed head distance of new lives, which face inward, `d > pit.radius` and `0 ≤ d < radius - 102`, so the newborn's tail, 42 outward, keeps the 60-unit spawn wall margin. Ring joins keep their angles; the host draws a uniform angle. `null` keeps the official radial grid and the host's random heading. |
 | `killScoreSeconds` | `null` | Positive finite kill-score window: each credited kill counts this long, kept per slot across lives. `null` keeps no kill score; it reads 0. |
-| `minScore` | `null` | Least displayed score, an integer from a newborn's 10 to 31,066,725, the most a 430-segment snake displays. Its floor mass is the least mass on the protocol-19 fam grid that displays it, so clients decode the same score. New lives start at that mass; boosting and the kiosk penalty never shrink a snake below it, and boosting there is free and drops nothing. Growth and death food are unchanged. Read when a world is created. |
+| `minScore` | `null` | Least displayed score that boosting and the kiosk penalty can shrink a snake to, an integer from a newborn's 10 to 18,436,960, the score at 430 segments. The score table ends there, so larger snakes display less, and growth could fall below a higher floor. The floor mass is the least mass on the protocol-19 fam grid that displays it. Above it, a snake loses mass normally down to the floor. At or below it, including as a newborn, boosting removes nothing but still drops normal pellets at the normal rate. Spawning, growth and death food are unchanged. Read when a world is created. |
 
 `radiusUpdates` sets radius at each supplied sample, overriding the model at that
 tick. For recorded replay, set `dynamicRadius` false to avoid model changes
@@ -158,6 +158,7 @@ In JSON, `"preset"` selects a constructor's world as the base: `"official"`
 replace the preset's values; nested objects such as `kiosk` merge field by
 field, and `null` clears an optional setting. Changing `radius` does not rescale
 the preset's food. Without `preset`, omitted fields use `Config::official(1)`.
+A config passes through a JSON value, so a repeated key keeps its last value.
 Replies and snapshots print the resolved fields, not the preset name.
 
 ```json
@@ -169,18 +170,17 @@ Replies and snapshots print the resolved fields, not the preset name.
 `Config::battledome()` (`"preset": "battledome"`) is a custom mode for
 Battledome players: official physics and ecology, unchanged, plus a thin rules
 layer. It does not model any community server. Each value is a stated
-Battledome rule, the official model or a mode design choice:
+Battledome rule, the official model or a mode design choice. The radii and the
+floor's value and meaning await the operator's confirmation:
 
 | Setting | Value | Label |
 | --- | --- | --- |
-| Outer wall | `radius: 3584`, `dynamicRadius: false`, normal boundary behavior | Stated rule |
-| Pit | `pit.radius: 1784`; entry allowed, exit lethal | Stated rule; the swept head-center test, no food and the per-life reset are design choices |
-| Spawning | `spawnRadius: 2684`, midway between pit and wall, with the usual clearance and heading | Design choice derived from the two radii |
+| Outer wall | `radius: 3584`, `dynamicRadius: false`, normal boundary behavior; wall deaths drop no food | Stated rule, provisional value; no food is the official model |
+| Pit | `pit.radius: 1784`; entry allowed, exit lethal | Stated rule, provisional value; the swept head-center test, normal death food and the per-life reset are design choices |
+| Spawning | `spawnRadius: 2684`, midway between pit and wall: the official 2-segment newborn, facing inward, with the usual clearance | Design choice derived from the two radii |
 | Kill score | `killScoreSeconds: 900`: +1 per credited kill for 15 minutes, per slot across lives | Stated rule (+1, 15 minutes); persistence is a design choice |
-| Size floor | `minScore: 400`: boosting is not free, but no snake shrinks below 400 points | Stated rule |
-| Spawn size | New lives start at the floor: 26 segments, fam ≈ 0.1589, the least protocol-exact mass displaying 400 | Design choice (our reading of the floor) |
-| Boost at the floor | Free and drops nothing; food comes only from mass actually removed, so a partial step down drops a smaller pellet | Design choice |
-| Spawn body | A multi-segment spawn lies along the spawn circle behind the head, heading along its tangent, and must clear other snakes over its whole length; straight if the circle is too small | Design choice, so a 1,000-unit body stays clear of wall and pit |
+| Size floor | `minScore: 400`: boosting is not free, but boosting and the kiosk penalty never shrink a snake below 400 points | Stated rule, provisional value and meaning |
+| Boost at the floor | At or below the floor, including as a newborn, boosting removes no mass but drops normal pellets at the normal rate, so it makes free food | Design choice |
 | Prey | `prey.count: 0` | Mode rule |
 | Food | Official density at radius 3584: `foodCount` 3138, about 45.9 attempts/s; normal admission caps, death and boost food | Official model |
 | Everything else | As `Config::official(1)`: `dt`, broadcast and decision ticks, vision, kiosk, speed model, boundary mode | Official model |

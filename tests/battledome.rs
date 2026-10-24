@@ -1,5 +1,5 @@
 //! The Battledome mode rules and the general settings behind them: `pit`,
-//! `spawnRadius` and `killScoreSeconds`. Worlds here are synthetic setups.
+//! `spawnRadius`, `killScoreSeconds` and `minScore`. Worlds here are synthetic setups.
 use slither_sim::physics::{MAX_SEGMENTS, MassFloor, score};
 use slither_sim::{Action, Config, DeathReason, PitConfig, Point, Preset, Simulator, spawn};
 use std::f64::consts::{FRAC_PI_2, PI};
@@ -37,7 +37,7 @@ fn distance(p: Point) -> f64 {
 }
 
 #[test]
-fn entering_the_pit_is_allowed_and_leaving_it_kills_without_food() {
+fn entering_the_pit_is_allowed_and_leaving_it_kills_with_death_food() {
     let mut world = pit_world();
     world.add("diver", 0, 1).unwrap();
     place(&mut world, 0, Point { x: 300.0, y: 0.0 }, PI);
@@ -57,10 +57,11 @@ fn entering_the_pit_is_allowed_and_leaving_it_kills_without_food() {
     assert_eq!(world.deaths.len(), 1);
     let death = &world.deaths[0];
     assert_eq!(
-        (death.reason, death.killer.as_deref(), death.food),
-        (DeathReason::Pit, None, 0)
+        (death.reason, death.killer.as_deref()),
+        (DeathReason::Pit, None)
     );
-    assert!(world.food.is_empty());
+    assert!(death.food > 0);
+    assert_eq!(world.food.len(), death.food);
 }
 
 #[test]
@@ -89,10 +90,22 @@ fn crossing_the_pit_within_one_tick_kills() {
     world.step(&straight(&world)).unwrap();
     let s = &world.snakes[0];
     assert!(!s.alive && s.head.x > 1.0, "{:?}", s.head);
-    assert_eq!(
-        (world.deaths[0].reason, world.deaths[0].food),
-        (DeathReason::Pit, 0)
-    );
+    assert_eq!(world.deaths[0].reason, DeathReason::Pit);
+}
+
+#[test]
+fn a_tiny_pit_crossing_does_not_underflow() {
+    // Synthetic scales: this path's squared length underflows to zero.
+    let mut config = pit_world().config;
+    config.pit = Some(PitConfig { radius: 1e-175 });
+    config.dt = 2e-170 / slither_sim::physics::base_speed(2);
+    let mut world = Simulator::new(3, config).unwrap();
+    world.add("speck", 0, 1).unwrap();
+    place(&mut world, 0, Point { x: -1e-170, y: 0.0 }, 0.0);
+    world.step(&straight(&world)).unwrap();
+    let s = &world.snakes[0];
+    assert!(!s.alive && s.head.x > 1e-175, "{:?}", s.head);
+    assert_eq!(world.deaths[0].reason, DeathReason::Pit);
 }
 
 #[test]
@@ -167,26 +180,22 @@ fn new_lives_start_on_the_configured_ring_outside_the_pit() {
     let mut world = Simulator::new(1, config).unwrap();
     for slot in 0..8 {
         world.add(slot.to_string(), slot, 8).unwrap();
-        assert_on_ring(&world.snakes[slot], ring);
+        assert_inward(&world.snakes[slot], ring);
     }
 }
 
-/// A `minScore` life: 26 anchors 42 apart on the spawn circle, heading along it.
-fn assert_on_ring(s: &slither_sim::Snake, ring: f64) {
-    assert_eq!((s.segments, s.body.len(), s.score), (26, 26, 400.0));
+/// A new life on the ring: the official 2-segment newborn, whatever the
+/// `minScore`, facing the center with its tail one anchor outward.
+fn assert_inward(s: &slither_sim::Snake, ring: f64) {
+    assert_eq!(
+        (s.segments, s.fam, s.body.len(), s.score),
+        (2, 0.0, 2, 10.0)
+    );
     assert_eq!(s.body[0], s.head);
-    for pair in s.body.windows(2) {
-        assert!((pair[0].distance(pair[1]) - 42.0).abs() < 1e-9);
-    }
-    assert!(s.body.iter().all(|&p| (distance(p) - ring).abs() < 1e-9));
-    let radial = s.head.y.atan2(s.head.x);
-    assert!((s.heading - radial).cos().abs() < 1e-12, "tangent heading");
-    // The body trails the head, against the heading.
-    let back = Point {
-        x: s.body[1].x - s.head.x,
-        y: s.body[1].y - s.head.y,
-    };
-    assert!(back.x * s.heading.cos() + back.y * s.heading.sin() < 0.0);
+    assert!((distance(s.head) - ring).abs() < 1e-9);
+    assert!((distance(s.body[1]) - ring - 42.0).abs() < 1e-9);
+    let outward = s.head.y.atan2(s.head.x);
+    assert!((s.heading - outward).cos() + 1.0 < 1e-12, "inward heading");
 }
 
 #[cfg(feature = "networking")]
@@ -203,7 +212,7 @@ fn hosted_lives_start_on_the_ring_at_varied_angles() {
     for slot in [0, 1, 2, 0, 1, 2] {
         backend.reconnect_slot(slot).unwrap();
         let snake = &backend.world().snakes[slot];
-        assert_on_ring(snake, 2684.0);
+        assert_inward(snake, 2684.0);
         angles.push(snake.head.y.atan2(snake.head.x));
     }
     angles.sort_by(f64::total_cmp);
@@ -373,27 +382,17 @@ fn presets_select_a_base_that_explicit_fields_override() {
             "unknown field `depth`",
         ),
         (r#"{"preset":"arena"}"#, "unknown variant `arena`"),
-        (
-            r#"{"radius":1000,"radius":2000}"#,
-            "duplicate field `radius`",
-        ),
-        (
-            r#"{"preset":"sandbox","preset":"battledome"}"#,
-            "duplicate field `preset`",
-        ),
-        (
-            r#"{"preset":"battledome","kiosk":{"enabled":false,"enabled":true}}"#,
-            "duplicate field `enabled`",
-        ),
-        (
-            r#"{"radiusUpdates":[{"time":1,"time":2,"radius":500}]}"#,
-            "duplicate field `time`",
-        ),
         (r#"{"preset":null}"#, "invalid type: null"),
     ] {
         let message = parse(text).unwrap_err().to_string();
         assert!(message.contains(error), "{text}: {message}");
     }
+    // Configs pass through `serde_json::Value`, so a repeated key keeps its last value.
+    let repeated = parse(
+        r#"{"preset":"sandbox","radius":1000,"radius":2000,"kiosk":{"enabled":true,"enabled":false}}"#,
+    )
+    .unwrap();
+    assert_eq!((repeated.radius, repeated.kiosk.enabled), (2000.0, false));
 }
 
 #[test]
@@ -404,7 +403,7 @@ fn mode_settings_reject_unreachable_rules() {
         config.validate()
     };
     let pit = "pit.radius must be positive and less than radius";
-    let ring = "spawnRadius must lie outside pit.radius and more than 60 inside radius";
+    let ring = "spawnRadius must lie outside pit.radius and more than 102 inside radius";
     let window = "killScoreSeconds must be positive and finite";
     let floor = "minScore must be from a newborn's displayed 10 to";
     for (change, error) in [
@@ -415,8 +414,8 @@ fn mode_settings_reject_unreachable_rules() {
         (|c| c.pit = Some(PitConfig { radius: 3584.0 }), pit),
         (|c| c.pit = Some(PitConfig { radius: f64::NAN }), pit),
         (|c| c.spawn_radius = Some(3584.0), ring),
-        // Hosted spawns keep every anchor 60 inside the wall, so they never fit here.
-        (|c| c.spawn_radius = Some(3524.0), ring),
+        // A new life's tail, 42 outward, must keep the 60-unit spawn wall margin.
+        (|c| c.spawn_radius = Some(3482.0), ring),
         (|c| c.spawn_radius = Some(1784.0), ring),
         (|c| c.spawn_radius = Some(-1.0), ring),
         (|c| c.spawn_radius = Some(f64::NAN), ring),
@@ -431,10 +430,11 @@ fn mode_settings_reject_unreachable_rules() {
         assert!(message.starts_with(error), "{message}");
     }
     // Both ends of the displayed-score range are valid floors: a newborn's 10,
-    // and the last segment with fractional fam, past `score(430, 0.5)`.
+    // and the score at 430 segments, the least any larger snake displays.
     let (low, high) = MassFloor::score_range().into_inner();
     assert_eq!(low, 10);
-    assert!(f64::from(high) > score(MAX_SEGMENTS, 0.5));
+    assert_eq!(f64::from(high), score(MAX_SEGMENTS, 0.0));
+    assert_eq!(score(MAX_SEGMENTS + 1, 0.0), score(MAX_SEGMENTS, 0.0));
     for score in [low, high] {
         let mut config = Config::battledome();
         config.min_score = Some(score);
@@ -455,7 +455,7 @@ fn mode_settings_reject_unreachable_rules() {
         c.spawn_radius = Some(0.0);
     })
     .unwrap();
-    with(|c| c.spawn_radius = Some(3523.0)).unwrap();
+    with(|c| c.spawn_radius = Some(3481.0)).unwrap();
     assert!(
         Simulator::new(
             1,
@@ -533,8 +533,9 @@ fn min_score_converts_to_the_least_mass_that_displays_it() {
             fam: 0.0
         })
     );
+    // The top floor is attainable: its mass displays exactly the bound.
     let top = MassFloor::for_score(high).unwrap();
-    assert_eq!(top.segments, MAX_SEGMENTS);
+    assert_eq!(score(top.segments, top.fam), f64::from(high));
     assert_eq!(MassFloor::for_score(low - 1), None);
     assert_eq!(MassFloor::for_score(high + 1), None);
     // Targets at and just past each segment boundary, where the score's
@@ -574,6 +575,14 @@ fn floor_world() -> Simulator {
     world
 }
 
+fn straight_boost(world: &Simulator) -> Vec<Option<Action>> {
+    let mut actions = straight(world);
+    for action in actions.iter_mut().flatten() {
+        action.boost = true;
+    }
+    actions
+}
+
 /// Turn steadily, so the snake circles inside the arena.
 fn circling(world: &Simulator, boost: bool) -> Vec<Option<Action>> {
     world
@@ -589,51 +598,95 @@ fn circling(world: &Simulator, boost: bool) -> Vec<Option<Action>> {
 }
 
 #[test]
-fn min_score_spawns_and_respawns_at_the_floor() {
-    let floor = MassFloor::for_score(400).unwrap();
-    let world = floor_world();
+fn growth_past_the_score_table_keeps_the_top_floor() {
+    let high = *MassFloor::score_range().end();
+    let mut config = floor_world().config;
+    config.radius = 30_000.0;
+    config.spawn_radius = Some(15_000.0);
+    config.min_score = Some(high);
+    let mut world = Simulator::new(3, config).unwrap();
+    world.add("giant", 0, 1).unwrap();
+    // A full growth unit grows the snake past 430 segments at its next anchor.
+    set_mass(&mut world, MAX_SEGMENTS, 1.0);
+    for _ in 0..100 {
+        world.step(&straight(&world)).unwrap();
+        assert!(world.snakes[0].score >= f64::from(high));
+        if world.snakes[0].segments > MAX_SEGMENTS {
+            break;
+        }
+    }
     let s = &world.snakes[0];
-    assert_eq!(
-        (s.segments, s.fam, s.score),
-        (floor.segments, floor.fam, 400.0)
-    );
-    assert_eq!(world.spawn_segments(), 26);
-    let mut world = world;
-    world.snakes[0].alive = false;
-    let (short, heading) = (vec![Point::default(); 25], 0.0);
-    assert_eq!(
-        world.respawn_body(0, short, heading).unwrap_err(),
-        "minScore needs a spawn body of at least 26 segments"
-    );
-    let (body, heading) = world.spawn_body(Point { x: 500.0, y: 0.0 }, FRAC_PI_2);
-    assert!(world.body_is_clear(&body, 600.0));
-    world.respawn_body(0, body, heading).unwrap();
-    let s = &world.snakes[0];
-    assert_eq!(
-        (s.segments, s.fam, s.score),
-        (floor.segments, floor.fam, 400.0)
-    );
-    assert_on_ring(s, 500.0);
+    assert!(s.alive && s.segments == MAX_SEGMENTS + 1, "{}", s.segments);
+    assert_eq!(s.score, f64::from(high));
+}
+
+/// Give slot 0 a straight body of this mass along the x axis, facing +x.
+fn set_mass(world: &mut Simulator, segments: usize, fam: f64) {
+    let s = &mut world.snakes[0];
+    s.segments = segments;
+    s.fam = fam;
+    s.heading = 0.0;
+    s.body = (0..segments)
+        .map(|i| Point {
+            x: -600.0 - 10.0 * i as f64,
+            y: 0.0,
+        })
+        .collect();
+    s.head = s.body[0];
+    Simulator::update_mass(s);
+}
+
+/// Boost straight ahead for `ticks`, returning every pellet dropped.
+fn boost_drops(world: &mut Simulator, ticks: usize) -> Vec<slither_sim::Food> {
+    world.food_spawn_events = Some(Vec::new());
+    let mut drops = Vec::new();
+    for _ in 0..ticks {
+        world.step(&straight_boost(world)).unwrap();
+        let events = world.food_spawn_events.as_ref().unwrap();
+        drops.extend(events.iter().map(|event| event.food.clone()));
+    }
+    drops
 }
 
 #[test]
-fn boosting_at_the_floor_costs_and_drops_nothing() {
-    let floor = MassFloor::for_score(400).unwrap();
+fn a_newborn_below_the_floor_boosts_free() {
     let mut world = floor_world();
-    world.food_spawn_events = Some(Vec::new());
+    set_mass(&mut world, 2, 0.0);
     let cruise = world.snakes[0].speed;
-    for _ in 0..300 {
-        world.step(&circling(&world, true)).unwrap();
-        assert!(world.food_spawn_events.as_ref().unwrap().is_empty());
-    }
+    let drops = boost_drops(&mut world, 300);
     let s = &world.snakes[0];
     assert!(s.alive && world.is_boosting(0) && s.speed > cruise);
+    assert_eq!((s.segments, s.fam, s.score), (2, 0.0, 10.0));
+    assert_eq!(world.boost_accounting(0).unwrap().boost_mass_spent, 0.0);
+    assert!(drops.len() > 5 && drops.iter().all(|food| food.value > 0.0));
+}
+
+#[test]
+fn boosting_at_the_floor_drops_normal_pellets_for_free() {
+    let floor = MassFloor::for_score(400).unwrap();
+    let mut floored = floor_world();
+    let mut config = floored.config.clone();
+    config.min_score = None;
+    let mut open = Simulator::new(11, config).unwrap();
+    open.add("player", 0, 1).unwrap();
+    for world in [&mut floored, &mut open] {
+        set_mass(world, floor.segments, floor.fam);
+    }
+    let cruise = floored.snakes[0].speed;
+    let (free, paid) = (boost_drops(&mut floored, 300), boost_drops(&mut open, 300));
+    let s = &floored.snakes[0];
+    assert!(s.alive && floored.is_boosting(0) && s.speed > cruise);
     assert_eq!(
         (s.segments, s.fam, s.score),
         (floor.segments, floor.fam, 400.0)
     );
-    assert!(world.food.is_empty());
-    assert_eq!(world.boost_accounting(0).unwrap().boost_mass_spent, 0.0);
+    assert_eq!(floored.boost_accounting(0).unwrap().boost_mass_spent, 0.0);
+    // The same rate, and the first pellet, at equal mass, is the one an
+    // unfloored snake pays for.
+    assert!(free.len() > 5, "{} drops", free.len());
+    assert_eq!(free.len(), paid.len());
+    assert_eq!(free[0], paid[0]);
+    assert!(open.snakes[0].segments < floor.segments);
 }
 
 #[test]
@@ -739,6 +792,30 @@ fn kiosk_shrinking_stops_at_the_floor() {
 }
 
 #[test]
+fn battledome_pit_deaths_drop_food_and_wall_deaths_none() {
+    let mut config = Config::battledome();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.0;
+    config.kiosk.enabled = false;
+    let mut world = Simulator::new(3, config).unwrap();
+    world.add("leaver", 0, 2).unwrap();
+    world.add("runner", 1, 2).unwrap();
+    // Just inside the pit, heading out; and just inside the wall, heading out.
+    place(&mut world, 0, Point { x: 1780.0, y: 0.0 }, 0.0);
+    place(&mut world, 1, Point { x: 0.0, y: 3570.0 }, FRAC_PI_2);
+    for _ in 0..20 {
+        world.step(&straight(&world)).unwrap();
+    }
+    let mut deaths = world.deaths.clone();
+    deaths.sort_by_key(|death| death.reason as u8);
+    let reasons: Vec<_> = deaths.iter().map(|death| death.reason).collect();
+    assert_eq!(reasons, [DeathReason::Boundary, DeathReason::Pit]);
+    assert_eq!(deaths[0].food, 0);
+    assert!(deaths[1].food > 0);
+    assert_eq!(world.food.len(), deaths[1].food);
+}
+
+#[test]
 fn death_food_follows_actual_mass_under_a_floor() {
     let mut open = kill_world(None);
     let mut floored = kill_world(None);
@@ -755,55 +832,4 @@ fn death_food_follows_actual_mass_under_a_floor() {
     assert!(floored.deaths[0].food > 0);
     assert_eq!(floored.deaths, open.deaths);
     assert_eq!(floored.food, open.food);
-}
-
-#[test]
-fn ring_bodies_fall_back_on_circles_too_small_to_hold_them() {
-    assert!(spawn::ring_body(Point { x: 20.0, y: 0.0 }, 0.0, 26).is_none());
-    // 26 anchors 42 apart would wrap a circle of radius 100.
-    assert!(spawn::ring_body(Point { x: 100.0, y: 0.0 }, 0.0, 26).is_none());
-    let (body, heading) = spawn::ring_body(Point { x: 0.0, y: 400.0 }, PI, 26).unwrap();
-    assert_eq!(body.len(), 26);
-    // Heading west at the top of the circle turns counterclockwise.
-    assert!((heading - PI).abs() < 1e-12);
-    let mut config = Config::sandbox();
-    config.min_score = Some(400);
-    let mut world = Simulator::new(1, config).unwrap();
-    let head = Point { x: 100.0, y: 0.0 };
-    let (body, heading) = world.spawn_body(head, 0.3);
-    assert_eq!((body.len(), heading), (26, 0.3));
-    assert!((body[25].distance(head) - 42.0 * 25.0).abs() < 1e-9);
-    // A straight fallback longer than the arena allows is rejected, not placed.
-    world.config.spawn_radius = Some(10.0);
-    let error = world.add("a", 0, 1).unwrap_err();
-    assert!(
-        error.starts_with("minScore spawn body extends outside arena"),
-        "{error}"
-    );
-    assert!(world.snakes.is_empty());
-}
-
-#[cfg(feature = "networking")]
-#[test]
-fn the_floor_survives_protocol_quantization() {
-    use slither_sim::client::{SimulationConfig, SimulatorBackend};
-    let mut world = Config::battledome();
-    world.food_count = 0;
-    world.ambient_replenish_per_second = 0.0;
-    let config = SimulationConfig {
-        agents: 1,
-        world,
-        ..Default::default()
-    };
-    let mut backend = SimulatorBackend::new(5, config).unwrap();
-    backend.advance_ticks(6).unwrap();
-    let floor = MassFloor::for_score(400).unwrap();
-    let core = &backend.world().snakes[0];
-    assert_eq!(
-        (core.segments, core.fam, core.score),
-        (26, floor.fam, 400.0)
-    );
-    // The decoded client frame, not only the core, shows the floor exactly.
-    let me = backend.frame().unwrap().observation.unwrap().me;
-    assert_eq!((me.segments, me.fam, me.score), (26, floor.fam, 400.0));
 }

@@ -363,10 +363,12 @@ pub struct MassFloor {
     pub fam: f64,
 }
 impl MassFloor {
-    /// Displayed scores a floor can take: a newborn's, up to the most a
-    /// spawnable mass displays (`MAX_SEGMENTS` and the last fam step below one).
+    /// Displayed scores a floor can take: a newborn's, up to the score at
+    /// `MAX_SEGMENTS`. Below that size the display rises with mass. The score
+    /// table ends there, so a larger snake displays `score(MAX_SEGMENTS, fam)`
+    /// again, as little as the upper bound. Growth never undercuts a floor in this range.
     pub fn score_range() -> std::ops::RangeInclusive<u32> {
-        score(2, 0.0) as u32..=score(MAX_SEGMENTS, wire_fam(FAM_STEPS - 1)) as u32
+        score(2, 0.0) as u32..=score(MAX_SEGMENTS, 0.0) as u32
     }
     /// The least segments and wire fam step whose displayed score is at least
     /// `target`. Displayed score never decreases with mass, so a linear scan

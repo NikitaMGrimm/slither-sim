@@ -17,11 +17,10 @@
   keeps official physics and ecology in a fixed 3,584-unit arena with a one-way
   pit, spawns on a ring between pit and wall, a 15-minute kill score and no prey.
   It is built from four general world settings: `pit` (leaving it kills with
-  the new death reason `pit` and drops no food), `spawnRadius`,
-  `killScoreSeconds` and `minScore`, a least displayed score (400 in
-  Battledome): new lives start at it, and boosting or the kiosk penalty never
-  shrink a snake below it.
-  Multi-segment spawns lie along the spawn circle.
+  the new death reason `pit` and drops death food), `spawnRadius` (new lives
+  face inward), `killScoreSeconds` and `minScore`, a least displayed score
+  (400 in Battledome) that boosting or the kiosk penalty never shrink a snake
+  below. At or below it, boosting is free but still drops pellets.
   See [Battledome](docs/configuration.md#battledome).
 - World configs accept `"preset": "official" | "sandbox" | "battledome"` in
   `serve` and Python resets and in `host` and `client` config files; explicit
