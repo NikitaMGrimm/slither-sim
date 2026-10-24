@@ -196,6 +196,34 @@ are **pre-main-integration**: parent c93a480 plus the frozen corrected kernel
 `011cd24744da399910eb7f2dd325652849e81297a8c9336586fffbe788605a1b`, executable
 `4dd345199ec72fd31258927db4fad7b8698b1ff21d6f8c03c6efc2a806ad5df5`.
 
+## Main integration after measurement
+
+Main #77, `b88fdb4fefe524ce870052a9f82b981e14c84d3b`, was merged normally
+in `266c600273493375c86771cd0fdc147ba47404ef`, with no conflicts or history
+rewrite. The corrected kernel and study harness are unchanged. The merge keeps
+main's `StepError::Rejected`/`Ended`, `slither-sim-json-v3`, ABI v2, terminal
+session clearing and uncapped mass semantics. The added portable adapter uses
+`Backend`'s existing fallible operations; the study uses `SimulatorBackend`,
+not the geometric transport session. Existing bot/example error callers and
+the perf harness/build overlay remain unchanged from main.
+
+A bounded compatibility probe reran seed 31001's two 180-second worlds on the
+merged code. Its complete JSONL matches the pre-merge probe byte-for-byte,
+including action checksums and referee outcomes; SHA-256 is
+`946a46e60dec5ff2c195d199428b26b0ddbabe43379e25d382c650aa5515cdfd`.
+The merged executable is
+`785ee84dab1706e8fedf3805af8a2a8b225093e80a45ae509b5b734b2bb4be26`.
+This is limited trajectory regression evidence, not a new qualification pack or
+timing result. The full qualification and cost runs above retain their actual
+pre-merge source pins; unchanged gates and old attempts remain intact.
+
+The actual perf baseline overlay against the pinned main also builds and runs.
+Its `step-default` workload definitions and 32-step full-state traces match
+(trace SHA-256 `ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637`).
+One warmup and one timing pair are only a compatibility smoke test, collected
+alongside checks; no performance comparison is inferred. Selected integration
+identities are in [`main-integration.json`](main-integration.json).
+
 ## Verification and limits
 
 Focused deterministic tests cover food reselection/turn cost/ties, wall/body/head
@@ -206,12 +234,18 @@ persistent client decoder at the retained virtual receipt times; full frames and
 reference decisions must match, including reconnect. This proves matching-input
 parity, not identical trajectories under arbitrary real network delays.
 
-Passed locally: `uv run --locked --only-group tools python -B tools/check.py rust`,
-the `tools` group, the ten focused reference/adapter tests and
+The original attempt passed the full `rust`/`tools` groups, ten focused tests and
 `cargo package --locked --allow-dirty`. The first adapter test assumed the native
 backend immediately played; it correctly returned `waiting`. The fixture was
 fixed to advance the login/setup ticks, with no policy change. Both attempts'
-logs are retained. Linux/macOS/MSRV execution is left to PR CI.
+logs are retained. After the correction and again after merging main, the full
+`uv run --locked --only-group tools python -B tools/check.py rust` and `tools`
+groups passed, along with all twelve focused tests. The combined tools run used
+a fresh target directory and passed the JSON v3 / ABI v2 example smokes and
+Python package tests (one optional NumPy test skipped because NumPy is absent).
+Earlier failed check attempts remain in the local raw directory with their
+causes recorded in `half-turn-fix/NOTES.md`; none were discarded. Linux/macOS/MSRV
+execution is left to PR CI. Package verification was not repeated after the fix.
 
 This study does not establish combat strength, human-level play, hidden-seed
 robustness against every adversary, enforced decision deadlines or server capacity.
