@@ -65,22 +65,6 @@ fn count(i: usize, what: &str) -> Result<u32, String> {
     u32::try_from(i).map_err(|_| format!("Frame {what} count {i} exceeds u32::MAX"))
 }
 
-/// Whether every row, count and offset of a frame of `world` taken before any
-/// tick fits below [`NONE`], so collecting it cannot fail. Each slot sees at
-/// most every snake, food item and prey.
-pub(crate) fn fits(world: &Simulator) -> bool {
-    let snakes = world.snakes.len();
-    let views = snakes
-        .checked_add(world.food.len())
-        .and_then(|rows| rows.checked_add(world.prey.len()))
-        .and_then(|rows| rows.checked_mul(snakes));
-    let body = (world.snakes.iter().map(|s| s.body.len())).try_fold(0, usize::checked_add);
-    let tally = world.snakes.iter().map(|s| s.kills.max(s.segments)).max();
-    [views, body, tally.or(Some(0))]
-        .into_iter()
-        .all(|n| n.is_some_and(|n| n < NONE as usize))
-}
-
 /// Read-only columns of one world's current frame, with the values its JSON frame
 /// prints. Column slices of a table have equal length, one element per row.
 #[derive(Clone, Copy, Debug)]

@@ -320,18 +320,13 @@ impl Session {
                     }
                     built.push(world);
                 }
-                // Earlier frames keep their buffers for the new worlds, unless
-                // a frame could fail and lose the previous session with them.
-                let reuse = built.iter().all(frame::fits);
-                let mut frames = (if reuse { self.current.take() } else { None })
-                    .map(|run| run.worlds.into_iter().map(|state| state.frame))
-                    .into_iter()
-                    .flatten();
+                // Fresh frames: the previous session, frames included, stays
+                // intact until the whole reply exists.
                 let mut states: Vec<_> = built
                     .into_iter()
                     .map(|world| WorldState {
                         world,
-                        frame: frames.next().unwrap_or_default(),
+                        frame: Frame::default(),
                         actions: Vec::new(),
                     })
                     .collect();
