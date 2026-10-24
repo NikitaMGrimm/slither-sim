@@ -78,6 +78,65 @@ fn a_snake_that_never_entered_cannot_die_at_the_pit() {
 }
 
 #[test]
+fn crossing_the_pit_within_one_tick_kills() {
+    // A synthetic pit of radius 1 that an unboosted head crosses in one 32 ms tick.
+    let mut config = pit_world().config;
+    config.pit = Some(PitConfig { radius: 1.0 });
+    config.dt = 0.032;
+    let mut world = Simulator::new(3, config).unwrap();
+    world.add("diver", 0, 1).unwrap();
+    place(&mut world, 0, Point { x: -2.0, y: 0.0 }, 0.0);
+    world.step(&straight(&world)).unwrap();
+    let s = &world.snakes[0];
+    assert!(!s.alive && s.head.x > 1.0, "{:?}", s.head);
+    assert_eq!(
+        (world.deaths[0].reason, world.deaths[0].food),
+        (DeathReason::Pit, 0)
+    );
+}
+
+#[test]
+fn clipping_the_pit_edge_within_one_tick_kills() {
+    // A chord near the rim of the Battledome pit: both ends lie outside it.
+    let mut config = Config::battledome();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.0;
+    config.kiosk.enabled = false;
+    config.min_score = None;
+    config.dt = 0.032;
+    let mut world = Simulator::new(3, config).unwrap();
+    world.add("grazer", 0, 1).unwrap();
+    let start = Point {
+        x: -2.9,
+        y: 1783.999,
+    };
+    place(&mut world, 0, start, 0.0);
+    world.step(&straight(&world)).unwrap();
+    let end = world.snakes[0].head;
+    assert!(
+        distance(start) >= 1784.0 && distance(end) >= 1784.0,
+        "{end:?}"
+    );
+    assert!(end.x > 2.0);
+    assert!(!world.snakes[0].alive);
+    assert_eq!(world.deaths[0].reason, DeathReason::Pit);
+}
+
+#[test]
+fn a_life_starting_inside_the_pit_dies_on_leaving() {
+    let mut world = pit_world();
+    world.add("inside", 0, 1).unwrap();
+    place(&mut world, 0, Point { x: 199.0, y: 0.0 }, 0.0);
+    for _ in 0..10 {
+        if world.snakes[0].alive {
+            world.step(&straight(&world)).unwrap();
+        }
+    }
+    assert!(!world.snakes[0].alive);
+    assert_eq!(world.deaths[0].reason, DeathReason::Pit);
+}
+
+#[test]
 fn respawning_clears_the_pit_state() {
     let mut world = pit_world();
     world.add("diver", 0, 1).unwrap();
@@ -314,6 +373,22 @@ fn presets_select_a_base_that_explicit_fields_override() {
             "unknown field `depth`",
         ),
         (r#"{"preset":"arena"}"#, "unknown variant `arena`"),
+        (
+            r#"{"radius":1000,"radius":2000}"#,
+            "duplicate field `radius`",
+        ),
+        (
+            r#"{"preset":"sandbox","preset":"battledome"}"#,
+            "duplicate field `preset`",
+        ),
+        (
+            r#"{"preset":"battledome","kiosk":{"enabled":false,"enabled":true}}"#,
+            "duplicate field `enabled`",
+        ),
+        (
+            r#"{"radiusUpdates":[{"time":1,"time":2,"radius":500}]}"#,
+            "duplicate field `time`",
+        ),
         (r#"{"preset":null}"#, "invalid type: null"),
     ] {
         let message = parse(text).unwrap_err().to_string();
@@ -331,7 +406,7 @@ fn mode_settings_reject_unreachable_rules() {
     let pit = "pit.radius must be positive and less than radius";
     let ring = "spawnRadius must lie inside radius and outside pit.radius";
     let window = "killScoreSeconds must be positive and finite";
-    let floor = "minScore must be finite and from a new snake's";
+    let floor = "minScore must be from a newborn's displayed 10 to";
     for (change, error) in [
         (
             (|c| c.pit = Some(PitConfig { radius: 0.0 })) as fn(&mut Config),
@@ -346,24 +421,32 @@ fn mode_settings_reject_unreachable_rules() {
         (|c| c.kill_score_seconds = Some(0.0), window),
         (|c| c.kill_score_seconds = Some(f64::INFINITY), window),
         (|c| c.kill_score_seconds = Some(f64::NAN), window),
-        (|c| c.min_score = Some(score(2, 0.0)), floor),
-        (|c| c.min_score = Some(1e9), floor),
-        (|c| c.min_score = Some(f64::NAN), floor),
-        (|c| c.min_score = Some(f64::INFINITY), floor),
+        (|c| c.min_score = Some(9), floor),
+        (|c| c.min_score = Some(0), floor),
+        (|c| c.min_score = Some(u32::MAX), floor),
     ] {
         let message = with(change).unwrap_err();
         assert!(message.starts_with(error), "{message}");
     }
-    // Both ends of the score table's range are valid floors.
-    for score in [
-        *MassFloor::score_range().start(),
-        *MassFloor::score_range().end(),
-    ] {
-        with(|c| c.min_score = None).unwrap();
+    // Both ends of the displayed-score range are valid floors: a newborn's 10,
+    // and the last segment with fractional fam, past `score(430, 0.5)`.
+    let (low, high) = MassFloor::score_range().into_inner();
+    assert_eq!(low, 10);
+    assert!(f64::from(high) > score(MAX_SEGMENTS, 0.5));
+    for score in [low, high] {
         let mut config = Config::battledome();
         config.min_score = Some(score);
         config.validate().unwrap();
     }
+    let mut config = Config::battledome();
+    config.min_score = Some(high + 1);
+    assert!(config.validate().unwrap_err().starts_with(floor));
+    // A fractional score is not a displayed score.
+    let error = serde_json::from_str::<Config>(r#"{"minScore":400.5}"#).unwrap_err();
+    assert!(
+        error.to_string().contains("invalid type: floating point"),
+        "{error}"
+    );
     // Without a pit, any distance inside the wall is a valid ring.
     with(|c| {
         c.pit = None;
@@ -430,11 +513,15 @@ fn host_config_files_accept_a_preset() {
 
 #[test]
 fn min_score_converts_to_the_least_mass_that_displays_it() {
-    let floor = MassFloor::for_score(400.0).unwrap();
+    const STEPS: f64 = 16_777_215.0;
+    let floor = MassFloor::for_score(400).unwrap();
     assert_eq!(floor.segments, 26);
     assert!((floor.fam - 0.1589).abs() < 1e-4, "{floor:?}");
+    // On the protocol grid, so a client decodes the same fam.
+    let step = (floor.fam * STEPS).round();
+    assert_eq!(floor.fam, step / STEPS);
     assert_eq!(score(floor.segments, floor.fam), 400.0);
-    assert_eq!(score(floor.segments, floor.fam.next_down()), 399.0);
+    assert_eq!(score(floor.segments, (step - 1.0) / STEPS), 399.0);
     let (low, high) = MassFloor::score_range().into_inner();
     assert_eq!(
         MassFloor::for_score(low),
@@ -443,15 +530,33 @@ fn min_score_converts_to_the_least_mass_that_displays_it() {
             fam: 0.0
         })
     );
-    assert_eq!(
-        MassFloor::for_score(high),
-        Some(MassFloor {
-            segments: MAX_SEGMENTS,
-            fam: 0.0
-        })
-    );
-    assert_eq!(MassFloor::for_score(low.next_down()), None);
-    assert_eq!(MassFloor::for_score(high.next_up()), None);
+    let top = MassFloor::for_score(high).unwrap();
+    assert_eq!(top.segments, MAX_SEGMENTS);
+    assert_eq!(MassFloor::for_score(low - 1), None);
+    assert_eq!(MassFloor::for_score(high + 1), None);
+    // Targets at and just past each segment boundary, where the score's
+    // linear pieces meet and a closed-form inverse cancels to a tiny fam.
+    for segments in 2..MAX_SEGMENTS {
+        let start = score(segments, 0.0) as u32;
+        for target in [start.saturating_sub(1), start, start + 1, start + 2] {
+            let Some(floor) = MassFloor::for_score(target) else {
+                assert!(target < low || target > high);
+                continue;
+            };
+            let step = (floor.fam * STEPS).round();
+            assert_eq!(floor.fam, step / STEPS);
+            assert!(score(floor.segments, floor.fam) >= f64::from(target));
+            if (floor.segments, step) == (2, 0.0) {
+                continue; // A newborn's mass has nothing below it.
+            }
+            let below = if step > 0.0 {
+                score(floor.segments, (step - 1.0) / STEPS)
+            } else {
+                score(floor.segments - 1, (STEPS - 1.0) / STEPS)
+            };
+            assert!(below < f64::from(target), "{target}: {floor:?}");
+        }
+    }
 }
 
 /// A food-free, kiosk-free sandbox with a 400-point floor and one snake.
@@ -460,7 +565,7 @@ fn floor_world() -> Simulator {
     config.food_count = 0;
     config.ambient_replenish_per_second = 0.0;
     config.kiosk.enabled = false;
-    config.min_score = Some(400.0);
+    config.min_score = Some(400);
     let mut world = Simulator::new(11, config).unwrap();
     world.add("player", 0, 1).unwrap();
     world
@@ -482,7 +587,7 @@ fn circling(world: &Simulator, boost: bool) -> Vec<Option<Action>> {
 
 #[test]
 fn min_score_spawns_and_respawns_at_the_floor() {
-    let floor = MassFloor::for_score(400.0).unwrap();
+    let floor = MassFloor::for_score(400).unwrap();
     let world = floor_world();
     let s = &world.snakes[0];
     assert_eq!(
@@ -510,7 +615,7 @@ fn min_score_spawns_and_respawns_at_the_floor() {
 
 #[test]
 fn boosting_at_the_floor_costs_and_drops_nothing() {
-    let floor = MassFloor::for_score(400.0).unwrap();
+    let floor = MassFloor::for_score(400).unwrap();
     let mut world = floor_world();
     world.food_spawn_events = Some(Vec::new());
     let cruise = world.snakes[0].speed;
@@ -530,7 +635,7 @@ fn boosting_at_the_floor_costs_and_drops_nothing() {
 
 #[test]
 fn boosting_above_the_floor_costs_normally_and_stops_there() {
-    let floor = MassFloor::for_score(400.0).unwrap();
+    let floor = MassFloor::for_score(400).unwrap();
     let mut floored = floor_world();
     let mut config = floored.config.clone();
     config.min_score = None;
@@ -581,13 +686,14 @@ fn boosting_above_the_floor_costs_normally_and_stops_there() {
 
 #[test]
 fn kiosk_shrinking_stops_at_the_floor() {
-    let floor = MassFloor::for_score(400.0).unwrap();
+    let floor = MassFloor::for_score(400).unwrap();
     let mut world = floor_world();
     world.config.kiosk = slither_sim::KioskConfig {
         floor_score: 100.0,
         grace_seconds: 0.0,
         stationary_radius: 1e5,
         shrink_per_second: 2.0,
+        score_decay_per_second: 1.0,
         ..Default::default()
     };
     let s = &mut world.snakes[0];
@@ -609,17 +715,31 @@ fn kiosk_shrinking_stops_at_the_floor() {
             s.segments,
             s.fam
         );
+        if (s.segments, s.fam) == (floor.segments, floor.fam) {
+            break;
+        }
     }
     let s = &world.snakes[0];
     assert!(s.alive);
     assert_eq!((s.segments, s.fam), (floor.segments, floor.fam));
+    // Once physical shrinking ends at the floor, the displayed credit decays
+    // as usual instead of stalling, here within a few seconds.
+    let mut displayed = s.score;
+    assert!(displayed > 400.0);
+    for _ in 0..1000 {
+        world.step(&circling(&world, false)).unwrap();
+        let score = world.snakes[0].score;
+        assert!(score <= displayed);
+        displayed = score;
+    }
+    assert_eq!(world.snakes[0].score, 400.0);
 }
 
 #[test]
 fn death_food_follows_actual_mass_under_a_floor() {
     let mut open = kill_world(None);
     let mut floored = kill_world(None);
-    floored.config.min_score = Some(400.0);
+    floored.config.min_score = Some(400);
     let mut floored = Simulator::new(7, floored.config.clone()).unwrap();
     floored.add("victim", 0, 2).unwrap();
     floored.add("killer", 1, 2).unwrap();
@@ -644,7 +764,7 @@ fn ring_bodies_fall_back_on_circles_too_small_to_hold_them() {
     // Heading west at the top of the circle turns counterclockwise.
     assert!((heading - PI).abs() < 1e-12);
     let mut config = Config::sandbox();
-    config.min_score = Some(400.0);
+    config.min_score = Some(400);
     let mut world = Simulator::new(1, config).unwrap();
     let head = Point { x: 100.0, y: 0.0 };
     let (body, heading) = world.spawn_body(head, 0.3);
@@ -658,4 +778,29 @@ fn ring_bodies_fall_back_on_circles_too_small_to_hold_them() {
         "{error}"
     );
     assert!(world.snakes.is_empty());
+}
+
+#[cfg(feature = "networking")]
+#[test]
+fn the_floor_survives_protocol_quantization() {
+    use slither_sim::client::{SimulationConfig, SimulatorBackend};
+    let mut world = Config::battledome();
+    world.food_count = 0;
+    world.ambient_replenish_per_second = 0.0;
+    let config = SimulationConfig {
+        agents: 1,
+        world,
+        ..Default::default()
+    };
+    let mut backend = SimulatorBackend::new(5, config).unwrap();
+    backend.advance_ticks(6).unwrap();
+    let floor = MassFloor::for_score(400).unwrap();
+    let core = &backend.world().snakes[0];
+    assert_eq!(
+        (core.segments, core.fam, core.score),
+        (26, floor.fam, 400.0)
+    );
+    // The decoded client frame, not only the core, shows the floor exactly.
+    let me = backend.frame().unwrap().observation.unwrap().me;
+    assert_eq!((me.segments, me.fam, me.score), (26, floor.fam, 400.0));
 }

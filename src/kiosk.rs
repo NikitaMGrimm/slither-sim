@@ -93,7 +93,14 @@ impl KioskState {
             return;
         }
         let physical = score_exact(snake.segments, snake.fam);
-        if physical <= config.floor_score && self.score_credit <= 0.0 {
+        // Physical shrinking ends at the higher of the kiosk and mass floors;
+        // the displayed-score decay below keeps the kiosk floor.
+        let shrink_floor = floor.map_or(config.floor_score, |floor| {
+            config
+                .floor_score
+                .max(score_exact(floor.segments, floor.fam))
+        });
+        if physical <= shrink_floor && self.score_credit <= 0.0 {
             self.anchor = None;
             self.held_seconds = 0.0;
             return;
@@ -110,10 +117,15 @@ impl KioskState {
             self.recover(snake, config, dt);
             return;
         }
-        if physical > config.floor_score + 0.5 {
-            let target =
-                (physical * (-config.shrink_per_second * dt).exp()).max(config.floor_score);
-            let target_mass = mass_for_score(target);
+        if physical > shrink_floor + 0.5 {
+            let target = (physical * (-config.shrink_per_second * dt).exp()).max(shrink_floor);
+            // At the mass floor, use its exact mass rather than a bisection estimate.
+            let target_mass = match floor {
+                Some(floor) if target <= score_exact(floor.segments, floor.fam) => {
+                    floor.segments as f64 + floor.fam
+                }
+                _ => mass_for_score(target),
+            };
             let old_mass = snake.segments as f64 + snake.fam;
             if target_mass < old_mass {
                 let removed = remove_mass(

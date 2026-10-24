@@ -18,8 +18,9 @@
   pit, spawns on a ring between pit and wall, a 15-minute kill score and no prey.
   It is built from four general world settings: `pit` (leaving it kills with
   the new death reason `pit` and drops no food), `spawnRadius`,
-  `killScoreSeconds` and `minScore`, a 400-point floor in Battledome: new lives
-  start at it, and boosting or the kiosk penalty never shrink a snake below it.
+  `killScoreSeconds` and `minScore`, a least displayed score (400 in
+  Battledome): new lives start at it, and boosting or the kiosk penalty never
+  shrink a snake below it.
   Multi-segment spawns lie along the spawn circle.
   See [Battledome](docs/configuration.md#battledome).
 - World configs accept `"preset": "official" | "sandbox" | "battledome"` in

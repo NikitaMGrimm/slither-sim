@@ -349,45 +349,52 @@ pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
 pub fn score(segments: usize, fam: f64) -> f64 {
     score_exact(segments, fam).floor()
 }
-/// The least mass whose continuous score reaches a `minScore`.
+/// Steps of protocol-19 fam: a 24-bit fraction that clients read as `u24 / 16777215`.
+const FAM_STEPS: u32 = 16_777_215;
+fn wire_fam(step: u32) -> f64 {
+    f64::from(step) / f64::from(FAM_STEPS)
+}
+
+/// The least mass that displays a `minScore`, on the protocol fam grid so
+/// that clients decode exactly the same mass and score.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MassFloor {
     pub segments: usize,
     pub fam: f64,
 }
 impl MassFloor {
-    /// Scores a floor can take: from a new 2-segment snake's to the last
-    /// segment of the score table.
-    pub fn score_range() -> std::ops::RangeInclusive<f64> {
-        score_exact(2, 0.0)..=score_exact(MAX_SEGMENTS, 0.0)
+    /// Displayed scores a floor can take: a newborn's, up to the most a
+    /// spawnable mass displays (`MAX_SEGMENTS` and the last fam step below one).
+    pub fn score_range() -> std::ops::RangeInclusive<u32> {
+        score(2, 0.0) as u32..=score(MAX_SEGMENTS, wire_fam(FAM_STEPS - 1)) as u32
     }
-    /// Inverts `score_exact` within one segment's linear piece, then adjusts
-    /// by ulps so the result is the least fam whose score is at least `score`.
-    pub fn for_score(score: f64) -> Option<Self> {
-        if !Self::score_range().contains(&score) {
+    /// The least segments and wire fam step whose displayed score is at least
+    /// `target`. Displayed score never decreases with mass, so a linear scan
+    /// over segments and a bisection over the 24-bit steps find it.
+    pub fn for_score(target: u32) -> Option<Self> {
+        if !Self::score_range().contains(&target) {
             return None;
         }
-        let (weights, sums) = score_tables();
-        let segments = (2..=MAX_SEGMENTS)
-            .rev()
-            .find(|&n| score_exact(n, 0.0) <= score)
-            .expect("the range starts at two segments");
-        let mut fam =
-            (((score + 5.0) / 15.0 + 1.0 - sums[segments]) * weights[segments]).clamp(0.0, 1.0);
-        while score_exact(segments, fam) < score {
-            fam = fam.next_up();
+        let shows =
+            |segments: usize, step: u32| score(segments, wire_fam(step)) >= f64::from(target);
+        let segments = (2..=MAX_SEGMENTS).find(|&n| shows(n, FAM_STEPS - 1))?;
+        // `hi` always displays the target; `lo` does not, unless it is zero.
+        let (mut lo, mut hi) = (0, FAM_STEPS - 1);
+        if shows(segments, 0) {
+            hi = 0;
         }
-        while fam > 0.0 && score_exact(segments, fam.next_down()) >= score {
-            fam = fam.next_down();
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            if shows(segments, mid) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
         }
-        // The top of one segment's piece is the next segment's start.
-        if fam >= 1.0 {
-            return Some(Self {
-                segments: segments + 1,
-                fam: 0.0,
-            });
-        }
-        Some(Self { segments, fam })
+        Some(Self {
+            segments,
+            fam: wire_fam(hi),
+        })
     }
     /// Mass above the floor, or zero at and below it.
     pub fn excess(self, segments: usize, fam: f64) -> f64 {

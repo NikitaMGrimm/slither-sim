@@ -165,10 +165,11 @@ pub struct Config {
     /// many seconds, across the slot's lives. `None` keeps no kill score.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kill_score_seconds: Option<f64>,
-    /// Displayed-score floor: new lives start at this score and boosting or the
-    /// kiosk penalty never shrink a snake below it. Read when a world is created.
+    /// Least displayed score: new lives start at the least mass that displays
+    /// it, and boosting or the kiosk penalty never shrink a snake below that
+    /// mass. Read when a world is created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_score: Option<f64>,
+    pub min_score: Option<u32>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -196,7 +197,9 @@ impl<'de> Deserialize<'de> for Config {
                 }
             }
         }
-        let mut fields = Map::deserialize(deserializer)?;
+        let Unique(Value::Object(mut fields)) = deserializer.deserialize_map(UniqueVisitor)? else {
+            return Err(D::Error::custom("invalid type, expected struct Config"));
+        };
         let fields = match fields.remove("preset") {
             None => fields,
             Some(preset) => {
@@ -211,6 +214,65 @@ impl<'de> Deserialize<'de> for Config {
             }
         };
         Config::deserialize(Value::Object(fields)).map_err(D::Error::custom)
+    }
+}
+/// A JSON value whose objects, at every depth, reject duplicate keys, as the
+/// derived deserializers do; a plain `Value` would keep the last one.
+struct Unique(serde_json::Value);
+struct UniqueVisitor;
+impl<'de> Deserialize<'de> for Unique {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(UniqueVisitor)
+    }
+}
+impl<'de> serde::de::Visitor<'de> for UniqueVisitor {
+    type Value = Unique;
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("struct Config")
+    }
+    fn visit_bool<E>(self, v: bool) -> Result<Unique, E> {
+        Ok(Unique(v.into()))
+    }
+    fn visit_i64<E>(self, v: i64) -> Result<Unique, E> {
+        Ok(Unique(v.into()))
+    }
+    fn visit_u64<E>(self, v: u64) -> Result<Unique, E> {
+        Ok(Unique(v.into()))
+    }
+    fn visit_f64<E>(self, v: f64) -> Result<Unique, E> {
+        Ok(Unique(v.into()))
+    }
+    fn visit_str<E>(self, v: &str) -> Result<Unique, E> {
+        Ok(Unique(v.into()))
+    }
+    fn visit_unit<E>(self) -> Result<Unique, E> {
+        Ok(Unique(serde_json::Value::Null))
+    }
+    fn visit_none<E>(self) -> Result<Unique, E> {
+        Ok(Unique(serde_json::Value::Null))
+    }
+    fn visit_some<D: serde::Deserializer<'de>>(self, d: D) -> Result<Unique, D::Error> {
+        Unique::deserialize(d)
+    }
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Unique, A::Error> {
+        let mut items = Vec::new();
+        while let Some(Unique(item)) = seq.next_element()? {
+            items.push(item);
+        }
+        Ok(Unique(items.into()))
+    }
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Unique, A::Error> {
+        let mut fields = serde_json::Map::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if fields.contains_key(&key) {
+                return Err(serde::de::Error::custom(format_args!(
+                    "duplicate field `{key}`"
+                )));
+            }
+            let Unique(value) = map.next_value()?;
+            fields.insert(key, value);
+        }
+        Ok(Unique(fields.into()))
     }
 }
 /// Protocol sector area used by the modeled official ecology below.
@@ -299,7 +361,7 @@ impl Config {
             pit: Some(PitConfig { radius: PIT }),
             spawn_radius: Some((PIT + RADIUS) / 2.0),
             kill_score_seconds: Some(900.0),
-            min_score: Some(400.0),
+            min_score: Some(400),
             ..Self::official(1)
         }
     }
@@ -352,8 +414,8 @@ impl Config {
         let scores = MassFloor::score_range();
         if self.min_score.is_some_and(|score| !scores.contains(&score)) {
             return Err(format!(
-                "minScore must be finite and from a new snake's {} to the {MAX_SEGMENTS}-segment \
-                 score {}, so a snake can be built at it",
+                "minScore must be from a newborn's displayed {} to {}, the most a \
+                 {MAX_SEGMENTS}-segment snake displays, so a snake can be built at it",
                 scores.start(),
                 scores.end()
             ));
@@ -1052,10 +1114,16 @@ impl Simulator {
                 boundary_deaths.push((i, DeathReason::Boundary));
             } else if let Some(pit) = &c.pit {
                 // A mode rule, not an official mechanic: docs/configuration.md#battledome.
-                if s.head.distance_lt(Point::default(), pit.radius) {
-                    self.pit_entered[i] = true;
-                } else if self.pit_entered[i] {
-                    boundary_deaths.push((i, DeathReason::Pit));
+                // The swept head-center path counts, so the rule does not depend on
+                // dt: crossing the pit or clipping its edge within a tick also kills.
+                let touched = self.pit_entered[i]
+                    || segment_distance(Point::default(), previous[i], s.head) < pit.radius;
+                if touched {
+                    if s.head.distance_lt(Point::default(), pit.radius) {
+                        self.pit_entered[i] = true;
+                    } else {
+                        boundary_deaths.push((i, DeathReason::Pit));
+                    }
                 }
             }
             if let Some(anchor) = crossed_anchor(previous[i], s.head, s.body[0]) {
