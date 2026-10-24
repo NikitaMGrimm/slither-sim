@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HOST_GROUPS = ("rust", "tools", "package")
 # `rust` is `lint` followed by `test`; CI runs the two parts as separate jobs.
 GROUPS = (*HOST_GROUPS, "lint", "test", "wasm")
+FIDELITY_HALVES = ("test_[a-d]*.py", "test_[!a-d]*.py")
 
 
 def clippy(*features):
@@ -53,12 +54,17 @@ def commands(group):
         wheels = str(target / "wheels")
         # Python 3.12 added --durations; the slowest tests guide CI tuning.
         durations = ["--durations", "5"] if sys.version_info >= (3, 12) else []
+
+        def suite(directory, pattern):
+            return [sys.executable, "-m", "unittest", "discover", "-s", directory, "-p", pattern, *durations]
         return [
             # Build first with every job; the fidelity tests and smoke runs reuse it.
             # maturin builds the Python extension below, with its interpreter.
             ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
-            [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py", *durations],
-            [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py", *durations],
+            suite("tools", "test_*.py"),
+            # Complementary halves, so the long end-to-end comparison test runs
+            # beside the rest of the fidelity suite.
+            *(suite("tools/fidelity", pattern) for pattern in FIDELITY_HALVES),
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
             [sys.executable, "-B", "tools/perf_transport.py", "--binary", binary,
              "--scenarios", "small", "dense-64", "worlds-16", "--steps", "3", "--repeats", "1"],
@@ -80,10 +86,10 @@ def commands(group):
 def steps(group):
     """The group's commands in order; the commands of one step run concurrently."""
     if group == "tools":
-        # The three suites share nothing but the build, and each mostly waits on
-        # its own subprocesses.
-        build, tools, fidelity, node, *rest = commands(group)
-        return [[build], [tools, fidelity, node], *([command] for command in rest)]
+        # The suites share nothing but the build, and each mostly waits on its
+        # own subprocesses.
+        build, tools, first, second, node, *rest = commands(group)
+        return [[build], [tools, first, second, node], *([command] for command in rest)]
     return [[command] for command in commands(group)]
 
 

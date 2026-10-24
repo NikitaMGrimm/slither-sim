@@ -1,6 +1,7 @@
 """Check selection and failure handling without invoking compilers or child suites."""
 
 from contextlib import redirect_stdout
+import fnmatch
 import io
 import os
 from pathlib import Path
@@ -75,7 +76,14 @@ class CheckRunnerTests(unittest.TestCase):
             self.assertEqual([command for step in check.steps(group) for command in step], check.commands(group))
         concurrent = [step for step in check.steps("tools") if len(step) > 1]
         self.assertEqual([[command[3] if command[0] != "node" else "node" for command in step] for step in concurrent],
-                         [["discover", "discover", "node"]])
+                         [["discover", "discover", "discover", "node"]])
+
+    def test_fidelity_halves_partition_the_suite(self):
+        names = sorted(path.name for path in (check.ROOT / "tools/fidelity").glob("test_*.py"))
+        halves = [sorted(name for name in names if fnmatch.fnmatch(name, pattern)) for pattern in check.FIDELITY_HALVES]
+        self.assertTrue(all(halves))
+        self.assertEqual(sorted(halves[0] + halves[1]), names)
+        self.assertFalse(set(halves[0]) & set(halves[1]))
 
     def test_concurrent_output_is_replayed_in_command_order(self):
         slow = [sys.executable, "-c", "import time; time.sleep(0.3); print('first')"]
@@ -105,7 +113,7 @@ class CheckRunnerTests(unittest.TestCase):
         commands = check.commands("tools")
         self.assertEqual(commands[0][:2], ["cargo", "build"])
         self.assertEqual(commands[1][0], check.sys.executable)
-        node = commands[3]
+        node = next(command for command in commands if command[:2] == ["node", "--test"])
         self.assertGreater(len(node), 2)
         self.assertTrue(all("*" not in path for path in node))
 
