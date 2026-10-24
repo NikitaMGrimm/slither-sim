@@ -100,6 +100,23 @@ def steps(group):
     return [[command] for command in commands(group)]
 
 
+def interrupt(tree, grace_seconds=5):
+    """Stops a still-running tree, first letting a POSIX suite clean up after SIGINT.
+
+    The kill reaches the tree's session, but not processes a test started in
+    sessions of their own, as perf_build's process-tree tests do; their cleanup
+    must run first. Windows job objects already contain nested jobs.
+    """
+    if os.name != "nt" and tree.process.poll() is None:
+        import signal
+        try:
+            os.killpg(tree.group, signal.SIGINT)
+            tree.process.wait(timeout=grace_seconds)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            pass
+    tree.stop()
+
+
 def run_concurrently(step, environment, timeout=CONCURRENT_TIMEOUT_SECONDS):
     """Runs a step's commands at once and replays each one's output in order.
 
@@ -130,13 +147,13 @@ def run_concurrently(step, environment, timeout=CONCURRENT_TIMEOUT_SECONDS):
                     del running[index]
             time.sleep(0.05)
         for index, (tree, start) in list(running.items()):
-            tree.stop()
+            interrupt(tree)
             finished[index] = (time.monotonic() - start, TIMED_OUT)
             del running[index]
             print(f"Stopped after {timeout} s: {shlex.join(step[index])}", file=sys.stderr, flush=True)
     finally:
         for tree, _ in running.values():
-            tree.stop()
+            interrupt(tree)
         for output in outputs:
             output.seek(0)
             sys.stdout.flush()

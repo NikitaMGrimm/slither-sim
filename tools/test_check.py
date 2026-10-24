@@ -113,9 +113,29 @@ class CheckRunnerTests(unittest.TestCase):
         with redirect_stdout(stdout), patch.object(check.sys, "stderr", io.StringIO()):
             results = check.run_concurrently([hung, quick], os.environ.copy(), timeout=1)
         stdout.flush()
-        self.assertEqual(buffer.getvalue().decode().split(), ["started", "done"])
+        # On POSIX, the interrupted child adds its KeyboardInterrupt traceback.
+        words = buffer.getvalue().decode().split()
+        self.assertEqual((words[0], words[-1]), ("started", "done"))
         self.assertEqual([code for _, code in results], [check.TIMED_OUT, 0])
         self.assertLess(results[0][0], 10)
+
+    @unittest.skipIf(os.name == "nt", "Windows job objects already contain nested jobs")
+    def test_a_stopped_suite_cleans_up_processes_in_their_own_sessions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "survived"
+            grandchild = f"import time; time.sleep(1.5); open({str(marker)!r}, 'w').close()"
+            suite = ("import subprocess, sys, time\n"
+                     f"child = subprocess.Popen([sys.executable, '-c', {grandchild!r}], start_new_session=True)\n"
+                     "try:\n"
+                     "    time.sleep(30)\n"
+                     "finally:\n"
+                     "    child.kill()\n")
+            with redirect_stdout(io.TextIOWrapper(io.BytesIO(), encoding="utf-8")), \
+                    patch.object(check.sys, "stderr", io.StringIO()):
+                results = check.run_concurrently([[sys.executable, "-c", suite]], os.environ.copy(), timeout=0.5)
+            time.sleep(2)
+            self.assertFalse(marker.exists())
+        self.assertEqual(results[0][1], check.TIMED_OUT)
 
     def test_a_failing_concurrent_command_stops_later_steps(self):
         with tempfile.TemporaryDirectory() as directory:
