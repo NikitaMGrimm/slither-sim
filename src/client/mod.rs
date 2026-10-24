@@ -149,6 +149,19 @@ pub trait Bot {
     fn reset(&mut self) {}
 }
 
+/// Stateless portable adapter for [`crate::reference::decide`].
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ReferenceBot;
+
+impl Bot for ReferenceBot {
+    fn decide(&mut self, frame: &ClientFrame) -> Option<Action> {
+        if frame.contract != CONTRACT || frame.status != ClientStatus::Playing {
+            return None;
+        }
+        frame.observation.as_ref().map(crate::reference::decide)
+    }
+}
+
 pub struct BotRunner<B> {
     backend: B,
     identity: Option<(u64, u64)>,

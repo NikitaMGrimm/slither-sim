@@ -149,6 +149,11 @@ coverage, prediction, receipt ages or network latency. Use the
 see [the basic example](../examples/basic.rs). Rust callers can build their own
 admission, respawn and match rules around the core.
 
+`reference::decide(&observation)` provides the crate's stateless, non-boosting
+food-seeking reference policy without a networking dependency. For received-state
+bots, use its [`client::ReferenceBot` adapter](client-api.md#reference-policy).
+Keep geometric and received-state evaluations separate.
+
 A bot that observes every decision should keep one buffer and call
 `observe_all_into` or `observe_selected_into`. They return the same observations
 as `observe_all` and `observe_selected`, but refill the vectors already in the
