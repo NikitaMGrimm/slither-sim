@@ -187,6 +187,45 @@ caller and includes its 0.5 ms pipe-poll sleeps. The host is killed and waited f
 on success and error; no listener is retained. Hosted receipts vary with wall time
 and have no deterministic response hash.
 
+## Controller transport
+
+The workloads above time only the Rust side. `tools/perf_transport.py` times what a
+[`serve` controller](bot-api.md) experiences, including reading and parsing each
+JSON reply. It generates one deterministic request script per scenario (seed 7,
+six decision ticks, headings that never read observations, so every mode simulates
+the same worlds). The scenario table at the top of the script defines `small`,
+`official-128`, `dense-64`, `heavy-food` and the 16-world `worlds-16`. Each
+scenario runs in three modes:
+
+- `server` pipes the whole script into `serve` and drains stdout through a pipe.
+  It times from the end of the reset reply to EOF: simulation, serialization and
+  pipe writes, with no client in the loop.
+- `python` and `node` are closed-loop reference controllers using only `json` or
+  `JSON.parse` (`tools/perf_transport_client.py` and `.mjs`). Per step they time
+  **wait** (write the request, block for the reply line: server plus pipe),
+  **parse** and **decide**, which folds every living slot's nearest visible food
+  into a checksum. Decisions are not sent.
+
+```sh
+cargo build --release --locked --bin slither-sim
+uv run --locked --only-group tools python -B tools/perf_transport.py --output outputs/transport/run
+```
+
+It needs Node.js 22+ on `PATH`, starts only the given executable and contacts no
+network service. The table reports mean reply size and median ms/step with the
+min–max over `--repeats` (default 3); the mode order rotates between repeats.
+`--output` names a new directory for a private binary copy, the request scripts,
+`report.json` with every raw sample and `summary.md`. `--scenarios`, `--modes`
+and `--steps` bound a run; `--threads N` passes `--threads N` to every `serve`.
+The run fails if any mode or repeat receives different reply bytes or the
+clients' checksums differ. The reset reply, process startup and request encoding
+(scripts are pre-encoded) are excluded from per-step times. Protocol-specific
+code is limited to the request encoders and each client's `decode`/`decide`
+functions.
+
+The [transport v2 study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-transport-v2/REPORT.md)
+holds the `slither-sim-json-v1` baseline, the v2 results and the thread comparison.
+
 ## Follow-up workloads
 
 For a shared time limit and retained incomplete attempts, see

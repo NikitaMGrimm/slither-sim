@@ -1,0 +1,342 @@
+--- a/tools/perf_transport.py
++++ b/tools/perf_transport.py
+@@ -2,7 +2,7 @@
+ 
+ Local and offline: starts only the given `slither-sim serve` executable. Each scenario
+ is a deterministic request script whose actions never depend on observations, so
+-every mode simulates the same worlds. Modes: `server` pipes the whole script into
++every mode simulates the same world. Modes: `server` pipes the whole script into
+ `serve` and counts its output; `python` and `node` run closed-loop reference
+ controllers (tools/perf_transport_client.*) that time wait, parse and decide per
+ step. See docs/performance.md#controller-transport.
+@@ -27,13 +27,10 @@
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ FORMAT = "slither-perf-transport-v1"
+-PROTOCOL = "slither-sim-json-v2"
+ MODES = ("server", "python", "node")
+ SEED = 7
+ DECISION_TICKS = 6
+ RUN_TIMEOUT_SECONDS = 600
+-# read1 allocates its full size on every call: 1 MiB reads cost about 0.13 ms each
+-# on Windows, which made many small replies look six times slower than serve.
+ CHUNK_BYTES = 1 << 16
+ TAIL_CHUNKS = 1024  # Bounds the largest final reply the server-only check can read.
+ 
+@@ -46,7 +43,6 @@
+     steps: int
+     pattern: str  # "outward" or "circle"; see headings().
+     note: str
+-    worlds: int = 1  # Every world gets the same headings; world w uses seed SEED + w.
+ 
+ 
+ SCENARIOS = (
+@@ -57,8 +53,6 @@
+              "Battle-Dome-like arena size; not Battle Dome rules"),
+     Scenario("heavy-food", 128, {"radius": 6000, "dynamicRadius": False, "foodCount": 40000}, 50,
+              "circle", "dense visible food"),
+-    Scenario("worlds-16", 32, {"radius": 6000, "dynamicRadius": False}, 200, "circle",
+-             "16 worlds stepped in parallel by serve", worlds=16),
+ )
+ 
+ 
+@@ -75,25 +69,24 @@
+     return [2 * math.pi * i / count + math.pi / 2 + 0.25 * step for i in range(count)]
+ 
+ 
+-# Protocol slither-sim-json-v2 request encoding. The clients send these lines
+-# verbatim; another protocol replaces these two functions.
++# Protocol slither-sim-json-v1 request encoding. The clients send these lines
++# verbatim; a columnar protocol replaces these two functions.
+ def encode_reset(scenario):
+-    request = {"op": "reset", "seed": SEED, "worlds": scenario.worlds, "agents": scenario.agents,
+-               "decisionTicks": DECISION_TICKS}
++    request = {"op": "reset", "seed": SEED, "agents": scenario.agents, "decisionTicks": DECISION_TICKS}
+     if scenario.config is not None:
+         request["config"] = scenario.config
+     return json.dumps(request, separators=(",", ":"), allow_nan=False)
+ 
+ 
+-def encode_step(values, worlds):
+-    actions = {"heading": values, "boost": [False] * len(values)}
+-    return json.dumps({"op": "step", "actions": [actions] * worlds}, separators=(",", ":"), allow_nan=False)
++def encode_step(values):
++    actions = [{"heading": heading, "boost": False} for heading in values]
++    return json.dumps({"op": "step", "actions": actions}, separators=(",", ":"), allow_nan=False)
+ 
+ 
+ def request_script(scenario, steps=None):
+     steps = scenario.steps if steps is None else steps
+     lines = [encode_reset(scenario)]
+-    lines.extend(encode_step(headings(scenario, step), scenario.worlds) for step in range(steps))
++    lines.extend(encode_step(headings(scenario, step)) for step in range(steps))
+     return ("\n".join(lines) + "\n").encode()
+ 
+ 
+@@ -108,11 +101,11 @@
+     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+ 
+ 
+-def run_server(binary, script_path, serve_args):
++def run_server(binary, script_path):
+     """Pipe the whole script into serve; time from the end of the reset reply to EOF."""
+     with open(script_path, "rb") as requests:
+         start = time.perf_counter_ns()
+-        process = subprocess.Popen([str(binary), "serve", *serve_args], stdin=requests, stdout=subprocess.PIPE)
++        process = subprocess.Popen([str(binary), "serve"], stdin=requests, stdout=subprocess.PIPE)
+         total = 0
+         reset_done = None
+         # Keep references to recent chunks for the final-reply check. Scanning every
+@@ -140,19 +133,18 @@
+     if not recent.endswith(b"\n") or (b"\n" not in recent[:-1] and len(tail) == tail.maxlen):
+         raise RuntimeError("serve output did not end with a complete reply line")
+     final = json.loads(recent[recent.rfind(b"\n", 0, len(recent) - 1) + 1:])
+-    if final.get("protocol") != PROTOCOL or "error" in final:
+-        raise RuntimeError(f"unexpected final reply: {final.get('protocol')} {final.get('error')}")
+-    living = sum(frame["living"] for frame in final["result"]["worlds"])
++    if "error" in final:
++        raise RuntimeError(f"serve error: {final['error']}")
+     return {"totalBytes": total, "resetBytes": reset_bytes, "replyBytes": total - reset_bytes,
+-            "stepsNs": end - reset_done, "wallNs": end - start, "livingFinal": living}
++            "stepsNs": end - reset_done, "wallNs": end - start, "livingFinal": final["result"]["living"]}
+ 
+ 
+-def run_client(mode, binary, script_path, serve_args):
++def run_client(mode, binary, script_path):
+     if mode == "python":
+         command = [sys.executable, "-B", str(ROOT / "tools" / "perf_transport_client.py")]
+     else:
+         command = ["node", str(ROOT / "tools" / "perf_transport_client.mjs")]
+-    result = subprocess.run([*command, str(binary), str(script_path), *serve_args], cwd=ROOT, capture_output=True,
++    result = subprocess.run([*command, str(binary), str(script_path)], cwd=ROOT, capture_output=True,
+                             timeout=RUN_TIMEOUT_SECONDS, check=False)
+     if result.returncode:
+         detail = result.stderr.decode(errors="replace").strip()[-2000:]
+@@ -220,11 +212,10 @@
+     parser.add_argument("--modes", nargs="+", choices=MODES, default=list(MODES))
+     parser.add_argument("--steps", type=int, help="override every scenario's step count")
+     parser.add_argument("--repeats", type=int, default=3)
+-    parser.add_argument("--threads", type=int, help="pass --threads N to serve (default: its full pool)")
+     parser.add_argument("--output", type=Path, help="new directory for the binary copy, scripts and report.json")
+     args = parser.parse_args(argv)
+-    if args.repeats < 1 or any(value is not None and value < 1 for value in (args.steps, args.threads)):
+-        parser.error("--repeats, --steps and --threads must be positive")
++    if args.repeats < 1 or (args.steps is not None and args.steps < 1):
++        parser.error("--repeats and --steps must be positive")
+     if args.output is not None and args.output.exists():
+         parser.error(f"{args.output} already exists; choose a new output directory")
+     if args.build:
+@@ -236,10 +227,9 @@
+         parser.error(f"{binary} not found; build with cargo build --release --locked, pass --build or --binary")
+     scenarios = [s for s in SCENARIOS if args.scenarios is None or s.name in args.scenarios]
+     modes = list(dict.fromkeys(args.modes))
+-    serve_args = [] if args.threads is None else ["--threads", str(args.threads)]
+ 
+     with tempfile.TemporaryDirectory(prefix="perf-transport-") as temporary:
+-        work = Path(temporary) if args.output is None else args.output.resolve()
++        work = Path(temporary) if args.output is None else args.output
+         work.mkdir(parents=True, exist_ok=True)
+         if args.output is not None:
+             # Time a private copy so a concurrent cargo build cannot replace it mid-run.
+@@ -251,14 +241,14 @@
+             scripts[scenario.name] = work / f"{scenario.name}.requests.jsonl"
+             scripts[scenario.name].write_bytes(script)
+         report = {
+-            "format": FORMAT, "protocol": PROTOCOL,
++            "format": FORMAT, "protocol": "slither-sim-json-v1",
+             "binary": {"path": str(binary), "sha256": sha256(binary)},
+             "host": {"platform": platform.platform(), "processor": platform.processor(),
+                      "cpuCount": os.cpu_count(), "python": sys.version.split()[0],
+                      "node": command_text(["node", "--version"]) if "node" in modes else None},
+             "toolCommit": command_text(["git", "-C", str(ROOT), "rev-parse", "HEAD"]),
+-            "repeats": args.repeats, "modes": modes, "serveArgs": serve_args,
+-            "scenarios": [{"name": s.name, "worlds": s.worlds, "agents": s.agents, "config": s.config, "seed": SEED,
++            "repeats": args.repeats, "modes": modes,
++            "scenarios": [{"name": s.name, "agents": s.agents, "config": s.config, "seed": SEED,
+                            "decisionTicks": DECISION_TICKS, "pattern": s.pattern, "note": s.note,
+                            "steps": args.steps or s.steps,
+                            "requestsSha256": hashlib.sha256(scripts[s.name].read_bytes()).hexdigest()}
+@@ -271,8 +261,8 @@
+             for scenario in scenarios:
+                 for mode in modes[shift:] + modes[:shift]:
+                     print(f"[{repeat + 1}/{args.repeats}] {scenario.name} {mode}", file=sys.stderr, flush=True)
+-                    raw = (run_server(binary, scripts[scenario.name], serve_args) if mode == "server"
+-                           else run_client(mode, binary, scripts[scenario.name], serve_args))
++                    raw = (run_server(binary, scripts[scenario.name]) if mode == "server"
++                           else run_client(mode, binary, scripts[scenario.name]))
+                     report["runs"].append({"scenario": scenario.name, "mode": mode, "repeat": repeat, "raw": raw})
+         for scenario in scenarios:
+             steps = args.steps or scenario.steps
+--- a/tools/perf_transport_client.py
++++ b/tools/perf_transport_client.py
+@@ -1,8 +1,8 @@
+ """Closed-loop Python reference controller for tools/perf_transport.py (standard library only).
+ 
+-Usage: python -B tools/perf_transport_client.py BINARY REQUESTS [SERVE_ARG ...]
++Usage: python -B tools/perf_transport_client.py BINARY REQUESTS
+ 
+-Sends each pre-encoded request line from REQUESTS to `BINARY serve SERVE_ARG...`, waits for its
++Sends each pre-encoded request line from REQUESTS to `BINARY serve`, waits for its
+ reply, parses it and runs a small decision over every living slot. The decision
+ is not sent; requests stay scripted. Prints one JSON line with the summed timings.
+ """
+@@ -13,9 +13,9 @@
+ import time
+ 
+ 
+-# Protocol slither-sim-json-v2: reply decoding and the decision step. Another
++# Protocol slither-sim-json-v1: reply decoding and the decision step. A columnar
+ # protocol replaces these two functions and leaves the timing loop unchanged.
+-PROTOCOL = "slither-sim-json-v2"
++PROTOCOL = "slither-sim-json-v1"
+ 
+ 
+ def decode_reply(line):
+@@ -28,37 +28,35 @@
+ 
+ 
+ def decide(result, checksum):
+-    """Fold every living slot's nearest visible food row, food count and snake count into a
+-    32-bit checksum, so no parsed view can be skipped. Must match the Node client."""
++    """Fold every living slot's nearest visible food, food count and opponent count into a
++    32-bit checksum, so no parsed observation can be skipped. Must match the Node client."""
+     living = food_seen = 0
+-    for frame in result["worlds"]:
+-        snake_x, snake_y = frame["snakes"]["x"], frame["snakes"]["y"]
+-        food_x, food_y = frame["food"]["x"], frame["food"]["y"]
+-        for view in frame["views"]:
+-            if view is None:
+-                continue
+-            x, y = snake_x[view["self"]], snake_y[view["self"]]
+-            food = view["food"]
+-            best, nearest = -1, float("inf")
+-            for row in food:
+-                dx, dy = food_x[row] - x, food_y[row] - y
+-                distance = dx * dx + dy * dy
+-                if distance < nearest:
+-                    best, nearest = row, distance
+-            living += 1
+-            food_seen += len(food)
+-            checksum = (checksum * 1000003 + best + 1 + 7 * len(food)
+-                        + 13 * len(view["snakes"])) & 0xFFFFFFFF
++    for observation in result["observations"]:
++        if observation is None:
++            continue
++        head = observation["self"]["head"]
++        x, y = head["x"], head["y"]
++        food = observation["food"]
++        best, nearest = -1, float("inf")
++        for index, item in enumerate(food):
++            dx, dy = item["x"] - x, item["y"] - y
++            distance = dx * dx + dy * dy
++            if distance < nearest:
++                best, nearest = index, distance
++        living += 1
++        food_seen += len(food)
++        checksum = (checksum * 1000003 + best + 1 + 7 * len(food)
++                    + 13 * len(observation["opponents"])) & 0xFFFFFFFF
+     return checksum, living, food_seen
+ 
+ 
+ def main(argv):
+-    if len(argv) < 2:
++    if len(argv) != 2:
+         raise SystemExit(__doc__)
+-    binary, requests_path, *serve_args = argv
++    binary, requests_path = argv
+     with open(requests_path, "rb") as file:
+         requests = [line + b"\n" for line in file.read().splitlines()]
+-    process = subprocess.Popen([binary, "serve", *serve_args], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
++    process = subprocess.Popen([binary, "serve"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+     clock = time.perf_counter_ns
+     totals = {"steps": 0, "replyBytes": 0, "waitNs": 0, "parseNs": 0, "decideNs": 0,
+               "living": 0, "foodSeen": 0}
+--- a/tools/perf_transport_client.mjs
++++ b/tools/perf_transport_client.mjs
+@@ -1,9 +1,9 @@
+ /**
+  * Closed-loop Node.js reference controller for tools/perf_transport.py (built-ins only).
+  *
+- * Usage: node tools/perf_transport_client.mjs BINARY REQUESTS [SERVE_ARG ...]
++ * Usage: node tools/perf_transport_client.mjs BINARY REQUESTS
+  *
+- * Sends each pre-encoded request line from REQUESTS to `BINARY serve SERVE_ARG...`, waits for its
++ * Sends each pre-encoded request line from REQUESTS to `BINARY serve`, waits for its
+  * reply, parses it and runs a small decision over every living slot. The decision
+  * is not sent; requests stay scripted. Prints one JSON line with the summed timings.
+  */
+@@ -12,9 +12,9 @@
+ import { readFileSync } from 'node:fs';
+ import { createInterface } from 'node:readline';
+ 
+-// Protocol slither-sim-json-v2: reply decoding and the decision step. Another
++// Protocol slither-sim-json-v1: reply decoding and the decision step. A columnar
+ // protocol replaces these two functions and leaves the timing loop unchanged.
+-const protocol = 'slither-sim-json-v2';
++const protocol = 'slither-sim-json-v1';
+ 
+ function decodeReply(line) {
+   const reply = JSON.parse(line);
+@@ -27,41 +27,36 @@
+ function decide(result, checksum) {
+   let living = 0;
+   let foodSeen = 0;
+-  for (const frame of result.worlds) {
+-    const { x: snakeX, y: snakeY } = frame.snakes;
+-    const { x: foodX, y: foodY } = frame.food;
+-    for (const view of frame.views) {
+-      if (view === null) continue;
+-      const x = snakeX[view.self];
+-      const y = snakeY[view.self];
+-      const food = view.food;
+-      let best = -1;
+-      let nearest = Infinity;
+-      for (const row of food) {
+-        const dx = foodX[row] - x;
+-        const dy = foodY[row] - y;
+-        const distance = dx * dx + dy * dy;
+-        if (distance < nearest) {
+-          best = row;
+-          nearest = distance;
+-        }
++  for (const observation of result.observations) {
++    if (observation === null) continue;
++    const { x, y } = observation.self.head;
++    const food = observation.food;
++    let best = -1;
++    let nearest = Infinity;
++    for (let index = 0; index < food.length; index += 1) {
++      const dx = food[index].x - x;
++      const dy = food[index].y - y;
++      const distance = dx * dx + dy * dy;
++      if (distance < nearest) {
++        best = index;
++        nearest = distance;
+       }
+-      living += 1;
+-      foodSeen += food.length;
+-      checksum = (Math.imul(checksum, 1000003) + best + 1 + 7 * food.length
+-        + 13 * view.snakes.length) >>> 0;
+     }
++    living += 1;
++    foodSeen += food.length;
++    checksum = (Math.imul(checksum, 1000003) + best + 1 + 7 * food.length
++      + 13 * observation.opponents.length) >>> 0;
+   }
+   return { checksum, living, foodSeen };
+ }
+ 
+-const [binary, requestsPath, ...serveArgs] = process.argv.slice(2);
+-if (!binary || !requestsPath) {
+-  throw new Error('Usage: node tools/perf_transport_client.mjs BINARY REQUESTS [SERVE_ARG ...]');
++const [binary, requestsPath, ...rest] = process.argv.slice(2);
++if (!binary || !requestsPath || rest.length) {
++  throw new Error('Usage: node tools/perf_transport_client.mjs BINARY REQUESTS');
+ }
+ const requests = readFileSync(requestsPath, 'utf8').split('\n').filter(line => line !== '').map(line => `${line}\n`);
+ 
+-const child = spawn(binary, ['serve', ...serveArgs], { stdio: ['pipe', 'pipe', 'inherit'] });
++const child = spawn(binary, ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
+ await once(child, 'spawn');
+ const finished = once(child, 'close');
+ const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });

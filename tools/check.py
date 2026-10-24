@@ -39,6 +39,8 @@ def commands(group):
             [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py"],
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
             ["cargo", "build", "--locked", "--workspace"],
+            [sys.executable, "-B", "tools/perf_transport.py", "--binary", binary,
+             "--scenarios", "small", "dense-64", "worlds-16", "--steps", "3", "--repeats", "1"],
             [sys.executable, "examples/bot.py", "--binary", binary, "--steps", "10"],
             [sys.executable, "examples/ffi_bot.py", "--library", library, "--steps", "10"],
             ["node", "examples/bot.mjs", binary, "10"],
