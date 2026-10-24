@@ -12,18 +12,26 @@ import os
 from pathlib import Path
 import platform
 import re
-import statistics
 import subprocess
-import sys
+import time
 
 from perf_baseline import capture_trace, digest, load_catalog, same_plan
 import perf_build
 from perf_build import HARNESS, TESTS
 import perf_compare
+import perf_stats
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MARKER = "<!-- slither-report-preview -->"
+# Statistics contract v1 §6: D = min(stage start + 620 s, job start + 900 s - 60 s).
+# JOB_TIMEOUT_SECONDS must match the workflow's timeout-minutes; the reserve leaves
+# time to write the report and upload artifacts before GitHub cancels the job.
+JOB_TIMEOUT_SECONDS = 900
+RESERVE_SECONDS = 60
+STAGE_CAP_SECONDS = 620
+RESULTS = {"Faster": "🟢 Faster", "Slower": "🔴 Slower", "Within": "⚪ Within ±5%",
+           "Undecided": "🟡 Undecided", "Unavailable": "⚠️ Unavailable"}
 
 
 def git(*args):
@@ -86,63 +94,59 @@ def metric_rows(base, candidate):
     return rows
 
 
-METRIC_LABELS = {"process CPU": "Process CPU", "operation wall": "Operation wall"}
-
-
-def performance_rows(directory, legacy):
-    """Legacy rows keep process CPU for historical comparability. Scenario rows use the
-    harness's operation wall time: their process CPU is dominated by untimed placement
-    and warmup, which would dilute a change in the timed operation."""
-    summary = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
-    raw = [json.loads(line) for line in (directory / "results.jsonl").read_text(encoding="utf-8").splitlines()]
-    result = []
-    for case, data in summary.items():
-        ratios = [p["cpu_ratio_candidate_over_baseline"] for p in data["pairs"]]
-        use_cpu = case in legacy and all(r is not None and math.isfinite(r) and r > 0 for r in ratios)
-        if not use_cpu:
-            ratios = [p["wall_ratio_candidate_over_baseline"] for p in data["pairs"]]
-        if not ratios or not all(math.isfinite(r) and r > 0 for r in ratios):
-            raise ValueError(f"invalid performance ratios for {case}")
-        ratio = statistics.median(ratios)
-        # A display heuristic for exploratory hosted timings, not a significance test.
-        reading = ("Faster" if ratio < .95 and max(ratios) < 1
-                   else "Slower" if ratio > 1.05 and min(ratios) > 1 else "Inconclusive")
-        representative = sorted(zip(ratios, data["pairs"]), key=lambda pair: pair[0])[len(ratios) // 2][1]
-        values = {}
-        for label in ("baseline", "candidate"):
-            sample = next(r for r in raw if r["case"] == case and r["label"] == label
-                          and r["repetition"] == representative["repetition"])
-            values[label] = (sample["cpu_seconds"] if use_cpu else sample["workload"]["timing"]["wallSeconds"]) * 1000 / data["iterations"]
-        result.append({"case": case, "metric": "process CPU" if use_cpu else "operation wall",
-                       **values, "ratio": ratio, "ratio_min": min(ratios), "ratio_max": max(ratios),
-                       "pairs": len(ratios), "reading": reading})
-    return result
-
-
 def cell(value):
     return str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ").replace("`", "'")
 
 
 def status(reading):
-    icon = {"Faster": "🟢", "Lower error": "🟢", "Equal": "🟢",
-            "Slower": "🔴", "Higher error": "🔴", "Inconclusive": "🟡",
+    icon = {"Lower error": "🟢", "Equal": "🟢", "Higher error": "🔴",
             "Changed": "🟡", "Unavailable": "⚠️"}.get(reading, "⚪")
     return f"{icon} {reading}"
 
 
+def percent(value):
+    """Two decimals with a true minus sign; a value that rounds to zero has no sign."""
+    text = f"{abs(value):.2f}%"
+    return text if text == "0.00%" else ("−" if value < 0 else "+") + text
+
+
+def change_cell(result):
+    """Estimate and asymmetric interval (contract §4); rounding never affects the label."""
+    if result is None:
+        return "—"
+    if result["interval_percent"] is None:
+        return f"{percent(result['change_percent'])} [interval unavailable]"
+    low, high = result["interval_percent"]
+    return f"{percent(result['change_percent'])} [{percent(low)}, {percent(high)}]"
+
+
+def stopping(row):
+    """One Details line: pairs used and why sampling stopped."""
+    name, used, complete = f"`{cell(row['case'])}`", row["n_used"], row["n_complete"]
+    if row["label"] == "Unavailable":
+        why = {"measurement_failure": f"{row['failure'] or row['reason'].replace('_', ' ')} (see raw logs)",
+               "not_started": "time cap before sampling started"}.get(
+            row["termination"], f"time cap before {perf_stats.LOOKS[0]} complete pairs ({complete} collected)")
+        return f"- {name}: unavailable; {cell(why)}."
+    parts = [f"{used} pairs used"]
+    if row["reason"] == "degenerate_residuals":
+        parts.append("interval unavailable (degenerate residuals)")
+    parts.append({"resolved": "stopped when resolved", "max_pairs": "stopped at the last look"}.get(
+        row["termination"], "time cap" + (f" ({complete} complete pairs collected)" if complete > used else "")))
+    return f"- {name}: " + "; ".join(parts) + "."
+
+
 def render(report):
     performance = report.get("performance", [])
-    metrics = {row["metric"] for row in performance}
-    units = f"{METRIC_LABELS[next(iter(metrics))]}, ms/op." if len(metrics) == 1 else "Time per operation, ms."
     lines = [MARKER, "## Comparison", "",
              f"Base `{report['base'][:8]}` → merge `{report['merge'][:8]}` · [Run and data]({report['run_url']})", "",
-             "### Performance", "", units, "",
+             "### Performance", "", "Operation wall time, ms/op. Negative change means less time.", "",
              "| Workload | Base | PR | Change | Result |",
              "| --- | ---: | ---: | ---: | --- |"]
     for row in performance:
-        label = row["case"] + (f" ({row['metric']})" if len(metrics) > 1 else "")
-        lines.append(f"| {cell(label)} | {row['baseline']:.5f} | {row['candidate']:.5f} | "
-                     f"{(row['ratio'] - 1) * 100:+.1f}% | {status(row['reading'])} |")
+        result = row["result"]
+        costs = [f"{result[f'{label}_ms_per_operation']:.5f}" if result else "—" for label in ("baseline", "candidate")]
+        lines.append(f"| {cell(row['case'])} | {costs[0]} | {costs[1]} | {change_cell(result)} | {RESULTS[row['label']]} |")
     if not performance:
         lines.append("| — | — | — | — | ⚠️ Unavailable |")
     lines += ["", "### Regression and fidelity", "",
@@ -194,16 +198,19 @@ def render(report):
         lines += ["", "⚠️ **Incomplete report:** see details for missing results."]
     lines += ["", "<details><summary>Details</summary>", "",
               f"- PR head: `{report['head']}`. Runner: {cell(report['platform'])}.",
-              "- Three alternating pairs after warmup. Base/PR costs come from the median-ratio pair.",
-              "- Faster/slower requires a ≥5% median shift with the same direction in every pair. This is a display heuristic, not statistical significance.",
-              "- Legacy rows show process CPU where available, including setup/teardown; scenario rows show operation wall time, which excludes placement and warmup.",
+              "- Paired operation wall time after warmup, with balanced order and checks at 8/12/26 pairs. "
+              "Base/PR are geometric means; Change shows estimate [interval] against a −5% to +5% band.",
+              "- Order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 3 looks "
+              "under independent normal log errors. Resolved rows stop; time-capped rows retain their last "
+              "completed look. Labels use unrounded bounds.",
+              # Remove only after hosted calibration has run and been reviewed.
+              "- Hosted-runner calibration is pending; performance labels are advisory and conditional on the timing model.",
               "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
               "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior."]
     if traces:
         lines.append("- State trace windows (operations): " + ", ".join(
             f"`{cell(t['case'])}` {t.get('iterations', '—')}" for t in traces) + ".")
-    for row in performance:
-        lines.append(f"- `{row['case']}` paired change range: {(row['ratio_min'] - 1) * 100:+.1f}% to {(row['ratio_max'] - 1) * 100:+.1f}%.")
+    lines += [stopping(row) for row in performance]
     for name in names:
         if before.get(name) != after.get(name) or after.get(name) != "ok":
             lines.append(f"- `{cell(name)}`: {before.get(name, 'unavailable')} → {after.get(name, 'unavailable')} "
@@ -224,7 +231,9 @@ def render(report):
     return "\n".join(lines)
 
 
-def collect(output, head):
+def collect(output, head, job_start):
+    """`job_start` is the time.monotonic() anchor recorded by the job's first step."""
+    phases = {"collector": time.monotonic() - job_start}
     merge = git("rev-parse", "HEAD")
     base = git("rev-parse", "HEAD^1")
     if git("rev-parse", "HEAD^2") != head:
@@ -233,7 +242,8 @@ def collect(output, head):
               "repository": os.environ["GITHUB_REPOSITORY"], "pr": int(os.environ["PR_NUMBER"]),
               "run": int(os.environ["GITHUB_RUN_ID"]), "attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
               "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-              "platform": platform.platform(), "errors": [], "tests": {}, "traces": []}
+              "platform": platform.platform(), "errors": [], "tests": {}, "traces": [],
+              "phases_seconds_after_job_start": phases}
     work = output.with_name(output.name + "-work")
     fidelity = {}
 
@@ -268,28 +278,36 @@ def collect(output, head):
         report["inputs"], report["suite_changes"] = baseline.inputs, list(baseline.suite_changes)
         report["rustc"] = subprocess.check_output(["rustc", "-Vv"], text=True, timeout=30)
         report["cargo_locks"] = {s.label: digest(s.checkout / "Cargo.lock") for s in (baseline, candidate)}
+        phases["builds"] = time.monotonic() - job_start
+        # The checkout's default target, where the workflow restores the dependency cache.
         builds, errors = perf_build.build_all(
-            [baseline, candidate], perf_build.SharedTarget(work / "target"), ("perf_baseline", "fidelity_metrics"),
+            [baseline, candidate], perf_build.SharedTarget(ROOT / "target"), ("perf_baseline", "fidelity_metrics"),
             logs=output, bins=work, hook=measured)
     report["errors"] += errors
     report["binaries"] = {label: build.hashes for label, build in builds.items()}
     report["identities"] = {label: build.record for label, build in builds.items()}
     report["fidelity"] = metric_rows(fidelity.get("baseline"), fidelity.get("candidate"))
     binaries = {label: build.binaries["perf_baseline"] for label, build in builds.items()}
-    suites = {}
+    catalogs, suites = {}, {}
     for label, binary in binaries.items():
         try:
-            suites[label] = load_catalog(binary).select(suite="ci")
+            catalogs[label] = load_catalog(binary)
+            suites[label] = catalogs[label].select(suite="ci")
         except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as error:
             report["errors"].append(f"{label} workload catalog: {error}")
     if len(suites) == 2:
         try:
             same_plan(suites)
+            if catalogs["baseline"].seed != catalogs["candidate"].seed:
+                raise ValueError("baseline and candidate catalog seeds differ")
+            if len(suites["candidate"]) > perf_stats.WORKLOAD_SLOTS:
+                raise ValueError(f"more than {perf_stats.WORKLOAD_SLOTS} ci workloads need a new error budget")
         except ValueError as error:
             report["errors"].append(str(error))
             suites = {}
     workloads = suites.get("candidate", suites.get("baseline", ()))
     report["workloads"] = [w.plan() for w in workloads]
+    phases["parity"] = time.monotonic() - job_start
     for workload in workloads:
         print(f"[parity] Capturing {workload.name} traces", flush=True)
         hashes = {}
@@ -305,17 +323,47 @@ def collect(output, head):
                                  "reading": "Unavailable" if len(hashes) != 2
                                  else "Equal" if hashes["baseline"]["sha256"] == hashes["candidate"]["sha256"] else "Changed"})
     if len(suites) == 2 and workloads:
-        print("[performance] Running three alternating pairs for each workload", flush=True)
-        perf = output / "performance"
-        code = perf_build.command([sys.executable, perf_compare.__file__, "--baseline", str(binaries["baseline"]),
-                                   "--candidate", str(binaries["candidate"]), "--output", str(perf),
-                                   "--repeats", "3", "--suite", "ci"],
-                                  ROOT, output / "performance.log")
-        if code:
-            report["errors"].append(f"paired performance runner exited {code}")
-        else:
-            report["performance"] = performance_rows(perf, {w.name for w in workloads if w.legacy})
+        measure(report, binaries, {label: builds[label].hashes[binaries[label].name] for label in binaries},
+                catalogs, suites, output / "performance", job_start)
+    phases["finished"] = time.monotonic() - job_start
     return report
+
+
+def measure(report, binaries, hashes, catalogs, suites, output, job_start):
+    """Freeze the plan, then sample until each row stops or the stage deadline (contract §1, §6)."""
+    stage = time.perf_counter()
+    report["phases_seconds_after_job_start"]["performance"] = time.monotonic() - job_start
+    # Convert the cross-process monotonic anchor to this process's perf_counter() clock.
+    job_deadline = stage + job_start + JOB_TIMEOUT_SECONDS - RESERVE_SECONDS - time.monotonic()
+    deadline = min(stage + STAGE_CAP_SECONDS, job_deadline)
+    # A row whose definition differs measures different inputs on each side.
+    matched = [w for w, other in zip(suites["candidate"], suites["baseline"])
+               if (w.fingerprint, w.operation) == (other.fingerprint, other.operation)]
+    plan = {"plan": perf_stats.PLAN, "seed": catalogs["candidate"].seed,
+            "metric": "operation wall time: the sum of the harness's monotonic operation intervals",
+            "catalogs": {label: catalog.sha256 for label, catalog in catalogs.items()},
+            "executables": hashes,
+            "workloads": [{"name": w.name, "operation": w.operation, "definitionSha256": w.fingerprint,
+                           "operations_per_block": w.iterations, "blocks": 1} for w in matched],
+            "warmup": "one discarded baseline-then-candidate pair per workload, after the harness's fixed "
+                      "internal warmup in every process",
+            "order": perf_stats.ORDER, "looks": perf_stats.LOOKS, "band": [0.95, 1.05],
+            "critical": {str(df): value for df, value in perf_stats.T_CRITICAL.items()},
+            "deadline": {"stage_cap_seconds": STAGE_CAP_SECONDS, "job_timeout_seconds": JOB_TIMEOUT_SECONDS,
+                         "reserve_seconds": RESERVE_SECONDS, "stage_budget_seconds": deadline - stage}}
+    print(f"[performance] Sampling for at most {max(0, deadline - stage):.0f} s", flush=True)
+    output.mkdir()
+    try:
+        rows = perf_compare.sequential(binaries, hashes, matched, output, deadline, plan)
+    except Exception as error:  # Infrastructure failure: the report is incomplete, not a timing claim.
+        report["errors"].append(f"performance sampler: {type(error).__name__}: {error}")
+        return
+    mismatch = {**perf_stats.final([], 0, "measurement_failure", "workload definitions differ between base and PR"),
+                "n_attempted": 0}
+    report["performance"] = [{"case": w.name, **rows.get(w.name, mismatch)} for w in suites["candidate"]]
+    report["performance_plan_sha256"] = digest(output / "plan.json")
+    report["budget"] = {"stage_budget_seconds": deadline - stage, "stage_seconds": time.perf_counter() - stage,
+                        "limited_by": "stage cap" if stage + STAGE_CAP_SECONDS <= job_deadline else "job reserve"}
 
 
 def main():
@@ -325,10 +373,14 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9a-f]{40}", args.head):
         parser.error("head must be a full Git SHA")
+    # The workflow's first step records time.monotonic(), a system-wide clock on the runner.
+    job_start = float(os.environ["PR_REPORT_JOB_START"])
+    if not (math.isfinite(job_start) and 0 <= time.monotonic() - job_start < JOB_TIMEOUT_SECONDS):
+        parser.error("PR_REPORT_JOB_START must be a recent time.monotonic() reading")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     try:
-        report = collect(output, args.head)
+        report = collect(output, args.head, job_start)
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
         markdown = render(report)
         (output / "report.md").write_text(markdown, encoding="utf-8", newline="\n")

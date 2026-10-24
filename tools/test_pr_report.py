@@ -4,17 +4,24 @@ import ast
 import contextlib
 import io
 import json
+import math
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import tempfile
+import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from perf_baseline import digest
+import perf_compare
+import perf_stats
 import pr_report
 from test_perf_baseline import catalog, row
+from test_perf_stats import REFERENCE
 
 
 def local_imports(directory, module):
@@ -77,8 +84,11 @@ class ReportTests(unittest.TestCase):
                         if args[1] == "clean":
                             profile = args[args.index("--profile") + 1] if "--profile" in args else "dev"
                             events.append(("clean-" + profile, label))
-                            self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
                             log.write_text("synthetic clean result\n")
+                            copied = work / f"bin-baseline/perf_baseline{suffix}"
+                            if not copied.exists():
+                                return 0  # The first label's clean of a possibly restored target.
+                            self.assertEqual(copied.read_bytes(), b"baseline")
                             return int(failure == "clean-" + profile)
                         events.append((args[1], label))
                         if args[1] == "build":
@@ -112,12 +122,13 @@ class ReportTests(unittest.TestCase):
                         patch.object(pr_report.perf_build, "command", side_effect=command), \
                         patch.object(pr_report, "load_catalog", return_value=listed), \
                         patch.object(pr_report, "capture_trace", side_effect=trace), \
-                        patch.object(pr_report, "performance_rows", return_value=[]), \
+                        patch.object(pr_report, "measure") as measure, \
                         patch.dict(os.environ, environment), contextlib.redirect_stdout(io.StringIO()):
-                    report = pr_report.collect(output, "a" * 40)
+                    report = pr_report.collect(output, "a" * 40, time.monotonic())
                 self.assertEqual(worktrees, [work / "baseline"])
                 self.assertFalse(worktrees[0].exists())
-                self.assertEqual(target_paths, {work / "target"})
+                self.assertEqual(target_paths, {checkout / "target"})
+                self.assertEqual(measure.called, not failure)
                 self.assertEqual(report["identities"]["baseline"]["commit"], "b" * 40)
                 if failure:
                     self.assertEqual([t["reading"] for t in report["traces"]], ["Unavailable"] * 2)
@@ -130,9 +141,10 @@ class ReportTests(unittest.TestCase):
                                      [("step-default", 32, "Equal"), ("official-100-step", 8, "Equal")])
                     self.assertIn("`official-100-step` 8", pr_report.render({**report, "run_url": "https://example.invalid"}))
                 self.assertEqual((work / f"bin-baseline/perf_baseline{suffix}").read_bytes(), b"baseline")
-                self.assertEqual(events[:3], [("build", "baseline"), ("test", "baseline"), ("clean-release", "baseline")])
+                self.assertEqual(events[:5], [("clean-release", "baseline"), ("clean-dev", "baseline"),
+                                              ("build", "baseline"), ("test", "baseline"), ("clean-release", "baseline")])
                 if failure != "clean-release":
-                    self.assertEqual(events[3], ("clean-dev", "baseline"))
+                    self.assertEqual(events[5], ("clean-dev", "baseline"))
                 if failure:
                     self.assertTrue(report["errors"])
                     self.assertNotIn("candidate", report["binaries"])
@@ -175,66 +187,6 @@ test same_name ... ok
         self.assertEqual(pr_report.transition("ok", "FAILED"), "regressed")
         self.assertEqual(pr_report.transition("ignored", "ok"), "changed")
 
-    def performance(self, directory, ratios, cpu=True):
-        pairs, rows = [], []
-        for repetition, ratio in enumerate(ratios):
-            pairs.append({"repetition": repetition, "cpu_ratio_candidate_over_baseline": ratio if cpu else None,
-                          "wall_ratio_candidate_over_baseline": ratio})
-            for label, value in (("baseline", 1), ("candidate", ratio)):
-                rows.append({"case": "observe", "label": label, "repetition": repetition,
-                             "cpu_seconds": value if cpu else None,
-                             "workload": {"timing": {"wallSeconds": value}}})
-        (directory / "summary.json").write_text(json.dumps({"observe": {"pairs": pairs, "iterations": 1000}}))
-        (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
-        return pr_report.performance_rows(directory, {"observe"})[0]
-
-    def test_mixed_pair_directions_and_small_shifts_stay_inconclusive(self):
-        with tempfile.TemporaryDirectory() as name:
-            directory = Path(name)
-            self.assertEqual(self.performance(directory, [.8, .8, 1.1])["reading"], "Inconclusive")
-            self.assertEqual(self.performance(directory, [.98, .99, .99])["reading"], "Inconclusive")
-            self.assertEqual(self.performance(directory, [.8, .85, .9])["reading"], "Faster")
-            self.assertEqual(self.performance(directory, [1.1, 1.2, 1.3])["reading"], "Slower")
-            self.assertEqual(self.performance(directory, [.8, .85, .9], cpu=False)["metric"], "operation wall")
-
-    def test_legacy_rows_use_process_cpu_and_scenario_rows_use_operation_wall(self):
-        with tempfile.TemporaryDirectory() as name:
-            directory = Path(name)
-            # CPU ratios stay near 1 (setup-dominated); the timed operation got 20% faster.
-            pairs = [{"repetition": r, "cpu_ratio_candidate_over_baseline": .99,
-                      "wall_ratio_candidate_over_baseline": .8} for r in range(3)]
-            rows = [{"case": case, "label": label, "repetition": r, "cpu_seconds": 2.0,
-                     "workload": {"timing": {"wallSeconds": 1.0 if label == "baseline" else .8}}}
-                    for case in ("observe", "official-100-bot") for r in range(3)
-                    for label in ("baseline", "candidate")]
-            summary = {case: {"pairs": pairs, "iterations": 100} for case in ("observe", "official-100-bot")}
-            (directory / "summary.json").write_text(json.dumps(summary))
-            (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
-            legacy, scenario = pr_report.performance_rows(directory, {"observe"})
-            self.assertEqual((legacy["metric"], legacy["ratio"], legacy["reading"]), ("process CPU", .99, "Inconclusive"))
-            self.assertEqual((scenario["metric"], scenario["ratio"], scenario["reading"]), ("operation wall", .8, "Faster"))
-            self.assertEqual((scenario["baseline"], scenario["candidate"]), (10.0, 8.0))
-            report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
-                      "platform": "Test platform", "performance": [legacy, scenario]}
-            text = pr_report.render(report)
-            self.assertIn("Time per operation, ms.", text)
-            self.assertIn("| observe (process CPU) |", text)
-            self.assertIn("| official-100-bot (operation wall) |", text)
-            self.assertIn("scenario rows show operation wall time, which excludes placement and warmup", text)
-            # Without legacy rows, no row uses process CPU.
-            self.assertEqual({row["metric"] for row in pr_report.performance_rows(directory, set())}, {"operation wall"})
-
-    def test_single_metric_headers_use_explicit_labels(self):
-        for metric_name, header in (("process CPU", "Process CPU, ms/op."), ("operation wall", "Operation wall, ms/op.")):
-            row = {"case": "observe", "metric": metric_name, "baseline": 1, "candidate": 1, "ratio": 1,
-                   "ratio_min": 1, "ratio_max": 1, "reading": "Inconclusive"}
-            report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
-                      "platform": "Test platform", "performance": [row]}
-            with self.subTest(metric_name):
-                text = pr_report.render(report)
-                self.assertIn(header, text)
-                self.assertNotIn("Process cpu", text)
-
     def test_incomplete_render_does_not_claim_success_and_escapes_table_cells(self):
         report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
                   "platform": "Test platform", "errors": ["release build unavailable"],
@@ -250,20 +202,6 @@ test same_name ... ok
         self.assertNotIn("on behalf of", text)
         self.assertNotIn("do not block merging", text)
         self.assertEqual(pr_report.cell("a|b\nc`d"), "a\\|b c'd")
-
-    def test_displayed_costs_come_from_the_same_pair_as_the_paired_delta(self):
-        with tempfile.TemporaryDirectory() as name:
-            directory = Path(name)
-            self.performance(directory, [1.1, .9, 1.0])
-            raw = [json.loads(line) for line in (directory / "results.jsonl").read_text().splitlines()]
-            for row in raw:
-                multiplier = [1, 2, 100][row["repetition"]]
-                row["cpu_seconds"] *= multiplier
-            (directory / "results.jsonl").write_text("\n".join(json.dumps(row) for row in raw))
-            row = pr_report.performance_rows(directory, {"observe"})[0]
-            self.assertEqual(row["baseline"], 100)
-            self.assertEqual(row["candidate"], 100)
-            self.assertEqual(row["ratio"], row["candidate"] / row["baseline"])
 
     def test_workflow_paths_cover_every_measured_input_and_skip_documentation(self):
         root = pr_report.ROOT
@@ -308,25 +246,6 @@ test same_name ... ok
         source = '#[test]\nfn normal() {}\n#[test]\n#[ignore = "reason"]\nfn ignored() {}\nfn helper() {}'
         self.assertEqual(pr_report.test_names(source), {"normal", "ignored"})
 
-    def test_color_cues_preserve_mixed_metrics_and_uncertainty(self):
-        performance = [{"case": case, "metric": metric_name, "baseline": 1, "candidate": ratio,
-                        "ratio": ratio, "ratio_min": ratio, "ratio_max": ratio, "reading": reading}
-                       for case, metric_name, ratio, reading in (
-                           ("observe", "process CPU", .8, "Faster"),
-                           ("protocol", "operation wall", 1.2, "Slower"),
-                           ("portable", "process CPU", 1.01, "Inconclusive"))]
-        report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40,
-                  "run_url": "https://example.invalid/run", "platform": "Test platform", "performance": performance}
-        text = pr_report.render(report)
-        self.assertIn("observe (process CPU)", text)
-        self.assertIn("protocol (operation wall)", text)
-        self.assertIn("🟢 Faster", text)
-        self.assertIn("🔴 Slower", text)
-        self.assertIn("🟡 Inconclusive", text)
-        visible, details = text.split("<details>", 1)
-        self.assertNotIn("display heuristic", visible)
-        self.assertIn("display heuristic", details)
-
     def test_unchanged_failures_and_ignored_cases_are_not_green_passes(self):
         report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40,
                   "run_url": "https://example.invalid/run", "platform": "Test platform", "expected_tests": ["physics::case"]}
@@ -335,6 +254,265 @@ test same_name ... ok
             text = pr_report.render(report)
             self.assertIn(result, text)
             self.assertNotIn("🟢 Passed", text)
+
+    def test_performance_rows_follow_the_comment_wording(self):
+        def dataset(name):
+            return next(x for x in REFERENCE["datasets"] if x["id"] == name)["pairs"]
+
+        def state(name):
+            return next(x for x in REFERENCE["state_vectors"] if x["id"] == name)
+
+        def look(name, termination, complete=None):
+            pairs = dataset(name)
+            return perf_stats.final([perf_stats.analyze(pairs)], complete or len(pairs), termination)
+
+        capped = state("cap_after_14_keep_12")
+        rows = {"faster": look("faster_at_8", "resolved"), "slower": look("slower_at_12", "resolved"),
+                "within": look("within_at_12", "resolved"), "noisy": look("undecided_at_26", "max_pairs"),
+                "capped": perf_stats.final(capped["expected"]["history"], 14, "time_cap"),
+                "flat": look("order_only_degenerate_at_8", "time_cap"),
+                "crash": perf_stats.final([], 4, "measurement_failure", "candidate failed at pair 5"),
+                "short": perf_stats.final([], 7, "time_cap"), "late": perf_stats.final([], 0, "not_started")}
+        report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40, "run_url": "https://example.invalid/run",
+                  "platform": "Test platform",
+                  "performance": [{"case": case, **row} for case, row in rows.items()]}
+        text = pr_report.render(report)
+        visible, details = text.split("<details>", 1)
+        self.assertIn("\nOperation wall time, ms/op. Negative change means less time.\n", visible)
+        self.assertIn("| Workload | Base | PR | Change | Result |", visible)
+        faster = rows["faster"]["result"]
+        low, high = faster["interval_percent"]
+        self.assertIn(f"| faster | {faster['baseline_ms_per_operation']:.5f} | {faster['candidate_ms_per_operation']:.5f} | "
+                      f"−{-faster['change_percent']:.2f}% [−{-low:.2f}%, −{-high:.2f}%] | 🟢 Faster |", visible)
+        for case, result in (("slower", "🔴 Slower"), ("within", "⚪ Within ±5%"), ("noisy", "🟡 Undecided"),
+                             ("capped", "🟡 Undecided")):
+            self.assertRegex(visible, rf"\| {case} \| \d+\.\d{{5}} \| \d+\.\d{{5}} \| [+−]?\d+\.\d\d% "
+                                      rf"\[[+−]?\d+\.\d\d%, [+−]?\d+\.\d\d%\] \| {result} \|")
+        self.assertRegex(visible, r"\| flat \| [\d.]+ \| [\d.]+ \| \+\d+\.\d\d% \[interval unavailable\] \| 🟡 Undecided \|")
+        for case in ("crash", "short", "late"):
+            self.assertIn(f"| {case} | — | — | — | ⚠️ Unavailable |", visible)
+        rows_text = visible.split("| --- | ---: | ---: | ---: | --- |\n", 1)[1].split("### Regression", 1)[0]
+        self.assertNotIn("-", rows_text, "negative numbers use a true minus sign")
+        self.assertIn("\n- Paired operation wall time after warmup, with balanced order and checks at 8/12/26 pairs. "
+                      "Base/PR are geometric means; Change shows estimate [interval] against a −5% to +5% band.\n"
+                      "- Order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 3 looks "
+                      "under independent normal log errors. Resolved rows stop; time-capped rows retain their last "
+                      "completed look. Labels use unrounded bounds.\n"
+                      "- Hosted-runner calibration is pending; performance labels are advisory and conditional on "
+                      "the timing model.\n", details)
+        for line in ("- `faster`: 8 pairs used; stopped when resolved.",
+                     "- `noisy`: 26 pairs used; stopped at the last look.",
+                     "- `capped`: 12 pairs used; time cap (14 complete pairs collected).",
+                     "- `flat`: 8 pairs used; interval unavailable (degenerate residuals); time cap.",
+                     "- `crash`: unavailable; candidate failed at pair 5 (see raw logs).",
+                     "- `short`: unavailable; time cap before 8 complete pairs (7 collected).",
+                     "- `late`: unavailable; time cap before sampling started."):
+            self.assertIn("\n" + line + "\n", details)
+        for retired in ("display heuristic", "median", "process CPU", "Inconclusive", "paired change range", "95% interval"):
+            self.assertNotIn(retired, text)
+
+    def test_percentages_use_a_true_minus_and_never_show_negative_zero(self):
+        self.assertEqual([pr_report.percent(v) for v in (-8.3, 1.2, -0.004, 0.0, -0.0, 0.004, 0.005001)],
+                         ["−8.30%", "+1.20%", "0.00%", "0.00%", "0.00%", "0.00%", "+0.01%"])
+
+    def test_stage_deadline_keeps_the_job_reserve(self):
+        listed = catalog([row("step-default", legacy=True), row("observe")])
+        changed = catalog([row("step-default", legacy=True), row("observe", definition={"changed": True})])
+        for elapsed, changed_suite, limit in ((100, False, "stage cap"), (300, True, "job reserve")):
+            with self.subTest(elapsed=elapsed), tempfile.TemporaryDirectory() as name:
+                captured = {}
+
+                def sample(binaries, hashes, workloads, output, deadline, plan):
+                    captured.update(workloads=[w.name for w in workloads], budget=deadline - time.perf_counter(), plan=plan)
+                    return {w.name: perf_stats.final([], 0, "not_started") | {"n_attempted": 0} for w in workloads}
+
+                report = {"errors": [], "phases_seconds_after_job_start": {}}
+                catalogs = {"baseline": changed if changed_suite else listed, "candidate": listed}
+                suites = {label: c.select(suite="ci") for label, c in catalogs.items()}
+                (Path(name) / "out").mkdir()
+                with patch.object(pr_report.perf_compare, "sequential", side_effect=sample), \
+                        patch.object(pr_report, "digest", return_value="d" * 64), contextlib.redirect_stdout(io.StringIO()):
+                    pr_report.measure(report, {}, {}, catalogs, suites, Path(name) / "out" / "performance",
+                                      time.monotonic() - elapsed)
+                expected = min(pr_report.STAGE_CAP_SECONDS,
+                               pr_report.JOB_TIMEOUT_SECONDS - pr_report.RESERVE_SECONDS - elapsed)
+                self.assertAlmostEqual(captured["budget"], expected, delta=1)
+                self.assertEqual(report["budget"]["limited_by"], limit)
+                self.assertEqual(captured["workloads"], ["step-default"] if changed_suite else ["step-default", "observe"])
+                observe = report["performance"][1]
+                self.assertEqual(observe["termination"], "measurement_failure" if changed_suite else "not_started")
+                if changed_suite:
+                    self.assertEqual(observe["failure"], "workload definitions differ between base and PR")
+                self.assertEqual(captured["plan"]["order"], perf_stats.ORDER)
+
+    def test_workflow_timeout_matches_the_deadline_and_pr_runs_never_save_the_cache(self):
+        workflow = (pr_report.ROOT / ".github/workflows/pr-report.yml").read_text(encoding="utf-8")
+        measure = workflow.split("\n  measure:\n", 1)[1].split("\n  cache:\n", 1)[0]
+        self.assertIn(f"\n    timeout-minutes: {pr_report.JOB_TIMEOUT_SECONDS // 60}\n", measure)
+        steps = measure.split("\n      - ")
+        self.assertIn("PR_REPORT_JOB_START", steps[1], "the anchor must be the first step")
+        self.assertIn("save-if: false", measure)
+        self.assertIn("if: github.event_name == 'pull_request'", measure)
+        self.assertLess(measure.index("name: Upload comment data"), measure.index("name: Upload results"))
+
+
+class Clock:
+    def __init__(self):
+        self.now = 0.0
+
+    def perf_counter(self):
+        return self.now
+
+
+class Sampling(unittest.TestCase):
+    """perf_compare.sequential against scripted children (statistics contract §2 and §6)."""
+
+    PATTERN = [-1.1, .7, -.4, 1.4, -.8, .2, 1.0, -1.0, .5, -.3, 1.2, -.6, -.9, .4, -.2, 1.3, -.7, .1, .9, -1.2,
+               .6, -.5, 1.1, -.1, .3, -.8]
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.directory = Path(temporary.name)
+        self.binaries = {}
+        for label in ("baseline", "candidate"):
+            self.binaries[label] = self.directory / label
+            self.binaries[label].write_bytes(label.encode())
+        self.hashes = {label: digest(path) for label, path in self.binaries.items()}
+        self.clock = Clock()
+        self.calls = []
+
+    def run_sampler(self, workloads, behavior, deadline=1e9):
+        """behavior(case, label, pair_index, position) -> seconds, or an exception to raise."""
+        output = self.directory / f"out-{len(list(self.directory.iterdir()))}"
+        output.mkdir()
+        operations = {w.name: w.iterations for w in workloads}
+
+        def native(executable, case, iterations, stderr_path, profile=False, *, deadline=None):
+            label = Path(executable).name
+            # Attempt logs are named CASE-(warmup|INDEX)-LABEL-stderr.txt.
+            index = None if "-warmup-" in stderr_path.name else int(stderr_path.name.split("-")[-3])
+            position = sum(1 for c in self.calls if c[:2] == (case, index))
+            self.calls.append((case, index, label))
+            self.clock.now += 1
+            outcome = behavior(case, label, index, position)
+            if isinstance(outcome, BaseException):
+                raise outcome
+            if self.clock.now > deadline:
+                self.clock.now = deadline
+                raise TimeoutError("performance run deadline exceeded during native child")
+            return {"case": case, "exit_code": 0, "cpu_seconds": 0.015625,
+                    # The harness reports its internal operation name, not the catalog's label.
+                    "workload": {"kind": "report", "case": case, "mode": "timing", "operation": "internal_name",
+                                 "iterations": iterations,
+                                 "timing": {"wallSeconds": outcome, "operations": operations[case]}}}
+
+        with patch.object(perf_compare, "native", side_effect=native), \
+                patch.object(perf_compare, "time", SimpleNamespace(perf_counter=self.clock.perf_counter)), \
+                contextlib.redirect_stdout(io.StringIO()):
+            rows = perf_compare.sequential(self.binaries, self.hashes, workloads, output, deadline, {"plan": "test"})
+        return rows, output
+
+    def scripted(self, effects):
+        """Candidate time = factor * exp(noise * pattern); the first process of a pair runs 2% slower."""
+        def behavior(case, label, index, position):
+            factor, noise, fail_at = effects[case]
+            if index is not None and index == fail_at and label == "candidate":
+                return RuntimeError(f"{case} exited 101")
+            seconds = 1.0 if label == "baseline" or index is None else factor * math.exp(noise * self.PATTERN[index - 1])
+            return seconds * (1.02 if position == 0 else 1.0)
+        return behavior
+
+    def workloads(self, *names):
+        return catalog([row(name, iterations=1000) for name in names]).select(suite="ci")
+
+    def test_orders_warmups_stopping_and_failures(self):
+        workloads = self.workloads("fast", "same", "crash", "noisy")
+        rows, output = self.run_sampler(workloads, self.scripted({
+            "fast": (.8, .004, None), "same": (1.0, .03, None), "crash": (1.0, .01, 5), "noisy": (1.0, .1, None)}))
+        warmups = [(case, label) for case, index, label in self.calls if index is None]
+        self.assertEqual(warmups, [(w.name, label) for w in workloads for label in ("baseline", "candidate")])
+        self.assertEqual(self.calls[:len(warmups)], [(c, None, l) for c, l in warmups])
+        for case in ("fast", "same", "noisy"):
+            pairs = [c for c in self.calls if c[0] == case and c[1] is not None]
+            for index in range(1, len(pairs) // 2 + 1):
+                first = next(label for c, i, label in pairs if i == index)
+                self.assertEqual(first, "baseline" if perf_stats.ORDER[index - 1] == 1 else "candidate")
+        # Rounds visit active rows in catalog order.
+        self.assertEqual([c for c, i, _ in self.calls if i == 1][::2], ["fast", "same", "crash", "noisy"])
+        self.assertEqual([c for c, i, _ in self.calls if i == 9][::2], ["same", "noisy"])
+        fast, same, crash, noisy = (rows[name] for name in ("fast", "same", "crash", "noisy"))
+        self.assertEqual((fast["label"], fast["n_used"], fast["termination"]), ("Faster", 8, "resolved"))
+        self.assertEqual([look["label"] for look in same["history"]], ["Undecided", "Within"])
+        self.assertEqual((same["n_used"], same["n_complete"]), (12, 12))
+        self.assertEqual((crash["label"], crash["termination"], crash["n_complete"], crash["failure"]),
+                         ("Unavailable", "measurement_failure", 4, "candidate failed at pair 5"))
+        self.assertFalse([c for c in self.calls if c[0] == "crash" and (c[1] or 0) > 5])
+        self.assertEqual((noisy["label"], noisy["termination"], noisy["n_used"]), ("Undecided", "max_pairs", 26))
+        self.assertEqual([look["n"] for look in noisy["history"]], list(perf_stats.LOOKS))
+        # Every child attempt is retained; analysis uses only recorded pairs.
+        attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
+        self.assertEqual(len(attempts), len(self.calls))
+        self.assertEqual(sum(a["warmup"] for a in attempts), 8)
+        self.assertEqual([a["status"] for a in attempts if a["case"] == "crash" and a["pair_index"] == 5],
+                         ["ok", "failed"] if perf_stats.ORDER[4] == 1 else ["failed"])
+        pairs = [json.loads(line) for line in (output / "pairs.jsonl").read_text().splitlines()]
+        noisy_pairs = [{k: p[k] for k in perf_stats.FIELDS} for p in pairs if p["workload_id"] == "noisy"]
+        self.assertEqual(noisy["history"][-1], perf_stats.analyze(noisy_pairs))
+        self.assertTrue((output / "plan.json").is_file())
+        self.assertEqual(json.loads((output / "sequential.json").read_text())["fast"]["label"], "Faster")
+
+    def test_time_cap_keeps_the_last_completed_look(self):
+        workloads = self.workloads("first", "second")
+        behavior = self.scripted({"first": (1.0, .1, None), "second": (1.0, .1, None)})
+        # Each child takes one second: 4 warmup children, then 4 per round.
+        rows, output = self.run_sampler(workloads, behavior, deadline=4 + 4 * 10 + 1.5)
+        for name in ("first", "second"):
+            row = rows[name]
+            self.assertEqual((row["termination"], row["n_used"], row["last_look_n"], row["label"]),
+                             ("time_cap", 8, 8, row["history"][0]["label"]))
+        self.assertEqual((rows["first"]["n_complete"], rows["first"]["n_attempted"]), (10, 11))
+        self.assertEqual((rows["second"]["n_complete"], rows["second"]["n_attempted"]), (10, 10))
+        attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
+        self.assertEqual(attempts[-1]["status"], "incomplete_due_to_cap")
+        self.assertEqual(attempts[-1]["pair_index"], 11)
+
+    def test_no_child_starts_at_the_deadline_and_a_warmup_cap_leaves_rows_unstarted(self):
+        workloads = self.workloads("first", "second")
+        behavior = self.scripted({"first": (1.0, .1, None), "second": (1.0, .1, None)})
+        rows, _ = self.run_sampler(workloads, behavior, deadline=4 + 4 * 7)
+        self.assertEqual(len(self.calls), 4 + 4 * 7)
+        self.assertEqual([(r["termination"], r["label"], r["reason"]) for r in rows.values()],
+                         [("time_cap", "Unavailable", "insufficient_pairs")] * 2)
+        self.calls.clear()
+        self.clock.now = 0
+        rows, _ = self.run_sampler(workloads, behavior, deadline=2.5)
+        self.assertEqual([r["termination"] for r in rows.values()], ["not_started"] * 2)
+
+    def test_hung_children_invalid_records_and_changed_binaries_are_failures(self):
+        workloads = self.workloads("hung", "count")
+
+        def behavior(case, label, index, position):
+            if case == "hung" and index == 2:
+                return TimeoutError("child response deadline exceeded")
+            if case == "count" and index == 3 and label == "baseline":
+                return float("nan")
+            return 1.0 + .01 * (index or 0) * (label == "candidate")
+
+        rows, _ = self.run_sampler(workloads, behavior)
+        self.assertEqual((rows["hung"]["termination"], rows["hung"]["n_complete"]), ("measurement_failure", 1))
+        self.assertEqual((rows["count"]["termination"], rows["count"]["failure"]),
+                         ("measurement_failure", "baseline failed at pair 3"))
+
+        def corrupt(case, label, index, position):
+            if index == 8:
+                self.binaries["baseline"].write_bytes(b"changed")
+            return 1.0 + .001 * self.PATTERN[(index or 1) - 1] * (label == "candidate")
+
+        self.calls.clear()
+        rows, _ = self.run_sampler(self.workloads("one"), corrupt)
+        self.assertEqual((rows["one"]["label"], rows["one"]["failure"], len(rows["one"]["history"])),
+                         ("Unavailable", "benchmark executable changed during sampling", 1))
 
 
 if __name__ == "__main__":

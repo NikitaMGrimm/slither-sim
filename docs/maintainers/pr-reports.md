@@ -40,29 +40,20 @@ therefore see identical measurement code and evidence. Cargo lockfiles can diffe
 and their hashes are retained. Compilation failures make results unavailable.
 Snapshots, the input overlay, builds and identity records come from
 `tools/perf_build.py`, which [local comparisons](../performance.md#compare-a-change)
-also use. Both revisions reuse one run-owned Cargo target directory for dependencies.
-After baseline executables are copied and hashed, only the simulator package's
-release and dev build outputs are explicitly cleaned, forcing a fresh candidate
-build without recompiling compatible dependencies. A failed cleanup leaves
-candidate results unavailable.
+also use. Both revisions build in the checkout's Cargo target directory, which
+starts from a [dependency cache](#fixed-costs-and-the-dependency-cache). Before
+each revision builds, and after the previous revision's executables are copied
+and hashed, the simulator package's release and dev outputs are cleaned, so each
+revision compiles its own package without recompiling compatible dependencies.
+A failed cleanup leaves that revision's results unavailable.
 
 The performance table and state traces cover the `ci` suite of the PR harness's
 [workload catalog](../performance.md#workload-selection): the six legacy workloads plus
 selected steady-state scenarios, at most ten rows. Both builds must list the same
 plan; otherwise performance and trace results are unavailable. Adding a `ci`
-workload to the harness adds it here without a collector change.
-Three adjacent alternating pairs follow a warmup; raw results are retained.
-The displayed target/PR costs come from the pair with the median ratio, so they
-agree with the paired percentage; they are not separate medians of the costs.
-The six legacy rows show process CPU (user plus kernel time, including
-setup/teardown) for comparability with earlier reports; CPU counters are
-Windows-only, so they fall back to operation wall elsewhere. Scenario rows show
-the harness's operation wall time, which excludes placement and warmup: their
-untimed setup dominates process CPU and would dilute a change in the timed
-operation. Each row names its metric. Values are descriptive hosted-runner
-measurements. The 5% display band and consistent-direction rule are
-presentation heuristics, not a significance test or a production speed
-guarantee. Small or mixed shifts are inconclusive.
+workload to the harness adds it here without a collector change, up to the ten
+rows the error budget covers. Every row is timed by
+[operation wall time](#how-results-are-decided).
 
 The fidelity table exposes the existing duration-weighted turn residuals and
 speed-ramp residuals by source, with denominators, using the same recorded
@@ -78,12 +69,101 @@ The denominator includes every declared test in these two selected source files,
 including cases absent from both execution logs after an abort. The table marks
 those cases unavailable and labels the report incomplete.
 
+## How results are decided
+
+The method implements the frozen
+[statistics contract v1](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-pr-comparison-statistics/STATISTICS-CONTRACT.md);
+`tools/perf_stats.py` cites its sections, and the sampler is
+`perf_compare.sequential`.
+
+**Metric.** Every row uses operation wall time: the sum of the harness's
+monotonic operation intervals, excluding setup, placement, warmup, resets,
+output destruction and serialization. It is instrumented operation cost, not
+process or end-to-end latency. Process CPU stays in the raw results as a
+diagnostic only; Windows reports it in 15.625 ms steps.
+
+**Sampling.** One observation is an adjacent pair of fresh baseline and PR
+processes for one workload. Both sides follow one plan frozen before sampling
+(`performance/plan.json`): workload definition hash, seed, operation count,
+executable hashes, the order sequence and the deadline. A row whose workload
+definitions differ between the revisions is unavailable. Each workload first
+runs one discarded baseline-then-PR warmup pair. Rounds then visit the active
+rows in catalog order, one pair each, following a fixed sequence in which every
+two consecutive pairs contain one baseline-first and one PR-first pair.
+
+**Analysis.** A row is analyzed only after exactly 8, 12 and 26 pairs. With
+`d = log(PR time / base time)` per pair, a regression `d = mu + gamma * order`
+removes a constant first-run effect, and `mu ± t * s / sqrt(n)` is the interval,
+where `s` is the residual standard deviation and `t` the Student-t quantile at
+1 − 1/1200 with `n − 2` degrees of freedom. Change shows `exp(mu) − 1` with the
+interval's transformed ends, so the bracket is asymmetric; Base and PR are
+geometric means over the same pairs. Each interval's own coverage is 99.83%; it
+is not a per-row 95% interval.
+
+| Result | Meaning |
+| --- | --- |
+| 🟢 Faster | The whole interval is below −5% time. |
+| 🔴 Slower | The whole interval is above +5% time. |
+| ⚪ Within ±5% | The whole interval lies in the −5% to +5% band, ends included. |
+| 🟡 Undecided | Anything else, including numerically zero residual spread, which shows `[interval unavailable]`. Neither equality nor the absence of a regression is claimed. |
+| ⚠️ Unavailable | A failed or invalid measurement, mismatched plans, or no completed look. |
+
+The band is about time, not throughput: 10% less time is not exactly 10% more
+operations per second. Labels use unrounded interval ends, so a displayed end of
+exactly ±5.00% can coexist with a strict label.
+
+**Error bound.** Ten workloads with three looks give at most 30 intervals, each
+missing its true value with probability 1/600. By the union bound, all of them
+cover their true values with probability at least 95%, and any wrong Faster,
+Slower or Within claim in a report requires a miss. So the chance that a report
+contains any wrong claim is at most 5%, whatever the correlation between
+workloads. Stopping a resolved row and keeping the last look at a deadline only
+choose among these planned intervals. The bound is model-based: within each
+workload it assumes independent, normally distributed log-ratio errors with
+constant variance, and constant change and order effects over the run. Heavy
+tails, drift, serial dependence or changing effects can break it. It covers
+these two executables on this runner, not other machines, builds or later
+commits. Until a hosted-runner calibration has been run and reviewed, the
+comment says so.
+
+**Stopping and budget.** A Faster, Slower or Within row stops at once and keeps
+that look. An Undecided row continues to the next look and stops at 26 pairs. A
+crash, hang, invalid timing record, changed executable or numeric failure makes
+the row unavailable for the rest of the run; earlier looks stay in its raw
+history but are never displayed. The job has a 15-minute timeout. Its first step
+records a monotonic start time, and sampling stops at the earlier of 620 seconds
+after the stage starts (warmups included) or 14 minutes after job start, leaving
+60 seconds to write the report and upload artifacts. No child starts after the
+deadline; a child still running is killed and its pair is kept as an incomplete
+attempt. Each unfinished row then keeps its last completed look: 10 or 11 pairs
+report the 8-pair result, and fewer than 8 pairs are unavailable. A time-capped
+Undecided result is not a failure; the job stays advisory and outside required
+checks.
+
+The `performance/` artifact directory holds the frozen plan, every child attempt
+including warmups, failures and process CPU (`results.jsonl`), the complete
+pairs (`pairs.jsonl`) and each row's evaluated looks (`sequential.json`).
+`report.json` repeats the looks with phase times measured from job start.
+
+### Fixed costs and the dependency cache
+
+Builds, tests and traces take most of the job, so the workflow trims them
+without touching the measured binaries. A `push` to `main` runs only the
+`Dependency cache` job, which builds the release and test dependencies into a
+cache keyed by the lockfile, toolchain and Cargo environment, and skips the
+build when that cache already exists. PR runs restore it read-only before the
+collector starts and never save it, so one PR's build cannot reach another PR's
+measurement. The cache omits workspace packages, and Cargo rebuilds any
+dependency whose inputs changed. Dependencies compile with all four runner
+cores, and test builds keep only line tables for debug information. Cache
+restoration and every build, test and trace finish before the first warmup.
+
 ## Publishing and permissions
 
 The comment is updated in place, keyed by a hidden marker and bot author.
 It is generated automatically from the measurements, with no model call or
-agent byline. Colored status dots distinguish improvements, regressions and
-inconclusive changes; methodology and diagnostics are collapsed under Details.
+agent byline. Colored status dots mark the results described above;
+methodology and diagnostics are collapsed under Details.
 Before posting, the publisher checks the artifact's PR/repository/head/merge
 identity, current open PR head and target, and prior published run/attempt.
 The current target is resolved through the branch API; the PR's `base.sha` can
@@ -144,6 +224,7 @@ To check the reporting tools themselves:
 
 ```sh
 uv run --locked --only-group tools python -m unittest discover -s tools -p test_pr_report.py
+uv run --locked --only-group tools python -m unittest discover -s tools -p test_perf_stats.py
 cargo test --locked --example fidelity_metrics --test movement_turns --test physics
 ```
 
