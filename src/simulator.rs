@@ -1,4 +1,5 @@
 use crate::bounds_index::BoundsIndex;
+use crate::food_grid::{EaterGrid, FoodCache};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
@@ -299,6 +300,10 @@ pub struct Simulator {
     prey_outward: HashSet<u64>,
     prey_motion_clock: f64,
     radius_update_index: usize,
+    #[serde(skip)]
+    food_cache: FoodCache,
+    #[serde(skip)]
+    eater_grid: EaterGrid,
 }
 impl Simulator {
     /// Set ambient placement attempts per second, preserving fractional refill credit.
@@ -345,18 +350,27 @@ impl Simulator {
             prey_outward: HashSet::new(),
             prey_motion_clock: 0.0,
             radius_update_index: 0,
+            food_cache: FoodCache::default(),
+            eater_grid: EaterGrid::default(),
         };
         world.update_radius(0.0);
         world.food.reserve(world.config.food_count);
-        let mut occupied = world.config.ambient_food.enabled.then(HashMap::new);
+        world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
         // candidate is not retried, so crowded small worlds can start below it.
         for _ in 0..world.config.food_count {
             let f = world.new_food();
-            if admit_ambient_food(&f, &world.config.ambient_food, &mut occupied) {
+            if admit_ambient_food(
+                &f,
+                &world.config.ambient_food,
+                &mut world.food_cache,
+                &world.food,
+            ) {
+                world.food_cache.push(&f);
                 world.food.push(f);
             }
         }
+        world.food_cache.end();
         for _ in 0..world.config.prey.count {
             world.spawn_prey();
         }
@@ -665,9 +679,9 @@ impl Simulator {
             .map(|s| head_tip(s.head, s.heading, s.segments))
             .collect();
         let mut boundary_deaths = Vec::new();
-        // Construct only if an actual positive-size boost emission is attempted.
-        // Earlier admitted drops in this same step then share its capacity.
-        let mut boost_occupied: Option<HashMap<(i64, i64), usize>> = None;
+        // Every food edit from here to the refill is mirrored into the cache, so
+        // occupancy is compared with the food list at most once per step.
+        self.food_cache.begin();
         for &i in &alive {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
@@ -714,32 +728,14 @@ impl Simulator {
                         let y = tail.y + (self.random.next() - 0.5) * jitter;
                         let pellet = Self::pellet(Point { x, y }, size, Origin::Boost);
                         if c.emit_boost_food {
-                            let admitted = if c.boost_food.enabled {
-                                let occupied = boost_occupied.get_or_insert_with(|| {
-                                    let mut occupied = HashMap::<(i64, i64), usize>::new();
-                                    for food in &self.food {
-                                        *occupied
-                                            .entry(food_cell(
-                                                food.x,
-                                                food.y,
-                                                c.boost_food.cell_size,
-                                            ))
-                                            .or_default() += 1;
-                                    }
-                                    occupied
-                                });
-                                let count = occupied
-                                    .entry(food_cell(pellet.x, pellet.y, c.boost_food.cell_size))
-                                    .or_default();
-                                if *count >= c.boost_food.max_per_cell {
-                                    false
-                                } else {
-                                    *count += 1;
-                                    true
-                                }
-                            } else {
-                                true
-                            };
+                            // Earlier admitted drops in this same step share the capacity.
+                            let admitted = !c.boost_food.enabled
+                                || self.food_cache.has_room(
+                                    &self.food,
+                                    &pellet,
+                                    c.boost_food.cell_size,
+                                    c.boost_food.max_per_cell,
+                                );
                             if admitted {
                                 if let Some(events) = &mut self.food_spawn_events {
                                     events.push(FoodSpawnEvent {
@@ -747,6 +743,7 @@ impl Simulator {
                                         food: pellet.clone(),
                                     });
                                 }
+                                self.food_cache.push(&pellet);
                                 self.food.push(pellet);
                             }
                         }
@@ -923,20 +920,37 @@ impl Simulator {
             profile.death_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
         }
-        let eaters: Vec<(usize, Point, f64, Bounds)> = alive
-            .iter()
-            .filter(|&&i| self.snakes[i].alive)
-            .map(|&i| {
-                let s = &self.snakes[i];
-                let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                (i, center, radius, Bounds::between(center, center))
-            })
-            .collect();
+        // Without food there is nothing to index or eat.
+        let eaters: Vec<(usize, Point, f64, Bounds)> = if self.food.is_empty() {
+            Vec::new()
+        } else {
+            alive
+                .iter()
+                .filter(|&&i| self.snakes[i].alive)
+                .map(|&i| {
+                    let s = &self.snakes[i];
+                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                    (i, center, radius, Bounds::between(center, center))
+                })
+                .collect()
+        };
         // Index the few eater circles, then visit food in reverse order; ties go to the
         // nearest head, then the lexically smaller id.
         const CELL: f64 = 256.0;
-        let indexed =
-            self.config.food_index && eaters.len().saturating_mul(self.food.len()) >= 32000;
+        // The dense grid lists exactly the eaters whose cover holds a pellet's cell,
+        // so it agrees with both paths below. They remain for circles it cannot index.
+        // A grid much larger than the food list costs more to allocate than it saves.
+        let dense = self.config.food_index
+            && !eaters.is_empty()
+            && self.eater_grid.build(
+                eaters
+                    .iter()
+                    .map(|&(_, center, radius, _)| (center, radius)),
+                self.food.len().saturating_mul(4).max(4096),
+            );
+        let indexed = !dense
+            && self.config.food_index
+            && eaters.len().saturating_mul(self.food.len()) >= 32000;
         let groups = eaters.len().div_ceil(64);
         // Hash collisions add candidates only; they can never remove a real candidate.
         let bucket = |x: i64, y: i64| {
@@ -960,48 +974,67 @@ impl Simulator {
                 }
             }
         }
-        let mut indexed_candidates = Vec::with_capacity(eaters.len());
-        let mut eaten = vec![false; self.food.len()];
-        let mut any_eaten = false;
-        for (findex, f) in self.food.iter().enumerate().rev() {
-            let p = f.point();
-            let eater = if indexed {
-                indexed_candidates.clear();
-                let offset =
-                    bucket((p.x / CELL).floor() as i64, (p.y / CELL).floor() as i64) * groups;
-                for g in 0..groups {
-                    let mut mask = grid[offset + g];
-                    while mask != 0 {
-                        indexed_candidates.push(g * 64 + mask.trailing_zeros() as usize);
-                        mask &= mask - 1;
+        // Eating changes only mass, which no pickup test reads, so eaters are found
+        // first and then applied in the same reverse food order.
+        let mut hits = Vec::new();
+        if dense {
+            dense_hits::<PROFILE>(
+                &self.eater_grid,
+                &self.snakes,
+                &eaters,
+                &self.food,
+                &mut hits,
+                profile,
+            );
+        } else {
+            let mut indexed_candidates = Vec::with_capacity(eaters.len());
+            for (findex, f) in self.food.iter().enumerate().rev() {
+                let p = f.point();
+                let eater = if indexed {
+                    indexed_candidates.clear();
+                    let offset =
+                        bucket((p.x / CELL).floor() as i64, (p.y / CELL).floor() as i64) * groups;
+                    for g in 0..groups {
+                        let mut mask = grid[offset + g];
+                        while mask != 0 {
+                            indexed_candidates.push(g * 64 + mask.trailing_zeros() as usize);
+                            mask &= mask - 1;
+                        }
                     }
+                    find_eater::<PROFILE>(
+                        &self.snakes,
+                        p,
+                        indexed_candidates.iter().map(|&e| eaters[e]),
+                        profile,
+                    )
+                } else {
+                    find_eater::<PROFILE>(&self.snakes, p, eaters.iter().copied(), profile)
+                };
+                if let Some(i) = eater {
+                    hits.push((findex, i));
                 }
-                find_eater::<PROFILE>(
-                    &self.snakes,
-                    p,
-                    indexed_candidates.iter().map(|&e| eaters[e]),
-                    profile,
-                )
-            } else {
-                find_eater::<PROFILE>(&self.snakes, p, eaters.iter().copied(), profile)
-            };
-            if let Some(i) = eater {
-                if let Some(events) = &mut self.pickup_events {
-                    events.push(PickupEvent {
-                        eater: i,
-                        item: PickupItem::Food(f.clone()),
-                    });
-                }
-                let s = &mut self.snakes[i];
-                s.fam += f
-                    .size
-                    .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
-                Self::update_mass(s);
-                eaten[findex] = true;
-                any_eaten = true;
             }
         }
-        if any_eaten {
+        for &(findex, i) in &hits {
+            let f = &self.food[findex];
+            if let Some(events) = &mut self.pickup_events {
+                events.push(PickupEvent {
+                    eater: i,
+                    item: PickupItem::Food(f.clone()),
+                });
+            }
+            let s = &mut self.snakes[i];
+            s.fam += f
+                .size
+                .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
+            Self::update_mass(s);
+        }
+        if !hits.is_empty() {
+            let mut eaten = vec![false; self.food.len()];
+            for &(findex, _) in &hits {
+                eaten[findex] = true;
+            }
+            self.food_cache.remove(&eaten);
             let mut i = 0;
             self.food.retain(|_| {
                 let keep = !eaten[i];
@@ -1027,38 +1060,25 @@ impl Simulator {
             let interval = 1.0 / replenish;
             self.ambient_clock += dt;
             if self.ambient_clock + 1e-12 >= interval {
-                let mut ambient_food_count = self
-                    .food
-                    .iter()
-                    .filter(|f| f.origin == Some(Origin::Ambient))
-                    .count();
-                // Food can be edited externally. Rebuild once for this refill
-                // batch and include every origin in the shared cell occupancy.
-                let mut occupied =
-                    (self.config.ambient_food.enabled && ambient_food_count < target).then(|| {
-                        let mut occupied = HashMap::<(i64, i64), usize>::new();
-                        for food in &self.food {
-                            *occupied
-                                .entry(food_cell(
-                                    food.x,
-                                    food.y,
-                                    self.config.ambient_food.cell_size,
-                                ))
-                                .or_default() += 1;
-                        }
-                        occupied
-                    });
+                let mut ambient_food_count = self.food_cache.ambient(&self.food);
                 while self.ambient_clock + 1e-12 >= interval {
                     self.ambient_clock -= interval;
                     if ambient_food_count < target {
                         let f = self.new_food();
-                        if admit_ambient_food(&f, &self.config.ambient_food, &mut occupied) {
+                        // Cell occupancy includes every origin.
+                        if admit_ambient_food(
+                            &f,
+                            &self.config.ambient_food,
+                            &mut self.food_cache,
+                            &self.food,
+                        ) {
                             if let Some(events) = &mut self.food_spawn_events {
                                 events.push(FoodSpawnEvent {
                                     source: None,
                                     food: f.clone(),
                                 });
                             }
+                            self.food_cache.push(&f);
                             self.food.push(f);
                             ambient_food_count += 1;
                         }
@@ -1066,6 +1086,7 @@ impl Simulator {
                 }
             }
         }
+        self.food_cache.end();
         if PROFILE {
             profile.ambient_seconds += clock.unwrap().elapsed().as_secs_f64();
             profile.ticks += 1;
@@ -1357,17 +1378,11 @@ impl Simulator {
     fn death_food(&mut self, index: usize) -> usize {
         let s = &self.snakes[index];
         let density = &self.config.death_food;
-        // Current food is publicly mutable, and earlier deaths this same tick
-        // are already present. Rebuild occupancy for each death.
-        let mut occupied = density.enabled.then(|| {
-            let mut occupied = HashMap::<(i64, i64), usize>::new();
-            for food in &self.food {
-                *occupied
-                    .entry(food_cell(food.x, food.y, density.cell_size))
-                    .or_default() += 1;
-            }
-            occupied
-        });
+        // Occupancy counts current food, including earlier deaths this same tick.
+        let outside_step = !self.food_cache.is_open();
+        if outside_step {
+            self.food_cache.begin();
+        }
         let mut count = 0;
         // Ordered official packets favor independent coordinate offsets in a
         // square; 15 is an empirical half-width (see death-jitter-audit.md).
@@ -1382,13 +1397,15 @@ impl Simulator {
                 size,
                 Origin::Death,
             );
-            if let Some(occupied) = occupied.as_mut() {
-                let cell = food_cell(pellet.x, pellet.y, density.cell_size);
-                let occupancy = occupied.entry(cell).or_default();
-                if *occupancy >= density.max_per_cell {
-                    continue;
-                }
-                *occupancy += 1;
+            if density.enabled
+                && !self.food_cache.has_room(
+                    &self.food,
+                    &pellet,
+                    density.cell_size,
+                    density.max_per_cell,
+                )
+            {
+                continue;
             }
             if let Some(events) = &mut self.food_spawn_events {
                 events.push(FoodSpawnEvent {
@@ -1396,8 +1413,12 @@ impl Simulator {
                     food: pellet.clone(),
                 });
             }
+            self.food_cache.push(&pellet);
             self.food.push(pellet);
             count += 1;
+        }
+        if outside_step {
+            self.food_cache.end();
         }
         count
     }
@@ -1406,19 +1427,10 @@ impl Simulator {
 fn admit_ambient_food(
     food: &Food,
     config: &AmbientFoodConfig,
-    occupied: &mut Option<HashMap<(i64, i64), usize>>,
+    cache: &mut FoodCache,
+    current: &[Food],
 ) -> bool {
-    let Some(occupied) = occupied else {
-        return true;
-    };
-    let count = occupied
-        .entry(food_cell(food.x, food.y, config.cell_size))
-        .or_default();
-    if *count >= config.max_per_cell {
-        return false;
-    }
-    *count += 1;
-    true
+    !config.enabled || cache.has_room(current, food, config.cell_size, config.max_per_cell)
 }
 
 /// Whether `segment_distance(origin, a, b) > radius` follows from both ends lying
@@ -1433,8 +1445,24 @@ fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
         || (a.y < -limit && b.y < -limit)
 }
 
-fn food_cell(x: f64, y: f64, size: f64) -> (i64, i64) {
-    ((x / size).floor() as i64, (y / size).floor() as i64)
+/// Visit food in reverse, recording each pellet's eater.
+fn dense_hits<const PROFILE: bool>(
+    grid: &EaterGrid,
+    snakes: &[Snake],
+    eaters: &[(usize, Point, f64, Bounds)],
+    food: &[Food],
+    hits: &mut Vec<(usize, usize)>,
+    profile: &mut StepProfile,
+) {
+    for (findex, f) in food.iter().enumerate().rev() {
+        let p = f.point();
+        if let Some(candidates) = grid.candidates(p) {
+            let eater = find_eater::<PROFILE>(snakes, p, candidates.map(|e| eaters[e]), profile);
+            if let Some(i) = eater {
+                hits.push((findex, i));
+            }
+        }
+    }
 }
 
 fn find_eater<const PROFILE: bool>(
@@ -1471,6 +1499,7 @@ fn find_eater<const PROFILE: bool>(
 #[cfg(test)]
 mod death_food_density_tests {
     use super::*;
+    use crate::food_grid::food_cell;
 
     fn world(enabled: bool) -> Simulator {
         let mut world = Simulator::new(
