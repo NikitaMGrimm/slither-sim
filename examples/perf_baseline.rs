@@ -285,6 +285,18 @@ static REGISTRATIONS: &[Registration] = &[
         step: op(4000, 32, Full),
         bot: Some(op(130, 2, Full)),
     }),
+    Registration::Scenario(Scenario {
+        id: "official-128",
+        world: World::Official(128),
+        population: 128,
+        segments: (10, 80),
+        clearance: 0.0,
+        controller: Controller::Wander,
+        warmup_ticks: 2000,
+        epoch: EPOCH_OPERATIONS,
+        step: op(7000, 16, Full),
+        bot: Some(op(800, 3, Full)),
+    }),
     Registration::Client(ClientScenario {
         id: "client-official-100",
         world: World::Official(100),

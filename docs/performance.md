@@ -80,6 +80,19 @@ support. The [workload guide](performance-workloads.md) explains scenario
 lifecycles, validity checks, adding cases and the specialized observation/retained
 client harnesses. [PR comparisons](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md) use the same catalog.
 
+## Observation batches
+
+`-bot` rows time a step followed by `observe_all_into`; with `--profile`, the
+report's `observeSeconds` holds the observation interval alone. Observation
+changes have been measured on `official-128-bot` and `dome-proxy-96-bot`, sequentially
+and with `--parallel`, and on the frozen `observe-*` fixtures. Filtering food by
+each slot's vision dominates batch cost. A batch builds a food grid only with
+at least 8 observers, at least 32,768 observers × pellets and a vision radius
+from 0 to 2^40; smaller batches scan the food list directly. That grid is rebuilt
+for each such batch, with finer cells only when enough observers repay them. It
+is a small share of a sequential batch, but it runs before the parallel split. The [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md)
+has the phase breakdown and explains why the grid is not reused across steps.
+
 ## Controller transport
 
 The workloads above time only the Rust side. `tools/perf_transport.py` times what a
@@ -129,6 +142,9 @@ metadata or 120-second native-child limits. It is not an OS CPU/memory cap.
 Expiry prevents the next child or interrupts the current one. Cleanup kills the
 owned child, waits up to ten seconds and closes its pipes/error file. Flushed rows
 and diagnostics remain, and `failure.json` records the budget and elapsed time.
+Failed native attempts retain exact stdout bytes in a `.stdout.bin` file and
+failure metadata in `.failure.json`, beside that attempt's stderr file (replacing
+its `.txt` suffix). These diagnostics never count as completed measurements.
 An incomplete run has no comparison summary. Rehash retained binaries before a
 separate attempt; use a fresh output directory.
 

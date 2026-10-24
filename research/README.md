@@ -17,6 +17,7 @@ scientific rule or product adoption.
 | Performance | [Serve transport v1 → v2](performance/2026-10-24-transport-v2/REPORT.md) | Controller-side Python/Node costs on one shared Windows desktop; v2 replies 7–27× smaller and steps 3.5–13.6× faster in four synthetic scenarios; 16 worlds step 4× faster server-side on the default pool than with one thread. |
 | Performance | [Borrowed observation views](performance/2026-10-24-borrowed-views/REPORT.md) | Not adopted: borrowed fill-and-read batches were 14% faster in a dense sequential world but up to 17% slower in the official 128-snake world; attempt kept as a patch. |
 | Performance | [PR comparison statistics](performance/2026-10-24-pr-comparison-statistics/REPORT.md) | Adopted error-controlled comparison for PR reports: frozen contract and SciPy reference vectors; no new measurements, hosted calibration pending. |
+| Performance | [Observation food index](performance/2026-10-24-observation-food-index/REPORT.md) | Adopted finer food-grid cells with rows trimmed to the vision circle: observation 16–19% faster sequentially and 5–12% in parallel in two synthetic worlds; finer cells only when observers repay them; up to about 15% slower when food is concentrated in patches away from the observers; `observe-wide` and `observe-strip` about 2.5–4% slower; the step's food caches cannot serve observation and a persistent index was not prototyped. |
 
 ## Adding or updating material
 
