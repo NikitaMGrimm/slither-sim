@@ -1,6 +1,8 @@
+import contextlib
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,6 +11,24 @@ from unittest.mock import patch
 
 import release
 import release_automation as automation
+
+# Variables that point Git away from the working directory; hooks set GIT_DIR, for example.
+GIT_LOCATION = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_NAMESPACE")
+
+
+@contextlib.contextmanager
+def fixture_repository():
+    """A new temporary repository as `release.ROOT` that inherited Git variables cannot redirect."""
+    with (tempfile.TemporaryDirectory() as directory, patch.dict(os.environ),
+          patch.object(release, "ROOT", Path(directory))):
+        for name in GIT_LOCATION:
+            os.environ.pop(name, None)
+        subprocess.run(["git", "init", "--quiet"], cwd=directory, check=True)
+        git_dir = subprocess.check_output(["git", "rev-parse", "--absolute-git-dir"], cwd=directory, text=True)
+        if not os.path.samefile(git_dir.strip(), Path(directory) / ".git"):
+            raise AssertionError(f"fixture Git commands reached {git_dir.strip()}")
+        yield directory
 
 
 class AutomationTests(unittest.TestCase):
@@ -196,11 +216,10 @@ class AutomationTests(unittest.TestCase):
 
 class GitIntegrationTests(unittest.TestCase):
     def test_original_version_commit_and_metadata_validation_with_real_git_history(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(release, "ROOT", Path(directory)):
+        with fixture_repository() as directory:
             def git(*args):
                 return subprocess.check_output(["git", *args], cwd=directory, text=True).strip()
 
-            git("init", "--quiet")
             git("config", "user.name", "Test")
             git("config", "user.email", "test@example.invalid")
             root = Path(directory)
@@ -248,7 +267,7 @@ class GitIntegrationTests(unittest.TestCase):
                     self.assertIsNone(automation.manual_release_merge(base))
 
     def test_inherited_workspace_versions_move_with_the_root_package(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(release, "ROOT", Path(directory)):
+        with fixture_repository() as directory:
             root = Path(directory)
 
             def git(*args):
@@ -268,7 +287,6 @@ class GitIntegrationTests(unittest.TestCase):
                     for name, version in (("slither-sim", root_version), ("slither-sim-ffi", ffi_version),
                                           ("tool", tool_version)))
 
-            git("init", "--quiet")
             git("config", "user.name", "Test")
             git("config", "user.email", "test@example.invalid")
             manifest = ('[package]\nname = "slither-sim"\nversion.workspace = true\n'
