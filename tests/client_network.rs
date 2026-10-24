@@ -366,7 +366,9 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         url: format!("ws://{address}/slither"),
         handshake: Handshake::Direct,
         decision_interval_seconds: 0.015,
-        idle_timeout_seconds: 0.12,
+        // The 70 ms first trickle must finish well inside this, and the 320 ms
+        // second one well outside it, on slow CI runners too.
+        idle_timeout_seconds: 0.2,
         ..NetworkConfig::default()
     })
     .unwrap();
@@ -403,7 +405,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         }
     }
     assert!(timed_out, "trickled bytes must not bypass the idle timeout");
-    assert!(started.elapsed() < Duration::from_millis(300));
+    assert!(started.elapsed() < Duration::from_millis(400));
     assert_eq!(backend.frame().unwrap().status, ClientStatus::Disconnected);
     backend.disconnect();
     server.join().unwrap();

@@ -51,11 +51,12 @@ def commands(group):
                                           "libslither_sim_ffi.so"))
         wheels = str(target / "wheels")
         return [
+            # Build first with every job; the fidelity tests and smoke runs reuse it.
+            # maturin builds the Python extension below, with its interpreter.
+            ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
             [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"],
             [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py"],
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
-            # maturin builds the Python extension below, with its interpreter.
-            ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
             [sys.executable, "-B", "tools/perf_transport.py", "--binary", binary,
              "--scenarios", "small", "dense-64", "worlds-16", "--steps", "3", "--repeats", "1"],
             [sys.executable, "examples/bot.py", "--binary", binary, "--steps", "10"],

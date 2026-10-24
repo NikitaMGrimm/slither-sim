@@ -21,6 +21,10 @@ env:
   # apply its shared-machine default of 2.
   CARGO_BUILD_JOBS: 4
   RUST_TEST_THREADS: 4
+  # Panics keep file and line numbers; full debug info mostly costs link time
+  # and cache size, especially on Windows.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
 
 jobs:
   lint:

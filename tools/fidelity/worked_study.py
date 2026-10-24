@@ -17,6 +17,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -368,7 +369,7 @@ def git_identity():
 
 def build_executables():
     result = subprocess.run(
-        ["cargo", "build", "--locked", "-j", "2", "--quiet", "--bin", "slither-sim",
+        ["cargo", "build", "--locked", "-j", os.environ.get("CARGO_BUILD_JOBS", "2"), "--quiet", "--bin", "slither-sim",
          "--example", "fidelity_replay", "--message-format=json"],
         cwd=ROOT, capture_output=True, text=True, check=True)
     found = {}

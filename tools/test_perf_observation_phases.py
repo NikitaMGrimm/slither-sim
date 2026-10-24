@@ -75,7 +75,8 @@ class PreparationTests(unittest.TestCase):
         original, tree = phases.source_files(self.root, self.base)
         self.assertEqual(tree, self.tree)
         with tempfile.TemporaryDirectory() as temporary:
-            output = phases.prepare(self.root, self.base, Path(temporary) / "phase-prep")
+            # safe_output rejects symlinked ancestors, such as macOS's /var -> /private/var.
+            output = phases.prepare(self.root, self.base, Path(temporary).resolve() / "phase-prep")
             manifest = json.loads((output / "manifest.json").read_bytes())
             self.assertEqual(manifest["baseCommit"], self.base)
             self.assertEqual(manifest["baseTree"], self.tree)

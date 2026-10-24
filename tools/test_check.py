@@ -71,8 +71,9 @@ class CheckRunnerTests(unittest.TestCase):
 
     def test_tool_children_use_the_running_python_and_expanded_node_paths(self):
         commands = check.commands("tools")
-        self.assertEqual(commands[0][0], check.sys.executable)
-        node = commands[2]
+        self.assertEqual(commands[0][:2], ["cargo", "build"])
+        self.assertEqual(commands[1][0], check.sys.executable)
+        node = commands[3]
         self.assertGreater(len(node), 2)
         self.assertTrue(all("*" not in path for path in node))
 
