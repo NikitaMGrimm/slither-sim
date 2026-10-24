@@ -121,11 +121,114 @@ test('download exception concurrent with completion retracts an existing snapsho
 test('malformed successful terminal artifact retracts rather than promoting interim claims', async t => {
   const saved={run:100,attempt:1,sequence:1,state:'sampling',head,base,merge,plan:'d'.repeat(64)};
   const f=fixture(t,{previous:[{id:42,user:bot,body:`${marker}\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`}]});
-  const copy=fs.mkdtempSync(path.join(os.tmpdir(),'slither-invalid-'));
-  fs.writeFileSync(path.join(copy,'report.json'),'invalid JSON');
-  await publish.observe({...f.args,download:async()=>copy});
+  let clock=0, attempts=0;
+  await publish.observe({...f.args,now:()=>clock,sleep:async ms=>{clock+=ms;},download:async()=>{
+    attempts++;
+    const copy=fs.mkdtempSync(path.join(os.tmpdir(),'slither-invalid-'));
+    fs.writeFileSync(path.join(copy,'report.json'),'invalid JSON');
+    return copy;
+  }});
+  assert.equal(attempts,3);
+  assert.equal(clock,60000);
   assert.equal(f.calls.length,1);
   assert.match(f.calls[0][1].body,/terminal artifact download or validation failed/);
+});
+
+const provisional = () => ({run:100,attempt:1,sequence:1,state:'sampling',head,base,merge,plan:'d'.repeat(64)});
+const ownedComment = saved => ({id:42,user:bot,body:`${marker}\nFaster provisional claim\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`});
+
+test('withdrawal clears old claims after head changes, unmerged closure or target rewrite', async t => {
+  for (const options of [{liveHead:base},{prOverride:{state:'closed',merged:false}}, {liveBase:head,targetHistory:'diverged'}]) {
+    const f=fixture(t,{...options,runOverride:{conclusion:'cancelled'},previous:[ownedComment(provisional())]});
+    await publish.observe({...f.args,download:async()=>{throw Error('no artifact needed');}});
+    assert.equal(f.calls.length,1);
+    assert.match(f.calls[0][1].body,/claims are withdrawn/);
+    assert.doesNotMatch(f.calls[0][1].body,/Faster provisional claim/);
+  }
+});
+
+test('failed rerun withdraws only older provisional same-run/head attempts', async t => {
+  const f=fixture(t,{runOverride:{run_attempt:2,conclusion:'failure'},previous:[ownedComment(provisional())],artifacts:[]});
+  f.args.context.payload.workflow_run.run_attempt=2;
+  await publish.observe(f.args);
+  assert.equal(f.calls.length,1);
+  const saved=publish.savedComment({body:f.calls[0][1].body});
+  assert.equal(saved.attempt,2);
+  assert.equal(saved.withdrawn_attempt,1);
+  for (const saved of [{...provisional(),run:101},{...provisional(),attempt:2},
+    {...provisional(),state:'complete',sequence:5},{...provisional(),head:base}]) {
+    const other=fixture(t,{runOverride:{conclusion:'cancelled'},previous:[ownedComment(saved)]});
+    await publish.observe(other.args);
+    assert.equal(other.calls.length,0);
+  }
+});
+
+test('withdrawal re-reads bot ownership and preserves a newer result written during validation', async t => {
+  const previous=[ownedComment(provisional())];
+  const f=fixture(t,{runOverride:{conclusion:'cancelled'},previous});
+  const paginate=f.args.github.paginate;
+  let reads=0;
+  f.args.github.paginate=async(method,args)=>{
+    if(method===f.args.github.rest.issues.listComments && ++reads===2) {
+      previous[0]=ownedComment({...provisional(),run:101,state:'complete',sequence:5});
+    }
+    return paginate(method,args);
+  };
+  await publish.observe(f.args);
+  assert.equal(reads,2);
+  assert.equal(f.calls.length,0);
+  assert.equal(publish.savedComment(previous[0]).run,101);
+});
+
+test('successful completion never promotes progress to terminal; valid final recovers incomplete precedence', async t => {
+  const f=fixture(t,{reportOverride:{snapshot:progress(2),performance_plan_sha256:'d'.repeat(64)}});
+  await publish(f.args);
+  assert.equal(f.calls.length,0);
+  const report=JSON.parse(fs.readFileSync(path.join(f.directory,'report.json')));
+  report.snapshot={schema:'slither-pr-progress-v1',sequence:5,state:'complete'};
+  fs.writeFileSync(path.join(f.directory,'report.json'),JSON.stringify(report));
+  await publish(f.args);
+  assert.equal(f.calls.length,1);
+  const other=fixture(t,{previous:[ownedComment({...provisional(),state:'incomplete',sequence:5})]});
+  await publish(other.args);
+  assert.equal(other.calls.length,1);
+  assert.equal(publish.savedComment({body:other.calls[0][1].body}).state,'complete');
+});
+
+test('transient terminal download failure retries then publishes final without withdrawal', async t => {
+  const f=fixture(t,{previous:[ownedComment(provisional())]});
+  let clock=0, attempts=0;
+  await publish.observe({...f.args,now:()=>clock,sleep:async ms=>{clock+=ms;},download:async()=>{
+    if(++attempts===1)throw Error('transient artifact download');
+    const copy=fs.mkdtempSync(path.join(os.tmpdir(),'slither-retry-'));
+    for(const name of ['report.json','report.md'])fs.copyFileSync(path.join(f.directory,name),path.join(copy,name));
+    return copy;
+  }});
+  assert.equal(attempts,2);
+  assert.equal(clock,30000);
+  assert.equal(f.calls.length,1);
+  assert.equal(publish.savedComment({body:f.calls[0][1].body}).state,'complete');
+});
+
+test('completion during progress download is followed by the final artifact', async t => {
+  const f=fixture(t,{runOverride:{status:'in_progress',conclusion:null},reportOverride:{snapshot:progress(2),performance_plan_sha256:'d'.repeat(64)}});
+  const paginate=f.args.github.paginate;
+  let clock=0, downloads=0;
+  f.args.github.paginate=async(method,args)=>method===f.args.github.rest.actions.listWorkflowRunArtifacts
+    ? [{id:5,name:f.run.status==='completed'?'pr-report-comment-1':'pr-report-progress-1-2',size_in_bytes:100}]
+    : paginate(method,args);
+  await publish.observe({...f.args,now:()=>clock,sleep:async ms=>{clock+=ms;},download:async()=>{
+    const copy=fs.mkdtempSync(path.join(os.tmpdir(),'slither-complete-race-'));
+    const report=JSON.parse(fs.readFileSync(path.join(f.directory,'report.json')));
+    if(++downloads===2)report.snapshot={schema:'slither-pr-progress-v1',sequence:5,state:'complete'};
+    f.run.status='completed';f.run.conclusion='success';
+    fs.writeFileSync(path.join(copy,'report.json'),JSON.stringify(report));
+    fs.copyFileSync(path.join(f.directory,'report.md'),path.join(copy,'report.md'));
+    return copy;
+  }});
+  assert.equal(downloads,2);
+  assert.equal(f.calls.length,1);
+  assert.equal(publish.savedComment({body:f.calls[0][1].body}).state,'complete');
 });
 
 test('completion racing a progress publication is reconciled by the bounded observer', async t => {

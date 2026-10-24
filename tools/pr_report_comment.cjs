@@ -65,6 +65,7 @@ function supersedes(saved, next) {
     const a = saved[key] ?? (key === 'sequence' ? 5 : 0);
     if (a !== next[key]) return a > next[key];
   }
+  if (saved.state === 'incomplete' && next.state === 'complete') return false;
   return saved.state !== 'sampling' || next.state === 'sampling';
 }
 
@@ -82,6 +83,9 @@ async function publish({ github, context, core, directory, expectedSequence, una
       (snapshot.state === 'sampling' && !hash.test(report.performance_plan_sha256)) ||
       (expectedSequence !== undefined && snapshot.sequence !== expectedSequence)) throw new Error('Report identity, snapshot, marker or size does not match this PR run');
   if (snapshot.state === 'complete' && run.status !== 'completed') return;
+  // A progress artifact selected before successful completion is still interim.
+  // Leave terminal precedence for the final artifact or an explicit withdrawal.
+  if (snapshot.state === 'sampling' && run.status === 'completed' && run.conclusion === 'success') return;
   let associated = run.pull_requests || [];
   if (!associated.length) {
     associated = (await github.paginate(github.rest.pulls.list, { owner, repo, state: 'all', per_page: 100,
@@ -149,14 +153,14 @@ function headlines(rows) {
 
 async function observe({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now(), download = downloadReport }) {
   const deadline = now() + 31 * 60 * 1000;
-  let lastArtifact = null, completedPolls = 0;
+  let lastArtifact = null, completedPolls = 0, terminalFailures = 0;
   while (now() < deadline) {
     const run = await sourceRun(github, context);
     if (run.status === 'completed' && run.conclusion !== 'success') {
       await withdrawPrior({ github, context, core, run });
       return;
     }
-    let artifact;
+    let artifact, processedTerminal = false;
     try {
       artifact = await selectArtifact(github, context, run);
       const revision = `${artifact?.id}:${run.status}:${run.conclusion}`;
@@ -165,18 +169,24 @@ async function observe({ github, context, core, sleep = ms => new Promise(resolv
         try { await publish({ github, context, core, directory, expectedSequence: artifact.sequence }); }
         finally { fs.rmSync(directory, { recursive: true, force: true }); }
         lastArtifact = revision;
+        processedTerminal = artifact.sequence === 5;
+      } else if (artifact?.sequence === 5 && revision === lastArtifact) {
+        processedTerminal = true;
       }
     } catch (error) {
       core.warning(`Snapshot unavailable: ${error.message}`);
       const live = await sourceRun(github, context);
       if (live.status === 'completed') {
-        await withdrawPrior({ github, context, core, run: live, reason: 'terminal artifact download or validation failed' });
-        return;
+        if (live.conclusion !== 'success' || ++terminalFailures >= 3) {
+          await withdrawPrior({ github, context, core, run: live, reason: live.conclusion === 'success'
+            ? 'terminal artifact download or validation failed after three attempts' : `source run ${live.conclusion}` });
+          return;
+        }
       }
     }
     const current = await sourceRun(github, context);
     if (current.status === 'completed' && run.status === 'completed') {
-      if (artifact?.sequence === 5) return;
+      if (processedTerminal) return;
       if (++completedPolls >= 3) {
         await withdrawPrior({ github, context, core, run: current, reason: 'source completed without a terminal report' });
         return;
@@ -184,6 +194,9 @@ async function observe({ github, context, core, sleep = ms => new Promise(resolv
     }
     await sleep(30_000);
   }
+  const final = await sourceRun(github, context);
+  if (final.status === 'completed') await withdrawPrior({ github, context, core, run: final,
+    reason: 'observer deadline reached without a processed terminal report' });
   core.warning('Bounded observer ended; the completed event handles the terminal result');
 }
 
@@ -198,16 +211,34 @@ async function withdrawPrior({ github, context, core, run, reason }) {
   if (associated.length !== 1) return;
   const pr = associated[0].number;
   const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr, per_page: 100 });
-  const saved = savedComment(comments.find(c => bot(c) && c.body?.includes(marker)));
-  if (!saved || saved.run !== run.id || saved.attempt !== run.run_attempt || saved.head !== run.head_sha) return;
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-withdraw-'));
-  try {
-    fs.writeFileSync(path.join(directory, 'report.json'), JSON.stringify({ schema: 1,
-      repository: `${context.repo.owner}/${context.repo.repo}`, pr, head: saved.head, base: saved.base, merge: saved.merge,
-      run: run.id, attempt: run.run_attempt, performance_plan_sha256: saved.plan }));
-    fs.writeFileSync(path.join(directory, 'report.md'), `${marker}\n## Comparison\n`);
-    await publish({ github, context, core, directory, unavailableReason: reason || `source run ${run.conclusion}` });
-  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  const previous = comments.find(c => bot(c) && c.body?.includes(marker));
+  const originalBody = previous?.body, saved = savedComment(previous);
+  if (!saved || saved.state !== 'sampling' || saved.run !== run.id || saved.head !== run.head_sha ||
+      !Number.isSafeInteger(saved.attempt) || saved.attempt < 1 || saved.attempt > run.run_attempt ||
+      !Number.isInteger(saved.sequence) || saved.sequence < 1 || saved.sequence > 3 ||
+      !sha.test(saved.base) || !sha.test(saved.merge) || !hash.test(saved.plan)) return;
+  const { data: preview } = await github.rest.repos.getCommit({ ...context.repo, ref: saved.merge });
+  if (preview.parents.length !== 2 || preview.parents[0].sha !== saved.base || preview.parents[1].sha !== saved.head) {
+    throw new Error('Saved comparison parents do not match the source provenance');
+  }
+  const { data: currentPR } = await github.rest.pulls.get({ ...context.repo, pull_number: pr });
+  if (currentPR.base.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
+  // Withdrawal removes an owned provisional claim. The current head, closure
+  // and target history may have changed; those gates apply only to new claims.
+  const live = await sourceRun(github, context);
+  if (live.status !== 'completed' || live.run_attempt !== run.run_attempt || live.conclusion !== run.conclusion) return;
+  const latest = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr, per_page: 100 });
+  const owned = latest.find(c => bot(c) && c.body?.includes(marker));
+  if (owned?.id !== previous.id || owned.body !== originalBody) {
+    core.info('Skipping withdrawal superseded by a newer comment'); return;
+  }
+  const next = { ...saved, attempt: run.run_attempt, sequence: 5, state: 'incomplete',
+    withdrawn_attempt: saved.attempt, metrics: [], outcomes: [], errors: true };
+  const body = `${marker}\n## Comparison\n\n⚠️ **Incomplete comparison:** ${reason || 'source run ' + run.conclusion}. ` +
+    `All interim performance claims are withdrawn for measured head \`${saved.head}\` (attempt ${saved.attempt}). ` +
+    `[Run and retained attempts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}).\n` +
+    `\n<!-- slither-report-run: ${JSON.stringify(next)} -->\n`;
+  await github.rest.issues.updateComment({ ...context.repo, comment_id: previous.id, body });
 }
 
 async function downloadReport(github, context, artifact) {

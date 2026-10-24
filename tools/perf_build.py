@@ -100,16 +100,24 @@ class Job:
     def assign(self, process):
         self.check(self.kernel.AssignProcessToJobObject(self.handle, int(process._handle)))
 
-    def active(self):
+    def active(self, *, verify=False):
         info = self.accounting()
         ok = self.kernel.QueryInformationJobObject(self.handle, 1, self.ctypes.byref(info),
                                                    self.ctypes.sizeof(info), None)
+        if not ok and verify:
+            raise self.ctypes.WinError(self.ctypes.get_last_error())
         return info.ActiveProcesses if ok else 0
 
-    def terminate(self, wait_seconds=30):
-        self.kernel.TerminateJobObject(self.handle, 1)
+    def terminate(self, wait_seconds=30, *, verify=False):
+        ok = self.kernel.TerminateJobObject(self.handle, 1)
+        if not ok and verify:
+            raise self.ctypes.WinError(self.ctypes.get_last_error())
         deadline = time.perf_counter() + wait_seconds
-        while self.active() and time.perf_counter() < deadline:
+        while self.active(verify=verify):
+            if time.perf_counter() >= deadline:
+                if verify:
+                    raise TimeoutError("Windows process job still has active descendants")
+                break
             time.sleep(0.01)
 
     def close(self):
@@ -158,12 +166,16 @@ class ProcessTree:
     def wait(self, timeout):
         return self.process.wait(timeout=timeout)
 
-    def stop(self):
+    def stop(self, *, verify=False):
         """Kill every remaining member regardless of the leader's state, and reap the leader."""
         if self.job:
-            self.job.terminate()
-            self.job.close()
-            self.process.wait(timeout=30)
+            try:
+                # Diagnostic uploads need proof of quiescence, not best-effort
+                # cleanup: failed query/termination/timeout must prevent upload.
+                self.job.terminate(verify=verify)
+            finally:
+                self.job.close()
+                self.process.wait(timeout=30)
             return
         import signal
         try:
@@ -179,6 +191,9 @@ class ProcessTree:
             except (ProcessLookupError, PermissionError):
                 break
             time.sleep(0.01)
+        else:
+            if verify:
+                raise TimeoutError("Process group still has descendants after cleanup")
 
 
 def command(args, cwd, log, environment=None, timeout=600):

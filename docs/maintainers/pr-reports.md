@@ -224,6 +224,17 @@ claims using saved validated bot provenance even if its artifacts were deleted,
 expired or malformed. ZIP paths, symlinks, duplicate entries and oversized data
 are rejected; downloaded data is never executed.
 
+Withdrawal revalidates the saved bot-owned provisional identity and source
+provenance rather than requiring the old PR head to remain current. It can remove
+a cancelled run's claim after a head update, unmerged closure or target rewrite,
+including an older provisional attempt of the same rerun/head. It re-reads comment
+ownership immediately before editing and preserves newer or completed results.
+A successful run's progress artifact never consumes terminal precedence. Terminal
+artifact download/validation gets at most three attempts within the observer's
+existing deadline; failure/cancellation withdrawal is immediate. Exhausted artifact
+failures become incomplete, and a later valid final artifact can still replace
+that incomplete state for the same measured identity.
+
 Late results can update a merged PR when the source run, final PR head, original
 preview parents and actual merge identity still verify, with the measured base
 an ancestor of the actual merge. The publisher compares preview and actual trees
@@ -241,6 +252,19 @@ input/binary hashes, traces and logs remain in a separate artifact for 14 days,
 including partial output on failure. The publisher downloads only the small
 comment artifacts. Launcher logs/PID and partial diagnostics are included even
 when an upload step fails before the collector's finish step. Broken report generation remains visible as a failed job.
+
+The Windows measurement job keeps a supervisor owning the collector and all its
+descendants through a kill-on-close process Job. Before terminal/full uploads,
+an `always()` cleanup step requests stop and waits for explicit quiescence. The
+supervisor terminates and reaps descendants even after a normal collector exit,
+closes its evidence output, then acknowledges. Strict Job query, termination or
+timeout failure withholds that acknowledgment; upload is skipped if cleanup is
+unverified or the supervisor was killed. Successful cleanup does not turn a failed
+or interrupted comparison into success. This precedes the runner's later orphan
+cleanup: [cancellation signals target the active step](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation),
+and [`always()` can still run uploads after cancellation](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#always).
+Real synthetic process-tree tests cover local cleanup; hosted cancellation has
+not been exercised.
 Full-state trace archives use gzip level 1 to reduce untimed compression work;
 parity still hashes every uncompressed byte. Archive sizes can therefore grow.
 

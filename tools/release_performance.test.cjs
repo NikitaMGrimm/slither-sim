@@ -39,6 +39,10 @@ test('bot-generated release refresh updates only its separately owned comment an
   assert.match(calls[0].body,/Failed\/incomplete/);
   assert.doesNotMatch(calls[0].body,/release-plz .*compatible/);
   target.head.sha=head;
+  const originalPaginate=github.paginate;
+  github.paginate=async(method,args)=>method===github.rest.issues.listComments && args.issue_number===27
+    ? [comment({state:'complete',outcomes:[{case:'step-default',label:'Within'}]})]
+    : originalPaginate(method,args);
   const original=github.rest.pulls.get;
   github.rest.pulls.get=async()=>({data:{...(await original()).data,head:{...target.head,sha:base}}});
   await release.summarize(args);

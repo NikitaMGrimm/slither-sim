@@ -193,12 +193,17 @@ def sequential(binaries, hashes, workloads, output, deadline, plan, *, checkpoin
     def stop(name, termination, failure=None):
         rows[name].update(termination=termination, failure=failure)
 
+    corrupted = False
+
     def summary():
-        corrupted = hashes != {key: digest(path) for key, path in binaries.items()}
+        nonlocal corrupted
+        corrupted = corrupted or hashes != {key: digest(path) for key, path in binaries.items()}
+        if corrupted:
+            for name in rows:
+                stop(name, "measurement_failure", "benchmark executable changed during sampling")
+            active.clear()
         return {name: {**perf_stats.final(
-                    row["history"], len(row["pairs"]),
-                    "measurement_failure" if corrupted else row["termination"] or "sampling",
-                    "benchmark executable changed during sampling" if corrupted else row["failure"]),
+                    row["history"], len(row["pairs"]), row["termination"] or "sampling", row["failure"]),
                        "n_attempted": row["attempted"]} for name, row in rows.items()}
 
     try:
@@ -263,6 +268,8 @@ def sequential(binaries, hashes, workloads, output, deadline, plan, *, checkpoin
                 # artifact upload; no measurement child runs during that pause.
                 if checkpoint is not None and round_index in perf_stats.LOOKS:
                     checkpoint(summary(), deadline)
+                    if corrupted:
+                        break
         # Deadline: rows never attempted (including after a capped warmup) did not start.
         for workload in active:
             stop(workload.name, "time_cap" if rows[workload.name]["attempted"] else "not_started")
