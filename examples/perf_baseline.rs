@@ -573,6 +573,7 @@ impl Meter {
         json!({
             "scope": "sum of operation intervals; setup, controls, reset, output drop and serialization excluded",
             "wallSeconds": wall_seconds,
+            "operations": self.seconds.len(),
             "operationsPerSecond": if wall_seconds > 0.0 { Some(self.seconds.len() as f64 / wall_seconds) } else { None },
             "latencySeconds": {"p50": percentile(50), "p95": percentile(95), "p99": percentile(99), "max": self.seconds.last()},
         })
