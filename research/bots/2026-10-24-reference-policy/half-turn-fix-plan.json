@@ -1,0 +1,19 @@
+{
+  "reason": "Correct projection to execute the quantized target through physics::advance; do not refit qualification gates",
+  "previousHead": "c93a4807ada31208a97fc3df1cf6448ec35e519e",
+  "originalPlanSha256": "3861975d208abad66d38b315fed5954b0ef22bc37b498ff31a231e1d414cae79",
+  "fixedPolicySha256": "011cd24744da399910eb7f2dd325652849e81297a8c9336586fffbe788605a1b",
+  "thresholds": {"survival": 0.8, "food_value": 0.55},
+  "thresholdProvenance": "Original c93a480 calibration; frozen.json and results.json remain historical and unchanged",
+  "regressionSeeds": [41001, 41024],
+  "regressionStatus": "Reused original validation seeds, not fresh held-out evidence",
+  "freshValidationSeeds": [51001, 51024],
+  "freshValidationStatus": "Frozen after the source correction and before collecting either follow-up pack; no policy or gate retuning",
+  "method": "Original plan.json: 16 agents, official(16), 180 seconds, no respawn, 6 ticks/decision/broadcast, zero processing delay, rotations 0 and 5, same reference/control counts and seed-block bootstrap",
+  "replay": "Repeat seed 51001, both rotations, byte-identical outputs required",
+  "cost": "Original plan.json: seed 7; 4, 16, 64, 128 snakes; 240 corpus steps sampled every 15; 3 repeats of 200000 decisions",
+  "runtimeProbe": {"seed": 31001, "worlds": 2, "secondsPerWorld": 180, "elapsedSeconds": 3.677144500077702},
+  "estimatedFullPacksElapsedSeconds": 177,
+  "runtimeLimitSecondsPerPack": 600,
+  "resources": "Windows shared desktop, one logical CPU (affinity mask 4), no cloud, process-tree cleanup on timeout"
+}

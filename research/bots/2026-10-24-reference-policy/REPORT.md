@@ -62,10 +62,13 @@ both lower endpoints of 10,000-resample seed-block bootstrap 95% intervals for
 mean paired ratios to clear their frozen thresholds. No per-snake/decision
 pseudoreplication, validation retuning or epsilon for zero reference metrics.
 
-## Results
+## Initial results at c93a480 (historical)
 
-**The reference passes this portable cohort qualification; all four negative
-controls fail.** The 48 calibration worlds and 48 fresh validation worlds are
+The initial reference passed this portable cohort qualification; all four negative
+controls failed. A later half-turn projection defect invalidated its safety
+prediction; the original results and source hashes below are preserved, not
+relabelled as evidence for the corrected policy. Current results follow below.
+The 48 calibration worlds and 48 fresh validation worlds are
 all retained. Their nominal 180 s horizon is 25,714 ticks (179.998 s).
 
 Calibration reference/reference p05 ratios were **0.82648 survival** and
@@ -130,6 +133,69 @@ Base `a019c2b3f63f2e555d2a71984392dfc9b222e2b6`, plus the exact kernel/adapter/
 harness/plan/analyzer hashes recorded there, identifies the measured source
 while this PR's documentation/results were still being written.
 
+## Half-turn correction
+
+The original modular angle wrap mapped +pi to -pi while executed motion used
+`physics::advance`'s trigonometric turn direction. It also projected the raw
+heading rather than the quantized command. In a synthetic stationary-head hazard,
+this could score a clear clockwise escape but execute the opposite turn and die.
+The correction projects `physics::quantize_heading(wanted)` through the existing
+`physics::advance`. The returned action remains the original command, avoiding
+another quantization of a grid-edge float. No simulator mechanics or contracts
+change, and the policy remains stateless, non-boosting and allocation-free.
+
+The new regression executes the policy every six physics ticks for 52 ticks
+(0.364 s). It covers the exact reported heading-zero geometry plus nearby
+heading-bin offsets, six rotations and the 0/2pi seam: 30 cases. A second test
+uses the actual protocol-19 action encoder and `physics::advance`, comparing the
+encoded command's motion with `Simulator::step`; neither test copies the policy
+predictor. Both tests fail on the original source and pass after the correction.
+
+[`half-turn-fix-plan.json`](half-turn-fix-plan.json) froze the corrected kernel
+hash and fresh seeds before collecting the follow-up. The original **0.80
+survival / 0.55 food** gates were retained; calibration was not rerun or refitted.
+Seeds 41001–41024 were rerun only as reused regression evidence. Fresh seeds
+51001–51024 use the same two rotations, populations, timing, controls and
+seed-block bootstrap as the original plan. All 96 follow-up worlds are retained.
+
+Both packs pass reference self-comparison and reject all four negative controls.
+The reused pack's lower confidence bounds are 0.964 survival and 0.917 food.
+The independent fresh pack gives:
+
+| Fresh validation cohort | Survival ratio, mean [bootstrap 95% interval] | Food ratio, mean [bootstrap 95% interval] | Qualified |
+| --- | --- | --- | --- |
+| Reference/reference | 0.991 [0.960, 1.021] | 1.036 [0.985, 1.088] | Yes |
+| Greedy | 0.601 [0.533, 0.669] | 0.223 [0.177, 0.275] | No |
+| Circle | 0.871 [0.812, 0.930] | 0.021 [0.018, 0.023] | No |
+| Idle | 0.070 [0.065, 0.074] | 0.031 [0.028, 0.033] | No |
+| Suicide | 0.047 [0.047, 0.048] | 0.015 [0.014, 0.016] | No |
+
+The seed-51001 replay matches both fresh worlds byte-for-byte. A two-world
+runtime probe took 3.677 s, predicting about 177 s for the two complete packs;
+actual pack times were 106.08 and 70.91 s. Each had a 600 s process-tree timeout.
+The original executable and raw attempts remain outside Git under the same study
+directory, with the correction in its `half-turn-fix/` subdirectory.
+
+Corrected decision costs, on the same Windows/Ryzen/MSVC environment and original
+cost workload, after the full Rust/tools checks finished:
+
+| Initial snakes | Frozen frames | CPU µs/decision, median [min, max] | Elapsed µs/decision, median |
+| ---: | ---: | ---: | ---: |
+| 4 | 60 | 6.25 [6.02, 6.25] | 6.22 |
+| 16 | 240 | 10.23 [10.16, 10.23] | 10.30 |
+| 64 | 954 | 10.86 [10.86, 10.94] | 11.09 |
+| 128 | 1,915 | 12.19 [12.19, 12.27] | 12.40 |
+
+One logical CPU (affinity mask 4) is inherited from the launcher and verified on
+the job's child process. All three repeats are kept. Corpus trajectories changed
+with the policy, so comparison with the historical table is not a paired speedup
+or regression estimate. Costs still exclude simulator/decoder/setup/JSON work.
+Source, binary and raw-data hashes and both packs' full selected statistics are
+in [`half-turn-fix-results.json`](half-turn-fix-results.json). These measurements
+are **pre-main-integration**: parent c93a480 plus the frozen corrected kernel
+`011cd24744da399910eb7f2dd325652849e81297a8c9336586fffbe788605a1b`, executable
+`4dd345199ec72fd31258927db4fad7b8698b1ff21d6f8c03c6efc2a806ad5df5`.
+
 ## Verification and limits
 
 Focused deterministic tests cover food reselection/turn cost/ties, wall/body/head
@@ -159,6 +225,9 @@ players/server bots; no AWS resources were used.
 
 ## Reproduction and evidence
 
+The following reproduces the **historical c93a480 attempt**, including its gate
+calibration. Do not use it to refit gates for the corrected policy.
+
 ```sh
 cargo test --locked --test reference --test client_reference
 cargo build --release --locked --example reference_study
@@ -169,6 +238,23 @@ uv run --locked --only-group tools python research/bots/2026-10-24-reference-pol
 reference_study matches 41001 1 180 > replay.jsonl
 reference_study cost 16 200000
 ```
+
+For the corrected policy, keep the existing gates and run fresh output paths:
+
+```sh
+cargo test --locked --test reference --test client_reference --test reference_half_turn
+reference_study matches 41001 24 180 > regression.jsonl
+reference_study matches 51001 24 180 > fresh-validation.jsonl
+reference_study matches 51001 1 180 > replay.jsonl
+# Write cost-4.jsonl, cost-16.jsonl, cost-64.jsonl, cost-128.jsonl:
+reference_study cost 16 200000
+```
+
+`half_turn_fix.py RAW_DIRECTORY OUTPUT_JSON` reuses `analyze.py`'s seed-block
+statistics without recalibration and verifies source/plan hashes, per-run identity
+files and replay. The Windows launcher and full raw runs are local-only alongside
+the earlier evidence; its identity files bind command, elapsed time, affinity and
+policy/executable hashes.
 
 Use the built `target/release/examples/reference_study` executable (`.exe` on
 Windows); pin to one logical CPU with the OS launcher. Fresh output paths are

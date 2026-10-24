@@ -1,0 +1,367 @@
+{
+  "dataOrigin": "local-simulator",
+  "contract": "slither-client-v2",
+  "originalResultsSha256": "3857cf2de1f76510f6ecc8df3463e3f802cf742e239f4920d71fb739020db101",
+  "amendmentPlanSha256": "36eceaab5e1d393c7814e63306fcf1156269a503781bc5059d97c89ac0214c86",
+  "sourceSha256": {
+    "src/reference.rs": "011cd24744da399910eb7f2dd325652849e81297a8c9336586fffbe788605a1b",
+    "src/client/mod.rs": "cf5f92bc6efb645c8c17e16d3baed3629cb3dbedfd8637ec91539886803e53bb",
+    "examples/reference_study.rs": "8acd7ac444077d53f04ac9d79c8e89c5731875c01f832af6cf781aa1dd5b3299",
+    "tests/reference_half_turn.rs": "f159667cfaa87f243cc1bae680b0b2ef1a6decb3ac13f2ab3f14ce51af6f46dd"
+  },
+  "analysisSha256": "7aed350c5fc91c564f9ce252b0b73732e8b759c3c65734deab4cd8b624116728",
+  "thresholds": {
+    "survival": 0.8,
+    "food_value": 0.55
+  },
+  "packs": {
+    "regression": {
+      "seeds": [
+        41001,
+        41002,
+        41003,
+        41004,
+        41005,
+        41006,
+        41007,
+        41008,
+        41009,
+        41010,
+        41011,
+        41012,
+        41013,
+        41014,
+        41015,
+        41016,
+        41017,
+        41018,
+        41019,
+        41020,
+        41021,
+        41022,
+        41023,
+        41024
+      ],
+      "status": "reused regression seeds",
+      "statistics": {
+        "reference-control": {
+          "survival": {
+            "mean": 1.0053379188337492,
+            "p05": 0.8450901053075598,
+            "p95": 1.1672356462229214,
+            "ci95": [
+              0.9642961608697121,
+              1.045952242090653
+            ]
+          },
+          "food_value": {
+            "mean": 0.9810481484874563,
+            "p05": 0.7479115460754746,
+            "p95": 1.2790208750679066,
+            "ci95": [
+              0.9169776655271527,
+              1.0476724829051933
+            ]
+          }
+        },
+        "greedy": {
+          "survival": {
+            "mean": 0.6317663734113809,
+            "p05": 0.36829535213109904,
+            "p95": 1.0175187833545873,
+            "ci95": [
+              0.5451263954448475,
+              0.7230990695175077
+            ]
+          },
+          "food_value": {
+            "mean": 0.22397268808370732,
+            "p05": 0.10074095175189912,
+            "p95": 0.4449310957799039,
+            "ci95": [
+              0.18133843087343246,
+              0.26883570577644367
+            ]
+          }
+        },
+        "circle": {
+          "survival": {
+            "mean": 0.9437341301396948,
+            "p05": 0.7159094998851809,
+            "p95": 1.1881180901275512,
+            "ci95": [
+              0.8786929847261907,
+              1.0087954216938932
+            ]
+          },
+          "food_value": {
+            "mean": 0.02108284139027554,
+            "p05": 0.015146606727790267,
+            "p95": 0.029868509529899293,
+            "ci95": [
+              0.01920923230068713,
+              0.023131804943294046
+            ]
+          }
+        },
+        "idle": {
+          "survival": {
+            "mean": 0.0687562782657029,
+            "p05": 0.05360043661418548,
+            "p95": 0.08555618809992967,
+            "ci95": [
+              0.06432131536487012,
+              0.07324552545275796
+            ]
+          },
+          "food_value": {
+            "mean": 0.02939524602014074,
+            "p05": 0.022010416864238755,
+            "p95": 0.03637584468347221,
+            "ci95": [
+              0.02726519364246845,
+              0.0315956620121387
+            ]
+          }
+        },
+        "suicide": {
+          "survival": {
+            "mean": 0.04784999361899602,
+            "p05": 0.04445831539180891,
+            "p95": 0.05308809536858026,
+            "ci95": [
+              0.046821999658656514,
+              0.04894449024241541
+            ]
+          },
+          "food_value": {
+            "mean": 0.014091584896710703,
+            "p05": 0.011250741792261414,
+            "p95": 0.017665721948341873,
+            "ci95": [
+              0.013213553770226606,
+              0.015057241994015765
+            ]
+          }
+        }
+      },
+      "qualified": {
+        "reference-control": true,
+        "greedy": false,
+        "circle": false,
+        "idle": false,
+        "suicide": false
+      }
+    },
+    "fresh-validation": {
+      "seeds": [
+        51001,
+        51002,
+        51003,
+        51004,
+        51005,
+        51006,
+        51007,
+        51008,
+        51009,
+        51010,
+        51011,
+        51012,
+        51013,
+        51014,
+        51015,
+        51016,
+        51017,
+        51018,
+        51019,
+        51020,
+        51021,
+        51022,
+        51023,
+        51024
+      ],
+      "status": "fresh held-out seeds",
+      "statistics": {
+        "reference-control": {
+          "survival": {
+            "mean": 0.9905727730358398,
+            "p05": 0.8846258060958309,
+            "p95": 1.0824681549240134,
+            "ci95": [
+              0.960524684354033,
+              1.0206218719027043
+            ]
+          },
+          "food_value": {
+            "mean": 1.035559699400606,
+            "p05": 0.8558108884969535,
+            "p95": 1.2159397745025147,
+            "ci95": [
+              0.9848650086696434,
+              1.0882482130047988
+            ]
+          }
+        },
+        "greedy": {
+          "survival": {
+            "mean": 0.6011215234160497,
+            "p05": 0.31837540673912845,
+            "p95": 0.8538747599368124,
+            "ci95": [
+              0.5325297206433476,
+              0.669470450939483
+            ]
+          },
+          "food_value": {
+            "mean": 0.22320011092378023,
+            "p05": 0.07290668003670445,
+            "p95": 0.47300659347531393,
+            "ci95": [
+              0.17702099381473357,
+              0.2749439088742915
+            ]
+          }
+        },
+        "circle": {
+          "survival": {
+            "mean": 0.8707654143548395,
+            "p05": 0.6414890498630841,
+            "p95": 1.0677413291164934,
+            "ci95": [
+              0.8119508738082847,
+              0.930189439901512
+            ]
+          },
+          "food_value": {
+            "mean": 0.020660434527375173,
+            "p05": 0.011314374411786766,
+            "p95": 0.029714618922789426,
+            "ci95": [
+              0.01843668813853791,
+              0.022890696311136043
+            ]
+          }
+        },
+        "idle": {
+          "survival": {
+            "mean": 0.06959788196876986,
+            "p05": 0.04884774265735322,
+            "p95": 0.08475455998872389,
+            "ci95": [
+              0.06513345384569882,
+              0.07397710511592692
+            ]
+          },
+          "food_value": {
+            "mean": 0.030643375727839053,
+            "p05": 0.019430053464465392,
+            "p95": 0.03889423876386257,
+            "ci95": [
+              0.02799257388887708,
+              0.033428084611090515
+            ]
+          }
+        },
+        "suicide": {
+          "survival": {
+            "mean": 0.04725714960512247,
+            "p05": 0.044650108621765286,
+            "p95": 0.0505554901110533,
+            "ci95": [
+              0.04648864186281056,
+              0.04802868923109805
+            ]
+          },
+          "food_value": {
+            "mean": 0.014717203282248141,
+            "p05": 0.011356455496222396,
+            "p95": 0.01756218526996224,
+            "ci95": [
+              0.013700481383360483,
+              0.015824402535969014
+            ]
+          }
+        }
+      },
+      "qualified": {
+        "reference-control": true,
+        "greedy": false,
+        "circle": false,
+        "idle": false,
+        "suicide": false
+      }
+    }
+  },
+  "binarySha256": "4dd345199ec72fd31258927db4fad7b8698b1ff21d6f8c03c6efc2a806ad5df5",
+  "replayByteIdentical": true,
+  "cost": [
+    {
+      "agents": 4,
+      "frames": 60,
+      "cpuMedian": 6.25,
+      "cpuMin": 6.015625,
+      "cpuMax": 6.25,
+      "wallMedian": 6.2240495
+    },
+    {
+      "agents": 16,
+      "frames": 240,
+      "cpuMedian": 10.234375,
+      "cpuMin": 10.15625,
+      "cpuMax": 10.234375,
+      "wallMedian": 10.304687
+    },
+    {
+      "agents": 64,
+      "frames": 954,
+      "cpuMedian": 10.859375,
+      "cpuMin": 10.859375,
+      "cpuMax": 10.9375,
+      "wallMedian": 11.0924085
+    },
+    {
+      "agents": 128,
+      "frames": 1915,
+      "cpuMedian": 12.1875,
+      "cpuMin": 12.1875,
+      "cpuMax": 12.265625,
+      "wallMedian": 12.398412999999998
+    }
+  ],
+  "environment": {
+    "os": "Windows 11 Pro 10.0.26200",
+    "cpu": "AMD Ryzen 7 9800X3D",
+    "logical_processors": 16,
+    "affinity_mask": 4,
+    "toolchain": "rustc 1.99.0 x86_64-pc-windows-msvc, LLVM 23.1.1",
+    "profile": "release, thin LTO, codegen-units=1, default features",
+    "isolation": "shared Windows desktop; one logical CPU inherited from the launcher; Rust/tools checks finished before cost runs"
+  },
+  "rawAccess": "local-only: C:/Users/Nikita/.t3/scratch/bot-capacity-design-20261024/reference-policy/half-turn-fix/raw",
+  "rawSha256": {
+    "baseline-regression.log": "75bf6d53ee7800b90a4f42eeea0562e07bc9bcc9dc1b9e934a41e84a8b46e744",
+    "build.log": "10ed751c9fbb79cdaf73c0768e63f567c82e5a2f4e55692f81b83c385f7d3042",
+    "cost-128-identity.json": "e493b4bab08240c9807abfd983b61d2d64c7a908939390ded07b56858926e933",
+    "cost-128.jsonl": "bb7acf8df173210d1dc527dd9713dc393ac54952810711f1d02f73531d9aac5d",
+    "cost-16-identity.json": "612dd87d9656ce19e330fdca5bcf86f226f48d6336ff7459953b1722e57f0198",
+    "cost-16.jsonl": "6fff9d0b73d3c52006b24ecc893c3bf57729003882caea2b52acd1ab406c746a",
+    "cost-4-identity.json": "377ab5fb5fb3f4ff255f16a545ec48f8f1480031f09637bc5c5744f3cbf9a643",
+    "cost-4.jsonl": "230bb5bfd15eb4ef5be18dbe07bea1271db6b932450920c969744192f63dee61",
+    "cost-64-identity.json": "ca0fac6bcbd2783ddac3e366842c85cde51eb7a4f5a5046cafe00cce4a257524",
+    "cost-64.jsonl": "64e8f6bce91782f995f6aa830143c143a1512e7b5f803526c5335bdb072e9a76",
+    "focused-final.log": "5f80e254af1a7c8a200a35f3dc70f4a289da6cb7de89f536b40f257e1c19fd38",
+    "focused-fixed.log": "e4277e0d1c8e5eda8242ce88748dcb1b85de66f46789f61f112841565f65dac8",
+    "fresh-validation-identity.json": "23a2337c5239d3fd1c084b9dc7bbbc9be61cb90ec77e1ef72a5d919dfc6d5da9",
+    "fresh-validation.jsonl": "8b67af0fc1a777e49ccffe1d7ff8f5e456fe4e3f726c0583803f8426c1fa3b1b",
+    "regression-identity.json": "c17f1998709a718fcd17103fa2e863d5e4b205e190ac78a63a2a699a31b7e427",
+    "regression.jsonl": "7fe06c8b1d992fe9cd5869a1150fd27b36341ad3a378bf59d614c3b3949e09b1",
+    "replay-identity.json": "a0c3fc580ef6e03ad695af16fa48b27e52f0c40962ca3df45dd69be439e06318",
+    "replay.jsonl": "7fe62178764badcb74ed21052d00f66a12a688486fe6e84fcd4189694e2ea208",
+    "rust-checks-retry.log": "50fb4abd679d69803df22d9973b437d4e933095d245b5e8e6ef4c4edd9049928",
+    "rust-checks.log": "7b972f59013b13db5778dd3bd5520f263f666970274ecc8a0c03cb4653eba99b",
+    "tools-checks-retry.log": "fb642855e8adcdd546d48760953e621c3f6d341e78682cc4ba97b15b5ecb3570",
+    "tools-checks.log": "09f4185447e052b1ed87b04ee5dba1fba292efb857f5c5b09747b2650b629f3f",
+    "workload-probe-identity.json": "e12c3407f449eba4183b5f0e2fbad8eeef23a648a725d6815426ea41c5fc37e1",
+    "workload-probe.jsonl": "946a46e60dec5ff2c195d199428b26b0ddbabe43379e25d382c650aa5515cdfd"
+  }
+}

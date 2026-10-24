@@ -55,13 +55,15 @@ pub fn decide(observation: &Observation) -> Action {
         PI,
     ] {
         let wanted = me.heading + delta;
+        // Score the same quantized target that the core and portable command
+        // execute. In particular, raw antipodes can turn the other way.
+        let target = physics::quantize_heading(wanted);
         let mut position = head;
         let mut heading = me.heading;
         let mut clearance = f64::INFINITY;
         for _ in 0..4 {
-            heading += wrap(wanted - heading).clamp(-turn_rate * 0.09, turn_rate * 0.09);
-            position.x += heading.cos() * me.speed * 0.09;
-            position.y += heading.sin() * me.speed * 0.09;
+            (position, heading) =
+                physics::advance(position, heading, target, me.speed, turn_rate, 0.09);
             clearance = clearance.min(
                 observation.arena.radius
                     - distance_squared(position, observation.arena.center).sqrt()
