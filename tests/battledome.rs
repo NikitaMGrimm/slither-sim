@@ -248,6 +248,136 @@ fn hosted_lives_start_on_the_ring_at_varied_angles() {
     assert_eq!(angles.len(), 6);
 }
 
+#[cfg(feature = "networking")]
+#[test]
+fn reconnect_on_the_old_rounding_sensitive_ring_preserves_a_living_slot() {
+    use slither_sim::client::{SimulationConfig, SimulatorBackend};
+    let mut world = Config::sandbox();
+    world.food_count = 0;
+    world.ambient_replenish_per_second = 0.0;
+    world.kiosk.enabled = false;
+    world.min_score = Some(400);
+    world.spawn_radius = Some(174.2208260217339);
+    world.validate().unwrap();
+    let mut backend = SimulatorBackend::new(
+        5,
+        SimulationConfig {
+            world,
+            agents: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    for _ in 0..30 {
+        assert!(backend.world().snakes[0].alive);
+        backend.reconnect_slot(0).unwrap();
+        assert_on_ring(&backend.world().snakes[0], 174.2208260217339, 26);
+    }
+}
+
+#[test]
+fn ring_validation_reserves_the_floor_body_diameter_at_closure() {
+    let mut config = Config::sandbox();
+    config.radius = 3000.0;
+    config.spawn_radius = Some(2869.0);
+    config.min_score = Some(18_436_960);
+    assert!(config.validate().is_err());
+    // The reported floor has a diameter of about 146, rather than 42.
+    config.radius = 4000.0;
+    config.spawn_radius = Some(3000.0);
+    let mut world = Simulator::new(1, config).unwrap();
+    world.add("wide", 0, 1).unwrap();
+    let snake = &world.snakes[0];
+    assert_eq!(snake.segments, 429);
+    assert!(snake.head.distance(*snake.body.last().unwrap()) > 2.0 * snake.radius);
+}
+
+/// Independent center-to-segment projection, including the endpoints.
+fn chord_radius(a: Point, b: Point) -> f64 {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let t = (-(a.x * dx + a.y * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
+    distance(Point {
+        x: a.x + t * dx,
+        y: a.y + t * dy,
+    })
+}
+
+#[test]
+fn ring_validation_keeps_complete_body_chords_outside_the_pit() {
+    let mut config = Config::sandbox();
+    config.min_score = Some(400);
+    config.spawn_radius = Some(200.0);
+    config.pit = Some(PitConfig { radius: 199.5 });
+    assert!(config.validate().is_err());
+    // Find the first accepted radius and check actual generated chords, not
+    // just anchors or a restatement of the validation inequality.
+    let (mut lower, mut upper) = (200.0, 201.0);
+    for _ in 0..64 {
+        let middle = (lower + upper) / 2.0;
+        config.spawn_radius = Some(middle);
+        if config.validate().is_ok() {
+            upper = middle;
+        } else {
+            lower = middle;
+        }
+    }
+    config.spawn_radius = Some(upper);
+    let world = Simulator::new(1, config).unwrap();
+    for i in 0..1024 {
+        let angle = std::f64::consts::TAU * f64::from(i) / 1024.0;
+        let head = Point {
+            x: upper * angle.cos(),
+            y: upper * angle.sin(),
+        };
+        for turn in [-FRAC_PI_2, FRAC_PI_2] {
+            let (body, _) = world.spawn_body(head, angle + turn).unwrap();
+            for edge in body.windows(2) {
+                assert!(chord_radius(edge[0], edge[1]) > 199.5, "{angle}: {edge:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_smallest_validated_floor_rings_spawn_at_every_sampled_angle() {
+    for score in [10, 400, *MassFloor::score_range().end()] {
+        let mut config = Config::sandbox();
+        config.radius = 30_000.0;
+        config.min_score = Some(score);
+        let (mut lower, mut upper) = (21.0, 15_000.0);
+        for _ in 0..64 {
+            let middle = (lower + upper) / 2.0;
+            config.spawn_radius = Some(middle);
+            if config.validate().is_ok() {
+                upper = middle;
+            } else {
+                lower = middle;
+            }
+        }
+        config.spawn_radius = Some(upper);
+        let world = Simulator::new(1, config).unwrap();
+        let floor = MassFloor::for_score(score).unwrap();
+        let diameter =
+            2.0 * slither_sim::physics::BODY_RADIUS * slither_sim::physics::scale(floor.segments);
+        for i in 0..2048 {
+            let angle = std::f64::consts::TAU * f64::from(i) / 2048.0;
+            let head = Point {
+                x: upper * angle.cos(),
+                y: upper * angle.sin(),
+            };
+            for turn in [-FRAC_PI_2, FRAC_PI_2] {
+                let (body, heading) = world.spawn_body(head, angle + turn).unwrap();
+                let tail = *body.last().unwrap();
+                assert!(head.distance(tail) > diameter, "{score}: {angle}");
+                let tip = slither_sim::physics::head_tip(head, heading, floor.segments);
+                assert!(tip.distance(tail) > diameter / 2.0);
+                assert!(world.body_is_clear(&body, 600.0));
+            }
+        }
+    }
+}
+
 /// A victim at the origin whose tip meets the killer's body at x = -25.
 fn kill_world(window: Option<f64>) -> Simulator {
     let mut config = Config::sandbox();
@@ -463,8 +593,8 @@ fn mode_settings_reject_unreachable_rules() {
                 c.pit = None;
                 c.spawn_radius = Some(150.0);
             },
-            "spawnRadius must lie outside pit.radius and more than 60 inside radius, on a ring \
-             long enough for a new life's 26 anchors 42 apart",
+            "spawnRadius must lie outside pit.radius and more than 60 inside radius, \
+             with body chords outside the pit and room for a new life's 26 anchors 42 apart",
         ),
     ] {
         let message = with(change).unwrap_err();

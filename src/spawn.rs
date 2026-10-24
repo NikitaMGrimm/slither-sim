@@ -1,5 +1,5 @@
-use crate::{Config, Point};
-use std::f64::consts::{FRAC_PI_2, TAU};
+use crate::{Config, Point, physics};
+use std::f64::consts::{FRAC_PI_2, PI, SQRT_2, TAU};
 
 /// Head distance of a new life: `config.spawn_radius`, or the official grid of
 /// `sample_spawn_distance`. Callers draw `unit` either way, so the setting never
@@ -39,14 +39,35 @@ pub fn ring_body(head: Point, heading: f64, segments: usize) -> Option<(Vec<Poin
     Some((body, angle + turn * FRAC_PI_2))
 }
 
-/// Angle between neighboring anchors 42 units apart on a circle of `radius`
-/// around the center, if `segments` of them fit without wrapping onto the head.
+/// One-ulp error budgets in world units, including both components' Euclidean
+/// error (sqrt(2)). Angles stay within +/-3*pi for a body shorter than a turn.
+pub(crate) fn ring_roundoff(radius: f64) -> f64 {
+    // Initial sin/cos, coordinate multiply and hypot radius round trip.
+    let radial = 2.0 * SQRT_2 + 1.0;
+    // atan2, step*index, angle subtraction, then sin/cos and multiply.
+    let position = PI + TAU + 3.0 * PI + 2.0 * SQRT_2;
+    // Division perturbs radius by epsilon; asin's absolute error is at most
+    // (pi/2)*epsilon and changes a chord midpoint by at most radius times that.
+    let chord = 1.0 + FRAC_PI_2;
+    radius * (f64::EPSILON * (radial + position + chord))
+}
+
+/// Angle between neighboring anchors 42 units apart on a circle of `radius`,
+/// leaving a head-tail gap wider than the body's actual diameter.
 pub(crate) fn ring_step(radius: f64, segments: usize) -> Option<f64> {
-    if !radius.is_finite() || radius <= 21.0 {
+    let half_spacing = physics::ANCHOR_SPACING / 2.0;
+    if !radius.is_finite() || radius <= half_spacing || segments < 2 {
         return None;
     }
-    let step = 2.0 * (21.0 / radius).asin();
-    (segments as f64 * step < TAU).then_some(step)
+    let step = 2.0 * (half_spacing / radius).asin();
+    // The tail is (segments - 1) steps behind the head. Reserve a chord of
+    // two body radii, with one position-error budget at each end, rather than
+    // one anchor spacing: large floor bodies are wider than 42 units.
+    let body_radius = physics::BODY_RADIUS * physics::scale(segments);
+    let gap = 2.0 * ((body_radius + ring_roundoff(radius)) / radius).asin();
+    let occupied = (segments - 1) as f64 * step;
+    let angle_roundoff = f64::EPSILON * (occupied + gap + TAU);
+    (occupied > gap + angle_roundoff && occupied + gap < TAU - angle_roundoff).then_some(step)
 }
 
 /// Observed own-spawn radii lie on `0.009 + 0.011*n` of the arena radius.

@@ -707,27 +707,28 @@ impl SimulatorBackend {
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
         let alive = self.world.snakes[slot].alive;
         self.world.snakes[slot].alive = false;
-        let mut pose = None;
-        for _ in 0..SPAWN_ATTEMPTS {
-            let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
-            let angle = self.spawn_random.unit() * TAU;
-            let heading = self.spawn_random.unit() * TAU;
-            let head = Point {
-                x: angle.cos() * distance,
-                y: angle.sin() * distance,
-            };
-            // Restore the earlier browser lobby's separation model. Own-join
-            // receipts support a large exclusion zone, but do not identify the
-            // exact official test. Never fall back to near-contact placement
-            // when the compact arena is crowded: defer this spawn instead.
-            let (body, heading) = self.world.spawn_body(head, heading)?;
-            if self.world.body_is_clear(&body, 600.) {
-                pose = Some((body, heading));
-                break;
+        let pose = (|| {
+            for _ in 0..SPAWN_ATTEMPTS {
+                let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
+                let angle = self.spawn_random.unit() * TAU;
+                let heading = self.spawn_random.unit() * TAU;
+                let head = Point {
+                    x: angle.cos() * distance,
+                    y: angle.sin() * distance,
+                };
+                // Restore the earlier browser lobby's separation model. Own-join
+                // receipts support a large exclusion zone, but do not identify the
+                // exact official test. Never fall back to near-contact placement
+                // when the compact arena is crowded: defer this spawn instead.
+                let (body, heading) = self.world.spawn_body(head, heading)?;
+                if self.world.body_is_clear(&body, 600.) {
+                    return Ok((body, heading));
+                }
             }
-        }
+            Err("No clear spawn position".into())
+        })();
         self.world.snakes[slot].alive = alive;
-        pose.ok_or_else(|| "No clear spawn position".into())
+        pose
     }
 
     fn connect(&mut self, slot: usize) -> Result<(), String> {
@@ -2002,6 +2003,41 @@ fn seek(frame: &ClientFrame) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_ring_spawn_restores_the_existing_life() {
+        let mut world = Config::sandbox();
+        world.food_count = 0;
+        world.ambient_replenish_per_second = 0.0;
+        world.kiosk.enabled = false;
+        world.min_score = Some(400);
+        world.spawn_radius = Some(174.2208260217339);
+        let mut backend = SimulatorBackend::new(
+            5,
+            SimulationConfig {
+                world,
+                agents: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        // Config is public and may be changed after construction. Force the
+        // early geometry error that used to bypass alive restoration.
+        backend.world.config.spawn_radius = Some(100.0);
+        let before = serde_json::to_value(&backend.world).unwrap();
+        let life = backend.slots[0].life;
+        let connections = backend.connections;
+        assert_eq!(
+            backend.reconnect_slot(0).unwrap_err(),
+            "Spawn circle is too small for a new life's body"
+        );
+        assert_eq!(serde_json::to_value(&backend.world).unwrap(), before);
+        assert_eq!(backend.slots[0].life, life);
+        assert_eq!(backend.connections, connections);
+        backend.world.snakes[0].alive = false;
+        assert!(backend.spawn_pose(0).is_err());
+        assert!(!backend.world.snakes[0].alive);
+    }
 
     /// Diff against freshly allocated listings, as after a changed broadcast.
     fn diff_food(

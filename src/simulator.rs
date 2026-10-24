@@ -385,20 +385,24 @@ impl Config {
         if self.min_score.is_some() && self.spawn_radius.is_none() {
             return Err("minScore requires spawnRadius, the ring new lives lie along".into());
         }
-        // Every anchor of a new life lies on the spawn ring, so the ring must
-        // sit between pit and wall margin and be long enough for the body.
+        // The whole centerline must clear the pit: the midpoint of a 42-unit
+        // chord is sqrt(spawn^2 - 21^2) from the center. Validate the lower
+        // rounded radius so every sin/cos -> hypot spawn angle still fits.
         let segments = self
             .min_score
             .and_then(MassFloor::for_score)
             .map_or(2, |floor| floor.segments);
         if self.spawn_radius.is_some_and(|spawn| {
-            !(spawn < self.radius - SPAWN_WALL_MARGIN
-                && pit.is_none_or(|pit| spawn > pit)
-                && crate::spawn::ring_step(spawn, segments).is_some())
+            let roundoff = crate::spawn::ring_roundoff(spawn);
+            let lower = spawn - roundoff;
+            !(spawn + roundoff < self.radius - SPAWN_WALL_MARGIN
+                && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
+                && crate::spawn::ring_step(lower, segments).is_some())
         }) {
             return Err(format!(
                 "spawnRadius must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
-                 radius, on a ring long enough for a new life's {segments} anchors 42 apart"
+                 radius, with body chords outside the pit and room for a new life's \
+                 {segments} anchors 42 apart plus its head-tail body clearance"
             ));
         }
         Ok(())
