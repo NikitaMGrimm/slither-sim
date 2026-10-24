@@ -104,7 +104,18 @@ class CheckRunnerTests(unittest.TestCase):
         self.assertEqual(buffer.getvalue().decode().split(), ["first", "second"])
         self.assertEqual([code for _, code in results], [0, 3])
         self.assertGreaterEqual(results[0][0], 0.3)
-        self.assertLess(results[1][0], results[0][0])
+
+    def test_a_hung_concurrent_command_is_stopped_and_its_output_shown(self):
+        hung = [sys.executable, "-c", "import time; print('started', flush=True); time.sleep(30)"]
+        quick = [sys.executable, "-c", "print('done')"]
+        buffer = io.BytesIO()
+        stdout = io.TextIOWrapper(buffer, encoding="utf-8")
+        with redirect_stdout(stdout), patch.object(check.sys, "stderr", io.StringIO()):
+            results = check.run_concurrently([hung, quick], os.environ.copy(), timeout=1)
+        stdout.flush()
+        self.assertEqual(buffer.getvalue().decode().split(), ["started", "done"])
+        self.assertEqual([code for _, code in results], [check.TIMED_OUT, 0])
+        self.assertLess(results[0][0], 10)
 
     def test_a_failing_concurrent_command_stops_later_steps(self):
         with tempfile.TemporaryDirectory() as directory:

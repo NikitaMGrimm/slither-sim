@@ -330,6 +330,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let address = listener.local_addr().unwrap();
     let (begin, ready) = mpsc::channel();
     let (polled, next_poll) = mpsc::channel();
+    let (written, write_done) = mpsc::channel();
     let (trickle, start_trickle) = mpsc::channel();
     let server = thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
@@ -350,6 +351,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         for byte in payload {
             next_poll.recv_timeout(Duration::from_secs(2)).unwrap();
             stream.write_all(&[byte]).unwrap();
+            written.send(()).unwrap();
         }
         start_trickle.recv_timeout(Duration::from_secs(2)).unwrap();
         // No complete game message arrives before idle timeout. Frequent bytes
@@ -382,6 +384,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let mut radius = 7926.;
     for _ in 0..12 {
         polled.send(()).unwrap();
+        write_done.recv_timeout(Duration::from_secs(2)).unwrap();
         radius = backend
             .next_frame()
             .unwrap()

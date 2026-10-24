@@ -15,6 +15,10 @@ HOST_GROUPS = ("rust", "tools", "package")
 # `rust` is `lint` followed by `test`; CI runs the two parts as separate jobs.
 GROUPS = (*HOST_GROUPS, "lint", "test", "wasm")
 FIDELITY_HALVES = ("test_[a-d]*.py", "test_[!a-d]*.py")
+# Concurrent output is buffered, so a hung suite is stopped and its output shown
+# before CI's 15-minute job limit cancels the step.
+CONCURRENT_TIMEOUT_SECONDS = 600
+TIMED_OUT = 124
 
 
 def clippy(*features):
@@ -96,10 +100,11 @@ def steps(group):
     return [[command] for command in commands(group)]
 
 
-def run_concurrently(step, environment):
+def run_concurrently(step, environment, timeout=CONCURRENT_TIMEOUT_SECONDS):
     """Runs a step's commands at once and replays each one's output in order.
 
-    Returns (seconds, exit code) per command. A command that cannot start raises
+    Returns (seconds, exit code) per command; commands still running at the
+    timeout are stopped with exit code 124. A command that cannot start raises
     OSError with a `command` attribute.
     """
     # Each command runs as a process tree, so no cargo, rustc or node descendant
@@ -115,7 +120,8 @@ def run_concurrently(step, environment):
             except OSError as error:
                 error.command = command
                 raise
-        while running:
+        deadline = time.monotonic() + timeout
+        while running and time.monotonic() < deadline:
             for index, (tree, start) in list(running.items()):
                 code = tree.process.poll()
                 if code is not None:
@@ -123,6 +129,11 @@ def run_concurrently(step, environment):
                     finished[index] = (time.monotonic() - start, code)
                     del running[index]
             time.sleep(0.05)
+        for index, (tree, start) in list(running.items()):
+            tree.stop()
+            finished[index] = (time.monotonic() - start, TIMED_OUT)
+            del running[index]
+            print(f"Stopped after {timeout} s: {shlex.join(step[index])}", file=sys.stderr, flush=True)
     finally:
         for tree, _ in running.values():
             tree.stop()
