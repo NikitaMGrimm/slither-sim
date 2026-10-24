@@ -1,0 +1,224 @@
+diff --git a/examples/perf_baseline.rs b/examples/perf_baseline.rs
+index 1eaf1b9..e1d32eb 100644
+--- a/examples/perf_baseline.rs
++++ b/examples/perf_baseline.rs
+@@ -1773,6 +1773,7 @@ fn run_scenario(
+             "eventBuffersEnabled": true, "boundaryTimed": false,
+             "profile": if args.profile { Some(profile) } else { None },
+             "observeSeconds": (args.profile && bot).then_some(observe_seconds),
++            "observePhases": slither_sim::observation::profile::take(),
+         }),
+     ))
+ }
+diff --git a/src/observation/mod.rs b/src/observation/mod.rs
+index b3cec45..7236010 100644
+--- a/src/observation/mod.rs
++++ b/src/observation/mod.rs
+@@ -37,6 +37,16 @@ impl<'a> VisibleState<'a> {
+     }
+ }
+ 
++#[doc(hidden)]
++pub mod profile {
++    use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
++    pub static C: [AtomicU64; 14] = [const { AtomicU64::new(0) }; 14];
++    pub const NAMES: [&str; 14] = ["batch", "new", "grid", "slot", "mark", "walk", "rest", "candidates", "visible", "batches", "g_bounds", "g_cells", "g_prefix", "g_scatter"];
++    pub fn add(i: usize, v: u64) { C[i].fetch_add(v, Relaxed); }
++    pub fn take() -> Vec<(&'static str, u64)> { NAMES.iter().zip(&C).map(|(n, c)| (*n, c.swap(0, Relaxed))).collect() }
++    pub fn ns(t: std::time::Instant) -> u64 { t.elapsed().as_nanos() as u64 }
++}
++
+ /// Within this coordinate range every rounding error in the queries below is
+ /// under 2^-9 units, far inside the one-unit query margin.
+ const TAME: f64 = (1u64 << 40) as f64;
+@@ -47,6 +57,7 @@ fn tame(p: Point) -> bool {
+ /// Food positions bucketed into square cells, contiguous per cell row.
+ struct FoodGrid {
+     origin: Point,
++    cell: f64,
+     inv_cell: f64,
+     cols: usize,
+     rows: usize,
+@@ -59,6 +70,7 @@ struct FoodGrid {
+ }
+ impl FoodGrid {
+     fn new(food: &[Food], vision: f64) -> Self {
++        let t = std::time::Instant::now();
+         let mut bounds: Option<Bounds> = None;
+         let mut outliers = Vec::new();
+         for (i, f) in food.iter().enumerate() {
+@@ -71,7 +83,8 @@ impl FoodGrid {
+         }
+         let bounds = bounds.unwrap_or(Bounds::between(Point::default(), Point::default()));
+         let cap = (2 * (food.len() - outliers.len()) + 16) as f64;
+-        let mut cell = (vision * 0.5).max(1.0);
++        let k: f64 = std::env::var("SLITHER_CELL_DIV").ok().and_then(|v| v.parse().ok()).unwrap_or(2.0);
++        let mut cell = (vision / k).max(1.0);
+         let (cols, rows) = loop {
+             let cols = ((bounds.max.x - bounds.min.x) / cell).floor() + 1.0;
+             let rows = ((bounds.max.y - bounds.min.y) / cell).floor() + 1.0;
+@@ -82,6 +95,7 @@ impl FoodGrid {
+         };
+         let mut grid = Self {
+             origin: bounds.min,
++            cell,
+             inv_cell: 1.0 / cell,
+             cols,
+             rows,
+@@ -90,6 +104,8 @@ impl FoodGrid {
+             ids: Vec::new(),
+             outliers,
+         };
++        profile::add(10, profile::ns(t));
++        let t = std::time::Instant::now();
+         let cells: Vec<u32> = food
+             .iter()
+             .map(|f| {
+@@ -103,9 +119,13 @@ impl FoodGrid {
+                 }
+             })
+             .collect();
++        profile::add(11, profile::ns(t));
++        let t = std::time::Instant::now();
+         for c in 0..cols * rows {
+             grid.starts[c + 1] += grid.starts[c];
+         }
++        profile::add(12, profile::ns(t));
++        let t = std::time::Instant::now();
+         let placed = grid.starts[cols * rows] as usize;
+         grid.points = vec![Point::default(); placed];
+         grid.ids = vec![0; placed];
+@@ -118,6 +138,7 @@ impl FoodGrid {
+                 *slot += 1;
+             }
+         }
++        profile::add(13, profile::ns(t));
+         grid
+     }
+     // Rounding is monotone, so a coordinate between two query bounds always lands
+@@ -140,6 +161,7 @@ struct Observer<'a> {
+ }
+ impl<'a> Observer<'a> {
+     fn new(world: VisibleState<'a>, observers: usize) -> Self {
++        let t0 = std::time::Instant::now();
+         // Exact visibility tests still decide every candidate; the index only
+         // skips food and snakes that cannot pass them.
+         let food = world.food.len();
+@@ -160,8 +182,9 @@ impl<'a> Observer<'a> {
+             food: (observers >= 8
+                 && observers.saturating_mul(food) >= 1 << 15
+                 && food < u32::MAX as usize)
+-                .then(|| FoodGrid::new(world.food, world.vision)),
++                .then(|| { let t = std::time::Instant::now(); let g = FoodGrid::new(world.food, world.vision); profile::add(2, profile::ns(t)); g }),
+         });
++        profile::add(1, profile::ns(t0));
+         Self { world, index }
+     }
+     /// Writes the observation of `index` into `slot`, refilling the vectors of the
+@@ -188,6 +211,7 @@ impl<'a> Observer<'a> {
+             opponents: &mut opponents,
+             kept: 0,
+         };
++        let t = std::time::Instant::now();
+         self.visit(index, marks, &mut copies)?;
+         let kept = copies.kept;
+         opponents.truncate(kept);
+@@ -210,6 +234,7 @@ impl<'a> Observer<'a> {
+             },
+             vision_radius: Some(w.vision),
+         });
++        profile::add(3, profile::ns(t));
+         Ok(())
+     }
+     /// Reports what `index` sees to `sink`: world indices of visible food, prey and
+@@ -251,7 +276,9 @@ impl<'a> Observer<'a> {
+                 },
+                 b,
+             )) => {
++                let t = std::time::Instant::now();
+                 marks.resize(w.food.len().div_ceil(64), 0);
++                let mut cand = 0u64;
+                 let mut count = 0;
+                 let mut first = usize::MAX;
+                 // Branch-free: about half the candidates are visible, unpredictably.
+@@ -260,11 +287,21 @@ impl<'a> Observer<'a> {
+                     count += usize::from(seen);
+                     first = first.min(if seen { i / 64 } else { usize::MAX });
+                 };
+-                let (lo, hi) = (grid.col(b.min.x), grid.col(b.max.x));
++                static TRIM: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++                let trim = *TRIM.get_or_init(|| std::env::var_os("SLITHER_NO_TRIM").is_none());
+                 for row in grid.row(b.min.y)..=grid.row(b.max.y) {
++                    let (lo, hi) = if trim {
++                        let top = grid.origin.y + row as f64 * grid.cell;
++                        let dy = (top - me.head.y).max(me.head.y - (top + grid.cell)).max(1.0) - 1.0;
++                        let w = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
++                        (grid.col(me.head.x - w), grid.col(me.head.x + w))
++                    } else {
++                        (grid.col(b.min.x), grid.col(b.max.x))
++                    };
+                     let cells = row * grid.cols;
+                     let span =
+                         grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
++                    cand += span.len() as u64;
+                     for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
+                         // The same pure conjunction as `visible`, without short-circuits.
+                         let seen = ((p.x - me.head.x).abs() <= vision)
+@@ -276,6 +313,10 @@ impl<'a> Observer<'a> {
+                 for &i in &grid.outliers {
+                     mark(i as usize, visible(w.food[i as usize].point()));
+                 }
++                profile::add(4, profile::ns(t));
++                profile::add(7, cand);
++                profile::add(8, count as u64);
++                let t = std::time::Instant::now();
+                 // Ascending bit order restores the original food order.
+                 sink.reserve_food(count);
+                 let mut reported = 0;
+@@ -290,6 +331,7 @@ impl<'a> Observer<'a> {
+                         bits &= bits - 1;
+                     }
+                 }
++                profile::add(5, profile::ns(t));
+             }
+             _ => {
+                 for (i, f) in w.food.iter().enumerate() {
+@@ -299,6 +341,7 @@ impl<'a> Observer<'a> {
+                 }
+             }
+         }
++        let t = std::time::Instant::now();
+         for (i, p) in w.prey.iter().enumerate() {
+             if visible(p.position) {
+                 sink.prey(i);
+@@ -324,6 +367,7 @@ impl<'a> Observer<'a> {
+         for i in visible_opponents {
+             sink.opponent(i);
+         }
++        profile::add(6, profile::ns(t));
+         Ok(())
+     }
+ }
+@@ -465,6 +509,13 @@ impl Simulator {
+             observations.resize_with(self.snakes.len(), || None);
+             return Ok(());
+         }
++        let t0 = std::time::Instant::now();
++        let r = self.observe_matching_inner(&wanted, observers, observations);
++        profile::add(0, profile::ns(t0));
++        profile::add(9, 1);
++        r
++    }
++    fn observe_matching_inner(&self, wanted: &[bool], observers: usize, observations: &mut Vec<Option<Observation>>) -> Result<(), String> {
+         observations.truncate(self.snakes.len());
+         observations.resize_with(self.snakes.len(), || None);
+         let observer = Observer::new(VisibleState::of(self), observers);
+@@ -483,7 +534,7 @@ impl Simulator {
+         if self.parallel() {
+             let parts = crate::parallel::parts(observers / OBSERVERS_PER_TASK);
+             if parts > 1 {
+-                let ranges = crate::parallel::balanced(&wanted, parts);
++                let ranges = crate::parallel::balanced(wanted, parts);
+                 return crate::parallel::map_ranges(&ranges, observations, &observe_range)
+                     .into_iter()
+                     .collect();
