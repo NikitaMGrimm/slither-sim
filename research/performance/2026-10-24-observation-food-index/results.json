@@ -11191,6 +11191,56 @@
     "reading": "equal",
     "sha256": "5b4bc72036d956e8b9f6d7b70bf859eadfb1c3af2dd0211c6bad3acca5307b70"
    }
-  ]
+  ],
+  "correctedHarness": {
+   "note": "massAndSpeed description for observe-clustered corrected from base_speed(32) to base_speed(2); the string appears only in the trace report line, so only the observe-clustered digest differs from perfObservationTraceParity above; timing rows were measured with the earlier harness",
+   "harnessSha256": "ff330d7e83ff8a4e58a574b050fff49f397ba94955080addaed54ff1cd84bdf7",
+   "executablesSha256": {
+    "perf_observation/baseline@fb71ecd+correctedHarness": "7d50b17650dc76e22a9a8023f903f0cfb5f4073a266b36855f6e6e08e61b60c8",
+    "perf_observation/adopted+correctedHarness": "4cca6d17a8a2f78e5bc136fc255a5aad8962139f73fcc1819b7e7c463f36387e"
+   },
+   "perfObservationTraceParity": [
+    {
+     "case": "observe-dense",
+     "reading": "equal",
+     "sha256": "8d962d428ee501dd70b19f4850c93ad11e3b950ffbbc75cfd02d09a0a0f9e4ee"
+    },
+    {
+     "case": "observe-compact",
+     "reading": "equal",
+     "sha256": "a4626e4ba71932d5d4c09495fc797251b643b9ec733f3e64d8102a67e535789d"
+    },
+    {
+     "case": "observe-wide",
+     "reading": "equal",
+     "sha256": "6e1693368c81ddf61ed708019df52c5809c98e50e227faea4dde8f2d45dae939"
+    },
+    {
+     "case": "observe-strip",
+     "reading": "equal",
+     "sha256": "84f41c98a92d4b3fb36773972460322d35418c1c81217884df4a5f511d208a1a"
+    },
+    {
+     "case": "observe-one",
+     "reading": "equal",
+     "sha256": "3ecb89e65c35a6d9ba94c31424db1476892f7aa90200b8c33fe63462fbf3aa53"
+    },
+    {
+     "case": "observe-empty",
+     "reading": "equal",
+     "sha256": "1f8ac96648dca99fdacc4a7e8c170ed2f45e211c0379ef5113cd4bf282625d99"
+    },
+    {
+     "case": "observe-sparse",
+     "reading": "equal",
+     "sha256": "72042f8304678005d240d231812892c5aa0f594dfa676d9ac36098dbff19b33a"
+    },
+    {
+     "case": "observe-clustered",
+     "reading": "equal",
+     "sha256": "3d360d1f9079ab9c18d5147b3dac4121181088a7aea7cca06c3554a28e1eb7b9"
+    }
+   ]
+  }
  }
 }

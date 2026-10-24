@@ -369,7 +369,11 @@ In the first review round, the same rows measured 0.974–1.006, 0.961–1.006 a
 
 Trace parity: all eight `perf_observation` fixtures produce identical trace bytes
 against `main` with the eight-fixture harness (2-iteration traces; digests in
-`results.json`, which also keeps the seven-fixture digests). For v1, six bot rows (`official-128`, `dome-proxy-96`,
+`results.json`, which also keeps the seven-fixture digests). The harness's
+`massAndSpeed` description for `observe-clustered` was later corrected from
+`base_speed(32)` to `base_speed(2)`. That string appears only in the trace's
+report line, so only the `observe-clustered` digest changed; parity was checked
+again with the corrected harness, and `results.json` keeps both sets. For v1, six bot rows (`official-128`, `dome-proxy-96`,
 `official-100`, `official-30`, `sandbox-16`, `dome-proxy-32`, each with 24
 iterations, sequential and parallel) were byte-identical. Their sequential and
 parallel traces matched each other apart from the report line's `parallel` flag.
@@ -444,14 +448,18 @@ Add `--parallel` for the parallel profile. For the paired timings, build
 Build `perf_observation` from `main` with the PR's `examples/perf_observation.rs`
 copied in, and from the candidate. Copy the executables out of the target
 directories. Then run these from the root of a PR checkout, where the study
-directory and `tools/` exist. `BASE`, `CAND`, `OBS_BASE` and `OBS_CAND` are
-absolute paths to the copied executables:
+directory and `tools/` exist. Set the four variables to the absolute paths of
+the copied executables:
 
 ```sh
 STUDY=research/performance/2026-10-24-observation-food-index
-python "$STUDY/pairs.py" BASE CAND rows.jsonl 9 timing official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
-python "$STUDY/pairs.py" BASE CAND rows.jsonl 9 profile official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
-python "$STUDY/obs_rounds.py" base,adopted OBS_BASE,OBS_CAND 11 obs.jsonl observe-sparse:500,observe-dense:5000,observe-wide:50000,observe-strip:10000
-python "$STUDY/obs_rounds.py" base,adopted OBS_BASE,OBS_CAND 9 clustered.jsonl observe-clustered:2000
+BASE=/absolute/path/to/perf_baseline-base
+CAND=/absolute/path/to/perf_baseline-candidate
+OBS_BASE=/absolute/path/to/perf_observation-base
+OBS_CAND=/absolute/path/to/perf_observation-candidate
+python "$STUDY/pairs.py" "$BASE" "$CAND" rows.jsonl 9 timing official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
+python "$STUDY/pairs.py" "$BASE" "$CAND" rows.jsonl 9 profile official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
+python "$STUDY/obs_rounds.py" base,adopted "$OBS_BASE,$OBS_CAND" 11 obs.jsonl observe-sparse:500,observe-dense:5000,observe-wide:50000,observe-strip:10000
+python "$STUDY/obs_rounds.py" base,adopted "$OBS_BASE,$OBS_CAND" 9 clustered.jsonl observe-clustered:2000
 uv run --locked --only-group tools python -B tools/perf_compare.py --base fb71ecd --suite full --output outputs/perf/food-index
 ```

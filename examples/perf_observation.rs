@@ -397,7 +397,7 @@ fn run() -> Result<(), String> {
                     "anchorsPerSlot": anchors, "totalAnchors": anchors.iter().sum::<usize>(),
                     "placement": if args.case == "observe-clustered" { "2 anchors at head - heading_unit * anchor_index * ANCHOR_SPACING; heading = slot / 128 * TAU + PI" } else { "32 anchors at head - heading_unit * anchor_index * ANCHOR_SPACING; heading = slot / 32 * TAU + PI" },
                     "anchorSpacing": physics::ANCHOR_SPACING, "fam": 0.75,
-                    "massAndSpeed": "update_mass and base_speed(32); initialize_speed_state(slot, Some(0.0))",
+                    "massAndSpeed": if args.case == "observe-clustered" { "update_mass and base_speed(2); initialize_speed_state(slot, Some(0.0))" } else { "update_mass and base_speed(32); initialize_speed_state(slot, Some(0.0))" },
                     "heads": match args.case.as_str() { "observe-strip" => "x=0; y=(slot-15.5)*750; retain ring heading", "observe-sparse" => "slots 0-7 at the origin, retaining ring heading; slots 8-31 dead", "observe-clustered" => "128 slots; head = ((slot%12)*1600-8800, (slot/12)*1600-8800); retain ring heading", _ => "Simulator::add ring at radius/2" },
                     "compactCaveat": if args.case == "observe-compact" { Some("radial tails extend outside radius=1000; synthetic immutable observation geometry, never stepped") } else { None },
                 },
