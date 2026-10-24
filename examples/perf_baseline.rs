@@ -5,7 +5,7 @@
 //! No additional dependencies, sockets, files, or wall-clock bot processing samples.
 use serde_json::{Value, json};
 use slither_sim::{
-    Action, Config, DeathEvent, DeathReason, Point, PreyConfig, Simulator, physics,
+    Action, Config, DeathEvent, DeathReason, Observation, Point, PreyConfig, Simulator, physics,
     profiling::{StepProfile, WorldStats},
     spawn,
 };
@@ -785,6 +785,20 @@ fn world_trace(world: &Simulator) -> Result<Value, String> {
     let mut trace = world_events(world)?;
     trace["observations"] = json!(world.observe_all());
     Ok(trace)
+}
+
+/// `perf_compare --base` builds this harness against older baselines too. Inherent
+/// methods win method resolution, so this runs only where `Simulator::observe_all_into`
+/// is missing, and bot rows there time the allocating loop bots had to use.
+#[allow(dead_code)]
+trait ObserveAllInto {
+    fn observe_all_into(&self, observations: &mut Vec<Option<Observation>>);
+}
+
+impl ObserveAllInto for Simulator {
+    fn observe_all_into(&self, observations: &mut Vec<Option<Observation>>) {
+        *observations = self.observe_all();
+    }
 }
 
 /// Clones of the world keep the setting, including epoch and reset templates.
