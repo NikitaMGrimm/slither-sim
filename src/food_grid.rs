@@ -207,7 +207,8 @@ impl std::fmt::Debug for EaterGrid {
 }
 impl EaterGrid {
     /// Index `(center, radius)` circles. Returns false, leaving the grid unusable,
-    /// when a circle is non-finite or too far out or the grid would be too large.
+    /// when a circle is non-finite or too far out or the grid would exceed
+    /// `max_cells` or the fixed limit.
     ///
     /// Exactness: a pellet `p` passes the pickup test only if
     /// `hypot(p.x - c.x, p.y - c.y) <= r`, which, for finite values under 2^20, puts
@@ -216,7 +217,11 @@ impl EaterGrid {
     /// floor division by a positive cell is monotonic. With finite circles a
     /// non-finite pellet fails the distance test or gets a NaN distance, which
     /// never wins. The hashed index uses the same bound, so its result agrees.
-    pub(crate) fn build(&mut self, circles: impl ExactSizeIterator<Item = (Point, f64)>) -> bool {
+    pub(crate) fn build(
+        &mut self,
+        circles: impl ExactSizeIterator<Item = (Point, f64)>,
+        max_cells: usize,
+    ) -> bool {
         for &i in &self.touched {
             self.heads[i as usize] = NONE;
         }
@@ -248,7 +253,10 @@ impl EaterGrid {
         }
         let width = (hi_x - lo_x + 1) as usize;
         let cells = width * (hi_y - lo_y + 1) as usize;
-        if cells > MAX_CELLS || area > MAX_CELLS || self.covers.len() >= NONE as usize {
+        if cells > MAX_CELLS.min(max_cells)
+            || area > MAX_CELLS
+            || self.covers.len() >= NONE as usize
+        {
             return false;
         }
         if self.heads.len() < cells {
@@ -457,7 +465,7 @@ mod tests {
                     (c, r)
                 })
                 .collect();
-            assert!(grid.build(circles.iter().copied()));
+            assert!(grid.build(circles.iter().copied(), MAX_CELLS));
             for _ in 0..400 {
                 let (c, r) = circles[rng.below(circles.len())];
                 let angle = rng.unit() * std::f64::consts::TAU;
@@ -518,10 +526,18 @@ mod tests {
             (c, -1.0),
             (Point { x: REGULAR, y: 0.0 }, 36.0),
         ] {
-            assert!(!grid.build([(c, 36.0), (center, radius)].into_iter()));
+            assert!(!grid.build([(c, 36.0), (center, radius)].into_iter(), MAX_CELLS));
         }
-        assert!(!grid.build([(c, 36.0), (Point { x: 9e5, y: 9e5 }, 36.0)].into_iter()));
-        assert!(grid.build([(c, 36.0)].into_iter()));
+        assert!(!grid.build(
+            [(c, 36.0), (Point { x: 9e5, y: 9e5 }, 36.0)].into_iter(),
+            MAX_CELLS
+        ));
+        // A caller limit below the grid size declines too.
+        assert!(!grid.build(
+            [(c, 36.0), (Point { x: 9e3, y: 9e3 }, 36.0)].into_iter(),
+            4096
+        ));
+        assert!(grid.build([(c, 36.0)].into_iter(), MAX_CELLS));
         assert!(
             grid.candidates(Point {
                 x: 0.0,

@@ -920,25 +920,33 @@ impl Simulator {
             profile.death_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
         }
-        let eaters: Vec<(usize, Point, f64, Bounds)> = alive
-            .iter()
-            .filter(|&&i| self.snakes[i].alive)
-            .map(|&i| {
-                let s = &self.snakes[i];
-                let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                (i, center, radius, Bounds::between(center, center))
-            })
-            .collect();
+        // Without food there is nothing to index or eat.
+        let eaters: Vec<(usize, Point, f64, Bounds)> = if self.food.is_empty() {
+            Vec::new()
+        } else {
+            alive
+                .iter()
+                .filter(|&&i| self.snakes[i].alive)
+                .map(|&i| {
+                    let s = &self.snakes[i];
+                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                    (i, center, radius, Bounds::between(center, center))
+                })
+                .collect()
+        };
         // Index the few eater circles, then visit food in reverse order; ties go to the
         // nearest head, then the lexically smaller id.
         const CELL: f64 = 256.0;
         // The dense grid lists exactly the eaters whose cover holds a pellet's cell,
         // so it agrees with both paths below. They remain for circles it cannot index.
+        // A grid much larger than the food list costs more to allocate than it saves.
         let dense = self.config.food_index
+            && !eaters.is_empty()
             && self.eater_grid.build(
                 eaters
                     .iter()
                     .map(|&(_, center, radius, _)| (center, radius)),
+                self.food.len().saturating_mul(4).max(4096),
             );
         let indexed = !dense
             && self.config.food_index
