@@ -17,8 +17,9 @@ rim sliding are provisional. In particular:
 
 - Dynamic radius is enabled; use recorded `radiusUpdates` with
   `dynamicRadius: false` for measured replay.
-- Each 75-unit cell admits up to 2 ambient, 9 boost and 22 death pellets.
-  Rejected boost emission still spends mass.
+- A 75-unit cell admits a new ambient, boost or death pellet only while it holds
+  fewer than 2, 9 or 22 pellets of any kind, respectively. Rejected boost
+  emission still spends mass.
 - The prey target is a working density assumption, not a measured global census.
 - Kiosk is enabled. Set `kiosk.enabled: false` for motion replays where it should
   not affect trajectories. The historical [WORM Labs study](https://www.reddit.com/r/Slitherio/comments/1dagyjq/worm_labs_inc_study_on_new_kiosk_penalty/)
