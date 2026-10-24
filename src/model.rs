@@ -12,6 +12,43 @@ impl Point {
     pub fn finite(self) -> bool {
         self.x.is_finite() && self.y.is_finite()
     }
+    /// `distance(other) <= r`, with identical results including NaN and overflow.
+    #[inline]
+    pub(crate) fn distance_le(self, other: Self, r: f64) -> bool {
+        match self.distance_order(other, r) {
+            Some(order) => order.is_lt(),
+            None => self.distance(other) <= r,
+        }
+    }
+    /// `distance(other) < r`, with identical results including NaN and overflow.
+    #[inline]
+    pub(crate) fn distance_lt(self, other: Self, r: f64) -> bool {
+        match self.distance_order(other, r) {
+            Some(order) => order.is_lt(),
+            None => self.distance(other) < r,
+        }
+    }
+    /// Decides clear cases from the squared distance and leaves the rest to `hypot`.
+    /// The squared sum and `hypot` each err by a few ulps, far inside the 1e-9
+    /// relative band, so a decided case always agrees with `distance()`. The range
+    /// guards keep overflow, underflow and NaN on the `hypot` path.
+    #[inline]
+    fn distance_order(self, other: Self, r: f64) -> Option<std::cmp::Ordering> {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let d2 = dx * dx + dy * dy;
+        if !(r > 1e-50 && r < 1e50 && d2 < 1e100) {
+            return None;
+        }
+        let r2 = r * r;
+        if d2 < r2 * (1.0 - 1e-9) {
+            Some(std::cmp::Ordering::Less)
+        } else if d2 > r2 * (1.0 + 1e-9) {
+            Some(std::cmp::Ordering::Greater)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -121,4 +158,55 @@ pub struct DeathEvent {
     pub killer: Option<String>,
     pub reason: DeathReason,
     pub food: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Point;
+
+    #[test]
+    fn fast_distance_comparisons_match_hypot() {
+        let mut state = 0x2545_f491_u64;
+        let mut unit = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let special = [
+            0.0,
+            -0.0,
+            1e-60,
+            1e60,
+            -3.0,
+            f64::MIN_POSITIVE,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NAN,
+        ];
+        for i in 0..200_000 {
+            let a = Point {
+                x: (unit() - 0.5) * 4e4,
+                y: (unit() - 0.5) * 4e4,
+            };
+            let mut b = Point {
+                x: a.x + (unit() - 0.5) * 3e3,
+                y: a.y + (unit() - 0.5) * 3e3,
+            };
+            let mut r = a.distance(b);
+            match i % 4 {
+                0 => {}
+                1 => r = f64::from_bits(r.to_bits().wrapping_add(i as u64 % 5) - 2),
+                2 => r = unit() * 3e3,
+                _ => {
+                    r = special[i / 4 % special.len()];
+                    if i % 8 == 3 {
+                        b.x = special[i / 8 % special.len()];
+                    }
+                }
+            }
+            assert_eq!(a.distance_le(b, r), a.distance(b) <= r, "{a:?} {b:?} {r}");
+            assert_eq!(a.distance_lt(b, r), a.distance(b) < r, "{a:?} {b:?} {r}");
+        }
+    }
 }

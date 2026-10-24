@@ -1,0 +1,47 @@
+[package]
+name = "slither-sim"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.86"
+description = "Headless Slither.io simulator for bot development, training and custom protocol-19 servers"
+repository = "https://github.com/NikitaMGrimm/slither-sim"
+readme = "README.md"
+license = "MIT"
+keywords = ["slither", "simulation", "bots", "headless"]
+categories = ["simulation", "games"]
+include = [
+    "/src",
+    "/examples/*.rs",
+    "/examples/*.py",
+    "/examples/*.mjs",
+    "/tests",
+    "/docs",
+    "/assets/logo.svg",
+    "/README.md",
+    "/CONTRIBUTING.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+]
+publish = ["crates-io"]
+
+[features]
+default = ["networking"]
+networking = ["dep:tungstenite"]
+
+[[bin]]
+name = "slither-sim"
+path = "src/main.rs"
+required-features = ["networking"]
+
+[[example]]
+name = "portable_bot"
+required-features = ["networking"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+tungstenite = { version = "0.30.0", features = ["rustls-tls-webpki-roots"], optional = true }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

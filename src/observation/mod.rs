@@ -72,7 +72,7 @@ impl<'a> Observer<'a> {
         let visible = |p: Point| {
             (p.x - me.head.x).abs() <= vision
                 && (p.y - me.head.y).abs() <= vision
-                && p.distance(me.head) <= vision
+                && p.distance_le(me.head, vision)
         };
         let food = if let Some(search) = &self.index {
             let cell = |x: f64| (x / vision).floor() as i64;
