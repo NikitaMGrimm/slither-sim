@@ -67,6 +67,31 @@ fn host(args: &[&str]) -> ExitCode {
     }
 }
 
+fn serve(args: &[&str]) -> ExitCode {
+    use slither_sim::transport::ServeOptions;
+    let options = match args {
+        [] => ServeOptions::default(),
+        #[cfg(feature = "parallel")]
+        ["--parallel"] => ServeOptions { parallel: true },
+        #[cfg(not(feature = "parallel"))]
+        ["--parallel"] => {
+            eprintln!("--parallel needs the parallel feature");
+            return ExitCode::from(2);
+        }
+        _ => {
+            eprintln!("Usage: slither-sim serve [--parallel]");
+            return ExitCode::from(2);
+        }
+    };
+    match slither_sim::transport::serve(io::stdin().lock(), io::stdout().lock(), options) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args().skip(1).collect();
     match args
@@ -78,7 +103,7 @@ fn main() -> ExitCode {
         [] | ["--help"] | ["-h"] | ["help"] => {
             println!(
                 "slither-sim {}\n\nUsage: slither-sim serve | client | host\n\n\
-                 serve      Geometric simulation control over JSON-lines.\n\
+                 serve      Geometric simulation control over JSON-lines; --parallel uses every core.\n\
                  client     Portable received-state bot control over JSON-lines.\n\
                  host       Shared protocol-19 WebSocket simulator at /slither.\n\
                  --version  Print the package version.\n\n\
@@ -93,13 +118,7 @@ fn main() -> ExitCode {
             println!("slither-sim {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        ["serve"] => match slither_sim::transport::serve(io::stdin().lock(), io::stdout().lock()) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                eprintln!("{error}");
-                ExitCode::FAILURE
-            }
-        },
+        ["serve", args @ ..] => serve(args),
         ["client"] => {
             match slither_sim::client::transport::serve(io::stdin().lock(), io::stdout().lock()) {
                 Ok(()) => ExitCode::SUCCESS,
