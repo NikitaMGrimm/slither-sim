@@ -185,4 +185,6 @@ jobs:
         run: |
           sha256sum * > SHA256SUMS
           cat SHA256SUMS
-          gh release upload "$RELEASE_TAG" * --clobber
+          # Replacing the checksums last keeps them from listing a missing set.
+          gh release upload "$RELEASE_TAG" slither-sim-* --clobber
+          gh release upload "$RELEASE_TAG" SHA256SUMS --clobber
