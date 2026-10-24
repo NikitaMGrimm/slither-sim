@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-const protocol = 'slither-sim-json-v1';
+const protocol = 'slither-sim-json-v2';
 const filename = process.platform === 'win32' ? 'slither-sim.exe' : 'slither-sim';
 const [binary = fileURLToPath(new URL(`../target/release/${filename}`, import.meta.url)), count = '200'] = process.argv.slice(2);
 const steps = Number(count);
@@ -12,21 +12,30 @@ if (!Number.isSafeInteger(steps) || steps < 1) {
   throw new Error('Usage: node examples/bot.mjs [binary] [positive step count]');
 }
 
-function action(observation) {
-  if (observation === null) return null;
-  const { x, y } = observation.self.head;
-  let heading = Math.atan2(-y, -x);
-  if (Math.hypot(x, y) < observation.arena.radius * 0.8) {
+/** Steer to the nearest visible food, or back toward the center near the rim. */
+function heading(frame, view) {
+  const { snakes, food } = frame;
+  const x = snakes.x[view.self];
+  const y = snakes.y[view.self];
+  let best = Math.atan2(-y, -x);
+  if (Math.hypot(x, y) < frame.radius * 0.8) {
     let distance = Infinity;
-    for (const food of observation.food) {
-      const candidate = (food.x - x) ** 2 + (food.y - y) ** 2;
+    for (const i of view.food) {
+      const candidate = (food.x[i] - x) ** 2 + (food.y[i] - y) ** 2;
       if (candidate < distance) {
         distance = candidate;
-        heading = Math.atan2(food.y - y, food.x - x);
+        best = Math.atan2(food.y[i] - y, food.x[i] - x);
       }
     }
   }
-  return { heading, boost: false };
+  return best;
+}
+
+function actions(frame) {
+  return {
+    heading: frame.views.map(view => (view === null ? null : heading(frame, view))),
+    boost: frame.views.map(() => false),
+  };
 }
 
 const child = spawn(binary, ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
@@ -46,14 +55,14 @@ async function request(message) {
 }
 
 try {
-  let result = await request({ op: 'reset', seed: 7, agents: 4 });
+  // One world; pass worlds: N to step N independent worlds per request.
+  let [frame] = (await request({ op: 'reset', seed: 7, agents: 4 })).worlds;
   let completed = 0;
-  while (completed < steps && result.observations.some(item => item !== null)) {
-    result = await request({ op: 'step', actions: result.observations.map(action) });
+  while (completed < steps && frame.living > 0) {
+    [frame] = (await request({ op: 'step', actions: [actions(frame)] })).worlds;
     completed += 1;
   }
-  const living = result.observations.filter(item => item !== null).length;
-  console.log(`decisions=${completed} time=${result.time.toFixed(3)}s living=${living}`);
+  console.log(`decisions=${completed} time=${frame.time.toFixed(3)}s living=${frame.living}`);
 } finally {
   child.stdin.end();
   const timeout = setTimeout(() => child.kill(), 5000);

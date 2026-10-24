@@ -7,21 +7,25 @@ import os
 from pathlib import Path
 import subprocess
 
-PROTOCOL = "slither-sim-json-v1"
+PROTOCOL = "slither-sim-json-v2"
 
 
-def action(observation):
-    if observation is None:
-        return None
-    head = observation["self"]["head"]
-    x, y = head["x"], head["y"]
-    food = observation["food"]
-    if food and math.hypot(x, y) < observation["arena"]["radius"] * 0.8:
-        target = min(food, key=lambda item: (item["x"] - x) ** 2 + (item["y"] - y) ** 2)
-        heading = math.atan2(target["y"] - y, target["x"] - x)
-    else:
-        heading = math.atan2(-y, -x)
-    return {"heading": heading, "boost": False}
+def heading(frame, view):
+    """Steer to the nearest visible food, or back toward the center near the rim."""
+    snakes, food = frame["snakes"], frame["food"]
+    x, y = snakes["x"][view["self"]], snakes["y"][view["self"]]
+    if view["food"] and math.hypot(x, y) < frame["radius"] * 0.8:
+        target = min(view["food"], key=lambda i: (food["x"][i] - x) ** 2 + (food["y"][i] - y) ** 2)
+        return math.atan2(food["y"][target] - y, food["x"][target] - x)
+    return math.atan2(-y, -x)
+
+
+def actions(frame):
+    views = frame["views"]
+    return {
+        "heading": [None if view is None else heading(frame, view) for view in views],
+        "boost": [False] * len(views),
+    }
 
 
 def main():
@@ -58,16 +62,13 @@ def main():
         return reply["result"]
 
     try:
-        result = request({"op": "reset", "seed": 7, "agents": 4})
+        # One world; pass "worlds": N to step N independent worlds per request.
+        frame = request({"op": "reset", "seed": 7, "agents": 4})["worlds"][0]
         completed = 0
-        for _ in range(args.steps):
-            observations = result["observations"]
-            if not any(item is not None for item in observations):
-                break
-            result = request({"op": "step", "actions": [action(item) for item in observations]})
+        while completed < args.steps and frame["living"]:
+            frame = request({"op": "step", "actions": [actions(frame)]})["worlds"][0]
             completed += 1
-        living = sum(item is not None for item in result["observations"])
-        print(f"decisions={completed} time={result['time']:.3f}s living={living}")
+        print(f"decisions={completed} time={frame['time']:.3f}s living={frame['living']}")
     finally:
         process.stdin.close()
         try:

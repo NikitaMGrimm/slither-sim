@@ -175,6 +175,53 @@ impl<'a> Observer<'a> {
     ) -> Result<(), String> {
         let w = self.world;
         let me = w.snakes.get(index).ok_or("Unknown agent slot")?;
+        let (previous_me, mut food, mut prey, mut opponents) = slot
+            .take()
+            .map(|o| (Some(o.me), o.food, o.prey, o.opponents))
+            .unwrap_or_default();
+        food.clear();
+        prey.clear();
+        let mut copies = Copies {
+            world: w,
+            food: &mut food,
+            prey: &mut prey,
+            opponents: &mut opponents,
+            kept: 0,
+        };
+        self.visit(index, marks, &mut copies)?;
+        let kept = copies.kept;
+        opponents.truncate(kept);
+        let me = match previous_me {
+            Some(mut previous) => {
+                previous.clone_from(me);
+                previous
+            }
+            None => me.clone(),
+        };
+        *slot = Some(Observation {
+            time: w.time,
+            me,
+            opponents,
+            food,
+            prey,
+            arena: Arena {
+                center: Point::default(),
+                radius: w.radius,
+            },
+            vision_radius: Some(w.vision),
+        });
+        Ok(())
+    }
+    /// Reports what `index` sees to `sink`: world indices of visible food, prey and
+    /// opponents, each in world order. `marks` is as in `observe_into`.
+    pub(crate) fn visit(
+        &self,
+        index: usize,
+        marks: &mut Vec<u64>,
+        sink: &mut impl Sink,
+    ) -> Result<(), String> {
+        let w = self.world;
+        let me = w.snakes.get(index).ok_or("Unknown agent slot")?;
         let vision = w.vision;
         let visible = |p: Point| {
             (p.x - me.head.x).abs() <= vision
@@ -197,12 +244,6 @@ impl<'a> Observer<'a> {
             };
             (i, b)
         });
-        let (previous_me, mut food, mut prey, mut opponents) = slot
-            .take()
-            .map(|o| (Some(o.me), o.food, o.prey, o.opponents))
-            .unwrap_or_default();
-        food.clear();
-        prey.clear();
         match query {
             Some((
                 Index {
@@ -236,21 +277,33 @@ impl<'a> Observer<'a> {
                     mark(i as usize, visible(w.food[i as usize].point()));
                 }
                 // Ascending bit order restores the original food order.
-                food.reserve(count);
+                sink.reserve_food(count);
+                let mut reported = 0;
                 for (word, bits) in marks.iter_mut().enumerate().skip(first) {
-                    if food.len() == count {
+                    if reported == count {
                         break;
                     }
                     let mut bits = std::mem::take(bits);
                     while bits != 0 {
-                        food.push(w.food[word * 64 + bits.trailing_zeros() as usize].clone());
+                        sink.food(word * 64 + bits.trailing_zeros() as usize);
+                        reported += 1;
                         bits &= bits - 1;
                     }
                 }
             }
-            _ => food.extend(w.food.iter().filter(|f| visible(f.point())).cloned()),
+            _ => {
+                for (i, f) in w.food.iter().enumerate() {
+                    if visible(f.point()) {
+                        sink.food(i);
+                    }
+                }
+            }
         }
-        prey.extend(w.prey.iter().filter(|p| visible(p.position)).cloned());
+        for (i, p) in w.prey.iter().enumerate() {
+            if visible(p.position) {
+                sink.prey(i);
+            }
+        }
         let visible_opponents = w
             .snakes
             .iter()
@@ -267,37 +320,72 @@ impl<'a> Observer<'a> {
                     })
                     && (visible(s.head) || s.body.iter().any(|&p| visible(p)))
             })
-            .map(|(_, s)| s);
-        // `clone_from` keeps the id and body allocations of the snakes already there.
-        let mut kept = 0;
-        for snake in visible_opponents {
-            match opponents.get_mut(kept) {
-                Some(previous) => previous.clone_from(snake),
-                None => opponents.push(snake.clone()),
-            }
-            kept += 1;
+            .map(|(i, _)| i);
+        for i in visible_opponents {
+            sink.opponent(i);
         }
-        opponents.truncate(kept);
-        let me = match previous_me {
-            Some(mut previous) => {
-                previous.clone_from(me);
-                previous
-            }
-            None => me.clone(),
-        };
-        *slot = Some(Observation {
-            time: w.time,
-            me,
-            opponents,
-            food,
-            prey,
-            arena: Arena {
-                center: Point::default(),
-                radius: w.radius,
-            },
-            vision_radius: Some(vision),
-        });
         Ok(())
+    }
+}
+
+/// Receives what one slot sees from [`Observer::visit`], as world indices.
+pub(crate) trait Sink {
+    /// `count` food items follow.
+    fn reserve_food(&mut self, _count: usize) {}
+    fn food(&mut self, index: usize);
+    fn prey(&mut self, index: usize);
+    fn opponent(&mut self, index: usize);
+}
+
+/// What one slot sees: world indices of food, prey and opponents, in world order.
+#[derive(Debug, Default)]
+pub(crate) struct Sighting {
+    pub food: Vec<usize>,
+    pub prey: Vec<usize>,
+    pub opponents: Vec<usize>,
+}
+impl Sink for Sighting {
+    fn reserve_food(&mut self, count: usize) {
+        self.food.reserve(count);
+    }
+    fn food(&mut self, index: usize) {
+        self.food.push(index);
+    }
+    fn prey(&mut self, index: usize) {
+        self.prey.push(index);
+    }
+    fn opponent(&mut self, index: usize) {
+        self.opponents.push(index);
+    }
+}
+
+/// Copies what a slot sees into the vectors of an observation.
+struct Copies<'a, 'w> {
+    world: VisibleState<'w>,
+    food: &'a mut Vec<Food>,
+    prey: &'a mut Vec<Prey>,
+    opponents: &'a mut Vec<Snake>,
+    /// Opponents written so far; any beyond are left over from earlier calls.
+    kept: usize,
+}
+impl Sink for Copies<'_, '_> {
+    fn reserve_food(&mut self, count: usize) {
+        self.food.reserve(count);
+    }
+    fn food(&mut self, index: usize) {
+        self.food.push(self.world.food[index].clone());
+    }
+    fn prey(&mut self, index: usize) {
+        self.prey.push(self.world.prey[index].clone());
+    }
+    fn opponent(&mut self, index: usize) {
+        let snake = &self.world.snakes[index];
+        // `clone_from` keeps the id and body allocations of the snakes already there.
+        match self.opponents.get_mut(self.kept) {
+            Some(previous) => previous.clone_from(snake),
+            None => self.opponents.push(snake.clone()),
+        }
+        self.kept += 1;
     }
 }
 impl Simulator {
@@ -333,6 +421,31 @@ impl Simulator {
         observations: &mut Vec<Option<Observation>>,
     ) -> Result<(), String> {
         self.observe_matching(Some(selected), observations)
+    }
+    /// One entry per slot: what each living slot sees, by the same rules as
+    /// [`observe_all`](Self::observe_all) but as indices into world state.
+    /// `marks` is scratch space kept between calls.
+    pub(crate) fn sight_all_into(
+        &self,
+        sightings: &mut Vec<Option<Sighting>>,
+        marks: &mut Vec<u64>,
+    ) {
+        sightings.truncate(self.snakes.len());
+        sightings.resize_with(self.snakes.len(), || None);
+        let observer = Observer::new(VisibleState::of(self), self.living());
+        for (i, slot) in sightings.iter_mut().enumerate() {
+            if !self.snakes[i].alive {
+                *slot = None;
+                continue;
+            }
+            let sighting = slot.get_or_insert_with(Sighting::default);
+            sighting.food.clear();
+            sighting.prey.clear();
+            sighting.opponents.clear();
+            observer
+                .visit(i, marks, sighting)
+                .expect("existing slots are observable");
+        }
     }
     fn observe_matching(
         &self,

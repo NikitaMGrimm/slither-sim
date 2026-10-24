@@ -1,25 +1,23 @@
-# Geometric controller: slither-sim-json-v1
+# Geometric controller: slither-sim-json-v2
 
-Run `slither-sim serve`. One controller owns the world and all player slots.
-Send UTF-8 JSON objects, one per stdin line; read one stdout reply per request.
-EOF stops the process. Rust callers can use the library directly.
-
-`slither-sim serve --parallel` computes each reply's observations on every core,
-through rayon's global pool; set `RAYON_NUM_THREADS` to use fewer. Replies are
-byte-identical, so controllers cannot tell the difference. Writing the JSON reply
-usually costs far more than observing, so expect little: with dense food or wide
-vision, observing got about 3× faster but whole steps only 2–4%, and small
-worlds can get slightly slower.
+Run `slither-sim serve`. One controller owns a session of independent worlds and
+all their player slots. Send UTF-8 JSON objects, one per stdin line; read one
+stdout reply per request. EOF stops the process. Rust callers can use the
+library directly.
 
 ```json
-{"protocol":"slither-sim-json-v1","result":{}}
-{"protocol":"slither-sim-json-v1","error":"Reset first"}
+{"protocol":"slither-sim-json-v2","result":{}}
+{"protocol":"slither-sim-json-v2","error":"Reset first"}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
 readers ignore additional fields. Error text is descriptive, not a stable code.
 Malformed or rejected requests leave the stream usable; I/O failures stop it.
 This interface is for trusted local controllers.
+
+Sessions with several worlds step them in parallel, one world per task, on every
+core; `slither-sim serve --threads N` caps the threads. Replies do not depend on
+the thread count.
 
 ## Requests
 
@@ -30,76 +28,88 @@ This interface is for trusted local controllers.
 ```
 
 Works before reset. Returns `version`, `defaultConfig`, `defaultDecisionTicks`,
-`maxAgents` and `maxDecisionTicks`.
+`maxAgents` (128), `maxWorlds` (1024), `maxDecisionTicks` (1000), the food
+`origins` codes and the observation `precision`.
 
 ### reset
 
 ```json
-{"op":"reset","seed":7,"agents":2,"decisionTicks":6,"config":{"radius":1000,"dynamicRadius":false,"foodCount":350}}
+{"op":"reset","seed":7,"worlds":1,"agents":2,"decisionTicks":6,"config":{"radius":1000,"dynamicRadius":false,"foodCount":350}}
 ```
 
-All fields except `op` are optional. Defaults: seed 1, four agents, six decision
-ticks and `Config::official(1)`. Agents must be 1–128 and decision ticks 1–1000.
-`config` and nested settings use camelCase; omitted fields use defaults.
-All world settings are listed in the [configuration reference](configuration.md#world-config).
-Invalid resets preserve the previous world.
+All fields except `op` are optional. Defaults: seed 1, one world, four agents,
+six decision ticks and `Config::official(1)`. Every world shares `agents`,
+`decisionTicks` and `config`; world `w` uses seed `seed + w` (wrapping at 2³²).
+`config` and nested settings use camelCase; omitted fields use defaults. All
+world settings are listed in the [configuration reference](configuration.md#world-config).
+Invalid resets preserve the previous session.
 
-Returns `seed`, resolved `config`, `decisionTicks`, `observations` and `time`.
-Slots have stable string IDs (`"0"`, `"1"`, …). Snakes start on a deterministic
-ring halfway to the boundary, facing inward; this is a synthetic test setup.
+Returns `seed`, the resolved `config`, `decisionTicks` and `worlds`, one
+[frame](#frames) per world. Snakes start on a deterministic ring halfway to the
+boundary, facing inward; this is a synthetic test setup.
 
-The same build, config, seed and actions produce the same world. Cross-platform
+The same build, config, seed and actions produce the same worlds. Cross-platform
 bitwise floating-point equivalence is not promised; retain these inputs and the
 commit when recording results.
 
 ### step
 
 ```json
-{"op":"step","actions":[{"heading":3.141592653589793,"boost":false},{"heading":0,"boost":false}]}
+{"op":"step","actions":[{"heading":[3.141592653589793,0],"boost":[false,true]}]}
 ```
 
-Supply one entry per agent. Living slots require a finite heading in radians and
-a boost boolean; dead slots may be `null`. Headings are absolute: zero is +x and
-pi/2 is +y. The whole batch is validated before advancing; rejection changes nothing.
+`actions` has one entry per world, each with a `heading` and a `boost` array of
+one entry per agent slot. Living slots require a finite heading in radians; dead
+slots may use `null`. Headings are absolute: zero is +x and pi/2 is +y. The
+whole request is validated before any world advances; rejection changes nothing.
 
-Actions are held for `decisionTicks` physics ticks, stopping early if all snakes
-die. Time follows simulation ticks, independent of controller compute time.
-`config.dt` is seconds per tick; defaults give a 42 ms decision interval.
-There is no network delay, automatic respawn, reward, victory condition or episode
-timeout. Use `reset` for a new world.
+Each world holds its actions for `decisionTicks` physics ticks, stopping early if
+all its snakes die. Time follows simulation ticks, independent of controller
+compute time. `config.dt` is seconds per tick; defaults give a 42 ms decision
+interval. There is no network delay, automatic respawn, reward, victory
+condition or episode timeout. Use `reset` for new worlds.
 
-| Result | Meaning |
-| --- | --- |
-| `observations` | Stable slots; dead slots are `null`. |
-| `deaths` | Death events from this request only. |
-| `time`, `elapsedSeconds`, `ticks` | World time and interval actually advanced. |
-| `living` | Surviving snakes. |
-
-### observe
-
-```json
-{"op":"observe","slot":0}
-```
-
-Returns `{"observation": ...}`, matching reset/step without changing time,
-visibility or RNG state. Dead slots return `null`; unknown slots return an error.
+Returns `worlds`, one frame per world.
 
 ### snapshot
 
 ```json
-{"op":"snapshot"}
+{"op":"snapshot","world":0}
 ```
 
-Returns whole-world `config`, `time`, `snakes`, `food`, `prey` and cumulative
-`deaths`. This debug view excludes internal motion/RNG state and is not a
-restorable checkpoint. Keep it out of limited-visibility bot evaluations.
+Returns world `world`'s (default 0) whole-world `config`, `time`, `snakes`,
+`food`, `prey` and cumulative `deaths` at full precision, with string slot IDs.
+This debug view excludes internal motion/RNG state and is not a restorable
+checkpoint. Keep it out of limited-visibility bot evaluations.
 
-## Observation boundary
+## Frames
 
-Observations contain `time`, `self`, `opponents`, `food`, `prey`, `arena` and
-`visionRadius`. Coordinates and body anchors use world units; speed is world
-units per second. Anchors run head to tail, separately from the current head.
-`arena.center` is the origin.
+A frame holds everything any living slot of that world can see, once, in
+columns, plus each slot's view as row indices into those columns.
+
+| Member | Meaning |
+| --- | --- |
+| `time`, `ticks` | World time, and ticks advanced by this request (0 on reset). |
+| `living` | Surviving snakes. |
+| `deaths` | Death events from this request: `time`, `victim` and `killer` slots, `reason` and dropped `food`. |
+| `radius`, `vision` | Arena radius around the origin, and the vision radius. |
+| `snakes` | One row per snake that some living slot sees, including each slot's own. |
+| `food`, `prey` | One row per item that some living slot sees. |
+| `views` | One entry per slot: `null` for dead slots, otherwise `self` (its own `snakes` row) and the `snakes`, `food` and `prey` rows it sees. |
+
+Columns are arrays of equal length; row `r` is element `r` of each.
+
+| Table | Columns |
+| --- | --- |
+| `snakes` | `slot`, head `x`/`y`, `heading`, `speed`, `radius`, `length`, `segments`, `fam`, `score`, `kills`; anchors `bodyX`/`bodyY` |
+| `food` | `x`, `y`, `value`, `size`, `origin` (index into `info.origins`: ambient, boost, death) |
+| `prey` | `id`, `x`, `y`, `heading`, `targetHeading`, `speed`, `size` |
+
+Row `r`'s body anchors are `bodyX[bodyStart[r]:bodyStart[r+1]]` and the same
+range of `bodyY`, head to tail; `bodyStart` has one more entry than there are rows.
+Rows and view lists follow world order, so a slot's view lists opponents by
+slot and food in spawn order. Coordinates use world units; speeds use world
+units per second.
 
 Food and prey are filtered by the vision circle. If an opponent's head or any
 anchor is visible, **its entire stored snake record is included**, even outside
@@ -109,6 +119,28 @@ be unavailable to a network client.
 The controller can read every slot and debug snapshots. A shared competition
 must separately restrict observations, isolate bots and define timing and
 disconnection rules.
+
+### Precision
+
+Frames round coordinates (head, anchors, food, prey) to 0.01 world units,
+headings to 0.0001 radians and speeds to 0.01 units per second; every other
+number is exact. `info.precision` reports these steps. Rounding happens only
+when a frame is written: the simulation, snapshots, the [portable bot
+API](client-api.md) and the [WebSocket host](raw-server.md) keep full precision,
+so players connected to a hosted server receive exactly what they did before.
+
+Real players mostly receive coarser data than this. Protocol-19 packets carry
+snake and prey positions in steps of 0.2 world units or coarser, food in steps of
+sector size/256 (1.17 units), snake motion headings in steps of 2π/256 and speeds
+in steps of 0.03 units/s or coarser; 81,218 field values from three retained
+official-server captures all sat on those grids. Prey headings, snake spawn
+headings (steps of 2π/16777215) and body anchors that clients rebuild from
+transmitted directions are finer than the frame steps. For those, the bound is
+what matters: headings are off by at most 0.00005 radians, 0.2% of the turn a
+small snake or prey can make in one tick (1.1% for the largest snakes), and
+points by at most 0.0071 units, 0.05% of the smallest snake radius. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
+has the measurements and error bounds. Rounding can still change a bot's choice
+when it sits exactly at a decision threshold.
 
 ## Transport and official-server compatibility
 
@@ -140,8 +172,8 @@ available. `networking` is enabled by default and restores the full interface.
 large batches over the current [rayon](https://docs.rs/rayon) thread pool;
 results are identical. It is off by default so that worlds you already run in
 parallel do not compete for cores; size the pool with `RAYON_NUM_THREADS` or run
-inside `ThreadPool::install`. It needs the default-enabled `parallel` feature.
-`transport::serve` takes the same switch in `ServeOptions`.
+inside `ThreadPool::install`. `transport::serve` steps a session's worlds on the
+same pool. Both need the default-enabled `parallel` feature.
 
 ```sh
 cargo build --lib --no-default-features --locked

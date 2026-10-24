@@ -2,12 +2,38 @@
 
 ## Unreleased
 
+### Breaking
+
+- `slither-sim serve` speaks `slither-sim-json-v2`, and v1 is removed. Replies
+  carry one frame per world: everything any living slot sees, once, in columns,
+  with each slot's view as row indices into them. With 128 living snakes, replies
+  are about 12× smaller, the server answers about twice as fast and Python's
+  `json.loads` is about 11× faster.
+- Frames round coordinates to 0.01 world units, headings to 0.0001 rad and speeds
+  to 0.01 units/s; other numbers stay exact. Real players mostly receive coarser
+  protocol-19 data, and the worst error is 0.05% of the smallest snake radius;
+  see the [observation precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md).
+  The simulation, snapshots, the portable client and the WebSocket host keep full
+  precision, so hosted players are unaffected.
+
 ### Added
 
-- `slither-sim serve --parallel` splits each reply's observations over every
-  core with byte-identical replies. JSON encoding still dominates each step, so
-  the gain is small. Library callers pass `transport::ServeOptions` to
-  `transport::serve`, which now takes it as a third argument.
+- One `serve` session runs many worlds: `reset` takes `worlds` (up to 1,024),
+  world `w` uses seed `seed + w`, and worlds step in parallel on every core.
+  `slither-sim serve --threads N` caps the threads; replies do not depend on it.
+
+### Migration from slither-sim-json-v1
+
+- Send `step` actions as one `{"heading":[...],"boost":[...]}` entry per world,
+  with one element per slot; dead slots take a `null` heading.
+- Read `result.worlds[w]` instead of `observations`. A slot's view is
+  `views[slot]` (`null` when dead): `self` is its own `snakes` row, and `snakes`,
+  `food` and `prey` list the rows it sees. Body anchors are the slice
+  `bodyStart[row]..bodyStart[row + 1]` of `bodyX`/`bodyY`.
+- `observe` is removed; every reset and step reply carries the frames.
+  `snapshot` takes `world` and stays at full precision. `elapsedSeconds` is
+  removed; use `ticks × config.dt`. See the [bot API](docs/bot-api.md) and the
+  ported Python and Node.js examples.
 
 ## [0.3.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.0...v0.3.1) - 2026-10-24
 

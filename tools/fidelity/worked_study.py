@@ -265,9 +265,10 @@ def simulate(executable):
     """Return per-tick true states and the commands the server applied."""
     sim = Simulator(executable)
     try:
-        reset = sim.request({"op": "reset", "seed": SEED, "agents": 1, "decisionTicks": 1,
-                             "config": SIM_CONFIG})
-        states = [reset["observations"][0]["self"]]
+        # Snapshots carry full-precision state; observations are rounded.
+        sim.request({"op": "reset", "seed": SEED, "agents": 1, "decisionTicks": 1,
+                     "config": SIM_CONFIG})
+        states = [sim.request({"op": "snapshot"})["snakes"][0]]
         first_command = math.floor((UPLINK_MS + DOWNLINK_MS + LEAD_MS) / TICK_MS) + 1
         commands, held, action = [], None, states[0]["heading"]
         for k in range(TICKS):
@@ -276,9 +277,9 @@ def simulate(executable):
                 if byte != held:
                     held, action = byte, command_heading(byte)
                     commands.append({"effectiveServerMs": k * TICK_MS, "byte": byte})
-            result = sim.request({"op": "step", "actions": [{"heading": action, "boost": False}]})
-            snake = result["observations"][0]["self"]
-            if not snake["alive"] or result["deaths"]:
+            frame = sim.request({"op": "step", "actions": [{"heading": [action], "boost": [False]}]})
+            snake = sim.request({"op": "snapshot"})["snakes"][0]
+            if not snake["alive"] or frame["worlds"][0]["deaths"]:
                 raise RuntimeError("synthetic snake died; schedule left the safe arena")
             states.append(snake)
         return states, commands, first_command

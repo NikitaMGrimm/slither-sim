@@ -13,6 +13,7 @@ scientific rule or product adoption.
 | Performance | [Collision bounds lookup](performance/2026-10-23-collision-bounds/REPORT.md) | Adopted lookup change; gain specific to the separated-body fixture. |
 | Performance | [Observation batches](performance/2026-10-23-observation-batches/REPORT.md) | Early return adopted for empty batches; rejected attempt and mixed nonempty results retained. |
 | Fidelity | [Visibility recheck and follow-ups](fidelity/2026-10-23-visibility-recheck/REPORT.md) | Acquisition successes and failures; no validated replacement subscription rule. |
+| Fidelity | [Observation precision](fidelity/2026-10-24-observation-precision/REPORT.md) | Protocol-19 field grids in three local-only captures; adopted 0.01-unit, 0.0001-rad and 0.01-unit/s steps for `serve` frames. |
 
 ## Adding or updating material
 

@@ -10,7 +10,7 @@ live inline in `tests/client_challenge.rs`; there is no `login-challenges.json`.
 `wireProtocol` (the actual binary wire version, currently literal `19`) and
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
 The client frame ID is distinct from the `slither-client-json-v1` request/reply
-envelope and the geometric `slither-sim-json-v1` controller; see
+envelope and the geometric `slither-sim-json-v2` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
 `dataOrigin: captured` identifies retained packet bytes, with
