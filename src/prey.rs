@@ -2,7 +2,7 @@
 //! client prediction is smooth. Steering and population control remain estimates.
 use crate::{
     model::*,
-    physics::{REFERENCE_FRAME_SECONDS, SPEED_UNIT_SECONDS, advance},
+    physics::{MAX_SEGMENTS, REFERENCE_FRAME_SECONDS, SPEED_UNIT_SECONDS, advance, nutrition},
 };
 use serde::{Deserialize, Serialize};
 
@@ -112,6 +112,17 @@ impl PreyConfig {
             || self.size_steps().is_none()
         {
             return Err("Invalid prey settings".into());
+        }
+        // A catch adds nutrition(size, mass) × nutritionFactor to the eater's
+        // mass, largest at the minimum mass 2. Finite inputs alone can still
+        // overflow: size 1e200 made fam and length infinite.
+        let (_, upper) = self.size_steps().expect("checked above");
+        let catch = nutrition(upper / 5.0, 2.0) * self.nutrition_factor;
+        if !(catch + MAX_SEGMENTS as f64).is_finite() {
+            return Err(
+                "Prey nutrition (largest size² × 0.0031535 × nutritionFactor), added to a                  snake's mass, must be finite"
+                    .into(),
+            );
         }
         Ok(())
     }

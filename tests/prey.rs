@@ -89,6 +89,33 @@ fn spawned_prey_respect_positive_representable_size_bounds() {
 }
 
 #[test]
+fn prey_nutrition_that_overflows_a_snake_mass_is_rejected() {
+    // Finite settings whose computed catch is infinite.
+    let huge = PreyConfig {
+        size: 1e200,
+        max_size: 1e200,
+        ..PreyConfig::default()
+    };
+    let error = huge.validate().unwrap_err();
+    assert!(error.contains("nutritionFactor"), "{error}");
+    let factor = PreyConfig {
+        size: 1000.,
+        max_size: 1000.,
+        nutrition_factor: 1e305,
+        ..PreyConfig::default()
+    };
+    assert!(factor.validate().is_err());
+    // Large but representable catches remain valid.
+    PreyConfig {
+        size: 1e100,
+        max_size: 1e100,
+        ..PreyConfig::default()
+    }
+    .validate()
+    .unwrap();
+}
+
+#[test]
 fn client_prey_units_and_turn_limit() {
     // Public client: mamu2=0.029 radians per 8ms; movement sp*vfr/4.
     let mut p = entity(0., 3.8 / 0.032);
