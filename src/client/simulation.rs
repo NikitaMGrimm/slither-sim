@@ -51,8 +51,8 @@ const RECORD_OVERHEAD: usize = 32;
 /// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
 /// snake in full.
 const FRESH_ANCHORS: usize = 4;
-/// Clear-pose draws per spawn before waiting for a later tick. Placement
-/// policy: a clear pose may exist after this many failures.
+/// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
+/// pose may exist after this many failures.
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves

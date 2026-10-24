@@ -29,8 +29,12 @@ the thread count.
 ```
 
 Works before reset. Returns `version`, `defaultConfig`, `defaultDecisionTicks`,
-`maxAgents` (128), `maxWorlds` (1024), `maxDecisionTicks` (1000), the food
-`origins` codes and the observation `precision`.
+`maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
+observation `precision`. The maxima are representation limits, not policies:
+`maxAgents` and `maxDecisionTicks` are 4294967295 because frames hold `u32`
+slot indices (`u32::MAX` means none) and tick counts; `maxWorlds` is the
+platform's `usize::MAX`, since only `worlds × agents` must fit `usize` and memory
+bounds worlds in practice.
 
 ### reset
 
@@ -45,9 +49,12 @@ six decision ticks and `Config::official(1)`. Every world shares `agents`,
 world settings are listed in the [configuration reference](configuration.md#world-config).
 Invalid resets preserve the previous session.
 
-Returns `seed`, the resolved `config`, `decisionTicks` and `worlds`, one
-[frame](#frames) per world. Snakes start on a deterministic ring halfway to the
-boundary, facing inward; this is a synthetic test setup.
+Returns `seed`, the resolved `config`, `decisionTicks`, `warnings` and `worlds`,
+one [frame](#frames) per world. `warnings` lists sentences about valid but
+unmeasured settings, such as a `dt` outside the measured server loop; it is
+empty otherwise. `slither-sim serve` also prints them to stderr, never stdout.
+See [limits](configuration.md#limits). Snakes start on a deterministic ring
+halfway to the boundary, facing inward; this is a synthetic test setup.
 
 The same build, config, seed and actions produce the same worlds. Cross-platform
 bitwise floating-point equivalence is not promised; retain these inputs and the
@@ -197,8 +204,9 @@ Respawn requires all points inside the arena; it does not enforce clearance or
 reject self-intersections. Call `body_is_clear` separately for spawn exclusion.
 The straight-body `spawn_is_clear` and `respawn` methods remain available.
 
-Refill rates must be finite and within 0–10,000; a rate too small to represent
-the rescaled pending clock is rejected. Use the setter instead of directly
+Refill rates must be finite and nonnegative, small enough that one attempt
+interval still changes the refill clock, and large enough to represent the
+rescaled pending clock. Use the setter instead of directly
 editing `config.ambient_replenish_per_second` when changing a running world.
 Rejected operations leave the world unchanged.
 

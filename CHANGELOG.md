@@ -13,6 +13,46 @@
   ABI library with its header, for Linux (x86-64 and ARM64, glibc 2.17+), macOS
   (Apple silicon and Intel) and Windows (x86-64), with a `SHA256SUMS` file. They
   are unsigned. See [download a release](README.md#download-a-release).
+- `Config::warnings`, `SimulationConfig::warnings` and `HostConfig::warnings`
+  describe valid but unmeasured settings, starting with a `dt` outside the
+  measured 6.94–7.07 ms loop and long broadcast intervals. `serve` reset replies
+  carry them as `warnings`, the CLI prints them to stderr, and Python's
+  `Session.reset` issues each as a `UserWarning`.
+
+### Breaking
+
+- Limits are now real limits, warned unmeasured ranges or named policies; see
+  [limits](docs/configuration.md#limits). Arbitrary caps are removed:
+  `foodCount ≤ 100000`, `ambientReplenishPerSecond ≤ 10000`, prey
+  `count ≤ 10000`, 128 agents for simulated clients and the host (now the
+  65,536 protocol-19 snake IDs), `serve`'s 128 agents, 1,024 worlds and 1,000
+  decision ticks (now `u32` frame bounds and memory), 1,000 decision and
+  broadcast ticks, the latency model's 2 s, 10 s and 1/s ceilings and
+  Pareto-shape interval, the 2 s cap on measured processing time and the
+  network backend's interval caps. `info` reports the new `serve` maxima.
+- With sliding boundaries `dt` must be below 16 / 437.5 s (≈ 36.57 ms): a
+  boosting minimum-size snake would otherwise pass its contact lead in one tick
+  and die on shallow rim contact. The old 32 ms cap claimed body-radius
+  tunneling, which swept collision tests rule out. Hard boundaries accept any
+  positive finite `dt`.
+- Zero `maxPerCell` admits nothing; kiosk rates, prey speeds, prey turn rate
+  and nutrition factor may be zero. Validation error texts changed.
+- Long broadcast intervals load with a warning instead of an error: snakes that
+  outrun the incremental window are resent in full. Up to three new anchors per
+  broadcast now encode incrementally, up from two.
+- A drawn round trip is no longer clamped to 2 s, and pings slower than 2 s are
+  reported instead of dropped.
+
+### Fixed
+
+- Prey whose IDs share their low 16 bits, such as 0 and 65536, no longer share a
+  protocol-19 wire ID and hide each other.
+- A tiny food `cellSize` no longer merges distinct admission cells.
+- Finite prey sizes whose catch overflows a snake's mass are rejected instead
+  of making `fam` and `length` infinite.
+- Unrepresentable `serve` frame columns, `worlds × agents` products and host
+  client counts are errors instead of panics; a failing reset keeps the previous
+  session, and a step whose frame fails ends it.
 
 ### Performance
 
