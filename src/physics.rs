@@ -324,11 +324,10 @@ pub fn crossed_anchor(_previous: Point, head: Point, last: Point) -> Option<Poin
         y: last.y + quantized.sin() * 42.0,
     })
 }
-/// Continuous score used by the provisional kiosk penalty. The public score
-/// still rounds down exactly as the official score display does.
-pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
+/// The stock client's `(fmlts, fpsls)` score tables over `0..=MAX_SEGMENTS`.
+fn score_tables() -> &'static ([f64; 431], [f64; 431]) {
     static TABLE: OnceLock<([f64; 431], [f64; 431])> = OnceLock::new();
-    let (weights, sums) = TABLE.get_or_init(|| {
+    TABLE.get_or_init(|| {
         let mut weights = [0.0; 431];
         let mut sums = [0.0; 431];
         for i in 0..=430 {
@@ -338,23 +337,87 @@ pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
             }
         }
         (weights, sums)
-    });
+    })
+}
+/// Continuous score used by the provisional kiosk penalty. The public score
+/// still rounds down exactly as the official score display does.
+pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
+    let (weights, sums) = score_tables();
     let n = segments.min(430);
     (sums[n] + fam.min(1.0) / weights[n] - 1.0) * 15.0 - 5.0
 }
 pub fn score(segments: usize, fam: f64) -> f64 {
     score_exact(segments, fam).floor()
 }
-pub fn remove_mass(segments: &mut usize, fam: &mut f64, amount: f64) -> usize {
+/// The least mass whose continuous score reaches a `minScore`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MassFloor {
+    pub segments: usize,
+    pub fam: f64,
+}
+impl MassFloor {
+    /// Scores a floor can take: from a new 2-segment snake's to the last
+    /// segment of the score table.
+    pub fn score_range() -> std::ops::RangeInclusive<f64> {
+        score_exact(2, 0.0)..=score_exact(MAX_SEGMENTS, 0.0)
+    }
+    /// Inverts `score_exact` within one segment's linear piece, then adjusts
+    /// by ulps so the result is the least fam whose score is at least `score`.
+    pub fn for_score(score: f64) -> Option<Self> {
+        if !Self::score_range().contains(&score) {
+            return None;
+        }
+        let (weights, sums) = score_tables();
+        let segments = (2..=MAX_SEGMENTS)
+            .rev()
+            .find(|&n| score_exact(n, 0.0) <= score)
+            .expect("the range starts at two segments");
+        let mut fam =
+            (((score + 5.0) / 15.0 + 1.0 - sums[segments]) * weights[segments]).clamp(0.0, 1.0);
+        while score_exact(segments, fam) < score {
+            fam = fam.next_up();
+        }
+        while fam > 0.0 && score_exact(segments, fam.next_down()) >= score {
+            fam = fam.next_down();
+        }
+        // The top of one segment's piece is the next segment's start.
+        if fam >= 1.0 {
+            return Some(Self {
+                segments: segments + 1,
+                fam: 0.0,
+            });
+        }
+        Some(Self { segments, fam })
+    }
+    /// Mass above the floor, or zero at and below it.
+    pub fn excess(self, segments: usize, fam: f64) -> f64 {
+        (segments as f64 - self.segments as f64 + (fam - self.fam)).max(0.0)
+    }
+}
+
+/// Remove up to `amount` mass, keeping at least two segments and, with a
+/// floor, at least the floor's mass. Returns the segments removed.
+pub fn remove_mass(
+    segments: &mut usize,
+    fam: &mut f64,
+    amount: f64,
+    floor: Option<MassFloor>,
+) -> usize {
+    let amount = floor.map_or(amount, |f| amount.min(f.excess(*segments, *fam)));
+    let before = *segments;
     *fam -= amount;
-    let mut removed = 0;
     while *fam < 0.0 && *segments > 2 {
         *segments -= 1;
         *fam += 1.0;
-        removed += 1;
     }
     *fam = fam.max(0.0);
-    removed
+    // `amount` stops at the floor, so landing below it is only rounding.
+    if let Some(f) = floor {
+        if amount > 0.0 && (*segments, *fam) < (f.segments, f.fam) {
+            (*segments, *fam) = (f.segments, f.fam);
+        }
+    }
+    before.saturating_sub(*segments)
 }
 pub fn quantize_food(value: f64) -> f64 {
     (value / (300.0 / 256.0)).floor() * (300.0 / 256.0)

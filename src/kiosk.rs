@@ -2,7 +2,7 @@
 //! Labs study; the detector, rates and recovery curve await current captures.
 
 use crate::model::{Point, Snake};
-use crate::physics::{MAX_SEGMENTS, remove_mass, score_exact};
+use crate::physics::{MAX_SEGMENTS, MassFloor, remove_mass, score_exact};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -75,7 +75,14 @@ pub(crate) struct KioskState {
 }
 
 impl KioskState {
-    pub(crate) fn step(&mut self, snake: &mut Snake, config: &KioskConfig, dt: f64) {
+    /// Shrinking stops at `floor`, the world's `minScore` mass.
+    pub(crate) fn step(
+        &mut self,
+        snake: &mut Snake,
+        config: &KioskConfig,
+        dt: f64,
+        floor: Option<MassFloor>,
+    ) {
         if !snake.alive {
             return;
         }
@@ -109,8 +116,12 @@ impl KioskState {
             let target_mass = mass_for_score(target);
             let old_mass = snake.segments as f64 + snake.fam;
             if target_mass < old_mass {
-                let removed =
-                    remove_mass(&mut snake.segments, &mut snake.fam, old_mass - target_mass);
+                let removed = remove_mass(
+                    &mut snake.segments,
+                    &mut snake.fam,
+                    old_mass - target_mass,
+                    floor,
+                );
                 snake
                     .body
                     .truncate(snake.body.len().saturating_sub(removed));
@@ -176,11 +187,11 @@ mod tests {
         let mut state = KioskState::default();
         let config = KioskConfig::default();
         let before = score_exact(snake.segments, snake.fam).floor();
-        state.step(snake, &config, 1_199.0);
+        state.step(snake, &config, 1_199.0, None);
         state.finish_score(snake);
         assert_eq!(snake.segments, 380);
         assert_eq!(snake.score, before);
-        state.step(snake, &config, 1.0);
+        state.step(snake, &config, 1.0, None);
         state.finish_score(snake);
         assert!(snake.segments < 380);
         assert_eq!(snake.score, before);
@@ -200,7 +211,7 @@ mod tests {
             score_credit: 10.0,
         };
         let previous_display = (score_exact(snake.segments, snake.fam) + 10.0).floor();
-        state.step(snake, &KioskConfig::default(), 1.0);
+        state.step(snake, &KioskConfig::default(), 1.0, None);
         state.finish_score(snake);
         assert!(state.score_credit <= 10.0);
         assert!(snake.score <= previous_display);

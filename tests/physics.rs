@@ -49,10 +49,10 @@ fn scale_score_mass_and_chords() {
     assert_eq!(score(2, 0.0), 10.0);
     assert_eq!(score(13, 0.8218), 194.0);
     let (mut n, mut f) = (4, 0.1);
-    assert_eq!(remove_mass(&mut n, &mut f, 0.2), 1);
+    assert_eq!(remove_mass(&mut n, &mut f, 0.2, None), 1);
     assert_eq!(n, 3);
     assert!((f - 0.9).abs() < 1e-12);
-    remove_mass(&mut n, &mut f, 10.0);
+    remove_mass(&mut n, &mut f, 10.0, None);
     assert_eq!((n, f), (2, 0.0));
     assert_eq!(
         crossed_anchor(

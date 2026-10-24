@@ -48,6 +48,7 @@ Invalid resets preserve the previous session.
 Returns `seed`, the resolved `config`, `decisionTicks` and `worlds`, one
 [frame](#frames) per world. Snakes start on a deterministic ring halfway to the
 boundary, or at `config.spawnRadius`, facing inward; this is a synthetic test setup.
+With `config.minScore`, each starts at that score along its ring, counterclockwise.
 `config` may name a [`preset`](configuration.md#presets), such as
 `{"preset":"battledome"}`; the reply prints the resolved fields.
 
@@ -195,7 +196,8 @@ Before embedding:
 | --- | --- |
 | `observe_selected(&mask)` | Shared-index batch observations, one result per slot. Unselected/dead slots are `None`; wrong mask length is an error. |
 | `body_is_clear(&body, clearance)` | Check all supplied edges against living snakes and the 60-unit arena margin; invalid input returns false. |
-| `respawn_body(slot, body, heading)` | Replace a dead slot using supplied geometry and reset per-life motion, boost, penalty, death-time and join-order state. |
+| `respawn_body(slot, body, heading)` | Replace a dead slot using supplied geometry and reset per-life motion, boost, penalty, death-time and join-order state. With `minScore`, the body needs at least `spawn_segments()` anchors. |
+| `spawn_body(head, heading)` | The configured new-life body and heading at `head`: two straight segments, or a `minScore` body along the spawn circle. |
 | `set_ambient_rate(attempts_per_second)` | Change refill rate while preserving fractional placement credit. Zero discards pending credit and disables refill. |
 
 Supplied bodies are head-first, one anchor per segment, with 2–430 finite points.

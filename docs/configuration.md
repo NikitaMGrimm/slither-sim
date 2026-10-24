@@ -103,6 +103,7 @@ only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 | `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary. A snake whose head center has been inside (distance `< r`) dies with reason `pit`, dropping no food, when its head center reaches `r` again. Each life starts outside it. |
 | `spawnRadius` | `null` | Fixed head distance of new lives, `0 ≤ d < radius` and `d > pit.radius`. Ring joins keep their angles; the host draws a uniform angle. `null` keeps the official radial grid. |
 | `killScoreSeconds` | `null` | Positive finite kill-score window: each credited kill counts this long, kept per slot across lives. `null` keeps no kill score; it reads 0. |
+| `minScore` | `null` | Displayed-score floor, from a new 2-segment snake's ≈10.08 to the 430-segment score. New lives start at exactly this score, the least mass that displays it. Boosting and the kiosk penalty never shrink a snake below it; boosting there is free and drops nothing. Growth and death food are unchanged. Read when a world is created. |
 
 `radiusUpdates` sets radius at each supplied sample, overriding the model at that
 tick. For recorded replay, set `dynamicRadius` false to avoid model changes
@@ -176,6 +177,8 @@ Battledome rule, the official model or a mode design choice:
 | Pit | `pit.radius: 1784`; entry allowed, exit lethal | Stated rule; the head-center test, no food and the per-life reset are design choices |
 | Spawning | `spawnRadius: 2684`, midway between pit and wall, with the usual clearance and heading | Design choice derived from the two radii |
 | Kill score | `killScoreSeconds: 900`: +1 per credited kill for 15 minutes, per slot across lives | Stated rule (+1, 15 minutes); persistence is a design choice |
+| Size floor | `minScore: 400`: spawn at 400 points (26 segments, fam ≈ 0.1589); boosting is not free, but no snake shrinks below 400 | Stated rule; food only from mass actually removed is a design choice |
+| Spawn body | A multi-segment spawn lies along the spawn circle behind the head, heading along its tangent, and must clear other snakes over its whole length; straight if the circle is too small | Design choice, so a 1,000-unit body stays clear of wall and pit |
 | Prey | `prey.count: 0` | Mode rule |
 | Food | Official density at radius 3584: `foodCount` 3138, about 45.9 attempts/s; normal admission caps, death and boost food | Official model |
 | Everything else | As `Config::official(1)`: `dt`, broadcast and decision ticks, vision, kiosk, speed model, boundary mode | Official model |

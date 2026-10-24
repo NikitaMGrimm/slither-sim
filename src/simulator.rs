@@ -6,7 +6,7 @@ use crate::profiling::StepProfile;
 use crate::{model::*, physics::*};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::{FRAC_PI_2, PI, TAU};
 use std::time::Instant;
 
 /// Provisional density limit inferred from received death-food packets.
@@ -165,6 +165,10 @@ pub struct Config {
     /// many seconds, across the slot's lives. `None` keeps no kill score.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kill_score_seconds: Option<f64>,
+    /// Displayed-score floor: new lives start at this score and boosting or the
+    /// kiosk penalty never shrink a snake below it. Read when a world is created.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_score: Option<f64>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -254,6 +258,7 @@ impl Config {
             pit: None,
             spawn_radius: None,
             kill_score_seconds: None,
+            min_score: None,
         }
     }
 
@@ -277,7 +282,7 @@ impl Config {
 
     /// Battledome: official physics and ecology in a fixed 3584-unit arena,
     /// with a one-way pit of radius 1784, spawns midway between the two, a
-    /// 15-minute kill score and no prey. See docs/configuration.md#battledome.
+    /// 15-minute kill score, a 400-point size floor and no prey. See docs/configuration.md#battledome.
     pub fn battledome() -> Self {
         const RADIUS: f64 = 3584.0;
         const PIT: f64 = 1784.0;
@@ -294,6 +299,7 @@ impl Config {
             pit: Some(PitConfig { radius: PIT }),
             spawn_radius: Some((PIT + RADIUS) / 2.0),
             kill_score_seconds: Some(900.0),
+            min_score: Some(400.0),
             ..Self::official(1)
         }
     }
@@ -326,23 +332,31 @@ impl Config {
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
     fn validate_mode(&self) -> Result<(), String> {
         let pit = self.pit.as_ref().map(|pit| pit.radius);
-        if let Some(pit) = pit
-            && !(pit > 0.0 && pit < self.radius)
-        {
+        if pit.is_some_and(|pit| !(pit > 0.0 && pit < self.radius)) {
             return Err("pit.radius must be positive and less than radius, so the pit lies inside the arena".into());
         }
-        if let Some(spawn) = self.spawn_radius
-            && !(spawn >= 0.0 && spawn < self.radius && pit.is_none_or(|pit| spawn > pit))
-        {
+        if self.spawn_radius.is_some_and(|spawn| {
+            !(spawn >= 0.0 && spawn < self.radius && pit.is_none_or(|pit| spawn > pit))
+        }) {
             return Err("spawnRadius must lie inside radius and outside pit.radius, where new snakes can live".into());
         }
-        if let Some(window) = self.kill_score_seconds
-            && !(window.is_finite() && window > 0.0)
+        if self
+            .kill_score_seconds
+            .is_some_and(|window| !(window.is_finite() && window > 0.0))
         {
             return Err(
                 "killScoreSeconds must be positive and finite, so kills count and then expire"
                     .into(),
             );
+        }
+        let scores = MassFloor::score_range();
+        if self.min_score.is_some_and(|score| !scores.contains(&score)) {
+            return Err(format!(
+                "minScore must be finite and from a new snake's {} to the {MAX_SEGMENTS}-segment \
+                 score {}, so a snake can be built at it",
+                scores.start(),
+                scores.end()
+            ));
         }
         Ok(())
     }
@@ -435,6 +449,8 @@ pub struct Simulator {
     pit_entered: Vec<bool>,
     /// Times of each slot's credited kills still inside `killScoreSeconds`.
     kill_times: Vec<VecDeque<f64>>,
+    /// `config.min_score` as mass, converted when the world is created.
+    min_mass: Option<MassFloor>,
     ambient_clock: f64,
     prey_random: Random,
     next_prey_id: u64,
@@ -489,6 +505,7 @@ impl Simulator {
     }
     pub fn new(seed: u32, config: Config) -> Result<Self, String> {
         config.validate()?;
+        let min_mass = config.min_score.and_then(MassFloor::for_score);
         let mut world = Self {
             config,
             snakes: vec![],
@@ -507,6 +524,7 @@ impl Simulator {
             kiosks: vec![],
             pit_entered: vec![],
             kill_times: vec![],
+            min_mass,
             ambient_clock: 0.0,
             prey_random: Random(seed ^ 0x706_7265),
             next_prey_id: 0,
@@ -592,28 +610,35 @@ impl Simulator {
             x: a.cos() * distance,
             y: a.sin() * distance,
         };
-        self.snakes.push(Snake {
+        // Two segments face inward; a `minScore` body follows the ring counterclockwise.
+        let (body, heading) = if self.spawn_segments() > 2 {
+            self.spawn_body(head, a + FRAC_PI_2)
+        } else {
+            let tail = Point {
+                x: head.x + a.cos() * 42.0,
+                y: head.y + a.sin() * 42.0,
+            };
+            (vec![head, tail], a + PI)
+        };
+        let segments = body.len();
+        let mut snake = Snake {
             id,
             head,
-            body: vec![
-                head,
-                Point {
-                    x: head.x + a.cos() * 42.0,
-                    y: head.y + a.sin() * 42.0,
-                },
-            ],
-            heading: a + PI,
-            speed: base_speed(2),
-            radius: 14.5,
-            length: 2.0,
-            segments: 2,
-            fam: 0.0,
-            score: score(2, 0.0),
+            body,
+            heading,
+            speed: base_speed(segments),
+            radius: 0.0,
+            length: 0.0,
+            segments,
+            fam: self.min_mass.map_or(0.0, |floor| floor.fam),
+            score: 0.0,
             kills: 0,
             alive: true,
-        });
+        };
+        Self::update_mass(&mut snake);
+        self.snakes.push(snake);
         self.boosts.push(Boost::default());
-        self.speeds.push(SpeedState::idle(base_speed(2)));
+        self.speeds.push(SpeedState::idle(base_speed(segments)));
         self.kiosks.push(KioskState::default());
         self.pit_entered.push(false);
         self.kill_times.push(VecDeque::new());
@@ -667,6 +692,32 @@ impl Simulator {
             active_boost_seconds: b.active_boost_seconds,
             boost_mass_spent: b.boost_mass_spent,
         })
+    }
+    /// Segments of a new life: two, or the `minScore` floor's.
+    pub fn spawn_segments(&self) -> usize {
+        self.min_mass.map_or(2, |floor| floor.segments)
+    }
+    /// Head-first body and heading of a new life of `spawn_segments` with its
+    /// head at `head`. Two segments lie straight behind `heading`. A larger
+    /// `minScore` body follows the circle through `head` around the center,
+    /// turning the way `heading` leans, so it keeps the head's distance from
+    /// the wall and pit; it is straight if that circle is too small to hold it.
+    /// Pass the result to `body_is_clear` and `respawn_body`.
+    pub fn spawn_body(&self, head: Point, heading: f64) -> (Vec<Point>, f64) {
+        let segments = self.spawn_segments();
+        if let Some(ring) = (segments > 2)
+            .then(|| crate::spawn::ring_body(head, heading, segments))
+            .flatten()
+        {
+            return ring;
+        }
+        let body = (0..segments)
+            .map(|i| Point {
+                x: head.x - heading.cos() * 42.0 * i as f64,
+                y: head.y - heading.sin() * 42.0 * i as f64,
+            })
+            .collect();
+        (body, heading)
     }
     /// Calibrated spawn exclusion, not collision immunity. Check the whole new
     /// body so its tail cannot appear in front of an existing player either.
@@ -752,6 +803,8 @@ impl Simulator {
     /// Respawn a dead slot with a supplied head-first body (2..=430 finite anchors).
     /// Every anchor must be inside the arena. Resets the same per-life state as
     /// `respawn`; call `body_is_clear` separately if placement needs exclusion.
+    /// With `minScore`, the body needs at least `spawn_segments` anchors; at
+    /// exactly that many, the life starts at the floor's score.
     pub fn respawn_body(
         &mut self,
         index: usize,
@@ -772,6 +825,13 @@ impl Simulator {
         {
             return Err("Spawn body extends outside arena".into());
         }
+        let floor = self.min_mass;
+        if let Some(floor) = floor.filter(|floor| body.len() < floor.segments) {
+            return Err(format!(
+                "minScore needs a spawn body of at least {} segments",
+                floor.segments
+            ));
+        }
         let s = &mut self.snakes[index];
         s.head = body[0];
         s.segments = body.len();
@@ -783,7 +843,9 @@ impl Simulator {
             heading
         };
         s.speed = base_speed(s.segments);
-        s.fam = 0.0;
+        s.fam = floor
+            .filter(|floor| floor.segments == s.segments)
+            .map_or(0.0, |floor| floor.fam);
         s.kills = 0;
         s.alive = true;
         Self::update_mass(s);
@@ -892,8 +954,9 @@ impl Simulator {
                 state.exhausted = false;
             }
             // Boosting needs mass above the two-segment minimum; real 2-segment snakes keep
-            // boosting down to fam ~0.
-            let can_boost = s.segments > 2 || s.fam > 0.0;
+            // boosting down to fam ~0. A `minScore` floor makes boosting there free.
+            let floor = self.min_mass;
+            let can_boost = floor.is_some() || s.segments > 2 || s.fam > 0.0;
             if a.boost && can_boost && !state.exhausted && !state.active {
                 // The first pellet usually drops within a loop of the boost request.
                 state.clock = BOOST_DROP_SECONDS;
@@ -917,9 +980,14 @@ impl Simulator {
                     elapsed -= BOOST_DROP_SECONDS;
                     let tail = s.body.last().copied().unwrap_or(s.head);
                     let mult = multiplier(s.segments as f64 + s.fam);
-                    let cost = (s.segments as f64 - 2.0 + s.fam)
-                        .min(boost_cost(s.segments) * (0.94 + 0.14 * self.random.next()));
-                    let removed = remove_mass(&mut s.segments, &mut s.fam, cost);
+                    // Food comes only from removed mass: nothing at the floor and a
+                    // smaller pellet for a partial step down to it.
+                    let available = floor.map_or(s.segments as f64 - 2.0 + s.fam, |floor| {
+                        floor.excess(s.segments, s.fam)
+                    });
+                    let cost =
+                        available.min(boost_cost(s.segments) * (0.94 + 0.14 * self.random.next()));
+                    let removed = remove_mass(&mut s.segments, &mut s.fam, cost, floor);
                     state.boost_mass_spent += cost;
                     s.body.truncate(s.body.len() - removed);
                     let size = ((cost * 0.95 / (NUTRITION * mult)).sqrt() * 5.0).floor() / 5.0;
@@ -949,7 +1017,7 @@ impl Simulator {
                             }
                         }
                     }
-                    if s.segments == 2 && s.fam <= 0.0 {
+                    if floor.is_none() && s.segments == 2 && s.fam <= 0.0 {
                         state.active = false;
                         state.exhausted = true;
                     }
@@ -988,7 +1056,7 @@ impl Simulator {
                 append_anchor(&mut s.body, anchor, grow);
             }
             Self::update_mass(s);
-            self.kiosks[i].step(s, &c.kiosk, c.dt);
+            self.kiosks[i].step(s, &c.kiosk, c.dt, self.min_mass);
             Self::update_mass(s);
         }
         if PROFILE {
