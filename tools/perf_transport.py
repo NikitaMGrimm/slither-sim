@@ -28,7 +28,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 FORMAT = "slither-perf-transport-v1"
-PROTOCOL = "slither-sim-json-v2"
+PROTOCOL = "slither-sim-json-v3"
 MODES = ("server", "python", "node")
 SEED = 7
 DECISION_TICKS = 6
@@ -76,7 +76,7 @@ def headings(scenario, step):
     return [2 * math.pi * i / count + math.pi / 2 + 0.25 * step for i in range(count)]
 
 
-# Protocol slither-sim-json-v2 request encoding. The clients send these lines
+# Protocol slither-sim-json-v3 request encoding. The clients send these lines
 # verbatim; another protocol replaces these two functions.
 def encode_reset(scenario):
     request = {"op": "reset", "seed": SEED, "worlds": scenario.worlds, "agents": scenario.agents,

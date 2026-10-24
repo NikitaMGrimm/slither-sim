@@ -1,7 +1,9 @@
 use crate::model::{Arena, Point, Snake};
 use serde::{Deserialize, Serialize};
 
-const MAX_SIDE: usize = 512;
+/// Stock-client compatibility: it clamps transmitted U/L sides to 512, although
+/// the u16 size field could carry more.
+pub(crate) const MAX_SIDE: usize = 512;
 /// The stock legacy `u` snapshot has a fixed 80-cell side.
 const LEGACY_SIDE: usize = 80;
 /// Bound on cells retained across one L packet's team layers: four 512-by-512
@@ -361,7 +363,7 @@ fn clipped_edge(a: Point, b: Point, arena: &Arena, side: usize) -> Option<(Point
 
 impl Minimap {
     pub fn validate(&self) -> Result<(), String> {
-        if !(1..=512).contains(&self.side)
+        if !(1..=MAX_SIDE).contains(&self.side)
             || self.cells.len() != self.side * self.side
             || self.cells.iter().any(|&v| v > 1)
             || !self.age_seconds.is_finite()
@@ -412,7 +414,7 @@ impl Minimap {
     /// Simulator approximation: rasterize live body centerlines to a binary grid.
     /// The original server's aggregation rule is unavailable; this is not a food map.
     pub fn from_snakes(snakes: &[Snake], arena: &Arena, side: usize) -> Self {
-        assert!((1..=512).contains(&side));
+        assert!((1..=MAX_SIDE).contains(&side));
         let mut cells = vec![0; side * side];
         let grid = |p: Point| Point {
             x: ((p.x - arena.center.x) / arena.radius + 1.) * side as f64 / 2.,

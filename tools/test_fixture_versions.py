@@ -113,6 +113,16 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assertEqual(entry["wireProtocol"], 19)
         self.assertEqual(fixture["frame"]["settings"]["protocol"], entry["wireProtocol"])
 
+    def test_synthetic_serve_v3_error_contract(self):
+        fixture = json.loads((ROOT / "tests/fixtures/serve-errors-v3.json").read_text(encoding="utf-8"))
+        self.assertIn("Synthetic", fixture["description"])
+        for name, ended in (("rejectedReply", False), ("terminalReply", True)):
+            reply = fixture[name]
+            self.assertEqual(set(reply), {"protocol", "error", "sessionEnded"})
+            self.assertEqual(reply["protocol"], "slither-sim-json-v3")
+            self.assertIs(reply["sessionEnded"], ended)
+            self.assertIsInstance(reply["error"], str)
+
     def test_protocol19_food_interest_receipts(self):
         entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")
         self.assertEqual(entry["wireProtocol"], 19)

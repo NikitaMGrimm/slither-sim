@@ -695,9 +695,12 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     let default = HostConfig::default();
     assert_eq!(default.bind, "127.0.0.1:8766".parse().unwrap());
     default.validate().unwrap();
-    for (clients, bots) in [(0, 4), (100, 29)] {
-        assert!(config(clients, bots).validate().is_err());
-    }
+    assert!(config(0, 4).validate().is_err());
+    // Protocol-19 rank and population are u16: 65535 slots, not a policy cap of 128.
+    config(100, 29).validate().unwrap();
+    config(65_000, 535).validate().unwrap();
+    let error = config(65_000, 536).validate().unwrap_err();
+    assert!(error.contains("u16"), "{error}");
     let mut recording = config(1, 0);
     recording.simulation.record_wire = true;
     assert!(recording.validate().is_err());

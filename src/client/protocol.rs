@@ -24,15 +24,19 @@ use std::collections::{BTreeMap, VecDeque};
 use std::f64::consts::TAU;
 
 pub const PROTOCOL_VERSION: u8 = 19;
+/// Sent commands retained to interpret server replies; a local budget.
 const MAX_SENT_COMMANDS: usize = 64;
+/// History behind `pingRangeSeconds`; a reporting choice.
 const PING_RANGE_SECONDS: f64 = 5.;
 /// The stock client sends a game ping only after more than 250 ms.
 const PING_INTERVAL_SECONDS: f64 = 0.25;
-const MAX_PING_SECONDS: f64 = 2.;
 /// Bound on motion reports retained between anchors for head extrapolation.
 const MAX_MOTION_STEPS: usize = 256;
 /// The stock `setMscps` extends its score tables by this many repeated entries.
 const SCORE_TABLE_EXTENSION: usize = 2048;
+/// Decoder retention budgets: a hostile or broken server cannot grow received
+/// state without bound. Local resource policies, not protocol widths; dense
+/// simulated worlds can exceed them before any wire field overflows.
 const MAX_RECEIVED_SNAKES: usize = 4096;
 const MAX_RECEIVED_BODY_POINTS: usize = 65_536;
 const MAX_RECEIVED_SNAKE_POINTS: usize = 4096;
@@ -1342,8 +1346,10 @@ impl ClientState {
             }
             Packet::Pong => {
                 if let Some(sent) = session.pending_ping.take() {
+                    // Any delay is a measurement: a slow link or congestion can
+                    // exceed any fixed window, and the pong carries no RTT.
                     let rtt = receipt - sent;
-                    if (0. ..=MAX_PING_SECONDS).contains(&rtt) {
+                    if rtt >= 0. {
                         session.ping = Some(rtt);
                         session.pongs.push_back((receipt, rtt));
                     }

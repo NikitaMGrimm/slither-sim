@@ -41,6 +41,9 @@ fn host(args: &[&str]) -> ExitCode {
             config.bind = bind.parse().map_err(|_| "--bind needs a literal IP:PORT")?;
         }
         config.validate()?;
+        for warning in config.warnings() {
+            eprintln!("warning: {warning}");
+        }
         Ok(Some(config))
     })();
     let config = match parsed {

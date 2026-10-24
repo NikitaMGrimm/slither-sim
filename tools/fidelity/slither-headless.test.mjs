@@ -1707,7 +1707,9 @@ test('paired collectors cancel, observe immediate writer failures and preserve n
             if (mode === 'existing') return error.code === 'EEXIST';
             return /queue exceeds|closed before finish/.test(error.message);
           });
-          assert(performance.now() - started < 2000, 'writer failure must not wait for deadline');
+          // A sixth of the 60 s capture deadline: a Windows runner once took
+          // 2.2 s here (40 ms locally), and no waiting path finishes this soon.
+          assert(performance.now() - started < 10000, 'writer failure must not wait for deadline');
           assert(bots.every(bot => bot.stopped));
           assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
           if (mode === 'existing') assert.equal(fs.readFileSync(path.join(out, 'bot0.jsonl.gz'), 'utf8'), 'keep original');

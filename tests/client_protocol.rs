@@ -990,16 +990,22 @@ fn pings_track_pending_measured_and_recent_range() {
     assert!(close(range[0], 0.06, 1e-12) && close(range[1], 0.1, 1e-12));
     let range = state.frame(5.5).unwrap().timing.ping_range_seconds.unwrap();
     assert!(close(range[0], 0.1, 1e-12) && close(range[1], 0.1, 1e-12));
-    // An unmatched or implausible pong is not a measurement.
+    // A slow pong is still a measurement; an unmatched one is not.
     state.record_sent(&[251], 6.).unwrap();
     state.receive_frame(&[0, 40, b'p'], 8.5).unwrap();
     assert!(close(
         state.frame(8.5).unwrap().timing.ping_seconds.unwrap(),
-        0.1,
+        2.5,
+        1e-12
+    ));
+    state.receive_frame(&[0, 40, b'p'], 8.6).unwrap();
+    assert!(close(
+        state.frame(8.6).unwrap().timing.ping_seconds.unwrap(),
+        2.5,
         1e-12
     ));
     state.set_processing_seconds(0.004).unwrap();
-    assert_eq!(state.frame(8.5).unwrap().timing.processing_seconds, 0.004);
+    assert_eq!(state.frame(8.6).unwrap().timing.processing_seconds, 0.004);
     assert!(state.set_processing_seconds(-1.).is_err());
 }
 

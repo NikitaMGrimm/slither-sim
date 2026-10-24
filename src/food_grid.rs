@@ -5,8 +5,28 @@ use crate::model::{Food, Origin, Point};
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 
-pub(crate) fn food_cell(x: f64, y: f64, size: f64) -> (i64, i64) {
-    ((x / size).floor() as i64, (y / size).floor() as i64)
+/// One axis of an admission cell key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum Axis {
+    /// `floor(coordinate / cellSize)`.
+    Index(i64),
+    /// The coordinate's bits. From 2^53 cells on, a cell is no wider than the
+    /// spacing of doubles at that coordinate, so distinct coordinates lie in
+    /// distinct cells; a saturating `i64` cast would instead merge them, as a
+    /// tiny `cellSize` did for every pellet of a quadrant.
+    Exact(u64),
+}
+fn axis(value: f64, size: f64) -> Axis {
+    const EXACT_CELLS: f64 = (1u64 << f64::MANTISSA_DIGITS) as f64;
+    let cell = (value / size).floor();
+    if cell.abs() < EXACT_CELLS {
+        Axis::Index(cell as i64)
+    } else {
+        Axis::Exact(value.to_bits())
+    }
+}
+pub(crate) fn food_cell(x: f64, y: f64, size: f64) -> (Axis, Axis) {
+    (axis(x, size), axis(y, size))
 }
 
 /// Multiply-rotate hash for cell keys; only lookups use it, never iteration order.
@@ -24,13 +44,17 @@ impl Hasher for CellHasher {
     fn write_i64(&mut self, n: i64) {
         self.write_u64(n as u64);
     }
+    /// Derived `Hash` writes the `Axis` discriminant through this.
+    fn write_isize(&mut self, n: isize) {
+        self.write_u64(n as u64);
+    }
     fn finish(&self) -> u64 {
         // The final multiply leaves the low bits that pick a bucket weakest.
         self.0.rotate_left(26)
     }
 }
 
-type Counts = HashMap<(i64, i64), usize, BuildHasherDefault<CellHasher>>;
+type Counts = HashMap<(Axis, Axis), usize, BuildHasherDefault<CellHasher>>;
 
 /// The fields of one pellet that occupancy and the ambient count read.
 #[derive(Clone, Copy, PartialEq)]
@@ -371,6 +395,32 @@ mod tests {
             size: Some(1.0),
             origin,
         }
+    }
+
+    #[test]
+    fn tiny_cells_keep_distinct_positions_apart() {
+        let mut cache = FoodCache::default();
+        let mut food = Vec::new();
+        let size = 1e-300;
+        for i in 0..100 {
+            let angle = f64::from(i) * 0.7;
+            let f = Food {
+                x: 500.0 * angle.cos(),
+                y: 500.0 * angle.sin(),
+                value: 1.0,
+                size: Some(1.0),
+                origin: Some(Origin::Ambient),
+            };
+            // A saturating cast once put every pellet of a quadrant in one cell.
+            assert!(cache.has_room(&food, &f, size, 2), "pellet {i}");
+            cache.push(&f);
+            food.push(f);
+        }
+        let same = food[0].clone();
+        assert!(cache.has_room(&food, &same, size, 2));
+        cache.push(&same);
+        food.push(same.clone());
+        assert!(!cache.has_room(&food, &same, size, 2));
     }
 
     #[test]
