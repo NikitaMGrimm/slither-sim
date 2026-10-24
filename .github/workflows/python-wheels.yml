@@ -6,6 +6,9 @@ name: Python wheels
 on:
   workflow_call:
     inputs:
+      # Builds run this commit's code where caches are shared with main, so pass
+      # only trusted commits: release.yml passes its release commit only after
+      # require_main_ci has verified it is on main with passing CI.
       ref:
         description: Commit to build
         type: string
