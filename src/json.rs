@@ -5,13 +5,45 @@
 //! which costs several times the simulation step for large observations. This
 //! writer emits the same bytes directly: leaves go through serde_json itself, and
 //! an object whose keys arrive out of order is reordered once, when it ends.
-use serde::ser::{self, Serialize};
-use serde_json::Error;
+//! Builds where crate features change `Value` itself take the `Value` path.
+use serde::ser::{self, Serialize, SerializeMap, Serializer};
+use serde_json::{Error, Value};
+use std::sync::OnceLock;
 
 pub(crate) fn to_vec<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
+    if !default_value_model() {
+        return serde_json::to_vec(&serde_json::to_value(value)?);
+    }
     let mut writer = Writer::default();
     value.serialize(&mut writer)?;
     Ok(writer.out)
+}
+
+/// Whether `Value` sorts object keys, keeps no number text and parses no raw
+/// JSON, as by default. The `preserve_order`, `arbitrary_precision` and
+/// `raw_value` features of serde_json change `Value` for every crate in a
+/// build, which this writer does not reproduce.
+fn default_value_model() -> bool {
+    static DEFAULT: OnceLock<bool> = OnceLock::new();
+    *DEFAULT.get_or_init(|| {
+        let plain = serde_json::from_str::<Value>(r#"{"b":0,"a":1.00}"#)
+            .and_then(|value| serde_json::to_string(&value))
+            .is_ok_and(|text| text == r#"{"a":1.0,"b":0}"#);
+        plain && serde_json::to_value(RawToken).is_ok_and(|value| value.is_object())
+    })
+}
+
+/// Shaped like serde_json's `RawValue`: `Value` parses its text under
+/// `raw_value` and otherwise keeps it as an ordinary one-member object.
+struct RawToken;
+impl Serialize for RawToken {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        const TOKEN: &str = "$serde_json::private::RawValue";
+        let mut raw = serializer.serialize_struct(TOKEN, 1)?;
+        raw.serialize_field(TOKEN, "0")?;
+        raw.end()
+    }
 }
 
 /// A JSON-lines reply `{"protocol":..,"result":..}` without its newline.
@@ -89,13 +121,21 @@ struct Object<'a> {
 impl<'a> Object<'a> {
     fn member<T: Serialize + ?Sized>(&mut self, key: Key, value: &T) -> Result<(), Error> {
         let w = &mut *self.writer;
-        if w.members.len() > self.first {
+        let (mark, members) = (w.out.len(), w.members.len());
+        if members > self.first {
             w.out.push(b',');
         }
         let start = w.out.len();
-        w.leaf(key.as_str())?;
-        w.out.push(b':');
-        value.serialize(&mut *w)?;
+        let written = w.leaf(key.as_str()).and_then(|()| {
+            w.out.push(b':');
+            value.serialize(&mut *w)
+        });
+        if let Err(error) = written {
+            // As with `Value`, a failed member leaves no trace if the caller recovers.
+            w.out.truncate(mark);
+            w.members.truncate(members);
+            return Err(error);
+        }
         let end = w.out.len();
         w.members.push(Member { key, start, end });
         Ok(())
@@ -136,20 +176,8 @@ impl<'a> Object<'a> {
     }
 }
 
-/// A one-member object wrapping an enum variant's content.
-struct Variant<'a> {
-    writer: &'a mut Writer,
-    first: bool,
-}
-impl Variant<'_> {
-    fn open(writer: &mut Writer, variant: &'static str, open: u8) -> Result<(), Error> {
-        writer.out.push(b'{');
-        writer.leaf(variant)?;
-        writer.out.push(b':');
-        writer.out.push(open);
-        Ok(())
-    }
-}
+/// A one-member object wrapping a tuple variant's elements.
+struct Variant<'a>(Array<'a>);
 
 struct Array<'a> {
     writer: &'a mut Writer,
@@ -157,11 +185,18 @@ struct Array<'a> {
 }
 impl Array<'_> {
     fn element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Error> {
+        let w = &mut *self.writer;
+        let (mark, members) = (w.out.len(), w.members.len());
         if !self.first {
-            self.writer.out.push(b',');
+            w.out.push(b',');
+        }
+        if let Err(error) = value.serialize(&mut *w) {
+            w.out.truncate(mark);
+            w.members.truncate(members);
+            return Err(error);
         }
         self.first = false;
-        value.serialize(&mut *self.writer)
+        Ok(())
     }
 }
 
@@ -192,13 +227,13 @@ impl<'a> ser::Serializer for &'a mut Writer {
         self.leaf(&v)
     }
     fn serialize_i128(self, v: i128) -> Result<(), Error> {
-        // `Value` numbers hold at most 64 bits.
+        // `Value` numbers hold at most 64 bits; beyond that, take its own error.
         if let Ok(v) = u64::try_from(v) {
             self.leaf(&v)
         } else if let Ok(v) = i64::try_from(v) {
             self.leaf(&v)
         } else {
-            Err(ser::Error::custom("number out of range"))
+            serde_json::to_value(v).map(drop)
         }
     }
     fn serialize_u8(self, v: u8) -> Result<(), Error> {
@@ -216,7 +251,7 @@ impl<'a> ser::Serializer for &'a mut Writer {
     fn serialize_u128(self, v: u128) -> Result<(), Error> {
         match u64::try_from(v) {
             Ok(v) => self.leaf(&v),
-            Err(_) => Err(ser::Error::custom("number out of range")),
+            Err(_) => serde_json::to_value(v).map(drop),
         }
     }
     fn serialize_f32(self, v: f32) -> Result<(), Error> {
@@ -296,11 +331,14 @@ impl<'a> ser::Serializer for &'a mut Writer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Variant<'a>, Error> {
-        Variant::open(self, variant, b'[')?;
-        Ok(Variant {
+        self.out.push(b'{');
+        self.leaf(variant)?;
+        self.out.push(b':');
+        self.out.push(b'[');
+        Ok(Variant(Array {
             writer: self,
             first: true,
-        })
+        }))
     }
     fn serialize_map(self, _len: Option<usize>) -> Result<Object<'a>, Error> {
         Ok(self.open_object())
@@ -357,14 +395,10 @@ impl ser::SerializeTupleVariant for Variant<'_> {
     type Ok = ();
     type Error = Error;
     fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Error> {
-        if !self.first {
-            self.writer.out.push(b',');
-        }
-        self.first = false;
-        value.serialize(&mut *self.writer)
+        self.0.element(value)
     }
     fn end(self) -> Result<(), Error> {
-        self.writer.out.extend_from_slice(b"]}");
+        self.0.writer.out.extend_from_slice(b"]}");
         Ok(())
     }
 }
@@ -372,7 +406,7 @@ impl ser::SerializeMap for Object<'_> {
     type Ok = ();
     type Error = Error;
     fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Error> {
-        self.pending = Some(key.serialize(MapKey)?);
+        self.pending = Some(map_key(key)?);
         Ok(())
     }
     fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Error> {
@@ -418,155 +452,20 @@ impl ser::SerializeStructVariant for VariantObject<'_> {
     }
 }
 
-/// Object keys as `Value` accepts them: strings, or scalars rendered as strings.
-struct MapKey;
-impl ser::Serializer for MapKey {
-    type Ok = String;
-    type Error = Error;
-    type SerializeSeq = ser::Impossible<String, Error>;
-    type SerializeTuple = ser::Impossible<String, Error>;
-    type SerializeTupleStruct = ser::Impossible<String, Error>;
-    type SerializeTupleVariant = ser::Impossible<String, Error>;
-    type SerializeMap = ser::Impossible<String, Error>;
-    type SerializeStruct = ser::Impossible<String, Error>;
-    type SerializeStructVariant = ser::Impossible<String, Error>;
-
-    fn serialize_bool(self, v: bool) -> Result<String, Error> {
-        Ok(v.to_string())
+/// The object key `Value` makes of `key`, by serde_json's own rules and errors:
+/// strings, or scalars rendered as strings. No reply has non-string keys.
+fn map_key<T: Serialize + ?Sized>(key: &T) -> Result<String, Error> {
+    struct Single<'a, T: ?Sized>(&'a T);
+    impl<T: Serialize + ?Sized> Serialize for Single<'_, T> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry(self.0, &())?;
+            map.end()
+        }
     }
-    fn serialize_i8(self, v: i8) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_i16(self, v: i16) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_i32(self, v: i32) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_i64(self, v: i64) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_i128(self, v: i128) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_u8(self, v: u8) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_u16(self, v: u16) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_u32(self, v: u32) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_u64(self, v: u64) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_u128(self, v: u128) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_f32(self, v: f32) -> Result<String, Error> {
-        float_key(serde_json::to_string(&v)?, v.is_finite())
-    }
-    fn serialize_f64(self, v: f64) -> Result<String, Error> {
-        float_key(serde_json::to_string(&v)?, v.is_finite())
-    }
-    fn serialize_char(self, v: char) -> Result<String, Error> {
-        Ok(v.to_string())
-    }
-    fn serialize_str(self, v: &str) -> Result<String, Error> {
-        Ok(v.to_owned())
-    }
-    fn serialize_bytes(self, _v: &[u8]) -> Result<String, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_none(self) -> Result<String, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_some<T: Serialize + ?Sized>(self, _value: &T) -> Result<String, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_unit(self) -> Result<String, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<String, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_unit_variant(
-        self,
-        _name: &'static str,
-        _index: u32,
-        variant: &'static str,
-    ) -> Result<String, Error> {
-        Ok(variant.to_owned())
-    }
-    fn serialize_newtype_struct<T: Serialize + ?Sized>(
-        self,
-        _name: &'static str,
-        value: &T,
-    ) -> Result<String, Error> {
-        value.serialize(self)
-    }
-    fn serialize_newtype_variant<T: Serialize + ?Sized>(
-        self,
-        _name: &'static str,
-        _index: u32,
-        _variant: &'static str,
-        _value: &T,
-    ) -> Result<String, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_tuple_struct(
-        self,
-        _name: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeTupleStruct, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_tuple_variant(
-        self,
-        _name: &'static str,
-        _index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeTupleVariant, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_struct(
-        self,
-        _name: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStruct, Error> {
-        Err(key_must_be_a_string())
-    }
-    fn serialize_struct_variant(
-        self,
-        _name: &'static str,
-        _index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStructVariant, Error> {
-        Err(key_must_be_a_string())
-    }
-}
-
-fn key_must_be_a_string() -> Error {
-    ser::Error::custom("key must be a string")
-}
-
-fn float_key(text: String, finite: bool) -> Result<String, Error> {
-    if finite {
-        Ok(text)
-    } else {
-        Err(ser::Error::custom("float key must be finite"))
+    match serde_json::to_value(Single(key))? {
+        Value::Object(map) => Ok(map.into_iter().next().expect("one entry").0),
+        _ => unreachable!("a map serializes as an object"),
     }
 }
 
@@ -703,17 +602,74 @@ mod tests {
             }
         });
         same(&ScalarKeys(f64::MIN_POSITIVE));
-        assert!(to_vec(&ScalarKeys(f64::NAN)).is_err());
-        assert!(serde_json::to_value(ScalarKeys(f64::NAN)).is_err());
-        assert!(
-            to_vec(&Shape::Struct {
-                zeta: i128::MAX,
-                alpha: 0,
-                mid: 'x'
-            })
-            .is_err()
-        );
-        assert!(to_vec(&[(vec![1], 2)].into_iter().collect::<BTreeMap<_, _>>()).is_err());
+        same_error(&ScalarKeys(f64::NAN));
+        same_error(&Shape::Struct {
+            zeta: i128::MAX,
+            alpha: 0,
+            mid: 'x',
+        });
+        same_error(&[u128::MAX]);
+        same_error(&[(vec![1], 2)].into_iter().collect::<BTreeMap<_, _>>());
+        same_error(&[((), 2)].into_iter().collect::<BTreeMap<_, _>>());
+        same(&Recovering);
+        same(&RecoveringVariant);
+        // Without `raw_value`, serde_json's token struct is an ordinary struct.
+        same(&super::RawToken);
+        assert!(super::default_value_model());
+    }
+
+    struct RecoveringVariant;
+    impl Serialize for RecoveringVariant {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            use serde::ser::SerializeTupleVariant;
+            let mut variant = serializer.serialize_tuple_variant("E", 0, "v", 3)?;
+            variant.serialize_field(&1)?;
+            assert!(variant.serialize_field(&Failing).is_err());
+            variant.serialize_field(&2)?;
+            variant.end()
+        }
+    }
+
+    fn same_error<T: Serialize + ?Sized>(value: &T) {
+        let ours = to_vec(value).unwrap_err();
+        let theirs = serde_json::to_value(value).unwrap_err();
+        assert_eq!(ours.to_string(), theirs.to_string());
+        assert_eq!(ours.classify(), theirs.classify());
+    }
+
+    /// Fails after writing part of an object.
+    struct Failing;
+    impl Serialize for Failing {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            use serde::ser::{Error, SerializeStruct};
+            let mut inner = serializer.serialize_struct("Failing", 2)?;
+            inner.serialize_field("partial", &3)?;
+            Err(S::Error::custom("failed"))
+        }
+    }
+
+    /// Recovers from failed members and elements, which must leave no output.
+    struct Recovering;
+    impl Serialize for Recovering {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            use serde::ser::{SerializeSeq, SerializeStruct};
+            struct Items;
+            impl Serialize for Items {
+                fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                    let mut items = serializer.serialize_seq(None)?;
+                    items.serialize_element(&1)?;
+                    assert!(items.serialize_element(&Failing).is_err());
+                    items.serialize_element(&2)?;
+                    items.end()
+                }
+            }
+            let mut outer = serializer.serialize_struct("Recovering", 3)?;
+            assert!(outer.serialize_field("b", &Failing).is_err());
+            outer.serialize_field("fallback", &1)?;
+            assert!(outer.serialize_field("a", &Failing).is_err());
+            outer.serialize_field("items", &Items)?;
+            outer.end()
+        }
     }
 
     #[test]
