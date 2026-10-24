@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## [0.5.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.4.0...v0.5.0) - 2026-10-24
+
+### Added
+
+- [**breaking**] add Battledome rules and configurable mass floors ([#75](https://github.com/NikitaMGrimm/slither-sim/pull/75))
+- [**breaking**] make every limit a real bound, a warning or a named policy ([#77](https://github.com/NikitaMGrimm/slither-sim/pull/77))
+
+### Other
+
+- *(pr-report)* add a manual A/A calibration pilot ([#79](https://github.com/NikitaMGrimm/slither-sim/pull/79))
+- *(pr-report)* replace the heuristic with an error-controlled comparison ([#78](https://github.com/NikitaMGrimm/slither-sim/pull/78))
+- *(observation)* trim food grid rows to the vision circle ([#76](https://github.com/NikitaMGrimm/slither-sim/pull/76))
+- *(release)* attach prebuilt CLI and C ABI archives to releases ([#72](https://github.com/NikitaMGrimm/slither-sim/pull/72))
+- *(package)* exclude maintainer-only crate payload ([#73](https://github.com/NikitaMGrimm/slither-sim/pull/73))
+- *(release)* publish the Python package to PyPI ([#71](https://github.com/NikitaMGrimm/slither-sim/pull/71))
+- add weekly extended checks and monthly action updates ([#68](https://github.com/NikitaMGrimm/slither-sim/pull/68))
+
 ### Added
 
 - The `slither-sim` Python package is on PyPI: `pip install slither-sim`. From
