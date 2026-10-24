@@ -77,7 +77,9 @@ compute time. `config.dt` is seconds per tick; defaults give a 42 ms decision
 interval. There is no network delay, automatic respawn, reward, victory
 condition or episode timeout. Use `reset` for new worlds.
 
-Returns `worlds`, one frame per world.
+Returns `worlds`, one frame per world. Frame rows, counts and offsets are
+`u32`; a step whose frame cannot hold them ends the session after its worlds
+advanced, so reset to continue.
 
 ### snapshot
 
