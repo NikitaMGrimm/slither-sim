@@ -38,7 +38,7 @@ pub const ORIGINS: [&str; 3] = ["ambient", "boost", "death"];
 /// `food.origin` code of food without a recorded origin; JSON prints `null`.
 pub const NO_ORIGIN: u8 = 255;
 /// Names of the `deaths.reason` codes; JSON prints the name.
-pub const REASONS: [&str; 2] = ["body", "boundary"];
+pub const REASONS: [&str; 3] = ["body", "boundary", "pit"];
 /// Row or slot index meaning none: the `self` row of a dead slot and the killer
 /// of a death without one. JSON prints `null`.
 pub const NONE: u32 = u32::MAX;
@@ -103,6 +103,8 @@ pub struct SnakeColumns<'a> {
     pub fam: &'a [f64],
     pub score: &'a [f64],
     pub kills: &'a [u32],
+    /// `Simulator::kill_score`: kills inside `killScoreSeconds`, across lives.
+    pub kill_score: &'a [u32],
     /// One more entry than rows: row `r`'s anchors, head to tail, are
     /// `body_x[body_start[r]..body_start[r + 1]]` and the same range of `body_y`.
     pub body_start: &'a [u32],
@@ -177,6 +179,7 @@ struct SnakeTable {
     body_y: Vec<f64>,
     fam: Vec<f64>,
     heading: Vec<f64>,
+    kill_score: Vec<u32>,
     kills: Vec<u32>,
     length: Vec<f64>,
     radius: Vec<f64>,
@@ -290,6 +293,7 @@ impl Frame {
             d.reason.push(match death.reason {
                 DeathReason::Body => 0,
                 DeathReason::Boundary => 1,
+                DeathReason::Pit => 2,
             });
             d.time.push(death.time);
             d.victim.push(row(
@@ -331,6 +335,7 @@ impl Frame {
                 fam: &s.fam,
                 score: &s.score,
                 kills: &s.kills,
+                kill_score: &s.kill_score,
                 body_start: &s.body_start,
                 body_x: &s.body_x,
                 body_y: &s.body_y,
@@ -398,6 +403,7 @@ impl Frame {
         }
         for column in [
             &mut c.body_start,
+            &mut c.kill_score,
             &mut c.kills,
             &mut c.segments,
             &mut c.slot,
@@ -416,6 +422,10 @@ impl Frame {
             }
             c.fam.push(s.fam);
             c.heading.push(round(s.heading, ANGLE_STEPS));
+            c.kill_score.push(count(
+                world.kill_score(slot).expect("spawned slot"),
+                "kill score",
+            )?);
             c.kills.push(count(s.kills, "kill")?);
             c.length.push(s.length);
             c.radius.push(s.radius);

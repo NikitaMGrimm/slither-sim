@@ -61,7 +61,11 @@ one [frame](#frames) per world. `warnings` lists sentences about valid but
 unmeasured settings, such as a `dt` outside the measured server loop; it is
 empty otherwise. `slither-sim serve` also prints them to stderr, never stdout.
 See [limits](configuration.md#limits). Snakes start on a deterministic ring
-halfway to the boundary, facing inward; this is a synthetic test setup.
+halfway to the boundary, facing inward; this is a synthetic test setup. With `config.spawnRadius`,
+they lie along that ring instead, counterclockwise, heading along it, and with
+`config.minScore` they start at its floor.
+`config` may name a [`preset`](configuration.md#presets), such as
+`{"preset":"battledome"}`; the reply prints the resolved fields.
 
 The same build, config, seed and actions produce the same worlds. Cross-platform
 bitwise floating-point equivalence is not promised; retain these inputs and the
@@ -119,9 +123,13 @@ Columns are arrays of equal length; row `r` is element `r` of each.
 
 | Table | Columns |
 | --- | --- |
-| `snakes` | `slot`, head `x`/`y`, `heading`, `speed`, `radius`, `length`, `segments`, `fam`, `score`, `kills`; anchors `bodyX`/`bodyY` |
+| `snakes` | `slot`, head `x`/`y`, `heading`, `speed`, `radius`, `length`, `segments`, `fam`, `score`, `kills`, `killScore`; anchors `bodyX`/`bodyY` |
 | `food` | `x`, `y`, `value`, `size`, `origin` (index into `info.origins`: ambient, boost, death) |
 | `prey` | `id`, `x`, `y`, `heading`, `targetHeading`, `speed`, `size` |
+
+`kills` counts the current life's kills. `killScore` counts the slot's kills
+within the last `config.killScoreSeconds`, across lives, and is 0 without that
+window. Death `reason` is `body`, `boundary` or `pit` (only with `config.pit`).
 
 Row `r`'s body anchors are `bodyX[bodyStart[r]:bodyStart[r+1]]` and the same
 range of `bodyY`, head to tail; `bodyStart` has one more entry than there are rows.
@@ -211,7 +219,8 @@ Before embedding:
 | --- | --- |
 | `observe_selected(&mask)` | Shared-index batch observations, one result per slot. Unselected/dead slots are `None`; wrong mask length is an error. |
 | `body_is_clear(&body, clearance)` | Check all supplied edges against living snakes and the 60-unit arena margin; invalid input returns false. |
-| `respawn_body(slot, body, heading)` | Replace a dead slot using supplied geometry and reset per-life motion, boost, penalty, death-time and join-order state. |
+| `respawn_body(slot, body, heading)` | Replace a dead slot using supplied geometry and reset per-life motion, boost, penalty, death-time and join-order state. With `minScore`, the body needs at least the floor's segments; at exactly that many, the life starts at the floor's mass. |
+| `spawn_body(head, heading)` | The configured new-life body and heading at `head`. With `spawnRadius`, its anchors lie along the circle through `head`, turning the way `heading` leans, heading along it; an error if that circle cannot hold them. Otherwise two straight segments behind `heading`. Check it with `body_is_clear`. |
 | `set_ambient_rate(attempts_per_second)` | Change refill rate while preserving fractional placement credit. Zero discards pending credit and disables refill. |
 
 Supplied bodies are head-first, one anchor per segment, with 2–430 finite points.
@@ -250,7 +259,7 @@ steps. Worlds step on the rayon pool as in `serve`.
 
 `FrameRef` columns hold the values the JSON frame prints, rounded alike, in
 fixed types: `u64` prey `id`; `u8` food `origin` and death `reason`; `u32`
-`ticks`, `living`, `slot`, `segments`, `kills`, death `victim`, `killer` and
+`ticks`, `living`, `slot`, `segments`, `kills`, `kill_score`, death `victim`, `killer` and
 `food`, and every row index and offset; `f64` everything else. Where the JSON
 frame nests or prints `null`, the columns differ:
 
@@ -260,7 +269,7 @@ frame nests or prints `null`, the columns differ:
   likewise `food` and `prey`. Each `*_start` has one entry more than there are
   slots; dead slots have empty ranges.
 - `deaths` holds the columns `time`, `victim`, `killer` (`NONE` without a
-  killer), `reason` (an index into `transport::REASONS`: body, boundary) and
+  killer), `reason` (an index into `transport::REASONS`: body, boundary, pit) and
   dropped `food`.
 - `food.origin` indexes `transport::ORIGINS`, or is `NO_ORIGIN` (255) without an
   origin; `food.size` is NaN without a size.

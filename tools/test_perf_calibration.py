@@ -220,7 +220,7 @@ class Calibration(unittest.TestCase):
         calibration = (root / "pr-report-calibration.yml").read_text(encoding="utf-8")
         self.assertIn("options: [windows-latest, ubuntu-latest]", calibration)
         self.assertIn("runs-on: ${{ inputs.os }}", calibration)
-        self.assertIn(f"timeout-minutes: {pr_report.JOB_TIMEOUT_SECONDS // 60}\n", calibration)
+        self.assertIn(f"timeout-minutes: {perf_calibration.JOB_TIMEOUT_SECONDS // 60}\n", calibration)
         self.assertIn("workflow_dispatch:", calibration)
         self.assertNotIn("pull_request", calibration)
 

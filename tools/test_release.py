@@ -2,6 +2,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 import io
 import json
+import re
 import subprocess
 import tarfile
 import unittest
@@ -14,6 +15,15 @@ import release
 class ReleaseTests(unittest.TestCase):
     package = {"name": "slither-sim", "version": "0.1.0", "publish": ["crates-io"]}
     commit = "a" * 40
+
+    def test_archive_smoke_expects_the_current_serve_contract(self):
+        source = (release.ROOT / "src/transport.rs").read_text(encoding="utf-8")
+        protocol = re.search(r'pub const PROTOCOL: &str = "([^"]+)";', source)[1]
+        workflow = (release.ROOT / ".github/workflows/release-binaries.yml").read_text(encoding="utf-8")
+        # The archive jobs run only on workflow edits, so ordinary API changes
+        # must catch stale smoke-test expectations in the tools suite.
+        expected = re.findall(r'r\["protocol"\] == "([^"]+)"', workflow)
+        self.assertEqual(expected, [protocol])
 
     def test_ci_lookup_waits_for_the_exact_main_run(self):
         for replies in (["123\n"], ["", "123\n"]):

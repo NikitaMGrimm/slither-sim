@@ -9,6 +9,11 @@
   networking; `client::ReferenceBot` supports both portable backends. Decisions
   never boost or allocate. The host's background seekers are unchanged. See the
   [reference policy guide](docs/client-api.md#reference-policy).
+- Advisory PR performance comparisons publish up to three covered progress
+  updates and a terminal report, retain verified original-preview results after
+  merge, and consolidate evidence on the rolling release PR. A pre-budgeted v2
+  schedule continues unresolved rows within a provisional 30-minute job cap;
+  hosted timing-model calibration remains unestablished.
 - The `slither-sim` Python package is on PyPI: `pip install slither-sim`. From
   this release on, each crate release publishes the same version there.
   Stable-ABI wheels serve CPython 3.11+ on Linux (x86-64 and ARM64), macOS (Apple
@@ -18,6 +23,22 @@
   ABI library with its header, for Linux (x86-64 and ARM64, glibc 2.17+), macOS
   (Apple silicon and Intel) and Windows (x86-64), with a `SHA256SUMS` file. They
   are unsigned. See [download a release](README.md#download-a-release).
+- A Battledome mode: `Config::battledome()`, or `"preset": "battledome"` in JSON,
+  raises the minimum snake size to 400 points in a fixed 3,584-unit arena with
+  a one-way pit, a 15-minute kill score and no prey; physics and ecology are
+  otherwise official. It is built from four general world settings: `pit`
+  (leaving it kills with the new death reason `pit` and drops death food),
+  `spawnRadius` (new lives lie along that ring), `killScoreSeconds` and
+  `minScore` (new lives start at it; boosting and the kiosk penalty spend only
+  mass above it, and boosting at it is free and drops no pellets).
+  See [Battledome](docs/configuration.md#battledome).
+- World configs accept `"preset": "official" | "sandbox" | "battledome"` in
+  `serve` and Python resets and in `host` and `client` config files; explicit
+  fields override the preset. See [presets](docs/configuration.md#presets).
+- Frames carry each snake's kill score: `snakes.killScore` in `serve` JSON,
+  `kill_score` in `FrameRef`, `snake_kill_score` in Python and the C ABI, and
+  `Simulator::kill_score` in Rust. The column is additive to the current
+  `slither-sim-json-v3`, and `pit` deaths only occur with the new opt-in `pit`.
 - `Config::warnings`, `SimulationConfig::warnings` and `HostConfig::warnings`
   describe valid but unmeasured settings, starting with a `dt` outside the
   measured 6.94–7.07 ms loop and long broadcast intervals. `serve` reset replies
@@ -26,6 +47,11 @@
 
 ### Breaking
 
+- The unreleased C ABI `slither-sim-abi-v2` (`SLITHER_ABI_VERSION` 2) also gains
+  `snake_kill_score` after `snake_kills` in `slither_frame`, and
+  `SLITHER_DEATH_PIT` is a new `death_reason` code. Rebuild callers against the
+  new header.
+- `DeathReason` has a new `Pit` variant, and `transport::REASONS` a third entry.
 - Limits are now real limits, warned unmeasured ranges or named policies; see
   [limits](docs/configuration.md#limits). Arbitrary caps are removed:
   `foodCount ≤ 100000`, `ambientReplenishPerSecond ≤ 10000`, prey

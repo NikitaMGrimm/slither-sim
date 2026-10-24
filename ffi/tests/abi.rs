@@ -73,6 +73,7 @@ fn frame_layout_matches_the_header() {
         snake_fam,
         snake_score,
         snake_kills,
+        snake_kill_score,
         snake_body_start,
         snake_body_x,
         snake_body_y,
@@ -140,7 +141,7 @@ fn frame_layout_matches_the_header() {
         size_of::<SlitherFrame>()
     );
     #[cfg(target_pointer_width = "64")]
-    assert_eq!(size_of::<SlitherFrame>(), 32 + 6 * 8 + 38 * 8);
+    assert_eq!(size_of::<SlitherFrame>(), 32 + 6 * 8 + 39 * 8);
     compile_layout_assertions(&rust);
 }
 
@@ -333,6 +334,7 @@ fn assert_same(frame: &SlitherFrame, expected: FrameRef) {
         assert_eq!(column(frame.snake_fam, n), s.fam);
         assert_eq!(column(frame.snake_score, n), s.score);
         assert_eq!(column(frame.snake_kills, n), s.kills);
+        assert_eq!(column(frame.snake_kill_score, n), s.kill_score);
         assert_eq!(column(frame.snake_body_start, n + 1), s.body_start);
         assert_eq!(column(frame.snake_body_x, frame.body), s.body_x);
         assert_eq!(column(frame.snake_body_y, frame.body), s.body_y);
@@ -395,7 +397,8 @@ fn sessions_match_the_rust_api() {
     assert_eq!(handle.step(&[], &[]), SLITHER_REJECTED);
     assert_eq!(handle.error(), "Reset first");
 
-    let reset = r#"{"op":"reset","seed":11,"worlds":2,"agents":5,"config":{"radius":400,"dynamicRadius":false,"boundaryMode":"hard","foodCount":200}}"#;
+    // A synthetic pit and a short kill-score window fill the newer columns.
+    let reset = r#"{"op":"reset","seed":11,"worlds":2,"agents":5,"config":{"radius":400,"dynamicRadius":false,"boundaryMode":"hard","foodCount":200,"pit":{"radius":120},"spawnRadius":200,"killScoreSeconds":0.2}}"#;
     for line in [r#"{"op":"info"}"#, "not json", reset] {
         assert_eq!(handle.request(line), expected.request(line.as_bytes()));
     }
@@ -407,8 +410,8 @@ fn sessions_match_the_rust_api() {
         handle.frame(2).unwrap_err(),
         (SLITHER_REJECTED, "Unknown world".into())
     );
-    let mut deaths = 0;
-    for t in 0..40 {
+    let (mut reasons, mut scored) = ([false; 3], false);
+    for t in 0..80 {
         let mut headings = Vec::new();
         for w in 0..2 {
             let frame = expected.frame(w).unwrap();
@@ -427,11 +430,18 @@ fn sessions_match_the_rust_api() {
         assert_eq!(handle.error(), "");
         let flags: Vec<bool> = boosts.iter().map(|&b| b != 0).collect();
         expected.step(&headings, &flags).unwrap();
-        deaths += (0..2)
-            .map(|w| handle.frame(w).unwrap().deaths)
-            .sum::<usize>();
+        for w in 0..2 {
+            let frame = handle.frame(w).unwrap();
+            for &reason in unsafe { column(frame.death_reason, frame.deaths) } {
+                reasons[reason as usize] = true;
+            }
+            scored |= unsafe { column(frame.snake_kill_score, frame.snakes) }
+                .iter()
+                .any(|&score| score > 0);
+        }
     }
-    assert!(deaths > 0);
+    // Body and pit deaths, and a kill score above zero.
+    assert!(reasons[0] && reasons[2] && scored, "{reasons:?} {scored}");
     let snapshot = r#"{"op":"snapshot","world":1}"#;
     assert_eq!(
         handle.request(snapshot),

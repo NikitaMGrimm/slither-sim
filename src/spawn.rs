@@ -1,3 +1,75 @@
+use crate::{Config, Point, physics};
+use std::f64::consts::{FRAC_PI_2, PI, SQRT_2, TAU};
+
+/// Head distance of a new life: `config.spawn_radius`, or the official grid of
+/// `sample_spawn_distance`. Callers draw `unit` either way, so the setting never
+/// shifts the rest of their spawn stream.
+pub fn spawn_distance(config: &Config, unit: f64) -> f64 {
+    config
+        .spawn_radius
+        .unwrap_or_else(|| sample_spawn_distance(config.radius, unit))
+}
+
+/// A `segments`-anchor body along the circle through `head` around the center,
+/// trailing the head at the 42-unit anchor spacing, and its tangent heading.
+/// It turns counterclockwise when `heading` leans that way, else clockwise.
+/// `None` when the circle cannot hold the body without wrapping onto itself.
+/// A mode design choice for `spawnRadius` lives; see docs/configuration.md#battledome.
+pub fn ring_body(head: Point, heading: f64, segments: usize) -> Option<(Vec<Point>, f64)> {
+    let radius = head.distance(Point::default());
+    let step = ring_step(radius, segments)?;
+    let angle = head.y.atan2(head.x);
+    let turn = if (heading - angle - FRAC_PI_2).cos() >= 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
+    let body = (0..segments)
+        .map(|i| {
+            if i == 0 {
+                return head;
+            }
+            let a = angle - turn * step * i as f64;
+            Point {
+                x: a.cos() * radius,
+                y: a.sin() * radius,
+            }
+        })
+        .collect();
+    Some((body, angle + turn * FRAC_PI_2))
+}
+
+/// One-ulp error budgets in world units, including both components' Euclidean
+/// error (sqrt(2)). Angles stay within +/-3*pi for a body shorter than a turn.
+pub(crate) fn ring_roundoff(radius: f64) -> f64 {
+    // Initial sin/cos, coordinate multiply and hypot radius round trip.
+    let radial = 2.0 * SQRT_2 + 1.0;
+    // atan2, step*index, angle subtraction, then sin/cos and multiply.
+    let position = PI + TAU + 3.0 * PI + 2.0 * SQRT_2;
+    // Division perturbs radius by epsilon; asin's absolute error is at most
+    // (pi/2)*epsilon and changes a chord midpoint by at most radius times that.
+    let chord = 1.0 + FRAC_PI_2;
+    radius * (f64::EPSILON * (radial + position + chord))
+}
+
+/// Angle between neighboring anchors 42 units apart on a circle of `radius`,
+/// leaving a head-tail gap wider than the body's actual diameter.
+pub(crate) fn ring_step(radius: f64, segments: usize) -> Option<f64> {
+    let half_spacing = physics::ANCHOR_SPACING / 2.0;
+    if !radius.is_finite() || radius <= half_spacing || segments < 2 {
+        return None;
+    }
+    let step = 2.0 * (half_spacing / radius).asin();
+    // The tail is (segments - 1) steps behind the head. Reserve a chord of
+    // two body radii, with one position-error budget at each end, rather than
+    // one anchor spacing: large floor bodies are wider than 42 units.
+    let body_radius = physics::BODY_RADIUS * physics::scale(segments);
+    let gap = 2.0 * ((body_radius + ring_roundoff(radius)) / radius).asin();
+    let occupied = (segments - 1) as f64 * step;
+    let angle_roundoff = f64::EPSILON * (occupied + gap + TAU);
+    (occupied > gap + angle_roundoff && occupied + gap < TAU - angle_roundoff).then_some(step)
+}
+
 /// Observed own-spawn radii lie on `0.009 + 0.011*n` of the arena radius.
 /// The probability of each band is not identified: keep the area-weighted
 /// draw and quantize its radius to the observed grid.

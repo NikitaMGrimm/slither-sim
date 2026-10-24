@@ -26,6 +26,7 @@ on:
       - tools/perf_compare.py
       - tools/perf_build.py
       - tools/perf_stats.py
+      - tools/pr_report_progress.py
       - .github/workflows/pr-report.yml
   # Main runs only refresh the dependency cache that PR runs restore. PR runs never
   # save it, so one PR's build cannot reach another PR's measurement.
@@ -53,9 +54,9 @@ jobs:
     # cache key includes the OS. Changing it needs a calibration of the new runner
     # (docs/maintainers/pr-reports.md#calibration).
     runs-on: &runner windows-latest
-    # tools/pr_report.py derives the sampling deadline from this limit
-    # (JOB_TIMEOUT_SECONDS) and keeps 60 seconds for the report and uploads.
-    timeout-minutes: 15
+    # Provisional operational cap; includes checkpoint pauses. Keep 90 seconds
+    # for report finalization and uploads (tools/pr_report.py).
+    timeout-minutes: 30
     steps:
       - name: Record job start
         shell: bash
@@ -76,33 +77,86 @@ jobs:
         with:
           shared-key: pr-report
           save-if: false
-      - name: Compare target and proposed merge
+      - name: Start target and proposed merge comparison
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           REPORT_DIRECTORY: ${{ runner.temp }}/pr-report
         shell: bash
-        run: '"$PYTHON" tools/pr_report.py --output "$REPORT_DIRECTORY" --head "$PR_HEAD"'
+        run: '"$PYTHON" tools/pr_report_progress.py start --output "$REPORT_DIRECTORY" --head "$PR_HEAD"'
+      # Upload only while the collector is paused between covered rounds. The
+      # next wait acknowledges the preceding upload before timing can resume.
+      - name: Wait for first checkpoint
+        id: progress1
+        shell: bash
+        run: '"$PYTHON" tools/pr_report_progress.py wait --output "${{ runner.temp }}/pr-report" --sequence 1'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.progress1.outputs.ready == 'true'
+        with:
+          name: pr-report-progress-${{ github.run_attempt }}-1
+          path: |
+            ${{ runner.temp }}/pr-report/progress/1/report.json
+            ${{ runner.temp }}/pr-report/progress/1/report.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Wait for second checkpoint
+        id: progress2
+        shell: bash
+        run: '"$PYTHON" tools/pr_report_progress.py wait --output "${{ runner.temp }}/pr-report" --sequence 2'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.progress2.outputs.ready == 'true'
+        with:
+          name: pr-report-progress-${{ github.run_attempt }}-2
+          path: |
+            ${{ runner.temp }}/pr-report/progress/2/report.json
+            ${{ runner.temp }}/pr-report/progress/2/report.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Wait for third checkpoint
+        id: progress3
+        shell: bash
+        run: '"$PYTHON" tools/pr_report_progress.py wait --output "${{ runner.temp }}/pr-report" --sequence 3'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.progress3.outputs.ready == 'true'
+        with:
+          name: pr-report-progress-${{ github.run_attempt }}-3
+          path: |
+            ${{ runner.temp }}/pr-report/progress/3/report.json
+            ${{ runner.temp }}/pr-report/progress/3/report.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Finish comparison
+        shell: bash
+        run: '"$PYTHON" tools/pr_report_progress.py finish --output "${{ runner.temp }}/pr-report"'
+      - name: Stop and reap collector before uploads
+        id: cleanup
+        if: always()
+        timeout-minutes: 2
+        shell: bash
+        run: '"$PYTHON" tools/pr_report_progress.py cleanup --output "${{ runner.temp }}/pr-report"'
       # The small comment artifact goes first so a slow full upload cannot cost the comment.
       - name: Upload comment data
+        if: success() && steps.cleanup.outputs.safe_to_upload == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pr-report-comment
+          name: pr-report-comment-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/pr-report/report.json
             ${{ runner.temp }}/pr-report/report.md
           if-no-files-found: error
           retention-days: 14
-          overwrite: true
       - name: Upload results
-        if: always()
+        if: always() && steps.cleanup.outputs.safe_to_upload == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pr-report
-          path: ${{ runner.temp }}/pr-report
+          name: pr-report-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pr-report
+            ${{ runner.temp }}/pr-report.collector.log
+            ${{ runner.temp }}/pr-report.pid
+            ${{ runner.temp }}/pr-report.control
           if-no-files-found: error
           retention-days: 14
-          overwrite: true
 
   cache:
     name: Dependency cache

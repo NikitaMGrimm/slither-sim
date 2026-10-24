@@ -11,6 +11,12 @@ while packaged docs, tests and examples can. The version lives in the root
 package inherit it, so their lockfile entries move with the crate's. The Python
 tools version remains independent.
 
+The [release performance comment](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md#rolling-release-evidence) cheaply
+consolidates original PR evidence after release-plz refreshes and late reports.
+It owns a separate comment, changes no branch files or release-plz body, and
+does not authorize publication or start expensive measurements. Direct prior-tag
+versus pinned-candidate measurement remains a separate on-demand layer.
+
 ## Manual releases
 
 To publish now, manually merge the rolling `chore(release)` PR after its required
