@@ -306,6 +306,12 @@ beside the owning code.
 Domains such as finite values, nonnegative delays, probabilities in 0–1 and
 ordered ranges follow from each field's meaning.
 
+Work per step grows with what a config asks for and always finishes: each prey
+advances `dt / 0.007` fixed substeps, and ambient refill makes about
+`ambientReplenishPerSecond × dt` attempts, even when the target is full, since
+its clock must advance bit for bit. Neither is capped: configs come from the
+operator or the local controller, never from remote players.
+
 **Valid but unmeasured** settings load with a warning (stderr for the command
 line, `warnings` in `serve` reset replies, `UserWarning` in Python):
 
