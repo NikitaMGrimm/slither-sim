@@ -805,6 +805,22 @@ impl Simulator {
                 Some(bounds)
             })
             .collect();
+        // Each snake's tip, heading direction and scale, as `head_tip` and
+        // `strikes` compute them, evaluated once rather than per pair.
+        let heads: Vec<(Point, (f64, f64), f64)> = self
+            .snakes
+            .iter()
+            .map(|s| {
+                let scale = scale(s.segments);
+                let direction = (s.heading.cos(), s.heading.sin());
+                let r = BODY_RADIUS * scale;
+                let tip = Point {
+                    x: s.head.x + direction.0 * r,
+                    y: s.head.y + direction.1 * r,
+                };
+                (tip, direction, scale)
+            })
+            .collect();
         // The offline Android client resolves collisions oldest first against
         // newer snakes first, skipping those already dead. We preserve that
         // resolution after moving all snakes; online move/test phasing is unverified.
@@ -829,7 +845,7 @@ impl Simulator {
                 continue;
             }
             let s = &self.snakes[i];
-            let tip = head_tip(s.head, s.heading, s.segments);
+            let (tip, direction, head_scale) = heads[i];
             let probe = Bounds::between(tip, tip);
             let indexed = index.as_ref().is_some_and(|(index, longest)| {
                 // Scale grows with segments, so this bounds every pair's reach below.
@@ -842,20 +858,22 @@ impl Simulator {
                 }
                 let other_bounds = bodies[j].expect("living snake has bounds");
                 let other = &self.snakes[j];
-                let segments = other.segments;
+                let (other_tip, _, body_scale) = heads[j];
                 if PROFILE {
                     profile.body_pairs += 1;
                 }
-                if !other_bounds.near(probe, 3.666 * collision_distance(s.segments, segments)) {
+                // `3.666 * collision_distance(head, body)` with the same operation order.
+                let reach = 3.666 * (BODY_RADIUS * (head_scale + body_scale));
+                if !other_bounds.near(probe, reach) {
                     return false;
                 }
                 if PROFILE {
                     profile.segment_tests += self.snakes[j].body.len() as u64;
                 }
-                let line = [head_tip(other.head, other.heading, segments), other.head]
+                let line = [other_tip, other.head]
                     .into_iter()
                     .chain(other.body.iter().copied());
-                strikes(last_tips[i], tip, s.heading, s.segments, segments, line)
+                strikes_scaled(last_tips[i], tip, direction, head_scale, body_scale, line)
             };
             // Both visit positions newest first; the index omits only snakes
             // whose bounds fail the test above.

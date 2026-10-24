@@ -202,11 +202,31 @@ pub fn strikes(
     body_segments: usize,
     line: impl IntoIterator<Item = Point>,
 ) -> bool {
-    let body_radius = BODY_RADIUS * scale(body_segments);
-    let reach = 3.666 * collision_distance(head_segments, body_segments);
+    strikes_scaled(
+        last_tip,
+        tip,
+        (heading.cos(), heading.sin()),
+        scale(head_segments),
+        scale(body_segments),
+        line,
+    )
+}
+/// [`strikes`] with the head's heading as `(cos, sin)` and both scales precomputed,
+/// so a caller testing many pairs evaluates each snake's terms once.
+pub(crate) fn strikes_scaled(
+    last_tip: Point,
+    tip: Point,
+    (cos, sin): (f64, f64),
+    head_scale: f64,
+    body_scale: f64,
+    line: impl IntoIterator<Item = Point>,
+) -> bool {
+    let body_radius = BODY_RADIUS * body_scale;
+    // `3.666 * collision_distance(head, body)` with the same operation order.
+    let reach = 3.666 * (BODY_RADIUS * (head_scale + body_scale));
     let end = Point {
-        x: tip.x + heading.cos() * body_radius,
-        y: tip.y + heading.sin() * body_radius,
+        x: tip.x + cos * body_radius,
+        y: tip.y + sin * body_radius,
     };
     let mut points = line.into_iter();
     let Some(mut a) = points.next() else {
