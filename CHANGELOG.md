@@ -10,8 +10,9 @@
   are about 12× smaller, the server answers about twice as fast and Python's
   `json.loads` is about 11× faster.
 - Frames round coordinates to 0.01 world units, headings to 0.0001 rad and speeds
-  to 0.01 units/s; other numbers stay exact. Real players receive coarser
-  protocol-19 data; see the [observation precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md).
+  to 0.01 units/s; other numbers stay exact. Real players mostly receive coarser
+  protocol-19 data, and the worst error is 0.05% of the smallest snake radius;
+  see the [observation precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md).
   The simulation, snapshots, the portable client and the WebSocket host keep full
   precision, so hosted players are unaffected.
 

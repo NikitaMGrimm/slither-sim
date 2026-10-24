@@ -352,9 +352,34 @@ fn executable_emits_only_replies_and_exits_on_eof() {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    for args in [&["serve"][..], &["serve", "--threads", "2"]] {
+    let headings = |w: usize| (0..6).map(|i| (i + 2 * w) as f64 * 0.9).collect::<Vec<_>>();
+    let step = json!({"op":"step","actions":(0..4).map(|w| json!({
+        "heading": headings(w), "boost": [w % 2 == 0, false, true, false, false, false],
+    })).collect::<Vec<_>>()});
+    let requests = [
+        json!({"op":"info"}),
+        json!({"op":"reset","seed":11,"worlds":4,"agents":6,
+            "config":{"radius":900,"dynamicRadius":false,"foodCount":600}}),
+        step.clone(),
+        step.clone(),
+        step,
+    ];
+    let in_process = raw_exchange(&requests);
+    let input: String = requests
+        .iter()
+        .map(|request| format!("{request}\n"))
+        .collect();
+    let mut runs = vec![vec!["serve"]];
+    // Thread counts only size the pool; replies must not depend on them.
+    if cfg!(feature = "parallel") {
+        runs.extend([
+            vec!["serve", "--threads", "1"],
+            vec!["serve", "--threads", "4"],
+        ]);
+    }
+    for args in runs {
         let mut child = Command::new(env!("CARGO_BIN_EXE_slither-sim"))
-            .args(args)
+            .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -364,14 +389,16 @@ fn executable_emits_only_replies_and_exits_on_eof() {
             .stdin
             .take()
             .unwrap()
-            .write_all(b"{\"op\":\"info\"}\n")
+            .write_all(input.as_bytes())
             .unwrap();
         let result = child.wait_with_output().unwrap();
         assert!(result.status.success(), "{args:?}");
         assert!(result.stderr.is_empty());
         let text = String::from_utf8(result.stdout).unwrap();
-        assert_eq!(text.lines().count(), 1);
-        let reply: Value = serde_json::from_str(text.trim()).unwrap();
-        assert_eq!(reply["protocol"], transport::PROTOCOL);
+        assert_eq!(text.lines().count(), requests.len());
+        assert!(
+            text == in_process,
+            "{args:?} replies differ from in-process replies"
+        );
     }
 }
