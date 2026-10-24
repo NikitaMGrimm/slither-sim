@@ -16,8 +16,13 @@ const CLEANUP_SECONDS: f64 = 0.504;
 #[derive(Clone, Debug, Default)]
 pub(super) struct SectorInterest {
     subscribed: BTreeSet<[u8; 2]>,
+    /// Keys are exactly the subscribed sectors. Sectors of the current stencil
+    /// were last seen at `touched`; their stored values may be older.
     last_seen: BTreeMap<[u8; 2], f64>,
     cleanup_epoch: u64,
+    /// Grid center of the latest stencil.
+    center: Option<[f64; 2]>,
+    touched: f64,
 }
 
 impl SectorInterest {
@@ -30,22 +35,20 @@ impl SectorInterest {
         // add it before flooring, including for negative world coordinates.
         let cx = ((head.x + center + HEADING_LEAD * heading.cos()) / size).floor();
         let cy = ((head.y + center + HEADING_LEAD * heading.sin()) / size).floor();
-        for dx in -3_i32..=3 {
-            for dy in -3_i32..=3 {
-                if dx.abs() == 3 && dy.abs() == 3 {
-                    continue;
-                }
-                let sx = cx + f64::from(dx);
-                let sy = cy + f64::from(dy);
-                // Clip the stencil, rather than wrapping or clamping offsets
-                // onto an edge. These keys bound both collections to 65,536.
-                if (0. ..=255.).contains(&sx) && (0. ..=255.).contains(&sy) {
-                    let sector = [sx as u8, sy as u8];
-                    self.subscribed.insert(sector);
-                    self.last_seen.insert(sector, now);
+        // An unchanged stencil touches the same sectors, so only `touched` moves.
+        if self.center != Some([cx, cy]) {
+            if let Some(previous) = self.center {
+                for sector in stencil(previous) {
+                    self.last_seen.insert(sector, self.touched);
                 }
             }
+            for sector in stencil([cx, cy]) {
+                self.subscribed.insert(sector);
+                self.last_seen.insert(sector, now);
+            }
+            self.center = Some([cx, cy]);
         }
+        self.touched = now;
 
         // Absolute epochs keep phase at multiples of 0.504 from virtual zero.
         // Touch before cleanup; a large jump needs only one bounded sweep and
@@ -54,8 +57,12 @@ impl SectorInterest {
         if epoch > self.cleanup_epoch {
             self.cleanup_epoch = epoch;
             let subscribed = &mut self.subscribed;
+            let [cx, cy] = [cx, cy];
             self.last_seen.retain(|sector, last_seen| {
-                if now - *last_seen <= RETENTION_SECONDS {
+                let dx = (f64::from(sector[0]) - cx).abs();
+                let dy = (f64::from(sector[1]) - cy).abs();
+                let current = dx <= 3. && dy <= 3. && !(dx == 3. && dy == 3.);
+                if current || now - *last_seen <= RETENTION_SECONDS {
                     true
                 } else {
                     subscribed.remove(sector);
@@ -68,6 +75,23 @@ impl SectorInterest {
     pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
         &self.subscribed
     }
+}
+
+/// Sectors around a grid center, without the four corners.
+fn stencil([cx, cy]: [f64; 2]) -> impl Iterator<Item = [u8; 2]> {
+    (-3_i32..=3).flat_map(move |dx| {
+        (-3_i32..=3).filter_map(move |dy| {
+            if dx.abs() == 3 && dy.abs() == 3 {
+                return None;
+            }
+            let sx = cx + f64::from(dx);
+            let sy = cy + f64::from(dy);
+            // Clip the stencil, rather than wrapping or clamping offsets
+            // onto an edge. These keys bound both collections to 65,536.
+            ((0. ..=255.).contains(&sx) && (0. ..=255.).contains(&sy))
+                .then_some([sx as u8, sy as u8])
+        })
+    })
 }
 
 #[cfg(test)]

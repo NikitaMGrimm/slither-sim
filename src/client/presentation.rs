@@ -10,8 +10,9 @@
 //! See docs/presentation.md for evidence and limits; these choices do not establish
 //! new empirical claims and do not define a prey palette.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
+use super::fast_hash::FastMap;
 use super::latency::Random;
 use crate::model::{Food, Origin};
 use crate::simulator::FoodSpawnEvent;
@@ -103,6 +104,8 @@ fn custom_food_color(color: u8) -> Option<u8> {
     })
 }
 
+type BitsMap<V> = FastMap<(u64, u64), V>;
+
 fn identity(food: &Food) -> (u64, u64) {
     let bits = |value: f64| if value == 0. { 0 } else { value.to_bits() };
     (bits(food.x), bits(food.y))
@@ -118,7 +121,9 @@ pub(super) struct FoodPresentation {
     sources: Vec<Source>,
     // Physics keeps insertion order and can admit several pellets at one point.
     // The wire exposes the first; later births must not recolor that lifetime.
-    colors: HashMap<(u64, u64), VecDeque<u8>>,
+    colors: BitsMap<VecDeque<u8>>,
+    /// Reused pellet counts per position for `sync`.
+    live: BitsMap<usize>,
 }
 
 impl FoodPresentation {
@@ -131,7 +136,8 @@ impl FoodPresentation {
                     cursor: 0,
                 })
                 .collect(),
-            colors: HashMap::new(),
+            colors: BitsMap::default(),
+            live: BitsMap::default(),
         }
     }
 
@@ -186,19 +192,22 @@ impl FoodPresentation {
     }
 
     pub(super) fn sync(&mut self, food: &[Food]) -> Result<(), String> {
-        let mut live = HashMap::<_, usize>::new();
+        let mut live = std::mem::take(&mut self.live);
+        live.clear();
+        let mut short = false;
         for item in food {
             let count = live.entry(identity(item)).or_default();
             *count += 1;
-            if self.colors.get(&identity(item)).map_or(0, VecDeque::len) < *count
-                && matches!(item.origin, Some(Origin::Boost | Origin::Death))
-            {
-                return Err("Snake food is missing birth provenance".into());
+            if self.colors.get(&identity(item)).map_or(0, VecDeque::len) < *count {
+                if matches!(item.origin, Some(Origin::Boost | Origin::Death)) {
+                    return Err("Snake food is missing birth provenance".into());
+                }
+                short = true;
             }
         }
         // Walk food order, not hash iteration order, to keep seeded assignment
         // reproducible. Reconciliation also supports injected ambient fixtures.
-        for item in food {
+        for item in food.iter().filter(|_| short) {
             let key = identity(item);
             let colors = self.colors.entry(key).or_default();
             while colors.len() < live[&key] {
@@ -212,6 +221,7 @@ impl FoodPresentation {
             }
             None => false,
         });
+        self.live = live;
         Ok(())
     }
 
