@@ -628,6 +628,28 @@ fn accepted_prey_size_matches_the_received_appearance() {
 }
 
 #[test]
+fn prey_that_cannot_turn_are_shown_without_turning() {
+    let mut config = SimulationConfig::default();
+    config.world.food_count = 0;
+    config.world.vision = 3000.;
+    config.world.prey.count = 1;
+    config.world.prey.turn_rate = 0.;
+    let mut backend = SimulatorBackend::new(7, config).unwrap();
+    backend.advance_ticks(6).unwrap();
+    let heading = backend.world().prey[0].heading;
+    let shown = |backend: &mut SimulatorBackend| {
+        let prey = backend.frame().unwrap().observation.unwrap().prey;
+        assert_eq!(prey.len(), 1);
+        prey[0].heading
+    };
+    let first = shown(&mut backend);
+    assert!((first - heading).abs() < 1e-6);
+    backend.advance_ticks(200).unwrap();
+    assert_eq!(backend.world().prey[0].heading, heading);
+    assert!((shown(&mut backend) - first).abs() < 1e-6);
+}
+
+#[test]
 fn measured_processing_without_an_action_still_occupies_the_decision() {
     let mut backend = SimulatorBackend::new(4, config(1, LatencyConfig::fixed(0.02))).unwrap();
     while backend.next_frame().unwrap().status != ClientStatus::Playing {}

@@ -131,9 +131,6 @@ pub(crate) fn setup(radius: f64, prey_turn_rate: f64) -> Result<Vec<u8>, String>
         u16::MAX as f64,
         "Prey turn rate",
     )? as u16;
-    if prey_turn == 0 {
-        return Err("Prey turn rate rounds to zero on the wire".into());
-    }
     let mut p = vec![b'a'];
     p.extend(u24be(GRID_CENTER));
     p.extend(u16be(physics::MAX_SEGMENTS as u16));
@@ -980,7 +977,8 @@ mod tests {
         assert!(setup(MAX_RADIUS + 1., turn_rate).is_err());
         assert!(setup(1000., f64::INFINITY).is_err());
         assert!(setup(1000., f64::MAX).is_err());
-        assert!(setup(1000., 0.001).is_err());
+        // Prey that cannot turn are valid; the field holds zero.
+        assert_eq!(&setup(1000., 0.001).unwrap()[19..21], &[0, 0]);
     }
 
     /// Stock-client `l` handler: position, rank, count, then sct/fam/color/name.
