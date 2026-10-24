@@ -102,8 +102,7 @@ jobs:
 
   cache:
     name: Dependency cache
-    # TEMPORARY: also save a PR-scope cache to measure a cache hit on the next push.
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    if: github.event_name == 'push'
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
