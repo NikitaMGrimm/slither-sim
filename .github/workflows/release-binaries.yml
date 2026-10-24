@@ -92,7 +92,7 @@ jobs:
 
           serve JSON API:     $docs/bot-api.md
           C ABI:              $docs/c-api.md
-          Unsigned downloads: https://github.com/NikitaMGrimm/slither-sim/blob/v$version/README.md#download-a-release
+          Unsigned downloads: https://github.com/NikitaMGrimm/slither-sim/blob/main/README.md#download-a-release
 
           MIT licensed; see LICENSE. Source: https://github.com/NikitaMGrimm/slither-sim
           EOF

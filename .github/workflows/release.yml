@@ -185,6 +185,12 @@ jobs:
         run: |
           sha256sum * > SHA256SUMS
           cat SHA256SUMS
-          # Replacing the checksums last keeps them from listing a missing set.
+          # Clobbering is per file, so remove the old checksums before replacing
+          # any archive and upload the new ones last: an interrupted upload then
+          # leaves no SHA256SUMS rather than one that describes a mixed set.
+          assets=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+          if grep -qx SHA256SUMS <<< "$assets"; then
+            gh release delete-asset "$RELEASE_TAG" SHA256SUMS --yes
+          fi
           gh release upload "$RELEASE_TAG" slither-sim-* --clobber
           gh release upload "$RELEASE_TAG" SHA256SUMS --clobber

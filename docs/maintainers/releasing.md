@@ -88,14 +88,17 @@ tests its extracted archive with a `serve` reset and step and with
 `examples/ffi_bot.py`. PRs that change the workflow build the same archives. The
 builds are not signed or notarized.
 
-The `release-assets` job, the only one with write access, uploads the archives
-and a `SHA256SUMS` file with `gh release upload --clobber`. It runs only when all
-five builds succeed. Like the Python upload, it is not part of release completion:
-a failure leaves the crate release complete, and the next version proceeds
-normally. To repair it, dispatch Release with `vVERSION`. The rerun rebuilds every
-archive from the tagged commit and replaces the uploaded set, so the checksums
-match the files. It also retries the Python upload, which skips files already on
-PyPI; either upload can fail without stopping the other.
+The `release-assets` job, the only one with write access, runs only when all
+five builds succeed. It deletes any existing `SHA256SUMS`, replaces the archives
+with `gh release upload --clobber` and uploads the new `SHA256SUMS` last.
+Replacement is per file, so an interrupted upload can leave a partial or mixed
+archive set without a `SHA256SUMS`, but never with a stale one. Like the Python
+upload, it is not part of release completion: a failure leaves the crate release
+complete, and the next version proceeds normally. To repair it, dispatch Release
+with `vVERSION`. The rerun rebuilds every archive from the tagged commit and
+replaces the uploaded set and its checksums. It also retries the Python upload,
+which skips files already on PyPI; either upload can fail without stopping the
+other.
 
 ## Incompatible changes
 
