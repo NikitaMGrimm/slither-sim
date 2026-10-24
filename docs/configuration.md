@@ -128,7 +128,9 @@ deliberately small start, not a typical official lobby; request
 The prey density of one per 10 million square units is a working assumption,
 not a calibrated global population. Received density near recorded recipients,
 about 0.04–0.18 per million square units, is a lead rather than a census; the
-official prey population remains unresolved.
+official prey population remains unresolved. The
+[official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
+records the sources and caveats of these choices.
 
 Neither constructor changes ping, broadcasts or decision timing. Those belong to
 `SimulationConfig`, which wraps either world:

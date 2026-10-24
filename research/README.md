@@ -8,6 +8,7 @@ scientific rule or product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Fidelity | [Official baseline selection](fidelity/2026-10-23-official-defaults/REPORT.md) | Configuration choices and explicit model assumptions; no new measurements. |
 | Performance | [Initial cost baseline](performance/2026-10-23-baseline/REPORT.md) | Exploratory synthetic costs; not an isolated host or stable production comparison. |
 | Performance | [Collision bounds lookup](performance/2026-10-23-collision-bounds/REPORT.md) | Adopted lookup change; gain specific to the separated-body fixture. |
 | Performance | [Observation batches](performance/2026-10-23-observation-batches/REPORT.md) | Early return adopted for empty batches; rejected attempt and mixed nonempty results retained. |
