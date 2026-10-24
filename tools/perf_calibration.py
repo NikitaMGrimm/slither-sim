@@ -23,7 +23,9 @@ import time
 from perf_baseline import digest, load_catalog, native
 import perf_compare
 import perf_stats
-from pr_report import JOB_TIMEOUT_SECONDS, RESERVE_SECONDS, STAGE_CAP_SECONDS
+# Frozen pilot v1 retains its original operational budget when PR reporting
+# moves to a new plan. Never silently reinterpret source-pinned pilot records.
+JOB_TIMEOUT_SECONDS, RESERVE_SECONDS, STAGE_CAP_SECONDS = 900, 60, 620
 
 
 PLAN = "slither-perf-calibration-pilot-v1"

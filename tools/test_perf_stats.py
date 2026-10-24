@@ -5,6 +5,8 @@ import json
 import math
 from pathlib import Path
 import unittest
+from fractions import Fraction
+from unittest.mock import patch
 
 import perf_stats
 
@@ -44,6 +46,17 @@ def student_upper_tail(critical, df):
 
 class Statistics(unittest.TestCase):
     tolerance = REFERENCE["numeric_comparison"]
+
+    def setUp(self):
+        # Frozen v1 vectors keep their original allocation; never relabel their
+        # intervals using the v2 critical values.
+        constants = REFERENCE["constants"]
+        for key, value in {"LOOKS": tuple(constants["looks"]),
+                           "ORDER": tuple(constants["order_base_first_plus_one"]),
+                           "T_CRITICAL": {int(k): v for k, v in constants["critical_by_df"].items()}}.items():
+            manager = patch.object(perf_stats, key, value)
+            manager.start()
+            self.addCleanup(manager.stop)
 
     def assertMatches(self, actual, expected, path=""):
         if isinstance(expected, dict):
@@ -147,6 +160,34 @@ class Statistics(unittest.TestCase):
         self.assertEqual((row["label"], row["reason"], row["n_used"], row["termination"]),
                          ("Unavailable", "numeric_failure", 0, "measurement_failure"))
         self.assertIsNone(row["result"])
+
+
+class StatisticsV2(unittest.TestCase):
+    tolerance = Statistics.tolerance
+    assertMatches = Statistics.assertMatches
+
+    def test_v2_constants_balance_tails_and_total_allocation(self):
+        reference = json.loads((Path(__file__).parent / "fixtures/perf-statistics/protocol-v2-reference.json").read_text())
+        constants = reference["constants"]
+        self.assertEqual(perf_stats.PLAN, "slither-perf-sequential-v2")
+        self.assertEqual(list(perf_stats.LOOKS), constants["looks"])
+        self.assertEqual(list(perf_stats.ORDER26), constants["order26_repeated"])
+        allocation = 10 * sum((Fraction(1, d) for d in perf_stats.ETA_DENOMINATORS), Fraction())
+        self.assertEqual(allocation, Fraction(constants["family_alpha_exact_numerator"], constants["family_alpha_exact_denominator"]))
+        self.assertLess(allocation, Fraction(1, 20))
+        for n, denominator, row in zip(perf_stats.LOOKS, perf_stats.ETA_DENOMINATORS, constants["table"]):
+            critical = perf_stats.T_CRITICAL[n - 2]
+            self.assertEqual(critical, row["critical"])
+            self.assertEqual(denominator, row["eta_denominator"])
+            self.assertEqual(sum(perf_stats.ORDER[:n]), 0)
+            self.assertTrue(math.isclose(student_upper_tail(critical, n - 2), 1 / (2 * denominator), rel_tol=2e-10))
+        self.assertEqual(len(perf_stats.ORDER), perf_stats.LOOKS[-1])
+        self.assertTrue(all(sum(perf_stats.ORDER[i:i+2]) == 0 for i in range(0, len(perf_stats.ORDER), 2)))
+        for item in reference["datasets"]:
+            self.assertMatches(perf_stats.analyze(item["pairs"]), item["expected"], item["id"])
+        for example in reference["checkpoint_examples"]:
+            selected = max((n for n in perf_stats.LOOKS if n <= example["complete_pairs"]), default=None)
+            self.assertEqual(selected, example["use_n"])
 
 
 if __name__ == "__main__":

@@ -4,6 +4,12 @@
 
 ### Added
 
+- Advisory PR performance comparisons publish up to three covered progress
+  updates and a terminal report, retain verified original-preview results after
+  merge, and consolidate evidence on the rolling release PR. A pre-budgeted v2
+  schedule continues unresolved rows within a provisional 30-minute job cap;
+  hosted timing-model calibration remains unestablished.
+
 - The `slither-sim` Python package is on PyPI: `pip install slither-sim`. From
   this release on, each crate release publishes the same version there.
   Stable-ABI wheels serve CPython 3.11+ on Linux (x86-64 and ARM64), macOS (Apple
