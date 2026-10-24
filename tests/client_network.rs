@@ -330,6 +330,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let address = listener.local_addr().unwrap();
     let (begin, ready) = mpsc::channel();
     let (trickle, start_trickle) = mpsc::channel();
+    let t0 = Instant::now(); // DIAGNOSTIC
     let server = thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
         stream
@@ -342,7 +343,9 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         socket.read().unwrap();
         socket.send(framed(&setup())).unwrap();
         socket.send(framed(&appearance())).unwrap();
+        eprintln!("DIAG server appearance sent {:?}", t0.elapsed());
         ready.recv_timeout(Duration::from_secs(2)).unwrap();
+        eprintln!("DIAG server begin {:?}", t0.elapsed());
         // Send one small valid message over several client decision polls.
         let mut payload = vec![0, 7, b'z'];
         payload.extend(u24(7900));
@@ -350,6 +353,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         stream.write_all(&[0x82, payload.len() as u8]).unwrap();
         for byte in payload {
             stream.write_all(&[byte]).unwrap();
+            eprintln!("DIAG server byte {:?}", t0.elapsed());
             thread::sleep(Duration::from_millis(10));
         }
         start_trickle.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -374,15 +378,18 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     })
     .unwrap();
     assert_eq!(backend.next_frame().unwrap().status, ClientStatus::Playing);
+    eprintln!("DIAG client playing {:?}", t0.elapsed());
     begin.send(()).unwrap();
     let started = Instant::now();
     let first = backend.next_frame().unwrap();
     assert!(started.elapsed() < Duration::from_millis(150));
     assert_eq!(first.observation.unwrap().arena.radius, 7926.);
     let mut radius = 7926.;
+    eprintln!("DIAG client first frame {:?}", t0.elapsed());
     for _ in 0..12 {
-        radius = backend
-            .next_frame()
+        let frame = backend.next_frame();
+        eprintln!("DIAG client frame {:?} ok={}", t0.elapsed(), frame.is_ok());
+        radius = frame
             .unwrap()
             .observation
             .unwrap()
