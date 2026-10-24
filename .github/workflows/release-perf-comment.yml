@@ -17,7 +17,9 @@ jobs:
       actions: read
       pull-requests: write
     concurrency:
-      group: release-perf-comment
+      # Distinct measurement runs own distinct comments and cannot evict each
+      # other's pending publisher. Attempts of the same source run supersede.
+      group: release-perf-comment-${{ github.event.workflow_run.id }}
       cancel-in-progress: false
     steps:
       # workflow_run loads trusted default-branch code only. Never check out

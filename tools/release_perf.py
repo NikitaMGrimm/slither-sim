@@ -34,7 +34,7 @@ def request_key(measurement):
     return hashlib.sha256(canonical(measurement).encode("ascii")).hexdigest()
 
 
-def validate_request(request, root):
+def validate_request(request, root, deadline):
     measurement = request["measurement"]
     if request.get("schema") != SCHEMA or request_key(measurement) != request.get("key"):
         raise ValueError("invalid measurement request identity")
@@ -45,11 +45,11 @@ def validate_request(request, root):
         raise ValueError("unsupported measurement configuration")
     for label in ("baseline", "candidate", "harness"):
         pin = measurement[label]
-        if perf_build.resolve(root, pin["commit"]) != (pin["commit"], pin["tree"]):
+        if perf_build.resolve(root, pin["commit"], deadline=deadline) != (pin["commit"], pin["tree"]):
             raise ValueError(f"{label} commit/tree differs from pinned request")
-    if perf_build.resolve(root, "HEAD")[0] != measurement["harness"]["commit"]:
+    if perf_build.resolve(root, "HEAD", deadline=deadline)[0] != measurement["harness"]["commit"]:
         raise ValueError("collector checkout must be the pinned trusted harness")
-    if perf_build.output(["git", "status", "--porcelain", "--untracked-files=no"], root):
+    if perf_build.output(["git", "status", "--porcelain", "--untracked-files=no"], root, deadline=deadline):
         raise ValueError("collector checkout has tracked modifications")
 
 
@@ -82,10 +82,19 @@ def render(report):
     return "\n".join(lines) + "\n"
 
 
-def measure(report, builds, output, job_start):
+def job_cutoff(job_start):
+    return time.perf_counter() + job_start + 1800 - 90 - time.monotonic()
+
+
+def measure(report, builds, output, job_start, *, cutoff=None):
+    cutoff = job_cutoff(job_start) if cutoff is None else cutoff
+    perf_build.remaining(30, cutoff)
     binaries = {label: b.binaries["perf_baseline"] for label, b in builds.items()}
     hashes = {label: digest(path) for label, path in binaries.items()}
-    catalogs = {label: load_catalog(binary) for label, binary in binaries.items()}
+    catalogs = {}
+    for label, binary in binaries.items():
+        perf_build.remaining(30, cutoff)
+        catalogs[label] = load_catalog(binary, deadline=cutoff)
     suites = {label: c.select(suite="ci") for label, c in catalogs.items()}
     same_plan(suites)
     workloads = suites["candidate"]
@@ -98,13 +107,14 @@ def measure(report, builds, output, job_start):
             for a, b in zip(suites["baseline"], suites["candidate"])):
         raise ValueError("workload definitions, operations or compiled features differ")
     report["workloads"] = [w.plan() for w in workloads]
-    report["traces"] = perf_compare.parity(binaries, suites, output)
+    perf_build.remaining(120, cutoff)
+    report["traces"] = perf_compare.parity(binaries, suites, output, deadline=cutoff)
     # Do not make timing claims for a row whose parity could not be collected.
     available = {r["case"] for r in report["traces"] if r["reading"] != "Unavailable"}
     workloads = [w for w in workloads if w.name in available]
     stage = time.perf_counter()
-    job_deadline = stage + job_start + 1800 - 90 - time.monotonic()
-    deadline = min(stage + 1500, job_deadline)
+    deadline = min(stage + 1500, cutoff)
+    perf_build.remaining(1500, deadline)
     plan = {"plan": perf_stats.PLAN, "comparison": report["request"],
             "seed": catalogs["candidate"].seed, "executables": hashes,
             "catalogs": {label: c.sha256 for label, c in catalogs.items()},
@@ -126,7 +136,7 @@ def measure(report, builds, output, job_start):
 
 
 def collect(request, output, job_start, root=ROOT):
-    validate_request(request, root)
+    cutoff = job_cutoff(job_start)
     report = {"schema": SCHEMA, "request": request, "state": "unavailable", "errors": [],
               "tests": {}, "traces": [], "performance": [], "fidelity": []}
     perf_compare.write_json(output / "request.json", request)
@@ -136,24 +146,26 @@ def collect(request, output, job_start, root=ROOT):
         log = output / f"{snapshot.label}-tests.log"
         code = perf_build.command(["cargo", "test", "--locked", *FEATURES, "--no-fail-fast",
                                    *(arg for name in perf_build.TESTS for arg in ("--test", name)),
-                                   "--", "--test-threads=1"], snapshot.checkout, log, environment)
+                                   "--", "--test-threads=1"], snapshot.checkout, log, environment, deadline=cutoff)
         report["tests"][snapshot.label] = pr_report.parse_tests(log.read_text(encoding="utf-8"))
         if code:
             report["errors"].append(f"{snapshot.label} selected regressions exited {code}; see logs")
         if build:
             metrics = output / f"{snapshot.label}-fidelity.json"
             if perf_build.command([build.binaries["fidelity_metrics"], snapshot.checkout / "tests/fixtures"],
-                                  snapshot.checkout, metrics, environment):
+                                  snapshot.checkout, metrics, environment, deadline=cutoff):
                 report["errors"].append(f"{snapshot.label} fidelity metrics unavailable")
             else:
                 fidelity[snapshot.label] = json.loads(metrics.read_text(encoding="utf-8"))
 
     try:
+        perf_build.remaining(120, cutoff)
+        validate_request(request, root, cutoff)
         m = request["measurement"]
         targets = perf_build.LocalTargets(root)
-        with targets.hold(("baseline", "candidate")), perf_build.Session(root, output / "work") as session:
+        with targets.hold(("baseline", "candidate")), perf_build.Session(root, output / "work", deadline=cutoff) as session:
             harness = session.worktree("harness", m["harness"]["commit"])
-            snapshots = [perf_build.overlay(harness, session.worktree(label, m[label]["commit"]))
+            snapshots = [perf_build.overlay(harness, session.worktree(label, m[label]["commit"]), deadline=cutoff)
                          for label in ("baseline", "candidate")]
             if snapshots[0].inputs != snapshots[1].inputs:
                 raise ValueError("measurement input overlays differ")
@@ -162,7 +174,7 @@ def collect(request, output, job_start, root=ROOT):
                 pr_report.test_names((harness.checkout / f"tests/{name}.rs").read_text(encoding="utf-8")))]
             builds, errors = perf_build.build_all(snapshots, targets, ("perf_baseline", "fidelity_metrics"),
                                                   logs=output, bins=output / "binaries", hook=regression,
-                                                  cargo_args=FEATURES)
+                                                  cargo_args=FEATURES, deadline=cutoff)
             report["errors"] += errors
         report["identities"] = {label: b.record for label, b in builds.items()}
         report["fidelity"] = pr_report.metric_rows(fidelity.get("baseline"), fidelity.get("candidate"))
@@ -173,7 +185,7 @@ def collect(request, output, job_start, root=ROOT):
         if len(builds) == 2:
             for build in builds.values():
                 build.verify()
-            measure(report, builds, output, job_start)
+            measure(report, builds, output, job_start, cutoff=cutoff)
             for build in builds.values():
                 build.verify()
             report["state"] = "complete"

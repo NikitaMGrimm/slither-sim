@@ -32,9 +32,37 @@ SNAPSHOT_IDENTITY = {name: value for role in ("AUTHOR", "COMMITTER") for name, v
     (f"GIT_{role}_DATE", "2000-01-01T00:00:00Z"))}
 
 
-def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS):
+def remaining(timeout, deadline):
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.perf_counter())
+        if timeout <= 0:
+            raise TimeoutError("performance preparation deadline exceeded before starting a command")
+    return timeout
+
+
+def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS, *, deadline=None):
+    if deadline is not None:
+        remaining(timeout, deadline)
+        # Preparation (notably worktree checkout) can itself spawn descendants.
+        # The shared cutoff must stop/reap those before finalization too.
+        with tempfile.TemporaryFile() as stream:
+            tree = ProcessTree(args, cwd, environment, stream)
+            try:
+                try:
+                    code = tree.wait(remaining(timeout, deadline))
+                finally:
+                    tree.stop(verify=True)
+            except (subprocess.TimeoutExpired, TimeoutError) as error:
+                stream.seek(0)
+                raise TimeoutError(f"preparation command timed out: {error}: "
+                                   f"{stream.read().decode('utf-8', errors='replace')}") from error
+            stream.seek(0)
+            text = stream.read().decode("utf-8", errors="replace").strip()
+        if code:
+            raise RuntimeError(f"{' '.join(map(str, args))} exited {code}: {text}")
+        return text
     result = subprocess.run([str(arg) for arg in args], cwd=cwd, env=environment, capture_output=True,
-                            encoding="utf-8", errors="replace", timeout=timeout, check=False)
+                            encoding="utf-8", errors="replace", timeout=remaining(timeout, deadline), check=False)
     if result.returncode:
         raise RuntimeError(f"{' '.join(map(str, args))} exited {result.returncode}: {result.stderr.strip()}")
     return result.stdout.strip()
@@ -196,11 +224,15 @@ class ProcessTree:
                 raise TimeoutError("Process group still has descendants after cleanup")
 
 
-def command(args, cwd, log, environment=None, timeout=600):
+def command(args, cwd, log, environment=None, timeout=600, *, deadline=None):
     """Run a logged child; return its exit code, or -1 if it could not run or timed out.
 
     No descendant outlives the call on any path.
+    An optional shared deadline forbids starting after expiry, bounds the wait
+    after spawn, and requires verified process-tree cleanup. Pre-start expiry
+    raises TimeoutError without creating a log or child.
     """
+    remaining(timeout, deadline)
     with log.open("w", encoding="utf-8", newline="\n") as stream:
         try:
             tree = ProcessTree(args, cwd, environment, stream)
@@ -209,9 +241,12 @@ def command(args, cwd, log, environment=None, timeout=600):
             return -1
         try:
             try:
-                return tree.wait(timeout)
+                return tree.wait(remaining(timeout, deadline))
             finally:
-                tree.stop()
+                if deadline is None:
+                    tree.stop()
+                else:
+                    tree.stop(verify=True)
         except subprocess.TimeoutExpired as error:
             stream.write(f"\n{type(error).__name__}: {error}\n")
             return -1
@@ -247,9 +282,10 @@ class Build:
             raise RuntimeError(f"{self.label} executables changed after the build record")
 
 
-def resolve(root, ref):
-    commit = output(["git", "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}"], root)
-    return commit, output(["git", "rev-parse", "--verify", f"{commit}^{{tree}}"], root)
+def resolve(root, ref, *, deadline=None):
+    budget = {"deadline": deadline} if deadline is not None else {}
+    commit = output(["git", "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}"], root, **budget)
+    return commit, output(["git", "rev-parse", "--verify", f"{commit}^{{tree}}"], root, **budget)
 
 
 def checkout_snapshot(root, label):
@@ -288,10 +324,11 @@ def require_outside_snapshot(root, path):
 class Session:
     """Detached worktrees under `work`, removed on exit. Logs and binaries live elsewhere."""
 
-    def __init__(self, root, work):
+    def __init__(self, root, work, *, deadline=None):
         self.root = Path(root)
         self.work = Path(work)
         self.paths = []
+        self.budget = {"deadline": deadline} if deadline is not None else {}
 
     def __enter__(self):
         self.work.mkdir(parents=True, exist_ok=False)
@@ -300,7 +337,10 @@ class Session:
     def __exit__(self, *exception):
         for path in reversed(self.paths):
             try:
-                output(["git", "worktree", "remove", "--force", path], self.root)
+                # Cleanup may use the finalization reserve, but never three
+                # independent 120-second Git waits after a preparation cutoff.
+                output(["git", "worktree", "remove", "--force", path], self.root,
+                       **({"timeout": 5} if self.budget else {}))
             except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
                 print(f"warning: worktree {path} was not removed: {error}", file=sys.stderr)
         try:
@@ -311,12 +351,12 @@ class Session:
 
     def add(self, label, commit):
         path = self.work / label
-        output(["git", "worktree", "add", "--detach", path, commit], self.root)
         self.paths.append(path)
+        output(["git", "worktree", "add", "--detach", path, commit], self.root, **self.budget)
         return path
 
     def worktree(self, label, ref):
-        commit, tree = resolve(self.root, ref)
+        commit, tree = resolve(self.root, ref, **self.budget)
         return Snapshot(label, self.add(label, commit), commit, tree, f"ref {ref}")
 
     def freeze(self, label):
@@ -324,8 +364,9 @@ class Session:
         return Snapshot(label, self.add(label, commit), commit, tree, "working tree")
 
 
-def overlay(source, destination):
+def overlay(source, destination, *, deadline=None):
     """Copy the source snapshot's measurement inputs into the destination checkout."""
+    remaining(GIT_TIMEOUT_SECONDS, deadline)
     files = [*(source.checkout / name for name in HARNESS),
              *sorted((source.checkout / FIXTURES).rglob("*"))]
     files = [path for path in files if path.is_file()]
@@ -333,6 +374,7 @@ def overlay(source, destination):
     changes = tuple(name for name, sha in inputs.items()
                     if not (destination.checkout / name).is_file() or digest(destination.checkout / name) != sha)
     for path in files:
+        remaining(GIT_TIMEOUT_SECONDS, deadline)
         target = destination.checkout / path.relative_to(source.checkout)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
@@ -381,7 +423,7 @@ class LocalTargets:
                 locks.enter_context(exclusive(self.base / f"{label}.lock"))
             yield
 
-    def before(self, snapshots, index, logs):
+    def before(self, snapshots, index, logs, *, deadline=None):
         return None
 
 
@@ -402,20 +444,21 @@ class SharedTarget:
         return {**os.environ, "CARGO_TARGET_DIR": str(self.target),
                 "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
 
-    def before(self, snapshots, index, logs):
+    def before(self, snapshots, index, logs, *, deadline=None):
         label = snapshots[index].label
         environment = self.environment(label)
+        budget = {"deadline": deadline} if deadline is not None else {}
         # Package-only clean defaults to dev; explicitly clear release too. A restored
         # cache holds no package outputs, but the first label must not trust that.
         # Earlier executables have already been copied out of this target.
         if any(command(["cargo", "clean", "--locked", "--package", "slither-sim", "--profile", profile],
-                       snapshots[max(index - 1, 0)].checkout, logs / f"{label}-clean-{profile}.log", environment)
+                       snapshots[max(index - 1, 0)].checkout, logs / f"{label}-clean-{profile}.log", environment, **budget)
                for profile in ("release", "dev")):
             return f"{label} package cleanup failed; {label} measurements unavailable"
         return None
 
 
-def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=600, cargo_args=()):
+def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=600, cargo_args=(), deadline=None):
     """Build each snapshot's release examples and copy them out. Returns (builds, errors).
 
     `hook(snapshot, build_or_none, environment)` runs after each build attempt that got
@@ -423,9 +466,11 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
     any target locks.
     """
     builds, errors = {}, []
+    budget = {"deadline": deadline} if deadline is not None else {}
     for index, snapshot in enumerate(snapshots):
+        remaining(timeout, deadline)
         label = snapshot.label
-        error = targets.before(snapshots, index, logs)
+        error = targets.before(snapshots, index, logs, **budget)
         if error:
             errors.append(error)
             continue
@@ -438,7 +483,7 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
                      *(part for name in examples for part in ("--example", name))]
         print(f"[{label}] Building release measurement examples", flush=True)
         log = logs / f"{label}-build.log"
-        code = command(arguments, snapshot.checkout, log, environment, timeout)
+        code = command(arguments, snapshot.checkout, log, environment, timeout, **budget)
         build = None
         if code:
             errors.append(f"{label} release build exited {code}")
@@ -446,12 +491,13 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
             directory = Path(bins) / f"bin-{label}"
             directory.mkdir(parents=True)
             for name in built_names:
+                remaining(timeout, deadline)
                 shutil.copy2(target / "release/examples" / name, directory / name)
             binaries = {name: directory / f"{name}{SUFFIX}" for name in examples}
             hashes = {path.name: digest(path) for path in binaries.values()}
             record = {"schema": "slither-perf-build-v1", "utc": utc(), **snapshot.record(),
-                      "rustc": output(["rustc", "-Vv"], snapshot.checkout),
-                      "cargo": output(["cargo", "-V"], snapshot.checkout),
+                      "rustc": output(["rustc", "-Vv"], snapshot.checkout, **budget),
+                      "cargo": output(["cargo", "-V"], snapshot.checkout, **budget),
                       "cargo_lock_sha256": digest(snapshot.checkout / "Cargo.lock"),
                       "command": arguments, "target": str(target), "target_policy": targets.policy,
                       "log": str(log), "log_sha256": digest(log),
@@ -462,6 +508,7 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
             build = Build(label, snapshot, binaries, hashes, record)
             builds[label] = build
         if hook:
+            remaining(timeout, deadline)
             hook(snapshot, build, environment)
     return builds, errors
 

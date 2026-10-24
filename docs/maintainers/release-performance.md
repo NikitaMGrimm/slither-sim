@@ -57,8 +57,15 @@ consistency, not scientific validity.
 The [v2 contract](performance-statistics-v2.md) applies unchanged: Windows, one
 block per fresh process, at most ten workloads, fourteen covered looks, and the
 fixed error allocation. Builds/regressions/parity precede the sampling stage.
-Its deadline is `min(stage_start + 1500, job_start + 1800 - 90)`; setup and builds
-consume the job budget. The final covered prefix survives a normal time cap.
+The shared job cutoff is fixed before preparation at `job_start + 1800 - 90`.
+Git preparation, builds, regressions, fidelity, build metadata, catalogs and parity
+check the remaining allowance before starting children and bound those children
+by it. Preparation/build children use the shared process-tree owner with strict
+stop/reap verification. A cutoff leaves Unavailable and retained partial logs;
+it cannot start a fresh independent preparation timeout. Worktree cleanup uses
+bounded waits within the finalization reserve.
+Sampling uses `min(stage_start + 1500, job_cutoff)`; setup and builds consume the
+job budget. The final covered prefix survives a normal sampling time cap.
 Sampler or binary-validation failure suppresses final claims. There are no
 interim comments or background collector, so a cancelled foreground measurement
 step is stopped before unconditional diagnostic upload. Frozen v1 studies keep
@@ -78,8 +85,11 @@ runner, toolchain selector, explicit features/profile/settings, operation block
 policy, suite and budgets. PR number, comment text and outcome labels are absent.
 Before measuring, an identical older queued/in-progress declaration on the same
 default-branch harness revision suppresses a concurrent duplicate. The scan is
-bounded to 100 queued and 100 active runs. Input-keyed concurrency additionally
-serializes any duplicates that escape that scan without cancelling an active run.
+bounded to 100 queued and 100 active runs. Input-keyed concurrency permits one
+active and one pending measurement for duplicates that escape that scan. Under
+GitHub's default `queue: single`, another matching arrival replaces the pending
+duplicate; it does not cancel the active measurement. This is suppression, not
+a guarantee that every duplicate will be measured.
 
 There is deliberately **no completed-result reuse**. A later request runs afresh;
 an existing favorable comment, PR number, expired artifact or failed run cannot
@@ -99,11 +109,19 @@ artifact-controlled paths. Candidate Markdown is ignored; the publisher renders
 validated fields with fixed wording and retains Unavailable/Undecided outcomes.
 
 When pinning found one open rolling release PR, the publisher adds a distinctly
-owned **Direct release performance** comment there, linking the original run and
+owned **Direct release performance** comment per source run there, linking the original run and
 artifact evidence with all exact revisions. It writes only while that pinned PR
 head remains current. Otherwise the result stays in the workflow summary and
 artifacts; it is not attached to a different candidate. A failed/cancelled source
 run with a retained request publishes Unavailable, never partial timing claims.
+Publisher concurrency is scoped to the source run ID, and comment ownership
+includes that ID and the input key. Distinct completed runs therefore cannot
+replace each other's pending publication or overwrite each other's evidence.
+Only attempts of the same source run share the single-pending queue; stale
+attempts are rejected and the latest attempt owns that run's comment. This does
+not depend on dispatch order. See GitHub's [current concurrency policy](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+The documented `queue: max` option is unnecessary for this policy; the locally
+verified actionlint 1.7.12 does not support that newer field.
 Reports for older rerun attempts cannot overwrite newer evidence. No release
 body, release-plz PR body, guard, tag or release asset is changed.
 

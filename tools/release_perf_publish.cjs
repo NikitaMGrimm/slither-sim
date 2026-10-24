@@ -105,7 +105,7 @@ function validateReport(report, request) {
 
 function render(request, report, run, owner, repo) {
   const m = request.measurement, url = `https://github.com/${owner}/${repo}/actions/runs/${run.id}/attempts/${run.run_attempt}`;
-  const marker = `<!-- slither-release-perf-direct:${request.key} -->`;
+  const marker = `<!-- slither-release-perf-direct:${request.key}:${run.id} -->`;
   const lines = ['> [!NOTE]', `> 🤖 **GPT 6.1 Sol writing on behalf of ${owner}**`, '', marker, '## Direct release performance', '',
     `Published **${m.baseline.tag}**: \`${m.baseline.commit}\` (tree \`${m.baseline.tree}\`).`,
     `Pinned candidate: \`${m.candidate.commit}\` (tree \`${m.candidate.tree}\`).`,
@@ -167,7 +167,7 @@ async function publish({github, context, core, readArtifact = download}) {
   };
   if (!await fresh()) {core.info('Pinned release PR head advanced or closed; retain original run evidence without attaching to a different candidate');return;}
   const body = render(request,report,run,owner,repo);
-  const marker = `<!-- slither-release-perf-direct:${request.key} -->`;
+  const marker = `<!-- slither-release-perf-direct:${request.key}:${run.id} -->`;
   const comments = await github.paginate(github.rest.issues.listComments,{...context.repo,issue_number:request.target.number,per_page:100});
   const previous = comments.find(c=>bot(c) && c.body?.includes(marker));
   const saved = previous?.body?.match(/<!-- slither-release-perf-run: (\{[^\n]+\}) -->/);

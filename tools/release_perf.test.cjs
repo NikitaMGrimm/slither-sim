@@ -136,9 +136,29 @@ test('stale release head, a different owner, malformed result and newer original
       await assert.rejects(publisher.publish(x));
     } else {
       if(change==='newer')x.comments.push({id:10,user:{login:'github-actions[bot]',type:'Bot'},body:
-        `<!-- slither-release-perf-direct:${x.r.key} -->\n<!-- slither-release-perf-run: {"run":42,"attempt":2} -->`});
+        `<!-- slither-release-perf-direct:${x.r.key}:42 -->\n<!-- slither-release-perf-run: {"run":42,"attempt":2} -->`});
       await publisher.publish(x);
     }
     assert.equal(x.writes.length,0);
   }
+});
+test('distinct source runs retain their own terminal comments regardless of source ordering',async()=>{
+  const comments=[], writes=[];
+  const requests=[44,42,43].map(id=>{
+    const x=withArtifacts(fixture());
+    x.run.id=id;x.r.run=id;x.context.runId=id;x.context.payload.workflow_run.id=id;
+    if(id===43)x.run.conclusion='cancelled';
+    const paginate=x.github.paginate;
+    x.github.paginate=async(method,args)=>method===x.github.rest.issues.listComments?comments:paginate(method,args);
+    x.github.rest.issues.createComment=async args=>{
+      writes.push(args);comments.push({id,user:{login:'github-actions[bot]',type:'Bot'},body:args.body});
+    };
+    return x;
+  });
+  await Promise.all(requests.map(x=>publisher.publish(x)));
+  assert.equal(writes.length,3);
+  for(const x of requests)assert.ok(comments.some(c=>c.body.includes(`<!-- slither-release-perf-direct:${x.r.key}:${x.run.id} -->`)));
+  assert.ok(comments.find(c=>c.id===43).body.includes('Unavailable'));
+  const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/release-perf-comment.yml'),'utf8');
+  assert.match(workflow,/group: release-perf-comment-\$\{\{ github\.event\.workflow_run\.id \}\}/);
 });

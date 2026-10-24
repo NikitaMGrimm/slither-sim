@@ -60,11 +60,11 @@ class DirectComparison(unittest.TestCase):
                 pinned = request()
                 calls = []
 
-                def resolve(_root, ref):
+                def resolve(_root, ref, **kwargs):
                     pin = next(p for p in pinned["measurement"].values() if isinstance(p, dict) and p.get("commit") == ref) if ref != "HEAD" else pinned["measurement"]["harness"]
                     return pin["commit"], pin["tree"]
 
-                def command_output(args, cwd, environment=None, timeout=120):
+                def command_output(args, cwd, environment=None, timeout=120, **kwargs):
                     args = list(map(str, args))
                     calls.append(args)
                     if args[:3] == ["git", "worktree", "add"]:
@@ -79,7 +79,8 @@ class DirectComparison(unittest.TestCase):
                         shutil.rmtree(args[4])
                     return "" if args[:3] == ["git", "status", "--porcelain"] else "synthetic tool"
 
-                def command(args, cwd, log, environment=None, timeout=600):
+                def command(args, cwd, log, environment=None, timeout=600, **kwargs):
+                    self.assertGreater(kwargs["deadline"], release_perf.time.perf_counter())
                     args = list(map(str, args))
                     calls.append(args)
                     if args[:2] == ["cargo", "build"]:
@@ -103,7 +104,7 @@ class DirectComparison(unittest.TestCase):
                 with patch.object(perf_build, "resolve", side_effect=resolve), patch.object(
                         perf_build, "output", side_effect=command_output), patch.object(
                         perf_build, "command", side_effect=command), patch.object(release_perf, "measure") as sample:
-                    report = release_perf.collect(pinned, output, 0, root)
+                    report = release_perf.collect(pinned, output, release_perf.time.monotonic(), root)
                 self.assertEqual(report["state"], "unavailable" if incompatible else "complete")
                 self.assertEqual(sample.call_count, 0 if incompatible else 1)
                 self.assertEqual(report["request"], pinned)
@@ -154,8 +155,84 @@ class DirectComparison(unittest.TestCase):
                 builds = {label: SimpleNamespace(binaries={"perf_baseline": binary}) for label in ("baseline", "candidate")}
                 with patch.object(release_perf, "load_catalog", side_effect=[base, candidate]), patch.object(
                         perf_compare, "sequential") as sample, self.assertRaises(ValueError):
-                    release_perf.measure({"request": request()}, builds, Path(temporary), 0)
+                    release_perf.measure({"request": request()}, builds, Path(temporary), release_perf.time.monotonic())
                 sample.assert_not_called()
+
+    def test_expired_preparation_retains_unavailable_identity_without_starting_children(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+                release_perf.time, "perf_counter", return_value=1750), patch.object(
+                release_perf.time, "monotonic", return_value=1750), patch.object(
+                perf_build.subprocess, "run") as metadata, patch.object(perf_build, "ProcessTree") as build:
+            output = Path(temporary)
+            pinned = request()
+            report = release_perf.collect(pinned, output, 0, output)
+            self.assertEqual(report["state"], "unavailable")
+            self.assertEqual(report["performance"], [])
+            self.assertEqual(json.loads((output / "request.json").read_text()), pinned)
+            self.assertEqual(json.loads((output / "failure.json").read_text())["type"], "TimeoutError")
+            metadata.assert_not_called()
+            build.assert_not_called()
+
+    def test_preparation_metadata_rechecks_budget_after_spawn_and_verifies_cleanup(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+                perf_build.time, "perf_counter", side_effect=[1708, 1709]), patch.object(
+                perf_build, "ProcessTree") as spawn:
+            child = spawn.return_value
+            child.wait.return_value = 0
+            self.assertEqual(perf_build.output(["git", "rev-parse", "HEAD"], Path(temporary), deadline=1710), "")
+            child.wait.assert_called_once_with(1)
+            child.stop.assert_called_once_with(verify=True)
+
+    def test_build_and_metadata_share_remaining_cutoff_and_stop_before_next_child(self):
+        clock = [1708.0]
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+                perf_build.time, "perf_counter", side_effect=lambda: clock[0]), patch.object(
+                perf_build.subprocess, "run") as metadata, patch.object(perf_build, "ProcessTree") as spawn:
+            output = Path(temporary)
+            child = spawn.return_value
+            child.wait.side_effect = lambda timeout: clock.__setitem__(0, 1710.0) or 0
+            self.assertEqual(perf_build.command(["cargo", "build"], output, output / "build.log", deadline=1710), 0)
+            child.wait.assert_called_once_with(2)
+            child.stop.assert_called_once_with(verify=True)
+            with self.assertRaises(TimeoutError):
+                perf_build.command(["cargo", "test"], output, output / "tests.log", deadline=1710)
+            with self.assertRaises(TimeoutError):
+                perf_build.output(["rustc", "-Vv"], output, deadline=1710)
+            self.assertEqual(spawn.call_count, 1)
+            self.assertFalse((output / "tests.log").exists())
+            metadata.assert_not_called()
+
+    def test_catalog_and_parity_use_job_cutoff_before_sampling_can_start(self):
+        shared = catalog([row("one")])
+        for costs in ((2, 20), (1, 1)):
+            with self.subTest(costs=costs), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary)
+                binary = output / "fake"
+                binary.write_bytes(b"never execute")
+                builds = {label: SimpleNamespace(binaries={"perf_baseline": binary}) for label in ("baseline", "candidate")}
+                clock, events = [1707.0], []
+
+                def load(_binary, *, deadline):
+                    self.assertEqual(deadline, 1710)
+                    events.append(("catalog", clock[0]))
+                    clock[0] += costs[0]
+                    return shared
+
+                def parity(*args, deadline):
+                    self.assertEqual(deadline, 1710)
+                    events.append(("parity", clock[0]))
+                    clock[0] += costs[1]
+                    return [{"case": "one", "reading": "Equal"}]
+
+                with patch.object(release_perf.time, "perf_counter", side_effect=lambda: clock[0]), patch.object(
+                        release_perf.time, "monotonic", side_effect=lambda: clock[0]), patch.object(
+                        release_perf, "load_catalog", side_effect=load), patch.object(
+                        perf_compare, "parity", side_effect=parity), patch.object(perf_compare, "sequential") as sampler:
+                    with self.assertRaises(TimeoutError):
+                        release_perf.measure({"request": request()}, builds, output, 0)
+                self.assertTrue(all(start < 1710 for _, start in events))
+                self.assertEqual([name for name, _ in events], ["catalog", "catalog"] + (["parity"] if costs == (1, 1) else []))
+                sampler.assert_not_called()
 
     def test_request_archive_rejects_paths_duplicates_links_and_oversized_data(self):
         for entries in ([('request.json', b'{}')], [('../request.json', b'{}')],
