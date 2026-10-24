@@ -329,38 +329,33 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     let (begin, ready) = mpsc::channel();
+    let (polled, next_poll) = mpsc::channel();
     let (trickle, start_trickle) = mpsc::channel();
-    let t0 = Instant::now(); // DIAGNOSTIC
     let server = thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
             .unwrap();
-        // Send each trickled byte at once, as the host does. With Nagle's
-        // algorithm, macOS holds them for delayed ACKs past the idle timeout.
-        stream.set_nodelay(true).unwrap();
         let mut socket = tungstenite::accept(stream).unwrap();
         socket.read().unwrap();
         socket.send(framed(&setup())).unwrap();
         socket.send(framed(&appearance())).unwrap();
-        eprintln!("DIAG server appearance sent {:?}", t0.elapsed());
         ready.recv_timeout(Duration::from_secs(2)).unwrap();
-        eprintln!("DIAG server begin {:?}", t0.elapsed());
-        // Send one small valid message over several client decision polls.
+        // Send one small valid message over several client decision polls,
+        // one byte per poll: fixed sleeps overslept by up to 40 ms on macOS runners.
         let mut payload = vec![0, 7, b'z'];
         payload.extend(u24(7900));
         let stream = socket.get_mut();
         stream.write_all(&[0x82, payload.len() as u8]).unwrap();
         for byte in payload {
+            next_poll.recv_timeout(Duration::from_secs(2)).unwrap();
             stream.write_all(&[byte]).unwrap();
-            eprintln!("DIAG server byte {:?}", t0.elapsed());
-            thread::sleep(Duration::from_millis(10));
         }
         start_trickle.recv_timeout(Duration::from_secs(2)).unwrap();
         // No complete game message arrives before idle timeout. Frequent bytes
         // must not renew the absolute operation deadline inside socket.read().
         let mut payload = vec![0, 7, b'q'];
-        payload.resize(80, b'x');
+        payload.resize(120, b'x');
         stream.write_all(&[0x82, payload.len() as u8]).unwrap();
         for byte in payload {
             if stream.write_all(&[byte]).is_err() {
@@ -373,23 +368,22 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         url: format!("ws://{address}/slither"),
         handshake: Handshake::Direct,
         decision_interval_seconds: 0.015,
-        idle_timeout_seconds: 0.12,
+        // Above the first message's seven polls; below the second's 480 ms trickle.
+        idle_timeout_seconds: 0.3,
         ..NetworkConfig::default()
     })
     .unwrap();
     assert_eq!(backend.next_frame().unwrap().status, ClientStatus::Playing);
-    eprintln!("DIAG client playing {:?}", t0.elapsed());
     begin.send(()).unwrap();
     let started = Instant::now();
     let first = backend.next_frame().unwrap();
     assert!(started.elapsed() < Duration::from_millis(150));
     assert_eq!(first.observation.unwrap().arena.radius, 7926.);
     let mut radius = 7926.;
-    eprintln!("DIAG client first frame {:?}", t0.elapsed());
     for _ in 0..12 {
-        let frame = backend.next_frame();
-        eprintln!("DIAG client frame {:?} ok={}", t0.elapsed(), frame.is_ok());
-        radius = frame
+        polled.send(()).unwrap();
+        radius = backend
+            .next_frame()
             .unwrap()
             .observation
             .unwrap()
@@ -406,14 +400,14 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     trickle.send(()).unwrap();
     let started = Instant::now();
     let mut timed_out = false;
-    for _ in 0..20 {
+    for _ in 0..40 {
         if backend.next_frame().is_err() {
             timed_out = true;
             break;
         }
     }
     assert!(timed_out, "trickled bytes must not bypass the idle timeout");
-    assert!(started.elapsed() < Duration::from_millis(300));
+    assert!(started.elapsed() < Duration::from_millis(450));
     assert_eq!(backend.frame().unwrap().status, ClientStatus::Disconnected);
     backend.disconnect();
     server.join().unwrap();
