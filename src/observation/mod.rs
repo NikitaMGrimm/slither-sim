@@ -345,14 +345,15 @@ impl Simulator {
         let wanted: Vec<bool> = (0..self.snakes.len())
             .map(|i| self.snakes[i].alive && selected.is_none_or(|flags| flags[i]))
             .collect();
-        observations.truncate(self.snakes.len());
-        observations.resize_with(self.snakes.len(), || None);
         let observers = wanted.iter().filter(|&&w| w).count();
         // A dead-only or empty selection needs stable result slots, but no index.
         if observers == 0 {
-            observations.fill_with(|| None);
+            observations.clear();
+            observations.resize_with(self.snakes.len(), || None);
             return Ok(());
         }
+        observations.truncate(self.snakes.len());
+        observations.resize_with(self.snakes.len(), || None);
         let observer = Observer::new(VisibleState::of(self), observers);
         let observe_range = |range: Range<usize>, slots: &mut [Option<Observation>]| {
             let mut marks = Vec::new();
