@@ -58,14 +58,14 @@ struct ResetReply<'a> {
     seed: u32,
     config: &'a Config,
     decision_ticks: usize,
-    observations: Vec<Option<Observation>>,
+    observations: &'a [Option<Observation>],
     time: f64,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StepReply<'a> {
-    observations: Vec<Option<Observation>>,
+    observations: &'a [Option<Observation>],
     deaths: &'a [DeathEvent],
     time: f64,
     elapsed_seconds: f64,
@@ -92,6 +92,8 @@ fn reply(result: &impl Serialize) -> Vec<u8> {
 struct WorldSession {
     world: Simulator,
     decision_ticks: usize,
+    /// Refilled by every reply, so steady-state steps allocate little.
+    observations: Vec<Option<Observation>>,
 }
 
 #[derive(Default)]
@@ -123,16 +125,24 @@ impl Session {
                 for slot in 0..agents {
                     world.add(slot.to_string(), slot, agents)?;
                 }
+                // Keep the previous world's buffer; its vectors fit the next one.
+                let mut observations = self
+                    .current
+                    .take()
+                    .map(|session| session.observations)
+                    .unwrap_or_default();
+                world.observe_all_into(&mut observations);
                 let result = reply(&ResetReply {
                     seed,
                     config: &world.config,
                     decision_ticks,
-                    observations: world.observe_all(),
+                    observations: &observations,
                     time: world.time,
                 });
                 self.current = Some(WorldSession {
                     world,
                     decision_ticks,
+                    observations,
                 });
                 Ok(result)
             }
@@ -159,8 +169,9 @@ impl Session {
                     session.world.advance_validated(&actions);
                     ticks += 1;
                 }
+                session.world.observe_all_into(&mut session.observations);
                 Ok(reply(&StepReply {
-                    observations: session.world.observe_all(),
+                    observations: &session.observations,
                     deaths: &session.world.deaths[previous_deaths..],
                     time: session.world.time,
                     elapsed_seconds: session.world.time - start,

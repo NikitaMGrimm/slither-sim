@@ -13,12 +13,24 @@ pub(crate) fn parts(useful: usize) -> usize {
     }
 }
 
-/// `work` over each range in parallel, results in range order.
-pub(crate) fn map_ranges<R: Send>(
+/// `work` over each range and its slice of `items` in parallel, results in
+/// range order. The ranges must cover `items` consecutively from the start.
+pub(crate) fn map_ranges<T: Send, R: Send>(
     ranges: &[Range<usize>],
-    work: &(impl Fn(Range<usize>) -> R + Sync),
+    items: &mut [T],
+    work: &(impl Fn(Range<usize>, &mut [T]) -> R + Sync),
 ) -> Vec<R> {
-    ranges.par_iter().map(|range| work(range.clone())).collect()
+    let mut parts = Vec::with_capacity(ranges.len());
+    let mut rest = items;
+    for range in ranges {
+        let (part, tail) = rest.split_at_mut(range.len());
+        parts.push((range.clone(), part));
+        rest = tail;
+    }
+    parts
+        .into_par_iter()
+        .map(|(range, part)| work(range, part))
+        .collect()
 }
 
 /// Split `0..flags.len()` into at most `parts` consecutive ranges holding
@@ -82,8 +94,18 @@ mod tests {
     #[test]
     fn mapped_ranges_return_in_order() {
         let ranges = balanced(&[true; 100], 7);
-        let sums = map_ranges(&ranges, &|r: Range<usize>| r.sum::<usize>());
+        let mut items: Vec<usize> = (0..100).collect();
+        let sums = map_ranges(
+            &ranges,
+            &mut items,
+            &|r: Range<usize>, part: &mut [usize]| {
+                assert!(part.iter().copied().eq(r.clone()));
+                part.iter_mut().for_each(|item| *item *= 2);
+                r.sum::<usize>()
+            },
+        );
         let expected: Vec<usize> = ranges.iter().map(|r| r.clone().sum()).collect();
         assert_eq!(sums, expected);
+        assert!(items.iter().copied().eq((0..100).map(|i| i * 2)));
     }
 }

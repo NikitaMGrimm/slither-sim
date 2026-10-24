@@ -19,6 +19,11 @@
   `observe_all` and `observe_selected` batches over the rayon thread pool, with
   identical results. Off by default; needs the new default `parallel` feature.
   `perf_baseline --parallel` times it.
+- Refill a caller-owned buffer with `Simulator::observe_all_into` and
+  `observe_selected_into`. Observations are identical to `observe_all` and
+  `observe_selected`, but reuse the previous call's vectors; on Windows, bot
+  loops that observe every decision ran 1.8–3.5× faster than with `observe_all`.
+  `slither-sim serve` keeps one such buffer per session.
 
 ## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23
 

@@ -31,7 +31,9 @@ impl<'a> VisibleState<'a> {
     }
     /// Observation of one slot, without the batch index.
     pub(crate) fn observe(self, index: usize) -> Result<Observation, String> {
-        Observer::new(self, 1).observe(index, &mut Vec::new())
+        let mut slot = None;
+        Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot)?;
+        Ok(slot.expect("observed"))
     }
 }
 
@@ -162,8 +164,15 @@ impl<'a> Observer<'a> {
         });
         Self { world, index }
     }
-    /// `marks` is empty or has one zeroed bit per food item; it is zeroed again on return.
-    fn observe(&self, index: usize, marks: &mut Vec<u64>) -> Result<Observation, String> {
+    /// Writes the observation of `index` into `slot`, refilling the vectors of the
+    /// observation already there. `marks` is empty or has one zeroed bit per food
+    /// item; it is zeroed again on return.
+    fn observe_into(
+        &self,
+        index: usize,
+        marks: &mut Vec<u64>,
+        slot: &mut Option<Observation>,
+    ) -> Result<(), String> {
         let w = self.world;
         let me = w.snakes.get(index).ok_or("Unknown agent slot")?;
         let vision = w.vision;
@@ -188,7 +197,13 @@ impl<'a> Observer<'a> {
             };
             (i, b)
         });
-        let food = match query {
+        let (previous_me, mut food, mut prey, mut opponents) = slot
+            .take()
+            .map(|o| (Some(o.me), o.food, o.prey, o.opponents))
+            .unwrap_or_default();
+        food.clear();
+        prey.clear();
+        match query {
             Some((
                 Index {
                     food: Some(grid), ..
@@ -221,7 +236,7 @@ impl<'a> Observer<'a> {
                     mark(i as usize, visible(w.food[i as usize].point()));
                 }
                 // Ascending bit order restores the original food order.
-                let mut food = Vec::with_capacity(count);
+                food.reserve(count);
                 for (word, bits) in marks.iter_mut().enumerate().skip(first) {
                     if food.len() == count {
                         break;
@@ -232,49 +247,57 @@ impl<'a> Observer<'a> {
                         bits &= bits - 1;
                     }
                 }
-                food
             }
-            _ => w
-                .food
-                .iter()
-                .filter(|f| visible(f.point()))
-                .cloned()
-                .collect(),
+            _ => food.extend(w.food.iter().filter(|f| visible(f.point())).cloned()),
+        }
+        prey.extend(w.prey.iter().filter(|p| visible(p.position)).cloned());
+        let visible_opponents = w
+            .snakes
+            .iter()
+            .enumerate()
+            .filter(|(i, s)| {
+                *i != index
+                    && s.alive
+                    && query.is_none_or(|(index, q)| {
+                        let s = index.bodies[*i];
+                        !(s.max.x < q.min.x
+                            || s.min.x > q.max.x
+                            || s.max.y < q.min.y
+                            || s.min.y > q.max.y)
+                    })
+                    && (visible(s.head) || s.body.iter().any(|&p| visible(p)))
+            })
+            .map(|(_, s)| s);
+        // `clone_from` keeps the id and body allocations of the snakes already there.
+        let mut kept = 0;
+        for snake in visible_opponents {
+            match opponents.get_mut(kept) {
+                Some(previous) => previous.clone_from(snake),
+                None => opponents.push(snake.clone()),
+            }
+            kept += 1;
+        }
+        opponents.truncate(kept);
+        let me = match previous_me {
+            Some(mut previous) => {
+                previous.clone_from(me);
+                previous
+            }
+            None => me.clone(),
         };
-        Ok(Observation {
+        *slot = Some(Observation {
             time: w.time,
-            me: me.clone(),
+            me,
+            opponents,
             food,
-            prey: w
-                .prey
-                .iter()
-                .filter(|p| visible(p.position))
-                .cloned()
-                .collect(),
-            opponents: w
-                .snakes
-                .iter()
-                .enumerate()
-                .filter(|(i, s)| {
-                    *i != index
-                        && s.alive
-                        && query.is_none_or(|(index, q)| {
-                            let s = index.bodies[*i];
-                            !(s.max.x < q.min.x
-                                || s.min.x > q.max.x
-                                || s.max.y < q.min.y
-                                || s.min.y > q.max.y)
-                        })
-                        && (visible(s.head) || s.body.iter().any(|&p| visible(p)))
-                })
-                .map(|(_, s)| s.clone())
-                .collect(),
+            prey,
             arena: Arena {
                 center: Point::default(),
                 radius: w.radius,
             },
             vision_radius: Some(vision),
-        })
+        });
+        Ok(())
     }
 }
 impl Simulator {
@@ -283,18 +306,39 @@ impl Simulator {
     }
     /// Detached observations; indexes live only for this immutable borrow of world state.
     pub fn observe_all(&self) -> Vec<Option<Observation>> {
-        self.observe_matching(None)
+        let mut observations = Vec::new();
+        self.observe_all_into(&mut observations);
+        observations
+    }
+    /// [`observe_all`](Self::observe_all) into `observations`, refilling the
+    /// vectors of the observations already there. A bot that observes every
+    /// decision through one buffer then allocates little per call.
+    pub fn observe_all_into(&self, observations: &mut Vec<Option<Observation>>) {
+        self.observe_matching(None, observations)
             .expect("observations of existing slots cannot fail")
     }
     /// Materialize selected living slots using one shared observation index.
     /// The mask and result have one entry per snake; dead and unselected slots are None.
     pub fn observe_selected(&self, selected: &[bool]) -> Result<Vec<Option<Observation>>, String> {
-        self.observe_matching(Some(selected))
+        let mut observations = Vec::new();
+        self.observe_selected_into(selected, &mut observations)?;
+        Ok(observations)
+    }
+    /// [`observe_selected`](Self::observe_selected) into `observations`, like
+    /// [`observe_all_into`](Self::observe_all_into). An invalid mask leaves
+    /// `observations` unchanged.
+    pub fn observe_selected_into(
+        &self,
+        selected: &[bool],
+        observations: &mut Vec<Option<Observation>>,
+    ) -> Result<(), String> {
+        self.observe_matching(Some(selected), observations)
     }
     fn observe_matching(
         &self,
         selected: Option<&[bool]>,
-    ) -> Result<Vec<Option<Observation>>, String> {
+        observations: &mut Vec<Option<Observation>>,
+    ) -> Result<(), String> {
         if selected.is_some_and(|flags| flags.len() != self.snakes.len()) {
             return Err("One selection flag per agent slot required".into());
         }
@@ -304,35 +348,35 @@ impl Simulator {
         let observers = wanted.iter().filter(|&&w| w).count();
         // A dead-only or empty selection needs stable result slots, but no index.
         if observers == 0 {
-            return Ok((0..self.snakes.len()).map(|_| None).collect());
+            observations.clear();
+            observations.resize_with(self.snakes.len(), || None);
+            return Ok(());
         }
+        observations.truncate(self.snakes.len());
+        observations.resize_with(self.snakes.len(), || None);
         let observer = Observer::new(VisibleState::of(self), observers);
-        let observe_range = |range: Range<usize>| {
+        let observe_range = |range: Range<usize>, slots: &mut [Option<Observation>]| {
             let mut marks = Vec::new();
-            // Result collection cannot promise an exact lower size hint. Reserve stable slots once.
-            let mut observations = Vec::with_capacity(range.len());
-            for i in range {
-                observations.push(if wanted[i] {
-                    Some(observer.observe(i, &mut marks)?)
+            for (i, slot) in range.zip(slots) {
+                if wanted[i] {
+                    observer.observe_into(i, &mut marks, slot)?;
                 } else {
-                    None
-                });
+                    *slot = None;
+                }
             }
-            Ok::<_, String>(observations)
+            Ok::<_, String>(())
         };
         #[cfg(feature = "parallel")]
         if self.parallel() {
             let parts = crate::parallel::parts(observers / OBSERVERS_PER_TASK);
             if parts > 1 {
                 let ranges = crate::parallel::balanced(&wanted, parts);
-                let mut observations = Vec::with_capacity(self.snakes.len());
-                for part in crate::parallel::map_ranges(&ranges, &observe_range) {
-                    observations.extend(part?);
-                }
-                return Ok(observations);
+                return crate::parallel::map_ranges(&ranges, observations, &observe_range)
+                    .into_iter()
+                    .collect();
             }
         }
-        observe_range(0..self.snakes.len())
+        observe_range(0..self.snakes.len(), observations)
     }
 }
 
@@ -492,6 +536,9 @@ mod tests {
             f64::NAN,
             -1.0,
         ];
+        // Reused across worlds of every shape, so refills meet longer and shorter
+        // vectors, other slot counts and other snakes.
+        let mut buffer = Vec::new();
         for case in 0..600 {
             let vision = visions[case % visions.len()];
             let snakes = [0, 1, 2, 3, 4, 5, 9, 30][rng.below(8)];
@@ -501,6 +548,8 @@ mod tests {
                 .map(|i| world.snakes[i].alive.then(|| world.observe(i).unwrap()))
                 .collect();
             assert_eq!(key(&world.observe_all()), key(&single), "case {case}");
+            world.observe_all_into(&mut buffer);
+            assert_eq!(key(&buffer), key(&single), "case {case}");
             let mask: Vec<bool> = (0..snakes).map(|_| rng.below(3) != 0).collect();
             let selected: Vec<_> = single
                 .iter()
@@ -512,6 +561,15 @@ mod tests {
                 key(&selected),
                 "case {case}"
             );
+            let before = key(&buffer);
+            assert!(
+                world
+                    .observe_selected_into(&[true; 31], &mut buffer)
+                    .is_err()
+            );
+            assert_eq!(key(&buffer), before, "case {case}");
+            world.observe_selected_into(&mask, &mut buffer).unwrap();
+            assert_eq!(key(&buffer), key(&selected), "case {case}");
         }
     }
 
@@ -523,6 +581,7 @@ mod tests {
             .build()
             .unwrap();
         let mut rng = Rng(0x2545_f491_4f6c_dd1d);
+        let mut buffer = Vec::new();
         for case in 0..40 {
             let vision = [1500.0, 300.0, f64::NAN, 1e13][case % 4];
             let snakes = [16, 17, 40, 70][rng.below(4)];
@@ -539,6 +598,10 @@ mod tests {
                     selected,
                     "case {case}"
                 );
+                world.observe_all_into(&mut buffer);
+                assert_eq!(key(&buffer), all, "case {case}");
+                world.observe_selected_into(&mask, &mut buffer).unwrap();
+                assert_eq!(key(&buffer), selected, "case {case}");
             });
         }
     }
