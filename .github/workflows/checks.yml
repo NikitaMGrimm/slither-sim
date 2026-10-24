@@ -9,16 +9,43 @@ on:
 permissions:
   contents: read
 
+# A new push cancels its PR's older run. Main and dispatched runs each get their
+# own group and always finish: publication waits for the run of its exact commit,
+# and main runs save the Rust caches that PRs restore.
 concurrency:
-  group: checks-${{ github.event.pull_request.number || github.ref }}
+  group: checks-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 env:
-  CARGO_BUILD_JOBS: 2
-  RUST_TEST_THREADS: 2
+  # Standard runners have 4 vCPUs (3 on macOS arm64); check.py would otherwise
+  # apply its shared-machine default of 2.
+  CARGO_BUILD_JOBS: 4
+  RUST_TEST_THREADS: 4
+  # Panics keep file and line numbers; full debug info mostly costs link time
+  # and cache size, especially on Windows.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
 
 jobs:
-  rust:
+  lint:
+    name: Lint (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: python3 tools/check.py lint wasm package
+
+  test:
     name: Rust (${{ matrix.os }}, ${{ matrix.toolchain }})
     strategy:
       fail-fast: false
@@ -27,6 +54,8 @@ jobs:
           - os: ubuntu-latest
             toolchain: stable
           - os: windows-latest
+            toolchain: stable
+          - os: macos-latest
             toolchain: stable
           - os: ubuntu-latest
             toolchain: '1.86.0'
@@ -39,18 +68,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: ${{ matrix.toolchain }}
-          components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
-      - run: python tools/check.py rust
-      - if: matrix.os == 'ubuntu-latest' && matrix.toolchain == 'stable'
-        run: python tools/check.py wasm package
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Run python tools/check.py test
+        # Windows runners have no `cc` for the C header layout check.
+        env:
+          SLITHER_SIM_REQUIRE_CC: ${{ runner.os != 'Windows' && '1' || '' }}
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/check.py test
 
   tools:
     name: Tools (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -58,6 +90,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -72,12 +107,13 @@ jobs:
   required:
     name: Required checks
     if: always()
-    needs: [rust, tools]
+    needs: [lint, test, tools]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
       - name: Require every test job to succeed
         env:
-          RUST_RESULT: ${{ needs.rust.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_RESULT: ${{ needs.test.result }}
           TOOLS_RESULT: ${{ needs.tools.result }}
-        run: test "$RUST_RESULT" = success && test "$TOOLS_RESULT" = success
+        run: test "$LINT_RESULT" = success && test "$TEST_RESULT" = success && test "$TOOLS_RESULT" = success

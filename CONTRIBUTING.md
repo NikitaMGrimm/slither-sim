@@ -33,15 +33,18 @@ accuracy/link review and the documentation test above, without a Rust build.
 
 | Group | Command | Coverage / prerequisites |
 | --- | --- | --- |
-| Rust | `python tools/check.py rust` | Formatting, default/core-only/C ABI tests, doctests and Clippy; no uv or Node |
+| Rust | `python tools/check.py rust` | `lint` (formatting; Clippy on default, core-only and single-feature builds) then `test` (default/core-only/C ABI tests, doctests and a Python crate build); no uv or Node |
 | Tools | `uv run --locked --only-group tools python tools/check.py tools` | Python/Node tests, local bot/C ABI smoke tests and Python package tests; Python 3.12, uv, Node 22+ (24 recommended) and Rust |
 | Package | `python tools/check.py package` | Local crate verification; no registry publication |
 | WASM | `python tools/check.py wasm` | Core target check; install `wasm32-unknown-unknown` first |
 
 Before the tools group, run `uv sync --locked --only-group tools`. `all` runs
 `rust`, `tools` and `package`; WASM is explicit. Append `--list` to a group command
-to inspect its commands without running them. Tests use doubles or loopback,
-never outside game servers. PR CI invokes the same runner automatically.
+to inspect its commands without running them. Each command reports its time,
+and CI adds a timing table to the job summary. Tests use doubles or loopback,
+never outside game servers. PR CI invokes the same runner automatically: `lint`,
+WASM and package once on Linux, `test` on Linux, Windows, macOS and Rust 1.86,
+and `tools` on Linux, Windows and macOS.
 
 ## Evidence proportional to the change
 

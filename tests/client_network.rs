@@ -329,7 +329,12 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     let (begin, ready) = mpsc::channel();
+    let (polled, next_poll) = mpsc::channel();
+    let (written, write_done) = mpsc::channel();
     let (trickle, start_trickle) = mpsc::channel();
+    let mut first_payload = vec![0, 7, b'z'];
+    first_payload.extend(u24(7900));
+    let first_bytes = first_payload.len();
     let server = thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
         stream
@@ -340,20 +345,22 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         socket.send(framed(&setup())).unwrap();
         socket.send(framed(&appearance())).unwrap();
         ready.recv_timeout(Duration::from_secs(2)).unwrap();
-        // Send one small valid message over several client decision polls.
-        let mut payload = vec![0, 7, b'z'];
-        payload.extend(u24(7900));
+        // Send one small valid message over several client decision polls,
+        // one byte per poll: fixed sleeps overslept by up to 40 ms on macOS runners.
         let stream = socket.get_mut();
-        stream.write_all(&[0x82, payload.len() as u8]).unwrap();
-        for byte in payload {
+        stream
+            .write_all(&[0x82, first_payload.len() as u8])
+            .unwrap();
+        for byte in first_payload {
+            next_poll.recv_timeout(Duration::from_secs(2)).unwrap();
             stream.write_all(&[byte]).unwrap();
-            thread::sleep(Duration::from_millis(10));
+            written.send(()).unwrap();
         }
         start_trickle.recv_timeout(Duration::from_secs(2)).unwrap();
         // No complete game message arrives before idle timeout. Frequent bytes
         // must not renew the absolute operation deadline inside socket.read().
         let mut payload = vec![0, 7, b'q'];
-        payload.resize(80, b'x');
+        payload.resize(120, b'x');
         stream.write_all(&[0x82, payload.len() as u8]).unwrap();
         for byte in payload {
             if stream.write_all(&[byte]).is_err() {
@@ -366,7 +373,8 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         url: format!("ws://{address}/slither"),
         handshake: Handshake::Direct,
         decision_interval_seconds: 0.015,
-        idle_timeout_seconds: 0.12,
+        // Above the first message's seven polls; below the second's 480 ms trickle.
+        idle_timeout_seconds: 0.3,
         ..NetworkConfig::default()
     })
     .unwrap();
@@ -377,7 +385,12 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     assert!(started.elapsed() < Duration::from_millis(150));
     assert_eq!(first.observation.unwrap().arena.radius, 7926.);
     let mut radius = 7926.;
-    for _ in 0..12 {
+    for poll in 0..12 {
+        // Later polls only read, in case the last byte arrives a poll late.
+        if poll < first_bytes {
+            polled.send(()).unwrap();
+            write_done.recv_timeout(Duration::from_secs(2)).unwrap();
+        }
         radius = backend
             .next_frame()
             .unwrap()
@@ -396,14 +409,14 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     trickle.send(()).unwrap();
     let started = Instant::now();
     let mut timed_out = false;
-    for _ in 0..20 {
+    for _ in 0..40 {
         if backend.next_frame().is_err() {
             timed_out = true;
             break;
         }
     }
     assert!(timed_out, "trickled bytes must not bypass the idle timeout");
-    assert!(started.elapsed() < Duration::from_millis(300));
+    assert!(started.elapsed() < Duration::from_millis(450));
     assert_eq!(backend.frame().unwrap().status, ClientStatus::Disconnected);
     backend.disconnect();
     server.join().unwrap();
