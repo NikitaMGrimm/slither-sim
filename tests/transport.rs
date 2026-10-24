@@ -589,11 +589,13 @@ fn executable_emits_only_replies_and_exits_on_eof() {
     }
 }
 
+#[cfg(feature = "networking")]
 fn json_line(text: &str, index: usize) -> Value {
     serde_json::from_str(text.lines().nth(index).unwrap()).unwrap()
 }
 
 #[test]
+#[cfg(feature = "networking")]
 fn reset_warnings_reach_the_reply_and_only_stderr() {
     use std::io::Write;
     use std::process::{Command, Stdio};
