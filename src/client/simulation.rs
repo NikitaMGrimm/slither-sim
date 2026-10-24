@@ -61,6 +61,8 @@ const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
 /// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
 /// leaderboard's u16 rank and living population must also count every snake.
 pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
+/// Prey IDs are sent as u16; `assign_prey_wire` gives each living prey one.
+const MAX_PREY: usize = u16::MAX as usize + 1;
 /// Stock-client compatibility: its nickname input keeps 24 characters, while
 /// the u8 length field could carry 255 Latin-1 bytes.
 pub(crate) const MAX_NICKNAME: usize = 24;
@@ -129,6 +131,12 @@ impl Default for SimulationConfig {
 impl SimulationConfig {
     pub fn validate(&self) -> Result<(), String> {
         self.world.validate()?;
+        // Live prey refill to `count`, and each needs one of the u16 wire IDs.
+        if self.world.prey.count > MAX_PREY {
+            return Err(format!(
+                "Protocol-19 prey IDs are u16: prey count must be at most {MAX_PREY}"
+            ));
+        }
         self.latency.validate()?;
         encode::setup(self.world.radius, self.world.prey.turn_rate)?;
         for speed in [
@@ -1199,7 +1207,9 @@ impl SimulatorBackend {
             let wire = (0..=u16::MAX)
                 .map(|offset| (id as u16).wrapping_add(offset))
                 .find(|wire| !taken.contains(wire))
-                .ok_or("Protocol-19 prey IDs are 16-bit: more than 65536 prey are live")?;
+                .ok_or(format!(
+                    "Protocol-19 prey IDs are 16-bit: more than {MAX_PREY} prey are live"
+                ))?;
             taken.insert(wire);
             self.prey_wire.insert(id, wire);
         }

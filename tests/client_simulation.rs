@@ -484,6 +484,9 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
     // Rank and population are u16, so 65535 slots fit; 128 was a policy cap.
     accept(|c| c.agents = 65_535);
     reject(|c| c.agents = 65_536, "rank and population are u16");
+    // Each live prey needs one of the u16 wire IDs.
+    accept(|c| c.world.prey.count = 65_536);
+    reject(|c| c.world.prey.count = 65_537, "prey count");
     accept(|c| c.decision_ticks = 1001);
     // A long broadcast interval costs full resends, not correctness.
     accept(|c| c.broadcast_ticks = 1001);

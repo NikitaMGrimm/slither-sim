@@ -24,12 +24,14 @@
 - Limits are now real limits, warned unmeasured ranges or named policies; see
   [limits](docs/configuration.md#limits). Arbitrary caps are removed:
   `foodCount ≤ 100000`, `ambientReplenishPerSecond ≤ 10000`, prey
-  `count ≤ 10000`, 128 agents for simulated clients and the host (now 65,535,
-  which the protocol-19 `u16` snake IDs, rank and population fields count), `serve`'s 128 agents, 1,024 worlds and 1,000
-  decision ticks (now `u32` frame bounds and memory), 1,000 decision and
-  broadcast ticks, the latency model's 2 s, 10 s and 1/s ceilings and
-  Pareto-shape interval, the 2 s cap on measured processing time and the
-  network backend's interval caps. `info` reports the new `serve` maxima.
+  `count ≤ 10000` (65,536 wire prey IDs for simulated clients and the host), 128
+  agents for simulated clients and the host (now 65,535, which the protocol-19
+  `u16` snake IDs, rank and population fields count), `serve`'s 128 agents,
+  1,024 worlds and 1,000 decision ticks (now `u32` frame bounds and memory),
+  1,000 decision and broadcast ticks, the latency model's 2 s, 10 s and 1/s
+  ceilings and Pareto-shape interval, the 2 s cap on measured processing time
+  and the network backend's interval caps. `info` reports the new `serve`
+  maxima.
 - With sliding boundaries `dt` must be below 16 / 437.5 s (≈ 36.57 ms): a
   boosting minimum-size snake would otherwise pass its contact lead in one tick
   and die on shallow rim contact. The old 32 ms cap claimed body-radius

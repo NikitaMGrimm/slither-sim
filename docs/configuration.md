@@ -299,7 +299,7 @@ beside the owning code.
 | `serve` frame columns | Rows, counts and offsets are `u32`. A step whose frame does not fit ends the session, since its worlds already advanced. |
 | Wire `agents ≤ 65,535` | Protocol-19 snake IDs, leaderboard rank and living population are `u16`. |
 | Wire prey speeds, turn rate, size | Their `u16`/`u8` packet fields; see [SimulationConfig](#simulationconfig). |
-| At most 65,536 prey live | Protocol-19 prey IDs are `u16`; each living prey keeps a unique one. A retired ID is free at once, since every connection receives its removal before any reuse in the same broadcast. |
+| Wire prey `count ≤ 65,536`; at most 65,536 prey live | Protocol-19 prey IDs are `u16`; each living prey keeps a unique one. A retired ID is free at once, since every connection receives its removal before any reuse in the same broadcast. |
 | `customSkin` ≤ 255 bytes | Appearances give its length in one byte. |
 | `minimapSide ≥ 1`, positive intervals, `decisionTicks`/`broadcastTicks ≥ 1` | Empty maps and zero periods have no meaning; broadcasts fall on ticks divisible by `broadcastTicks`. |
 
