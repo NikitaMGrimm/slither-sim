@@ -10997,5 +10997,200 @@
     }
    }
   }
+ },
+ "secondReviewRound": {
+  "note": "observe-clustered fixture from the second review round; baseline is fb71ecd and adopted is the adopted runtime, both built with the eight-fixture perf_observation harness",
+  "executablesSha256": {
+   "perf_observation/baseline@fb71ecd+eightFixtureHarness": "01a56063108bacf66655e51fc8140588af6ffb0969897e4438a4e8e8559e2f36",
+   "perf_observation/adopted+eightFixtureHarness": "982cf0aae3b8c162a35ee876ed1dbd051e901b795682bfc6deb54177756d1b95"
+  },
+  "harnessSha256": "289ef407d89b081e5ed35a6f07fb76adea70d59d0fe530be6c26b701f1974d59",
+  "perfObservationRounds": {
+   "note": "obs_rounds.py rows; us = materialization per batch; rep -1 is the warmup",
+   "rows": [
+    {
+     "rep": -1,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 187.34884999999966
+    },
+    {
+     "rep": -1,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 161.9792000000001
+    },
+    {
+     "rep": 0,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 166.41100000000006
+    },
+    {
+     "rep": 0,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 184.59255000000047
+    },
+    {
+     "rep": 1,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 182.17850000000024
+    },
+    {
+     "rep": 1,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 173.83090000000018
+    },
+    {
+     "rep": 2,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 181.66590000000005
+    },
+    {
+     "rep": 2,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 182.94674999999967
+    },
+    {
+     "rep": 3,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 177.94854999999967
+    },
+    {
+     "rep": 3,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 151.6847499999999
+    },
+    {
+     "rep": 4,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 165.42514999999986
+    },
+    {
+     "rep": 4,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 181.4035
+    },
+    {
+     "rep": 5,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 181.27335000000014
+    },
+    {
+     "rep": 5,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 159.95554999999962
+    },
+    {
+     "rep": 6,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 157.95695000000006
+    },
+    {
+     "rep": 6,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 177.41629999999972
+    },
+    {
+     "rep": 7,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 183.4378999999997
+    },
+    {
+     "rep": 7,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 149.78979999999973
+    },
+    {
+     "rep": 8,
+     "label": "base",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 155.76255000000006
+    },
+    {
+     "rep": 8,
+     "label": "adopted",
+     "case": "observe-clustered",
+     "iterations": 2000,
+     "us": 191.43910000000008
+    }
+   ]
+  },
+  "perfObservationTraceParity": [
+   {
+    "case": "observe-dense",
+    "reading": "equal",
+    "sha256": "8d962d428ee501dd70b19f4850c93ad11e3b950ffbbc75cfd02d09a0a0f9e4ee"
+   },
+   {
+    "case": "observe-compact",
+    "reading": "equal",
+    "sha256": "a4626e4ba71932d5d4c09495fc797251b643b9ec733f3e64d8102a67e535789d"
+   },
+   {
+    "case": "observe-wide",
+    "reading": "equal",
+    "sha256": "6e1693368c81ddf61ed708019df52c5809c98e50e227faea4dde8f2d45dae939"
+   },
+   {
+    "case": "observe-strip",
+    "reading": "equal",
+    "sha256": "84f41c98a92d4b3fb36773972460322d35418c1c81217884df4a5f511d208a1a"
+   },
+   {
+    "case": "observe-one",
+    "reading": "equal",
+    "sha256": "3ecb89e65c35a6d9ba94c31424db1476892f7aa90200b8c33fe63462fbf3aa53"
+   },
+   {
+    "case": "observe-empty",
+    "reading": "equal",
+    "sha256": "1f8ac96648dca99fdacc4a7e8c170ed2f45e211c0379ef5113cd4bf282625d99"
+   },
+   {
+    "case": "observe-sparse",
+    "reading": "equal",
+    "sha256": "72042f8304678005d240d231812892c5aa0f594dfa676d9ac36098dbff19b33a"
+   },
+   {
+    "case": "observe-clustered",
+    "reading": "equal",
+    "sha256": "5b4bc72036d956e8b9f6d7b70bf859eadfb1c3af2dd0211c6bad3acca5307b70"
+   }
+  ]
  }
 }

@@ -37,7 +37,8 @@ observer.
   observer rules, and the other variants are in `variants.diff`.
 - `perf_compare --base` overlays the candidate's harness on the baseline. The
   `observe-sparse` baseline is `main`'s runtime built with the new
-  `perf_observation` harness.
+  `perf_observation` harness, and the `observe-clustered` pair is `main`'s and the
+  adopted runtime, both built with the eight-fixture harness.
 
 | Executable | Source | SHA-256 |
 | --- | --- | --- |
@@ -49,6 +50,8 @@ observer.
 | `perf_observation`, baseline (seven fixtures) | `fb71ecd` and new harness | `39f761899c71af460fbbd723d4fd61da0e57a33c4c89a78b11c2a3af22ca48de` |
 | `perf_observation`, first review round | `13a3c22` | `733f017530101ec9b2f2d19a67a4c4616ad792f3ec1c7c65b2645bdaaccc81ee` |
 | `perf_observation`, adopted | `c513291` | `202cb1cbe7223fc84531b90d886ef5e834fdc817b8cd478ecbe6402c4cb93871` |
+| `perf_observation`, baseline (eight fixtures) | `fb71ecd` and eight-fixture harness | `01a56063108bacf66655e51fc8140588af6ffb0969897e4438a4e8e8559e2f36` |
+| `perf_observation`, adopted (eight fixtures) | adopted runtime and eight-fixture harness | `982cf0aae3b8c162a35ee876ed1dbd051e901b795682bfc6deb54177756d1b95` |
 
 After warmup, `official-128` has 128 living snakes and 23,662 pellets in a
 7,580-unit arena, and `dome-proxy-96` has 96 living snakes and 11,032 pellets in
@@ -230,6 +233,25 @@ half-vision cells. `official-128` repays about 59,000 against 6,120 extra cells,
 against 3,936; all three refine. In `observe-wide`, the cap makes both grids
 identical. A unit test pins both outcomes for this lattice (8 and 8,192 observers).
 
+### Food clustered away from the observers
+
+The second review round found the opposite error. Mean bounding-box density can
+predict savings that the observers never see. The reviewer's case has radius
+20,000 and vision 1,500. It places 128 snakes on a 12-column head grid at
+1,600-unit spacing, within ±8,800. Four 64×64 lattices fill 1,200-unit patches in
+the corners of ±12,000, and 512 background pellets are spread over the same box.
+No observer can see a patch. The rule predicts 2 × 8,448 = 16,896 cells of savings
+against 15,552 extra cells, so it refines, but the observers see only the
+background. The reviewer measured 125.5 → 146.7 µs per batch, 14–16% slower in
+every pair. The case is now the `observe-clustered` fixture, with two-anchor
+bodies as in the reviewer's probe, so snake filtering does not hide the grid's
+cost. With the fixture's usual 32 anchors, the same layout measured 1.053
+(9/9 slower).
+
+The owner accepted this cost rather than a local-density estimate. A local
+estimate would need another pass over the food, and that pass would erode the
+gain in the realistic, uniform worlds.
+
 ## Method
 
 [`pairs.py`](pairs.py) runs two copied `perf_baseline` executables in adjacent
@@ -299,16 +321,22 @@ per batch:
 | `observe-empty` | 100,000 | 0.09 µs | 0.08 µs | 1.003 [0.895–1.092] | 6/11 |
 | `observe-sparse` | 500 | 2,235.6 µs | 2,381.0 µs | 1.019 [0.949–1.148] | 6/11 |
 
-This session was noisier than the first-round one (baseline ranges up to 25%
-wide). In that earlier session, the first-round form measured `observe-wide`
-1.034 (11/11 slower) and `observe-strip` 1.033 (10/11), while `observe-one` and
-`observe-empty` (which never build a grid) came out about 2% slower. So about
-1 point of that cost is a bias floor from code layout or run order. Here, too,
-`observe-wide` and `observe-strip` are about 3% (3 µs per batch) slower; the same
-cost appeared in every v1-shaped build. In both, the chord removes almost
+`observe-clustered` was added in the second review round and measured in its own
+session, with 9 rotating rounds of 2,000 batches: 160.0 µs [149.8–181.7] → 182.2 µs
+[177.4–191.4], ratio 1.123 [1.007–1.229], slower in 9/9 rounds (22 µs per batch).
+
+In this session, `observe-wide` and `observe-strip` are about 2.5–4% (3–6 µs per
+batch) slower: 1.025 (3.1 µs) and 1.040 (5.6 µs). This session was noisier than
+the first-round one (baseline ranges up to 25% wide). In that earlier session,
+the first-round form measured `observe-wide` 1.034 (11/11 slower) and
+`observe-strip` 1.033 (10/11), while `observe-one` and `observe-empty` (which
+never build a grid) came out about 2% slower. So about 1 point of that cost is a
+bias floor from code layout or run order. The same cost appeared in every
+v1-shaped build. In both, the chord removes almost
 nothing: the strip grid has a single column, and a row of the wide grid holds
 about one candidate. `observe-sparse` keeps half-vision cells and is neutral; the
-first-round form was 1.33 there.
+first-round form was 1.33 there. `observe-clustered` refines, as the rule
+predicts, and pays for cells its observers never query.
 
 The full `perf_baseline` catalog (`perf_compare --base fb71ecd --suite full`, five
 pairs per row, adopted sources) produced identical full-state traces for all 23
@@ -339,9 +367,9 @@ Nine longer alternating pairs on the same executables gave:
 In the first review round, the same rows measured 0.974–1.006, 0.961–1.006 and
 0.980–1.044. The step code is unchanged.
 
-Trace parity: the seven `perf_observation` fixtures produce identical trace bytes
-against `main` with the new harness (2-iteration traces; digests in
-`results.json`). For v1, six bot rows (`official-128`, `dome-proxy-96`,
+Trace parity: all eight `perf_observation` fixtures produce identical trace bytes
+against `main` with the eight-fixture harness (2-iteration traces; digests in
+`results.json`, which also keeps the seven-fixture digests). For v1, six bot rows (`official-128`, `dome-proxy-96`,
 `official-100`, `official-30`, `sandbox-16`, `dome-proxy-32`, each with 24
 iterations, sequential and parallel) were byte-identical. Their sequential and
 parallel traces matched each other apart from the report line's `parallel` flag.
@@ -354,12 +382,15 @@ parallel observation 5–12% faster. `dome-proxy-32-bot` and `observe-dense` imp
 The change is a cell-size rule and a per-row chord in the existing grid. It needs
 no cache, so nothing can go stale.
 
-The cost is about 3% (3 µs per batch) in the sparse `observe-wide` and narrow
-`observe-strip` synthetic fixtures. Every form that avoided it, by branching on
-whether to trim, gave up 3–8 points in the large worlds, and one was 10% slower
-in `dome-proxy-32-bot`. The owner accepted this cost after the first review
-round. Batches with too few observers to repay the fine grid, such as
-`observe-sparse`, keep half-vision cells.
+The cost is about 2.5–4% (3–6 µs per batch) in the sparse `observe-wide` and
+narrow `observe-strip` synthetic fixtures. Every form that avoided it, by
+branching on whether to trim, gave up 3–8 points in the large worlds, and one was
+10% slower in `dome-proxy-32-bot`. The owner accepted this cost after the first
+review round. Batches with too few observers to repay the fine grid, such as
+`observe-sparse`, keep half-vision cells. Food concentrated in patches away from
+the observers makes the rule refine anyway. `observe-clustered` is about 12%
+slower here, and 14–16% in the reviewer's probe. The owner accepted this cost
+after the second review round.
 
 No reused or persistent food index is adopted, and none was prototyped (see
 above). In parallel batches, the sequential `FoodGrid::new` is now the largest
@@ -378,7 +409,8 @@ ones.
   `2 * food + 16` cap get coarser cells, as before, and pay the per-row chord.
 - The refinement rule uses mean density over the food bounding box. Clustered
   food or clustered observers can make it refine when refinement does not pay
-  (or the reverse). The 1.2 ns cell cost comes from a 2 MB `starts` array, and
+  (or the reverse). `observe-clustered` measures one such layout, about 12%
+  slower; other layouts may cost more. The 1.2 ns cell cost comes from a 2 MB `starts` array, and
   smaller grids build cells more cheaply, so the rule leans towards half-vision
   cells.
 - Gains depend on codegen. Structurally small edits to the row loop moved
@@ -420,5 +452,6 @@ STUDY=research/performance/2026-10-24-observation-food-index
 python "$STUDY/pairs.py" BASE CAND rows.jsonl 9 timing official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
 python "$STUDY/pairs.py" BASE CAND rows.jsonl 9 profile official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
 python "$STUDY/obs_rounds.py" base,adopted OBS_BASE,OBS_CAND 11 obs.jsonl observe-sparse:500,observe-dense:5000,observe-wide:50000,observe-strip:10000
+python "$STUDY/obs_rounds.py" base,adopted OBS_BASE,OBS_CAND 9 clustered.jsonl observe-clustered:2000
 uv run --locked --only-group tools python -B tools/perf_compare.py --base fb71ecd --suite full --output outputs/perf/food-index
 ```

@@ -87,11 +87,14 @@ impl FoodGrid {
         // Fine cells let each queried row follow the vision circle: about 1.15
         // candidates per visible pellet in 96- and 128-snake worlds, against 1.7
         // to 1.95 with half-radius cells and the full query box. Each extra cell
-        // costs about 1.2 ns to build, each skipped candidate saves about 2 ns,
-        // and an observer skips at least 1.4 candidates per vision^2 of mean food
-        // density (1.4 to 3.1 measured). Refine only when the savings, at 2 (from
-        // 2.3) cells per candidate, cover the extra cells. Food narrower than the
-        // vision radius spans too few fine cells to trim. See
+        // costs about 1.2 ns to build, and each skipped candidate saves about 2 ns.
+        // Per vision^2 of mean food density, an observer skipped 3.1 candidates in
+        // official-128, 1.4 in dome-proxy-96 and 2.0 in observe-sparse; the rule
+        // conservatively assumes 1.4, the lowest of those measurements. Refine
+        // only when the savings, at 2 (from 2.3) cells per candidate, cover the
+        // extra cells. Mean density misjudges food that is dense only away from
+        // the observers: observe-clustered refines and is about 12% slower. Food
+        // narrower than the vision radius spans too few fine cells to trim. See
         // research/performance/2026-10-24-observation-food-index.
         let extra = fine.1 * fine.2 - coarse.1 * coarse.2;
         let skipped = observers as f64 * placed as f64 / (width * height) * vision * vision;
