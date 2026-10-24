@@ -1,5 +1,9 @@
 # Releasing
 
+For an explicitly requested previous-published-release versus pinned-candidate
+measurement, use the separate [on-demand performance workflow](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/release-performance.md).
+It attaches distinct evidence without changing release preparation or publication.
+
 This is the maintainer runbook. Contributors record user-facing changes in the
 changelog and follow the [versioning guidance](../../CONTRIBUTING.md#interfaces-and-packaging).
 

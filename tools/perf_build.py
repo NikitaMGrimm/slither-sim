@@ -400,7 +400,7 @@ class SharedTarget:
         return None
 
 
-def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=600):
+def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=600, cargo_args=()):
     """Build each snapshot's release examples and copy them out. Returns (builds, errors).
 
     `hook(snapshot, build_or_none, environment)` runs after each build attempt that got
@@ -419,7 +419,7 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
         built_names = [f"{name}{SUFFIX}" for name in examples]
         for name in built_names:
             (target / "release/examples" / name).unlink(missing_ok=True)
-        arguments = ["cargo", "build", "--release", "--locked",
+        arguments = ["cargo", "build", "--release", "--locked", *cargo_args,
                      *(part for name in examples for part in ("--example", name))]
         print(f"[{label}] Building release measurement examples", flush=True)
         log = logs / f"{label}-build.log"

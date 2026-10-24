@@ -1,0 +1,32 @@
+name: Direct release performance evidence
+
+on:
+  workflow_run:
+    workflows: [Direct release performance]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  publish:
+    if: github.event.workflow_run.event == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    concurrency:
+      group: release-perf-comment
+      cancel-in-progress: false
+    steps:
+      # workflow_run loads trusted default-branch code only. Never check out
+      # the measured candidate or execute files downloaded from its artifacts.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await require('./tools/release_perf_publish.cjs').publish({github,context,core});
