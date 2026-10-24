@@ -67,7 +67,7 @@ class DocumentationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.files = {p.relative_to(ROOT).as_posix() for directory in
-                     ("docs", "research", "src", "tests", "examples", "assets", "schemas", "tools", "evidence", ".github")
+                     ("docs", "research", "src", "tests", "examples", "assets", "schemas", "tools", "evidence", ".github", "ffi")
                      for p in (ROOT / directory).rglob("*") if p.is_file()}
         cls.files.update(p.name for p in ROOT.iterdir() if p.is_file())
         cls.markdown = sorted(p for p in cls.files if p.endswith(".md"))

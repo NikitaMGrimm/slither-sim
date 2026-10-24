@@ -1,6 +1,14 @@
 //! Local process transport. Each connection controls a session of independent worlds.
+//!
+//! [`serve`] speaks the JSON-lines protocol over a stream. In-process callers can
+//! drive the same [`Session`] directly: [`Session::request`] answers one JSON
+//! request, and [`Session::step`] with [`Session::frame`] skip JSON altogether.
 use crate::{Action, Config, DeathEvent, Food, Prey, Simulator, Snake};
-use frame::FrameBuilder;
+use frame::Frame;
+pub use frame::{
+    DeathColumns, FoodColumns, FrameRef, NO_ORIGIN, NONE, ORIGINS, PreyColumns, REASONS,
+    SnakeColumns, ViewColumns,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::{self, BufRead, Write};
@@ -104,8 +112,26 @@ fn worlds_reply(head: &[u8], frames: &[Vec<u8>]) -> Vec<u8> {
 
 struct WorldState {
     world: Simulator,
-    frames: FrameBuilder,
+    frame: Frame,
     actions: Vec<Option<Action>>,
+}
+
+impl WorldState {
+    /// Holds the validated actions for up to `decision_ticks` ticks, stopping
+    /// once every snake has died, then collects the new frame.
+    fn advance(&mut self, decision_ticks: usize) {
+        let previous_deaths = self.world.deaths.len();
+        let mut ticks = 0;
+        for _ in 0..decision_ticks {
+            if self.world.living() == 0 {
+                break;
+            }
+            self.world.advance_validated(&self.actions);
+            ticks += 1;
+        }
+        self.frame
+            .collect(&self.world, ticks, &self.world.deaths[previous_deaths..]);
+    }
 }
 
 struct Run {
@@ -128,12 +154,89 @@ fn each_world<R: Send>(
     worlds.iter_mut().map(work).collect()
 }
 
+/// One controller's worlds, as `serve` keeps them for a connection.
+///
+/// JSON requests and typed steps act on the same worlds and may be mixed. A
+/// session is `Send` but not shared: use it from one thread at a time.
 #[derive(Default)]
-struct Session {
+pub struct Session {
     current: Option<Run>,
 }
 
 impl Session {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Answers one JSON request line, given without its newline, with exactly
+    /// the reply line `serve` writes, also without its newline. Rejected or
+    /// malformed requests return an error reply and leave the session unchanged.
+    pub fn request(&mut self, line: &[u8]) -> Vec<u8> {
+        let result = serde_json::from_slice(line)
+            .map_err(|error| error.to_string())
+            .and_then(|request| self.handle(request));
+        match result {
+            Ok(reply) => reply,
+            Err(error) => crate::json::error_reply(PROTOCOL, &error),
+        }
+    }
+
+    /// Steps every world like a JSON `step`, without writing its reply; read
+    /// the new frames with [`Session::frame`]. `headings` and `boosts` hold
+    /// one entry per agent slot of every world, world-major: slot `s` of world
+    /// `w` is entry `w * agents + s`. A NaN heading means no action, which only
+    /// dead slots may give. Invalid steps change nothing.
+    pub fn step(&mut self, headings: &[f64], boosts: &[bool]) -> Result<(), String> {
+        let run = self.current.as_mut().ok_or("Reset first")?;
+        let need = run.worlds.len() * run.agents;
+        if headings.len() != need || boosts.len() != need {
+            return Err(format!(
+                "One heading and one boost per agent of every world required: \
+                 got {} headings and {} boosts, need {need}",
+                headings.len(),
+                boosts.len()
+            ));
+        }
+        // Reject the whole step before advancing any world.
+        for (index, (state, (headings, boosts))) in run
+            .worlds
+            .iter_mut()
+            .zip(headings.chunks(run.agents).zip(boosts.chunks(run.agents)))
+            .enumerate()
+        {
+            state.actions.clear();
+            state
+                .actions
+                .extend(headings.iter().zip(boosts).map(|(&heading, &boost)| {
+                    (!heading.is_nan()).then_some(Action { heading, boost })
+                }));
+            state
+                .world
+                .validate_actions(&state.actions)
+                .map_err(|error| format!("World {index}: {error}"))?;
+        }
+        let decision_ticks = run.decision_ticks;
+        each_world(&mut run.worlds, |state| state.advance(decision_ticks));
+        Ok(())
+    }
+
+    /// World `world`'s frame after the latest reset or step, or `None` before
+    /// the first reset and for unknown worlds. It holds the values the JSON
+    /// frame prints, rounded alike.
+    pub fn frame(&self, world: usize) -> Option<FrameRef<'_>> {
+        Some(self.current.as_ref()?.worlds.get(world)?.frame.columns())
+    }
+
+    /// Worlds of the current session; 0 before the first reset.
+    pub fn worlds(&self) -> usize {
+        self.current.as_ref().map_or(0, |run| run.worlds.len())
+    }
+
+    /// Agent slots per world; 0 before the first reset.
+    pub fn agents(&self) -> usize {
+        self.current.as_ref().map_or(0, |run| run.agents)
+    }
+
     fn handle(&mut self, request: Request) -> Result<Vec<u8>, String> {
         match request {
             Request::Info {} => Ok(reply(&json!({
@@ -176,23 +279,24 @@ impl Session {
                     }
                     built.push(world);
                 }
-                // Earlier frame builders keep their buffers for the new worlds.
-                let mut builders = self
+                // Earlier frames keep their buffers for the new worlds.
+                let mut frames = self
                     .current
                     .take()
-                    .map(|run| run.worlds.into_iter().map(|state| state.frames))
+                    .map(|run| run.worlds.into_iter().map(|state| state.frame))
                     .into_iter()
                     .flatten();
                 let mut states: Vec<_> = built
                     .into_iter()
                     .map(|world| WorldState {
                         world,
-                        frames: builders.next().unwrap_or_default(),
+                        frame: frames.next().unwrap_or_default(),
                         actions: Vec::new(),
                     })
                     .collect();
                 let frames = each_world(&mut states, |state| {
-                    state.frames.encode(&state.world, 0, &[])
+                    state.frame.collect(&state.world, 0, &[]);
+                    state.frame.encode()
                 });
                 let mut head = b"\"config\":".to_vec();
                 head.extend_from_slice(
@@ -242,18 +346,8 @@ impl Session {
                 }
                 let decision_ticks = run.decision_ticks;
                 let frames = each_world(&mut run.worlds, |state| {
-                    let previous_deaths = state.world.deaths.len();
-                    let mut ticks = 0;
-                    for _ in 0..decision_ticks {
-                        if state.world.living() == 0 {
-                            break;
-                        }
-                        state.world.advance_validated(&state.actions);
-                        ticks += 1;
-                    }
-                    state
-                        .frames
-                        .encode(&state.world, ticks, &state.world.deaths[previous_deaths..])
+                    state.advance(decision_ticks);
+                    state.frame.encode()
                 });
                 Ok(worlds_reply(b"", &frames))
             }
@@ -286,14 +380,7 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
         }
         let request = line.strip_suffix(b"\n").unwrap_or(&line);
         let request = request.strip_suffix(b"\r").unwrap_or(request);
-        let result = serde_json::from_slice(request)
-            .map_err(|error| error.to_string())
-            .and_then(|request| session.handle(request));
-        let reply = match result {
-            Ok(reply) => reply,
-            Err(error) => crate::json::error_reply(PROTOCOL, &error),
-        };
-        output.write_all(&reply)?;
+        output.write_all(&session.request(request))?;
         output.write_all(b"\n")?;
         output.flush()?;
     }

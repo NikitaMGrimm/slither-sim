@@ -346,6 +346,189 @@ fn dead_slots_remain_stable_and_all_dead_worlds_stop() {
     assert_eq!(after["deaths"], json!([]));
 }
 
+/// `frame` in the shape of its JSON frame, rebuilt from the typed columns only.
+fn columns_value(frame: transport::FrameRef) -> Value {
+    let index = |i: u32| (i != transport::NONE).then_some(i);
+    let v = frame.views;
+    assert_eq!(v.snakes_start.len(), v.me.len() + 1);
+    assert_eq!(v.food_start.len(), v.me.len() + 1);
+    assert_eq!(v.prey_start.len(), v.me.len() + 1);
+    let rows = |start: &[u32], rows: &[u32], slot: usize| {
+        rows[start[slot] as usize..start[slot + 1] as usize].to_vec()
+    };
+    let views: Vec<_> = (0..v.me.len())
+        .map(|slot| match index(v.me[slot]) {
+            None => Value::Null,
+            Some(me) => json!({
+                "self": me,
+                "snakes": rows(v.snakes_start, v.snakes, slot),
+                "food": rows(v.food_start, v.food, slot),
+                "prey": rows(v.prey_start, v.prey, slot),
+            }),
+        })
+        .collect();
+    let (s, f, p, d) = (frame.snakes, frame.food, frame.prey, frame.deaths);
+    json!({
+        "time": frame.time, "ticks": frame.ticks, "living": frame.living,
+        "radius": frame.radius, "vision": frame.vision,
+        "snakes": {
+            "slot": s.slot, "x": s.x, "y": s.y, "heading": s.heading, "speed": s.speed,
+            "radius": s.radius, "length": s.length, "segments": s.segments, "fam": s.fam,
+            "score": s.score, "kills": s.kills, "bodyStart": s.body_start,
+            "bodyX": s.body_x, "bodyY": s.body_y,
+        },
+        "food": {
+            "x": f.x, "y": f.y, "value": f.value,
+            "size": f.size.iter().map(|&x| (!x.is_nan()).then_some(x)).collect::<Vec<_>>(),
+            "origin": f.origin.iter().map(|&o| (o != transport::NO_ORIGIN).then_some(o))
+                .collect::<Vec<_>>(),
+        },
+        "prey": {
+            "id": p.id, "x": p.x, "y": p.y, "heading": p.heading,
+            "targetHeading": p.target_heading, "speed": p.speed, "size": p.size,
+        },
+        "views": views,
+        "deaths": (0..d.time.len()).map(|i| json!({
+            "time": d.time[i], "victim": d.victim[i], "killer": index(d.killer[i]),
+            "reason": transport::REASONS[d.reason[i] as usize], "food": d.food[i],
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn result(reply: &[u8]) -> Value {
+    let reply: Value = serde_json::from_slice(reply).unwrap();
+    assert!(reply.get("error").is_none(), "{reply}");
+    reply["result"].clone()
+}
+
+#[test]
+fn requests_answer_with_the_serve_lines() {
+    let input: &[&[u8]] = &[
+        b"not json",
+        br#"{"op":"info"}"#,
+        br#"{"op":"step","actions":[]}"#,
+        br#"{"op":"reset","seed":5,"worlds":2,"agents":3}"#,
+        br#"{"op":"step","actions":[{"heading":[0,1,2],"boost":[true,false,false]},{"heading":[2,1,0],"boost":[false,false,true]}]}"#,
+        br#"{"op":"snapshot","world":1}"#,
+    ];
+    let mut session = transport::Session::new();
+    assert_eq!((session.worlds(), session.agents()), (0, 0));
+    assert!(session.frame(0).is_none());
+    let mut lines = Vec::new();
+    for request in input {
+        lines.extend(session.request(request));
+        lines.push(b'\n');
+    }
+    let mut served = Vec::new();
+    transport::serve(Cursor::new(input.join(&b'\n')), &mut served).unwrap();
+    assert_eq!(lines, served);
+    assert_eq!((session.worlds(), session.agents()), (2, 3));
+    assert!(session.frame(1).is_some() && session.frame(2).is_none());
+}
+
+#[test]
+fn typed_steps_match_json_steps() {
+    let (mut seen_kill, mut seen_boundary, mut seen_partial) = (false, false, false);
+    // A hard arena where snakes die at the wall, and a crowded arena with body
+    // kills, each with several worlds.
+    for (reset, steps) in [
+        (
+            json!({"op":"reset","seed":11,"worlds":3,"agents":6,
+                "config":{"radius":400,"dynamicRadius":false,"boundaryMode":"hard","foodCount":200}}),
+            50,
+        ),
+        (
+            json!({"op":"reset","seed":7,"worlds":2,"agents":24,
+                "config":{"radius":1200,"dynamicRadius":false,"foodCount":3000}}),
+            30,
+        ),
+    ] {
+        let line = serde_json::to_vec(&reset).unwrap();
+        let mut by_json = transport::Session::new();
+        let mut typed = transport::Session::new();
+        let reply = result(&by_json.request(&line));
+        assert_eq!(result(&typed.request(&line)), reply);
+        let (worlds, agents) = (typed.worlds(), typed.agents());
+        for w in 0..worlds {
+            assert_eq!(columns_value(typed.frame(w).unwrap()), reply["worlds"][w]);
+        }
+        for t in 0..steps {
+            let (mut headings, mut boosts, mut actions) = (Vec::new(), Vec::new(), Vec::new());
+            for w in 0..worlds {
+                let frame = typed.frame(w).unwrap();
+                let heading: Vec<_> = (0..agents)
+                    .map(|s| {
+                        (frame.views.me[s] != transport::NONE)
+                            .then(|| (s as f64 * 0.7 + w as f64 * 0.3 + t as f64 * 0.05) % 6.0)
+                    })
+                    .collect();
+                let boost: Vec<_> = (0..agents).map(|s| (s + t + w) % 3 == 0).collect();
+                headings.extend(heading.iter().map(|h| h.unwrap_or(f64::NAN)));
+                boosts.extend(&boost);
+                actions.push(json!({"heading": heading, "boost": boost}));
+            }
+            let request = json!({"op":"step","actions":actions});
+            let reply = result(&by_json.request(&serde_json::to_vec(&request).unwrap()));
+            typed.step(&headings, &boosts).unwrap();
+            for w in 0..worlds {
+                let frame = &reply["worlds"][w];
+                assert_eq!(columns_value(typed.frame(w).unwrap()), *frame);
+                assert_eq!(columns_value(by_json.frame(w).unwrap()), *frame);
+                for death in frame["deaths"].as_array().unwrap() {
+                    seen_kill |= death["killer"].is_u64();
+                    seen_boundary |= death["reason"] == "boundary";
+                }
+                let living = frame["living"].as_u64().unwrap() as usize;
+                seen_partial |= 0 < living && living < agents;
+            }
+        }
+        for w in 0..worlds {
+            let snapshot = serde_json::to_vec(&json!({"op":"snapshot","world":w})).unwrap();
+            assert_eq!(by_json.request(&snapshot), typed.request(&snapshot));
+        }
+    }
+    assert!(seen_kill && seen_boundary && seen_partial);
+}
+
+#[test]
+fn rejected_typed_steps_change_nothing() {
+    let mut session = transport::Session::new();
+    assert_eq!(session.step(&[], &[]).unwrap_err(), "Reset first");
+    result(&session.request(br#"{"op":"reset","seed":3,"agents":2,"worlds":2}"#));
+    let state = |session: &mut transport::Session| {
+        (0..2)
+            .map(|w| {
+                let line = format!(r#"{{"op":"snapshot","world":{w}}}"#);
+                let frame = columns_value(session.frame(w).unwrap());
+                (session.request(line.as_bytes()), frame)
+            })
+            .collect::<Vec<_>>()
+    };
+    let before = state(&mut session);
+    // The first world's actions are valid; the second world's are not.
+    let error = session
+        .step(&[0.0, 1.0, 0.0, f64::NAN], &[false; 4])
+        .unwrap_err();
+    assert_eq!(error, "World 1: Missing or invalid action for 1");
+    let reply: Value = serde_json::from_slice(&session.request(
+        br#"{"op":"step","actions":[{"heading":[0,1],"boost":[false,false]},{"heading":[0,null],"boost":[false,false]}]}"#,
+    ))
+    .unwrap();
+    assert_eq!(reply["error"], error);
+    for (headings, boosts) in [
+        (&[0.0, 1.0, 0.0, f64::INFINITY][..], &[false; 4][..]),
+        (&[0.0, 1.0, 0.0, f64::NEG_INFINITY], &[false; 4]),
+        (&[0.0, 1.0, 0.0], &[false; 3]),
+        (&[0.0, 1.0, 0.0, 1.0], &[false; 3]),
+        (&[0.0; 6], &[false; 6]),
+    ] {
+        assert!(session.step(headings, boosts).is_err());
+    }
+    assert_eq!(state(&mut session), before);
+    session.step(&[0.0, 1.0, 2.0, 3.0], &[false; 4]).unwrap();
+    assert_ne!(state(&mut session), before);
+}
+
 #[test]
 #[cfg(feature = "networking")]
 fn executable_emits_only_replies_and_exits_on_eof() {

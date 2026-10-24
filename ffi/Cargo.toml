@@ -1,0 +1,15 @@
+[package]
+name = "slither-sim-ffi"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.86"
+description = "C ABI over slither-sim transport sessions (slither-sim-abi-v1)"
+repository = "https://github.com/NikitaMGrimm/slither-sim"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+slither-sim = { path = "..", default-features = false, features = ["parallel"] }

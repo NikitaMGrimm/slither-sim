@@ -379,6 +379,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "slither-sim-ffi"
+version = "0.1.0"
+dependencies = [
+ "slither-sim",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

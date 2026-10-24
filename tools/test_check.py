@@ -47,9 +47,11 @@ class CheckRunnerTests(unittest.TestCase):
 
     def test_smoke_uses_the_same_cargo_target_directory(self):
         with patch.dict(os.environ, {"CARGO_TARGET_DIR": "some target"}):
-            command = check.commands("tools")[-2]
+            commands = check.commands("tools")
         expected = check.ROOT / "some target" / "debug"
-        self.assertEqual(Path(command[command.index("--binary") + 1]).parent, expected)
+        for script, option in (("examples/bot.py", "--binary"), ("examples/ffi_bot.py", "--library")):
+            command = next(command for command in commands if script in command)
+            self.assertEqual(Path(command[command.index(option) + 1]).parent, expected)
 
 
 if __name__ == "__main__":

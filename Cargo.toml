@@ -24,6 +24,11 @@ include = [
 ]
 publish = ["crates-io"]
 
+[workspace]
+members = ["ffi"]
+# Plain cargo commands at the root keep building and packaging only this crate.
+default-members = ["."]
+
 [features]
 default = ["networking", "parallel"]
 networking = ["dep:tungstenite"]

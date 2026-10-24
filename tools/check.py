@@ -16,12 +16,13 @@ GROUPS = (*HOST_GROUPS, "wasm")
 def commands(group):
     if group == "rust":
         return [
-            ["cargo", "fmt", "--check"],
+            ["cargo", "fmt", "--all", "--check"],
             ["cargo", "test", "--all-targets", "--locked"],
             ["cargo", "test", "--all-targets", "--no-default-features", "--locked"],
             ["cargo", "test", "--doc", "--locked"],
             ["cargo", "test", "--doc", "--no-default-features", "--locked"],
-            ["cargo", "clippy", "--all-targets", "--locked", "--", "-D", "warnings"],
+            ["cargo", "test", "-p", "slither-sim-ffi", "--all-targets", "--locked"],
+            ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"],
             ["cargo", "clippy", "--all-targets", "--no-default-features", "--locked", "--", "-D", "warnings"],
             ["cargo", "run", "--locked", "--example", "basic"],
         ]
@@ -30,12 +31,16 @@ def commands(group):
         if not target.is_absolute():
             target = ROOT / target
         binary = str(target / "debug" / ("slither-sim.exe" if os.name == "nt" else "slither-sim"))
+        library = str(target / "debug" / ("slither_sim_ffi.dll" if os.name == "nt" else
+                                          "libslither_sim_ffi.dylib" if sys.platform == "darwin" else
+                                          "libslither_sim_ffi.so"))
         return [
             [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"],
             [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py"],
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
-            ["cargo", "build", "--locked"],
+            ["cargo", "build", "--locked", "--workspace"],
             [sys.executable, "examples/bot.py", "--binary", binary, "--steps", "10"],
+            [sys.executable, "examples/ffi_bot.py", "--library", library, "--steps", "10"],
             ["node", "examples/bot.mjs", binary, "10"],
         ]
     if group == "package":

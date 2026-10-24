@@ -2,8 +2,8 @@
 
 Run `slither-sim serve`. One controller owns a session of independent worlds and
 all their player slots. Send UTF-8 JSON objects, one per stdin line; read one
-stdout reply per request. EOF stops the process. Rust callers can use the
-library directly.
+stdout reply per request. EOF stops the process. Rust callers can drive the
+same sessions [in-process](#in-process-sessions) or use the library directly.
 
 ```json
 {"protocol":"slither-sim-json-v2","result":{}}
@@ -208,3 +208,40 @@ Refill rates must be finite and within 0–10,000; a rate too small to represent
 the rescaled pending clock is rejected. Use the setter instead of directly
 editing `config.ambient_replenish_per_second` when changing a running world.
 Rejected operations leave the world unchanged.
+
+### In-process sessions
+
+`transport::Session` is the session `serve` runs, without the stream. JSON
+requests and typed steps act on the same worlds and may be mixed.
+
+| Method | Purpose |
+| --- | --- |
+| `Session::new()` | An empty session; reset it before stepping. |
+| `request(line)` | Answers one JSON request line with exactly the reply line `serve` writes, both without the newline. Errors become error replies. |
+| `step(&headings, &boosts)` | Steps every world like a JSON `step` without writing JSON. Both slices hold `worlds × agents` entries, world-major: slot `s` of world `w` is entry `w × agents + s`. |
+| `frame(w)` | World `w`'s current frame as a `FrameRef` of read-only columns, after any reset or step; `None` before reset or for unknown worlds. |
+| `worlds()`, `agents()` | Session shape; 0 before the first reset. |
+
+A NaN heading means no action; only dead slots may give it. Typed steps validate
+like JSON steps, with the same error text where it applies, and reject the whole
+step before any world advances. Worlds step on the rayon pool as in `serve`.
+
+`FrameRef` columns hold the values the JSON frame prints, rounded alike, in
+fixed types: `u64` prey `id`; `u8` food `origin` and death `reason`; `u32`
+`ticks`, `living`, `slot`, `segments`, `kills`, death `victim`, `killer` and
+`food`, and every row index and offset; `f64` everything else. Where the JSON
+frame nests or prints `null`, the columns differ:
+
+- Views are compressed sparse rows. `views.me[s]` is slot `s`'s own `snakes` row,
+  or `transport::NONE` (`u32::MAX`) when the slot is dead. Its visible snakes are
+  the rows `views.snakes[views.snakes_start[s]..views.snakes_start[s + 1]]`, and
+  likewise `food` and `prey`. Each `*_start` has one entry more than there are
+  slots; dead slots have empty ranges.
+- `deaths` holds the columns `time`, `victim`, `killer` (`NONE` without a
+  killer), `reason` (an index into `transport::REASONS`: body, boundary) and
+  dropped `food`.
+- `food.origin` indexes `transport::ORIGINS`, or is `NO_ORIGIN` (255) without an
+  origin; `food.size` is NaN without a size.
+
+A `FrameRef` borrows its session, so it ends before the next request or step.
+Sessions are `Send`: run separate sessions on separate threads.
