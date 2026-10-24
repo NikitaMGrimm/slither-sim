@@ -39,7 +39,7 @@ def validate_request(request, root, deadline):
     if request.get("schema") != SCHEMA or request_key(measurement) != request.get("key"):
         raise ValueError("invalid measurement request identity")
     if measurement["protocol"] != perf_stats.PLAN or measurement["config"] != {
-            "runner": "windows-latest", "toolchain": "stable", "features": list(FEATURES),
+            "runner": "ubuntu-latest", "toolchain": "stable", "features": list(FEATURES),
             "profile": "release", "release_settings": RELEASE_SETTINGS, "jobs": 2, "suite": "ci", "blocks": 1,
             "job_seconds": 1800, "stage_seconds": 1500, "reserve_seconds": 90}:
         raise ValueError("unsupported measurement configuration")
@@ -60,7 +60,7 @@ def render(report):
              f"Published `{m['baseline']['tag']}` `{m['baseline']['commit']}` (tree `{m['baseline']['tree']}`)",
              f"→ candidate `{m['candidate']['commit']}` (tree `{m['candidate']['tree']}`).", "",
              f"Harness `{m['harness']['commit']}` · request `{request['key']}`.", "",
-             "Operation wall time; v2 conditional intervals, Windows, one block per process. "
+             "Operation wall time; v2 conditional intervals, Ubuntu, one block per process. "
              "This is a direct comparison of these revisions, separate from PR preview percentages. "
              "It does not establish the identity of any later shipped tree.", "",
              "| Workload | Change [interval] | Result | Parity | Pairs used / complete |",

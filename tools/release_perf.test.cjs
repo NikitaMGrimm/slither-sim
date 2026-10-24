@@ -162,3 +162,10 @@ test('distinct source runs retain their own terminal comments regardless of sour
   const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/release-perf-comment.yml'),'utf8');
   assert.match(workflow,/group: release-perf-comment-\$\{\{ github\.event\.workflow_run\.id \}\}/);
 });
+
+test('the declared runner is the measurement runner and cancellation reaches the collector',()=>{
+  const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/release-perf.yml'),'utf8');
+  const measure=workflow.slice(workflow.indexOf('\n  measure:'));
+  assert.equal(measure.match(/^    runs-on: (\S+)$/m)?.[1],pinning.config.runner);
+  assert.match(measure,/^        run: exec python3 -B tools\/release_perf\.py /m);
+});

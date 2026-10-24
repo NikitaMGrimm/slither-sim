@@ -55,7 +55,7 @@ jobs:
   measure:
     needs: pin
     if: needs.pin.outputs.duplicate == 'false'
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -76,10 +76,10 @@ jobs:
       RUST_TEST_THREADS: 1
     steps:
       - name: Record job clock before setup or builds
-        shell: pwsh
+        shell: bash
         run: |
-          "RELEASE_PERF_JOB_START=$(python -c 'import time; print(repr(time.monotonic()))')" >> $env:GITHUB_ENV
-          "CARGO_TARGET_DIR=$env:RUNNER_TEMP/release-perf-target" >> $env:GITHUB_ENV
+          echo "RELEASE_PERF_JOB_START=$(python3 -c 'import time; print(repr(time.monotonic()))')" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/release-perf-target" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.pin.outputs.harness }}
@@ -102,8 +102,11 @@ jobs:
         env:
           REQUEST: ${{ runner.temp }}/release-perf-request/request.json
           OUTPUT: ${{ runner.temp }}/release-perf
-        shell: pwsh
-        run: python -B tools/release_perf.py --request $env:REQUEST --output $env:OUTPUT
+        shell: bash
+        # Cancellation signals only the step's entry process, and bash would not
+        # forward SIGINT. exec makes the collector that process, so its cleanup
+        # kills the session-isolated build groups before the evidence upload.
+        run: exec python3 -B tools/release_perf.py --request "$REQUEST" --output "$OUTPUT"
       - name: Upload bounded terminal report
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

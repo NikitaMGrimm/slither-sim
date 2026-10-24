@@ -121,7 +121,7 @@ function render(request, report, run, owner, repo) {
   }
   if (!report.performance.length) lines.push('| — | — | Unavailable | Unavailable | 0 / 0 |');
   lines.push('', `State: ${report.state}; ${report.errors.length} diagnostic(s) in artifacts. A build/catalog incompatibility or failed attempt is Unavailable and receives no asymmetric adaptation.`, '',
-    'Protocol v2: Windows, one block per fresh process, at most ten workloads and fourteen covered looks; 1,800 s job / 1,500 s stage / 90 s reserve. Negative change means less operation wall time. Coverage is conditional on independent normal constant-variance log errors with constant change and order effects; hosted calibration is not established. Changed parity compares different behavior.', '',
+    'Protocol v2: Ubuntu, one block per fresh process, at most ten workloads and fourteen covered looks; 1,800 s job / 1,500 s stage / 90 s reserve. Negative change means less operation wall time. Coverage is conditional on independent normal constant-variance log errors with constant change and order effects; hosted calibration is not established. Changed parity compares different behavior.', '',
     `<!-- slither-release-perf-run: ${JSON.stringify({run:run.id,attempt:run.run_attempt,key:request.key,candidate:m.candidate.commit,baseline:m.baseline.commit})} -->`);
   return lines.join('\n');
 }

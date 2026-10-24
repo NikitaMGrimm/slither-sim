@@ -25,7 +25,7 @@ def request():
                    "baseline": {"tag": "v0.3.1", "commit": "a" * 40, "tree": "b" * 40},
                    "candidate": {"commit": "c" * 40, "tree": "d" * 40},
                    "harness": {"commit": "e" * 40, "tree": "f" * 40},
-                   "config": {"runner": "windows-latest", "toolchain": "stable", "features": list(release_perf.FEATURES),
+                   "config": {"runner": "ubuntu-latest", "toolchain": "stable", "features": list(release_perf.FEATURES),
                               "profile": "release", "release_settings": release_perf.RELEASE_SETTINGS,
                               "jobs": 2, "suite": "ci", "blocks": 1, "job_seconds": 1800, "stage_seconds": 1500, "reserve_seconds": 90}}
     return {"schema": release_perf.SCHEMA, "measurement": measurement, "key": release_perf.request_key(measurement),

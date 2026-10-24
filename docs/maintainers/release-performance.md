@@ -54,11 +54,14 @@ copied binaries and identities. `evidence.json` binds retained files by hash to
 the original request, including both runtime identities. Hashes establish
 consistency, not scientific validity.
 
-The [v2 contract](performance-statistics-v2.md) applies unchanged: Windows, one
-block per fresh process, at most ten workloads, fourteen covered looks, and the
-fixed error allocation. Builds/regressions/parity precede the sampling stage.
-The shared job cutoff is fixed before preparation at `job_start + 1800 - 90`.
-Git preparation, builds, regressions, fidelity, build metadata, catalogs and parity
+The [v2 contract](performance-statistics-v2.md) applies except for its runner:
+one block per fresh process, at most ten workloads, fourteen covered looks, and
+the fixed error allocation. The measurement job runs on `ubuntu-latest`, like the
+[PR comparisons](pr-reports.md#calibration), by owner decision on 2026-10-25,
+without a separate Windows-versus-Ubuntu confirmation run. The runner is a
+declared input, so the request records it. Builds/regressions/parity precede
+the sampling stage. The shared job cutoff is fixed before preparation at
+`job_start + 1800 - 90`. Git preparation, builds, regressions, fidelity, build metadata, catalogs and parity
 check the remaining allowance before starting children and bound those children
 by it. Preparation/build children use the shared process-tree owner with strict
 stop/reap verification. A cutoff leaves Unavailable and retained partial logs;
@@ -67,9 +70,12 @@ bounded waits within the finalization reserve.
 Sampling uses `min(stage_start + 1500, job_cutoff)`; setup and builds consume the
 job budget. The final covered prefix survives a normal sampling time cap.
 Sampler or binary-validation failure suppresses final claims. There are no
-interim comments or background collector, so a cancelled foreground measurement
-step is stopped before unconditional diagnostic upload. Frozen v1 studies keep
-their original contract and are never relabelled.
+interim comments or background collector. Cancellation sends SIGINT only to the
+step's entry process, so the step `exec`s the collector rather than leaving bash
+in between. Its cleanup then kills and reaps the session-isolated build and
+regression process groups before the unconditional diagnostic upload. Cleanup
+cut off by the runner's later SIGTERM or forced kill is outside this guarantee.
+Frozen v1 studies keep their original contract and are never relabelled.
 
 Intervals remain conditional on independent normal constant-variance log errors
 with constant change and order effects. Hosted-runner calibration and power are

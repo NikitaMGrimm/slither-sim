@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const schema = 'slither-release-perf-v1';
 const sha = /^[0-9a-f]{40}$/;
 const tag = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/;
-const config = {runner:'windows-latest', toolchain:'stable', features:['--no-default-features','--features','networking,parallel'],
+const config = {runner:'ubuntu-latest', toolchain:'stable', features:['--no-default-features','--features','networking,parallel'],
   profile:'release', release_settings:{OPT_LEVEL:'3',LTO:'thin',CODEGEN_UNITS:'1',DEBUG:'false',INCREMENTAL:'false',
     OVERFLOW_CHECKS:'false',PANIC:'unwind',STRIP:'none'}, jobs:2, suite:'ci', blocks:1, job_seconds:1800, stage_seconds:1500, reserve_seconds:90};
 function canonical(value) {
