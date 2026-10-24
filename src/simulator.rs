@@ -304,6 +304,8 @@ pub struct Simulator {
     food_cache: FoodCache,
     #[serde(skip)]
     eater_grid: EaterGrid,
+    #[serde(skip)]
+    buffers: StepBuffers,
     /// Batch observation on the rayon pool; see `set_parallel`.
     #[cfg(feature = "parallel")]
     #[serde(skip)]
@@ -370,6 +372,7 @@ impl Simulator {
             radius_update_index: 0,
             food_cache: FoodCache::default(),
             eater_grid: EaterGrid::default(),
+            buffers: StepBuffers::default(),
             #[cfg(feature = "parallel")]
             parallel: false,
         };
@@ -684,25 +687,45 @@ impl Simulator {
             events.clear();
         }
         self.update_radius(self.time + self.config.dt);
+        let mut buffers = std::mem::take(&mut self.buffers);
+        let StepBuffers {
+            alive,
+            previous,
+            last_tips,
+            boundary_deaths,
+            bodies,
+            heads,
+            order,
+            candidates,
+            dead,
+            fallen,
+            eaters,
+            hits,
+            eaten,
+            prey: prey_buffers,
+        } = &mut buffers;
         let c = &self.config;
-        let alive: Vec<usize> = self
-            .snakes
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.alive)
-            .map(|(i, _)| i)
-            .collect();
-        let previous: Vec<Point> = self.snakes.iter().map(|s| s.head).collect();
-        let last_tips: Vec<Point> = self
-            .snakes
-            .iter()
-            .map(|s| head_tip(s.head, s.heading, s.segments))
-            .collect();
-        let mut boundary_deaths = Vec::new();
+        alive.clear();
+        alive.extend(
+            self.snakes
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.alive)
+                .map(|(i, _)| i),
+        );
+        previous.clear();
+        previous.extend(self.snakes.iter().map(|s| s.head));
+        last_tips.clear();
+        last_tips.extend(
+            self.snakes
+                .iter()
+                .map(|s| head_tip(s.head, s.heading, s.segments)),
+        );
+        boundary_deaths.clear();
         // Every food edit from here to the refill is mirrored into the cache, so
         // occupancy is compared with the food list at most once per step.
         self.food_cache.begin();
-        for &i in &alive {
+        for &i in alive.iter() {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
             let state = &mut self.boosts[i];
@@ -808,44 +831,39 @@ impl Simulator {
             clock = Some(Instant::now());
         }
         // Stable-slot indexing avoids searching the living list for every pair.
-        let bodies: Vec<Option<Bounds>> = self
-            .snakes
-            .iter()
-            .map(|s| {
-                if !s.alive {
-                    return None;
-                }
-                let mut bounds = Bounds::between(s.head, s.head);
-                for &p in &s.body {
-                    bounds.include(p);
-                }
-                Some(bounds)
-            })
-            .collect();
+        bodies.clear();
+        bodies.extend(self.snakes.iter().map(|s| {
+            if !s.alive {
+                return None;
+            }
+            let mut bounds = Bounds::between(s.head, s.head);
+            for &p in &s.body {
+                bounds.include(p);
+            }
+            Some(bounds)
+        }));
         // Each living snake's tip, heading direction and scale, as `head_tip` and
         // `strikes` compute them, evaluated once rather than per pair. Dead
         // slots are never probed or tested.
-        let heads: Vec<(Point, (f64, f64), f64)> = self
-            .snakes
-            .iter()
-            .map(|s| {
-                if !s.alive {
-                    return (Point::default(), (0.0, 0.0), 0.0);
-                }
-                let scale = scale(s.segments);
-                let direction = (s.heading.cos(), s.heading.sin());
-                let r = BODY_RADIUS * scale;
-                let tip = Point {
-                    x: s.head.x + direction.0 * r,
-                    y: s.head.y + direction.1 * r,
-                };
-                (tip, direction, scale)
-            })
-            .collect();
+        heads.clear();
+        heads.extend(self.snakes.iter().map(|s| {
+            if !s.alive {
+                return (Point::default(), (0.0, 0.0), 0.0);
+            }
+            let scale = scale(s.segments);
+            let direction = (s.heading.cos(), s.heading.sin());
+            let r = BODY_RADIUS * scale;
+            let tip = Point {
+                x: s.head.x + direction.0 * r,
+                y: s.head.y + direction.1 * r,
+            };
+            (tip, direction, scale)
+        }));
         // The offline Android client resolves collisions oldest first against
         // newer snakes first, skipping those already dead. We preserve that
         // resolution after moving all snakes; online move/test phasing is unverified.
-        let mut order = alive.clone();
+        order.clear();
+        order.extend_from_slice(alive);
         order.sort_unstable_by_key(|&i| self.joins[i]);
         // Small worlds test every pair faster than they build an index.
         let index = (order.len() >= 32).then(|| {
@@ -856,10 +874,11 @@ impl Simulator {
             let longest = order.iter().map(|&j| self.snakes[j].segments).max();
             (BoundsIndex::new(&bounds), longest.unwrap_or(0))
         });
-        let mut candidates = vec![];
-        let mut dead: Vec<(usize, Option<usize>, DeathReason)> = vec![];
-        let mut fallen = vec![false; self.snakes.len()];
-        for &i in &order {
+        candidates.clear();
+        dead.clear();
+        fallen.clear();
+        fallen.resize(self.snakes.len(), false);
+        for &i in order.iter() {
             if boundary_deaths.binary_search(&i).is_ok() {
                 dead.push((i, None, DeathReason::Boundary));
                 fallen[i] = true;
@@ -871,7 +890,7 @@ impl Simulator {
             let indexed = index.as_ref().is_some_and(|(index, longest)| {
                 // Scale grows with segments, so this bounds every pair's reach below.
                 let reach = 3.666 * collision_distance(s.segments, *longest);
-                index.candidates(probe, reach, &mut candidates)
+                index.candidates(probe, reach, candidates)
             });
             let test = |j: usize, profile: &mut StepProfile| {
                 if i == j || fallen[j] {
@@ -916,7 +935,7 @@ impl Simulator {
             clock = Some(Instant::now());
         }
         self.time += c.dt;
-        for (i, killer, reason) in dead {
+        for &(i, killer, reason) in dead.iter() {
             self.snakes[i].alive = false;
             self.death_times[i] = Some(self.time);
             if let Some(k) = killer {
@@ -941,19 +960,14 @@ impl Simulator {
             clock = Some(Instant::now());
         }
         // Without food there is nothing to index or eat.
-        let eaters: Vec<(usize, Point, f64, Bounds)> = if self.food.is_empty() {
-            Vec::new()
-        } else {
-            alive
-                .iter()
-                .filter(|&&i| self.snakes[i].alive)
-                .map(|&i| {
-                    let s = &self.snakes[i];
-                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                    (i, center, radius, Bounds::between(center, center))
-                })
-                .collect()
-        };
+        eaters.clear();
+        if !self.food.is_empty() {
+            eaters.extend(alive.iter().filter(|&&i| self.snakes[i].alive).map(|&i| {
+                let s = &self.snakes[i];
+                let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                (i, center, radius, Bounds::between(center, center))
+            }));
+        }
         // Index the few eater circles, then visit food in reverse order; ties go to the
         // nearest head, then the lexically smaller id.
         const CELL: f64 = 256.0;
@@ -996,14 +1010,14 @@ impl Simulator {
         }
         // Eating changes only mass, which no pickup test reads, so eaters are found
         // first and then applied in the same reverse food order.
-        let mut hits = Vec::new();
+        hits.clear();
         if dense {
             dense_hits::<PROFILE>(
                 &self.eater_grid,
                 &self.snakes,
-                &eaters,
+                eaters,
                 &self.food,
-                &mut hits,
+                hits,
                 profile,
             );
         } else {
@@ -1035,7 +1049,7 @@ impl Simulator {
                 }
             }
         }
-        for &(findex, i) in &hits {
+        for &(findex, i) in hits.iter() {
             let f = &self.food[findex];
             if let Some(events) = &mut self.pickup_events {
                 events.push(PickupEvent {
@@ -1050,11 +1064,12 @@ impl Simulator {
             Self::update_mass(s);
         }
         if !hits.is_empty() {
-            let mut eaten = vec![false; self.food.len()];
-            for &(findex, _) in &hits {
+            eaten.clear();
+            eaten.resize(self.food.len(), false);
+            for &(findex, _) in hits.iter() {
                 eaten[findex] = true;
             }
-            self.food_cache.remove(&eaten);
+            self.food_cache.remove(eaten);
             let mut i = 0;
             self.food.retain(|_| {
                 let keep = !eaten[i];
@@ -1066,7 +1081,7 @@ impl Simulator {
             profile.food_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
         }
-        self.advance_prey(&previous);
+        self.advance_prey(previous, prey_buffers);
         if PROFILE {
             profile.prey_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
@@ -1114,6 +1129,7 @@ impl Simulator {
         for (snake, kiosk) in self.snakes.iter_mut().zip(&self.kiosks) {
             kiosk.finish_score(snake);
         }
+        self.buffers = buffers;
     }
     fn update_radius(&mut self, time: f64) {
         if self.config.dynamic_radius {
@@ -1231,7 +1247,7 @@ impl Simulator {
         }
     }
 
-    fn advance_prey(&mut self, previous: &[Point]) {
+    fn advance_prey(&mut self, previous: &[Point], buffers: &mut PreyBuffers) {
         let c = &self.config;
         let p = &c.prey;
         // Preserve integer-coordinate steps even when a caller batches snake
@@ -1243,7 +1259,15 @@ impl Simulator {
             (self.prey_motion_clock - motion_ticks as f64 * LOOP_SECONDS).max(0.0);
         // Public callers may insert/remove prey. Retain clocks only for present
         // identities, including through empty periods and after consumption.
-        let live_ids: HashSet<_> = self.prey.iter().map(|prey| prey.id).collect();
+        let PreyBuffers {
+            live_ids,
+            circles,
+            slots,
+            sweeps,
+            candidates,
+        } = buffers;
+        live_ids.clear();
+        live_ids.extend(self.prey.iter().map(|prey| prey.id));
         self.prey_decision_times
             .retain(|id, _| live_ids.contains(id));
         self.prey_outward.retain(|id| live_ids.contains(id));
@@ -1253,20 +1277,17 @@ impl Simulator {
         }
         // The same pickup circle as food. Eating prey changes only mass, so each
         // living snake's circle and lead stay fixed for this whole phase.
-        let circles: Vec<Option<(Point, f64, Point)>> = self
-            .snakes
-            .iter()
-            .map(|s| {
-                s.alive.then(|| {
-                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                    let lead = Point {
-                        x: center.x - s.head.x,
-                        y: center.y - s.head.y,
-                    };
-                    (center, radius, lead)
-                })
+        circles.clear();
+        circles.extend(self.snakes.iter().map(|s| {
+            s.alive.then(|| {
+                let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                let lead = Point {
+                    x: center.x - s.head.x,
+                    y: center.y - s.head.y,
+                };
+                (center, radius, lead)
             })
-            .collect();
+        }));
         // Index each living snake's swept circle path for many prey. Beyond the
         // largest radius plus one unit, a sweep's both ends lie past the
         // `sweep_misses` limit on one axis, so skipped pairs never eat. Capping
@@ -1274,8 +1295,8 @@ impl Simulator {
         // rounding far inside that unit; huge operands could cancel differently.
         const MAGNITUDE: f64 = 1e7;
         let small = |values: &[f64]| values.iter().all(|v| v.abs() <= MAGNITUDE);
-        let mut slots = vec![];
-        let mut sweeps = vec![];
+        slots.clear();
+        sweeps.clear();
         let mut reach = 0.0f64;
         let mut regular = true;
         for (i, circle) in circles.iter().enumerate() {
@@ -1299,8 +1320,8 @@ impl Simulator {
             }
         }
         let index =
-            (regular && slots.len() * self.prey.len() >= 512).then(|| BoundsIndex::new(&sweeps));
-        let mut candidates = vec![];
+            (regular && slots.len() * self.prey.len() >= 512).then(|| BoundsIndex::new(sweeps));
+        candidates.clear();
         self.prey.retain_mut(|prey| {
             let old = prey.position;
             // Ordinary decisions are per prey, with independently phased first
@@ -1349,7 +1370,7 @@ impl Simulator {
             let query = Bounds::between(old, prey.position);
             let indexed = index.as_ref().is_some_and(|index| {
                 small(&[old.x, old.y, prey.position.x, prey.position.y])
-                    && index.candidates(query, reach, &mut candidates)
+                    && index.candidates(query, reach, candidates)
             });
             // Both visit slots in ascending order, so ties resolve as before.
             let eater = if indexed {
@@ -1441,6 +1462,45 @@ impl Simulator {
             self.food_cache.end();
         }
         count
+    }
+}
+
+/// Working memory kept between steps, so that small worlds do not pay for an
+/// allocation per buffer per tick. Every buffer is cleared before use and
+/// nothing in it outlives a step, so clones and deserialized worlds start empty.
+#[derive(Default)]
+struct StepBuffers {
+    alive: Vec<usize>,
+    previous: Vec<Point>,
+    last_tips: Vec<Point>,
+    boundary_deaths: Vec<usize>,
+    bodies: Vec<Option<Bounds>>,
+    heads: Vec<(Point, (f64, f64), f64)>,
+    order: Vec<usize>,
+    candidates: Vec<u32>,
+    dead: Vec<(usize, Option<usize>, DeathReason)>,
+    fallen: Vec<bool>,
+    eaters: Vec<(usize, Point, f64, Bounds)>,
+    hits: Vec<(usize, usize)>,
+    eaten: Vec<bool>,
+    prey: PreyBuffers,
+}
+#[derive(Default)]
+struct PreyBuffers {
+    live_ids: HashSet<u64>,
+    circles: Vec<Option<(Point, f64, Point)>>,
+    slots: Vec<usize>,
+    sweeps: Vec<Bounds>,
+    candidates: Vec<u32>,
+}
+impl Clone for StepBuffers {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+impl std::fmt::Debug for StepBuffers {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StepBuffers").finish_non_exhaustive()
     }
 }
 
