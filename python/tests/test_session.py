@@ -4,9 +4,13 @@ Run through run.py, which imports the extension from a built wheel.
 """
 
 from array import array
+import ast
+from collections import UserDict
+import ctypes
 import math
 import os
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import threading
@@ -186,6 +190,47 @@ class InputTests(unittest.TestCase):
             with self.subTest(label):
                 self.assertEqual(self.stepped(h, b), expected)
 
+    def test_byte_orders_step_alike(self):
+        headings, boosts = self.inputs()
+        expected = self.stepped(headings, boosts)
+        count = len(headings)
+        for label, h, format in [
+            ("big-endian ctypes", (ctypes.c_double.__ctype_be__ * count)(*headings), ">d"),
+            ("little-endian ctypes", (ctypes.c_double.__ctype_le__ * count)(*headings), "<d"),
+        ]:
+            with self.subTest(label):
+                self.assertEqual(memoryview(h).format, format)
+                self.assertEqual(self.stepped(h, bytes(boosts)), expected)
+
+    def test_big_endian_nan_for_a_living_slot_is_rejected(self):
+        headings, boosts = self.inputs()
+        headings[AGENTS + 1] = math.nan
+        typed, listed = Session(), Session()
+        reset(typed)
+        reset(listed)
+        before = fingerprint(typed)
+        with self.assertRaises(ValueError) as caught:
+            typed.step((ctypes.c_double.__ctype_be__ * len(headings))(*headings), bytes(boosts))
+        with self.assertRaises(ValueError) as expected:
+            listed.step(headings, boosts)
+        self.assertEqual(str(caught.exception), str(expected.exception))
+        self.assertEqual(fingerprint(typed), before)
+
+    def test_unaligned_buffers(self):
+        headings, boosts = self.inputs()
+        expected = self.stepped(headings, boosts)
+        packed = b"x" + struct.pack(f"={len(headings)}d", *headings)
+        unaligned = memoryview(packed)[1:].cast("d")
+        self.assertEqual(self.stepped(unaligned, memoryview(b"x" + bytes(boosts))[1:]), expected)
+
+    def test_empty_buffers_reach_session_validation(self):
+        session = Session()
+        reset(session)
+        with self.assertRaises(ValueError) as caught:
+            session.step(array("d"), b"")
+        self.assertEqual(str(caught.exception), "One heading and one boost per agent of every world "
+                         f"required: got 0 headings and 0 boosts, need {WORLDS * AGENTS}")
+
     def test_none_heading_in_sequences_means_no_action(self):
         session = Session()
         reset(session)
@@ -219,6 +264,7 @@ class InputTests(unittest.TestCase):
             ("int64 boosts", headings, array("q", [0] * len(boosts))),
             ("double boosts", headings, array("d", [0] * len(boosts))),
             ("string headings", ["north"] * len(headings), boosts),
+            ("two-item format", memoryview(array("d", headings)).cast("B").cast("Q"), boosts),
         ]:
             with self.subTest(label), self.assertRaises(TypeError):
                 session.step(h, b)
@@ -303,9 +349,34 @@ class ErrorTests(unittest.TestCase):
 
     def test_unknown_world(self):
         session = Session()
+        with self.assertRaisesRegex(ValueError, "^Reset first$"):
+            session.frame(-1)
         reset(session)
-        with self.assertRaisesRegex(IndexError, "^Unknown world$"):
-            session.frame(WORLDS)
+        for world in (WORLDS, -1, -WORLDS, 2**100, -(2**100)):
+            with self.subTest(world), self.assertRaisesRegex(IndexError, "^Unknown world$"):
+                session.frame(world)
+        with self.assertRaises(TypeError):
+            session.frame(0.0)
+
+    def test_mappings_other_than_dicts_are_rejected_like_their_stubs(self):
+        session = Session()
+        reset(session)
+        before = fingerprint(session)
+        with self.assertRaises(TypeError):
+            reset(session, config=UserDict(CONFIG))
+        self.assertEqual(fingerprint(session), before)
+        with self.assertRaises(TypeError):
+            session.request(UserDict({"op": "info"}))
+        stub = ast.parse(Path(slither_sim.__file__).with_name("__init__.pyi").read_text(encoding="utf-8"))
+        methods = {node.name: node for node in ast.walk(stub) if isinstance(node, ast.FunctionDef)}
+        annotations = {arg.arg: ast.unparse(arg.annotation)
+                       for name in ("reset", "request") for arg in methods[name].args.args if arg.annotation}
+        self.assertEqual(annotations["config"], "dict[str, Any] | None")
+        self.assertEqual(annotations["message"], "dict[str, Any] | str | bytes")
+
+    def test_package_version_is_the_simulator_version(self):
+        info = Session().request({"op": "info"})["result"]
+        self.assertEqual(slither_sim.__version__, info["version"])
 
     def test_requests_accept_dicts_text_and_bytes(self):
         session = Session()

@@ -1,7 +1,7 @@
 //! The `slither_sim` Python extension: [`transport::Session`] in-process, with
 //! typed steps and frame columns copied into `array.array` objects.
-use pyo3::buffer::{Element, ElementType, PyBuffer, PyUntypedBuffer};
-use pyo3::exceptions::{PyIndexError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyIndexError, PyOverflowError, PyTypeError, PyValueError};
+use pyo3::ffi;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBytes, PyDict, PyString, PyTuple};
@@ -47,52 +47,126 @@ fn array<T: Column>(py: Python<'_>, values: &[T]) -> PyResult<Py<PyAny>> {
     Ok(array.call1((T::CODE, bytes))?.unbind())
 }
 
-/// One boost flag: a `uint8` or `bool` buffer item. Any nonzero byte boosts.
-#[derive(Clone, Copy, Default)]
-#[repr(transparent)]
-struct Flag(u8);
+fn is_buffer(object: &Bound<'_, PyAny>) -> bool {
+    // SAFETY: `object` is a live object, and this only inspects its type.
+    unsafe { ffi::PyObject_CheckBuffer(object.as_ptr()) != 0 }
+}
 
-// SAFETY: every byte value is a valid `Flag`.
-unsafe impl Element for Flag {
-    fn is_compatible_format(format: &CStr) -> bool {
-        matches!(
-            ElementType::from_format(format),
-            ElementType::UnsignedInteger { bytes: 1 } | ElementType::Bool
-        )
+/// Byte order of buffer items, from a `struct` format prefix.
+#[derive(Clone, Copy)]
+enum Order {
+    Native,
+    Little,
+    Big,
+}
+
+/// A buffer view of an object, released on drop. The view is boxed because
+/// exporters may point its `shape` into the view itself.
+struct View<'py> {
+    view: Box<ffi::Py_buffer>,
+    _attached: Python<'py>,
+}
+
+impl<'py> View<'py> {
+    fn get(object: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let mut view = Box::new(ffi::Py_buffer::new());
+        // SAFETY: `object` is live and `view` is writable; on success the view
+        // is released exactly once, by `drop`.
+        if unsafe { ffi::PyObject_GetBuffer(object.as_ptr(), &mut *view, ffi::PyBUF_FULL_RO) } != 0
+        {
+            return Err(PyErr::fetch(object.py()));
+        }
+        Ok(Self {
+            view,
+            _attached: object.py(),
+        })
+    }
+
+    /// The item code and byte order of a single-item format, such as `d` or
+    /// `>d`; `None` for any other format. A missing format means `B`.
+    fn item(&self) -> (String, Option<(u8, Order)>) {
+        let format = if self.view.format.is_null() {
+            b"B".as_slice()
+        } else {
+            // SAFETY: exporters give a NUL-terminated format that lives as long as the view.
+            unsafe { CStr::from_ptr(self.view.format) }.to_bytes()
+        };
+        let item = match *format {
+            [code] | [b'@' | b'=', code] => Some((code, Order::Native)),
+            [b'<', code] => Some((code, Order::Little)),
+            [b'>' | b'!', code] => Some((code, Order::Big)),
+            _ => None,
+        };
+        (String::from_utf8_lossy(format).into_owned(), item)
+    }
+
+    /// The items' bytes in C order. Copying needs no alignment and follows
+    /// any strides.
+    fn bytes(&self) -> PyResult<Vec<u8>> {
+        let length = usize::try_from(self.view.len).expect("buffer lengths are not negative");
+        let mut out = vec![0; length];
+        if length > 0 {
+            // SAFETY: `out` holds exactly `view.len` bytes and the view is live.
+            let status = unsafe {
+                ffi::PyBuffer_ToContiguous(
+                    out.as_mut_ptr().cast(),
+                    &*self.view,
+                    self.view.len,
+                    b'C' as _,
+                )
+            };
+            if status != 0 {
+                return Err(PyErr::fetch(self._attached));
+            }
+        }
+        Ok(out)
     }
 }
 
-fn is_buffer(object: &Bound<'_, PyAny>) -> bool {
-    // SAFETY: `object` is a live object, and this only inspects its type.
-    unsafe { pyo3::ffi::PyObject_CheckBuffer(object.as_ptr()) != 0 }
+impl Drop for View<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the view was filled by `PyObject_GetBuffer`, and holding
+        // `Python<'py>` keeps this thread attached.
+        unsafe { ffi::PyBuffer_Release(&mut *self.view) }
+    }
 }
 
-/// Copies a buffer of `T` items, in C order, into `out`.
-fn read_buffer<T: Element + Default>(
-    py: Python<'_>,
+/// The bytes of a buffer whose items have one of `codes`, each `size` bytes,
+/// and their byte order. Other formats raise `TypeError`.
+fn read_buffer(
     object: &Bound<'_, PyAny>,
     name: &str,
     wanted: &str,
-    out: &mut Vec<T>,
-) -> PyResult<()> {
-    let buffer = PyUntypedBuffer::get(object)?;
-    if !T::is_compatible_format(buffer.format()) || buffer.item_size() != size_of::<T>() {
-        return Err(PyTypeError::new_err(format!(
-            "{name} buffer must hold {wanted} items, not format {:?}",
-            buffer.format().to_string_lossy()
-        )));
+    codes: &[u8],
+    size: usize,
+) -> PyResult<(Vec<u8>, Order)> {
+    let view = View::get(object)?;
+    match view.item() {
+        (_, Some((code, order)))
+            if codes.contains(&code) && usize::try_from(view.view.itemsize) == Ok(size) =>
+        {
+            Ok((view.bytes()?, order))
+        }
+        (format, _) => Err(PyTypeError::new_err(format!(
+            "{name} buffer must hold {wanted} items, not format {format:?}"
+        ))),
     }
-    let buffer: PyBuffer<T> = buffer.into_typed()?;
-    out.clear();
-    out.resize(buffer.item_count(), T::default());
-    buffer.copy_to_slice(py, out)
 }
 
-fn read_headings(py: Python<'_>, object: &Bound<'_, PyAny>, out: &mut Vec<f64>) -> PyResult<()> {
-    if is_buffer(object) {
-        return read_buffer(py, object, "headings", "float64", out);
-    }
+fn read_headings(object: &Bound<'_, PyAny>, out: &mut Vec<f64>) -> PyResult<()> {
     out.clear();
+    if is_buffer(object) {
+        let (bytes, order) = read_buffer(object, "headings", "float64", b"d", 8)?;
+        out.extend(bytes.chunks_exact(8).map(|item| {
+            let item = item.try_into().expect("items have 8 bytes");
+            match order {
+                Order::Native => f64::from_ne_bytes(item),
+                Order::Little => f64::from_le_bytes(item),
+                Order::Big => f64::from_be_bytes(item),
+            }
+        }));
+        return Ok(());
+    }
     for item in object.try_iter()? {
         let item = item?;
         out.push(if item.is_none() {
@@ -104,12 +178,12 @@ fn read_headings(py: Python<'_>, object: &Bound<'_, PyAny>, out: &mut Vec<f64>) 
     Ok(())
 }
 
-fn read_boosts(py: Python<'_>, object: &Bound<'_, PyAny>, out: &mut Vec<bool>) -> PyResult<()> {
+/// Any nonzero byte of a bool or uint8 buffer boosts.
+fn read_boosts(object: &Bound<'_, PyAny>, out: &mut Vec<bool>) -> PyResult<()> {
     out.clear();
     if is_buffer(object) {
-        let mut flags = Vec::new();
-        read_buffer::<Flag>(py, object, "boosts", "bool or uint8", &mut flags)?;
-        out.extend(flags.iter().map(|flag| flag.0 != 0));
+        let (bytes, _) = read_buffer(object, "boosts", "bool or uint8", b"?B", 1)?;
+        out.extend(bytes.iter().map(|&byte| byte != 0));
         return Ok(());
     }
     for item in object.try_iter()? {
@@ -205,8 +279,8 @@ impl Session {
         headings: &Bound<'_, PyAny>,
         boosts: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
-        read_headings(py, headings, &mut self.headings)?;
-        read_boosts(py, boosts, &mut self.boosts)?;
+        read_headings(headings, &mut self.headings)?;
+        read_boosts(boosts, &mut self.boosts)?;
         let Self {
             inner,
             headings,
@@ -216,9 +290,15 @@ impl Session {
             .map_err(PyValueError::new_err)
     }
 
-    /// World `world`'s current frame, copied.
-    fn frame(&self, py: Python<'_>, world: usize) -> PyResult<Frame> {
-        match self.inner.frame(world) {
+    /// World `world`'s current frame, copied. Indices outside the session,
+    /// negative ones included, raise `IndexError`.
+    fn frame(&self, py: Python<'_>, world: &Bound<'_, PyAny>) -> PyResult<Frame> {
+        let world = match world.extract::<usize>() {
+            Ok(world) => Some(world),
+            Err(error) if error.is_instance_of::<PyOverflowError>(py) => None,
+            Err(error) => return Err(error),
+        };
+        match world.and_then(|world| self.inner.frame(world)) {
             Some(frame) => Frame::copy(py, &frame),
             None if self.inner.worlds() == 0 => Err(PyValueError::new_err("Reset first")),
             None => Err(PyIndexError::new_err("Unknown world")),

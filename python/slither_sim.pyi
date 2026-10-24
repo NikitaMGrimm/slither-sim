@@ -1,7 +1,7 @@
 """In-process slither-sim sessions: slither-sim-json-v2 without JSON on the hot path."""
 
 from array import array
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 import sys
 from typing import Any, Final, final
 
@@ -39,7 +39,7 @@ class Session:
         worlds: int = 1,
         agents: int = 4,
         decision_ticks: int = 6,
-        config: Mapping[str, Any] | None = None,
+        config: dict[str, Any] | None = None,
     ) -> None:
         """Replace the worlds like a JSON reset; raise ValueError on rejection, keeping the old ones."""
     def step(
@@ -49,12 +49,13 @@ class Session:
     ) -> None:
         """Step every world with `worlds * agents` world-major float64 headings and bool/uint8 boosts.
 
-        A NaN (or, in sequences, None) heading means no action, which only dead slots may
-        give. Raise ValueError on rejection, changing no world.
+        Buffers may use any byte order. A NaN (or, in sequences, None) heading means no
+        action, which only dead slots may give. Raise ValueError on rejection, changing
+        no world.
         """
     def frame(self, world: int) -> Frame:
-        """A copy of world `world`'s current frame."""
-    def request(self, message: Mapping[str, Any] | str | bytes) -> dict[str, Any]:
+        """A copy of world `world`'s current frame; IndexError for any other index, negative included."""
+    def request(self, message: dict[str, Any] | str | bytes) -> dict[str, Any]:
         """Answer one JSON request; return the parsed reply with `protocol` and `result` or `error`."""
     @property
     def worlds(self) -> int:

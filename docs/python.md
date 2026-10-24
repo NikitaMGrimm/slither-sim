@@ -54,13 +54,16 @@ print(session.frame(1).time)
 world `w` is entry `w × agents + s`. Headings are radians; NaN means no action,
 which only dead slots may give. Pass any buffer of float64 headings and of bool
 or uint8 boosts, such as `array.array('d')`, `bytes`, `bytearray` or numpy
-arrays; multidimensional buffers are read in C order. Lists and other iterables
+arrays, in any byte order and alignment; multidimensional buffers are read in C
+order. Lists and other iterables
 also work, with `None` for no action and any truthy value to boost.
 
 Rejected resets and steps raise `ValueError` with the protocol's error text and
 change nothing. Buffers of other item types raise `TypeError`. `frame` raises
-`ValueError` before the first reset and `IndexError` for unknown worlds.
-`request` returns error replies instead of raising.
+`ValueError` before the first reset and `IndexError` for any index outside the
+session; negative indices do not count from the end. `request` returns error
+replies instead of raising. Requests and `config` must be plain dicts; other
+mappings raise `TypeError`.
 
 The module also exports `PROTOCOL` (`slither-sim-json-v2`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
