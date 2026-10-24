@@ -6,7 +6,17 @@ the decision loop never encodes or parses JSON. It wraps the Rust
 [`transport::Session`](bot-api.md#in-process-sessions) with the same worlds,
 requests and frame values as `serve`.
 
-The package is not on PyPI yet. Build it from a checkout with Rust 1.86+.
+## Install
+
+```sh
+pip install slither-sim
+```
+
+`uv add slither-sim` works the same way. Wheels use the stable ABI, so one wheel
+per platform serves CPython 3.11 and later. They cover Linux (x86-64 and ARM64,
+glibc 2.17+), macOS (Apple silicon and Intel) and Windows (x86-64), and have no
+runtime dependencies. Elsewhere, pip builds the source distribution, which needs
+Rust 1.86+. Each crate release publishes the same version to PyPI.
 
 ## Install from a checkout
 
@@ -23,9 +33,6 @@ repository's locked maturin; it lands in `target/wheels`:
 ```sh
 uv run --locked --only-group tools python -m maturin build --release --locked -m python/Cargo.toml
 ```
-
-The wheel uses the stable ABI, so one build serves CPython 3.11 and later on
-that platform. It has no runtime dependencies.
 
 ## API
 

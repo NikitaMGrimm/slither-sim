@@ -7,7 +7,7 @@ changelog and follow the [versioning guidance](../../CONTRIBUTING.md#interfaces-
 `Cargo.toml`, `Cargo.lock` and the changelog after merges to main. It compares
 packaged files with crates.io: tools-only changes do not force a crate release,
 while packaged docs, tests and examples can. The version lives in the root
-`Cargo.toml`'s `[workspace.package]`; the unpublished C ABI crate and Python
+`Cargo.toml`'s `[workspace.package]`; the unpublished C ABI crate and the Python
 package inherit it, so their lockfile entries move with the crate's. The Python
 tools version remains independent.
 
@@ -60,6 +60,21 @@ tags the selected commit and explicitly
 dispatches checks on that tag if no main push run exists. Later main commits
 cannot change the selected release's source. Branch protection remains enabled.
 
+## Python package
+
+Each crate publication also publishes the `slither-sim` Python package at the
+same version. After the GitHub Release, the same `release.yml` run builds the
+released commit through `python-wheels.yml`: stable-ABI wheels for Linux x86-64
+and ARM64 (manylinux2014), macOS arm64 and x86-64 and Windows x86-64, each
+tested on Python 3.11, and a source distribution tested by building it. The
+`pypi` job uploads them with PyPI Trusted Publishing. PRs that change `python/`
+build the same distributions.
+
+The Python upload is not part of release completion. If it fails, the crate
+release stays complete and the next version proceeds normally. To repair it,
+dispatch Release with `vVERSION`; files already on PyPI are skipped, so a partial
+upload completes. A source fix needs a new version.
+
 ## Incompatible changes
 
 Within `0.x`, incompatible Rust changes require a minor bump, such as `0.3.0`.
@@ -81,6 +96,11 @@ token permissions can remain read-only. No PAT is needed.
 The crate's [trusted publisher](https://crates.io/crates/slither-sim/settings/new-trusted-publisher)
 must allow GitHub owner `NikitaMGrimm`, repository `slither-sim`, workflow filename
 `release.yml`, with no environment. This existing connection is unchanged.
+
+PyPI's [trusted publisher](https://pypi.org/manage/project/slither-sim/settings/publishing/)
+for project `slither-sim` must allow owner `NikitaMGrimm`, repository
+`slither-sim`, workflow `release.yml` and environment `pypi`. Required reviewers
+on the `pypi` GitHub environment would hold each upload for approval.
 
 If migrating from a saved crates.io token, revoke it in
 [API Tokens](https://crates.io/settings/tokens) and run
