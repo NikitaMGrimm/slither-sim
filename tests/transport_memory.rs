@@ -40,7 +40,7 @@ const RESET: &[u8] = br#"{"op":"reset","seed":7,"agents":1,"config":{"radius":10
 /// `twin`'s. `worlds_reply` reserves its members plus 64 bytes and one per
 /// frame: for one world, 8 bytes more than the reply minus its fixed wrapper.
 fn failing_reply(session: &mut Session, request: &[u8], twin: &[u8]) -> String {
-    let wrapper = br#"{"protocol":"slither-sim-json-v2","result":{"worlds":[]}}"#.len();
+    let wrapper = br#"{"protocol":"slither-sim-json-v3","result":{"worlds":[]}}"#.len();
     FAILED.store(0, Ordering::SeqCst);
     FAIL_SIZE.store(twin.len() - wrapper + 65, Ordering::SeqCst);
     let reply = session.request(request);
@@ -65,6 +65,7 @@ fn a_reset_whose_reply_cannot_be_allocated_keeps_the_previous_session() {
         failed.contains("The reply does not fit in memory"),
         "{failed}"
     );
+    assert!(failed.contains("\"sessionEnded\":false"), "{failed}");
     assert_eq!(session.worlds(), 1);
     assert_eq!(session.request(br#"{"op":"snapshot"}"#), before);
     assert!(session.frame(0).is_some());
@@ -87,7 +88,16 @@ fn a_step_whose_reply_cannot_be_allocated_ends_the_session() {
         "{failed}"
     );
     assert!(failed.contains("the session has ended"), "{failed}");
+    assert!(failed.contains("\"sessionEnded\":true"), "{failed}");
     assert_eq!(session.worlds(), 0);
     let retry = String::from_utf8(session.request(step)).unwrap();
     assert!(retry.contains("Reset first"), "{retry}");
+    assert!(retry.contains("\"sessionEnded\":false"), "{retry}");
+    session.request(RESET);
+    assert_eq!(session.worlds(), 1);
+    assert!(
+        String::from_utf8(session.request(step))
+            .unwrap()
+            .contains("\"result\":")
+    );
 }

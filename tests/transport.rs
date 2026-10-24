@@ -495,7 +495,10 @@ fn typed_steps_match_json_steps() {
 #[test]
 fn rejected_typed_steps_change_nothing() {
     let mut session = transport::Session::new();
-    assert_eq!(session.step(&[], &[]).unwrap_err(), "Reset first");
+    assert_eq!(
+        session.step(&[], &[]).unwrap_err(),
+        transport::StepError::Rejected("Reset first".into())
+    );
     result(&session.request(br#"{"op":"reset","seed":3,"agents":2,"worlds":2}"#));
     let state = |session: &mut transport::Session| {
         (0..2)
@@ -511,12 +514,16 @@ fn rejected_typed_steps_change_nothing() {
     let error = session
         .step(&[0.0, 1.0, 0.0, f64::NAN], &[false; 4])
         .unwrap_err();
-    assert_eq!(error, "World 1: Missing or invalid action for 1");
+    assert_eq!(
+        error,
+        transport::StepError::Rejected("World 1: Missing or invalid action for 1".into())
+    );
     let reply: Value = serde_json::from_slice(&session.request(
         br#"{"op":"step","actions":[{"heading":[0,1],"boost":[false,false]},{"heading":[0,null],"boost":[false,false]}]}"#,
     ))
     .unwrap();
-    assert_eq!(reply["error"], error);
+    assert_eq!(reply["error"], error.to_string());
+    assert_eq!(reply["sessionEnded"], false);
     for (headings, boosts) in [
         (&[0.0, 1.0, 0.0, f64::INFINITY][..], &[false; 4][..]),
         (&[0.0, 1.0, 0.0, f64::NEG_INFINITY], &[false; 4]),
@@ -529,6 +536,51 @@ fn rejected_typed_steps_change_nothing() {
     assert_eq!(state(&mut session), before);
     session.step(&[0.0, 1.0, 2.0, 3.0], &[false; 4]).unwrap();
     assert_ne!(state(&mut session), before);
+}
+
+#[test]
+fn terminal_steps_clear_all_worlds_and_allow_reset() {
+    use slither_sim::transport::StepError;
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/serve-errors-v3.json")).unwrap();
+    let reset = serde_json::to_vec(&fixture["reset"]).unwrap();
+    let step = serde_json::to_vec(&fixture["step"]).unwrap();
+    let mut session = transport::Session::new();
+    result(&session.request(&reset));
+    assert_eq!(session.worlds(), 2);
+    let error = session
+        .step(&[std::f64::consts::PI; 2], &[false; 2])
+        .unwrap_err();
+    assert!(matches!(error, StepError::Ended(_)), "{error}");
+    assert!(error.to_string().contains("mass would overflow"), "{error}");
+    assert_eq!((session.worlds(), session.agents()), (0, 0));
+    assert!(session.frame(0).is_none() && session.frame(1).is_none());
+    assert_eq!(
+        session.step(&[], &[]),
+        Err(StepError::Rejected("Reset first".into()))
+    );
+    let rejected: Value = serde_json::from_slice(&session.request(&step)).unwrap();
+    assert_eq!(rejected, fixture["rejectedReply"]);
+    result(&session.request(br#"{"op":"reset","agents":1}"#));
+    session.step(&[0.0], &[false]).unwrap();
+    assert!(session.frame(0).unwrap().time > 0.0);
+
+    // Exercise the stream and JSON error envelope independently of typed steps.
+    let replies = exchange(&[
+        fixture["step"].clone(),
+        fixture["reset"].clone(),
+        fixture["step"].clone(),
+        json!({"op":"snapshot"}),
+        json!({"op":"reset","agents":1}),
+        json!({"op":"step","actions":[{"heading":[0],"boost":[false]}]}),
+    ]);
+    assert_eq!(replies[0], fixture["rejectedReply"]);
+    assert_eq!(replies[2]["error"], error.to_string());
+    let mut terminal = replies[2].clone();
+    terminal["error"] = fixture["terminalReply"]["error"].clone();
+    assert_eq!(terminal, fixture["terminalReply"]);
+    assert_eq!(replies[3], fixture["rejectedReply"]);
+    assert!(replies[5]["result"]["worlds"][0]["time"].as_f64().unwrap() > 0.0);
 }
 
 #[test]

@@ -72,7 +72,13 @@ session; negative indices do not count from the end. `request` returns error
 replies instead of raising. Requests and `config` must be plain dicts; other
 mappings raise `TypeError`.
 
-The module also exports `PROTOCOL` (`slither-sim-json-v2`), `NONE`, `NO_ORIGIN`,
+If advancement or frame collection fails, `step` raises `SessionEndedError`,
+a subclass of `RuntimeError`. Every world is cleared: `worlds` and `agents`
+become 0, and `frame` raises `ValueError` ("Reset first"). Reset to continue.
+`request` reports the same failure with `sessionEnded: true` in its error reply;
+unchanged-state error replies have `sessionEnded: false`.
+
+The module also exports `PROTOCOL` (`slither-sim-json-v3`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
 constants](bot-api.md#in-process-sessions). Type stubs ship with the package.
 
@@ -133,6 +139,6 @@ the same wall time as one.
 ## Compatibility
 
 The package version is the `slither-sim` crate's, inherited from the workspace. Requests and replies follow
-`slither-sim-json-v2`; check `PROTOCOL`. The Python API is experimental and may
+`slither-sim-json-v3`; check `PROTOCOL`. The Python API is experimental and may
 change between `0.x` versions. As with `serve`, record the commit for
 reproducible results.

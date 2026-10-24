@@ -7,6 +7,7 @@ from array import array
 import ast
 from collections import UserDict
 import ctypes
+import json
 import math
 import os
 from pathlib import Path
@@ -281,7 +282,7 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "^Reset first$"):
             session.frame(0)
         self.assertEqual(session.request({"op": "step", "actions": []}),
-                         {"protocol": slither_sim.PROTOCOL, "error": "Reset first"})
+                         {"protocol": slither_sim.PROTOCOL, "error": "Reset first", "sessionEnded": False})
 
     def test_unmeasured_settings_warn_on_reset(self):
         session = Session()
@@ -360,6 +361,35 @@ class ErrorTests(unittest.TestCase):
             typed.step(headings, boosts)
         self.assertTrue(str(caught.exception).startswith("World 1: "))
         self.assertEqual(str(caught.exception), json_step(encoded, headings, boosts)["error"])
+
+    def test_terminal_steps_clear_worlds_and_reset_recovers(self):
+        fixture = json.loads((Path(__file__).resolve().parents[2]
+                              / "tests/fixtures/serve-errors-v3.json").read_text(encoding="utf-8"))
+        typed, encoded = Session(), Session()
+        options = fixture["reset"]
+        typed.reset(worlds=options["worlds"], agents=options["agents"],
+                    decision_ticks=options["decisionTicks"], config=options["config"])
+        self.assertIn("result", encoded.request(options))
+        with self.assertRaises(slither_sim.SessionEndedError) as caught:
+            typed.step([math.pi] * 2, bytes(2))
+        self.assertIsInstance(caught.exception, RuntimeError)
+        self.assertNotIsInstance(caught.exception, ValueError)
+        self.assertIn("mass would overflow", str(caught.exception))
+        reply = encoded.request(fixture["step"])
+        self.assertEqual(reply["error"], str(caught.exception))
+        reply["error"] = fixture["terminalReply"]["error"]
+        self.assertEqual(reply, fixture["terminalReply"])
+        for session in (typed, encoded):
+            self.assertEqual((session.worlds, session.agents), (0, 0))
+            for world in (0, 1):
+                with self.assertRaisesRegex(ValueError, "^Reset first$"):
+                    session.frame(world)
+            with self.assertRaisesRegex(ValueError, "^Reset first$"):
+                session.step([], b"")
+            self.assertEqual(session.request(fixture["step"]), fixture["rejectedReply"])
+            session.reset(agents=1)
+            session.step([0.0], b"\0")
+            self.assertGreater(session.frame(0).time, 0)
 
     def test_unknown_world(self):
         session = Session()

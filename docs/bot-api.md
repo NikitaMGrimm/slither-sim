@@ -1,4 +1,4 @@
-# Geometric controller: slither-sim-json-v2
+# Geometric controller: slither-sim-json-v3
 
 Run `slither-sim serve`, from a checkout with `cargo run --release --locked -- serve`
 or from a [release archive](../README.md#download-a-release) without Rust. One
@@ -7,14 +7,21 @@ stdout reply per request. EOF stops the process. Rust callers can drive the
 same sessions [in-process](#in-process-sessions) or use the library directly.
 
 ```json
-{"protocol":"slither-sim-json-v2","result":{}}
-{"protocol":"slither-sim-json-v2","error":"Reset first"}
+{"protocol":"slither-sim-json-v3","result":{}}
+{"protocol":"slither-sim-json-v3","error":"Reset first","sessionEnded":false}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
 readers ignore additional fields. Error text is descriptive, not a stable code.
 Malformed or rejected requests leave the stream usable; I/O failures stop it.
 This interface is for trusted local controllers.
+
+Every error reply includes `sessionEnded`. When false, no world advanced and
+the session is unchanged. When true, advancement or frame collection failed
+(for example, accumulated pickup mass overflowed); all worlds were cleared.
+Reset before stepping again. The stream remains usable in either case.
+Version 3 replaces version 2 to distinguish these terminal failures from
+unchanged-state rejections; successful reply shapes are unchanged.
 
 Sessions with several worlds step them in parallel, one world per task, on every
 core; `slither-sim serve --threads N` caps the threads. Replies do not depend on
@@ -228,9 +235,13 @@ requests and typed steps act on the same worlds and may be mixed.
 | `frame(w)` | World `w`'s current frame as a `FrameRef` of read-only columns, after any reset or step; `None` before reset or for unknown worlds. |
 | `worlds()`, `agents()` | Session shape; 0 before the first reset. |
 
-A NaN heading means no action; only dead slots may give it. Typed steps validate
-like JSON steps, with the same error text where it applies, and reject the whole
-step before any world advances. Worlds step on the rayon pool as in `serve`.
+A NaN heading means no action; only dead slots may give it. Typed steps return
+`Result<(), transport::StepError>`. `Rejected(message)` reports validation
+failure before any world advances, leaving the session unchanged. `Ended(message)`
+reports a failure during advancement or frame collection and clears every world,
+including worlds that advanced successfully; `frame` then returns `None` and
+`worlds()` and `agents()` return 0. Reset to continue. Error text matches JSON
+steps. Worlds step on the rayon pool as in `serve`.
 
 `FrameRef` columns hold the values the JSON frame prints, rounded alike, in
 fixed types: `u64` prey `id`; `u8` food `origin` and death `reason`; `u32`

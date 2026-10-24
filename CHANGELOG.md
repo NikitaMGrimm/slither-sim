@@ -44,7 +44,11 @@
   changed.
 - `Simulator::step` can fail after advancing: a pickup whose gain would
   overflow a snake's mass completes the tick without it, returns an error and
-  stops the world; `serve` ends the session.
+  stops the world. Sessions distinguish unchanged-state rejection from terminal
+  failure, which clears all worlds and requires a reset: `serve` now uses
+  `slither-sim-json-v3` with `sessionEnded` in error replies; Rust typed steps
+  return `transport::StepError::{Rejected, Ended}`; C uses `slither-sim-abi-v2`
+  with `SLITHER_ENDED` (4); Python raises `SessionEndedError` (`RuntimeError`).
 - The wire arena radius limit of 32,000 is now documented as an encoding-margin
   policy rather than a derived bound; its value is unchanged.
 - Long broadcast intervals load with a warning instead of an error: snakes that

@@ -1,4 +1,4 @@
-"""In-process slither-sim sessions: slither-sim-json-v2 without JSON on the hot path."""
+"""In-process slither-sim sessions: slither-sim-json-v3 without JSON on the hot path."""
 
 from array import array
 from collections.abc import Iterable
@@ -10,11 +10,11 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import Buffer
 
-__all__ = ["__version__", "PROTOCOL", "NONE", "NO_ORIGIN", "ORIGINS", "REASONS", "Session", "Frame"]
+__all__ = ["__version__", "PROTOCOL", "NONE", "NO_ORIGIN", "ORIGINS", "REASONS", "SessionEndedError", "Session", "Frame"]
 
 __version__: Final[str]
 PROTOCOL: Final[str]
-"""The JSON protocol of `Session.request`: "slither-sim-json-v2"."""
+"""The JSON protocol of `Session.request`: "slither-sim-json-v3"."""
 NONE: Final[int]
 """Row or slot index meaning none (2**32 - 1): `view_self` of dead slots, `death_killer` without a killer."""
 NO_ORIGIN: Final[int]
@@ -23,6 +23,9 @@ ORIGINS: Final[tuple[str, ...]]
 """Names of the `food_origin` codes."""
 REASONS: Final[tuple[str, ...]]
 """Names of the `death_reason` codes."""
+
+class SessionEndedError(RuntimeError):
+    """Advancement failed and cleared all worlds; reset the session to continue."""
 
 @final
 class Session:
@@ -54,7 +57,8 @@ class Session:
 
         Buffers may use any byte order. A NaN (or, in sequences, None) heading means no
         action, which only dead slots may give. Raise ValueError on rejection, changing
-        no world.
+        no world. Raise SessionEndedError if advancement fails, clearing all worlds;
+        reset the session to continue.
         """
     def frame(self, world: int) -> Frame:
         """A copy of world `world`'s current frame; IndexError for any other index, negative included."""

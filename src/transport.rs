@@ -15,7 +15,38 @@ use std::io::{self, BufRead, Write};
 
 mod frame;
 
-pub const PROTOCOL: &str = "slither-sim-json-v2";
+pub const PROTOCOL: &str = "slither-sim-json-v3";
+
+/// A step rejected before advancement, or a failure after advancement began.
+#[derive(Debug, PartialEq, Eq)]
+pub enum StepError {
+    /// No world advanced; the session is unchanged.
+    Rejected(String),
+    /// All worlds were cleared after advancement failed; reset to continue.
+    Ended(String),
+}
+
+impl std::fmt::Display for StepError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Rejected(message) | Self::Ended(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for StepError {}
+
+impl From<String> for StepError {
+    fn from(message: String) -> Self {
+        Self::Rejected(message)
+    }
+}
+
+impl From<&str> for StepError {
+    fn from(message: &str) -> Self {
+        Self::Rejected(message.into())
+    }
+}
 
 /// Frame slot indices are `u32` and `u32::MAX` means none.
 const MAX_AGENTS: usize = NONE as usize;
@@ -157,7 +188,7 @@ fn each_ok<R>(results: Vec<Result<R, String>>) -> Result<Vec<R>, String> {
         .collect()
 }
 
-/// Worlds have advanced when their frame fails, so the session cannot continue.
+/// Advancement or frame collection failed, so the session cannot continue.
 const ENDED: &str = "; the session has ended, reset to continue";
 
 /// `work` on every world, on the rayon pool when there are several. Worlds are
@@ -191,15 +222,21 @@ impl Session {
     }
 
     /// Answers one JSON request line, given without its newline, with exactly
-    /// the reply line `serve` writes, also without its newline. Rejected or
-    /// malformed requests return an error reply and leave the session unchanged.
+    /// the reply line `serve` writes, also without its newline. Error replies
+    /// include `sessionEnded`: false for unchanged-state rejection, true when
+    /// advancement failed and cleared all worlds. Reset to continue in that case.
     pub fn request(&mut self, line: &[u8]) -> Vec<u8> {
         let result = serde_json::from_slice(line)
-            .map_err(|error| error.to_string())
+            .map_err(|error| StepError::Rejected(error.to_string()))
             .and_then(|request| self.handle(request));
         match result {
             Ok(reply) => reply,
-            Err(error) => crate::json::error_reply(PROTOCOL, &error),
+            Err(error) => crate::json::to_vec(&json!({
+                "protocol": PROTOCOL,
+                "error": error.to_string(),
+                "sessionEnded": matches!(error, StepError::Ended(_)),
+            }))
+            .expect("error replies serialize"),
         }
     }
 
@@ -207,9 +244,10 @@ impl Session {
     /// the new frames with [`Session::frame`]. `headings` and `boosts` hold
     /// one entry per agent slot of every world, world-major: slot `s` of world
     /// `w` is entry `w * agents + s`. A NaN heading means no action, which only
-    /// dead slots may give. Invalid steps change nothing. A frame column that
-    /// overflows its `u32` type ends the session after the worlds advanced.
-    pub fn step(&mut self, headings: &[f64], boosts: &[bool]) -> Result<(), String> {
+    /// dead slots may give. [`StepError::Rejected`] changes nothing. Numeric
+    /// overflow during advancement or an unrepresentable frame returns
+    /// [`StepError::Ended`] and clears all worlds; reset to continue.
+    pub fn step(&mut self, headings: &[f64], boosts: &[bool]) -> Result<(), StepError> {
         let run = self.current.as_mut().ok_or("Reset first")?;
         let need = run.worlds.len() * run.agents;
         if headings.len() != need || boosts.len() != need {
@@ -218,7 +256,8 @@ impl Session {
                  got {} headings and {} boosts, need {need}",
                 headings.len(),
                 boosts.len()
-            ));
+            )
+            .into());
         }
         // Reject the whole step before advancing any world.
         for (index, (state, (headings, boosts))) in run
@@ -244,7 +283,7 @@ impl Session {
         }));
         result.map(|_| ()).map_err(|error| {
             self.current = None;
-            error + ENDED
+            StepError::Ended(error + ENDED)
         })
     }
 
@@ -265,7 +304,7 @@ impl Session {
         self.current.as_ref().map_or(0, |run| run.agents)
     }
 
-    fn handle(&mut self, request: Request) -> Result<Vec<u8>, String> {
+    fn handle(&mut self, request: Request) -> Result<Vec<u8>, StepError> {
         match request {
             Request::Info {} => Ok(reply(&json!({
                 "version": env!("CARGO_PKG_VERSION"),
@@ -295,13 +334,15 @@ impl Session {
                     return Err(format!(
                         "agents must be at most {MAX_AGENTS}: frame slot indices are u32 \
                          and u32::MAX means none"
-                    ));
+                    )
+                    .into());
                 }
                 if decision_ticks > MAX_DECISION_TICKS {
                     return Err(format!(
                         "decisionTicks must be at most {MAX_DECISION_TICKS}: frames report \
                          ticks as u32"
-                    ));
+                    )
+                    .into());
                 }
                 // The typed step and the C ABI index slots world-major.
                 worlds
@@ -354,7 +395,8 @@ impl Session {
                         "One action entry per world required: got {}, need {}",
                         actions.len(),
                         run.worlds.len()
-                    ));
+                    )
+                    .into());
                 }
                 // Reject the whole request before advancing any world.
                 for (index, (state, world_actions)) in
@@ -365,7 +407,8 @@ impl Session {
                     {
                         return Err(format!(
                             "World {index}: one heading and one boost per agent required"
-                        ));
+                        )
+                        .into());
                     }
                     state.actions.clear();
                     state.actions.extend(
@@ -387,7 +430,7 @@ impl Session {
                 // Either failure follows advancement, so a retry would step twice.
                 reply.map_err(|error| {
                     self.current = None;
-                    error + ENDED
+                    StepError::Ended(error + ENDED)
                 })
             }
             Request::Snapshot { world } => {
