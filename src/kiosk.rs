@@ -2,7 +2,7 @@
 //! Labs study; the detector, rates and recovery curve await current captures.
 
 use crate::model::{Point, Snake};
-use crate::physics::{MAX_SEGMENTS, remove_mass, score_exact};
+use crate::physics::{MAX_SEGMENTS, MassFloor, remove_mass_above_floor, score_exact};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -76,7 +76,14 @@ pub(crate) struct KioskState {
 }
 
 impl KioskState {
-    pub(crate) fn step(&mut self, snake: &mut Snake, config: &KioskConfig, dt: f64) {
+    /// Shrinking stops at `floor`, the world's `minScore` mass.
+    pub(crate) fn step(
+        &mut self,
+        snake: &mut Snake,
+        config: &KioskConfig,
+        dt: f64,
+        floor: Option<MassFloor>,
+    ) {
         if !snake.alive {
             return;
         }
@@ -87,7 +94,14 @@ impl KioskState {
             return;
         }
         let physical = score_exact(snake.segments, snake.fam);
-        if physical <= config.floor_score && self.score_credit <= 0.0 {
+        // Physical shrinking ends at the higher of the kiosk and mass floors;
+        // the displayed-score decay below keeps the kiosk floor.
+        let shrink_floor = floor.map_or(config.floor_score, |floor| {
+            config
+                .floor_score
+                .max(score_exact(floor.segments, floor.fam))
+        });
+        if physical <= shrink_floor && self.score_credit <= 0.0 {
             self.anchor = None;
             self.held_seconds = 0.0;
             return;
@@ -104,14 +118,23 @@ impl KioskState {
             self.recover(snake, config, dt);
             return;
         }
-        if physical > config.floor_score + 0.5 {
-            let target =
-                (physical * (-config.shrink_per_second * dt).exp()).max(config.floor_score);
-            let target_mass = mass_for_score(target);
+        if physical > shrink_floor + 0.5 {
+            let target = (physical * (-config.shrink_per_second * dt).exp()).max(shrink_floor);
+            // At the mass floor, use its exact mass rather than a bisection estimate.
+            let target_mass = match floor {
+                Some(floor) if target <= score_exact(floor.segments, floor.fam) => {
+                    floor.segments as f64 + floor.fam
+                }
+                _ => mass_for_score(target),
+            };
             let old_mass = snake.segments as f64 + snake.fam;
             if target_mass < old_mass {
-                let removed =
-                    remove_mass(&mut snake.segments, &mut snake.fam, old_mass - target_mass);
+                let removed = remove_mass_above_floor(
+                    &mut snake.segments,
+                    &mut snake.fam,
+                    old_mass - target_mass,
+                    floor,
+                );
                 snake
                     .body
                     .truncate(snake.body.len().saturating_sub(removed));
@@ -177,11 +200,11 @@ mod tests {
         let mut state = KioskState::default();
         let config = KioskConfig::default();
         let before = score_exact(snake.segments, snake.fam).floor();
-        state.step(snake, &config, 1_199.0);
+        state.step(snake, &config, 1_199.0, None);
         state.finish_score(snake);
         assert_eq!(snake.segments, 380);
         assert_eq!(snake.score, before);
-        state.step(snake, &config, 1.0);
+        state.step(snake, &config, 1.0, None);
         state.finish_score(snake);
         assert!(snake.segments < 380);
         assert_eq!(snake.score, before);
@@ -201,7 +224,7 @@ mod tests {
             score_credit: 10.0,
         };
         let previous_display = (score_exact(snake.segments, snake.fam) + 10.0).floor();
-        state.step(snake, &KioskConfig::default(), 1.0);
+        state.step(snake, &KioskConfig::default(), 1.0, None);
         state.finish_score(snake);
         assert!(state.score_credit <= 10.0);
         assert!(snake.score <= previous_display);

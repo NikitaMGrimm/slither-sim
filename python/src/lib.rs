@@ -417,6 +417,7 @@ frame! {
         fam => snake_fam,
         score => snake_score,
         kills => snake_kills,
+        kill_score => snake_kill_score,
         body_start => snake_body_start,
         body_x => snake_body_x,
         body_y => snake_body_y,

@@ -48,6 +48,7 @@ def as_json(frame):
             "radius": list(frame.snake_radius), "length": list(frame.snake_length),
             "segments": list(frame.snake_segments), "fam": list(frame.snake_fam),
             "score": list(frame.snake_score), "kills": list(frame.snake_kills),
+            "killScore": list(frame.snake_kill_score),
             "bodyStart": list(frame.snake_body_start), "bodyX": list(frame.snake_body_x),
             "bodyY": list(frame.snake_body_y),
         },
@@ -132,6 +133,33 @@ class TypedStepTests(unittest.TestCase):
         self.assertEqual(reasons, {0, 1})
         self.assertEqual(killers, {False, True})
         self.assertGreater(nan_steps, 0)
+
+    def test_pit_deaths_and_kill_scores_match_json_frames(self):
+        # A synthetic sandbox-based arena with a pit and a short kill-score window.
+        config = {"preset": "sandbox", "radius": 700, "pit": {"radius": 300},
+                  "spawnRadius": 400, "killScoreSeconds": 0.3}
+        options = {"seed": 5, "worlds": 2, "agents": 24, "config": config}
+        typed, encoded = Session(), Session()
+        typed.reset(**options)
+        reply = encoded.request({"op": "reset", **options})
+        self.assertEqual(reply["result"]["config"]["pit"], {"radius": 300.0})
+        # Every snake holds its starting inward heading, through the pit and out.
+        inward = [math.atan2(-frame.snake_y[me], -frame.snake_x[me])
+                  for frame in frames(typed) for me in frame.view_self]
+        reasons, scored = set(), False
+        for step in range(120):
+            headings = [math.nan if me == NONE else inward[w * 24 + slot]
+                        for w, frame in enumerate(frames(typed))
+                        for slot, me in enumerate(frame.view_self)]
+            boosts = [False] * len(headings)
+            typed.step(headings, boosts)
+            reply = json_step(encoded, headings, boosts)
+            self.assertEqual(fingerprint(typed), reply["result"]["worlds"], f"step {step}")
+            for frame in frames(typed):
+                reasons.update(REASONS[reason] for reason in frame.death_reason)
+                scored |= any(frame.snake_kill_score)
+        self.assertIn("pit", reasons)
+        self.assertTrue(scored)
 
     def test_columns_have_fixed_typecodes(self):
         session = Session()
@@ -306,6 +334,9 @@ class ErrorTests(unittest.TestCase):
             ({"agents": 2**32}, "agents must be at most 4294967295"),
             ({"seed": -1}, "invalid value: integer `-1`, expected u32"),
             ({"config": {"radius": 700, "colour": 1}}, "unknown field `colour`"),
+            ({"config": {"preset": "battledome", "colour": 1}}, "unknown field `colour`"),
+            ({"config": {"preset": "arena"}}, "unknown variant `arena`"),
+            ({"config": {"preset": "battledome", "minScore": 400.5}}, "invalid type: floating point"),
         ]:
             with self.subTest(options), self.assertRaises(ValueError) as caught:
                 reset(session, **options)

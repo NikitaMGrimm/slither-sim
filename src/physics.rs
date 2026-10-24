@@ -329,11 +329,10 @@ pub fn crossed_anchor(_previous: Point, head: Point, last: Point) -> Option<Poin
         y: last.y + quantized.sin() * 42.0,
     })
 }
-/// Continuous score used by the provisional kiosk penalty. The public score
-/// still rounds down exactly as the official score display does.
-pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
+/// The stock client's `(fmlts, fpsls)` score tables over `0..=MAX_SEGMENTS`.
+fn score_tables() -> &'static ([f64; 431], [f64; 431]) {
     static TABLE: OnceLock<([f64; 431], [f64; 431])> = OnceLock::new();
-    let (weights, sums) = TABLE.get_or_init(|| {
+    TABLE.get_or_init(|| {
         let mut weights = [0.0; 431];
         let mut sums = [0.0; 431];
         for i in 0..=430 {
@@ -343,23 +342,102 @@ pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
             }
         }
         (weights, sums)
-    });
+    })
+}
+/// Continuous score used by the provisional kiosk penalty. The public score
+/// still rounds down exactly as the official score display does.
+pub(crate) fn score_exact(segments: usize, fam: f64) -> f64 {
+    let (weights, sums) = score_tables();
     let n = segments.min(430);
     (sums[n] + fam.min(1.0) / weights[n] - 1.0) * 15.0 - 5.0
 }
 pub fn score(segments: usize, fam: f64) -> f64 {
     score_exact(segments, fam).floor()
 }
+/// Steps of protocol-19 fam: a 24-bit fraction that clients read as `u24 / 16777215`.
+const FAM_STEPS: u32 = 16_777_215;
+fn wire_fam(step: u32) -> f64 {
+    f64::from(step) / f64::from(FAM_STEPS)
+}
+
+/// The least mass that displays a `minScore`, on the protocol fam grid so
+/// that clients decode exactly the same mass and score.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MassFloor {
+    pub segments: usize,
+    pub fam: f64,
+}
+impl MassFloor {
+    /// Displayed scores a floor can take: a newborn's, up to the score at
+    /// `MAX_SEGMENTS`. Below that size the display rises with mass. The score
+    /// table ends there, so a larger snake displays `score(MAX_SEGMENTS, fam)`
+    /// again, as little as the upper bound. Growth never undercuts a floor in this range.
+    pub fn score_range() -> std::ops::RangeInclusive<u32> {
+        score(2, 0.0) as u32..=score(MAX_SEGMENTS, 0.0) as u32
+    }
+    /// The least segments and wire fam step whose displayed score is at least
+    /// `target`. Displayed score never decreases with mass, so a linear scan
+    /// over segments and a bisection over the 24-bit steps find it.
+    pub fn for_score(target: u32) -> Option<Self> {
+        if !Self::score_range().contains(&target) {
+            return None;
+        }
+        let shows =
+            |segments: usize, step: u32| score(segments, wire_fam(step)) >= f64::from(target);
+        let segments = (2..=MAX_SEGMENTS).find(|&n| shows(n, FAM_STEPS - 1))?;
+        // `hi` always displays the target; `lo` does not, unless it is zero.
+        let (mut lo, mut hi) = (0, FAM_STEPS - 1);
+        if shows(segments, 0) {
+            hi = 0;
+        }
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            if shows(segments, mid) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        Some(Self {
+            segments,
+            fam: wire_fam(hi),
+        })
+    }
+    /// Mass above the floor, or zero at and below it.
+    pub fn excess(self, segments: usize, fam: f64) -> f64 {
+        (segments as f64 - self.segments as f64 + (fam - self.fam)).max(0.0)
+    }
+}
+
+/// Remove up to `amount` mass, keeping at least two segments.
+/// Returns the segments removed.
 pub fn remove_mass(segments: &mut usize, fam: &mut f64, amount: f64) -> usize {
+    remove_mass_above_floor(segments, fam, amount, None)
+}
+
+/// The optional mode floor is internal so the default public API and overlaid
+/// baseline tests keep the same three-argument mass-removal contract.
+pub(crate) fn remove_mass_above_floor(
+    segments: &mut usize,
+    fam: &mut f64,
+    amount: f64,
+    floor: Option<MassFloor>,
+) -> usize {
+    let amount = floor.map_or(amount, |f| amount.min(f.excess(*segments, *fam)));
+    let before = *segments;
     *fam -= amount;
-    let mut removed = 0;
     while *fam < 0.0 && *segments > 2 {
         *segments -= 1;
         *fam += 1.0;
-        removed += 1;
     }
     *fam = fam.max(0.0);
-    removed
+    // `amount` stops at the floor, so landing below it is only rounding.
+    if let Some(f) = floor {
+        if amount > 0.0 && (*segments, *fam) < (f.segments, f.fam) {
+            (*segments, *fam) = (f.segments, f.fam);
+        }
+    }
+    before.saturating_sub(*segments)
 }
 pub fn quantize_food(value: f64) -> f64 {
     (value / (300.0 / 256.0)).floor() * (300.0 / 256.0)

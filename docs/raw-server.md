@@ -69,7 +69,11 @@ at zero for normal remote use. Client processing delay is not simulated twice.
 
 ### Presets
 
-There are no named host/JSON presets; omitted settings use the documented defaults.
+`simulation.world` accepts `"preset": "official"`, `"sandbox"` or `"battledome"`;
+explicit fields override the preset's values. Omitted settings without a preset
+use the documented defaults. See [presets](configuration.md#presets) and
+[Battledome](configuration.md#battledome).
+
 Native and remote clients share finite snake/prey coverage (`world.vision`, default
 1,500). Snakes remain visible while any centerline segment is covered. Food uses
 a separate 45-sector entry stencil with heading lead and temporal retention.
@@ -82,7 +86,7 @@ waits or fails without near-contact fallback. This conservative model is not an
 identified official exclusion rule.
 
 The host world defaults to `Config::official(1)`; Rust callers can choose
-`Config::official(n)` or `Config::sandbox()`. Neither is an exact official server
+`Config::official(n)`, `Config::sandbox()` or `Config::battledome()`. Neither is an exact official server
 configuration; see [official and sandbox](configuration.md#official-and-sandbox).
 
 ## VPS use
