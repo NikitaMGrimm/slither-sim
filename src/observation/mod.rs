@@ -355,8 +355,13 @@ mod tests {
             // On or a few ulps around the vision circle and box edges.
             2 | 3 => {
                 let a = rng.unit() * std::f64::consts::TAU;
-                let r =
-                    f64::from_bits(vision.abs().to_bits().wrapping_add(rng.below(5) as u64) - 2);
+                let r = f64::from_bits(
+                    vision
+                        .abs()
+                        .to_bits()
+                        .wrapping_add(rng.below(5) as u64)
+                        .wrapping_sub(2),
+                );
                 let (s, c) = if rng.below(2) == 0 {
                     a.sin_cos()
                 } else {
