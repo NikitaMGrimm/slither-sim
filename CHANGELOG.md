@@ -36,8 +36,9 @@
   boosting minimum-size snake would otherwise pass its contact lead in one tick
   and die on shallow rim contact. The old 32 ms cap claimed body-radius
   tunneling, which swept collision tests rule out. Hard boundaries accept
-  longer steps while one tick's 7 ms prey substeps fit `usize`
-  (≈ 1.29 × 10¹⁷ s on 64-bit).
+  longer steps while one tick's count of 7 ms prey substeps is an exact integer
+  that fits `usize` (≈ 6.3 × 10¹³ s); boost drops in such a step are counted,
+  so the step always finishes.
 - Zero `maxPerCell` admits nothing; kiosk rates, prey speeds, prey turn rate
   (also on the wire) and nutrition factor may be zero. Validation error texts
   changed.
