@@ -25,7 +25,7 @@ python -B tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/
 ```
 
 For an optional shared time limit and retained incomplete results, see
-[comparison deadlines](../../../docs/performance-deadlines.md).
+[comparison deadlines](../../../docs/performance.md#comparison-deadlines).
 
 The runner fixes longer per-case iteration counts below and preserves raw paired
 rows. Ratios are medians of each matched candidate/baseline ratio; lower is less
@@ -64,6 +64,6 @@ are integrated, establish and name that updated baseline before extending these
 performance claims. The remaining shortlist in the initial report is investigative work, not
 additional promised speedups.
 
-The [observation follow-up](../../../docs/performance-observations.md) adds immutable geometry
+The [observation follow-up](../../../docs/performance-workloads.md#observation-workloads) adds immutable geometry
 and selection cases with separate output-destruction timing and an explicitly
 updated source baseline.

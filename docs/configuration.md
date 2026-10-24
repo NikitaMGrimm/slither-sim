@@ -28,7 +28,7 @@ Pongs can be sent between broadcasts. Physics keeps advancing between updates.
 Minimaps and leaderboards have independent nominal 2.5/3-second clocks, serviced
 at physics ticks; deadlines do not accumulate gameplay-broadcast rounding. Prey
 position refreshes have their own bounded reporting intervals; see
-[host fidelity](host-fidelity.md#packet-timing).
+[host fidelity](server-rules.md#packet-timing).
 
 Ping is a measured round trip, not a target the server needs you to set. Native
 clients send game pings automatically after setup, with at most one outstanding.
@@ -117,9 +117,7 @@ Both Rust constructors return the same `Config` type:
 `Config::default()`, omitted JSON fields, `SimulationConfig` and `host` use
 `Config::official(1)`. It is the best current approximation, not an exact
 official replica. It keeps the provisional kiosk penalty, food cell limits, rim
-sliding, retained boost speed and radius model; the sandbox shares them. No model
-coefficients were retuned. The [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
-records the evidence and limits.
+sliding, retained boost speed and radius model; the sandbox shares them.
 
 `n` initializes radius, food and prey targets; it does not spawn snakes. With
 dynamic radius, the living population then drives the radius (unoccupied remote
@@ -130,7 +128,9 @@ deliberately small start, not a typical official lobby; request
 The prey density of one per 10 million square units is a working assumption,
 not a calibrated global population. Received density near recorded recipients,
 about 0.04–0.18 per million square units, is a lead rather than a census; the
-official prey population remains unresolved.
+official prey population remains unresolved. The
+[official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
+records the sources and caveats of these choices.
 
 Neither constructor changes ping, broadcasts or decision timing. Those belong to
 `SimulationConfig`, which wraps either world:

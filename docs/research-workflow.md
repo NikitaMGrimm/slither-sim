@@ -11,8 +11,9 @@ Go directly to the task you need:
 - [Plan a measurement](#plan-a-real-measurement), including [controlled routes](#controlled-snake-and-food-routes).
 - [Audit, analyze and replay](#inspect-analyze-and-reproduce).
 - [Package and submit](#package-and-submit) or [compare contributed bundles](#compare-contributed-evidence).
-- [Evolve a fixture or protocol](#fixture-and-protocol-evolution).
-- [Run offline checks](#offline-checks); documentation and Rust-only work can start there.
+- [Add or update a fixture](#add-or-update-a-fixture).
+
+For development setup and test commands, use [contributing](../CONTRIBUTING.md#setup-and-checks).
 
 For the evidence workflow below, use Python 3.12, uv, Rust 1.86+ and Node.js 22+
 (24 recommended). Rust-only and documentation work can skip this setup:
@@ -108,9 +109,7 @@ plan as well as checking both members and source hashes. A completed capture
 does not certify a valid crossing or statistical coverage.
 
 The duration ceiling is an operational capture budget, not a server constant.
-The paired CLI and `recordPair` still default to 480 seconds when duration is
-omitted; managed plans require an explicit duration. Historical 480-second
-studies retain their declared duration and scientific/control settings.
+Managed plans require an explicit duration.
 
 Low-level paired-death and feeding-shape collectors still need their own matching
 coordinator and attempt accounting.
@@ -118,6 +117,8 @@ coordinator and attempt accounting.
 ### Controlled snake and food routes
 
 The managed workflow also accepts these separate acquisition scenarios:
+
+#### Direct-snake routes
 
 ```json
 {"scenario": "paired-snake", "bots": 2, "seconds": 480,
@@ -149,6 +150,8 @@ leg deadlines keep running, and interrupted legs cannot establish an
 uninterrupted round trip. These are engineering bounds, separate from the frozen
 analysis freshness screens and opponent-cache absence.
 
+#### Food lanes
+
 ```json
 {"scenario": "food-lanes", "bots": 1, "seconds": 480}
 ```
@@ -173,6 +176,8 @@ freshness screens and required coverage belong in the frozen analysis plan.
 Food announcements and explicit clears describe delivery episodes; unannounced
 empty sectors never establish a known subscription or global food absence.
 
+#### Paired-prey routes
+
 For two-client visibility crossings, the paired-prey collector supports fixed
 `x`, `y`, `diagonal-positive` and `diagonal-negative` directions:
 
@@ -186,8 +191,7 @@ recording an endpoint, B keeps that relative waypoint for two seconds before the
 next traversal. `crossingHeldOffset` and `crossingHoldUntil` describe the hold;
 `intendedOffset` records the commanded offset even when `crossingLeg` already
 names the upcoming leg. These are acquisition controls, not measured server
-ranges or timers. Older source-pinned runs retain their 800-unit near waypoint
-and immediate reversal.
+ranges or timers.
 
 The logs retain projected along-route/cross-track distances, visibility, freshness,
 interruptions and completed legs. An intended route or phase name is not proof of
@@ -205,16 +209,14 @@ distinguish death from disconnection, and `primary_visibility_lost` means the
 primary cache is absent or too old. Neither proves a server subscription change.
 Match the event across recipients by trial and `endedAt`; it is one shared
 control event, not two independent observations. A trial still active at capture
-end is right-censored. Older source-pinned archives lack these events; do not
-infer their reset reasons from a later phase name.
+end is right-censored.
 
 Crossing endpoint advancement requires the reference near its assigned offset,
 both snake anchors at most 150 ms old and the reference prey report at most
 350 ms old. These are collector/study quality gates, not server constants.
 `endpointVisits` includes the initial approach; `completedLegs` counts subsequent
 legs between achieved endpoints. Observer B records each exact start/end witness
-once in `crossingEndpoint`. Earlier collector versions counted endpoint arrivals
-as completed legs; their source-pinned recordings retain that historical meaning.
+once in `crossingEndpoint`.
 These endpoint checks do not establish continuous geometry, avoidance-free travel,
 clock alignment, peer continuity or held-out coverage; analysis must still check them.
 
@@ -223,6 +225,8 @@ actual quantized, rate-limited sent commands. Their point robots have explicit
 synthetic speed/turn settings, exact fresh anchors and no obstacles; stationary
 and moving targets cover both signs of each route. This protects control wiring
 without tying it to measured physics defaults or claiming live acquisition success.
+
+### Capture records
 
 Raw frames retain direction, bytes and monotonic send/receipt timestamps. Metadata
 pins the plan/collector sources, wall-clock origin, connection/life boundaries,
@@ -381,81 +385,9 @@ bundled code execution. It uploads the JSON/Markdown report for review; a drift
 or inconclusive result is an artifact, not an automatic scientific pass/fail.
 Ordinary PR CI tests this pipeline offline without downloading contributed data.
 
-## Fixture and protocol evolution
+## Add or update a fixture
 
-Keep bounded selected cases in `tests/fixtures/`; keep full recordings and study
-bundles outside Git. Add a case for each new scenario and preserve valid old
-regressions. Avoid wholesale fixture reformatting. Record the source study/window
-and distinguish raw recorded packets from decoder- or model-derived expectations;
-label observed and synthetic inputs explicitly. Synthetic cases test a specified
-contract, not an empirical server claim.
-
-Pin the wire protocol, API contract and fixture schema where relevant for each
-fixture/test, using the fixture version inventory documented in
-[the fixture guide](../tests/fixtures/README.md). Current wire support is protocol 19;
-a future default may change. Older evidence keeps its original labels. A default
-change needs explicit new cases and compatibility/rejection expectations, not a
-bulk relabelling of recordings. Retain old decoder/rejection coverage according
-to the versions actually supported; retained historical fixtures do not promise
-runtime legacy support or establish support for an unverified newer version.
-
-Expected results must have an independent justification: recorded bytes, a
-specified contract, a checked calculation or supporting evidence. Regenerating
-expectations from the changed implementation cannot by itself approve a regression.
-If an expectation was wrong, document its independent correction and preserve the
-original evidence. Deprecating a case requires a reason tied to the supported
-contract or invalid evidence, with a replacement or retained rejection test where
-applicable. A passing decoder cross-check is not independent proof of its model.
-
-Keep a measured calibration gate tied to its recorded corpus. Test configurable
-mechanisms with deliberately synthetic parameters, so a new supported default
-does not require changing many unrelated lifecycle tests. Protocol bytes,
-rejection cases, invariants and frozen-corpus selection checks stay explicit.
-New conflicting observations need a new corpus and explained regime/supersession;
-replacing old data merely to make the current model pass hides a regression.
-
-For a new regression, retain a small selected raw packet/window with the archive
-SHA-256, record indices, wire version, decoder identity and selection rule. Derive
-expected fields with the existing decoder or replay exporter, label that derivation,
-then have the focused test consume the fixture. Keep the full audited study outside
-Git; the [worked study](https://github.com/NikitaMGrimm/slither-sim/blob/main/tools/fidelity/worked_study.py) demonstrates this path.
-
-The standalone replay exporter hashes and decodes one temporary archive snapshot.
-Its schema-1 `provenance` retains the archive, selected window/connection, wire
-protocol and decoder/exporter source digests. These additional metadata fields
-leave replay values unchanged; older fixtures keep their original provenance.
-The exporter checks gzip completion and window coverage, but does not perform
-the full capture/study audit. Its output labels that limit explicitly; audit the
-study separately before treating the derivative as evidence.
-
-## Offline checks
-
-Run focused tests for the changed owner first (see the
-[task map](../CONTRIBUTING.md#find-the-change)), then the relevant group from the
-repository root. Documentation-only changes need accuracy/link review, not builds
-or the research stack. Rust 1.86+ and platform build tools suffice for `rust` and
-`package`; the runner itself uses standard-library Python (3.11+).
-
-| Group | Command | Coverage / prerequisites |
-| --- | --- | --- |
-| Rust | `python tools/check.py rust` | Cargo-only fmt, default, core-only and C ABI tests, workspace Clippy and doctests; no uv or Node |
-| Tools | `uv run --locked --only-group tools python tools/check.py tools` | Root tools/fidelity Python, Node and local bot and C ABI smoke tests, and the Python package tests; locked uv, Node 22+ and Rust |
-| Package | `python tools/check.py package` | Local `cargo package` verification; no registry publication |
-| WASM | `python tools/check.py wasm` | Explicit target check; install `wasm32-unknown-unknown` first |
-
-For tools, prepare the environment with `uv sync --locked --only-group tools`.
-`all` runs the host groups (`rust`, `tools`, `package`); WASM is explicit and needs
-its installed target. Append `--list` to a group command to print commands without
-executing them. Direct focused Cargo commands are also valid, for example:
-
-```sh
-cargo test --locked --test client_protocol
-cargo test --locked --no-default-features --test core_consumer
-```
-
-Tests use doubles or loopback, never outside game servers. uv supplies Python for
-Node audit subprocesses; worked-study tests build this checkout's Rust binaries.
-PR CI automatically invokes the check runner. Report checks actually run and
-material gaps; a test pass does not establish scientific validity. Import
-attribution remains in [historical provenance](provenance.md); routine edits do
-not refresh import manifests. Per-study source identity checks still apply.
+Use the [fixture guide](../tests/fixtures/README.md) for selection, independent
+expectations, protocol labels and replay-export provenance. Routine tool/API fixes
+need a focused regression; a new capture is required only when the existing
+evidence cannot support the claim.

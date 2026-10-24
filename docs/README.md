@@ -1,59 +1,39 @@
 # Documentation
 
 Start with the [quick start](../README.md#quick-start) to run a local bot.
-For a code change, use the [contributor task map](../CONTRIBUTING.md#find-the-change)
-to find its source owner and focused check.
+For a code change, start with [contributing](../CONTRIBUTING.md): setup, source
+owners, focused tests and the evidence each kind of change needs.
 
-## Use and embed
+## Use the simulator
 
-| Goal | Guide |
+| Task | Guide |
 | --- | --- |
-| Write a bot using received client state | [Portable bot API](client-api.md) |
-| Control a world directly or embed the Rust core | [Geometric controller and library](bot-api.md) |
-| Run geometric sessions in-process from Python | [Python package](python.md) |
-| Run geometric sessions in-process from C or another language | [C ABI](c-api.md) |
-| Connect the stock browser or host WebSocket clients | [Server guide](raw-server.md) |
-| Choose world, latency and network settings | [Configuration reference](configuration.md) |
-| Understand food colors and renderer differences | [Client presentation](presentation.md) |
+| Write a bot that runs on simulation or WebSocket backends | [Portable client API](client-api.md) |
+| Control all slots and worlds directly, or embed the Rust core | [`serve` controller and Rust library](bot-api.md) |
+| Run `serve` sessions in-process from Python | [Python package](python.md) |
+| Run `serve` sessions in-process from C or another language | [C ABI](c-api.md) |
+| Host a shared world or connect the stock browser | [WebSocket server](raw-server.md) |
+| Choose world, timing and network settings | [Configuration](configuration.md) |
+| Understand implemented rules and approximations | [Mechanics and delivery limits](server-rules.md) |
 
-## Investigate and contribute
+## Contribute and investigate
 
-| Goal | Guide |
+| Task | Guide |
 | --- | --- |
-| Find supported mechanics and useful next contributions | [Rules and evidence limits](server-rules.md) |
-| Check visibility, spawning, minimap and ecology assumptions | [Host fidelity](host-fidelity.md) |
-| Plan, collect, audit or replay evidence | [Evidence workflow](research-workflow.md) |
-| Read or produce a portable evidence bundle | [Bundle format](evidence-format.md) |
-| Measure simulator and client costs | [Performance](performance.md), with observation, retained-client and deadline guides linked there |
-| Add or change a benchmark workload | [Performance workloads](performance-workloads.md) |
-| Understand automatic PR measurements | [PR comparisons](pr-reports.md) |
+| Find source owners and run checks | [Contributor task map](../CONTRIBUTING.md#find-the-change), [setup and checks](../CONTRIBUTING.md#setup-and-checks) |
+| Compare simulator or client performance | [Performance](performance.md) |
+| Add a workload or use a specialized harness | [Performance workloads](performance-workloads.md) |
+| Collect, audit, replay or compare evidence | [Evidence workflow](research-workflow.md) |
+| Read the evidence file contract | [Bundle format](evidence-format.md) |
+| Add a regression fixture | [Fixture guide](../tests/fixtures/README.md) |
+| Read dated results and counterexamples | [Research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) |
 
-## Maintain and trace history
+Maintainer references: [PR comparisons](maintainers/pr-reports.md),
+[releasing](maintainers/releasing.md), [provenance](provenance.md) and
+[changelog](../CHANGELOG.md).
 
-| Goal | Guide or record |
-| --- | --- |
-| Run current checks | [Offline check groups](research-workflow.md#offline-checks) |
-| Understand version selection and publication | [Releasing](releasing.md) |
-| Trace imported components and reference sources | [Provenance](provenance.md) |
-| Inspect the initial compatibility checks | [October 22 verification record](verification.md) |
-| Find dated studies, including failed and inconclusive attempts | [Research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) |
-| See release changes | [Changelog](../CHANGELOG.md) |
-
-## Where changes belong
-
-Update an existing guide when its commands or implemented behavior change. Keep
-each explanation with its owner and link to it from related guides. Add a guide
-when a distinct task needs its own instructions; link it here. This index groups
-guides by task without changing established URLs.
-
-Put distinct dated studies under `research/<topic>/YYYY-MM-DD-<question>/REPORT.md`
-and link them from the research index. Keep attempts and amendments to one study
-together, preserving frozen plans, counterexamples and source identities. A
-routine documentation or code fix usually needs no new study. Full recordings,
-binaries, generated outputs and changing handoffs stay outside Git; the
-[research placement guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md#adding-or-updating-material)
-covers access labels and selected result data.
-
-Current guides ship in the Rust crate; research records do not. Use repository
-URLs when linking from packaged guides to research. Old archive-entry pages and
-anchors remain available for existing links.
+Update the guide that owns the behavior. Put distinct dated studies under
+`research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; a routine fix needs no new
+report. Keep selected regressions in `tests/fixtures/` and full recordings,
+binaries and generated outputs outside Git. Current guides ship in the Rust
+crate; use repository URLs for research and tools excluded from that package.

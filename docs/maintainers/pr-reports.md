@@ -1,10 +1,14 @@
 # Automatic PR comparisons
 
+For contributors: a measured change gets one updated advisory comment. Correctness
+checks still gate merging; timing shifts do not. Use the
+[local comparison command](../performance.md#compare-a-change) to investigate a result.
+
+## When a comparison runs
+
 A PR that changes a measured input runs a performance and regression comparison
-when it is opened, updated or reopened, including draft PRs and forks. One
-Actions comment is updated in place. These measurements are advisory; the report
-workflow is separate from `Required checks`, and numerical regressions do not
-block merging.
+when it is opened, updated or reopened, including draft PRs and forks. The report
+workflow is separate from `Required checks`.
 
 Measured inputs are the simulator sources, Cargo manifests and build
 configuration, the two measurement examples, the selected regression tests and
@@ -25,6 +29,8 @@ PR head. GitHub's [path filters](https://docs.github.com/en/actions/reference/wo
 consider only the first 3,000 files of a diff, so a larger PR can go unmeasured.
 Drafts are measured on every push, so marking one ready does not repeat the run.
 
+## What is measured
+
 Each PR update measures the merge commit against its first parent (the exact
 target revision used for that merge). The report records that pair and the PR
 head. A Windows runner builds release executables for both revisions with the
@@ -33,7 +39,7 @@ test sources and fixtures into a fresh, detached baseline worktree. Both runtime
 therefore see identical measurement code and evidence. Cargo lockfiles can differ
 and their hashes are retained. Compilation failures make results unavailable.
 Snapshots, the input overlay, builds and identity records come from
-`tools/perf_build.py`, which [local comparisons](performance.md#compare-a-change)
+`tools/perf_build.py`, which [local comparisons](../performance.md#compare-a-change)
 also use. Both revisions reuse one run-owned Cargo target directory for dependencies.
 After baseline executables are copied and hashed, only the simulator package's
 release and dev build outputs are explicitly cleaned, forcing a fresh candidate
@@ -41,7 +47,7 @@ build without recompiling compatible dependencies. A failed cleanup leaves
 candidate results unavailable.
 
 The performance table and state traces cover the `ci` suite of the PR harness's
-[workload catalog](performance.md#workloads): the six legacy workloads plus
+[workload catalog](../performance.md#workload-selection): the six legacy workloads plus
 selected steady-state scenarios, at most ten rows. Both builds must list the same
 plan; otherwise performance and trace results are unavailable. Adding a `ci`
 workload to the harness adds it here without a collector change.
@@ -71,6 +77,8 @@ or empirical claim about unmeasured server mechanics is produced.
 The denominator includes every declared test in these two selected source files,
 including cases absent from both execution logs after an abort. The table marks
 those cases unavailable and labels the report incomplete.
+
+## Publishing and permissions
 
 The comment is updated in place, keyed by a hidden marker and bot author.
 It is generated automatically from the measurements, with no model call or
@@ -108,6 +116,8 @@ Conflicting PRs need their conflicts resolved before a merge checkout can run.
 The publisher workflow must exist on the default branch before GitHub can
 trigger it; see the [workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
+## Local checks and diagnosis
+
 The selected tests and fixture measurements also run locally, without GitHub
 credentials or Actions:
 
@@ -118,7 +128,7 @@ cargo run --locked --example fidelity_metrics -- tests/fixtures
 
 The second command prints JSON with the turn and speed-ramp errors and their
 sample counts. To compare performance against the target branch, use a fresh
-output directory; the [performance guide](performance.md#compare-a-change)
+output directory; the [performance guide](../performance.md#compare-a-change)
 describes the snapshots, builds and results:
 
 ```sh

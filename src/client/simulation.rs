@@ -1264,7 +1264,7 @@ impl SimulatorBackend {
             {
                 let delta = encode::minimap_delta(previous, map)?;
                 // Shortest valid encoding is a local compression choice, not
-                // a recovered server policy; see docs/host-fidelity.md.
+                // a recovered server policy; see docs/server-rules.md.
                 if delta.len() < packet.len() {
                     packet = delta;
                 }
@@ -1439,7 +1439,7 @@ impl SimulatorBackend {
                     let changed = known.motion != current.motion;
                     // Ordinary receipts cluster near one third second. The
                     // 210 ms pulse guard is an engineering choice, not a
-                    // universal receipt bound; see docs/host-fidelity.md.
+                    // universal receipt bound; see docs/server-rules.md.
                     // Keep corrections even when quantized position is still.
                     let pulse = known.motion[2] == 11000 || current.motion[2] == 11000;
                     let interval = if pulse { 0.210 } else { 1. / 3. };
@@ -1898,7 +1898,7 @@ fn changes(
 }
 
 /// Keep empty subscriptions internally. Retained receipts introduce food with
-/// nonempty `F`, then births/pickups; see docs/host-fidelity.md#food-sector-delivery.
+/// nonempty `F`, then births/pickups; see docs/server-rules.md#food-sector-delivery.
 /// `sectors` lists every subscribed sector.
 fn food_updates(
     packets: &mut Vec<Vec<u8>>,

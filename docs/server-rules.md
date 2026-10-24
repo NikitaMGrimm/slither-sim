@@ -1,104 +1,148 @@
-# Simulator rules and evidence limits
+# Mechanics and delivery limits
 
-Mechanics combine protocol-19 measurements, client constants and explicit models.
-The official server is closed source; packet agreement does not establish its
-full algorithms.
+SlitherSim combines protocol-19 measurements, client constants and explicit
+models. The official server is closed source; packet agreement does not identify
+its full algorithms. This page owns the current behavior and its evidence limits;
+[research records](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md)
+retain dated measurements, failed fits and counterexamples.
 
-`Config::default()` is `Config::official(1)`, the best current approximation
-including the provisional models below; `Config::sandbox()` is a compact fixed
-arena with the same mechanics. See [official and sandbox](configuration.md#official-and-sandbox)
-and the [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md).
+## Defaults
+
+`Config::default()` is `Config::official(1)`. `Config::sandbox()` uses the same
+mechanics in a compact fixed arena. Neither is an exact official replica. See
+[configuration](configuration.md#official-and-sandbox) for all defaults and overrides.
+
+The radius controller, food admission limits, prey population, kiosk penalty and
+rim sliding are provisional. In particular:
+
+- Dynamic radius is enabled; use recorded `radiusUpdates` with
+  `dynamicRadius: false` for measured replay.
+- A 75-unit cell admits a new ambient, boost or death pellet only while it holds
+  fewer than 2, 9 or 22 pellets of any kind, respectively. Rejected boost
+  emission still spends mass.
+- The prey target is a working density assumption, not a measured global census.
+- Kiosk is enabled. Set `kiosk.enabled: false` for motion replays where it should
+  not affect trajectories. The historical [WORM Labs study](https://www.reddit.com/r/Slitherio/comments/1dagyjq/worm_labs_inc_study_on_new_kiosk_penalty/)
+  motivates the model; current official onset and recovery remain unverified.
 
 ## Packaged regression evidence
 
-[Client presentation](presentation.md) covers pellet palettes separately from
-physical food generation and pickup rules.
-[Host fidelity](host-fidelity.md) records the separate snake, prey and food
-receipt rules, spawn and minimap corrections and the remaining unmeasured
-server policies.
+Tests are under `tests/`, fixtures under `tests/fixtures/`. Fixtures identify their
+sources, methods and hashes. Tests run without the full recordings, but repeating
+measurements may require those local-only archives.
 
-Fixtures retain sources, methods and hashes. Original recordings and analysis
-outputs are not distributed; packaged tests run without them, but repeating the
-measurements may require the original archives.
+| Rule | Tests and fixtures | Evidence limit |
+| --- | --- | --- |
+| Movement/steering | `physics.rs`, `movement_turns.rs`; `movement-turn-runs.json`, `speed-ramp-validation.json` | About 7 ms server loops; protocol conversion units differ. |
+| Growth/cruise | `cruise_growth_retention.rs`, `speed_state.rs`; `food-growth.json`, `cruise-growth-retention-20260930.json`, `cruise-retention-pair.json` | Retained cruise measured; transitions modeled. Fixed-size ramps do not test growth during a ramp. |
+| Body anchors | `physics.rs`, `server_body.rs`; `body-updates*.json`, `server-body-snapshots.json` | Client and received-server evidence differ; reconstruction is not universally exact. |
+| Collision | `physics.rs`; `official-collision-cases.json` | Android offline-client geometry, not measured server hitboxes. Online move/test phasing is unverified. |
+| Pickup | `circle_pickup.rs`, `pickup_events.rs`; `boost-circle-food.json` | Selected behavior, not complete coverage. |
+| Death food | `death_food.rs`; `death-food.json`, `death-food-prospective.json`, `death-jitter-fresh.json` | Scatter fits retain count gaps and held-out exceptions. |
+| Food density | `ambient_food.rs`, `boost_food.rs`, `death_food.rs` | Received occupancy cannot isolate generation from delivery filtering. |
+| Boundary/radius | `boundary.rs`; `boundary-contact.json`, `arena-radius-updates.json` | Sliding is fitted; recorded radius traces are stronger than the population law. |
+| Prey | `prey.rs`, `prey_outward.rs`, `prey_decisions.rs`, `prey_activation.rs`; `prey-*.json` | Speeds constrained; steering, population and outward departure trigger remain approximate. |
+| Kiosk | `kiosk.rs` and core unit tests | Historical model; current official applicability unverified. |
 
-| Rule | Tests and fixtures | Limit  |
-| --- | --- | ---  |
-| Movement/steering | `physics.rs`, `movement_turns.rs`; `movement-turn-runs.json`, `speed-ramp-validation.json` | About 7 ms server loops; protocol time/speed units differ.  |
-| Growth/cruise speed | `cruise_growth_retention.rs`, `speed_state.rs`; `food-growth.json`, `cruise-growth-retention-20260930.json`, `cruise-retention-pair.json` | Retained cruise measured; transitions modelled. Fixed-size ramps do not test growth during a ramp.  |
-| Body anchors | `physics.rs`, `server_body.rs`; `body-updates*.json`, `server-body-snapshots.json` | Client and received-server evidence differ; reconstruction is not universally exact.  |
-| Collision | `physics.rs`; `official-collision-cases.json` | Cases specify Android offline-client geometry, not observed server hitboxes; online move/test phasing is unverified.  |
-| Pickup | `circle_pickup.rs`, `pickup_events.rs`; `boost-circle-food.json` | Selected behavior, not complete coverage.  |
-| Death food | `death_food.rs`; `death-food.json`, `death-food-prospective.json`, `death-jitter-fresh.json` | Scatter fits retain count gaps and held-out exceptions.  |
-| Food density | `ambient_food.rs`, `boost_food.rs`, `death_food.rs` | Received occupancy cannot isolate generation from broadcast filtering.  |
-| Boundary/radius | `boundary.rs`; `boundary-contact.json`, `arena-radius-updates.json` | Sliding is fitted; radius traces are stronger than the population law.  |
-| Prey | `prey.rs`, `prey_outward.rs`, `prey_decisions.rs`, `prey_activation.rs`; `prey-*.json` | Speeds constrained; steering, population and departure remain approximate.  |
-| Client receipt | `src/client/visibility.rs`, `src/client/simulation.rs` unit tests; `client-food-interest.json` | Food, snake and prey use separate rules. Food sectors match selected small-snake witnesses, with later counterexamples; snake/prey distances are engineering choices. See [host fidelity](host-fidelity.md).  |
-| Spawning | `spawn.rs` | Radial bands do not determine their probability law; ring starts are synthetic. Own joins include [exceptions](host-fidelity.md) below the 600-unit clearance.  |
-| Kiosk penalty | `kiosk.rs` and core unit tests | Historical model; current official applicability unverified, including under `Config::official(n)`.  |
+## Client delivery and spawning
 
-Tests are under `tests/`, fixtures under `tests/fixtures/`. Run `cargo test --locked`.
+The [`serve` controller](bot-api.md#frames) exposes immediate simulation state,
+including the entire stored record of a visible opponent. The [portable client
+API](client-api.md) reconstructs delivered messages with timing and receipt ages.
+A receipt, a reconstructed pose and renderer prediction are different states.
 
-## Open contributions
+| Area | Implemented behavior | Evidence and regression |
+| --- | --- | --- |
+| Food interest | 45 sectors: 7×7 without four corners, 300 units per sector, center led 100 units along physical heading. Retain last-touched sectors for 2.6 s; cleanup on nominal 504 ms opportunities. | `client-food-interest.json` pins selected receipts. Later food-model counterexamples remain; scheduler and size scaling are provisional. |
+| Snakes | Complete centerline intersects `world.vision`, default 1,500. | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
+| Prey coverage | Points checked independently at the same configurable distance. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
+| Hosted spawning | Radial-lattice candidates; complete newborn body clears living heads/body edges by 600 units. Crowded admission waits or fails without a cramped fallback. | `spawn.rs` and host tests. Observed own joins include exceptions below 600; this is conservative local admission. Initial geometric test rings are synthetic. |
+| Minimap | Global living centerlines, 136×136 by default, nominal 2.5 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
+| Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins select boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes and pooled ambient counts. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
 
-Choose one discriminating case rather than retuning a model to fit its current
-regressions. The limits above define what each case still needs to resolve.
+The [visibility study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
+preserves food counterexamples and unsuccessful crossing acquisitions. No follow-up
+validated a replacement snake/prey subscription rule. The current collector's
+bounded-staleness pause has offline coverage; live route completion remains to be
+shown before fitting a rule.
 
-- **Growth/cruise:** record a size change inside a ramp whose candidate predictions
-  differ beyond timing and quantization error.
-- **Collision:** keep the offline-client cases and add a controlled near-miss pass
-  that separates candidate contact boundaries or move/test phasings.
-- **Food density:** separate generation from filtering, such as with paired
-  recipients or controlled consumption against matched sectors, with negative controls.
-- **Boundary/radius:** replay a recorded window with `dynamicRadius:false`, then
-  test a competing [controller](host-fidelity.md#ecology-models) prediction.
-- **Prey:** test one named activation or departure explanation on a retained
-  transition. Recipient arrivals do not estimate global births.
-- **Client receipt:** first obtain a live route with completed legs, then paired
-  present/absent crossings with held-out legs. See the current collector and
-  remaining feasibility gap in [host fidelity](host-fidelity.md).
-- **Spawning:** retain one shareable exception to the 600-unit clearance, with
-  neighbor freshness and corridor attribution.
-- **Kiosk:** design a bounded long stationary interval separating onset from
-  recovery, with own size, displayed score and moving controls, before changing parameters.
+### Food sector delivery
+
+The host keeps empty subscriptions internal. Nonempty entry listings use `F`,
+subsequent births/pickups use deltas, and `w` clears recipient food on exit without
+deleting physical food. The first birth in an already empty subscription uses a
+birth delta; this is a local choice. The food fixture retains the full-archive
+announcement census as well as selected entry witnesses. Decoder support for
+other packet forms does not require the host to emit them.
+
+### Minimap encoding
+
+Each connection retains its last queued bitmap. First/reconnected/resized maps
+use full `M`; later maps use XOR `V` only when strictly shorter. The base advances
+after queuing that recipient's packet. Both forms reconstruct the bitmap; this
+shortest-encoding policy is local and differs from some retained official choices.
+
+### Packet timing
+
+Physics ticks default to 7 ms; gameplay broadcasts default to six ticks (42 ms).
+Minimap and leaderboard deadlines are independent nominal 2.5/3-second clocks,
+serviced at physics ticks without accumulating gameplay-broadcast rounding.
+
+Prey receive periodic position corrections near one third second, even when their
+quantized position is unchanged. Exact-11 pulse transitions may report after
+210 ms; ordinary turning alone does not accelerate reporting. These opportunities
+are serviced on gameplay broadcasts. Per-recipient clocks and their appearance
+phase are approximations: the visibility study retains a 1,614 ms same-prey gap
+while other traffic continued. The local corrections prevent unbounded renderer
+prediction drift; they do not recover the official scheduler.
+
+Setup advertises the active prey turn rate in reference-frame units (default
+`mamu2=0.029`), as checked by `client-hud-leaderboard.json`. The cadence fixture
+pins a selected epoch with source/tool hashes; it is not a universal timing bound.
+Use the [packet census](research-workflow.md#inspect-analyze-and-reproduce) for new
+captures and [configuration](configuration.md#timing-and-ping) for local settings.
+
+## Ecology models
+
+Population-scaled radius, food target/refill, radial food profile and prey density
+are models. Recipient arrivals and occupancy cannot identify rejected generation,
+global counts or startup seeding. A later matched-sector check rejected the earlier
+ambient-replacement association, so it supplies no refill retuning.
+
+The radius controller is known to differ from retained observations. In
+`run4-radius-long-20260927/bot0.jsonl.gz` (SHA-256
+`3180b8201f51d5f4fe9732b6c69e85bab8ce49448742a2a72cfd228ef60613ef`),
+connection 4, server time 292,116→292,243 ms, radius grows 13,940→13,947 faster than
+the model's expansion cap. Its replacement remains unidentified; replay recorded
+`radiusUpdates` rather than installing the fastest observed slope as a new cap.
 
 ## Movement and geometry
 
-The historical source is `slither-arena-rs` commit
-`c2fb7285febb4273034e30699dc880715a334423`. Its research notes
-`movement-fidelity.md`, `speed-equations.md`, `circle-eating-investigation.md`,
-`official-collisions-20261003.md` and `body-geometry.md` explain the fitted turning,
-speed, pickup, collision and contraction choices. The corresponding packaged
-fixtures are listed above; full original studies are not distributed here.
+Historical source: `slither-arena-rs` commit
+`c2fb7285febb4273034e30699dc880715a334423`. Its `movement-fidelity.md`,
+`speed-equations.md`, `circle-eating-investigation.md`,
+`official-collisions-20261003.md` and `body-geometry.md` retain the fitted turning,
+speed, pickup, collision and contraction choices. The corresponding selected
+fixtures are packaged here; the full original studies are not.
 
-The October 23 recheck reproduced all 1,567 retained fixed-size speed ramps from
-three hash-matched validation archives. This supports those slopes, not growth
-during a ramp. Collision geometry comes from the Android offline client; the
-simulator moves all snakes before resolving collisions, while that client moves
-and tests each snake in sequence. Online move/test phasing remains unverified.
-Three selected near-rim prey removal projections agree with the rim within five
-units; recipient removals do not establish global deletion or its activation rule.
+The retained 1,567 fixed-size speed ramps support those slopes, not growth during
+a ramp. The simulator moves all snakes before resolving collisions, whereas the
+Android offline client moves and tests each in sequence. Online phasing remains
+unverified. Selected near-rim prey removals constrain received motion but do not
+establish global deletion or its activation rule.
 
-For ecology/radius counterexamples and receipt policies, see
-[host fidelity](host-fidelity.md). Keep physical world state, reconstructed client
-state and renderer prediction distinct when interpreting a regression.
+## Open contributions
 
-## Provisional defaults
+Choose a discriminating case that resolves one limit above:
 
-- Kiosk penalty is on. Set `config.kiosk.enabled: false` for motion replays where
-  this unverified penalty should not affect trajectories.
-- Each 75-unit food cell admits up to 2 ambient, 9 boost and 22 death pellets.
-  Rejected boost emission still spends mass; these limits remain inferred.
-- Dynamic radius is on by default; `radiusUpdates` traces override the population model.
-- The default prey target is a working density assumption, not a measured census.
-- Sliding and hard-boundary modes are available.
-- Prey behavior includes an outward replay mode whose official trigger is unknown.
+- Growth inside a speed ramp with competing predictions beyond timing/quantization error.
+- A controlled collision near miss separating contact boundaries or move/test phasing.
+- Paired food recipients or controlled consumption separating generation from filtering.
+- A competing radius-controller prediction against a recorded window.
+- A named prey activation/departure explanation against a retained transition.
+- Completed live visibility-route legs before paired crossings and held-out validation.
+- A shareable sub-600-unit spawn exception with fresh neighbor/corridor attribution.
+- A bounded kiosk trial with stationary/moving controls separating onset and recovery.
 
-The [geometric controller](bot-api.md#frames) returns immediate
-simulation state, including entire visible opponents. The [portable API](client-api.md)
-reconstructs delivered messages with timing and receipt history; its visibility
-subscriptions and minimap rasterization remain approximate. Neither establishes
-playing strength or exact official behavior.
-
-Mechanics changes need an evidence note, a distilled regression and an explanation
-of default changes. Keep the 7 ms physics loop separate from protocol conversion
-constants.
+Mechanics changes need supporting evidence, a distilled regression and an
+explanation of changed defaults; see [contributing](../CONTRIBUTING.md#evidence-proportional-to-the-change).

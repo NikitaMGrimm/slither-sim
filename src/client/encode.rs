@@ -541,7 +541,7 @@ pub(crate) fn minimap(map: &Minimap) -> Vec<u8> {
 /// `V` delta toggling the cells that differ from `previous`, the last bitmap sent
 /// on this connection. It carries no side, so both maps must share one; a first,
 /// reconnect or resized map needs [`minimap`]. Callers choose between the two
-/// encodings themselves; see `docs/host-fidelity.md` for what is measured.
+/// encodings themselves; see `docs/server-rules.md` for what is measured.
 pub(crate) fn minimap_delta(previous: &Minimap, map: &Minimap) -> Result<Vec<u8>, String> {
     previous.validate()?;
     map.validate()?;

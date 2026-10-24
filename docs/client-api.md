@@ -182,7 +182,7 @@ actions. Reconnect starts a new life at a clear spawn while other snakes continu
 
 Visibility, minimap rasterization and body presentation remain approximations;
 reconstruction differs from the stock renderer's smoothing. See
-[coverage evidence](host-fidelity.md) and [rules and limits](server-rules.md).
+[mechanics and delivery limits](server-rules.md).
 Use the [host](raw-server.md) to exercise
 real sockets; the native backend delivers protocol bytes inside the process.
 

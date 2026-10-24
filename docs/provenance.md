@@ -23,7 +23,7 @@ controllers, study schemas and evidence packager were added here.
 The source-linked food presentation layer and anonymous `client-presentation.json`
 fixture were subsequently adapted from the training repository's October 3 work;
 pooled ambient weights are pinned at `a0587bc87fb010d29e7dfdde00e5ea83587078e2`.
-See [presentation](presentation.md) for retained observations and model limits.
+See [presentation](raw-server.md#presentation) for retained observations and model limits.
 
 Generic body-clearance and respawn helpers were subsequently adapted from
 `src/simulator.rs` at `c2fb7285febb4273034e30699dc880715a334423`. Selected

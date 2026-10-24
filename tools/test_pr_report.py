@@ -284,7 +284,7 @@ test same_name ... ok
         self.assertEqual([name for name in measured if not matched(name)], [])
         self.assertEqual([p for p in patterns if p.startswith("tools/") and p not in collectors], [])
         # The publisher always runs default-branch code, so PR edits to it are not measured.
-        unmeasured = ["README.md", "CHANGELOG.md", "docs/pr-reports.md", "research/README.md",
+        unmeasured = ["README.md", "CHANGELOG.md", "docs/maintainers/pr-reports.md", "research/README.md",
                       "tests/spawn.rs", "examples/bot.mjs", "tools/pr_report_comment.cjs",
                       ".github/workflows/pr-report-comment.yml", ".github/workflows/checks.yml"]
         self.assertEqual([name for name in unmeasured if matched(name)], [])

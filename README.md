@@ -8,9 +8,9 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> |
-  <a href="docs/client-api.md">Bot API</a> |
+  <a href="docs/client-api.md">Portable bots</a> |
   <a href="docs/raw-server.md">WebSocket server</a> |
-  <a href="docs/server-rules.md">Rules and limits</a>
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">
@@ -84,8 +84,7 @@ See [interface versions](docs/client-api.md#interface-versions) for compatibilit
 ## Defaults and fidelity
 
 The defaults combine measured movement and protocol constants with approximate
-visibility, spawning and ecology. They include the current coverage, food-sector,
-minimap and reporting corrections; see [host fidelity](docs/host-fidelity.md).
+visibility, spawning and ecology; see [rules and evidence limits](docs/server-rules.md).
 
 The default world is `Config::official(1)`: the best current approximation of an
 official server, initialized for one snake, with dynamic radius, scaled food and

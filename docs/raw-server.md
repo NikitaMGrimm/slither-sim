@@ -71,7 +71,7 @@ There are no named host/JSON presets; omitted settings use the documented defaul
 Native and remote clients share finite snake/prey coverage (`world.vision`, default
 1,500). Snakes remain visible while any centerline segment is covered. Food uses
 a separate 45-sector entry stencil with heading lead and temporal retention.
-These are approximations with [measured constraints and known gaps](host-fidelity.md);
+These are approximations with [measured constraints and known gaps](server-rules.md);
 the browser does not send its viewport or zoom to this host.
 
 Human joins and hosted bot lives, including startup, request 600-unit clearance
@@ -101,12 +101,12 @@ world time; it does not skip physics ticks to catch up.
 
 ## Packet compatibility
 
-[Client presentation](presentation.md) describes source-linked pellet colors,
-their retained evidence and remaining uncertainty.
+[Presentation](#presentation) describes pellet colors and their evidence limits.
 
 The host uses the native simulator's encoder. Packet layouts follow protocol 19;
 world values, compression choices and update schedules can differ from official
-sessions. See [rules](server-rules.md) and [verification](verification.md).
+sessions. See [mechanics and delivery limits](server-rules.md) and
+[protocol sources](provenance.md#protocol-references).
 
 | Direction | Supported messages |
 | --- | --- |
@@ -128,7 +128,7 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 - `k`: simulator collision-attributed kills.
 - `F`: nonempty sector listings on entry; empty subscriptions stay internal and
   send neither `W` nor an empty `F`. Births/pickups update subscribed food;
-  `w` clears on exit. See [food delivery](host-fidelity.md#food-sector-delivery).
+  `w` clears on exit. See [food delivery](server-rules.md#food-sector-delivery).
 - `M`/`V`: a global minimap (136×136 by default, configurable via
   `simulation.minimapSide`) on an independent nominal 2.5-second clock.
   First, reconnected and resized maps use full `M`; later maps use XOR `V` only
@@ -136,7 +136,7 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   Living heads and body centerlines are rasterized; the stock client draws its
   own player marker. This compression choice is local; exact official pixel
   filtering and full/delta selection remain unknown. See
-  [minimap encoding](host-fidelity.md#minimap-encoding).
+  [minimap encoding](server-rules.md#minimap-encoding).
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.
@@ -155,21 +155,28 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   once; minimap updates stop. Otherwise the browser extrapolates stale opponents
   through the fade. The native bot frame stays dead with no playable observation.
 
-The tested stock browser owns the death timing: a 1,600 ms hold followed by a
-fade subtracting `.004 * min(5, elapsed_ms / 8) * lag_mult` per rendered update.
-With frequent frames and no lag, the fade takes about 2 seconds. The host keeps
-streaming through this transition; it does not replace it with a fixed menu timer.
-Retained official observations reported post-death world traffic and three
-transport closes at 6.775, 6.861 and 7.124 seconds. Those are limited receipts,
-not a universal timeout; this host leaves the connection open until the client
-closes it, including during victory entry. Broadcast and delivery times remain
-subject to the configured tick cadence, link delays and host load.
+The stock browser owns its death fade and return-to-play timing. The host keeps
+streaming and answering pings until the client closes, including during victory
+entry. It sets no fixed menu timer. Delivery remains subject to configured tick
+cadence, link delays and host load.
 
 These ranking, cadence and record rules are local policies, not recovered official
 server rules. Keyboard turns use 0.033 times the size turn factor per count;
 this remains an approximation. Ignored unknown packets are not decoded features.
 
-### Stock browser client
+## Presentation
+
+Pellet colors are assigned by a separate seeded presentation RNG, outside physics
+and bot observations. Colors persist across source death, reconnects and sector
+re-entry. The [presentation fixture](../tests/fixtures/client-presentation.json)
+retains pooled ambient weights and stock/custom recipes; the current model limits
+are in [mechanics and delivery](server-rules.md#client-delivery-and-spawning).
+Primary skins 0–8 select matching boost/death colors; unknown skins use an
+approximate modulo-9 fallback. Birth/pickup telemetry supplies colors and eater
+IDs without guessing from proximity. The wire exposes the first co-located pellet;
+physics consumes co-located pellets in insertion order before ambient refill.
+
+## Stock browser client
 
 Official assets are not distributed. Redirect an idle client to the local server;
 public discovery does not list it. For the tested HTTP bundle,

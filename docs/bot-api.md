@@ -129,18 +129,10 @@ when a frame is written: the simulation, snapshots, the [portable bot
 API](client-api.md) and the [WebSocket host](raw-server.md) keep full precision,
 so players connected to a hosted server receive exactly what they did before.
 
-Real players mostly receive coarser data than this. Protocol-19 packets carry
-snake and prey positions in steps of 0.2 world units or coarser, food in steps of
-sector size/256 (1.17 units), snake motion headings in steps of 2π/256 and speeds
-in steps of 0.03 units/s or coarser; 81,218 field values from three retained
-official-server captures all sat on those grids. Prey headings, snake spawn
-headings (steps of 2π/16777215) and body anchors that clients rebuild from
-transmitted directions are finer than the frame steps. For those, the bound is
-what matters: headings are off by at most 0.00005 radians, 0.2% of the turn a
-small snake or prey can make in one tick (1.1% for the largest snakes), and
-points by at most 0.0071 units, 0.05% of the smallest snake radius. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
-has the measurements and error bounds. Rounding can still change a bot's choice
-when it sits exactly at a decision threshold.
+Nearest rounding changes a heading by at most 0.00005 radians and a point by at
+most 0.0071 world units. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
+compares those bounds with packet grids and simulation scales. Rounding can
+still change a bot's choice at a decision threshold.
 
 ## Transport and official-server compatibility
 

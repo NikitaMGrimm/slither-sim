@@ -143,3 +143,38 @@ the unordered internal `prey_outward` set are sorted. Compare full decompressed
 trace bytes between identically built harnesses. These ordinary finite fixtures
 do not cover all numerical/index boundaries; JSON cannot distinguish every
 nonfinite floating-point payload.
+
+## Historical phase-diagnostic recipe
+
+This later diagnostic recipe targets the pinned October 23 source below. It does
+not instrument the current 2D food grid or establish current performance results.
+
+`tools/perf_observation_phases.py` prepares source snapshots without building or
+running them. It instruments the actual observation implementation in a generated
+snapshot; the shipped runtime and original fixture remain unchanged. The recipe
+accepts reviewed source shapes and refuses existing output paths. For the current
+reviewed shape, use the full public commit:
+
+```sh
+uv run --project "REPO_ROOT" --locked --only-group tools --no-sync --offline python -B tools/perf_observation_phases.py --commit 20dd3aff5574af0270d8ad2c1e93f9001e8f1142 --output "NEW_ABS_OUTPUT_DIR"
+```
+
+Replace `REPO_ROOT` with the tools-environment checkout and `NEW_ABS_OUTPUT_DIR`
+with a new absolute local output directory outside every checkout. The requested
+commit must exist locally; preparation does not fetch history. Preparation
+retains the exact exported source hashes, recipe, resource and instrumentation
+patch. Both snapshots omit only the registration of the unexported `portable_bot`
+example. `COMMANDS.txt` contains explicit offline core-only builds, complete trace
+comparisons, and separate profiles. Builds use distinct targets and jobs=2; build
+and workload deadlines are 600 and 120 seconds. These are direct-child timeouts,
+without OS CPU/memory caps. No dependency installation or environment tuning is
+performed. Retain failed attempts rather than overwriting them.
+
+The counters report index visits, food candidates/accepted copies, own/opponent
+body anchors and stable empty batches. Wall intervals distinguish index setup,
+indexed food filtering, accepted-index ordering and copying. Linear food and
+prey/opponent predicates and copies remain interleaved. The inclusive batch
+interval contains its nested phases, clock/counter overhead and temporary/index
+destruction; returned-output destruction is reported separately by the harness.
+Do not sum inclusive and nested intervals or use these profiles as comparative
+timings. Trace mode disables profiling sessions and compares complete bytes.

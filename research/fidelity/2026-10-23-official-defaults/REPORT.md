@@ -33,7 +33,7 @@ performance workloads that require that scene now request it explicitly.
   radius using living snakes; initial food and prey targets do not automatically
   rescale afterwards. Global food generation and the radius controller are
   unresolved. The existing controller's expansion cap has recorded
-  counterexamples; see [host fidelity](../../../docs/host-fidelity.md#ecology-models).
+  counterexamples; see [ecology models](../../../docs/server-rules.md#ecology-models).
 - **Prey population:** choose `max(1, round(area / 10_000_000))` as a coarse
   working initial target. This is a new explicit model choice, with one prey
   in the smallest world and 14 in `official(100)`. The imported research note
@@ -53,8 +53,7 @@ performance workloads that require that scene now request it explicitly.
 - **Other mechanics:** retain the current enabled admission models, retained
   speed, sliding boundary, protocol constants and coverage/reporting estimates.
   Their measured, client-derived and modeled portions remain distinguished in
-  [server rules](../../../docs/server-rules.md) and
-  [host fidelity](../../../docs/host-fidelity.md).
+  [server rules](../../../docs/server-rules.md).
 
 ## Compatibility and reproducibility
 

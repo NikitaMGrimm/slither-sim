@@ -7,7 +7,7 @@ Workloads come from both harnesses' `--list` catalogs, whose plans must match.
 Uses the same operation and Windows process counters as perf_baseline.py; no host
 listeners or environment changes. --max-wall-seconds shares a deadline across
 metadata and workload children (after the builds in --base mode); reserve cleanup
-time separately. See docs/performance.md and docs/performance-deadlines.md.
+time separately. See docs/performance.md#comparison-deadlines.
 
 Exit 0: complete and every trace equal. Exit 3: complete, but a trace or workload
 definition changed (timings kept, labeled behavior-changed). Exit 1: incomplete;

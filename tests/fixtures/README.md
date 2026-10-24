@@ -1,4 +1,7 @@
-# Protocol fixtures
+# Regression fixtures
+
+For a new case or changed expectation, start with
+[selecting and updating cases](#selecting-and-updating-cases).
 
 [manifest.json](manifest.json) inventories the existing wire/client protocol and
 client-frame contract fixtures. Paths are relative to the repository root.
@@ -60,3 +63,41 @@ tests (these compile the networking client):
 ```sh
 cargo test --locked --features networking --test client_protocol --test client_hud --test client_contract --test client_challenge
 ```
+
+## Selecting and updating cases
+
+Keep bounded selected cases in `tests/fixtures/`; keep full recordings and study
+bundles outside Git. Add a case for each new scenario and preserve valid old
+regressions. Avoid wholesale fixture reformatting. Record the source study/window
+and distinguish raw recorded packets from decoder- or model-derived expectations;
+label observed and synthetic inputs explicitly. Synthetic cases test a specified
+contract, not an empirical server claim.
+
+Expected results must have an independent justification: recorded bytes, a
+specified contract, a checked calculation or supporting evidence. Regenerating
+expectations from the changed implementation cannot by itself approve a regression.
+If an expectation was wrong, document its independent correction and preserve the
+original evidence. Deprecating a case requires a reason tied to the supported
+contract or invalid evidence, with a replacement or retained rejection test where
+applicable. A passing decoder cross-check is not independent proof of its model.
+
+Keep a measured calibration gate tied to its recorded corpus. Test configurable
+mechanisms with deliberately synthetic parameters, so a new supported default
+does not require changing many unrelated lifecycle tests. Protocol bytes,
+rejection cases, invariants and frozen-corpus selection checks stay explicit.
+New conflicting observations need a new corpus and explained regime/supersession;
+replacing old data merely to make the current model pass hides a regression.
+
+For a new regression, retain a small selected raw packet/window with the archive
+SHA-256, record indices, wire version, decoder identity and selection rule. Derive
+expected fields with the existing decoder or replay exporter, label that derivation,
+then have the focused test consume the fixture. Keep the full audited study outside
+Git; the [worked study](https://github.com/NikitaMGrimm/slither-sim/blob/main/tools/fidelity/worked_study.py) demonstrates this path.
+
+The standalone replay exporter hashes and decodes one temporary archive snapshot.
+Its schema-1 `provenance` retains the archive, selected window/connection, wire
+protocol and decoder/exporter source digests. These additional metadata fields
+leave replay values unchanged; older fixtures keep their original provenance.
+The exporter checks gzip completion and window coverage, but does not perform
+the full capture/study audit. Its output labels that limit explicitly; audit the
+study separately before treating the derivative as evidence.
