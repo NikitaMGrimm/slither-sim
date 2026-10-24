@@ -47,7 +47,9 @@ cargo run --release --locked --example perf_baseline -- --list
 
 Each sandbox, official and dome-proxy registration expands into `<id>-step`, which
 times one `Simulator::step`, and `<id>-bot`, which times `step` followed by
-`observe_all`, including dropping the observations.
+`observe_all_into` on one reused buffer, as a bot that observes every decision
+would. Before the reused buffer, `-bot` rows timed `observe_all` and dropped its
+observations; their definitions changed with it.
 
 ## Steady-state lifecycle
 
@@ -74,7 +76,7 @@ running population with deaths, death food, respawns and grown bodies:
   not processing an earlier decision.
 
 `--profile` replaces `step` with `step_profiled`. Profiled `-bot` rows also report
-`observeSeconds`, the time spent in `observe_all`.
+`observeSeconds`, the time spent in `observe_all_into`.
 
 Reports keep the `slither-perf-baseline-v1` envelope. Scenario details add the
 definition, lifecycle counts, population statistics and warmup results.

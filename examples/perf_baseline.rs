@@ -172,7 +172,7 @@ struct Scenario {
     epoch: usize,
     /// `<id>-step`: one `Simulator::step`.
     step: Operation,
-    /// `<id>-bot`: `step` then `observe_all`.
+    /// `<id>-bot`: `step` then `observe_all_into` one reused buffer.
     bot: Option<Operation>,
 }
 
@@ -365,7 +365,7 @@ impl Driver {
                     "epochOperations": scenario.epoch,
                 },
                 "warmupTicks": scenario.warmup_ticks,
-                "operation": if bot { "step+observe_all" } else { "step" },
+                "operation": if bot { "step+observe_all_into" } else { "step" },
             }),
             Driver::Client(client) => json!({
                 "world": client.world.definition(), "config": client.world.config(),
@@ -1670,6 +1670,7 @@ fn run_scenario(
     let mut meter = Meter::default();
     let mut profile = StepProfile::default();
     let mut observe_seconds = 0.0;
+    let mut buffer = Vec::new();
     for iteration in 0..args.iterations {
         if iteration > 0 && iteration % scenario.epoch == 0 {
             scene = template.clone();
@@ -1688,15 +1689,15 @@ fn run_scenario(
                 return Ok(None);
             }
             let started = args.profile.then(Instant::now);
-            let observations = scene.world.observe_all();
+            // Bot rows refill one buffer, as a bot loop that observes every decision would.
+            scene.world.observe_all_into(&mut buffer);
             if let Some(started) = started {
                 observe_seconds += started.elapsed().as_secs_f64();
             }
             if args.trace {
-                return Ok(Some(observations));
+                return Ok(Some(buffer.clone()));
             }
-            // Bot rows drop observations inside the timed interval.
-            black_box(&observations);
+            black_box(&buffer);
             Ok(None)
         })?;
         black_box(&scene.world);
@@ -1731,8 +1732,8 @@ fn run_scenario(
     let operation = match (args.profile, bot) {
         (false, false) => "step",
         (true, false) => "step_profiled",
-        (false, true) => "step then observe_all",
-        (true, true) => "step_profiled then observe_all",
+        (false, true) => "step then observe_all_into",
+        (true, true) => "step_profiled then observe_all_into",
     };
     Ok(report(
         args,

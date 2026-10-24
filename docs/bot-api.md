@@ -117,6 +117,12 @@ coverage, prediction, receipt ages or network latency. Use the
 see [the basic example](../examples/basic.rs). Rust callers can build their own
 admission, respawn and match rules around the core.
 
+A bot that observes every decision should keep one buffer and call
+`observe_all_into` or `observe_selected_into`. They return the same observations
+as `observe_all` and `observe_selected`, but refill the vectors already in the
+buffer, which avoids most per-call allocation; bot loops in the
+[performance workloads](performance-workloads.md) run 1.8–3.5× faster this way.
+
 Set `default-features = false` on a path or Git dependency for the core alone:
 no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
 observations, JSON transport and the `basic`/`fidelity_replay` examples remain

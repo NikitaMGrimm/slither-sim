@@ -5,12 +5,14 @@ fn main() -> Result<(), String> {
     for slot in 0..4 {
         world.add(slot.to_string(), slot, 4)?;
     }
+    // One buffer for every decision: `observe_all_into` refills its vectors.
+    let mut observations = Vec::new();
     for _ in 0..300 {
-        let actions: Vec<_> = world
-            .observe_all()
-            .into_iter()
+        world.observe_all_into(&mut observations);
+        let actions: Vec<_> = observations
+            .iter()
             .map(|observation| {
-                observation.map(|observation| {
+                observation.as_ref().map(|observation| {
                     let head = observation.me.head;
                     let heading = observation
                         .food
