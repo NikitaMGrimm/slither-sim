@@ -120,8 +120,9 @@ admission, respawn and match rules around the core.
 A bot that observes every decision should keep one buffer and call
 `observe_all_into` or `observe_selected_into`. They return the same observations
 as `observe_all` and `observe_selected`, but refill the vectors already in the
-buffer, which avoids most per-call allocation; bot loops in the
-[performance workloads](performance-workloads.md) run 1.8–3.5× faster this way.
+buffer, which avoids most per-call allocation. On Windows, bot loops in the
+[performance workloads](performance-workloads.md) ran 1.8–3.5× faster with
+`observe_all_into` than with `observe_all`.
 
 Set `default-features = false` on a path or Git dependency for the core alone:
 no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
