@@ -1,0 +1,63 @@
+name: Extended checks
+
+# Broader, slower coverage than the required PR checks: optimized builds, a
+# native ARM runner and RustSec advisories published after a lockfile last
+# changed. Failures notify the maintainer but block nothing.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/extended.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extended-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_BUILD_JOBS: 4
+  RUST_TEST_THREADS: 4
+
+jobs:
+  release:
+    name: Release-profile tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      # The published profile (thin LTO, one codegen unit) without debug assertions.
+      - run: cargo test --release --locked --all-targets
+      - run: cargo test --release --locked -p slither-sim-ffi --all-targets
+
+  arm:
+    name: Rust (ubuntu-24.04-arm, stable)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - run: python3 tools/check.py test
+        env:
+          SLITHER_SIM_REQUIRE_CC: '1'
+
+  audit:
+    name: RustSec advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-audit
+      - run: cargo audit
