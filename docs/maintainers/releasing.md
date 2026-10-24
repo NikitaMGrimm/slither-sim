@@ -100,7 +100,10 @@ must allow GitHub owner `NikitaMGrimm`, repository `slither-sim`, workflow filen
 PyPI's [trusted publisher](https://pypi.org/manage/project/slither-sim/settings/publishing/)
 for project `slither-sim` must allow owner `NikitaMGrimm`, repository
 `slither-sim`, workflow `release.yml` and environment `pypi`. Required reviewers
-on the `pypi` GitHub environment would hold each upload for approval.
+on the `pypi` GitHub environment would hold each upload for approval. Until the
+first upload creates the project, this is a pending publisher on the account's
+[Publishing page](https://pypi.org/manage/account/publishing/), registered on
+October 24, 2026.
 
 If migrating from a saved crates.io token, revoke it in
 [API Tokens](https://crates.io/settings/tokens) and run
