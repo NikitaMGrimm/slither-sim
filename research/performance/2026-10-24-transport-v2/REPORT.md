@@ -212,11 +212,14 @@ uv run --locked --only-group tools python -B tools/perf_transport.py --repeats 5
 uv run --locked --only-group tools python -B tools/perf_transport.py --repeats 5 --scenarios worlds-16 --threads 1 --output outputs/transport/v2-threads-1
 ```
 
-The v1 runs used the tool from commit `28b6401`, with `CHUNK_BYTES = 1 << 16` and
-`TAIL_CHUNKS = 1024` (blob above), run against the `0d367f6` binary with
-`--repeats 5`. That commit was a local pre-rebase commit and was not published;
-to recreate it, port the v2 tool's request encoders and client
-`decode_reply`/`decide` back to v1 observations.
+The v1 runs used the v1-protocol tool (blobs above) against the `0d367f6` binary
+with `--repeats 5`. Its commit, `28b6401`, was never published. To recreate it,
+apply [`v1-tool.patch`](v1-tool.patch) to the committed tool; this reproduces
+those three blob hashes:
+
+```sh
+git apply research/performance/2026-10-24-transport-v2/v1-tool.patch
+```
 
 The raw `report.json` files, request scripts, binary copies, logs and CPU samples
 are local-only, under `outputs/transport/{v1-baseline,v1-rerun,v2-default,v2-threads-1}`
