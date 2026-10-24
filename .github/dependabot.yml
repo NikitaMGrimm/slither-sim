@@ -1,0 +1,14 @@
+# Workflows pin actions to commit SHAs; one monthly PR keeps those pins current.
+# Crate updates are left to maintainers, and the weekly extended checks report
+# RustSec advisories against Cargo.lock.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci

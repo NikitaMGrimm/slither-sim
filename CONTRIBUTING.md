@@ -44,7 +44,9 @@ to inspect its commands without running them. Each command reports its time,
 and CI adds a timing table to the job summary. Tests use doubles or loopback,
 never outside game servers. PR CI invokes the same runner automatically: `lint`,
 WASM and package once on Linux, `test` on Linux, Windows, macOS and Rust 1.86,
-and `tools` on Linux, Windows and macOS.
+and `tools` on Linux, Windows and macOS. The weekly
+[extended checks](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/workflows/extended.yml) add release-profile tests,
+Linux ARM tests and a RustSec audit; they block nothing and can be dispatched.
 
 ## Evidence proportional to the change
 
