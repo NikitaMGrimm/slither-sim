@@ -39,29 +39,9 @@
   JSON requests. It shares the crate's version, as does `slither-sim-ffi`, through
   `[workspace.package]`. See the [Python guide](docs/python.md).
 
-### Migration from slither-sim-json-v1
-
-- Send `step` actions as one `{"heading":[...],"boost":[...]}` entry per world,
-  with one element per slot; dead slots take a `null` heading.
-- Read `result.worlds[w]` instead of `observations`. A slot's view is
-  `views[slot]` (`null` when dead): `self` is its own `snakes` row, and `snakes`,
-  `food` and `prey` list the rows it sees. Body anchors are the slice
-  `bodyStart[row]..bodyStart[row + 1]` of `bodyX`/`bodyY`.
-- `observe` is removed; every reset and step reply carries the frames.
-  `snapshot` takes `world` and stays at full precision. `elapsedSeconds` is
-  removed; use `ticks × config.dt`. See the [bot API](docs/bot-api.md) and the
-  ported Python and Node.js examples.
-
 ## [0.3.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.0...v0.3.1) - 2026-10-24
 
-### Added
-
-- *(observation)* refill observation buffers with observe_all_into ([#58](https://github.com/NikitaMGrimm/slither-sim/pull/58))
-- *(observation)* split large observation batches over the rayon pool ([#56](https://github.com/NikitaMGrimm/slither-sim/pull/56))
-- *(tools)* compare a base ref with the working tree in one command ([#49](https://github.com/NikitaMGrimm/slither-sim/pull/49))
-- *(performance)* add steady-state workloads and a --list catalog ([#48](https://github.com/NikitaMGrimm/slither-sim/pull/48))
-
-### Other
+### Changed
 
 - *(simulator)* reuse per-step buffers between steps ([#57](https://github.com/NikitaMGrimm/slither-sim/pull/57))
 - *(transport)* write JSON replies without building a Value tree ([#55](https://github.com/NikitaMGrimm/slither-sim/pull/55))
@@ -95,11 +75,7 @@
 
 ## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23
 
-### Added
-
-- [**breaking**] make the official model the default ([#43](https://github.com/NikitaMGrimm/slither-sim/pull/43))
-
-### Other
+### Maintenance
 
 - publish manual releases and reset the automatic timer
 - clarify fidelity gaps and simplify navigation ([#46](https://github.com/NikitaMGrimm/slither-sim/pull/46))
@@ -118,29 +94,7 @@
 
 ## [0.2.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.0...v0.2.1) - 2026-10-23
 
-### Added
-
-- *(tools)* add isolated observation phase diagnostics ([#34](https://github.com/NikitaMGrimm/slither-sim/pull/34))
-
-### Fixed
-
-- *(performance)* separate reconnect metrics and clarify workload guides ([#40](https://github.com/NikitaMGrimm/slither-sim/pull/40))
-- *(performance)* share a deadline across matched runs ([#38](https://github.com/NikitaMGrimm/slither-sim/pull/38))
-- bound aggregate minimap decoding work per frame ([#30](https://github.com/NikitaMGrimm/slither-sim/pull/30))
-- reject unrepresentable prey sizes in client worlds ([#28](https://github.com/NikitaMGrimm/slither-sim/pull/28))
-- *(ci)* start protected checks for release bot PRs ([#33](https://github.com/NikitaMGrimm/slither-sim/pull/33))
-- *(client)* bound minimap rasterization work ([#26](https://github.com/NikitaMGrimm/slither-sim/pull/26))
-- *(client)* bound food sector clear work ([#24](https://github.com/NikitaMGrimm/slither-sim/pull/24))
-
-### Other
-
-- summarize unreleased changes and embedding guidance ([#36](https://github.com/NikitaMGrimm/slither-sim/pull/36))
-- *(performance)* cover retained clients and native seekers ([#37](https://github.com/NikitaMGrimm/slither-sim/pull/37))
-- *(ci)* reduce PR comparison overhead ([#35](https://github.com/NikitaMGrimm/slither-sim/pull/35))
-- publish performance and fidelity comparisons on PRs ([#27](https://github.com/NikitaMGrimm/slither-sim/pull/27))
-- *(observation)* skip unused batch indexes ([#32](https://github.com/NikitaMGrimm/slither-sim/pull/32))
-- baseline standalone workloads and index collision bounds ([#25](https://github.com/NikitaMGrimm/slither-sim/pull/25))
-- automate patch releases with a 12-hour cooldown ([#29](https://github.com/NikitaMGrimm/slither-sim/pull/29))
+### Changes
 
 - Bound food-sector clearing in bundled client frames, including preflight
   validation, to avoid repeatedly scanning unrelated retained food.
@@ -153,9 +107,11 @@
 - Add isolated observation-phase diagnostics, retained-client workloads and
   optional whole-comparison deadlines with retained incomplete-run evidence.
 - Automate compatible patch-release preparation and publication with a 12-hour
-  cooldown and protected checks for release-bot PRs; see [releasing](docs/releasing.md).
+  cooldown and protected checks for release-bot PRs; see [releasing](docs/maintainers/releasing.md).
 - Add informational performance and fidelity comparisons to PR CI. Synthetic
   comparisons do not establish official-server fidelity or general speedups.
+- Reduce PR-comparison overhead and report reconnect work separately in
+  retained-client measurements.
 
 ## 0.2.0 (2026-10-23)
 

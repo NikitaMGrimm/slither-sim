@@ -7,7 +7,7 @@
 //! the retained recipe's first color and chooses white from 0..2 once per life.
 //! Unknown skins explicitly fall back to skin % 9. Ambient weights are a retained
 //! pooled presentation model, not an identified official RNG or universal mix.
-//! See docs/presentation.md for evidence and limits; these choices do not establish
+//! See docs/server-rules.md for evidence and limits; these choices do not establish
 //! new empirical claims and do not define a prey palette.
 
 use std::collections::VecDeque;

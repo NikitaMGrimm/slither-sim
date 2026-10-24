@@ -14,7 +14,7 @@ Read README.md and the relevant API guide before changing behavior; consult
   frozen plans and failed attempts. Label synthetic data and distinguish measured
   behavior from inferred rules. Hashes verify consistency, not scientific claims.
 - Use Conventional Commits and LF; avoid unrelated formatting. Start with focused
-  checks, then the relevant [check group](docs/research-workflow.md#offline-checks).
+  checks, then the relevant [check group](CONTRIBUTING.md#setup-and-checks).
   Rust/docs work needs no research stack. Python tooling uses locked uv;
   simulator examples use only the standard library. PR CI runs automatically.
 - Use one task, branch and worktree. Discuss large/API changes first; small fixes
@@ -25,7 +25,7 @@ Read README.md and the relevant API guide before changing behavior; consult
   Preserve historical paths/hashes inside evidence. Packaged guides must use
   repository URLs for research records excluded from the crate.
 - Keep selected fixtures in Git and full recordings outside it. Follow
-  [fixture evolution](docs/research-workflow.md#fixture-and-protocol-evolution):
+  [fixture evolution](tests/fixtures/README.md#selecting-and-updating-cases):
   pin protocol/contract labels, preserve valid regressions, and independently
   justify changed expectations. A newer default does not relabel older evidence.
 - [Provenance](docs/provenance.md) is a historical import record, not a routine

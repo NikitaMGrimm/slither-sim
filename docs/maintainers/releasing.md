@@ -1,5 +1,8 @@
 # Releasing
 
+This is the maintainer runbook. Contributors record user-facing changes in the
+changelog and follow the [versioning guidance](../../CONTRIBUTING.md#interfaces-and-packaging).
+
 `release-pr.yml` maintains one rolling release PR with release-plz, updating
 `Cargo.toml`, `Cargo.lock` and the changelog after merges to main. It compares
 packaged files with crates.io: tools-only changes do not force a crate release,
@@ -67,8 +70,6 @@ that Rust API checks cannot detect, and update affected contract identifiers.
 Physics changes still need their evidence and meaningful changelog notes in the
 original PR. Automated version selection does not establish scientific fidelity.
 
-The manual merge starts publication immediately using its original version-bump
-commit, even if main advances afterward; the same authorization covers retries.
 Do not move version tags or reuse published versions.
 
 ## Connection and recovery

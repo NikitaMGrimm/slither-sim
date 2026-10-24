@@ -41,9 +41,10 @@ times. Each run passed the tool's checks: every mode and repeat received the sam
 reply bytes, and the Python and Node checksums agreed. The v1 and v2 scripts send
 identical headings; the v2 reset adds only `"worlds":1`. Both protocols reported
 the same living snakes and the same total visible food per scenario, for example
-591,202 food rows over `dense-64`. That confirms that both protocols simulated
-the same worlds. Checksums differ between protocols because v2 folds row indices
-and rounds coordinates.
+591,202 food rows over `dense-64`. These aggregate checks are consistent with
+matching worlds; they do not establish complete state or trajectory equality.
+Checksums differ between protocols because v2 folds row indices and rounds
+coordinates.
 
 Five repeats per session, one fresh process per mode and repeat, no warmup. The
 mode order rotates between repeats. Tables give medians in ms per step.

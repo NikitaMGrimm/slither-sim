@@ -21,8 +21,27 @@ the source owner and its callers, then start with the matching test.
 | Wire decoder and local host | [Server guide](docs/raw-server.md); `src/client/protocol.rs`, `src/client/server.rs`; `tests/client_protocol.rs`, `tests/client_server.rs` | `cargo test --locked --test client_protocol` |
 | Capture, audit and recorded replay | [Research workflow](docs/research-workflow.md); `tools/fidelity/evidence.py`, `tools/fidelity/prepare-fidelity-replay.py` and adjacent tests; `examples/fidelity_replay.rs` | Matching Python/Node test; `cargo test --locked --example fidelity_replay` for Rust replay |
 | Core library / WASM consumer | [Configuration](docs/configuration.md), `examples/basic.rs`; `src/lib.rs`, `src/observation/mod.rs`; `tests/core_consumer.rs` | `cargo test --locked --no-default-features --test core_consumer`; explicit `wasm` group for target changes |
-| Simulator or client performance | [Performance](docs/performance.md), [workloads](docs/performance-workloads.md); `examples/perf_baseline.rs`, `tools/perf_compare.py`, `tools/perf_build.py`; `tools/test_perf_*.py` | `uv run --locked --only-group tools python -B tools/perf_compare.py --base origin/main --output outputs/perf/NAME` (output parity, then paired timings) |
+| Simulator or client performance | [Performance](docs/performance.md), [workloads](docs/performance-workloads.md); `examples/perf_baseline.rs`, `tools/perf_compare.py`, `tools/perf_build.py`; `tools/test_perf_*.py` | `cargo test --locked --example perf_baseline`, or the matching Python test; measure when claiming a speed change |
 | Documentation | Relevant guide and its linked source/examples | `python -B -m unittest discover -s tools -p test_documentation.py`; no research dependencies |
+
+## Setup and checks
+
+Run focused tests for the affected owner first, then the relevant group from the
+repository root. Rust work needs Rust 1.86+ and platform build tools; the check
+runner uses standard-library Python 3.11+. Documentation-only changes need
+accuracy/link review and the documentation test above, without a Rust build.
+
+| Group | Command | Coverage / prerequisites |
+| --- | --- | --- |
+| Rust | `python tools/check.py rust` | Formatting, default/core-only/C ABI tests, doctests and Clippy; no uv or Node |
+| Tools | `uv run --locked --only-group tools python tools/check.py tools` | Python/Node tests, local bot/C ABI smoke tests and Python package tests; Python 3.12, uv, Node 22+ (24 recommended) and Rust |
+| Package | `python tools/check.py package` | Local crate verification; no registry publication |
+| WASM | `python tools/check.py wasm` | Core target check; install `wasm32-unknown-unknown` first |
+
+Before the tools group, run `uv sync --locked --only-group tools`. `all` runs
+`rust`, `tools` and `package`; WASM is explicit. Append `--list` to a group command
+to inspect its commands without running them. Tests use doubles or loopback,
+never outside game servers. PR CI invokes the same runner automatically.
 
 ## Evidence proportional to the change
 
@@ -45,10 +64,10 @@ The [evidence comparison workflow](docs/research-workflow.md#compare-contributed
 screens contributed bundles for declared reporting differences. Its statistical
 report supports review; it neither approves physics changes nor replaces fixtures.
 
-Keep bounded, selected [regression fixtures](docs/research-workflow.md#fixture-and-protocol-evolution)
+Keep bounded, selected [regression fixtures](tests/fixtures/README.md#selecting-and-updating-cases)
 in Git and full recordings, credentials and generated outputs outside it. Use
 Conventional Commits and LF; avoid unrelated formatting. Run the
-[relevant offline checks](docs/research-workflow.md#offline-checks); PR CI runs
+[relevant checks](#setup-and-checks); PR CI runs
 automatically. Maintainer review checks ownership, callers, contracts and evidence
 independently of contributor-written tests. Passing those tests alone is not
 acceptance. Tests stay offline; collection or publication needs separate authorization.
@@ -61,7 +80,7 @@ Required CI must pass with the latest main; new commits need the relevant checks
 and review again. Auto-merge can finish an approved PR once these requirements
 pass. An independent agent review is useful evidence, but agents using the same
 GitHub account cannot approve that account's own PR. The owner-authorized
-[release automation](docs/releasing.md) can merge compatible patch release PRs
+[release automation](docs/maintainers/releasing.md) can merge compatible patch release PRs
 containing only version/changelog metadata after required CI. Other release
 bumps require maintainer review and merge; publication then runs automatically.
 
@@ -111,6 +130,9 @@ the C ABI crate and the Python package inherit; `pyproject.toml` owns the tools 
 Within `0.x`, incompatible Rust API changes bump the minor version. Keep unreleased
 changes together in the changelog; no permanent freeze or multi-version support
 is promised.
+
+Write one user-facing changelog entry per change, with a link to its PR when
+useful. Avoid repeating generated commit titles in a second prose list.
 
 The `package` check group verifies a local crate containing Rust tests and fixtures.
 Evidence tools and schemas require the Git checkout.

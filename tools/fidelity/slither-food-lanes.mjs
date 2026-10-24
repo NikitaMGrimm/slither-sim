@@ -59,7 +59,7 @@ export function foodLaneSiteQuiet(world, now, geometry, head) {
   const corridors = [[A.west, A.east], [B.west, B.east], [A.west, B.west], [head, A.west]];
   // Received bodies plus extrapolated tips must clear whole planned corridors;
   // this engineering margin cannot guarantee future or unreceived safety.
-  // R7 witnesses: docs/host-fidelity-recheck-20261023.md#exploratory-route-pilots-r7.
+  // R7 witnesses: research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-route-pilots-r7.
   return [...world.snakes.values()].filter(other => other.id !== world.self).every(other => {
     const points = [...other.pts, world.head(other, now)];
     for (let i = 1; i < points.length; i++) {

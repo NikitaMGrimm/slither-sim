@@ -75,4 +75,4 @@ Ranked next work, considering measured cost, scope and parity risk:
    recording and frame copies before optimizing. The initial tape is too short
    to characterize long-lived reconstruction or minimap delta costs.
 
-For the longer follow-up workload, see [retained client processing](../../../docs/performance-clients.md).
+For the longer follow-up workload, see [retained client processing](../../../docs/performance-workloads.md#retained-client-workload).

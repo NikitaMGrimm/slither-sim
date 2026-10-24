@@ -2,7 +2,7 @@
 
 The completed recordings challenge the current food-interest model and expose
 crossing-collector accounting defects. They do not identify a replacement online
-subscription algorithm. [Host fidelity](../../../docs/host-fidelity.md) describes the current
+subscription algorithm. [Host fidelity](../../../docs/server-rules.md) describes the current
 engineering choices; no physical default or subscription constant changes here.
 
 ## Acquisition and source identity

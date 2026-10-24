@@ -1,191 +1,84 @@
-# Reproducible performance checks
+# Performance checks
 
-These synthetic, offline workloads measure this simulator and its client tools.
-They do not measure official servers or bot playing strength. Name and pin the
-baseline for each comparison; historical results are linked below.
+These offline synthetic workloads measure simulator/client costs. They do not
+measure official servers or bot playing strength. For a behavior-preserving
+optimization, check output parity before interpreting timings.
 
 ## Compare a change
-
-One command builds a base ref and the current working tree, checks output
-parity, records step profiles and times both sides:
 
 ```sh
 uv run --locked --only-group tools python -B tools/perf_compare.py --base origin/main --output outputs/perf/my-change
 ```
 
-Agree on a quiet window with other local work first. The command builds before
-it measures; no other builds or tests should run until it finishes. Record
-background activity and any interruption. A quiet-window agreement does not
-establish an otherwise idle host.
+This builds the base ref and current working tree with the same harness, checks
+full-state traces, records supported phase profiles and runs adjacent alternating
+timing pairs. Use a new output directory outside the checkout or under ignored
+`outputs/`. Finish other builds/tests first and arrange a quiet measurement window;
+record interruptions and background activity.
 
-- **Snapshots.** The candidate is the working tree frozen as a Git tree and
-  commit: tracked edits, deletions and untracked non-ignored files are included;
-  ignored files are not. A temporary index leaves your index, `HEAD`, stash and
-  files untouched. The base ref is checked out as a detached worktree, and the
-  candidate's measurement inputs (`examples/perf_baseline.rs`,
-  `examples/fidelity_metrics.rs`, the selected tests and `tests/fixtures`) are
-  copied into it, so both runtimes run the same harness. That harness must
-  compile against the base API. Worktrees live under `OUTPUT/work` and are
-  removed afterwards.
-- **Builds.** Each side runs `cargo build --release --locked --example perf_baseline`
-  in its own persistent target, `target/perf-suite/baseline` or `.../candidate`
-  (under `CARGO_TARGET_DIR` when set). A lock file next to each target refuses a
-  concurrent run; delete a stale lock only when no run is active. Previous
-  executables are deleted before every build, so a failed build cannot reuse
-  them. Copies go to `OUTPUT/bin-<label>/`; `<label>-identity.json` binds their
-  hashes to the commit, tree, overlaid inputs, toolchain, command and build log.
-  Hashes are checked again before and after timing.
-- **Measurements.** Both harnesses' catalogs must select the same names,
-  iterations and trace windows. Then full-state trace parity for every selected
-  workload, step profiles for rows that support them (`--no-profiles` skips),
-  and adjacent alternating timing pairs after one untallied warmup
-  (`--repeats`, default 5). `--suite ci` (default), `--suite full` or
-  `--cases NAME ...` selects workloads. `--max-wall-seconds` bounds the
-  measurement after the builds; see [comparison deadlines](performance-deadlines.md).
-- **Results.** Exit 0: complete and every trace equal. Exit 3: complete, but a
-  trace or workload definition changed; timings are kept and labeled
-  behavior-changed. Exit 1: incomplete; `failure.json`, logs and partial outputs
-  remain. `summary.md` and `summary.json` hold the paired ratios;
-  `comparison.json` holds the plan, parity readings and build identities.
+| Option | Purpose |
+| --- | --- |
+| `--base REF` | Named runtime baseline; the candidate is the current working tree. |
+| `--suite ci` / `--suite full` | Choose the catalog suite; `ci` is the default. |
+| `--cases NAME ...` | Select explicit workloads; unknown names fail before measurement. |
+| `--repeats N` | Measured pairs after one untallied warmup; default 5. |
+| `--no-profiles` | Skip separate instrumented runs. |
+| `--max-wall-seconds N` | Bound measurement time after builds; see below. |
 
-The output directory must be new, and outside the checkout or in an ignored
-directory such as `outputs/`, so a run never snapshots its own outputs.
+The candidate snapshot includes tracked edits/deletions and untracked non-ignored
+files. A temporary Git index leaves your index, HEAD, stash and files untouched.
+The candidate's measurement examples, selected tests and fixtures are overlaid on
+the detached baseline so both runtimes use the same harness; it must compile
+against the base API.
 
-## Workloads
+Each side has a separate persistent target under `target/perf-suite/` (or
+`CARGO_TARGET_DIR`). A lock refuses concurrent use; check its owner before removing
+a stale lock. Binaries are freshly built, copied to the output directory and bound
+to source/tree, harness, toolchain and binary hashes. Hashes are checked around
+timing. Temporary worktrees are removed after the run.
+
+## Read the results
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Complete, with equal traces. |
+| 3 | Complete, with changed traces or workload definitions; timings are labeled behavior-changed. |
+| 1 | Incomplete; inspect `failure.json`, logs and retained partial outputs. |
+
+`summary.md` and `summary.json` contain paired ratios; `comparison.json` retains
+the plan, parity results and build identities. Both catalogs must select the same
+names, iterations and trace windows. Incomplete attempts cannot support a speed
+claim; changed behavior may be appropriate for a mechanics correction but is not
+a behavior-preserving optimization.
+
+Operation wall time excludes setup, trace output and report serialization.
+Process CPU/wall includes them; peak working set measures resident pages, not
+allocation or total system memory. Process CPU and peak metrics are Windows-only
+and explicitly unavailable elsewhere. Short CPU samples can be quantized to
+15.625 ms. Instrumented phase profiles are separate runs with clock/counter
+overhead; do not interpret them as unprofiled speedups.
+
+Inspect living populations, admitted food and operation counts before comparing
+throughput. Compare identical workloads, seeds, sample sizes, machine, toolchain,
+build flags and harness bytes. These fixtures are not a production distribution;
+small or mixed timing shifts remain inconclusive.
+
+Trace mode is untimed and retains canonical full simulator state, serialized
+RNG/motion state, events and relevant observations/client frames/wire bytes.
+Compare complete decompressed bytes and require a terminal scenario record.
+Real-time host checks use deterministic wire replay and host contract tests,
+without asserting equal wall-clock receipts.
+
+## Workload selection
 
 ```sh
 cargo run --release --locked --example perf_baseline -- --list
 ```
 
-prints the workload catalog as one JSON line: names, suites, default iterations,
-trace windows, profile support and resolved definitions. Every runner and the
-[PR comparison](pr-reports.md) read it; there is no other case list. The
-[workload guide](performance-workloads.md) describes the scenario families,
-steady-state lifecycle, validity checks and synthetic labels, and how to add a
-workload. Unknown names fail before any measurement.
-
-All native cases use seed 7 and the 7 ms physics tick. Overrides describe workload
-complexity; they do not change package defaults.
-The compact native client/protocol and Python E2E cases explicitly retain the
-sandbox world. The historical `step-default` name also refers to that fixture,
-independently of the official gameplay default. The six legacy rows keep their
-historical names and meaning:
-
-| Case | Work per iteration |
-| --- | --- |
-| `step-default` | One tick, four ring-start snakes, `Config::sandbox()` world/350 food attempts. |
-| `step-food` | One tick, 32 ring-start snakes, radius 6,000, 12,000 food attempts. |
-| `step-body` | One tick, 64 separated 128-anchor bodies, radius 12,000, 350 food attempts. Primarily bounds and rejected pairs. |
-| `observe` | `observe_all` on an immutable world: 32 snakes with 32 anchors each, 12,000 food attempts and eight prey. |
-| `portable` | Six ticks plus all eight client frames via `step_all`, with wire recording and untimed draining. |
-| `protocol` | Fresh decoder replay of a synthetic 48-tick tape for slot zero, with a frame after each of nine record groups. |
-
-Legacy step and portable episodes reset before the next operation after any death
-or before exceeding 1,000 episode ticks. Resets and control calculation are outside
-native operation timing and inside process totals. Actual admitted food counts
-can be below attempts. The short protocol tape exercises initial reconstruction;
-it does not cover long-lived minimap deltas. These cases are a starting baseline,
-not a distribution of production worlds.
-
-Native operation latency and wall time exclude setup, trace output and report
-serialization. Child-process CPU/wall and peak working set include them. CPU is
-kernel plus user time; short Windows measurements can be quantized to 15.625 ms.
-Peak working set measures resident pages, not private allocation or total system
-memory. Per-process CPU and peak memory collection currently use Windows APIs;
-other systems explicitly report these metrics unavailable. Phase profiling adds
-clocks and counters and is a separate run; use unprofiled measurements for
-comparisons. `segmentTests` counts candidate body anchors after broad-phase
-acceptance, not the exact number of executed edge tests.
-
-Inspect actual living populations and operation counts before interpreting
-throughput. Start with short runs; increase duration if CPU quantization or
-variance prevents a useful comparison. Compare the same workload, seed,
-iterations, machine, toolchain, build flags and harness source.
-
-Trace mode runs separately from timings. The Rust harness emits full simulator
-state, including serialized internal RNG/motion state, and the relevant
-event/observation or client frame/wire outputs. The runners retain their SHA-256
-and compressed bytes; scenario traces must end with a terminal record. Compare
-decompressed traces exactly between the same source harness built against
-baseline and candidate. Serialization order of unordered internal containers
-must be canonicalized; do not exclude gameplay, timing-in-virtual-time or
-protocol fields. Real-time hosted tests use the shared decoder's deterministic
-wire replay plus existing host contract tests as their semantic checks; they do
-not assert equal wall-clock receipt times.
-
-## Manual copied-binary procedure
-
-Use this advanced path to time executables you built yourself, for example the
-observation harness or a full baseline report with the E2E cases. Use a release
-build with the checked-in lockfile and unmodified release profile (thin LTO, one
-codegen unit). No dependencies, runtime threads, services or platform tuning are
-needed.
-
-```sh
-cargo build --release --locked --bin slither-sim --example perf_baseline -j 2
-```
-
-Use task-owned target storage or coordinate use of the existing Cargo target.
-For baseline/candidate source snapshots, use a separate target directory per
-snapshot, including when source files retain old timestamps. Keep the build log,
-absolute source/manifest paths and exact build command with each copied binary.
-At build time, bind its binary hash to an immutable source identity: a clean
-commit/tree ID or a source-manifest digest covering all compiled inputs and local
-edits. A fast cached build alone does not verify that it used the intended snapshot.
-Copy both executables into a new owned output directory before timing. Do not
-benchmark executables in a shared target that another build can replace. On
-Windows, for example (adjust the source target path if configured):
-
-```powershell
-New-Item -ItemType Directory outputs/perf-baseline/bin
-Copy-Item target/release/slither-sim.exe outputs/perf-baseline/bin/
-Copy-Item target/release/examples/perf_baseline.exe outputs/perf-baseline/bin/
-uv run --locked --only-group tools python -B tools/perf_baseline.py --harness outputs/perf-baseline/bin/perf_baseline.exe --cli outputs/perf-baseline/bin/slither-sim.exe --output outputs/perf-baseline/run-1
-```
-
-The runners use only the Python standard library. Existing locked tools
-environments can be reused with `uv run --project PATH --locked --only-group tools
---no-sync --offline python -B ...`; no environment synchronization is needed for
-this harness. Unix executables omit `.exe`.
-
-The new output directory contains source/toolchain/binary hashes, the catalog
-hash and per-workload definition fingerprints, exact commands, individual
-measurements, separate phase profiles and compressed full traces. Outputs are
-ignored by Git; preserve relevant results before cleanup. The source status and
-diff hash accompany the commit because the benchmark itself can be an addition
-to the runtime baseline. Build commands/profile and the exact CPU model must also
-be recorded with a report. This runner does not build or infer which sources
-produced an arbitrary executable; its measurement-time checkout hashes do not
-establish the binary's build-time source identity.
-
-A binary hash identifies the copied bytes, not the source that produced them.
-Reject benchmark inputs with missing or mismatched build records before timing;
-the copied-binary runners do not enforce that provenance check.
-If build provenance is uncertain, retain the attempt as invalid and rebuild in a
-fresh snapshot-specific target before running parity checks and then timings.
-
-Each case runs once as an untallied warmup, then five fresh processes by default.
-By default every available catalog workload runs with its catalog iterations and
-trace window, plus both E2E cases. `--cases`, `--iterations`,
-`--trace-iterations`, `--repeats` and `--e2e-steps` bound the run.
-Alternate copied baseline/candidate executables within the same agreed window
-for a performance claim:
-
-```sh
-python -B tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/CANDIDATE --output outputs/perf-comparison
-```
-
-This times the catalog's `ci` suite by default and accepts `--suite` and
-`--cases`; it does not trace. Both executables' catalogs must agree.
-
-The end-to-end cases include process startup, Python JSON, stdin/stdout and polling
-overhead. `e2e-client` uses eight simulation slots and explicit zero processing
-duration. `e2e-host` starts a temporary host on `127.0.0.1:0`, one network client
-and four background bots. It measures real-time scheduling and socket processing,
-so throughput is cadence-limited. Response latency is observed at the Python
-caller and includes its 0.5 ms pipe-poll sleeps. The host is killed and waited for
-on success and error; no listener is retained. Hosted receipts vary with wall time
-and have no deterministic response hash.
+The catalog owns names, suites, sample sizes, resolved definitions and profile
+support. The [workload guide](performance-workloads.md) explains scenario
+lifecycles, validity checks, adding cases and the specialized observation/retained
+client harnesses. [PR comparisons](maintainers/pr-reports.md) use the same catalog.
 
 ## Controller transport
 
@@ -226,23 +119,48 @@ functions.
 The [transport v2 study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-transport-v2/REPORT.md)
 holds the `slither-sim-json-v1` baseline, the v2 results and the thread comparison.
 
-## Follow-up workloads
+## Comparison deadlines
 
-For a shared time limit and retained incomplete attempts, see
-[comparison deadlines](performance-deadlines.md).
-The [observation guide](performance-observations.md) adds immutable geometry and
-selection cases from a separate harness without a catalog; `perf_compare.py`
-keeps their fixed sample sizes. [Retained client processing](performance-clients.md)
-covers longer-lived connections and decoder state.
+`--max-wall-seconds` gives metadata commands and measurement children one shared
+monotonic deadline; builds happen before it starts. Leave margin for startup,
+file operations and cleanup. The option cannot extend the existing 30-second
+metadata or 120-second native-child limits. It is not an OS CPU/memory cap.
 
-## Initial 0.2.0 cost report, October 23, 2026
+Expiry prevents the next child or interrupts the current one. Cleanup kills the
+owned child, waits up to ten seconds and closes its pipes/error file. Flushed rows
+and diagnostics remain, and `failure.json` records the budget and elapsed time.
+An incomplete run has no comparison summary. Rehash retained binaries before a
+separate attempt; use a fresh output directory.
 
-The [archived baseline study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-23-baseline/REPORT.md)
-retains the original measurements, cost attribution and limitations.
+## Compare copied executables
 
-## First optimization: collision bounds lookup
+For specialized harnesses or an existing copied-binary study, build each source
+snapshot with the checked-in lockfile and release profile, using separate targets.
+For the baseline harness and CLI:
 
-The [archived collision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-23-collision-bounds/REPORT.md)
-retains all paired results and parity evidence. Its gain is specific to the
-separated-body fixture; no general or end-to-end speedup was established.
-See the [research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) for other completed studies.
+```sh
+cargo build --release --locked --bin slither-sim --example perf_baseline -j 2
+```
+
+Copy each executable out of its mutable Cargo target before timing. Record the
+build command/log, immutable source identity (including edits), toolchain and
+binary SHA-256 at build time. A binary hash or cached build alone does not prove
+which sources produced it. The copied-binary runners do not enforce that check;
+reject uncertain inputs and rebuild before parity checks and timing.
+
+```sh
+python -B tools/perf_compare.py --baseline PATH/TO/BASELINE --candidate PATH/TO/CANDIDATE --output outputs/perf-comparison
+```
+
+This mode defaults to the catalog's `ci` suite and accepts `--suite`/`--cases`;
+it does not trace. Both catalogs must agree. The separate `tools/perf_baseline.py`
+runner also accepts `--harness` and `--cli` for end-to-end reports. Its
+`e2e-client` includes Python/JSON/process overhead; `e2e-host` additionally runs a
+temporary loopback host and is cadence-limited. The host is stopped on success or
+error. Hosted receipts have no deterministic response hash.
+
+The runners use standard-library Python. Existing locked environments can be
+reused with `uv run --project PATH --locked --only-group tools --no-sync --offline
+python -B ...`. Preserve raw results before cleaning ignored outputs. Dated
+measurements and decisions live in the
+[research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md).
