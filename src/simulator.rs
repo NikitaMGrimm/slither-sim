@@ -460,6 +460,15 @@ impl Simulator {
             }
         }
         world.food_cache.end();
+        world
+            .prey
+            .try_reserve(world.config.prey.count)
+            .map_err(|_| {
+                format!(
+                    "prey count {} does not fit in memory",
+                    world.config.prey.count
+                )
+            })?;
         // A new world has no prey, so IDs 0..count need no collision scan.
         for _ in 0..world.config.prey.count {
             world.push_prey();

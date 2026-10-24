@@ -136,6 +136,18 @@ fn food_and_prey_targets_have_no_policy_cap() {
     )
     .unwrap_err();
     assert!(error.contains("foodCount"), "{error}");
+    let error = Simulator::new(
+        7,
+        Config {
+            prey: slither_sim::PreyConfig {
+                count: usize::MAX,
+                ..Default::default()
+            },
+            ..Config::sandbox()
+        },
+    )
+    .unwrap_err();
+    assert!(error.contains("prey count"), "{error}");
 }
 
 #[test]
