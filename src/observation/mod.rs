@@ -147,7 +147,11 @@ impl<'a> Observer<'a> {
                     b
                 })
                 .collect(),
-            food: (observers >= 4 && food >= 256 && food < u32::MAX as usize)
+            // Building the grid costs a few passes over the food list, so small
+            // batches scan it directly instead.
+            food: (observers >= 8
+                && observers.saturating_mul(food) >= 1 << 15
+                && food < u32::MAX as usize)
                 .then(|| FoodGrid::new(world.food, world.vision)),
         });
         Self { world, index }
