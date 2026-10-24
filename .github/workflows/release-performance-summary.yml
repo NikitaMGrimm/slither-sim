@@ -1,0 +1,36 @@
+name: Release performance summary
+
+on:
+  workflow_run:
+    # Includes bot-generated PR refreshes, which need no pull_request event.
+    workflows: [Release PR, Release]
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-performance-summary
+  cancel-in-progress: false
+
+jobs:
+  summarize:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Trusted default-branch code only, including on pull_request_target/forks.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { summarize } = require('./tools/release_performance.cjs');
+            await summarize({github, context, core});

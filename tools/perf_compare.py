@@ -141,7 +141,7 @@ def child_error(row, workload):
     return None
 
 
-def sequential(binaries, hashes, workloads, output, deadline, plan):
+def sequential(binaries, hashes, workloads, output, deadline, plan, *, checkpoint=None):
     """The PR comparison sampler: statistics contract v1 §1, §2 and §6.
 
     `workloads` are in frozen catalog order with matched plans on both sides; `deadline`
@@ -193,6 +193,14 @@ def sequential(binaries, hashes, workloads, output, deadline, plan):
     def stop(name, termination, failure=None):
         rows[name].update(termination=termination, failure=failure)
 
+    def summary():
+        corrupted = hashes != {key: digest(path) for key, path in binaries.items()}
+        return {name: {**perf_stats.final(
+                    row["history"], len(row["pairs"]),
+                    "measurement_failure" if corrupted else row["termination"] or "sampling",
+                    "benchmark executable changed during sampling" if corrupted else row["failure"]),
+                       "n_attempted": row["attempted"]} for name, row in rows.items()}
+
     try:
         active = list(workloads)
         capped = False
@@ -207,7 +215,7 @@ def sequential(binaries, hashes, workloads, output, deadline, plan):
                 active.remove(workload)
         else:
             # Rounds in catalog order, one pair per active workload; every row keeps its own index.
-            for _ in perf_stats.ORDER:
+            for round_index, _ in enumerate(perf_stats.ORDER, 1):
                 for workload in list(active):
                     row = rows[workload.name]
                     index = len(row["pairs"]) + 1
@@ -251,19 +259,17 @@ def sequential(binaries, hashes, workloads, output, deadline, plan):
                     active.remove(workload)
                 if capped or not active:
                     break
+                # Publish only covered complete rounds. The callback may pause for
+                # artifact upload; no measurement child runs during that pause.
+                if checkpoint is not None and round_index in perf_stats.LOOKS:
+                    checkpoint(summary(), deadline)
         # Deadline: rows never attempted (including after a capped warmup) did not start.
         for workload in active:
             stop(workload.name, "time_cap" if rows[workload.name]["attempted"] else "not_started")
     finally:
         results.close()
         pairs_log.close()
-    corrupted = hashes != {key: digest(path) for key, path in binaries.items()}
-    final = {}
-    for name, row in rows.items():
-        if corrupted:  # §6: global binary corruption invalidates every row
-            row.update(termination="measurement_failure", failure="benchmark executable changed during sampling")
-        final[name] = {**perf_stats.final(row["history"], len(row["pairs"]), row["termination"], row["failure"]),
-                       "n_attempted": row["attempted"]}
+    final = summary()
     write_json(output / "sequential.json", final)
     return final
 

@@ -71,8 +71,8 @@ those cases unavailable and labels the report incomplete.
 
 ## How results are decided
 
-The method implements the frozen
-[statistics contract v1](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-pr-comparison-statistics/STATISTICS-CONTRACT.md);
+New runs implement [statistics protocol v2](performance-statistics-v2.md);
+the frozen v1 contract and its evidence retain their historical allocation.
 `tools/perf_stats.py` cites its sections, and the sampler is
 `perf_compare.sequential`.
 
@@ -91,14 +91,14 @@ runs one discarded baseline-then-PR warmup pair. Rounds then visit the active
 rows in catalog order, one pair each, following a fixed sequence in which every
 two consecutive pairs contain one baseline-first and one PR-first pair.
 
-**Analysis.** A row is analyzed only after exactly 8, 12 and 26 pairs. With
+**Analysis.** Covered looks are 8, 12, 26, then doubling through 53,248 pairs. With
 `d = log(PR time / base time)` per pair, a regression `d = mu + gamma * order`
 removes a constant first-run effect, and `mu ± t * s / sqrt(n)` is the interval,
 where `s` is the residual standard deviation and `t` the Student-t quantile at
-1 − 1/1200 with `n − 2` degrees of freedom. Change shows `exp(mu) − 1` with the
+1 − eta/2 with `n − 2` degrees of freedom. Change shows `exp(mu) − 1` with the
 interval's transformed ends, so the bracket is asymmetric; Base and PR are
-geometric means over the same pairs. Each interval's own coverage is 99.83%; it
-is not a per-row 95% interval.
+geometric means over the same pairs. The allocation is 1/750 at the first three
+looks, then `1/(1000 * 2^k)` at later doubling look k. These are not per-row 95% intervals.
 
 | Result | Meaning |
 | --- | --- |
@@ -112,8 +112,8 @@ The band is about time, not throughput: 10% less time is not exactly 10% more
 operations per second. Labels use unrounded interval ends, so a displayed end of
 exactly ±5.00% can coexist with a strict label.
 
-**Error bound.** Ten workloads with three looks give at most 30 intervals, each
-missing its true value with probability 1/600. By the union bound, all of them
+**Error bound.** Ten slots and fourteen pre-budgeted looks have total
+noncoverage allocation 0.0499951171875. By the union bound, all of them
 cover their true values with probability at least 95%, and any wrong Faster,
 Slower or Within claim in a report requires a miss. So the chance that a report
 contains any wrong claim is at most 5%, whatever the correlation between
@@ -123,20 +123,22 @@ workload it assumes independent, normally distributed log-ratio errors with
 constant variance, and constant change and order effects over the run. Heavy
 tails, drift, serial dependence or changing effects can break it. It covers
 these two executables on this runner, not other machines, builds or later
-commits. Until a hosted-runner calibration has been run and reviewed, the
-comment says so.
+commits. Hosted model calibration is not established; labels remain conditional
+and advisory. This extension selects no new OS, block count or power claim.
 
 **Stopping and budget.** A Faster, Slower or Within row stops at once and keeps
-that look. An Undecided row continues to the next look and stops at 26 pairs. A
+that look. An Undecided row continues until the cap or the explicit 53,248-pair
+safety guard; that guard is not a confidence claim. A
 crash, hang, invalid timing record, changed executable or numeric failure makes
 the row unavailable for the rest of the run; earlier looks stay in its raw
-history but are never displayed. The job has a 15-minute timeout. Its first step
-records a monotonic start time, and sampling stops at the earlier of 620 seconds
-after the stage starts (warmups included) or 14 minutes after job start, leaving
-60 seconds to write the report and upload artifacts. No child starts after the
+history but are never displayed. An unexpected sampler exception also invalidates
+final claims after an interim snapshot. The job has a provisional 30-minute timeout.
+Its first step records a monotonic start time, and sampling stops at the earlier of 1,500 seconds
+after the stage starts (warmups and upload pauses included) or 28.5 minutes after job start, leaving
+90 seconds to write the report and upload artifacts. No child starts after the
 deadline; a child still running is killed and its pair is kept as an incomplete
 attempt. Each unfinished row then keeps its last completed look: 10 or 11 pairs
-report the 8-pair result, and fewer than 8 pairs are unavailable. A time-capped
+report the 8-pair result, 45 pairs use 26, and fewer than 8 pairs are unavailable. A time-capped
 Undecided result is not a failure; the job stays advisory and outside required
 checks.
 
@@ -168,7 +170,8 @@ builds the harness once, copies and hashes it, and runs both roles from that one
 file with identical arguments through `tools/perf_calibration.py`. For every
 workload in the group it times processes with 1, 2 and 4 reset-identical blocks:
 one discarded warmup pair per block count, then six balanced pairs each, with no
-early stopping. It uses the comparison's deadline. The artifact keeps every child
+early stopping. This frozen v1 pilot retains its 620-second stage/15-minute job
+budget rather than adopting the v2 comparison deadline. The artifact keeps every child
 attempt with its block times, the manifest (executable, catalog, toolchain,
 runner image, CPU) and `summary.json`. The summary holds per-job estimates for
 each block count (order-adjusted paired residual variance, within- and
@@ -193,7 +196,7 @@ It is generated automatically from the measurements, with no model call or
 agent byline. Colored status dots mark the results described above;
 methodology and diagnostics are collapsed under Details.
 Before posting, the publisher checks the artifact's PR/repository/head/merge
-identity, current open PR head and target, and prior published run/attempt.
+identity, final PR head and target, and prior published run/attempt/sequence.
 The current target is resolved through the branch API; the PR's `base.sha` can
 retain an older snapshot even when the merge checkout uses a newer target.
 If concurrent work advances the target along the same history, the pinned
@@ -206,6 +209,27 @@ and reads a bounded comment artifact as data. It never runs PR scripts with its
 comment-write token. Artifact identity, bot authorship and published run metadata
 prevent unrelated or older runs from replacing a newer report. GitHub mentions
 in PR-provided diagnostics are suppressed.
+
+The unprivileged collector writes immutable snapshots at at most three covered
+complete-round checkpoints. Each is bound to the exact run, attempt, PR head,
+base, two-parent preview, report/snapshot schema and frozen plan hash. The workflow
+pauses timing while pinned `upload-artifact` steps upload them, then acknowledges
+each upload before the next child starts. These pauses are retained and count
+against the deadline; their measurement-process effect is not calibrated.
+The trusted `workflow_run: in_progress` observer polls only for this source run,
+every 30 seconds for at most 31 minutes. It edits the same comment using monotone
+sequences. A separate `completed` event reconciles terminal outcomes, including
+failure/cancellation/timeout. Any unsuccessful source run withdraws all interim
+claims using saved validated bot provenance even if its artifacts were deleted,
+expired or malformed. ZIP paths, symlinks, duplicate entries and oversized data
+are rejected; downloaded data is never executed.
+
+Late results can update a merged PR when the source run, final PR head, original
+preview parents and actual merge identity still verify, with the measured base
+an ancestor of the actual merge. The publisher compares preview and actual trees
+and explicitly labels a different tree: the original preview remains evidence,
+but it does not measure the shipped tree. Closed-unmerged PRs and stale heads
+cannot receive current-looking updates. No merge method is assumed equivalent.
 If GitHub omits the run's PR association for a fork, the source branch must
 identify exactly one PR in this repository, including closed PRs. Ambiguous
 branches cannot publish a comment; their raw measurement artifacts remain
@@ -215,7 +239,8 @@ Both workflows use pinned actions and leave checkout credentials unpersisted.
 No personal token or external benchmarking service is needed. Full measurements,
 input/binary hashes, traces and logs remain in a separate artifact for 14 days,
 including partial output on failure. The publisher downloads only the small
-comment artifact. Broken report generation remains visible as a failed job.
+comment artifacts. Launcher logs/PID and partial diagnostics are included even
+when an upload step fails before the collector's finish step. Broken report generation remains visible as a failed job.
 Full-state trace archives use gzip level 1 to reduce untimed compression work;
 parity still hashes every uncompressed byte. Archive sizes can therefore grow.
 
@@ -223,6 +248,30 @@ GitHub's usual approval policy still applies to first-time fork contributors.
 Conflicting PRs need their conflicts resolved before a merge checkout can run.
 The publisher workflow must exist on the default branch before GitHub can
 trigger it; see the [workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+
+## Rolling release evidence
+
+A separate bot-owned comment on the rolling `release-plz-*` PR consolidates merged
+PR reports since the latest published release tag, pinned to that tag's commit
+and the current main candidate. It preserves all outcome-label counts and exposes
+two preselected headline workloads (`step-default`, `official-100-bot`) with their
+own uncertainty and source links. Missing, historical, failed and incomplete
+reports stay explicit. Preview measurements are not relabeled as shipped-tree
+measurements, and PR percentages are never summed.
+
+Cheap refreshes follow terminal PR reporting, merges, and completion of Release PR
+and Release workflows. This includes release-plz updates made with `GITHUB_TOKEN`
+that do not produce ordinary PR events. All summary writers share one concurrency
+group, recheck candidate/release-head freshness and skip identical content. They
+edit no release-plz body or branch files and change no release authorization,
+metadata-only diff, publication, merge or cooldown guard. The range is bounded
+to 1,000 commits; a larger or diverged range is explicitly unavailable.
+
+A direct prior-published-tag versus pinned release-candidate comparison is a
+separate on-demand layer. Consolidation starts no measurements on main pushes
+or release metadata churn. Comparing a release PR merely to its target would
+miss accumulated changes; historical harness incompatibility must be unavailable
+with a reason rather than a fabricated comparison.
 
 ## Local checks and diagnosis
 

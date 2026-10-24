@@ -6,6 +6,7 @@ requires a quiet runner and matched inputs.
 """
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -24,12 +25,12 @@ import perf_stats
 
 ROOT = Path(__file__).resolve().parents[1]
 MARKER = "<!-- slither-report-preview -->"
-# Statistics contract v1 §6: D = min(stage start + 620 s, job start + 900 s - 60 s).
+# Operational v2 budget, provisional rather than a calibrated optimum.
 # JOB_TIMEOUT_SECONDS must match the workflow's timeout-minutes; the reserve leaves
 # time to write the report and upload artifacts before GitHub cancels the job.
-JOB_TIMEOUT_SECONDS = 900
-RESERVE_SECONDS = 60
-STAGE_CAP_SECONDS = 620
+JOB_TIMEOUT_SECONDS = 1800
+RESERVE_SECONDS = 90
+STAGE_CAP_SECONDS = 1500
 RESULTS = {"Faster": "🟢 Faster", "Slower": "🔴 Slower", "Within": "⚪ Within ±5%",
            "Undecided": "🟡 Undecided", "Unavailable": "⚠️ Unavailable"}
 
@@ -131,7 +132,7 @@ def stopping(row):
     parts = [f"{used} pairs used"]
     if row["reason"] == "degenerate_residuals":
         parts.append("interval unavailable (degenerate residuals)")
-    parts.append({"resolved": "stopped when resolved", "max_pairs": "stopped at the last look"}.get(
+    parts.append({"sampling": "sampling continues", "resolved": "stopped when resolved", "max_pairs": "stopped at the last look"}.get(
         row["termination"], "time cap" + (f" ({complete} complete pairs collected)" if complete > used else "")))
     return f"- {name}: " + "; ".join(parts) + "."
 
@@ -198,13 +199,14 @@ def render(report):
         lines += ["", "⚠️ **Incomplete report:** see details for missing results."]
     lines += ["", "<details><summary>Details</summary>", "",
               f"- PR head: `{report['head']}`. Runner: {cell(report['platform'])}.",
-              "- Paired operation wall time after warmup, with balanced order and checks at 8/12/26 pairs. "
+              "- Paired operation wall time after warmup, with balanced order and covered checks at 8/12/26, "
+              "then doubling through 53,248 pairs (finite safety guard). "
               "Base/PR are geometric means; Change shows estimate [interval] against a −5% to +5% band.",
-              "- Order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 3 looks "
+              "- V2 order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 14 pre-budgeted looks "
               "under independent normal log errors. Resolved rows stop; time-capped rows retain their last "
               "completed look. Labels use unrounded bounds.",
               # Remove only after hosted calibration has run and been reviewed.
-              "- Hosted-runner calibration is pending; performance labels are advisory and conditional on the timing model.",
+              "- Hosted model calibration is not established; performance labels are advisory and conditional on the timing model.",
               "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
               "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior."]
     if traces:
@@ -228,7 +230,39 @@ def render(report):
         lines.append(f"- **Incomplete:** {cell(error)}.")
     lines += ["- Measurements use PR code and the selected fixtures; inspect the raw data for any disputed result.",
               "- Raw results, hashes and logs are linked above.", "", "</details>", ""]
+    if report.get("snapshot", {}).get("state") == "sampling":
+        lines[3:3] = ["**Sampling in progress:** provisional covered checkpoint; a failed or cancelled run withdraws these claims.", ""]
     return "\n".join(lines)
+
+
+def save_report(output, report):
+    """A snapshot directory is exclusively created and never changed after ready."""
+    output.mkdir(parents=True, exist_ok=False)
+    (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (output / "report.md").write_text(render(report), encoding="utf-8", newline="\n")
+    (output / "ready").touch(exist_ok=False)
+
+
+class Snapshots:
+    def __init__(self, output):
+        self.output, self.sequence = output, 0
+
+    def checkpoint(self, report, deadline):
+        if self.sequence >= 3:
+            return
+        self.sequence += 1
+        snapshot = copy.deepcopy(report)
+        snapshot["snapshot"] = {"schema": "slither-pr-progress-v1", "sequence": self.sequence, "state": "sampling"}
+        directory = self.output / "progress" / str(self.sequence)
+        save_report(directory, snapshot)
+        if os.environ.get("PR_REPORT_CHECKPOINT_UPLOAD") == "1":
+            started = time.perf_counter()
+            # The next workflow step acknowledges only after upload completes.
+            # An expired pause cannot resume timing: the sampler checks D first.
+            while not (directory / "resume").exists() and time.perf_counter() < deadline:
+                time.sleep(min(0.25, max(0, deadline - time.perf_counter())))
+            with (self.output / "checkpoint-pauses.jsonl").open("a", encoding="utf-8") as log:
+                log.write(json.dumps({"sequence": self.sequence, "seconds": time.perf_counter() - started}) + "\n")
 
 
 def collect(output, head, job_start):
@@ -348,18 +382,33 @@ def measure(report, binaries, hashes, catalogs, suites, output, job_start):
             "warmup": "one discarded baseline-then-candidate pair per workload, after the harness's fixed "
                       "internal warmup in every process",
             "order": perf_stats.ORDER, "looks": perf_stats.LOOKS, "band": [0.95, 1.05],
+            "eta_denominators": perf_stats.ETA_DENOMINATORS,
             "critical": {str(df): value for df, value in perf_stats.T_CRITICAL.items()},
             "deadline": {"stage_cap_seconds": STAGE_CAP_SECONDS, "job_timeout_seconds": JOB_TIMEOUT_SECONDS,
                          "reserve_seconds": RESERVE_SECONDS, "stage_budget_seconds": deadline - stage}}
     print(f"[performance] Sampling for at most {max(0, deadline - stage):.0f} s", flush=True)
     output.mkdir()
-    try:
-        rows = perf_compare.sequential(binaries, hashes, matched, output, deadline, plan)
-    except Exception as error:  # Infrastructure failure: the report is incomplete, not a timing claim.
-        report["errors"].append(f"performance sampler: {type(error).__name__}: {error}")
-        return
+    snapshots = Snapshots(output.parent)
     mismatch = {**perf_stats.final([], 0, "measurement_failure", "workload definitions differ between base and PR"),
                 "n_attempted": 0}
+
+    def checkpoint(rows, deadline):
+        report["performance"] = [{"case": w.name, **rows.get(w.name, mismatch)} for w in suites["candidate"]]
+        report["performance_plan_sha256"] = digest(output / "plan.json")
+        snapshots.checkpoint(report, deadline)
+
+    try:
+        options = {"checkpoint": checkpoint} if os.environ.get("PR_REPORT_CHECKPOINT_UPLOAD") == "1" else {}
+        rows = perf_compare.sequential(binaries, hashes, matched, output, deadline, plan, **options)
+    except Exception as error:  # Infrastructure failure: the report is incomplete, not a timing claim.
+        failure = f"performance sampler: {type(error).__name__}: {error}"
+        report["errors"].append(failure)
+        prior = {r["case"]: r for r in report.get("performance", [])}
+        report["performance"] = [{"case": w.name, **perf_stats.final(
+            prior.get(w.name, {}).get("history", []), prior.get(w.name, {}).get("n_complete", 0),
+            "measurement_failure", failure), "n_attempted": prior.get(w.name, {}).get("n_attempted", 0)}
+            for w in suites["candidate"]]
+        return
     report["performance"] = [{"case": w.name, **rows.get(w.name, mismatch)} for w in suites["candidate"]]
     report["performance_plan_sha256"] = digest(output / "plan.json")
     report["budget"] = {"stage_budget_seconds": deadline - stage, "stage_seconds": time.perf_counter() - stage,
@@ -381,6 +430,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     try:
         report = collect(output, args.head, job_start)
+        report["snapshot"] = {"schema": "slither-pr-progress-v1", "sequence": 5, "state": "complete"}
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
         markdown = render(report)
         (output / "report.md").write_text(markdown, encoding="utf-8", newline="\n")
@@ -390,6 +440,8 @@ def main():
     except Exception as error:
         (output / "failure.json").write_text(json.dumps({"type": type(error).__name__, "error": str(error)}) + "\n", encoding="utf-8")
         raise
+    finally:
+        (output / "done").touch()
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ const marker = '<!-- slither-report-preview -->';
 const bot = { login: 'github-actions[bot]', type: 'Bot' };
 function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotBase = liveBase,
                       targetHistory = 'diverged', reportOverride = {}, runOverride = {},
-                      fork = false, liveRepo, parents, artifacts, associated } = {}) {
+                      fork = false, liveRepo, parents, artifacts, associated, prOverride = {}, sameTree = true } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-comment-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true }));
   const report = { schema: 1, repository: 'owner/repo', pr: 27, head, base, merge, run: 100, attempt: 1, ...reportOverride };
@@ -30,17 +30,18 @@ function fixture(t, { previous = [], liveHead = head, liveBase = base, snapshotB
     : artifacts || [{ id: 5, name: 'pr-report-comment', expired: false, size_in_bytes: 1000 }], rest: {
     actions: { getWorkflowRun: async () => ({ data: run }),
       getWorkflow: async () => ({ data: { id: 4 } }), listWorkflowRunArtifacts: {} },
-    pulls: { list: {}, get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'any-branch', repo: { id: liveRepo ?? (fork ? 2 : 1) } }, base: { sha: snapshotBase, ref: 'target', repo: { full_name: 'owner/repo' } } } }) },
+    pulls: { list: {}, get: async () => ({ data: { state: 'open', head: { sha: liveHead, ref: 'any-branch', repo: { id: liveRepo ?? (fork ? 2 : 1) } }, base: { sha: snapshotBase, ref: 'target', repo: { full_name: 'owner/repo' } }, ...prOverride } }) },
     repos: { getBranch: async () => ({ data: { commit: { sha: liveBase } } }),
-      getCommit: async () => ({ data: { parents: parents || [{ sha: base }, { sha: head }] } }),
+      getCommit: async ({ref}) => ({ data: { parents: parents || [{ sha: base }, { sha: head }],
+        commit: {tree: {sha: ref === merge || sameTree ? base : head}} } }),
       compareCommitsWithBasehead: async () => ({ data: { status: targetHistory } }) },
     issues: { listComments: {},
-      createComment: async x => { calls.push(['create', x]); return { data: { html_url: 'created' } }; },
-      updateComment: async x => { calls.push(['update', x]); return { data: { html_url: 'updated' } }; }
+      createComment: async x => { calls.push(['create', x]); previous.push({id:99,user:bot,body:x.body}); return { data: { html_url: 'created' } }; },
+      updateComment: async x => { calls.push(['update', x]); const old=previous.find(c=>c.id===x.comment_id); if(old)old.body=x.body; return { data: { html_url: 'updated' } }; }
     }
   } };
-  return { directory, calls, outputs, args: { github, context,
-    core: { info() {}, setOutput(key, value) { outputs[key] = value; } }, directory } };
+  return { directory, calls, outputs, run, args: { github, context,
+    core: { info() {}, warning() {}, setOutput(key, value) { outputs[key] = value; } }, directory } };
 }
 
 test('creates the first comment and ignores a human marker impersonation', async t => {
@@ -49,6 +50,103 @@ test('creates the first comment and ignores a human marker impersonation', async
   assert.equal(f.calls[0][0], 'create');
   assert.equal(f.calls[0][1].issue_number, 27);
   assert.match(f.calls[0][1].body, /slither-report-run:.*"run":100/);
+});
+
+test('merged final head retains original preview evidence and discloses actual tree', async t => {
+  for (const sameTree of [true, false]) {
+    const f = fixture(t, { sameTree, targetHistory: 'ahead', prOverride: {state: 'closed', merged: true, merge_commit_sha: 'd'.repeat(40)} });
+    await publish(f.args);
+    assert.equal(f.calls.length, 1);
+    assert.match(f.calls[0][1].body, sameTree ? /has the same tree/ : /has a different tree/);
+    assert.match(f.calls[0][1].body, /Measured preview/);
+  }
+  for (const options of [
+    {prOverride: {state: 'closed', merged: false}},
+    {liveHead: base, prOverride: {state: 'closed', merged: true, merge_commit_sha: merge}},
+    {targetHistory: 'diverged', prOverride: {state: 'closed', merged: true, merge_commit_sha: merge}},
+  ]) {
+    const f = fixture(t, options);
+    await publish(f.args);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+const progress = sequence => ({schema: 'slither-pr-progress-v1', sequence, state: 'sampling'});
+test('progress sequences are monotone, plan-bound and attempt-bound', async t => {
+  const saved = {run:100, attempt:1, sequence:2, state:'sampling', plan:'d'.repeat(64)};
+  for (const sequence of [1,2,3]) {
+    const f = fixture(t, {runOverride:{status:'in_progress', conclusion:null},
+      reportOverride:{snapshot:progress(sequence), performance_plan_sha256:saved.plan},
+      previous:[{id:42,user:bot,body:`${marker}\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`}]});
+    await publish(f.args);
+    assert.equal(f.calls.length, sequence === 3 ? 1 : 0);
+  }
+  const f = fixture(t, {runOverride:{status:'in_progress', conclusion:null},
+    reportOverride:{snapshot:progress(3),performance_plan_sha256:'e'.repeat(64)},
+    previous:[{id:42,user:bot,body:`${marker}\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`}]});
+  await assert.rejects(publish(f.args), /plan changed/);
+});
+
+test('every unsuccessful terminal outcome withdraws all interim claims', async t => {
+  for (const conclusion of ['failure','cancelled','timed_out','action_required']) {
+    const f = fixture(t, {runOverride:{conclusion}, reportOverride:{snapshot:progress(2),performance_plan_sha256:'d'.repeat(64)}});
+    await publish(f.args);
+    assert.equal(f.calls.length,1);
+    assert.match(f.calls[0][1].body,/All interim performance claims are withdrawn/);
+    assert.doesNotMatch(f.calls[0][1].body,/Measured report/);
+  }
+});
+
+test('terminal failure withdraws from trusted provenance without deleted, expired or malformed artifacts', async t => {
+  for (const artifacts of [[],[{name:'pr-report-progress-1-1',expired:true}],
+    [{name:'pr-report-comment-1',size_in_bytes:9_000_000}]]) {
+    const saved={run:100,attempt:1,sequence:1,state:'sampling',head,base,merge,plan:'d'.repeat(64)};
+    const f=fixture(t,{runOverride:{conclusion:'cancelled'},artifacts,
+      previous:[{id:42,user:bot,body:`${marker}\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`}]});
+    await publish.observe({...f.args,download:async()=>{throw Error('must not download');}});
+    assert.equal(f.calls.length,1);
+    assert.match(f.calls[0][1].body,/claims are withdrawn/);
+  }
+});
+
+test('download exception concurrent with completion retracts an existing snapshot', async t => {
+  const saved={run:100,attempt:1,sequence:1,state:'sampling',head,base,merge,plan:'d'.repeat(64)};
+  const f=fixture(t,{runOverride:{status:'in_progress',conclusion:null},
+    previous:[{id:42,user:bot,body:`${marker}\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`}]});
+  await publish.observe({...f.args,download:async()=>{f.run.status='completed';f.run.conclusion='failure';throw Error('synthetic download failure');}});
+  assert.equal(f.calls.length,1);
+  assert.match(f.calls[0][1].body,/claims are withdrawn/);
+});
+
+test('malformed successful terminal artifact retracts rather than promoting interim claims', async t => {
+  const saved={run:100,attempt:1,sequence:1,state:'sampling',head,base,merge,plan:'d'.repeat(64)};
+  const f=fixture(t,{previous:[{id:42,user:bot,body:`${marker}\n<!-- slither-report-run: ${JSON.stringify(saved)} -->`}]});
+  const copy=fs.mkdtempSync(path.join(os.tmpdir(),'slither-invalid-'));
+  fs.writeFileSync(path.join(copy,'report.json'),'invalid JSON');
+  await publish.observe({...f.args,download:async()=>copy});
+  assert.equal(f.calls.length,1);
+  assert.match(f.calls[0][1].body,/terminal artifact download or validation failed/);
+});
+
+test('completion racing a progress publication is reconciled by the bounded observer', async t => {
+  const f = fixture(t, {runOverride:{status:'in_progress',conclusion:null},
+    reportOverride:{snapshot:progress(1),performance_plan_sha256:'d'.repeat(64)}});
+  const artifact = {id:5,name:'pr-report-progress-1-1',size_in_bytes:100};
+  const paginate=f.args.github.paginate;
+  f.args.github.paginate = async (method,args) => method === f.args.github.rest.actions.listWorkflowRunArtifacts ? [artifact] : paginate(method,args);
+  let clock=0, downloads=0;
+  await publish.observe({...f.args, now:()=>clock, sleep:async()=>{clock+=30000; f.run.status='completed'; f.run.conclusion='failure';},
+    download:async()=>{
+      downloads++;
+      const copy=fs.mkdtempSync(path.join(os.tmpdir(),'slither-race-'));
+      fs.copyFileSync(path.join(f.directory,'report.json'),path.join(copy,'report.json'));
+      fs.copyFileSync(path.join(f.directory,'report.md'),path.join(copy,'report.md'));
+      return copy;
+    }});
+  assert.equal(downloads,1);
+  assert.equal(f.calls.length,2);
+  assert.match(f.calls[1][1].body,/All interim performance claims are withdrawn/);
+  assert.equal(clock,30000);
 });
 test('updates the existing bot comment rather than creating another', async t => {
   const f = fixture(t, { previous: [{ id: 42, user: bot, body: `${marker}\n<!-- slither-report-run: {"run":99,"attempt":1} -->` }] });

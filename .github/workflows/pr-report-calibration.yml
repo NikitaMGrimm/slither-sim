@@ -25,8 +25,7 @@ jobs:
   calibrate:
     name: Calibration (${{ inputs.os }}, group ${{ inputs.group }})
     runs-on: ${{ inputs.os }}
-    # Same budget as the PR comparison: tools/perf_calibration.py takes its deadline
-    # from tools/pr_report.py.
+    # Frozen pilot v1 budget, independently retained in tools/perf_calibration.py.
     timeout-minutes: 15
     steps:
       - name: Record job start
