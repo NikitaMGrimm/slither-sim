@@ -2071,3 +2071,38 @@ mod prey_index_tests {
         assert!(world.prey.is_empty(), "{} prey left", world.prey.len());
     }
 }
+
+#[cfg(test)]
+mod pit_sweep_tests {
+    use super::*;
+
+    #[test]
+    fn a_one_ulp_step_inside_counts_although_rescaling_collapses_it() {
+        // Near the reviewer's repro, find a one-ulp step whose ends rescale to
+        // the same point while its end is measurably closer. `hypot` rounding
+        // differs across platforms, so search rather than fix the points.
+        let origin = Point::default();
+        let mut x: f64 = -7190.000000000015;
+        let mut tested = 0;
+        for _ in 0..1000 {
+            let (a, b) = (
+                Point { x, y: 10_000.0 },
+                Point {
+                    x: x.next_up(),
+                    y: 10_000.0,
+                },
+            );
+            x = x.next_down();
+            let (far, near) = (a.distance(origin), b.distance(origin));
+            if a.x / 10_000.0 != b.x / 10_000.0 || near >= far {
+                continue;
+            }
+            // A radius between the two: the start is outside, the end inside.
+            let radius = near.next_up();
+            assert!(far >= radius);
+            assert!(reaches_center(a, b, radius), "{a:?} -> {b:?}");
+            tested += 1;
+        }
+        assert!(tested > 0);
+    }
+}
