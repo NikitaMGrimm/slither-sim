@@ -122,6 +122,12 @@ no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
 observations, JSON transport and the `basic`/`fidelity_replay` examples remain
 available. `networking` is enabled by default and restores the full interface.
 
+`Simulator::set_parallel(true)` lets `observe_all` and `observe_selected` split
+large batches over the current [rayon](https://docs.rs/rayon) thread pool;
+results are identical. It is off by default so that worlds you already run in
+parallel do not compete for cores; size the pool with `RAYON_NUM_THREADS` or run
+inside `ThreadPool::install`. It needs the default-enabled `parallel` feature.
+
 ```sh
 cargo build --lib --no-default-features --locked
 ```

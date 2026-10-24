@@ -1,5 +1,11 @@
 //! Visibility, independent of stepping, rewards, and transport.
 use crate::{model::*, physics::Bounds, prey::Prey, simulator::Simulator};
+use std::ops::Range;
+
+/// Fewest observers worth a parallel task: one observation takes roughly 10-30
+/// microseconds, and waking pool threads costs tens of microseconds.
+#[cfg(feature = "parallel")]
+const OBSERVERS_PER_TASK: usize = 8;
 
 /// World state an observation is cut from: the authoritative world, or a frame a
 /// client has received.
@@ -292,24 +298,41 @@ impl Simulator {
         if selected.is_some_and(|flags| flags.len() != self.snakes.len()) {
             return Err("One selection flag per agent slot required".into());
         }
-        let wanted = |i: usize| self.snakes[i].alive && selected.is_none_or(|flags| flags[i]);
-        let observers = (0..self.snakes.len()).filter(|&i| wanted(i)).count();
+        let wanted: Vec<bool> = (0..self.snakes.len())
+            .map(|i| self.snakes[i].alive && selected.is_none_or(|flags| flags[i]))
+            .collect();
+        let observers = wanted.iter().filter(|&&w| w).count();
         // A dead-only or empty selection needs stable result slots, but no index.
         if observers == 0 {
             return Ok((0..self.snakes.len()).map(|_| None).collect());
         }
         let observer = Observer::new(VisibleState::of(self), observers);
-        let mut marks = Vec::new();
-        // Result collection cannot promise an exact lower size hint. Reserve stable slots once.
-        let mut observations = Vec::with_capacity(self.snakes.len());
-        for i in 0..self.snakes.len() {
-            observations.push(if wanted(i) {
-                Some(observer.observe(i, &mut marks)?)
-            } else {
-                None
-            });
+        let observe_range = |range: Range<usize>| {
+            let mut marks = Vec::new();
+            // Result collection cannot promise an exact lower size hint. Reserve stable slots once.
+            let mut observations = Vec::with_capacity(range.len());
+            for i in range {
+                observations.push(if wanted[i] {
+                    Some(observer.observe(i, &mut marks)?)
+                } else {
+                    None
+                });
+            }
+            Ok::<_, String>(observations)
+        };
+        #[cfg(feature = "parallel")]
+        if self.parallel() {
+            let parts = crate::parallel::parts(observers / OBSERVERS_PER_TASK);
+            if parts > 1 {
+                let ranges = crate::parallel::balanced(&wanted, parts);
+                let mut observations = Vec::with_capacity(self.snakes.len());
+                for part in crate::parallel::map_ranges(&ranges, &observe_range) {
+                    observations.extend(part?);
+                }
+                return Ok(observations);
+            }
         }
-        Ok(observations)
+        observe_range(0..self.snakes.len())
     }
 }
 
@@ -489,6 +512,34 @@ mod tests {
                 key(&selected),
                 "case {case}"
             );
+        }
+    }
+
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn parallel_batches_match_sequential_batches() {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build()
+            .unwrap();
+        let mut rng = Rng(0x2545_f491_4f6c_dd1d);
+        for case in 0..40 {
+            let vision = [1500.0, 300.0, f64::NAN, 1e13][case % 4];
+            let snakes = [16, 17, 40, 70][rng.below(4)];
+            let food = [0, 700, 3000][rng.below(3)];
+            let mut world = world(&mut rng, snakes, food, vision);
+            let all = key(&world.observe_all());
+            let mask: Vec<bool> = (0..snakes).map(|_| rng.below(3) != 0).collect();
+            let selected = key(&world.observe_selected(&mask).unwrap());
+            world.set_parallel(true);
+            pool.install(|| {
+                assert_eq!(key(&world.observe_all()), all, "case {case}");
+                assert_eq!(
+                    key(&world.observe_selected(&mask).unwrap()),
+                    selected,
+                    "case {case}"
+                );
+            });
         }
     }
 }

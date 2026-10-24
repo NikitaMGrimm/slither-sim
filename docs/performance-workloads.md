@@ -16,7 +16,8 @@ cargo run --release --locked --example perf_baseline -- --list
 `--list` prints one line of canonical JSON (sorted keys), format
 `slither-perf-catalog-v1`, and exits 0. Each workload in registration order has:
 
-- `name`: the `CASE` argument of `perf_baseline CASE ITERATIONS [--profile|--trace]`.
+- `name`: the `CASE` argument of
+  `perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel]`.
 - `suite`: `ci` rows are timed and traced by PR CI, which allows at most ten;
   `full` rows are local defaults only.
 - `iterations` and `traceIterations`: the default timed sample size and parity
@@ -104,6 +105,11 @@ traces contain:
 4. An `epoch` snapshot whenever the warmed scene is restored.
 5. A terminal `end` record with the operation count, physics ticks and lifecycle
    counts, followed by the usual report line. A trace without `end` is incomplete.
+
+`--parallel` calls `Simulator::set_parallel(true)` on the timed world, so `observe`
+and `-bot` rows observe on the rayon pool. It needs the default `parallel` feature
+and adds `"parallel": true` to the report; every other trace line must match the
+run without it. Runners and PR comparisons do not pass it.
 
 Snapshots and warmup statistics are taken right after the operation, before dead
 slots respawn: respawning resets a slot's per-life state, which would otherwise

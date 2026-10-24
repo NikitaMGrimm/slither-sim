@@ -304,8 +304,26 @@ pub struct Simulator {
     food_cache: FoodCache,
     #[serde(skip)]
     eater_grid: EaterGrid,
+    /// Batch observation on the rayon pool; see `set_parallel`.
+    #[cfg(feature = "parallel")]
+    #[serde(skip)]
+    parallel: bool,
 }
 impl Simulator {
+    /// Let `observe_all` and `observe_selected` split large batches over the
+    /// current rayon thread pool: the global pool, sized by `RAYON_NUM_THREADS`
+    /// or the core count, unless called inside `ThreadPool::install`. Results are
+    /// identical either way. Off by default, so worlds already run in parallel do
+    /// not compete for cores. Like the event buffers, this is not serialized.
+    #[cfg(feature = "parallel")]
+    pub fn set_parallel(&mut self, parallel: bool) {
+        self.parallel = parallel;
+    }
+    /// The `set_parallel` value.
+    #[cfg(feature = "parallel")]
+    pub fn parallel(&self) -> bool {
+        self.parallel
+    }
     /// Set ambient placement attempts per second, preserving fractional refill credit.
     /// Zero disables refill and discards pending credit. Invalid rates or unrepresentable
     /// clock rescaling leave the world unchanged. Use this instead of editing the rate directly.
@@ -352,6 +370,8 @@ impl Simulator {
             radius_update_index: 0,
             food_cache: FoodCache::default(),
             eater_grid: EaterGrid::default(),
+            #[cfg(feature = "parallel")]
+            parallel: false,
         };
         world.update_radius(0.0);
         world.food.reserve(world.config.food_count);
