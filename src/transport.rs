@@ -17,9 +17,12 @@ mod frame;
 
 pub const PROTOCOL: &str = "slither-sim-json-v2";
 
-const MAX_AGENTS: usize = 128;
-const MAX_WORLDS: usize = 1024;
-const MAX_DECISION_TICKS: usize = 1000;
+/// Frame slot indices are `u32` and `u32::MAX` means none.
+const MAX_AGENTS: usize = NONE as usize;
+/// Worlds are independent; only `worlds * agents` and memory bound them.
+const MAX_WORLDS: usize = usize::MAX;
+/// Frames report the ticks a step advanced as a `u32`.
+const MAX_DECISION_TICKS: usize = u32::MAX as usize;
 
 fn default_seed() -> u32 {
     1
@@ -283,13 +286,19 @@ impl Session {
                 decision_ticks,
                 config,
             } => {
-                if !(1..=MAX_WORLDS).contains(&worlds)
-                    || !(1..=MAX_AGENTS).contains(&agents)
-                    || !(1..=MAX_DECISION_TICKS).contains(&decision_ticks)
-                {
+                if worlds == 0 || agents == 0 || decision_ticks == 0 {
+                    return Err("Need at least one world, agent and decision tick".into());
+                }
+                if agents > MAX_AGENTS {
                     return Err(format!(
-                        "Need 1..{MAX_WORLDS} worlds, 1..{MAX_AGENTS} agents and \
-                         1..{MAX_DECISION_TICKS} decisionTicks"
+                        "agents must be at most {MAX_AGENTS}: frame slot indices are u32 \
+                         and u32::MAX means none"
+                    ));
+                }
+                if decision_ticks > MAX_DECISION_TICKS {
+                    return Err(format!(
+                        "decisionTicks must be at most {MAX_DECISION_TICKS}: frames report \
+                         ticks as u32"
                     ));
                 }
                 // The typed step and the C ABI index slots world-major.

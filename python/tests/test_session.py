@@ -287,8 +287,8 @@ class ErrorTests(unittest.TestCase):
         reset(session)
         before = fingerprint(session)
         for options, message in [
-            ({"worlds": 0}, "Need 1..1024 worlds, 1..128 agents and 1..1000 decisionTicks"),
-            ({"agents": 129}, "Need 1..1024 worlds, 1..128 agents and 1..1000 decisionTicks"),
+            ({"worlds": 0}, "Need at least one world, agent and decision tick"),
+            ({"agents": 2**32}, "agents must be at most 4294967295"),
             ({"seed": -1}, "invalid value: integer `-1`, expected u32"),
             ({"config": {"radius": 700, "colour": 1}}, "unknown field `colour`"),
         ]:
@@ -385,7 +385,7 @@ class ErrorTests(unittest.TestCase):
         self.assertEqual(replies[0], replies[2])
         info = replies[0]["result"]
         self.assertEqual(tuple(info["origins"]), slither_sim.ORIGINS)
-        self.assertEqual(info["maxAgents"], 128)
+        self.assertEqual(info["maxAgents"], 2**32 - 1)
         self.assertIn("error", session.request(b"{not json"))
         self.assertIn("error", session.request({"op": "fly"}))
 

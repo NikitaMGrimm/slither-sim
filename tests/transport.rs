@@ -262,9 +262,9 @@ fn rejected_requests_preserve_every_world() {
         json!({"op":"step","actions":[ok, {"heading":[0,1],"boost":[false,false],"x":1}]}),
         json!({"op":"reset","agents":0}),
         json!({"op":"reset","worlds":0}),
-        json!({"op":"reset","worlds":1025}),
+        json!({"op":"reset","agents":u64::from(u32::MAX) + 1}),
         json!({"op":"reset","config":{"dt":0}}),
-        json!({"op":"reset","decisionTicks":1001}),
+        json!({"op":"reset","decisionTicks":0}),
         json!({"op":"reset","config":{"unknownRule":true}}),
         json!({"op":"snapshot","world":2}),
         snapshots[0].clone(),
@@ -297,7 +297,9 @@ fn malformed_lines_and_unknown_requests_do_not_break_framing() {
         let info = &reply["result"];
         assert_eq!(info["version"], env!("CARGO_PKG_VERSION"));
         assert_eq!(info["defaultConfig"]["dt"], 0.007);
-        assert_eq!(info["maxWorlds"], 1024);
+        assert_eq!(info["maxAgents"], u32::MAX);
+        assert_eq!(info["maxWorlds"], usize::MAX);
+        assert_eq!(info["maxDecisionTicks"], u32::MAX);
         assert_eq!(info["origins"], json!(["ambient", "boost", "death"]));
         assert_eq!(
             info["precision"],
@@ -584,4 +586,42 @@ fn executable_emits_only_replies_and_exits_on_eof() {
             "{args:?} replies differ from in-process replies"
         );
     }
+}
+
+#[test]
+fn reset_sizes_are_bounded_by_frame_types_and_memory_not_policy() {
+    let small = json!({"radius":300,"dynamicRadius":false,"foodCount":0,"prey":{"count":0}});
+    let wide = json!({"radius":5000,"dynamicRadius":false,"foodCount":0,"prey":{"count":0}});
+    let replies = exchange(&[
+        json!({"op":"reset","worlds":1025,"agents":1,"config":small}),
+        json!({"op":"reset","agents":1,"decisionTicks":1001,"config":wide}),
+        json!({"op":"step","actions":[{"heading":[0],"boost":[false]}]}),
+        json!({"op":"reset","agents":129,"config":small}),
+        json!({"op":"reset","agents":u64::from(u32::MAX) + 1,"config":small}),
+        json!({"op":"reset","decisionTicks":u64::from(u32::MAX) + 1,"config":small}),
+        json!({"op":"reset","worlds":usize::MAX,"agents":2,"config":small}),
+        json!({"op":"reset","worlds":usize::MAX,"agents":1,"config":small}),
+        json!({"op":"reset","worlds":0}),
+        json!({"op":"snapshot"}),
+    ]);
+    assert_eq!(
+        replies[0]["result"]["worlds"].as_array().unwrap().len(),
+        1025
+    );
+    assert_eq!(replies[1]["result"]["decisionTicks"], 1001);
+    assert_eq!(replies[2]["result"]["worlds"][0]["ticks"], 1001);
+    let errors: Vec<&str> = replies[4..9]
+        .iter()
+        .map(|reply| reply["error"].as_str().unwrap())
+        .collect();
+    assert!(errors[0].contains("u32::MAX means none"), "{}", errors[0]);
+    assert!(errors[1].contains("ticks as u32"), "{}", errors[1]);
+    assert!(errors[2].contains("worlds * agents"), "{}", errors[2]);
+    assert!(errors[3].contains("do not fit in memory"), "{}", errors[3]);
+    assert!(errors[4].contains("at least one world"), "{}", errors[4]);
+    // Rejected resets keep the 129-agent session.
+    assert_eq!(
+        replies[9]["result"]["snakes"].as_array().unwrap().len(),
+        129
+    );
 }
