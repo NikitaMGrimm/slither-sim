@@ -231,9 +231,10 @@ impl Config {
         warnings
     }
 }
-/// Refill subtracts one attempt interval at a time from a clock below
-/// `interval + dt` until it runs out. Unless that subtraction changes the clock,
-/// the loop never ends, so f64 resolution, not a policy cap, bounds the rate.
+/// Refill subtracts one attempt interval at a time from a positive clock below
+/// `interval + dt` until it runs out. Unless that subtraction changes the
+/// largest such clock (and so every smaller one), the loop never ends, so f64
+/// resolution, not a policy cap, bounds the rate.
 fn check_ambient_rate(rate: f64, dt: f64) -> Result<(), String> {
     if !rate.is_finite() || rate < 0.0 {
         return Err("ambientReplenishPerSecond must be finite and nonnegative".into());
@@ -1145,7 +1146,11 @@ impl Simulator {
             self.ambient_clock += dt;
             if self.ambient_clock + 1e-12 >= interval {
                 let mut ambient_food_count = self.food_cache.ambient(&self.food);
-                while self.ambient_clock + 1e-12 >= interval {
+                // The tolerance spends an attempt a rounding error early, but only
+                // while credit remains: below a 1e-12 s interval it would otherwise
+                // drive the clock negative until subtraction stopped changing it.
+                // Above that interval a qualifying clock is always positive.
+                while self.ambient_clock > 0.0 && self.ambient_clock + 1e-12 >= interval {
                     self.ambient_clock -= interval;
                     if ambient_food_count < target {
                         let f = self.new_food();
