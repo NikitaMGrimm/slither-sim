@@ -313,8 +313,9 @@ def percentiles(values):
             for name, q in (("p50", .5), ("p95", .95), ("p99", .99), ("max", 1))}
 
 
-def native(executable, case, iterations, stderr_path, profile=False, *, deadline=None):
-    args = [str(executable), case, str(iterations)] + (["--profile"] if profile else [])
+def native(executable, case, iterations, stderr_path, profile=False, *, deadline=None, blocks=None):
+    args = [str(executable), case, str(iterations)] + (["--profile"] if profile else []) + (
+        ["--blocks", str(blocks)] if blocks is not None else [])
     started = time.perf_counter()
     child_deadline = min(started + 120, deadline) if deadline is not None else started + 120
     if child_deadline <= started:
