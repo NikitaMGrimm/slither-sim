@@ -49,7 +49,7 @@ at both ends of a real connection unless that extra delay is intentional.
 | `bind` | `"127.0.0.1:8766"` | Literal IP and port; `--bind` overrides it. |
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
 | `maxClients` | `4` | Reserved remote slots; at least 1. |
-| `bots` | `4` | Background food-seeking bots; clients + bots must be at most 65,536. |
+| `bots` | `4` | Background food-seeking bots; clients + bots must be at most 65,535. |
 | `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false. |
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
@@ -61,7 +61,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
 | `world` | `Config::official(1)` | World settings below. |
-| `agents` | `1` | Slots, 1–65,536; overridden by the host. |
+| `agents` | `1` | Slots, 1–65,535; overridden by the host. |
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, at least 1. |
 | `broadcastTicks` | `6` | Physics ticks per gameplay broadcast, at least 1; see the warning below. |
@@ -76,8 +76,9 @@ Broadcasts send at most three new body anchors per snake incrementally. When
 `broadcastTicks × world.dt × 437.5` reaches 126 world units, a boosting snake
 can outrun that window and is resent in full, which costs bandwidth but stays
 correct; such configs load with a warning. All possible arena radii must be at
-most 32,000, and configured prey speeds must satisfy `round(speed × 32) ≤ 65535`
-and the turn rate `1 ≤ round(turnRate × 8) ≤ 65535`. The largest attainable prey
+most 32,000 (an encoding-margin [policy](#limits)), and configured prey speeds
+must satisfy `round(speed × 32) ≤ 65535` and the turn rate
+`round(turnRate × 8) ≤ 65535`. The largest attainable prey
 size on the 0.2-unit spawn grid must not exceed 51, the maximum encodable in an
 appearance packet. Range endpoints may exceed 51 if they still only produce
 representable sizes (for example, `size: 51, maxSize: 51.01`).
@@ -286,19 +287,19 @@ beside the owning code.
 
 | Bound | Reason |
 | --- | --- |
-| Sliding `dt < 16 / 437.5 s` (≈ 36.57 ms) | A slide leaves the head one contact lead (16 × scale) behind the rim. A boosting minimum-size snake that moves that far in one tick, keeping its heading, lands on or outside the rim and dies instead of sliding. Hard boundaries kill on contact anyway and accept any positive step. |
-| Refill rate | Refill subtracts one attempt interval at a time; the interval must still change the refill clock in f64, or the loop never ends. |
-| Largest prey catch finite | Finite settings can still overflow `size² × 0.0031535 × nutritionFactor` and the eater's mass. |
+| Sliding `dt < 16 / 437.5 s` (≈ 36.57 ms) | A slide leaves the head one contact lead (16 × scale) behind the rim. A boosting minimum-size snake that moves that far in one tick, keeping its heading, lands on or outside the rim and dies instead of sliding. Hard boundaries kill on contact anyway and accept longer steps, up to the substep bound below. |
+| `dt < 0.007 × usize::MAX` s (≈ 1.29 × 10¹⁷ s on 64-bit) | Prey advance in 7 ms substeps, and one tick's count must fit `usize`. This also keeps a tick of boost travel, `dt × 437.5`, finite. |
+| Refill rate | Refill subtracts one attempt interval at a time while credit remains; the interval must still change the refill clock in f64, or the loop never ends. |
+| Largest prey catch finite | Finite settings can still overflow `size² × 0.0031535 × nutritionFactor` and the eater's mass. Catches can still accumulate past f64; that pickup stops the world: its tick completes without the gain, the step returns an error and later steps are rejected (`serve` ends the session). |
 | Largest latency draw finite | Delays are added to clocks. |
 | Network durations ≥ 1 ns and representable | Socket timeouts reject zero; `Instant` arithmetic must not overflow. |
 | `serve` `agents ≤ 4,294,967,295` | Frame slot indices are `u32`, and `u32::MAX` means none. |
 | `serve` `decisionTicks ≤ 4,294,967,295` | Frames report the ticks a step advanced as `u32`. |
 | `serve` `worlds × agents` fits `usize` | Typed steps and the C ABI index slots world-major. Memory bounds worlds otherwise. |
 | `serve` frame columns | Rows, counts and offsets are `u32`. A step whose frame does not fit ends the session, since its worlds already advanced. |
-| Wire `agents ≤ 65,536` | Protocol-19 snake IDs are `u16`. |
+| Wire `agents ≤ 65,535` | Protocol-19 snake IDs, leaderboard rank and living population are `u16`. |
 | Wire prey speeds, turn rate, size | Their `u16`/`u8` packet fields; see [SimulationConfig](#simulationconfig). |
-| Wire arena radius ≤ 32,000 | Coordinate encoding. Anchors fit ±32,550; 32,000 keeps a conservative margin, not derived by formula, for food scatter and bodies near the rim. |
-| At most 65,536 prey live or shown | Protocol-19 prey IDs are `u16`; each living prey keeps a unique one. |
+| At most 65,536 prey live | Protocol-19 prey IDs are `u16`; each living prey keeps a unique one. A retired ID is free at once, since every connection receives its removal before any reuse in the same broadcast. |
 | `customSkin` ≤ 255 bytes | Appearances give its length in one byte. |
 | `minimapSide ≥ 1`, positive intervals, `decisionTicks`/`broadcastTicks ≥ 1` | Empty maps and zero periods have no meaning; broadcasts fall on ticks divisible by `broadcastTicks`. |
 
@@ -325,6 +326,7 @@ measured range.
 | Victory text | 140 ASCII bytes | Stock-client input. |
 | `minimapSide` | at most 512 | The stock client clamps larger sides. |
 | Close reason | 123 bytes | WebSocket control payload (125) minus the close code. |
+| Wire arena radius | at most 32,000 | Encoding margin. Anchors encode as `u16` around 32,550, so coordinates must stay within −32,550..32,985, and encoders reject anything outside. The 550 units left for heads and bodies near the rim are not derived; a hard-mode tick's overshoot grows with `dt`. |
 | Simulated link queues | 4,096 messages per direction; 2,048 combined for remote slots | Bounded memory; the run fails when full. |
 | Wire records | 32 MiB per slot or connection | Drain to continue. |
 | Messages | 1 MiB | Host send buffer and native client message size. |

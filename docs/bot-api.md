@@ -78,8 +78,8 @@ interval. There is no network delay, automatic respawn, reward, victory
 condition or episode timeout. Use `reset` for new worlds.
 
 Returns `worlds`, one frame per world. Frame rows, counts and offsets are
-`u32`; a step whose frame cannot hold them ends the session after its worlds
-advanced, so reset to continue.
+`u32`. A step whose frame cannot hold them, or whose pickup would overflow a
+snake's mass, ends the session after its worlds advanced, so reset to continue.
 
 ### snapshot
 
@@ -210,7 +210,9 @@ Refill rates must be finite and nonnegative, small enough that one attempt
 interval still changes the refill clock, and large enough to represent the
 rescaled pending clock. Use the setter instead of directly
 editing `config.ambient_replenish_per_second` when changing a running world.
-Rejected operations leave the world unchanged.
+Rejected operations leave the world unchanged. The exception is a pickup whose
+gain would overflow its eater's mass: that step completes its tick without the
+gain and returns an error, and every later step is rejected with it.
 
 ### In-process sessions
 
