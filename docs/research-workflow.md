@@ -438,8 +438,8 @@ or the research stack. Rust 1.86+ and platform build tools suffice for `rust` an
 
 | Group | Command | Coverage / prerequisites |
 | --- | --- | --- |
-| Rust | `python tools/check.py rust` | Cargo-only fmt, default and core-only tests, Clippy and doctests; no uv or Node |
-| Tools | `uv run --locked --only-group tools python tools/check.py tools` | Root tools/fidelity Python, Node and local bot smoke tests; locked uv, Node 22+ and Rust |
+| Rust | `python tools/check.py rust` | Cargo-only fmt, default, core-only and C ABI tests, workspace Clippy and doctests; no uv or Node |
+| Tools | `uv run --locked --only-group tools python tools/check.py tools` | Root tools/fidelity Python, Node and local bot and C ABI smoke tests; locked uv, Node 22+ and Rust |
 | Package | `python tools/check.py package` | Local `cargo package` verification; no registry publication |
 | WASM | `python tools/check.py wasm` | Explicit target check; install `wasm32-unknown-unknown` first |
 

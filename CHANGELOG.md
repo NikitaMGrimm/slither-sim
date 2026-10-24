@@ -26,6 +26,11 @@
   heading and boost slices for every slot of every world and writes no JSON;
   `frame` then reads each world's frame as typed, read-only columns with the
   values the JSON frame prints. See [in-process sessions](docs/bot-api.md#in-process-sessions).
+- `slither-sim-abi-v1`, a C ABI over these sessions, in the unpublished
+  `slither-sim-ffi` workspace crate (`ffi/`, with a hand-written header). Any
+  language that can call C can reset through JSON, then step from typed arrays
+  and read frame columns through pointers. `examples/ffi_bot.py` drives it with
+  Python's standard-library `ctypes`. See the [C ABI guide](docs/c-api.md).
 
 ### Migration from slither-sim-json-v1
 
