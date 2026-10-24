@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import sys
 
-ABI_VERSION = 1
+ABI_VERSION = 2
 PROTOCOL = "slither-sim-json-v2"
 NONE = 0xFFFFFFFF
 
@@ -29,8 +29,8 @@ class Frame(ctypes.Structure):
         *((name, ctypes.c_size_t) for name in ("slots", "snakes", "body", "food", "prey", "deaths")),
         ("snake_slot", U32), ("snake_x", F64), ("snake_y", F64), ("snake_heading", F64),
         ("snake_speed", F64), ("snake_radius", F64), ("snake_length", F64), ("snake_segments", U32),
-        ("snake_fam", F64), ("snake_score", F64), ("snake_kills", U32), ("snake_body_start", U32),
-        ("snake_body_x", F64), ("snake_body_y", F64),
+        ("snake_fam", F64), ("snake_score", F64), ("snake_kills", U32), ("snake_kill_score", U32),
+        ("snake_body_start", U32), ("snake_body_x", F64), ("snake_body_y", F64),
         ("food_x", F64), ("food_y", F64), ("food_value", F64), ("food_size", F64), ("food_origin", U8),
         ("prey_id", ctypes.POINTER(ctypes.c_uint64)), ("prey_x", F64), ("prey_y", F64),
         ("prey_heading", F64), ("prey_target_heading", F64), ("prey_speed", F64), ("prey_size", F64),

@@ -13,6 +13,26 @@
   ABI library with its header, for Linux (x86-64 and ARM64, glibc 2.17+), macOS
   (Apple silicon and Intel) and Windows (x86-64), with a `SHA256SUMS` file. They
   are unsigned. See [download a release](README.md#download-a-release).
+- A Battledome mode: `Config::battledome()`, or `"preset": "battledome"` in JSON,
+  keeps official physics and ecology in a fixed 3,584-unit arena with a one-way
+  pit, spawns on a ring between pit and wall, a 15-minute kill score and no prey.
+  It is built from three general world settings: `pit` (leaving it kills with
+  the new death reason `pit` and drops no food), `spawnRadius` and
+  `killScoreSeconds`. See [Battledome](docs/configuration.md#battledome).
+- World configs accept `"preset": "official" | "sandbox" | "battledome"` in
+  `serve` and Python resets and in `host` and `client` config files; explicit
+  fields override the preset. See [presets](docs/configuration.md#presets).
+- Frames carry each snake's kill score: `snakes.killScore` in `serve` JSON,
+  `kill_score` in `FrameRef`, `snake_kill_score` in Python and the C ABI, and
+  `Simulator::kill_score` in Rust. `serve` stays `slither-sim-json-v2`: the
+  column is additive, and `pit` deaths only occur with the new opt-in `pit`.
+
+### Breaking
+
+- The C ABI is `slither-sim-abi-v2` (`SLITHER_ABI_VERSION` 2): `slither_frame`
+  gains `snake_kill_score` after `snake_kills`, and `SLITHER_DEATH_PIT` is a new
+  `death_reason` code. Rebuild callers against the new header.
+- `DeathReason` has a new `Pit` variant, and `transport::REASONS` a third entry.
 
 ### Performance
 

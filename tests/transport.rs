@@ -374,7 +374,8 @@ fn columns_value(frame: transport::FrameRef) -> Value {
         "snakes": {
             "slot": s.slot, "x": s.x, "y": s.y, "heading": s.heading, "speed": s.speed,
             "radius": s.radius, "length": s.length, "segments": s.segments, "fam": s.fam,
-            "score": s.score, "kills": s.kills, "bodyStart": s.body_start,
+            "score": s.score, "kills": s.kills, "killScore": s.kill_score,
+            "bodyStart": s.body_start,
             "bodyX": s.body_x, "bodyY": s.body_y,
         },
         "food": {
@@ -429,8 +430,10 @@ fn requests_answer_with_the_serve_lines() {
 #[test]
 fn typed_steps_match_json_steps() {
     let (mut seen_kill, mut seen_boundary, mut seen_partial) = (false, false, false);
-    // A hard arena where snakes die at the wall, and a crowded arena with body
-    // kills, each with several worlds.
+    let (mut seen_pit, mut seen_score) = (false, false);
+    // A hard arena where snakes die at the wall, a crowded arena with body
+    // kills and a synthetic pit arena with a short kill-score window, each
+    // with several worlds.
     for (reset, steps) in [
         (
             json!({"op":"reset","seed":11,"worlds":3,"agents":6,
@@ -441,6 +444,12 @@ fn typed_steps_match_json_steps() {
             json!({"op":"reset","seed":7,"worlds":2,"agents":24,
                 "config":{"radius":1200,"dynamicRadius":false,"foodCount":3000}}),
             30,
+        ),
+        (
+            json!({"op":"reset","seed":5,"worlds":2,"agents":24,
+                "config":{"radius":700,"dynamicRadius":false,"foodCount":1000,
+                    "pit":{"radius":300},"spawnRadius":500,"killScoreSeconds":0.3}}),
+            60,
         ),
     ] {
         let line = serde_json::to_vec(&reset).unwrap();
@@ -477,7 +486,13 @@ fn typed_steps_match_json_steps() {
                 for death in frame["deaths"].as_array().unwrap() {
                     seen_kill |= death["killer"].is_u64();
                     seen_boundary |= death["reason"] == "boundary";
+                    seen_pit |= death["reason"] == "pit";
                 }
+                seen_score |= frame["snakes"]["killScore"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|score| score.as_u64() > Some(0));
                 let living = frame["living"].as_u64().unwrap() as usize;
                 seen_partial |= 0 < living && living < agents;
             }
@@ -487,7 +502,7 @@ fn typed_steps_match_json_steps() {
             assert_eq!(by_json.request(&snapshot), typed.request(&snapshot));
         }
     }
-    assert!(seen_kill && seen_boundary && seen_partial);
+    assert!(seen_kill && seen_boundary && seen_partial && seen_pit && seen_score);
 }
 
 #[test]

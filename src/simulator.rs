@@ -5,7 +5,7 @@ use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
 use crate::{model::*, physics::*};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::f64::consts::{PI, TAU};
 use std::time::Instant;
 
@@ -87,8 +87,42 @@ impl BoostFoodConfig {
     }
 }
 
+/// A one-way inner boundary: entering is free, but a snake whose head center
+/// has been inside dies when its head center reaches `radius` again.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PitConfig {
+    pub radius: f64,
+}
+
+/// Named starting point for a JSON world config; explicit fields override it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Preset {
+    /// `Config::official(1)`, which omitted fields also use without a preset.
+    Official,
+    Sandbox,
+    Battledome,
+}
+impl Preset {
+    pub fn config(self) -> Config {
+        match self {
+            Self::Official => Config::official(1),
+            Self::Sandbox => Config::sandbox(),
+            Self::Battledome => Config::battledome(),
+        }
+    }
+}
+
+// `remote = "Self"` turns the derived impls into inherent functions, which the
+// trait impls below wrap to accept `preset`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[serde(
+    remote = "Self",
+    default,
+    rename_all = "camelCase",
+    deny_unknown_fields
+)]
 pub struct Config {
     /// Boundary radius; the starting radius when `dynamicRadius` is set.
     pub radius: f64,
@@ -120,14 +154,69 @@ pub struct Config {
     pub ambient_food: AmbientFoodConfig,
     /// Provisional local admission cap on new boost pellets.
     pub boost_food: BoostFoodConfig,
+    /// Optional one-way inner boundary; leaving it kills with `DeathReason::Pit`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pit: Option<PitConfig>,
+    /// Fixed distance of new lives from the center; `None` keeps the official
+    /// radial grid of `spawn::sample_spawn_distance`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spawn_radius: Option<f64>,
+    /// Window of `Simulator::kill_score`: each credited kill counts for this
+    /// many seconds, across the slot's lives. `None` keeps no kill score.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kill_score_seconds: Option<f64>,
 }
 impl Default for Config {
     fn default() -> Self {
         Self::official(1)
     }
 }
+impl Serialize for Config {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        Config::serialize(self, serializer)
+    }
+}
+impl<'de> Deserialize<'de> for Config {
+    /// Fields given beside `preset` replace its values; nested objects merge
+    /// field by field. Without a preset, omitted fields use `Config::official(1)`.
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        use serde_json::{Map, Value};
+        fn merge(target: &mut Map<String, Value>, fields: Map<String, Value>) {
+            for (key, value) in fields {
+                match (target.get_mut(&key), value) {
+                    (Some(Value::Object(target)), Value::Object(fields)) => merge(target, fields),
+                    (_, value) => {
+                        target.insert(key, value);
+                    }
+                }
+            }
+        }
+        let mut fields = Map::deserialize(deserializer)?;
+        let fields = match fields.remove("preset") {
+            None => fields,
+            Some(preset) => {
+                let preset = Preset::deserialize(preset).map_err(D::Error::custom)?;
+                let Value::Object(mut base) =
+                    serde_json::to_value(preset.config()).map_err(D::Error::custom)?
+                else {
+                    unreachable!("configs serialize as objects")
+                };
+                merge(&mut base, fields);
+                base
+            }
+        };
+        Config::deserialize(Value::Object(fields)).map_err(D::Error::custom)
+    }
+}
 /// Protocol sector area used by the modeled official ecology below.
 const SECTOR_AREA: f64 = 300.0 * 300.0;
+/// Official food target and ambient attempts/s for an arena of `radius`:
+/// about 7 pellets and 0.1024 attempts/s per sector.
+fn official_food(radius: f64) -> (usize, f64) {
+    let sectors = PI * radius * radius / SECTOR_AREA;
+    ((7.0 * sectors) as usize, 0.1024 * sectors)
+}
 impl Config {
     /// Best-current official-server approximation, initialized for `snakes`.
     /// Includes provisional models; this is not an identified server preset.
@@ -138,7 +227,7 @@ impl Config {
     pub fn official(snakes: usize) -> Self {
         let radius = population_radius(snakes);
         let area = PI * radius * radius;
-        let sectors = area / SECTOR_AREA;
+        let (food_count, ambient_replenish_per_second) = official_food(radius);
         Self {
             radius,
             dynamic_radius: true,
@@ -146,8 +235,8 @@ impl Config {
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
             // Exact server entry/exit geometry and size scaling remain unknown.
             vision: 1500.0,
-            food_count: (7.0 * sectors) as usize,
-            ambient_replenish_per_second: 0.1024 * sectors,
+            food_count,
+            ambient_replenish_per_second,
             dt: LOOP_SECONDS,
             food_index: true,
             emit_boost_food: true,
@@ -162,6 +251,9 @@ impl Config {
             death_food: DeathFoodConfig::default(),
             ambient_food: AmbientFoodConfig::default(),
             boost_food: BoostFoodConfig::default(),
+            pit: None,
+            spawn_radius: None,
+            kill_score_seconds: None,
         }
     }
 
@@ -179,6 +271,29 @@ impl Config {
                 count: 0,
                 ..PreyConfig::default()
             },
+            ..Self::official(1)
+        }
+    }
+
+    /// Battledome: official physics and ecology in a fixed 3584-unit arena,
+    /// with a one-way pit of radius 1784, spawns midway between the two, a
+    /// 15-minute kill score and no prey. See docs/configuration.md#battledome.
+    pub fn battledome() -> Self {
+        const RADIUS: f64 = 3584.0;
+        const PIT: f64 = 1784.0;
+        let (food_count, ambient_replenish_per_second) = official_food(RADIUS);
+        Self {
+            radius: RADIUS,
+            dynamic_radius: false,
+            food_count,
+            ambient_replenish_per_second,
+            prey: PreyConfig {
+                count: 0,
+                ..PreyConfig::default()
+            },
+            pit: Some(PitConfig { radius: PIT }),
+            spawn_radius: Some((PIT + RADIUS) / 2.0),
+            kill_score_seconds: Some(900.0),
             ..Self::official(1)
         }
     }
@@ -205,7 +320,31 @@ impl Config {
         self.death_food.validate()?;
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
+        self.validate_mode()?;
         crate::boundary::validate(&self.radius_updates)
+    }
+    /// Pit, spawn ring and kill-score window: only the limits the rules need.
+    fn validate_mode(&self) -> Result<(), String> {
+        let pit = self.pit.as_ref().map(|pit| pit.radius);
+        if let Some(pit) = pit
+            && !(pit > 0.0 && pit < self.radius)
+        {
+            return Err("pit.radius must be positive and less than radius, so the pit lies inside the arena".into());
+        }
+        if let Some(spawn) = self.spawn_radius
+            && !(spawn >= 0.0 && spawn < self.radius && pit.is_none_or(|pit| spawn > pit))
+        {
+            return Err("spawnRadius must lie inside radius and outside pit.radius, where new snakes can live".into());
+        }
+        if let Some(window) = self.kill_score_seconds
+            && !(window.is_finite() && window > 0.0)
+        {
+            return Err(
+                "killScoreSeconds must be positive and finite, so kills count and then expire"
+                    .into(),
+            );
+        }
+        Ok(())
     }
 }
 /// Constant-density boundary heuristic. Population/radius pairs do not identify
@@ -292,6 +431,10 @@ pub struct Simulator {
     boosts: Vec<Boost>,
     speeds: Vec<SpeedState>,
     kiosks: Vec<KioskState>,
+    /// Whether each slot's current life has had its head center inside the pit.
+    pit_entered: Vec<bool>,
+    /// Times of each slot's credited kills still inside `killScoreSeconds`.
+    kill_times: Vec<VecDeque<f64>>,
     ambient_clock: f64,
     prey_random: Random,
     next_prey_id: u64,
@@ -362,6 +505,8 @@ impl Simulator {
             boosts: vec![],
             speeds: vec![],
             kiosks: vec![],
+            pit_entered: vec![],
+            kill_times: vec![],
             ambient_clock: 0.0,
             prey_random: Random(seed ^ 0x706_7265),
             next_prey_id: 0,
@@ -442,9 +587,10 @@ impl Simulator {
             return Err("Duplicate agent id".into());
         }
         let a = index as f64 / count as f64 * TAU;
+        let distance = self.config.spawn_radius.unwrap_or(self.config.radius * 0.5);
         let head = Point {
-            x: a.cos() * self.config.radius * 0.5,
-            y: a.sin() * self.config.radius * 0.5,
+            x: a.cos() * distance,
+            y: a.sin() * distance,
         };
         self.snakes.push(Snake {
             id,
@@ -469,6 +615,8 @@ impl Simulator {
         self.boosts.push(Boost::default());
         self.speeds.push(SpeedState::idle(base_speed(2)));
         self.kiosks.push(KioskState::default());
+        self.pit_entered.push(false);
+        self.kill_times.push(VecDeque::new());
         self.death_times.push(None);
         self.joins.push(self.next_join);
         self.next_join += 1;
@@ -476,6 +624,15 @@ impl Simulator {
     }
     pub fn death_time(&self, index: usize) -> Option<f64> {
         self.death_times.get(index).copied().flatten()
+    }
+    /// Credited kills of this slot, across its lives, within the last
+    /// `killScoreSeconds`: a kill at time `t` counts while `time < t + window`.
+    /// Zero without a window; `None` for unknown slots.
+    pub fn kill_score(&self, index: usize) -> Option<usize> {
+        let times = self.kill_times.get(index)?;
+        Some(self.config.kill_score_seconds.map_or(0, |window| {
+            times.len() - times.partition_point(|&t| t + window <= self.time)
+        }))
     }
     /// Synchronize an imported/replaced snake's hidden motion state. None infers
     /// progress from its public speed; Some supplies known progress (0 means idle).
@@ -633,6 +790,7 @@ impl Simulator {
         self.boosts[index] = Boost::default();
         self.speeds[index] = SpeedState::idle(s.speed);
         self.kiosks[index] = KioskState::default();
+        self.pit_entered[index] = false;
         self.death_times[index] = None;
         self.joins[index] = self.next_join;
         self.next_join += 1;
@@ -812,7 +970,14 @@ impl Simulator {
                 crate::boundary::constrain(s.head, s.heading, sc, c.radius, c.boundary_mode);
             s.head = head;
             if lethal {
-                boundary_deaths.push(i);
+                boundary_deaths.push((i, DeathReason::Boundary));
+            } else if let Some(pit) = &c.pit {
+                // A mode rule, not an official mechanic: docs/configuration.md#battledome.
+                if s.head.distance_lt(Point::default(), pit.radius) {
+                    self.pit_entered[i] = true;
+                } else if self.pit_entered[i] {
+                    boundary_deaths.push((i, DeathReason::Pit));
+                }
             }
             if let Some(anchor) = crossed_anchor(previous[i], s.head, s.body[0]) {
                 let grow = s.fam >= 1.0;
@@ -879,8 +1044,8 @@ impl Simulator {
         fallen.clear();
         fallen.resize(self.snakes.len(), false);
         for &i in order.iter() {
-            if boundary_deaths.binary_search(&i).is_ok() {
-                dead.push((i, None, DeathReason::Boundary));
+            if let Ok(k) = boundary_deaths.binary_search_by_key(&i, |&(j, _)| j) {
+                dead.push((i, None, boundary_deaths[k].1));
                 fallen[i] = true;
                 continue;
             }
@@ -935,17 +1100,29 @@ impl Simulator {
             clock = Some(Instant::now());
         }
         self.time += c.dt;
+        if let Some(window) = c.kill_score_seconds {
+            for times in &mut self.kill_times {
+                while times.front().is_some_and(|&t| t + window <= self.time) {
+                    times.pop_front();
+                }
+            }
+        }
         for &(i, killer, reason) in dead.iter() {
             self.snakes[i].alive = false;
             self.death_times[i] = Some(self.time);
             if let Some(k) = killer {
                 self.snakes[k].kills += 1;
+                if self.config.kill_score_seconds.is_some() {
+                    self.kill_times[k].push_back(self.time);
+                }
             }
             let food = match reason {
                 DeathReason::Body => self.death_food(i),
                 // Outward browser controls produced no drops, including from
                 // body anchors still inside the arena. See ecology evidence.
                 DeathReason::Boundary => 0,
+                // A mode rule: pit deaths drop no food, like the outer wall.
+                DeathReason::Pit => 0,
             };
             self.deaths.push(DeathEvent {
                 time: self.time,
@@ -1473,7 +1650,8 @@ struct StepBuffers {
     alive: Vec<usize>,
     previous: Vec<Point>,
     last_tips: Vec<Point>,
-    boundary_deaths: Vec<usize>,
+    /// Ascending slots killed by the outer wall or the pit during movement.
+    boundary_deaths: Vec<(usize, DeathReason)>,
     bodies: Vec<Option<Bounds>>,
     heads: Vec<(Point, (f64, f64), f64)>,
     order: Vec<usize>,

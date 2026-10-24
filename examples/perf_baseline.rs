@@ -1385,7 +1385,8 @@ impl Lifecycle {
         for death in deaths {
             match death.reason {
                 DeathReason::Body => self.body_deaths += 1,
-                DeathReason::Boundary => self.boundary_deaths += 1,
+                // Workloads configure no pit; count its deaths as wall deaths.
+                DeathReason::Boundary | DeathReason::Pit => self.boundary_deaths += 1,
             }
             self.death_food += death.food;
         }

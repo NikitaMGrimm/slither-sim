@@ -149,6 +149,8 @@ pub struct Observation {
 pub enum DeathReason {
     Body,
     Boundary,
+    /// Left a configured `pit` after its head center had been inside.
+    Pit,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

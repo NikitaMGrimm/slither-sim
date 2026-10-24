@@ -14,6 +14,8 @@ configs require the default-enabled `networking` feature.
 | `serve`: `{"op":"reset","config":{...}}` | World `Config` directly. |
 | `client`: `{"op":"network","config":{...}}` | `NetworkConfig` for a real WebSocket connection. |
 
+Every world `Config` object also accepts a [`preset`](#presets).
+
 ## Timing and ping
 
 - `world.dt: 0.007`: physics advances every 7 ms, about 143 ticks/s.
@@ -98,6 +100,9 @@ only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 | `deathFood` | Defaults below | Death-food admission limit. |
 | `ambientFood` | Defaults below | Ambient-food admission limit. |
 | `boostFood` | Defaults below | Boost-food admission limit. |
+| `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary. A snake whose head center has been inside (distance `< r`) dies with reason `pit`, dropping no food, when its head center reaches `r` again. Each life starts outside it. |
+| `spawnRadius` | `null` | Fixed head distance of new lives, `0 ≤ d < radius` and `d > pit.radius`. Ring joins keep their angles; the host draws a uniform angle. `null` keeps the official radial grid. |
+| `killScoreSeconds` | `null` | Positive finite kill-score window: each credited kill counts this long, kept per slot across lives. `null` keeps no kill score; it reads 0. |
 
 `radiusUpdates` sets radius at each supplied sample, overriding the model at that
 tick. For recorded replay, set `dynamicRadius` false to avoid model changes
@@ -145,12 +150,39 @@ let simulation = SimulationConfig {
 let host = HostConfig { simulation, ..Default::default() };
 ```
 
-There is no named preset selector in JSON or the CLI. For the compact sandbox,
-set its fields explicitly:
+### Presets
+
+In JSON, `"preset"` selects a constructor's world as the base: `"official"`
+(`Config::official(1)`), `"sandbox"` or `"battledome"`. Fields given beside it
+replace the preset's values; nested objects such as `kiosk` merge field by
+field, and `null` clears an optional setting. Changing `radius` does not rescale
+the preset's food. Without `preset`, omitted fields use `Config::official(1)`.
+Replies and snapshots print the resolved fields, not the preset name.
 
 ```json
-{"radius": 1000, "dynamicRadius": false, "foodCount": 350, "ambientReplenishPerSecond": 5, "prey": {"count": 0}}
+{"preset": "battledome", "killScoreSeconds": 300}
 ```
+
+### Battledome
+
+`Config::battledome()` (`"preset": "battledome"`) is a custom mode for
+Battledome players: official physics and ecology, unchanged, plus a thin rules
+layer. It does not model any community server. Each value is a stated
+Battledome rule, the official model or a mode design choice:
+
+| Setting | Value | Label |
+| --- | --- | --- |
+| Outer wall | `radius: 3584`, `dynamicRadius: false`, normal boundary behavior | Stated rule |
+| Pit | `pit.radius: 1784`; entry allowed, exit lethal | Stated rule; the head-center test, no food and the per-life reset are design choices |
+| Spawning | `spawnRadius: 2684`, midway between pit and wall, with the usual clearance and heading | Design choice derived from the two radii |
+| Kill score | `killScoreSeconds: 900`: +1 per credited kill for 15 minutes, per slot across lives | Stated rule (+1, 15 minutes); persistence is a design choice |
+| Prey | `prey.count: 0` | Mode rule |
+| Food | Official density at radius 3584: `foodCount` 3138, about 45.9 attempts/s; normal admission caps, death and boost food | Official model |
+| Everything else | As `Config::official(1)`: `dt`, broadcast and decision ticks, vision, kiosk, speed model, boundary mode | Official model |
+
+Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
+Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
+Hosted stock clients do not yet draw the pit or show kill scores.
 
 ### Prey
 

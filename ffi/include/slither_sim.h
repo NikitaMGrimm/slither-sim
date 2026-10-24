@@ -1,5 +1,5 @@
 /*
- * slither-sim-abi-v1: a C ABI over slither-sim transport sessions.
+ * slither-sim-abi-v2: a C ABI over slither-sim transport sessions.
  *
  * Guide: https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/c-api.md
  * Written by hand from ffi/src/lib.rs; ffi/tests/abi.rs checks that this
@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-#define SLITHER_ABI_VERSION 1u
+#define SLITHER_ABI_VERSION 2u
 
 /* Status codes. */
 #define SLITHER_OK 0
@@ -39,6 +39,7 @@ extern "C" {
 /* death_reason codes. */
 #define SLITHER_DEATH_BODY 0
 #define SLITHER_DEATH_BOUNDARY 1
+#define SLITHER_DEATH_PIT 2
 
 typedef struct slither_session slither_session;
 
@@ -72,6 +73,8 @@ typedef struct slither_frame {
     const double *snake_fam;
     const double *snake_score;
     const uint32_t *snake_kills;
+    /* kills inside the config's killScoreSeconds, across lives; 0 without it */
+    const uint32_t *snake_kill_score;
     /* snakes + 1 offsets: row r's anchors are body_x[body_start[r]] up to
        body_x[body_start[r + 1]], head to tail; body anchors in all */
     const uint32_t *snake_body_start;

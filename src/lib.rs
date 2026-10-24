@@ -27,5 +27,5 @@ pub use physics::{SpeedModel, SpeedState};
 pub use prey::{Prey, PreyConfig, PreyMode};
 pub use simulator::{
     AmbientFoodConfig, BoostAccounting, BoostFoodConfig, Config, DeathFoodConfig, FoodSpawnEvent,
-    PickupEvent, PickupItem, Simulator,
+    PickupEvent, PickupItem, PitConfig, Preset, Simulator,
 };

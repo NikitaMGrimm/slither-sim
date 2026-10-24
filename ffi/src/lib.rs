@@ -1,4 +1,4 @@
-//! `slither-sim-abi-v1`: a C ABI over [`slither_sim::transport::Session`].
+//! `slither-sim-abi-v2`: a C ABI over [`slither_sim::transport::Session`].
 //!
 //! `include/slither_sim.h` declares these functions and [`SlitherFrame`];
 //! `tests/abi.rs` checks that the two agree. No panic unwinds across the
@@ -13,7 +13,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::{ptr, slice};
 
 /// Increments with every incompatible change of this interface.
-pub const SLITHER_ABI_VERSION: u32 = 1;
+pub const SLITHER_ABI_VERSION: u32 = 2;
 
 pub const SLITHER_OK: i32 = 0;
 /// The session rejected the call and changed nothing.
@@ -61,6 +61,7 @@ pub struct SlitherFrame {
     pub snake_fam: *const f64,
     pub snake_score: *const f64,
     pub snake_kills: *const u32,
+    pub snake_kill_score: *const u32,
     pub snake_body_start: *const u32,
     pub snake_body_x: *const f64,
     pub snake_body_y: *const f64,
@@ -116,6 +117,7 @@ impl From<FrameRef<'_>> for SlitherFrame {
             snake_fam: s.fam.as_ptr(),
             snake_score: s.score.as_ptr(),
             snake_kills: s.kills.as_ptr(),
+            snake_kill_score: s.kill_score.as_ptr(),
             snake_body_start: s.body_start.as_ptr(),
             snake_body_x: s.body_x.as_ptr(),
             snake_body_y: s.body_y.as_ptr(),

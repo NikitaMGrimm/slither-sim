@@ -88,7 +88,7 @@ jobs:
           slither-sim $version for $TARGET
 
           slither-sim         CLI: serve, client and host. Run it with --help.
-          slither_sim_ffi     slither-sim-abi-v1 shared library; header slither_sim.h.
+          slither_sim_ffi     slither-sim-abi-v2 shared library; header slither_sim.h.
 
           serve JSON API:     $docs/bot-api.md
           C ABI:              $docs/c-api.md

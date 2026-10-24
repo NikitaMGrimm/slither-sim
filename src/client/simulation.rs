@@ -419,7 +419,7 @@ impl Slot {
 /// Simulator backend whose clients reconstruct frames from protocol-19 bytes.
 ///
 /// `reconnect` opens a new connection and respawns the slot with the core
-/// `Simulator::respawn` at a clear pose drawn from `spawn::sample_spawn_distance`;
+/// `Simulator::respawn` at a clear pose drawn from `spawn::spawn_distance`;
 /// a living snake is first removed without death food. In-flight messages of the
 /// old connection are dropped.
 pub struct SimulatorBackend {
@@ -706,10 +706,9 @@ impl SimulatorBackend {
     fn spawn_pose(&mut self, slot: usize) -> Result<(Point, f64), String> {
         let alive = self.world.snakes[slot].alive;
         self.world.snakes[slot].alive = false;
-        let radius = self.world.config.radius;
         let mut pose = None;
         for _ in 0..SPAWN_ATTEMPTS {
-            let distance = spawn::sample_spawn_distance(radius, self.spawn_random.unit());
+            let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
             let angle = self.spawn_random.unit() * TAU;
             let heading = self.spawn_random.unit() * TAU;
             let head = Point {

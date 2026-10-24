@@ -1,4 +1,4 @@
-# C ABI: slither-sim-abi-v1
+# C ABI: slither-sim-abi-v2
 
 The `slither-sim-ffi` library runs [`serve` sessions](bot-api.md) inside the
 caller's process for any language that can call C. It has the same worlds,
@@ -33,7 +33,7 @@ load another build.
 
 | Function | Purpose |
 | --- | --- |
-| `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 1 for `slither-sim-abi-v1`. Check it first. |
+| `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 2 for `slither-sim-abi-v2`. Check it first. |
 | `slither_session_new()`, `slither_session_free(s)` | Create and free a session; free ignores null. |
 | `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v2` request line as `serve` would. |
 | `slither_step(s, headings, n, boosts, n)` | Steps every world like a JSON `step`, without JSON. |
@@ -66,6 +66,8 @@ one pointer per column. Columns hold the values and fixed types of the
 [Rust frame columns](bot-api.md#in-process-sessions): `double` measures,
 `uint32_t` slots, counts and row indices, `uint64_t` prey IDs and `uint8_t` codes.
 
+- `snake_kill_score` is the slot's kills within the config's `killScoreSeconds`,
+  across lives, or 0 without that window.
 - Snake row `r`'s anchors are entries `snake_body_start[r]` up to
   `snake_body_start[r + 1]` of `snake_body_x` and `snake_body_y`.
 - `view_self[s]` is slot `s`'s own snakes row, or `SLITHER_NONE` when the slot is
@@ -74,8 +76,8 @@ one pointer per column. Columns hold the values and fixed types of the
   has `slots + 1` entries.
 - `food_size` is NaN without a size, `food_origin` is `SLITHER_NO_ORIGIN` without
   an origin, and `death_killer` is `SLITHER_NONE` without a killer; JSON prints
-  `null` for each. `death_reason` is `SLITHER_DEATH_BODY` or
-  `SLITHER_DEATH_BOUNDARY`.
+  `null` for each. `death_reason` is `SLITHER_DEATH_BODY`,
+  `SLITHER_DEATH_BOUNDARY` or `SLITHER_DEATH_PIT`.
 
 Pointers of empty columns are not null, but must not be dereferenced.
 
@@ -89,8 +91,9 @@ separate threads. Steps advance several worlds in parallel on the library's
 
 ## Compatibility
 
-`slither-sim-abi-v1` covers the function signatures, the `slither_frame` layout,
+`slither-sim-abi-v2` covers the function signatures, the `slither_frame` layout,
 the codes and the column meanings. An incompatible change needs a new identifier
-and `SLITHER_ABI_VERSION`. Requests and replies follow `slither-sim-json-v2`;
+and `SLITHER_ABI_VERSION`. Version 2 inserted `snake_kill_score` after
+`snake_kills` and added `SLITHER_DEATH_PIT`; v1 callers must be rebuilt. Requests and replies follow `slither-sim-json-v2`;
 check `protocol` in replies. As with `serve`, record the commit for reproducible
 results.
