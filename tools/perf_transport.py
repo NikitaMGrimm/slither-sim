@@ -126,7 +126,9 @@ class Watchdog:
         return self
 
     def __exit__(self, *exception):
+        # cancel() only signals the timer thread; joining makes `fired` final.
         self.timer.cancel()
+        self.timer.join()
 
 
 def run_server(binary, script_path, serve_args):
