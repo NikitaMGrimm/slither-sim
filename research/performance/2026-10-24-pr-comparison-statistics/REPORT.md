@@ -19,8 +19,9 @@ every row, paired log ratios with a fitted order term, a fixed balanced order
 sequence, looks at 8, 12 and 26 pairs, 1/600 error per look and workload, a
 ±5% band, and a 620-second sampling stage inside a 15-minute job with a
 60-second reserve. [`COMMENT-WORDING.md`](COMMENT-WORDING.md) fixes the comment
-text. Both are copied unchanged from the handoff; their references to sibling
-files and scratch paths are original provenance.
+text. [`CALIBRATION-PLAN.md`](CALIBRATION-PLAN.md) is the proposed hosted A/A
+pilot and confirmation. All three are copied unchanged from the handoff; their
+references to sibling files and scratch paths are original provenance.
 
 The current explanation is in the
 [PR comparison guide](../../../docs/maintainers/pr-reports.md#how-results-are-decided).
