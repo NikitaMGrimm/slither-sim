@@ -1579,7 +1579,7 @@ fn find_eater<const PROFILE: bool>(
 #[cfg(test)]
 mod death_food_density_tests {
     use super::*;
-    use crate::food_grid::food_cell;
+    use crate::food_grid::{Axis, food_cell};
 
     fn world(enabled: bool) -> Simulator {
         let mut world = Simulator::new(
@@ -1643,7 +1643,7 @@ mod death_food_density_tests {
             world
                 .food
                 .iter()
-                .all(|f| food_cell(f.x, f.y, 75.0) == (0, 0))
+                .all(|f| food_cell(f.x, f.y, 75.0) == (Axis::Index(0), Axis::Index(0)))
         );
     }
 
@@ -1683,7 +1683,10 @@ mod death_food_density_tests {
         world.snakes[0].head = negative;
         world.snakes[0].body.fill(negative);
         world.food = vec![existing(2.0, 2.0, Origin::Ambient); 22];
-        assert_eq!(food_cell(-37.5, -37.5, 75.0), (-1, -1));
+        assert_eq!(
+            food_cell(-37.5, -37.5, 75.0),
+            (Axis::Index(-1), Axis::Index(-1))
+        );
         assert_eq!(world.death_food(0), 22);
         assert_eq!(world.food.len(), 44);
     }
