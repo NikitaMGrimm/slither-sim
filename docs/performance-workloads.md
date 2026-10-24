@@ -138,8 +138,8 @@ The immutable `perf_observation` harness separates observation materialization
 from output destruction. It performs no physics stepping and has no workload
 catalog. It screens geometry/selection costs rather than long-running sessions.
 
-All six cases use seed 7, 32 living slots, 32 body anchors per slot, eight prey,
-and vision 1,500. Body anchors extend from each ring-start head at 42-unit spacing.
+The first six cases use seed 7, 32 living slots, 32 body anchors per slot, eight
+prey, and vision 1,500. Body anchors extend from each ring-start head at 42-unit spacing.
 Food counts below are admitted pellets, not placement attempts.
 
 | Case | Geometry and API | Food | Baseline iterations/sample |
@@ -150,11 +150,18 @@ Food counts below are admitted pellets, not placement attempts.
 | `observe-strip` | Radius 50,000, heads on x=0 at 750-unit y spacing; remapped food within x=±75, y=±48,000; `observe_all`. | 11,999 | 1,000 |
 | `observe-one` | Dense world, `observe_selected` for slot zero. | 11,321 | 10,000 |
 | `observe-empty` | Dense world, all-false selection mask; still returns 32 empty slots. | 11,321 | 10,000 |
+| `observe-sparse` | Radius 100,000; slots 0–7 alive with heads at the origin, slots 8–31 dead; a 512×512 food lattice over x, y = ±65,625 replaces the startup food; `observe_all`. | 262,144 | 500 |
+| `observe-clustered` | Radius 20,000; 128 slots with two-anchor bodies and heads on a 12-column grid at 1,600-unit spacing within ±8,800; four 64×64 lattices in 1,200-unit corner patches within ±12,000, plus 512 background pellets, replace the startup food; `observe_all`. | 16,896 | 2,000 |
 
 The strip remap consumes no additional RNG and retains insertion order, values,
-sizes and origins. These overrides are explicit workload construction, with no
-package default changes. The wide/compact/strip cases expose different filtering
-and copying costs; they are not weighted samples of production worlds.
+sizes and origins. The sparse lattice gives the food grid many cells for only
+eight observers. The clustered patches lie beyond every observer's vision, so the
+mean food density overstates what the observers can see. `observe-clustered` has
+128 slots with two-anchor bodies, so snake filtering does not hide the grid's cost.
+These overrides are explicit workload construction, with no package default
+changes. The wide/compact/strip/sparse/clustered cases expose different
+filtering, copying and index costs; they are not weighted samples of production
+worlds.
 
 ### Reproduction and metric scope
 
@@ -163,7 +170,7 @@ same toolchain, release profile and source file for each runtime. Copy and hash
 each executable into separate owned output storage. Opt in to these cases explicitly:
 
 ```sh
-python -B tools/perf_compare.py --baseline BASELINE --candidate CANDIDATE --output outputs/observation-comparison --cases observe-dense observe-compact observe-wide observe-strip observe-one observe-empty
+python -B tools/perf_compare.py --baseline BASELINE --candidate CANDIDATE --output outputs/observation-comparison --cases observe-dense observe-compact observe-wide observe-strip observe-one observe-empty observe-sparse observe-clustered
 ```
 
 The comparison uses 10,000 wide batches and 100,000 empty selections per sample

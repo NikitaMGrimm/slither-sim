@@ -1,0 +1,208 @@
+# Variant 49128ca against v1 (2923018), src/observation/mod.rs only
+diff --git a/src/observation/mod.rs b/src/observation/mod.rs
+index 8f85c8e..83afc53 100644
+--- a/src/observation/mod.rs
++++ b/src/observation/mod.rs
+@@ -266,18 +266,26 @@ impl<'a> Observer<'a> {
+                     count += usize::from(seen);
+                     first = first.min(if seen { i / 64 } else { usize::MAX });
+                 };
++                let (lo, hi) = (grid.col(b.min.x), grid.col(b.max.x));
++                // Trimming costs about as much per row as a few candidates, so
++                // narrow or coarse grids (sparse food) scan the whole box instead.
++                let trim = hi - lo >= 8;
+                 for row in grid.row(b.min.y)..=grid.row(b.max.y) {
+                     // Only a chord of the circle can be visible in this row. Moving
+                     // the row a unit closer and using `reach` as the radius leave the
+                     // squared chord a margin above 2 * vision, far beyond its rounding
+                     // error for tame values, and the added unit covers the rest.
+-                    let top = grid.origin.y + row as f64 * grid.cell;
+-                    let dy = (top - me.head.y)
+-                        .max(me.head.y - (top + grid.cell))
+-                        .max(1.0)
+-                        - 1.0;
+-                    let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
+-                    let (lo, hi) = (grid.col(me.head.x - half), grid.col(me.head.x + half));
++                    let (lo, hi) = if trim {
++                        let top = grid.origin.y + row as f64 * grid.cell;
++                        let dy = (top - me.head.y)
++                            .max(me.head.y - (top + grid.cell))
++                            .max(1.0)
++                            - 1.0;
++                        let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
++                        (grid.col(me.head.x - half), grid.col(me.head.x + half))
++                    } else {
++                        (lo, hi)
++                    };
+                     let cells = row * grid.cols;
+                     let span =
+                         grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
+# Variant 15183de against v1 (2923018), src/observation/mod.rs only
+diff --git a/src/observation/mod.rs b/src/observation/mod.rs
+index 8f85c8e..b8a587d 100644
+--- a/src/observation/mod.rs
++++ b/src/observation/mod.rs
+@@ -74,9 +74,11 @@ impl FoodGrid {
+         let cap = (2 * (food.len() - outliers.len()) + 16) as f64;
+         // Fine cells let each queried row follow the vision circle: about 1.15
+         // candidates per visible pellet in 96- and 128-snake worlds, against 1.7
+-        // to 1.95 with half-radius cells and the full query box. See
++        // to 1.95 with half-radius cells and the full query box. Food narrower
++        // than a query box cannot be trimmed and only pays for more cells. See
+         // research/performance/2026-10-24-observation-food-index.
+-        let mut cell = (vision / 8.0).max(1.0);
++        let narrow = (bounds.max.x - bounds.min.x).min(bounds.max.y - bounds.min.y) < 2.0 * vision;
++        let mut cell = (vision / if narrow { 2.0 } else { 8.0 }).max(1.0);
+         let (cols, rows) = loop {
+             let cols = ((bounds.max.x - bounds.min.x) / cell).floor() + 1.0;
+             let rows = ((bounds.max.y - bounds.min.y) / cell).floor() + 1.0;
+@@ -266,18 +268,26 @@ impl<'a> Observer<'a> {
+                     count += usize::from(seen);
+                     first = first.min(if seen { i / 64 } else { usize::MAX });
+                 };
++                let (lo, hi) = (grid.col(b.min.x), grid.col(b.max.x));
++                // Trimming costs about as much per row as a few candidates, so
++                // narrow or coarse grids (sparse food) scan the whole box instead.
++                let trim = hi - lo >= 8;
+                 for row in grid.row(b.min.y)..=grid.row(b.max.y) {
+                     // Only a chord of the circle can be visible in this row. Moving
+                     // the row a unit closer and using `reach` as the radius leave the
+                     // squared chord a margin above 2 * vision, far beyond its rounding
+                     // error for tame values, and the added unit covers the rest.
+-                    let top = grid.origin.y + row as f64 * grid.cell;
+-                    let dy = (top - me.head.y)
+-                        .max(me.head.y - (top + grid.cell))
+-                        .max(1.0)
+-                        - 1.0;
+-                    let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
+-                    let (lo, hi) = (grid.col(me.head.x - half), grid.col(me.head.x + half));
++                    let (lo, hi) = if trim {
++                        let top = grid.origin.y + row as f64 * grid.cell;
++                        let dy = (top - me.head.y)
++                            .max(me.head.y - (top + grid.cell))
++                            .max(1.0)
++                            - 1.0;
++                        let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
++                        (grid.col(me.head.x - half), grid.col(me.head.x + half))
++                    } else {
++                        (lo, hi)
++                    };
+                     let cells = row * grid.cols;
+                     let span =
+                         grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
+# Variant 2a1857d against v1 (2923018), src/observation/mod.rs only
+diff --git a/src/observation/mod.rs b/src/observation/mod.rs
+index 8f85c8e..1623022 100644
+--- a/src/observation/mod.rs
++++ b/src/observation/mod.rs
+@@ -51,6 +51,8 @@ struct FoodGrid {
+     inv_cell: f64,
+     cols: usize,
+     rows: usize,
++    /// Whether cells are fine enough for rows to be trimmed to the vision circle.
++    trim: bool,
+     /// Cell `c` holds `points[starts[c]..starts[c + 1]]`, cells in row-major order.
+     starts: Vec<u32>,
+     points: Vec<Point>,
+@@ -74,9 +76,12 @@ impl FoodGrid {
+         let cap = (2 * (food.len() - outliers.len()) + 16) as f64;
+         // Fine cells let each queried row follow the vision circle: about 1.15
+         // candidates per visible pellet in 96- and 128-snake worlds, against 1.7
+-        // to 1.95 with half-radius cells and the full query box. See
++        // to 1.95 with half-radius cells and the full query box. Food narrower
++        // than the vision radius spans too few fine cells to trim and only pays
++        // for building more of them. See
+         // research/performance/2026-10-24-observation-food-index.
+-        let mut cell = (vision / 8.0).max(1.0);
++        let narrow = (bounds.max.x - bounds.min.x).min(bounds.max.y - bounds.min.y) < vision;
++        let mut cell = (vision / if narrow { 2.0 } else { 8.0 }).max(1.0);
+         let (cols, rows) = loop {
+             let cols = ((bounds.max.x - bounds.min.x) / cell).floor() + 1.0;
+             let rows = ((bounds.max.y - bounds.min.y) / cell).floor() + 1.0;
+@@ -91,6 +96,9 @@ impl FoodGrid {
+             inv_cell: 1.0 / cell,
+             cols,
+             rows,
++            // In coarser cells, which hold sparse food, trimming a row costs more
++            // than the few candidates it removes.
++            trim: cell * 4.0 <= vision,
+             starts: vec![0; cols * rows + 1],
+             points: Vec::new(),
+             ids: Vec::new(),
+@@ -134,6 +142,43 @@ impl FoodGrid {
+     fn row(&self, y: f64) -> usize {
+         (((y - self.origin.y) * self.inv_cell) as usize).min(self.rows - 1)
+     }
++    /// Calls `mark` with each pellet in the cells under `query`, and whether it
++    /// is visible from `head`. Each `TRIM` gets its own row loop, without the
++    /// choice inside it.
++    fn mark<const TRIM: bool>(
++        &self,
++        head: Point,
++        vision: f64,
++        query: Bounds,
++        mark: &mut impl FnMut(usize, bool),
++    ) {
++        let reach = vision + 1.0;
++        let (lo, hi) = (self.col(query.min.x), self.col(query.max.x));
++        for row in self.row(query.min.y)..=self.row(query.max.y) {
++            // Only a chord of the circle can be visible in this row. Moving the
++            // row a unit closer and using `reach` as the radius leave the squared
++            // chord a margin above 2 * vision, far beyond its rounding error for
++            // tame values, and the added unit covers the rest.
++            let (lo, hi) = if TRIM {
++                let top = self.origin.y + row as f64 * self.cell;
++                let dy = (top - head.y).max(head.y - (top + self.cell)).max(1.0) - 1.0;
++                let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
++                (self.col(head.x - half), self.col(head.x + half))
++            } else {
++                (lo, hi)
++            };
++            let cells = row * self.cols;
++            let span = self.starts[cells + lo] as usize..self.starts[cells + hi + 1] as usize;
++            for (&p, &i) in self.points[span.clone()].iter().zip(&self.ids[span]) {
++                // The same pure conjunction as `visible` in `Observer::visit`,
++                // without short-circuits.
++                let seen = ((p.x - head.x).abs() <= vision)
++                    & ((p.y - head.y).abs() <= vision)
++                    & p.distance_le(head, vision);
++                mark(i as usize, seen);
++            }
++        }
++    }
+ }
+ 
+ struct Index {
+@@ -266,28 +311,10 @@ impl<'a> Observer<'a> {
+                     count += usize::from(seen);
+                     first = first.min(if seen { i / 64 } else { usize::MAX });
+                 };
+-                for row in grid.row(b.min.y)..=grid.row(b.max.y) {
+-                    // Only a chord of the circle can be visible in this row. Moving
+-                    // the row a unit closer and using `reach` as the radius leave the
+-                    // squared chord a margin above 2 * vision, far beyond its rounding
+-                    // error for tame values, and the added unit covers the rest.
+-                    let top = grid.origin.y + row as f64 * grid.cell;
+-                    let dy = (top - me.head.y)
+-                        .max(me.head.y - (top + grid.cell))
+-                        .max(1.0)
+-                        - 1.0;
+-                    let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
+-                    let (lo, hi) = (grid.col(me.head.x - half), grid.col(me.head.x + half));
+-                    let cells = row * grid.cols;
+-                    let span =
+-                        grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
+-                    for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
+-                        // The same pure conjunction as `visible`, without short-circuits.
+-                        let seen = ((p.x - me.head.x).abs() <= vision)
+-                            & ((p.y - me.head.y).abs() <= vision)
+-                            & p.distance_le(me.head, vision);
+-                        mark(i as usize, seen);
+-                    }
++                if grid.trim {
++                    grid.mark::<true>(me.head, vision, b, &mut mark);
++                } else {
++                    grid.mark::<false>(me.head, vision, b, &mut mark);
+                 }
+                 for &i in &grid.outliers {
+                     mark(i as usize, visible(w.food[i as usize].point()));
