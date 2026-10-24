@@ -14,6 +14,21 @@ from unittest.mock import patch
 import perf_observation_phases as phases
 
 
+PINNED = Path(__file__).resolve().parent / "fixtures" / "observation-phases"
+
+
+def PINNED_SOURCE(name):
+    """Vendored copy of one guarded source blob."""
+    return PINNED / ("Cargo.toml.pinned" if name == "Cargo.toml" else name)
+
+
+class PinnedFixtureTests(unittest.TestCase):
+    def test_vendored_sources_are_the_guarded_blobs(self):
+        for name, blob in phases.SHAPE.items():
+            vendored = phases.git(phases.ROOT, "hash-object", "--no-filters", str(PINNED_SOURCE(name)))
+            self.assertEqual(vendored.decode().strip(), blob, name)
+
+
 class PreparationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -30,6 +45,10 @@ class PreparationTests(unittest.TestCase):
             target = cls.root / source.relative_to(phases.ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.read_bytes())
+        # The recipe instruments only the reviewed shape, which current sources
+        # have since left; overlay the vendored pinned blobs over the copy.
+        for name in phases.SHAPE:
+            (cls.root / name).write_bytes(PINNED_SOURCE(name).read_bytes())
         phases.git(cls.root, "init", "--quiet", "--template=")
         phases.git(cls.root, "add", ".")
         cls.commit("fixture")
