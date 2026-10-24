@@ -307,9 +307,10 @@ impl Session {
                 worlds
                     .checked_mul(agents)
                     .ok_or("worlds * agents must fit in usize")?;
-                // Construct completely before replacing a working session.
-                let mut built = Vec::new();
-                built
+                // Construct completely, with fresh frames, before replacing a
+                // working session: it stays intact until the whole reply exists.
+                let mut states = Vec::new();
+                states
                     .try_reserve_exact(worlds)
                     .map_err(|_| format!("{worlds} worlds do not fit in memory"))?;
                 for index in 0..worlds {
@@ -318,18 +319,12 @@ impl Session {
                     for slot in 0..agents {
                         world.add(slot.to_string(), slot, agents)?;
                     }
-                    built.push(world);
-                }
-                // Fresh frames: the previous session, frames included, stays
-                // intact until the whole reply exists.
-                let mut states: Vec<_> = built
-                    .into_iter()
-                    .map(|world| WorldState {
+                    states.push(WorldState {
                         world,
                         frame: Frame::default(),
                         actions: Vec::new(),
-                    })
-                    .collect();
+                    });
+                }
                 let frames = each_ok(each_world(&mut states, |state| {
                     state.frame.collect(&state.world, 0, &[])?;
                     Ok(state.frame.encode())
