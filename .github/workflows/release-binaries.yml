@@ -1,0 +1,148 @@
+name: Release binaries
+
+# Builds and smoke-tests one archive per platform with the slither-sim CLI and
+# the slither-sim-ffi shared library. release.yml calls this for each published
+# version and uploads the archives; PRs that edit this workflow build them too.
+on:
+  workflow_call:
+    inputs:
+      # Builds run this commit's code in the caller's context, so pass only
+      # trusted commits: release.yml passes its release commit only after
+      # require_main_ci has verified it is on main with passing CI. The jobs
+      # use no caches.
+      ref:
+        description: Commit to build
+        type: string
+        required: true
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release-binaries.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-binaries-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Binaries (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { runner: macos-latest, target: aarch64-apple-darwin }
+          - { runner: macos-15-intel, target: x86_64-apple-darwin }
+          # Without the VC++ redistributable, a dynamically linked C runtime would
+          # keep the downloads from starting on a clean Windows machine.
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc, rustflags: -C target-feature=+crt-static }
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+      RUSTFLAGS: ${{ matrix.rustflags }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      # Separate builds keep the library free of the CLI's networking features.
+      # The manylinux2014 container, as for the Python wheels, links glibc 2.17.
+      - name: Build (manylinux2014)
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/io" -w /io \
+            "quay.io/pypa/manylinux2014_$(uname -m)" bash -euo pipefail -c '
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              . "$HOME/.cargo/env"
+              cargo build --release --locked --bin slither-sim
+              cargo build --release --locked -p slither-sim-ffi'
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        if: runner.os != 'Linux'
+      - name: Build
+        if: runner.os != 'Linux'
+        run: |
+          cargo build --release --locked --bin slither-sim
+          cargo build --release --locked -p slither-sim-ffi
+      - name: Package
+        run: |
+          version=$(target/release/slither-sim --version | cut -d ' ' -f 2)
+          name="slither-sim-$TARGET"
+          case "$RUNNER_OS" in
+            Linux) files=(slither-sim libslither_sim_ffi.so) ;;
+            macOS) files=(slither-sim libslither_sim_ffi.dylib) ;;
+            Windows) files=(slither-sim.exe slither_sim_ffi.dll slither_sim_ffi.dll.lib) ;;
+          esac
+          mkdir -p "dist/$name"
+          for file in "${files[@]}"; do cp "target/release/$file" "dist/$name/"; done
+          cp ffi/include/slither_sim.h LICENSE "dist/$name/"
+          docs="https://github.com/NikitaMGrimm/slither-sim/blob/v$version/docs"
+          cat > "dist/$name/README.txt" <<EOF
+          slither-sim $version for $TARGET
+
+          slither-sim         CLI: serve, client and host. Run it with --help.
+          slither_sim_ffi     slither-sim-abi-v1 shared library; header slither_sim.h.
+
+          serve JSON API:     $docs/bot-api.md
+          C ABI:              $docs/c-api.md
+          Unsigned downloads: https://github.com/NikitaMGrimm/slither-sim/blob/v$version/README.md#download-a-release
+
+          MIT licensed; see LICENSE. Source: https://github.com/NikitaMGrimm/slither-sim
+          EOF
+          cd dist
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            7z a "$name.zip" "$name"
+          else
+            # Keeps macOS extended attributes out as ._ files.
+            COPYFILE_DISABLE=1 tar -czf "$name.tar.gz" "$name"
+            tar -tzvf "$name.tar.gz"
+          fi
+      - name: Smoke-test the extracted archive
+        env:
+          PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+        run: |
+          mkdir smoke
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            7z x -osmoke dist/*.zip
+          else
+            tar -xzf dist/*.tar.gz -C smoke
+          fi
+          dir="smoke/slither-sim-$TARGET"
+          "$dir/slither-sim" --version
+          printf '%s\n' '{"op":"reset","seed":7,"agents":2}' \
+            '{"op":"step","actions":[{"heading":[0,1],"boost":[false,true]}]}' \
+            | "$dir/slither-sim" serve > smoke/replies.jsonl
+          "$PYTHON" -c 'import json, sys
+          replies = [json.loads(line) for line in sys.stdin]
+          assert len(replies) == 2, replies
+          assert all(r["protocol"] == "slither-sim-json-v2" and "result" in r for r in replies), replies' \
+            < smoke/replies.jsonl
+          library=$(find "$dir" -name '*.so' -o -name '*.dylib' -o -name '*.dll')
+          "$PYTHON" examples/ffi_bot.py --library "$library" --steps 10
+          case "$RUNNER_OS" in
+            Linux)
+              for file in "$dir/slither-sim" "$library"; do
+                newest=$(objdump -T "$file" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -n 1)
+                echo "$file requires $newest"
+                [[ "$(printf '%s\n' "$newest" GLIBC_2.17 | sort -V | tail -n 1)" == GLIBC_2.17 ]]
+              done ;;
+            Windows)
+              if grep -li vcruntime140 "$dir/slither-sim.exe" "$library"; then
+                echo 'Expected a statically linked C runtime'
+                exit 1
+              fi ;;
+          esac
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binaries-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error

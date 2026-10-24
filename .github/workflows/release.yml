@@ -35,6 +35,7 @@ jobs:
       id-token: write
     outputs:
       commit: ${{ steps.target.outputs.commit }}
+      tag: ${{ steps.target.outputs.tag }}
       ready: ${{ steps.cooldown.outputs.ready }}
     env:
       GH_TOKEN: ${{ github.token }}
@@ -149,3 +150,39 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           skip-existing: true
+
+  # Prebuilt CLI and C ABI archives follow the same rules as the Python package:
+  # a failure leaves the crate release done, and dispatching vVERSION rebuilds
+  # every archive and replaces the uploaded set, checksums included.
+  binaries:
+    needs: release
+    if: needs.release.outputs.ready == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-binaries.yml
+    with:
+      ref: ${{ needs.release.outputs.commit }}
+
+  release-assets:
+    name: Upload release binaries
+    needs: [release, binaries]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: binaries-*
+          path: assets
+          merge-multiple: true
+      - name: Upload to the GitHub Release
+        working-directory: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$RELEASE_TAG" * --clobber
