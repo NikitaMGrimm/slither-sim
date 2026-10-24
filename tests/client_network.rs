@@ -332,6 +332,9 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let (polled, next_poll) = mpsc::channel();
     let (written, write_done) = mpsc::channel();
     let (trickle, start_trickle) = mpsc::channel();
+    let mut first_payload = vec![0, 7, b'z'];
+    first_payload.extend(u24(7900));
+    let first_bytes = first_payload.len();
     let server = thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
         stream
@@ -344,11 +347,11 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         ready.recv_timeout(Duration::from_secs(2)).unwrap();
         // Send one small valid message over several client decision polls,
         // one byte per poll: fixed sleeps overslept by up to 40 ms on macOS runners.
-        let mut payload = vec![0, 7, b'z'];
-        payload.extend(u24(7900));
         let stream = socket.get_mut();
-        stream.write_all(&[0x82, payload.len() as u8]).unwrap();
-        for byte in payload {
+        stream
+            .write_all(&[0x82, first_payload.len() as u8])
+            .unwrap();
+        for byte in first_payload {
             next_poll.recv_timeout(Duration::from_secs(2)).unwrap();
             stream.write_all(&[byte]).unwrap();
             written.send(()).unwrap();
@@ -382,9 +385,12 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     assert!(started.elapsed() < Duration::from_millis(150));
     assert_eq!(first.observation.unwrap().arena.radius, 7926.);
     let mut radius = 7926.;
-    for _ in 0..12 {
-        polled.send(()).unwrap();
-        write_done.recv_timeout(Duration::from_secs(2)).unwrap();
+    for poll in 0..12 {
+        // Later polls only read, in case the last byte arrives a poll late.
+        if poll < first_bytes {
+            polled.send(()).unwrap();
+            write_done.recv_timeout(Duration::from_secs(2)).unwrap();
+        }
         radius = backend
             .next_frame()
             .unwrap()
