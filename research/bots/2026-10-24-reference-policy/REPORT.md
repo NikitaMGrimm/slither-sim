@@ -224,6 +224,20 @@ One warmup and one timing pair are only a compatibility smoke test, collected
 alongside checks; no performance comparison is inferred. Selected integration
 identities are in [`main-integration.json`](main-integration.json).
 
+Main #78, `9996dc4cfe0ba2b33307908e443f9a6c8e8d80a1`, was subsequently
+merged normally in `863eb42fe53bb394988b9e58e945e6183b3e961a`, also without
+conflicts. All `src/`, Cargo manifests/lock, reference-study harness and reference
+tests are identical to the #77 integration. The new statistics and perf tooling
+are retained from main; the only Rust harness change adds an operation count to
+perf reports. It does not change the frozen reference-study bootstrap or gates.
+The earlier qualification, cost and trajectory-probe evidence keeps its actual
+source pins, without another unaffected qualification run.
+Both required check groups and all twelve focused tests passed again. The real
+overlay against #78's main also passes with equal workload definitions and
+full-state traces; its single pair remains only a compatibility smoke.
+See [`main-78-integration.json`](main-78-integration.json) for this later source
+pin, selected overlay evidence and raw-log hashes.
+
 ## Verification and limits
 
 Focused deterministic tests cover food reselection/turn cost/ties, wall/body/head
@@ -240,8 +254,8 @@ backend immediately played; it correctly returned `waiting`. The fixture was
 fixed to advance the login/setup ticks, with no policy change. Both attempts'
 logs are retained. After the correction and again after merging main, the full
 `uv run --locked --only-group tools python -B tools/check.py rust` and `tools`
-groups passed, along with all twelve focused tests. The combined tools run used
-a fresh target directory and passed the JSON v3 / ABI v2 example smokes and
+groups passed, along with all twelve focused tests. Tools checks passed the
+JSON v3 / ABI v2 example smokes and
 Python package tests (one optional NumPy test skipped because NumPy is absent).
 Earlier failed check attempts remain in the local raw directory with their
 causes recorded in `half-turn-fix/NOTES.md`; none were discarded. Linux/macOS/MSRV
