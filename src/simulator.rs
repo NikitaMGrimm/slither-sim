@@ -342,6 +342,10 @@ pub struct Simulator {
     prey_outward: HashSet<u64>,
     prey_motion_clock: f64,
     radius_update_index: usize,
+    /// Why the world stopped: a pickup whose gain would overflow the eater's
+    /// mass. Validation rejects every later step with it.
+    #[serde(skip)]
+    failure: Option<String>,
     #[serde(skip)]
     food_cache: FoodCache,
     #[serde(skip)]
@@ -415,6 +419,7 @@ impl Simulator {
             buffers: StepBuffers::default(),
             #[cfg(feature = "parallel")]
             parallel: false,
+            failure: None,
         };
         world.update_radius(0.0);
         // A zero cell limit rejects every candidate, so there is nothing to store.
@@ -693,12 +698,17 @@ impl Simulator {
     }
     /// One physics tick (`config.dt`, the 7 ms server loop by default). Actions use stable
     /// spawn slots; dead slots may be None.
+    /// Advance one tick. Rejected actions change nothing. A pickup whose gain
+    /// would overflow its eater's mass completes the tick without that gain,
+    /// returns the error and stops the world: every later step is rejected.
     pub fn step(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
         self.validate_actions(actions)?;
-        self.advance_validated(actions);
-        Ok(())
+        self.advance_validated(actions)
     }
     pub fn validate_actions(&self, actions: &[Option<Action>]) -> Result<(), String> {
+        if let Some(failure) = &self.failure {
+            return Err(failure.clone());
+        }
         // The public configuration may have changed since construction. Reject
         // invalid prey settings before movement, clocks or refill mutate state.
         self.config.prey.validate()?;
@@ -719,10 +729,12 @@ impl Simulator {
     ) -> Result<(), String> {
         self.validate_actions(actions)?;
         self.advance::<true>(actions, profile);
-        Ok(())
+        self.failure.clone().map_or(Ok(()), Err)
     }
-    pub(crate) fn advance_validated(&mut self, actions: &[Option<Action>]) {
+    /// Advance validated actions; errors only when the tick stopped the world.
+    pub(crate) fn advance_validated(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
         self.advance::<false>(actions, &mut StepProfile::default());
+        self.failure.clone().map_or(Ok(()), Err)
     }
     fn advance<const PROFILE: bool>(
         &mut self,
@@ -1108,10 +1120,10 @@ impl Simulator {
                 });
             }
             let s = &mut self.snakes[i];
-            s.fam += f
+            let gain = f
                 .size
                 .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
-            Self::update_mass(s);
+            gain_mass(s, gain, "food", &mut self.failure);
         }
         if !hits.is_empty() {
             eaten.clear();
@@ -1452,8 +1464,8 @@ impl Simulator {
                     });
                 }
                 let s = &mut self.snakes[i];
-                s.fam += nutrition(prey.size, s.segments as f64 + s.fam) * p.nutrition_factor;
-                Self::update_mass(s);
+                let gain = nutrition(prey.size, s.segments as f64 + s.fam) * p.nutrition_factor;
+                gain_mass(s, gain, "prey", &mut self.failure);
                 false
             } else {
                 true
@@ -1560,6 +1572,22 @@ impl Clone for StepBuffers {
 impl std::fmt::Debug for StepBuffers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StepBuffers").finish_non_exhaustive()
+    }
+}
+
+/// Add `gain` to `s`'s mass, or record why not when the sum overflows f64.
+/// Validation bounds one catch, not the mass that catches accumulate.
+fn gain_mass(s: &mut Snake, gain: f64, item: &str, failure: &mut Option<String>) {
+    let fam = s.fam + gain;
+    if fam.is_finite() {
+        s.fam = fam;
+        Simulator::update_mass(s);
+    } else if failure.is_none() {
+        *failure = Some(format!(
+            "Snake {}'s mass would overflow f64 after eating {item} worth {gain:e}; the tick \
+             completed without that gain and the world cannot advance further",
+            s.id
+        ));
     }
 }
 

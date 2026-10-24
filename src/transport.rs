@@ -134,7 +134,7 @@ impl WorldState {
             if self.world.living() == 0 {
                 break;
             }
-            self.world.advance_validated(&self.actions);
+            self.world.advance_validated(&self.actions)?;
             ticks += 1;
         }
         self.frame

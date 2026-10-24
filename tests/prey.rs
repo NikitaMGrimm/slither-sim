@@ -116,6 +116,61 @@ fn prey_nutrition_that_overflows_a_snake_mass_is_rejected() {
 }
 
 #[test]
+fn accumulated_prey_mass_that_overflows_stops_the_world() {
+    // Each catch is finite, so validation passes, but the second overflows.
+    let size = 18.8;
+    let mut config = Config::sandbox();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.;
+    config.prey = PreyConfig {
+        count: 0,
+        size,
+        max_size: size,
+        nutrition_factor: f64::MAX / physics::nutrition(size, 2.),
+        cruise_speed: 0.,
+        escape_speed: 0.,
+        sprint_speed: 0.,
+        turn_rate: 0.,
+        ..PreyConfig::default()
+    };
+    config.validate().unwrap();
+    let mut world = Simulator::new(1, config).unwrap();
+    world.add("a", 0, 1).unwrap();
+    let catch = |world: &mut Simulator, id| {
+        let snake = &world.snakes[0];
+        let (position, _) =
+            physics::pickup_circle(snake.head, snake.heading, snake.speed, snake.segments);
+        world.prey.push(Prey {
+            id,
+            position,
+            size,
+            ..entity(0., 0.)
+        });
+        let heading = world.snakes[0].heading;
+        world.step(&[Some(Action {
+            heading,
+            boost: false,
+        })])
+    };
+    catch(&mut world, 0).unwrap();
+    assert!(world.prey.is_empty());
+    let fam = world.snakes[0].fam;
+    assert!(fam.is_finite() && fam > 1e308);
+    let error = catch(&mut world, 1).unwrap_err();
+    assert!(
+        error.contains("overflow") && error.contains("cannot advance"),
+        "{error}"
+    );
+    // The tick completed without the overflowing gain.
+    assert!(world.prey.is_empty());
+    assert_eq!(world.snakes[0].fam, fam);
+    assert!(world.snakes[0].length.is_finite());
+    let time = world.time;
+    assert_eq!(catch(&mut world, 2).unwrap_err(), error);
+    assert_eq!(world.time, time);
+}
+
+#[test]
 fn client_prey_units_and_turn_limit() {
     // Public client: mamu2=0.029 radians per 8ms; movement sp*vfr/4.
     let mut p = entity(0., 3.8 / 0.032);
