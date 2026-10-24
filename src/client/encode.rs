@@ -377,9 +377,6 @@ pub(crate) fn sector_clear(sector: [u8; 2]) -> Vec<u8> {
     vec![b'w', sector[0], sector[1]]
 }
 
-pub(crate) fn prey_id(prey: &Prey) -> u16 {
-    prey.id as u16
-}
 /// Prey motion position on the wire's 3-unit grid.
 pub(crate) fn prey_grid(point: Point) -> Result<[u16; 2], String> {
     let cell = |value: f64| {
@@ -387,9 +384,10 @@ pub(crate) fn prey_grid(point: Point) -> Result<[u16; 2], String> {
     };
     Ok([cell(point.x)?, cell(point.y)?])
 }
-pub(crate) fn prey_appearance(prey: &Prey) -> Result<Vec<u8>, String> {
+/// `id` is the connection-unique wire ID, not the 64-bit simulator ID.
+pub(crate) fn prey_appearance(id: u16, prey: &Prey) -> Result<Vec<u8>, String> {
     let mut p = vec![b'y'];
-    p.extend(u16be(prey_id(prey)));
+    p.extend(u16be(id));
     p.push(0); // color
     p.extend(coord_u24(prey.position.x)?);
     p.extend(coord_u24(prey.position.y)?);
@@ -402,9 +400,9 @@ pub(crate) fn prey_appearance(prey: &Prey) -> Result<Vec<u8>, String> {
     Ok(p)
 }
 /// Position, plus heading, wanted heading and speed when `full`.
-pub(crate) fn prey_motion(prey: &Prey, full: bool) -> Result<Vec<u8>, String> {
+pub(crate) fn prey_motion(id: u16, prey: &Prey, full: bool) -> Result<Vec<u8>, String> {
     let mut p = vec![b'j'];
-    p.extend(u16be(prey_id(prey)));
+    p.extend(u16be(id));
     for value in prey_grid(prey.position)? {
         p.extend(u16be(value));
     }
@@ -889,9 +887,9 @@ mod tests {
                 speed: 100.,
                 size: 4.,
             };
-            let appearance = prey_appearance(&prey).unwrap();
+            let appearance = prey_appearance(3, &prey).unwrap();
             assert_eq!((appearance[3], appearance[11]), (0, expected));
-            assert_eq!(prey_motion(&prey, true).unwrap()[7], expected);
+            assert_eq!(prey_motion(3, &prey, true).unwrap()[7], expected);
         }
     }
 

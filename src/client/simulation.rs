@@ -203,6 +203,7 @@ struct KnownSnake {
 }
 #[derive(Clone, Debug)]
 struct KnownPrey {
+    wire: u16,
     motion: [u32; 3],
     reported_at: f64,
 }
@@ -275,7 +276,8 @@ struct Connection {
     snakes: KnownSnakes,
     food: KnownSectors,
     food_interest: SectorInterest,
-    prey: BTreeMap<u16, KnownPrey>,
+    /// Keyed by simulator ID; each entry keeps the wire ID it was shown with.
+    prey: BTreeMap<u64, KnownPrey>,
     radius: u32,
     minimap_at: f64,
     /// XOR bases belong to recipients: missed deadlines and reconnects differ.
@@ -431,7 +433,10 @@ pub struct SimulatorBackend {
     food_presentation: FoodPresentation,
     /// Exact pickup positions since the last broadcast, before buffers reset.
     food_eaters: BTreeMap<(u64, u64), u16>,
-    prey_eaters: BTreeMap<u16, u16>,
+    /// Eater slot by simulator prey ID since the last broadcast.
+    prey_eaters: BTreeMap<u64, u16>,
+    /// Wire ID of each living prey. Simulator IDs are 64-bit; see `assign_prey_wire`.
+    prey_wire: BTreeMap<u64, u16>,
     /// Listings of the subscribed sectors at the last broadcast, indexed by
     /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
     /// so a connection already holding it can skip the comparison.
@@ -475,6 +480,7 @@ impl SimulatorBackend {
             food_presentation: FoodPresentation::new(seed, config.agents),
             food_eaters: BTreeMap::new(),
             prey_eaters: BTreeMap::new(),
+            prey_wire: BTreeMap::new(),
             food_sectors: Vec::new(),
             listed: Vec::new(),
             food_buckets: Vec::new(),
@@ -1024,7 +1030,7 @@ impl SimulatorBackend {
         for event in self.world.pickup_events.as_deref().unwrap_or(&[]) {
             if let PickupItem::Prey(prey) = &event.item {
                 self.prey_eaters
-                    .entry(encode::prey_id(prey))
+                    .entry(prey.id)
                     .or_insert(event.eater as u16);
             }
             if let PickupItem::Food(food) = &event.item {
@@ -1094,6 +1100,7 @@ impl SimulatorBackend {
             }
         }
         self.sync_food_sectors()?;
+        self.assign_prey_wire()?;
         let eaten = eaten_sectors(&self.food_eaters);
         let bounds: Vec<[f64; 4]> = self
             .world
@@ -1140,6 +1147,40 @@ impl SimulatorBackend {
         self.food_eaters.clear();
         self.prey_eaters.clear();
         self.minimaps()?;
+        Ok(())
+    }
+
+    /// Give every living prey a 16-bit wire ID. Truncating 64-bit simulator IDs
+    /// would let a survivor and a much later prey share one (0 and 65536), so
+    /// IDs are allocated: a prey keeps its ID while it lives, and a new prey
+    /// takes the first free ID from its own truncated value. An ID stays taken
+    /// while any connection still shows it, so a removal always precedes reuse.
+    fn assign_prey_wire(&mut self) -> Result<(), String> {
+        let live: BTreeSet<u64> = self.world.prey.iter().map(|prey| prey.id).collect();
+        self.prey_wire.retain(|id, _| live.contains(id));
+        let mut taken: Option<BTreeSet<u16>> = None;
+        for &id in &live {
+            if self.prey_wire.contains_key(&id) {
+                continue;
+            }
+            let taken = taken.get_or_insert_with(|| {
+                self.prey_wire
+                    .values()
+                    .copied()
+                    .chain(
+                        self.slots
+                            .iter()
+                            .flat_map(|slot| slot.connection.prey.values().map(|known| known.wire)),
+                    )
+                    .collect()
+            });
+            let wire = (0..=u16::MAX)
+                .map(|offset| (id as u16).wrapping_add(offset))
+                .find(|wire| !taken.contains(wire))
+                .ok_or("Protocol-19 prey IDs are 16-bit: more than 65536 prey are live or shown")?;
+            taken.insert(wire);
+            self.prey_wire.insert(id, wire);
+        }
         Ok(())
     }
 
@@ -1411,21 +1452,26 @@ impl SimulatorBackend {
         let mut visible = BTreeMap::new();
         for prey in &world.prey {
             if prey.position.distance(head) <= vision {
-                visible.entry(encode::prey_id(prey)).or_insert(prey);
+                visible.entry(prey.id).or_insert(prey);
             }
         }
-        let gone: Vec<u16> = connection
+        let gone: Vec<u64> = connection
             .prey
             .keys()
             .filter(|id| !visible.contains_key(id))
             .copied()
             .collect();
         for id in gone {
-            connection.prey.remove(&id);
-            packets.push(encode::prey_removal(id, self.prey_eaters.get(&id).copied()));
+            let known = connection.prey.remove(&id).expect("known prey");
+            packets.push(encode::prey_removal(
+                known.wire,
+                self.prey_eaters.get(&id).copied(),
+            ));
         }
         for (id, prey) in visible {
+            let wire = self.prey_wire[&id];
             let current = KnownPrey {
+                wire,
                 motion: [
                     encode::angle_u24(prey.heading),
                     encode::angle_u24(prey.target_heading),
@@ -1434,7 +1480,7 @@ impl SimulatorBackend {
                 reported_at: now,
             };
             match connection.prey.get(&id) {
-                None => packets.push(encode::prey_appearance(prey)?),
+                None => packets.push(encode::prey_appearance(wire, prey)?),
                 Some(known) => {
                     let changed = known.motion != current.motion;
                     // Ordinary receipts cluster near one third second. The
@@ -1446,7 +1492,7 @@ impl SimulatorBackend {
                     if now + 1e-9 < known.reported_at + interval {
                         continue;
                     }
-                    packets.push(encode::prey_motion(prey, changed)?)
+                    packets.push(encode::prey_motion(wire, prey, changed)?)
                 }
             }
             connection.prey.insert(id, current);
@@ -2722,6 +2768,53 @@ mod tests {
                 .contains(&encode::prey_removal(123, None))
         );
     }
+    #[test]
+    fn prey_ids_that_share_their_low_16_bits_get_distinct_wire_ids() {
+        let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey ids");
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let head = sim.backend.world.snakes[0].head;
+        let prey = |id: u64, dx: f64| crate::prey::Prey {
+            id,
+            position: Point {
+                x: head.x + dx,
+                y: head.y + 600.,
+            },
+            heading: 0.,
+            target_heading: 0.,
+            speed: 0.,
+            size: 6.,
+        };
+        // A surviving early prey and a late-life prey whose truncated IDs collide.
+        sim.backend
+            .world
+            .prey
+            .extend([prey(0, -100.), prey(65_536, 100.)]);
+        sim.backend.broadcast().unwrap();
+        let appearances: BTreeSet<u16> = remote
+            .pump(&mut sim, 0)
+            .iter()
+            .filter(|p| p[0] == b'y' && p.len() == 20)
+            .map(|p| u16::from_be_bytes([p[1], p[2]]))
+            .collect();
+        assert_eq!(appearances, BTreeSet::from([0, 1]));
+        assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
+
+        // The ID of a removed prey is reused only after its removal was shown.
+        sim.backend.world.prey.retain(|prey| prey.id != 0);
+        sim.backend.world.prey.push(prey(131_072, 0.));
+        sim.backend.broadcast().unwrap();
+        let packets = remote.pump(&mut sim, 0);
+        assert!(packets.contains(&encode::prey_removal(0, None)));
+        let added: Vec<u16> = packets
+            .iter()
+            .filter(|p| p[0] == b'y' && p.len() == 20)
+            .map(|p| u16::from_be_bytes([p[1], p[2]]))
+            .collect();
+        assert_eq!(added, [2]);
+        assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
+    }
+
     fn profile(nickname: &str) -> PlayerAppearance {
         PlayerAppearance {
             nickname: nickname.as_bytes().to_vec(),
@@ -3139,7 +3232,7 @@ mod tests {
             speed: 100.,
             size: 6.,
         };
-        let appear = encode::prey_appearance(&prey).unwrap();
+        let appear = encode::prey_appearance(123, &prey).unwrap();
         // Synthetic world edits isolate visibility even with no living sessions.
         sim.backend.world.food.push(food);
         sim.backend.world.prey.push(prey);
