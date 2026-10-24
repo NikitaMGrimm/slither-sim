@@ -138,7 +138,7 @@ headings (steps of 2π/16777215) and body anchors that clients rebuild from
 transmitted directions are finer than the frame steps. For those, the bound is
 what matters: headings are off by at most 0.00005 radians, 0.2% of the turn a
 small snake or prey can make in one tick (1.1% for the largest snakes), and
-points by at most 0.007 units, 0.05% of the smallest snake radius. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
+points by at most 0.0071 units, 0.05% of the smallest snake radius. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
 has the measurements and error bounds. Rounding can still change a bot's choice
 when it sits exactly at a decision threshold.
 

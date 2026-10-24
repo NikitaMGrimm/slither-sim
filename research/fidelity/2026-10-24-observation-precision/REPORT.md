@@ -67,8 +67,8 @@ and turns at most 0.0289 rad per tick.
 
 | Field | Step | Finer than the wire by | Worst error relative to the scales |
 | --- | --- | --- | --- |
-| Head, anchors | 0.01 | 20× (spawn) to 100× | 0.007 per point, 0.05% of the smallest radius; 0.014 between two points, 0.03% of anchor spacing |
-| Food position | 0.01 | 117× | 0.014 between snake and food, 0.04% of the smallest pickup radius |
+| Head, anchors | 0.01 | 20× (spawn) to 100× | 0.0071 per point, 0.05% of the smallest radius; 0.0142 between two points, 0.03% of anchor spacing |
+| Food position | 0.01 | 117× | 0.0142 between snake and food, 0.04% of the smallest pickup radius |
 | Prey position | 0.01 | 20× to 300× | same bound as food |
 | Snake and prey headings | 0.0001 rad | 245× finer than motion updates; 267× coarser than spawn angle24 | 0.17% of the smallest snake's turn per tick; at most 0.004 units at the head tip of a maximum-size snake |
 | Speeds | 0.01 units/s | 3× (spawn) to 174× | 0.00004 units per tick |
