@@ -485,6 +485,15 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
     accept(|c| c.agents = 65_536);
     reject(|c| c.agents = 65_537, "u16");
     accept(|c| c.decision_ticks = 1001);
+    // A long broadcast interval costs full resends, not correctness.
+    accept(|c| c.broadcast_ticks = 1001);
+    let mut long = config(1, LatencyConfig::default());
+    long.broadcast_ticks = 42;
+    let warnings = long.warnings();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("resent in full"), "{}", warnings[0]);
+    long.broadcast_ticks = 41;
+    assert!(long.warnings().is_empty());
     reject(|c| c.decision_ticks = 0, "at least 1");
     reject(|c| c.broadcast_ticks = 0, "at least 1");
     // Delays have no fixed ceiling; only an unrepresentable largest draw fails.
@@ -534,7 +543,6 @@ fn unsupported_configurations_are_rejected() {
     reject(|c| c.world.radius = 40_000.);
     reject(|c| c.agents = 0);
     reject(|c| c.controlled_slot = 1);
-    reject(|c| c.broadcast_ticks = 40);
     reject(|c| c.minimap_side = 513);
     reject(|c| c.leaderboard_interval_seconds = 0.);
     reject(|c| c.leaderboard_interval_seconds = -1.);

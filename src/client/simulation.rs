@@ -43,9 +43,12 @@ const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
 /// record also counts a fixed overhead so empty events stay bounded.
 const MAX_RECORD_BYTES: usize = 32 << 20;
 const RECORD_OVERHEAD: usize = 32;
-/// New anchors per broadcast that keep an exact incremental encoding; the
-/// fourth-newest anchor has already moved by the body contraction.
-const FRESH_ANCHORS: usize = 3;
+/// Front anchors searched for a known snake's previous front. Contraction runs
+/// before each insertion from index 3 on, so that front stays unchanged at
+/// indices 1, 2 and 3 through three insertions and moves on the fourth: up to
+/// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
+/// snake in full.
+const FRESH_ANCHORS: usize = 4;
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
@@ -147,13 +150,6 @@ impl SimulationConfig {
         if self.decision_ticks == 0 || self.broadcast_ticks == 0 {
             return Err("Decision and broadcast ticks must be at least 1".into());
         }
-        // Anchors farther behind the front have been contracted and cannot be
-        // encoded incrementally; boost speed must not outrun that window.
-        if self.broadcast_ticks as f64 * self.world.dt * physics::BOOST_SPEED
-            >= (FRESH_ANCHORS - 1) as f64 * physics::ANCHOR_SPACING
-        {
-            return Err("Broadcast interval is too long for incremental body updates".into());
-        }
         if !self.minimap_interval_seconds.is_finite() || self.minimap_interval_seconds <= 0. {
             return Err("Minimap interval must be positive".into());
         }
@@ -187,7 +183,18 @@ impl SimulationConfig {
 
     /// Valid settings outside measured behavior; see [`Config::warnings`].
     pub fn warnings(&self) -> Vec<String> {
-        self.world.warnings()
+        let mut warnings = self.world.warnings();
+        // A head less than one spacing past its front anchor that travels less
+        // than `FRESH_ANCHORS - 1` spacings crosses at most that many anchors.
+        let window = (FRESH_ANCHORS - 1) as f64 * physics::ANCHOR_SPACING;
+        if self.broadcast_ticks as f64 * self.world.dt * physics::BOOST_SPEED >= window {
+            warnings.push(format!(
+                "broadcastTicks × dt × {} exceeds the {window}-unit incremental body-update \
+                 window: snakes that outrun it are resent in full (more bandwidth)",
+                physics::BOOST_SPEED
+            ));
+        }
+        warnings
     }
 }
 
@@ -2823,6 +2830,90 @@ mod tests {
             .collect();
         assert_eq!(added, [2]);
         assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
+    }
+
+    #[test]
+    fn three_new_anchors_encode_incrementally_and_four_resend() {
+        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
+        world.add("0", 0, 1).unwrap();
+        let mut snake = world.snakes[0].clone();
+        snake.heading = 0.;
+        snake.body = (0..20)
+            .map(|i| Point {
+                x: -42. * f64::from(i),
+                y: 3. * f64::from(i % 2),
+            })
+            .collect();
+        snake.head = snake.body[0];
+        snake.segments = 20;
+        for insertions in 1..=FRESH_ANCHORS {
+            let mut moved = snake.clone();
+            let mut known = KnownSnake::new(0, &moved, 0.).unwrap();
+            for k in 1..=insertions {
+                let anchor = Point {
+                    x: 42. * k as f64,
+                    y: 0.,
+                };
+                physics::append_anchor(&mut moved.body, anchor, false);
+                moved.head = anchor;
+            }
+            let mut packets = Vec::new();
+            changes(
+                &mut packets,
+                false,
+                1,
+                &mut known,
+                &moved,
+                0.,
+                &NATIVE_PROFILE,
+            )
+            .unwrap();
+            let anchors = packets
+                .iter()
+                .filter(|p| matches!(p[0], b'g' | b'='))
+                .count();
+            if insertions < FRESH_ANCHORS {
+                // The old front is still unchanged at index `insertions`.
+                assert_eq!(moved.body[insertions], snake.body[0]);
+                assert_eq!(anchors, insertions);
+                assert!(!packets.iter().any(|p| is_full(p)), "{insertions}");
+            } else {
+                assert_ne!(moved.body[insertions], snake.body[0]);
+                assert!(packets.iter().any(|p| is_full(p)), "{insertions}");
+            }
+            assert_eq!(known.front, moved.body[0]);
+        }
+    }
+
+    #[test]
+    fn boosting_within_the_window_never_resends_the_body() {
+        let mut config = raw_config(2);
+        config.world.radius = 6000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        // 40 ticks of boost travel 122.5 units: up to three anchors per broadcast.
+        config.broadcast_ticks = 40;
+        assert!(config.warnings().is_empty());
+        let mut sim = RawSimulator::new(7, config, 2).unwrap();
+        let mut a = Remote::connect(&mut sim, 0, "Observer");
+        let mut b = Remote::connect(&mut sim, 1, "Booster");
+        for (slot, y, segments) in [(0, 1000., 2), (1, 0., 60)] {
+            sim.backend.world.snakes[slot].alive = false;
+            sim.backend
+                .world
+                .respawn(slot, Point { x: -1500., y }, 0., segments)
+                .unwrap();
+            sim.backend.slots[slot].control = Action {
+                heading: 0.,
+                boost: slot == 1,
+            };
+        }
+        run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 200);
+        a.packets.clear();
+        run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 400);
+        assert!(sim.backend.world.is_boosting(1));
+        assert!(a.packets.iter().any(|p| p[0] == b'g' && p[1..3] == [0, 1]));
+        assert!(!a.packets.iter().any(|p| is_full(p) && p[1..3] == [0, 1]));
     }
 
     fn profile(nickname: &str) -> PlayerAppearance {
