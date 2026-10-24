@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- The `slither-sim` Python package is on PyPI: `pip install slither-sim`. From
+  this release on, each crate release publishes the same version there.
+  Stable-ABI wheels serve CPython 3.11+ on Linux (x86-64 and ARM64), macOS (Apple
+  silicon and Intel) and Windows (x86-64); elsewhere the source distribution
+  builds with Rust 1.86+. See the [Python guide](docs/python.md).
+
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 
 ### Added

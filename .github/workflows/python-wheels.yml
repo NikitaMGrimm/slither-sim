@@ -1,0 +1,98 @@
+name: Python wheels
+
+# Builds and tests the PyPI distributions: one stable-ABI wheel per platform,
+# plus the source distribution. release.yml calls this for each published
+# version and uploads the artifacts; PRs that edit the package build them too.
+on:
+  workflow_call:
+    inputs:
+      # Builds run this commit's code where caches are shared with main, so pass
+      # only trusted commits: release.yml passes its release commit only after
+      # require_main_ci has verified it is on main with passing CI.
+      ref:
+        description: Commit to build
+        type: string
+        required: true
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - python/**
+      - .github/workflows/python-wheels.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-wheels-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  wheel:
+    name: Wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux wheels build in manylinux2014 containers, so they load on glibc 2.17+.
+          - { name: linux-x86_64, runner: ubuntu-latest, target: x86_64-unknown-linux-gnu, manylinux: '2014' }
+          - { name: linux-aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, manylinux: '2014' }
+          - { name: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin }
+          - { name: macos-x86_64, runner: macos-15-intel, target: x86_64-apple-darwin }
+          - { name: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      # The oldest supported Python, which also tests the stable-ABI floor.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v1.15.0
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux || 'off' }}
+          args: --release --locked --out dist -m python/Cargo.toml
+      # Container builds leave dist/ owned by root; test a copy.
+      - name: Test the wheel
+        shell: bash
+        run: |
+          mkdir wheel-test
+          cp dist/*.whl wheel-test/
+          python python/tests/run.py wheel-test
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python-wheel-${{ matrix.name }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v1.15.0
+          command: sdist
+          args: --out dist -m python/Cargo.toml
+      # Build it the way pip does on platforms without a wheel.
+      - name: Test the source distribution
+        run: |
+          python -m pip wheel --no-deps --wheel-dir wheel-test dist/*.tar.gz
+          python python/tests/run.py wheel-test
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error

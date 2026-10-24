@@ -95,6 +95,10 @@ class DocumentationTests(unittest.TestCase):
         self.assertFalse(any(p.startswith("research/") for p in available))
         self.assertEqual(broken_links(guides, available), [])
 
+    def test_python_package_license_matches_repository(self):
+        # maturin only ships license files from beside python/pyproject.toml.
+        self.assertEqual((ROOT / "python/LICENSE").read_bytes(), (ROOT / "LICENSE").read_bytes())
+
     def test_study_reports_are_reachable_from_index(self):
         index = "research/README.md"
         reached = set()

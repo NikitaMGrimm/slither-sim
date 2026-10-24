@@ -33,6 +33,9 @@ jobs:
       actions: write
       pull-requests: write
       id-token: write
+    outputs:
+      commit: ${{ steps.target.outputs.commit }}
+      ready: ${{ steps.cooldown.outputs.ready }}
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -113,3 +116,36 @@ jobs:
       - name: Confirm connection
         if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
         run: echo 'Trusted publishing authenticated successfully. No crate or release was published.'
+
+  # The Python package shares the crate's version and follows its publication.
+  # It is not part of release completion: a failure leaves the crate release
+  # done, and dispatching vVERSION rebuilds and uploads only missing files.
+  python-dist:
+    needs: release
+    if: needs.release.outputs.ready == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/python-wheels.yml
+    with:
+      ref: ${{ needs.release.outputs.commit }}
+
+  pypi:
+    name: Publish Python package
+    needs: python-dist
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # PyPI's trusted publisher names this workflow and environment.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/slither-sim/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: python-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          skip-existing: true

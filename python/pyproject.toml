@@ -7,6 +7,8 @@ name = "slither-sim"
 # Taken from python/Cargo.toml.
 dynamic = ["version"]
 description = "In-process slither-sim sessions for Python bots"
+# Not README.md, which the sdist root takes from the workspace.
+readme = "PYPI.md"
 requires-python = ">=3.11"
 license = "MIT"
 classifiers = [
@@ -22,3 +24,6 @@ Documentation = "https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/pyth
 [tool.maturin]
 module-name = "slither_sim"
 locked = true
+# The sdist moves pyproject.toml to the workspace root, where builds from it
+# look for the stub.
+include = [{ path = "slither_sim.pyi", format = "sdist" }]
