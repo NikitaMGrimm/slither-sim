@@ -66,6 +66,9 @@ class Statistics(unittest.TestCase):
         self.assertEqual(perf_stats.WORKLOAD_SLOTS * len(perf_stats.LOOKS), constants["eta_denominator"] // 20)
         self.assertEqual((perf_stats.LOWER, perf_stats.UPPER),
                          (constants["lower_log_boundary"], constants["upper_log_boundary"]))
+        # Within one ulp of the logarithms, whatever this platform's libm returns.
+        for boundary, ratio in ((perf_stats.LOWER, 0.95), (perf_stats.UPPER, 1.05)):
+            self.assertLessEqual(abs(boundary - math.log(ratio)), math.ulp(boundary))
         self.assertEqual(perf_stats.DEGENERATE_ULP_MULTIPLIER, constants["degenerate_ulp_multiplier"])
         self.assertEqual({str(df): value for df, value in perf_stats.T_CRITICAL.items()}, constants["critical_by_df"])
         self.assertEqual(sorted(perf_stats.T_CRITICAL), [n - 2 for n in perf_stats.LOOKS])

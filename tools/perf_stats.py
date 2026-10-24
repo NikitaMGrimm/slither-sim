@@ -20,9 +20,13 @@ WORKLOAD_SLOTS = 10
 # t_(1 - 1/1200, n - 2). SciPy 1.18.1 `t.isf(1/1200, df)`; test_perf_stats checks
 # each against the incomplete-beta tail with the standard library.
 T_CRITICAL = {6: 5.3982324751112900, 10: 4.2586177085984529, 24: 3.5404690421382261}
-# §4 practical band, as time ratios.
-LOWER = math.log(0.95)
-UPPER = math.log(1.05)
+# §4 practical band: log(0.95) and log(1.05) as fixed binary64 literals, equal to the
+# reference vectors' boundaries. math.log is not correctly rounded everywhere: the
+# Windows runtime returns log(1.05) one ulp below the correctly rounded
+# 0.04879016416943205 that glibc and macOS return, so computing it would make
+# boundary labels platform-dependent.
+LOWER = -0.05129329438755058
+UPPER = 0.04879016416943204
 # §5 numerical policy, in units of ulp(max(1, max |d_i|)).
 DEGENERATE_ULP_MULTIPLIER = 64
 RESOLVED = ("Faster", "Slower", "Within")
