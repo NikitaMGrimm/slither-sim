@@ -6,6 +6,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -50,12 +51,14 @@ def commands(group):
                                           "libslither_sim_ffi.dylib" if sys.platform == "darwin" else
                                           "libslither_sim_ffi.so"))
         wheels = str(target / "wheels")
+        # Python 3.12 added --durations; the slowest tests guide CI tuning.
+        durations = ["--durations", "5"] if sys.version_info >= (3, 12) else []
         return [
             # Build first with every job; the fidelity tests and smoke runs reuse it.
             # maturin builds the Python extension below, with its interpreter.
             ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
-            [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"],
-            [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py"],
+            [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py", *durations],
+            [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py", *durations],
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
             [sys.executable, "-B", "tools/perf_transport.py", "--binary", binary,
              "--scenarios", "small", "dense-64", "worlds-16", "--steps", "3", "--repeats", "1"],
@@ -72,6 +75,47 @@ def commands(group):
     if group == "wasm":
         return [["cargo", "check", "--lib", "--locked", "--no-default-features", "--target", "wasm32-unknown-unknown"]]
     raise ValueError(f"Unknown check group: {group}")
+
+
+def steps(group):
+    """The group's commands in order; the commands of one step run concurrently."""
+    if group == "tools":
+        # The three suites share nothing but the build, and each mostly waits on
+        # its own subprocesses.
+        build, tools, fidelity, node, *rest = commands(group)
+        return [[build], [tools, fidelity, node], *([command] for command in rest)]
+    return [[command] for command in commands(group)]
+
+
+def run_concurrently(step, environment):
+    """Runs a step's commands at once and replays each one's output in order.
+
+    Returns (seconds, exit code) per command.
+    """
+    outputs, running, finished = [], {}, {}
+    try:
+        for index, command in enumerate(step):
+            output = tempfile.TemporaryFile()
+            outputs.append(output)
+            running[index] = (subprocess.Popen(command, cwd=ROOT, env=environment,
+                                               stdout=output, stderr=subprocess.STDOUT), time.monotonic())
+        while running:
+            for index, (process, start) in list(running.items()):
+                if process.poll() is not None:
+                    finished[index] = (time.monotonic() - start, process.returncode)
+                    del running[index]
+            time.sleep(0.05)
+    finally:
+        for process, _ in running.values():
+            process.kill()
+            process.wait()
+    for output in outputs:
+        output.seek(0)
+        sys.stdout.flush()
+        sys.stdout.buffer.write(output.read())
+        sys.stdout.buffer.flush()
+        output.close()
+    return [finished[index] for index in range(len(step))]
 
 
 def select_groups(requested):
@@ -113,22 +157,29 @@ def main(argv=None):
     timings = []
     try:
         for group in select_groups(requested):
-            for command in commands(group):
-                print(f"[{group}] {shlex.join(command)}", flush=True)
+            for step in steps(group):
+                for command in step:
+                    concurrent = " (concurrent)" if len(step) > 1 else ""
+                    print(f"[{group}]{concurrent} {shlex.join(command)}", flush=True)
                 if args.list:
                     continue
                 start = time.monotonic()
                 try:
-                    result = subprocess.run(command, cwd=ROOT, env=environment, check=False)
+                    if len(step) > 1:
+                        results = run_concurrently(step, environment)
+                    else:
+                        code = subprocess.run(step[0], cwd=ROOT, env=environment, check=False).returncode
+                        results = [(time.monotonic() - start, code)]
                 except OSError as error:
-                    print(f"Cannot run {command[0]}: {error}", file=sys.stderr)
-                    timings.append((group, command, time.monotonic() - start, 1))
+                    print(f"Cannot run {shlex.join(step[0])}: {error}", file=sys.stderr)
+                    timings.append((group, step[0], time.monotonic() - start, 1))
                     return 1
-                seconds = time.monotonic() - start
-                timings.append((group, command, seconds, result.returncode))
-                print(f"[{group}] {seconds:.1f} s, exit {result.returncode}", flush=True)
-                if result.returncode:
-                    return result.returncode if result.returncode > 0 else 1
+                for command, (seconds, code) in zip(step, results):
+                    timings.append((group, command, seconds, code))
+                    print(f"[{group}] {seconds:.1f} s, exit {code}: {shlex.join(command[:6])}", flush=True)
+                failed = next((code for _, code in results if code), 0)
+                if failed:
+                    return failed if failed > 0 else 1
         return 0
     finally:
         summarize(timings)

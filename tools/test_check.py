@@ -5,6 +5,7 @@ import io
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -68,6 +69,37 @@ class CheckRunnerTests(unittest.TestCase):
                     redirect_stdout(io.StringIO()):
                 self.assertEqual(check.main(["rust", "--list"]), 0)
             self.assertFalse(summary.exists())
+
+    def test_steps_keep_every_command_in_order(self):
+        for group in check.GROUPS:
+            self.assertEqual([command for step in check.steps(group) for command in step], check.commands(group))
+        concurrent = [step for step in check.steps("tools") if len(step) > 1]
+        self.assertEqual([[command[3] if command[0] != "node" else "node" for command in step] for step in concurrent],
+                         [["discover", "discover", "node"]])
+
+    def test_concurrent_output_is_replayed_in_command_order(self):
+        slow = [sys.executable, "-c", "import time; time.sleep(0.3); print('first')"]
+        fast = [sys.executable, "-c", "import sys; print('second'); sys.exit(3)"]
+        buffer = io.BytesIO()
+        stdout = io.TextIOWrapper(buffer, encoding="utf-8")
+        with redirect_stdout(stdout):
+            results = check.run_concurrently([slow, fast], os.environ.copy())
+        stdout.flush()
+        self.assertEqual(buffer.getvalue().decode().split(), ["first", "second"])
+        self.assertEqual([code for _, code in results], [0, 3])
+        self.assertGreaterEqual(results[0][0], 0.3)
+        self.assertLess(results[1][0], results[0][0])
+
+    def test_a_failing_concurrent_command_stops_later_steps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "later"
+            ok = [sys.executable, "-c", "pass"]
+            failing = [sys.executable, "-c", "import sys; sys.exit(5)"]
+            later = [sys.executable, "-c", f"open({str(marker)!r}, 'w').close()"]
+            with patch.object(check, "steps", return_value=[[ok, failing], [later]]), \
+                    redirect_stdout(io.TextIOWrapper(io.BytesIO(), encoding="utf-8")):
+                self.assertEqual(check.main(["tools"]), 5)
+            self.assertFalse(marker.exists())
 
     def test_tool_children_use_the_running_python_and_expanded_node_paths(self):
         commands = check.commands("tools")
