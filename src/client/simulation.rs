@@ -58,8 +58,9 @@ const SPAWN_ATTEMPTS: usize = 64;
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
 /// the rest of `MAX_IN_FLIGHT` for broadcasts while the host drains.
 const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
-/// Snake IDs are the slots, sent as u16.
-pub(crate) const MAX_AGENTS: usize = u16::MAX as usize + 1;
+/// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
+/// leaderboard's u16 rank and living population must also count every snake.
+pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
 /// Stock-client compatibility: its nickname input keeps 24 characters, while
 /// the u8 length field could carry 255 Latin-1 bytes.
 pub(crate) const MAX_NICKNAME: usize = 24;
@@ -149,8 +150,8 @@ impl SimulationConfig {
         }
         if !(1..=MAX_AGENTS).contains(&self.agents) || self.controlled_slot >= self.agents {
             return Err(format!(
-                "Simulation needs 1 to {MAX_AGENTS} agents, the protocol-19 u16 snake IDs, \
-                 and a controlled slot among them"
+                "Simulation needs 1 to {MAX_AGENTS} agents, since protocol-19 snake IDs, \
+                 leaderboard rank and population are u16, and a controlled slot among them"
             ));
         }
         // Broadcasts fall on ticks divisible by broadcastTicks.
