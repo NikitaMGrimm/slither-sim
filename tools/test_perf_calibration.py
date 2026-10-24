@@ -5,13 +5,17 @@ import io
 import itertools
 import json
 import math
+import os
 from pathlib import Path
 import re
+import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+import perf_baseline
 import perf_calibration
 import pr_report
 from test_perf_baseline import catalog, row
@@ -25,17 +29,22 @@ class Calibration(unittest.TestCase):
         self.now = 0.0
         self.calls = []
 
-    def run_pilot(self, names, seconds, deadline=1e9):
+    def run_pilot(self, names, seconds, deadline=1e9, failure=None, via_main=False):
         """seconds(case, m, pair_index, block) -> one block's wall time."""
         workloads = catalog([row(name, iterations=100) for name in names]).select(suite="ci")
-        output = self.directory / f"out-{len(self.calls)}"
-        output.mkdir()
+        output = self.directory / f"out-{len(list(self.directory.iterdir()))}"
+        if not via_main:
+            output.mkdir()
 
         def native(executable, case, iterations, stderr_path, profile=False, *, deadline=None, blocks=None):
             index = stderr_path.name.split("-")[-3]
             index = None if index == "warmup" else int(index)
             self.calls.append((Path(executable).name, case, blocks, index))
             self.now += 1
+            if failure:
+                error = failure(case, blocks, index, stderr_path.name.split("-")[-2])
+                if error:
+                    raise error
             if self.now > deadline:
                 self.now = deadline
                 raise TimeoutError("performance run deadline exceeded during native child")
@@ -46,10 +55,105 @@ class Calibration(unittest.TestCase):
                                  "timing": None, "blocks": timings}}
 
         with patch.object(perf_calibration, "native", side_effect=native), \
-                patch.object(perf_calibration, "time", SimpleNamespace(perf_counter=lambda: self.now)), \
+                patch.object(perf_calibration, "time", SimpleNamespace(perf_counter=lambda: self.now,
+                                                                     monotonic=lambda: self.now)), \
                 contextlib.redirect_stdout(io.StringIO()):
-            data = perf_calibration.calibrate(self.directory / "perf_baseline", workloads, output, deadline)
+            if via_main:
+                binary = self.directory / "perf_baseline"
+                binary.write_bytes(b"synthetic executable")
+                with patch.object(sys, "argv", ["perf_calibration", "--binary", str(binary), "--group", "A",
+                                                "--output", str(output)]), \
+                        patch.dict(os.environ, {"PR_REPORT_JOB_START": "0"}), \
+                        patch.object(perf_calibration, "load_catalog", return_value=catalog(
+                            [row(name, iterations=100) for name in names])), \
+                        patch.object(perf_calibration, "GROUPS", {"A": names}), \
+                        patch.object(perf_calibration, "STAGE_CAP_SECONDS", deadline), \
+                        patch.object(perf_calibration.subprocess, "check_output", return_value="fixture rustc"):
+                    self.assertEqual(perf_calibration.main(), 0)
+                data = json.loads((output / "summary.json").read_text())
+            else:
+                data, _ = perf_calibration.calibrate(self.directory / "perf_baseline", workloads, output, deadline)
         return data, output
+
+    def test_failed_warmup_invalidates_only_its_cell_and_is_not_retried(self):
+        for label in ("baseline", "candidate"):
+            with self.subTest(label=label):
+                self.calls.clear()
+                self.now = 0
+
+                def failure(case, m, index, side):
+                    if (case, m, index, side) == ("first", 2, None, label):
+                        return RuntimeError("warmup failure witness")
+
+                summary, output = self.run_pilot(["first", "healthy"], lambda *args: 1.0,
+                                                 failure=failure, via_main=True)
+                cell = summary["workloads"]["first"]["cells"][1]
+                self.assertEqual((cell["status"], cell["pairs"]), ("failed", 0))
+                self.assertIn("warmup", cell["failure"])
+                self.assertTrue(all(key not in cell for key in ("paired_residual_variance", "v_w", "v_b", "Q")))
+                self.assertEqual(summary["workloads"]["first"]["pairs"]["2"], [])
+                attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
+                affected = [a for a in attempts if a["case"] == "first" and a["blocks"] == 2]
+                self.assertEqual(len(affected), 1 if label == "baseline" else 2)
+                self.assertTrue(all(a["warmup"] for a in affected))
+                self.assertEqual((affected[-1]["label"], affected[-1]["status"]), (label, "failed"))
+                self.assertIn("warmup failure witness", affected[-1]["error"])
+                for name, workload in summary["workloads"].items():
+                    for other in workload["cells"]:
+                        if (name, other["blocks"]) != ("first", 2):
+                            self.assertEqual((other["status"], other["pairs"]), ("complete", 6))
+                            self.assertIn("Q", other)
+                self.assertAlmostEqual(summary["workloads"]["first"]["cost_model"]["h"], .5)
+                self.assertAlmostEqual(summary["workloads"]["first"]["cost_model"]["c"], 1)
+
+    def test_invalid_warmup_record_does_not_admit_counted_pairs(self):
+        summary, output = self.run_pilot(["first", "healthy"],
+                                         lambda case, m, index, k: float("nan")
+                                         if (case, m, index) == ("first", 2, None) else 1.0, via_main=True)
+        cell = summary["workloads"]["first"]["cells"][1]
+        self.assertEqual((cell["status"], cell["pairs"]), ("failed", 0))
+        self.assertNotIn("Q", cell)
+        self.assertEqual([c["pairs"] for c in summary["workloads"]["healthy"]["cells"]], [6, 6, 6])
+        attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
+        affected = [a for a in attempts if a["case"] == "first" and a["blocks"] == 2]
+        self.assertEqual(len(affected), 1)
+        self.assertEqual(affected[0]["status"], "failed")
+
+    def test_exit_wait_timeout_writes_summary_and_retains_completed_pairs(self):
+        for capped in (False, True):
+            with self.subTest(capped=capped):
+                self.calls.clear()
+                self.now = 0
+
+                def failure(case, m, index, label):
+                    if (case, m, index, label) != ("first", 1, 4, "baseline"):
+                        return None
+                    if capped:
+                        self.now = 500
+                    child = Mock(stdin=None, stdout=io.BytesIO(), stderr=None, returncode=0)
+                    child.poll.return_value = 0
+                    child.wait.side_effect = subprocess.TimeoutExpired("fixture", 120)
+                    with patch.object(perf_baseline.subprocess, "Popen", return_value=child), \
+                            patch.object(perf_baseline.Lines, "read", return_value=b"{}"), \
+                            patch.object(perf_baseline, "time", SimpleNamespace(perf_counter=lambda: 0)):
+                        try:
+                            perf_baseline.native("fixture", case, 100, self.directory / "stderr.txt", deadline=120)
+                        except TimeoutError as error:
+                            return error
+
+                summary, output = self.run_pilot(["first", "healthy"], lambda *args: 1.0,
+                                                 deadline=500, failure=failure, via_main=True)
+                cell = summary["workloads"]["first"]["cells"][0]
+                self.assertEqual(cell["pairs"], 3)
+                self.assertEqual(cell["status"], "incomplete" if capped else "failed")
+                self.assertNotIn("Q", cell)
+                self.assertEqual(len(summary["workloads"]["first"]["pairs"]["1"]), 3)
+                self.assertEqual([c["pairs"] for c in summary["workloads"]["healthy"]["cells"]],
+                                 [3, 3, 3] if capped else [6, 6, 6])
+                attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
+                last = next(a for a in attempts if a["case"] == "first" and a["blocks"] == 1
+                            and a["pair_index"] == 4)
+                self.assertEqual(last["status"], "incomplete_due_to_cap" if capped else "failed")
 
     def test_schedule_is_same_binary_warmed_and_balanced(self):
         data, output = self.run_pilot(["first", "second"], lambda case, m, index, k: 1.0)

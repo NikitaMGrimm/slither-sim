@@ -176,6 +176,10 @@ between-process components, cost per pair and `Q`) and a linear cost fit. These
 feed the plan's offline analysis; they are not a decision. The plan's pilot is
 two separately dispatched jobs per runner image and group, eight in all. A cell
 the deadline cuts short is reported as incomplete.
+If a warmup or counted attempt fails, that workload/block-count cell is marked
+failed and receives no further attempts. Its completed pairs and failed attempt
+remain diagnostic evidence; variance, `Q` and the cost fit use only successfully
+warmed, complete cells. Other cells continue within the deadline.
 
 The comparison's runner is set once, as the `&runner` anchor in `pr-report.yml`.
 Change it only after a calibration supports the new runner. The cache key

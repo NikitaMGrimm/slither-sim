@@ -50,14 +50,16 @@ def child_error(row, workload, blocks):
     return None
 
 
-def estimate(pairs, blocks):
+def estimate(pairs, blocks, failure=None):
     """Per-job variance components for one workload and m (plan: model, estimators)."""
     x = [[math.log(c) - math.log(b) for b, c in zip(p["baseline_blocks"], p["candidate_blocks"])] for p in pairs]
     y = [math.fsum(row) / blocks for row in x]
     r = len(pairs)
     cost = math.fsum(p["elapsed_seconds"] for p in pairs) / r if pairs else None
-    result = {"pairs": r, "blocks": blocks, "seconds_per_pair": cost}
-    if r != PAIRS:  # only the complete, balanced cell supports the order regression
+    result = {"pairs": r, "blocks": blocks, "seconds_per_pair": cost,
+              "status": "failed" if failure else "complete" if r == PAIRS else "incomplete",
+              "failure": failure}
+    if failure or r != PAIRS:  # only a warmed, complete, balanced cell supports estimates
         return result
     order = [p["order"] for p in pairs]
     mu = math.fsum(y) / r
@@ -73,7 +75,8 @@ def estimate(pairs, blocks):
 
 def cost_model(cells):
     """Least-squares C(m) = h + c*m over the complete cells' observed pair costs."""
-    points = [(cell["blocks"], cell["seconds_per_pair"]) for cell in cells if cell["pairs"] == PAIRS]
+    points = [(cell["blocks"], cell["seconds_per_pair"]) for cell in cells
+              if cell["pairs"] == PAIRS and not cell.get("failure")]
     if len(points) < 2:
         return None
     mean_m = math.fsum(m for m, _ in points) / len(points)
@@ -84,8 +87,9 @@ def cost_model(cells):
 
 
 def calibrate(binary, workloads, output, deadline):
-    """Warmups for every workload/m, then six rounds; returns {workload: {m: pairs}}."""
+    """Warmups then six rounds; returns (pairs, failures), each indexed by workload and m."""
     data = {w.name: {m: [] for m in BLOCKS} for w in workloads}
+    failures = {w.name: {} for w in workloads}
     attempts = (output / "results.jsonl").open("w", encoding="utf-8", newline="\n")
 
     def child(workload, blocks, label, index, position, order):
@@ -120,6 +124,8 @@ def calibrate(binary, workloads, output, deadline):
             if status == "incomplete_due_to_cap":
                 return False
             if status != "ok":
+                where = "warmup" if index is None else f"pair {index}"
+                failures[workload.name][blocks] = f"{label} failed at {where}: {records[label]['error']}"
                 return True
         if index is not None:
             data[workload.name][blocks].append({
@@ -133,11 +139,14 @@ def calibrate(binary, workloads, output, deadline):
         schedule = [(w, m, None) for w in workloads for m in BLOCKS]
         schedule += [(w, m, index) for index, ms in enumerate(BLOCK_ORDER, 1) for w in workloads for m in ms]
         for workload, blocks, index in schedule:
+            # A failed warmup cannot qualify later pairs; do not retry failed cells.
+            if blocks in failures[workload.name]:
+                continue
             if not pair(workload, blocks, index):
                 break
     finally:
         attempts.close()
-    return data
+    return data, failures
 
 
 def main():
@@ -171,15 +180,15 @@ def main():
                 "warmup": "one discarded baseline-then-candidate pair per workload and m before counted pairs",
                 "stage_budget_seconds": deadline - stage}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
-    data = calibrate(binary, workloads, output, deadline)
+    data, failures = calibrate(binary, workloads, output, deadline)
     summary = {"plan": PLAN, "stage_seconds": time.perf_counter() - stage,
                "executable_unchanged": digest(binary) == sha, "workloads": {}}
     for name, cells in data.items():
-        estimates = [estimate(cells[m], m) for m in BLOCKS]
+        estimates = [estimate(cells[m], m, failures[name].get(m)) for m in BLOCKS]
         summary["workloads"][name] = {"cells": estimates, "cost_model": cost_model(estimates), "pairs": cells}
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n")
     incomplete = sorted(f"{n} m={c['blocks']}" for n, w in summary["workloads"].items()
-                        for c in w["cells"] if c["pairs"] != PAIRS)
+                        for c in w["cells"] if c["status"] != "complete")
     print(f"[calibration] {summary['stage_seconds']:.0f} s; incomplete cells: {', '.join(incomplete) or 'none'}")
     return 0 if summary["executable_unchanged"] else 1
 
