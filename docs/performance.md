@@ -80,6 +80,17 @@ support. The [workload guide](performance-workloads.md) explains scenario
 lifecycles, validity checks, adding cases and the specialized observation/retained
 client harnesses. [PR comparisons](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md) use the same catalog.
 
+## Observation batches
+
+`-bot` rows time a step followed by `observe_all_into`; with `--profile`, the
+report's `observeSeconds` holds the observation interval alone. Observation
+changes have been measured on `official-128-bot` and `dome-proxy-96-bot`, sequentially
+and with `--parallel`, and on the frozen `observe-*` fixtures. Filtering food by
+each slot's vision dominates batch cost. The food grid is rebuilt for
+every batch: a small share of a sequential batch, but it runs before the parallel
+split. The [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md)
+has the phase breakdown and explains why the grid is not reused across steps.
+
 ## Controller transport
 
 The workloads above time only the Rust side. `tools/perf_transport.py` times what a
