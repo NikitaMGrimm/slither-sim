@@ -1,5 +1,16 @@
 # PR comparison statistics reference
 
+New runs use `protocol-v2-reference.json`, `protocol-v2-critical-values.csv` and
+the separate `generate_v2_reference.py`/lock. Their 14 covered looks and exact
+allocation are specified in
+[protocol v2](../../../docs/maintainers/performance-statistics-v2.md).
+The copied CSV SHA-256 is
+`de2f7e7c0c5a0c00faa09a5c764dcbec9b4fe0192cdaa16bc032f6ffbf4c5303`.
+The synthetic v2 oracle uses SciPy's general least squares and checked t tails;
+it is not hosted calibration. Reproduce it with
+`uv run --locked --script generate_v2_reference.py`.
+The historical files described below retain their original v1 meaning.
+
 `statistics-reference.json` is a synthetic oracle for `tools/perf_stats.py`, not
 a measurement. The statistician who wrote the comparison's statistics contract
 generated it on 2026-10-24 with `generate_statistics_reference.py` (Python

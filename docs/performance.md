@@ -4,6 +4,10 @@ These offline synthetic workloads measure simulator/client costs. They do not
 measure official servers or bot playing strength. For a behavior-preserving
 optimization, check output parity before interpreting timings.
 
+Automatic PR comparisons use a separate [covered sequential protocol](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/performance-statistics-v2.md),
+with early resolution, a finite 30-minute job cap and at most three interim
+comment updates. The commands below remain fixed-repeat descriptive comparisons.
+
 ## Compare a change
 
 ```sh

@@ -216,6 +216,7 @@ test same_name ... ok
         measured = [p.relative_to(root).as_posix() for directory in ("src", "tests/fixtures")
                     for p in (root / directory).rglob("*") if p.is_file()]
         collectors = [f"tools/{name}.py" for name in sorted(local_imports(root / "tools", "pr_report"))]
+        collectors.append("tools/pr_report_progress.py")  # Workflow-owned checkpoint handshake.
         self.assertIn("tools/perf_build.py", collectors)
         measured += [*pr_report.HARNESS, "Cargo.toml", "Cargo.lock", ".github/workflows/pr-report.yml", *collectors,
                      # Cargo and rustup read these if added; none exist yet.
@@ -229,7 +230,8 @@ test same_name ... ok
         self.assertEqual([name for name in unmeasured if matched(name)], [])
 
     def test_publisher_identity_and_staleness_regressions(self):
-        subprocess.run(["node", "--test", str(Path(__file__).with_name("pr_report_comment.test.cjs"))], check=True)
+        subprocess.run(["node", "--test", str(Path(__file__).with_name("pr_report_comment.test.cjs")),
+                        str(Path(__file__).with_name("release_performance.test.cjs"))], check=True)
 
     def test_aborted_test_binary_keeps_its_missing_cases_in_the_denominator(self):
         completed = {f"movement_turns::{name}": "ok" for name in ("a", "b", "c")}
@@ -294,12 +296,13 @@ test same_name ... ok
             self.assertIn(f"| {case} | — | — | — | ⚠️ Unavailable |", visible)
         rows_text = visible.split("| --- | ---: | ---: | ---: | --- |\n", 1)[1].split("### Regression", 1)[0]
         self.assertNotIn("-", rows_text, "negative numbers use a true minus sign")
-        self.assertIn("\n- Paired operation wall time after warmup, with balanced order and checks at 8/12/26 pairs. "
+        self.assertIn("\n- Paired operation wall time after warmup, with balanced order and covered checks at 8/12/26, "
+                      "then doubling through 53,248 pairs (finite safety guard). "
                       "Base/PR are geometric means; Change shows estimate [interval] against a −5% to +5% band.\n"
-                      "- Order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 3 looks "
+                      "- V2 order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 14 pre-budgeted looks "
                       "under independent normal log errors. Resolved rows stop; time-capped rows retain their last "
                       "completed look. Labels use unrounded bounds.\n"
-                      "- Hosted-runner calibration is pending; performance labels are advisory and conditional on "
+                      "- Hosted model calibration is not established; performance labels are advisory and conditional on "
                       "the timing model.\n", details)
         for line in ("- `faster`: 8 pairs used; stopped when resolved.",
                      "- `noisy`: 26 pairs used; stopped at the last look.",
@@ -319,7 +322,7 @@ test same_name ... ok
     def test_stage_deadline_keeps_the_job_reserve(self):
         listed = catalog([row("step-default", legacy=True), row("observe")])
         changed = catalog([row("step-default", legacy=True), row("observe", definition={"changed": True})])
-        for elapsed, changed_suite, limit in ((100, False, "stage cap"), (300, True, "job reserve")):
+        for elapsed, changed_suite, limit in ((100, False, "stage cap"), (400, True, "job reserve")):
             with self.subTest(elapsed=elapsed), tempfile.TemporaryDirectory() as name:
                 captured = {}
 
@@ -345,6 +348,33 @@ test same_name ... ok
                 if changed_suite:
                     self.assertEqual(observe["failure"], "workload definitions differ between base and PR")
                 self.assertEqual(captured["plan"]["order"], perf_stats.ORDER)
+
+    def test_sampler_failure_after_published_checkpoint_withdraws_final_claims(self):
+        with tempfile.TemporaryDirectory() as name:
+            output = Path(name)
+            listed = catalog([row("step-default", legacy=True)])
+            suites = {label: listed.select(suite="ci") for label in ("baseline", "candidate")}
+            report = {"base": "a" * 40, "merge": "b" * 40, "head": "c" * 40,
+                      "run_url": "https://example.invalid", "platform": "synthetic",
+                      "errors": [], "phases_seconds_after_job_start": {}}
+            look = next(d["expected"] for d in REFERENCE["datasets"] if d["id"] == "faster_at_8")
+
+            def sample(*args, checkpoint):
+                checkpoint({"step-default": perf_stats.final([look], 8, "resolved") | {"n_attempted": 8}}, time.perf_counter())
+                raise OSError("synthetic final binary digest read failure")
+
+            with patch.dict(os.environ, {"PR_REPORT_CHECKPOINT_UPLOAD": "1"}), \
+                    patch.object(pr_report.perf_compare, "sequential", side_effect=sample), \
+                    patch.object(pr_report, "digest", return_value="d" * 64), contextlib.redirect_stdout(io.StringIO()):
+                pr_report.measure(report, {}, {}, {label: listed for label in suites}, suites,
+                                  output / "performance", time.monotonic())
+            prior = json.loads((output / "progress/1/report.json").read_text())
+            self.assertEqual(prior["performance"][0]["label"], "Faster")
+            final = report["performance"][0]
+            self.assertEqual((final["label"], final["n_used"], final["termination"]), ("Unavailable", 0, "measurement_failure"))
+            self.assertIsNone(final["result"])
+            self.assertEqual(final["history"], [look])
+            self.assertTrue(report["errors"])
 
     def test_workflow_timeout_matches_the_deadline_and_pr_runs_never_save_the_cache(self):
         workflow = (pr_report.ROOT / ".github/workflows/pr-report.yml").read_text(encoding="utf-8")
@@ -383,7 +413,7 @@ class Sampling(unittest.TestCase):
         self.clock = Clock()
         self.calls = []
 
-    def run_sampler(self, workloads, behavior, deadline=1e9):
+    def run_sampler(self, workloads, behavior, deadline=1e9, checkpoint=None):
         """behavior(case, label, pair_index, position) -> seconds, or an exception to raise."""
         output = self.directory / f"out-{len(list(self.directory.iterdir()))}"
         output.mkdir()
@@ -411,7 +441,7 @@ class Sampling(unittest.TestCase):
         with patch.object(perf_compare, "native", side_effect=native), \
                 patch.object(perf_compare, "time", SimpleNamespace(perf_counter=self.clock.perf_counter)), \
                 contextlib.redirect_stdout(io.StringIO()):
-            rows = perf_compare.sequential(self.binaries, self.hashes, workloads, output, deadline, {"plan": "test"})
+            rows = perf_compare.sequential(self.binaries, self.hashes, workloads, output, deadline, {"plan": "test"}, checkpoint=checkpoint)
         return rows, output
 
     def scripted(self, effects):
@@ -420,7 +450,7 @@ class Sampling(unittest.TestCase):
             factor, noise, fail_at = effects[case]
             if index is not None and index == fail_at and label == "candidate":
                 return RuntimeError(f"{case} exited 101")
-            seconds = 1.0 if label == "baseline" or index is None else factor * math.exp(noise * self.PATTERN[index - 1])
+            seconds = 1.0 if label == "baseline" or index is None else factor * math.exp(noise * self.PATTERN[(index - 1) % len(self.PATTERN)])
             return seconds * (1.02 if position == 0 else 1.0)
         return behavior
 
@@ -449,8 +479,9 @@ class Sampling(unittest.TestCase):
         self.assertEqual((crash["label"], crash["termination"], crash["n_complete"], crash["failure"]),
                          ("Unavailable", "measurement_failure", 4, "candidate failed at pair 5"))
         self.assertFalse([c for c in self.calls if c[0] == "crash" and (c[1] or 0) > 5])
-        self.assertEqual((noisy["label"], noisy["termination"], noisy["n_used"]), ("Undecided", "max_pairs", 26))
-        self.assertEqual([look["n"] for look in noisy["history"]], list(perf_stats.LOOKS))
+        self.assertEqual((noisy["label"], noisy["termination"]), ("Within", "resolved"))
+        self.assertGreater(noisy["n_used"], 26)
+        self.assertEqual([look["n"] for look in noisy["history"]], [n for n in perf_stats.LOOKS if n <= noisy["n_used"]])
         # Every child attempt is retained; analysis uses only recorded pairs.
         attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
         self.assertEqual(len(attempts), len(self.calls))
@@ -478,6 +509,23 @@ class Sampling(unittest.TestCase):
         self.assertEqual(attempts[-1]["status"], "incomplete_due_to_cap")
         self.assertEqual(attempts[-1]["pair_index"], 11)
 
+    def test_progress_only_at_covered_complete_rounds_and_pause_consumes_budget(self):
+        snapshots = []
+
+        def checkpoint(rows, deadline):
+            snapshots.append(json.loads(json.dumps(rows)))
+            self.assertTrue(all(r["n_complete"] in perf_stats.LOOKS for r in rows.values()))
+            self.clock.now = deadline  # An upload pause cannot extend D.
+
+        rows, _ = self.run_sampler(self.workloads("fast", "noisy"), self.scripted({
+            "fast": (.8, .004, None), "noisy": (1.0, .1, None)}), deadline=200, checkpoint=checkpoint)
+        self.assertEqual(len(snapshots), 1)
+        self.assertEqual(snapshots[0]["fast"]["termination"], "resolved")
+        self.assertEqual(snapshots[0]["noisy"]["termination"], "sampling")
+        self.assertEqual(rows["noisy"]["n_used"], perf_stats.LOOKS[0])
+        self.assertEqual(rows["noisy"]["termination"], "time_cap")
+        self.assertFalse(any(index and index > perf_stats.LOOKS[0] for _, index, _ in self.calls))
+
     def test_no_child_starts_at_the_deadline_and_a_warmup_cap_leaves_rows_unstarted(self):
         workloads = self.workloads("first", "second")
         behavior = self.scripted({"first": (1.0, .1, None), "second": (1.0, .1, None)})
@@ -489,6 +537,19 @@ class Sampling(unittest.TestCase):
         self.clock.now = 0
         rows, _ = self.run_sampler(workloads, behavior, deadline=2.5)
         self.assertEqual([r["termination"] for r in rows.values()], ["not_started"] * 2)
+
+    def test_v2_cap_after_45_keeps_26_and_safety_guard_is_not_resolution(self):
+        behavior = self.scripted({"noisy": (1.05, .1, None)})
+        rows, _ = self.run_sampler(self.workloads("noisy"), behavior, deadline=2 + 2 * 45)
+        self.assertEqual((rows["noisy"]["n_complete"], rows["noisy"]["n_used"], rows["noisy"]["termination"]),
+                         (45, 26, "time_cap"))
+        # A deliberately small synthetic finite schedule exercises the safety
+        # guard without writing 100,000 child records in a regression test.
+        with patch.object(perf_stats, "LOOKS", (8, 12)), patch.object(perf_stats, "ORDER", perf_stats.ORDER[:12]):
+            self.calls.clear()
+            self.clock.now = 0
+            rows, _ = self.run_sampler(self.workloads("noisy"), behavior)
+        self.assertEqual((rows["noisy"]["label"], rows["noisy"]["termination"]), ("Undecided", "max_pairs"))
 
     def test_exit_wait_timeout_keeps_last_looks_or_only_fails_affected_workload(self):
         for capped in (False, True):
@@ -522,8 +583,8 @@ class Sampling(unittest.TestCase):
                 else:
                     self.assertEqual((rows["first"]["termination"], rows["first"]["label"]),
                                      ("measurement_failure", "Unavailable"))
-                    self.assertEqual((rows["healthy"]["termination"], rows["healthy"]["n_used"]),
-                                     ("max_pairs", 26))
+                    self.assertEqual((rows["healthy"]["termination"], rows["healthy"]["label"]),
+                                     ("resolved", "Within"))
                 attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
                 failed = next(a for a in attempts if a["case"] == "first" and a["pair_index"] == 10)
                 self.assertEqual(failed["status"], "incomplete_due_to_cap" if capped else "failed")

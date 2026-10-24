@@ -1,25 +1,32 @@
 """Error-controlled paired timing analysis for PR comparisons; standard library only.
 
-Implements the frozen "Performance comparison statistics contract v1" in
-research/performance/2026-10-24-pr-comparison-statistics/STATISTICS-CONTRACT.md;
-§ numbers in comments refer to its sections. docs/maintainers/pr-reports.md explains
+Implements the v2 schedule in docs/maintainers/performance-statistics-v2.md.
+The model/calculations retain the frozen v1 contract's section numbering.
+docs/maintainers/pr-reports.md explains
 the method. SciPy-generated reference vectors live in tools/fixtures/perf-statistics/.
 """
 
 import math
 
 
-PLAN = "slither-perf-sequential-v1"
-LOOKS = (8, 12, 26)
+PLAN = "slither-perf-sequential-v2"
+LOOKS = (8, 12, 26) + tuple(26 * 2 ** k for k in range(1, 12))
 # §2 literal order sequence: +1 runs the baseline first. Every adjacent two-pair
 # block is balanced, so every scheduled prefix is too.
-ORDER = (1, -1, -1, 1, 1, -1, 1, -1, -1, 1, 1, -1, -1, 1,
-         1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1, 1)
+ORDER26 = (1, -1, -1, 1, 1, -1, 1, -1, -1, 1, 1, -1, -1, 1,
+           1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1, 1)
+ORDER = ORDER26 * (LOOKS[-1] // 26)
 WORKLOAD_SLOTS = 10
-# §3: eta = 0.05 / (10 workloads * 3 looks) = 1/600, so each two-sided interval uses
-# t_(1 - 1/1200, n - 2). SciPy 1.18.1 `t.isf(1/1200, df)`; test_perf_stats checks
-# each against the incomplete-beta tail with the standard library.
-T_CRITICAL = {6: 5.3982324751112900, 10: 4.2586177085984529, 24: 3.5404690421382261}
+# Allocate every possible look before sampling; stopped/missing rows do not lend
+# their allocation to other rows. The finite family bound is 0.0499951171875.
+ETA_DENOMINATORS = (750,) * 3 + tuple(1000 * 2 ** k for k in range(1, 12))
+# SciPy 1.18.1 t.isf(1/(2*eta_denominator), n-2), independently checked against
+# the stdlib incomplete-beta tail. No production quantile dependency.
+T_CRITICAL = {6: 5.6381610664568065, 10: 4.4008345563591851, 24: 3.6302454361287109,
+              50: 3.7231413492837411, 102: 3.7958204274577012, 206: 3.91053112436507,
+              414: 4.0447022702968463, 830: 4.1872769246391446, 1662: 4.3324956015448794,
+              3326: 4.4773191275288378, 6654: 4.6201814720747434, 13310: 4.7603285541138822,
+              26622: 4.8974519327571864, 53246: 5.0314828408503693}
 # §4 practical band: log(0.95) and log(1.05) as fixed binary64 literals, equal to the
 # reference vectors' boundaries. math.log is not correctly rounded everywhere: the
 # Windows runtime returns log(1.05) one ulp below the correctly rounded
