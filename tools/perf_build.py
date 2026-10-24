@@ -19,11 +19,9 @@ import time
 from perf_baseline import digest
 
 
-TESTS = ("movement_turns", "physics")
-# The candidate's measurement code and evidence, copied into the baseline so both
-# runtimes run identical harness sources. The harness must compile against the base API.
-HARNESS = ("examples/perf_baseline.rs", "examples/fidelity_metrics.rs", *(f"tests/{name}.rs" for name in TESTS))
-FIXTURES = "tests/fixtures"
+# The candidate's measurement code, copied into the baseline so both runtimes run
+# identical harness sources. The harness must compile against the base API.
+HARNESS = ("examples/perf_baseline.rs",)
 GIT_TIMEOUT_SECONDS = 120
 SUFFIX = ".exe" if os.name == "nt" else ""
 # Fixed metadata makes the snapshot commit a pure function of its tree and parent.
@@ -237,12 +235,6 @@ def resolve(root, ref):
     return commit, output(["git", "rev-parse", "--verify", f"{commit}^{{tree}}"], root)
 
 
-def checkout_snapshot(root, label):
-    """An existing checkout measured in place (CI's clean merge checkout)."""
-    commit, tree = resolve(root, "HEAD")
-    return Snapshot(label, Path(root), commit, tree, "checkout")
-
-
 def freeze(root):
     """Return (commit, tree) for the working tree: tracked edits, deletions and untracked
     non-ignored files. A temporary index leaves the user's index, HEAD, stash and files alone."""
@@ -311,9 +303,7 @@ class Session:
 
 def overlay(source, destination):
     """Copy the source snapshot's measurement inputs into the destination checkout."""
-    files = [*(source.checkout / name for name in HARNESS),
-             *sorted((source.checkout / FIXTURES).rglob("*"))]
-    files = [path for path in files if path.is_file()]
+    files = [path for path in (source.checkout / name for name in HARNESS) if path.is_file()]
     inputs = {path.relative_to(source.checkout).as_posix(): digest(path) for path in files}
     changes = tuple(name for name, sha in inputs.items()
                     if not (destination.checkout / name).is_file() or digest(destination.checkout / name) != sha)
@@ -366,53 +356,15 @@ class LocalTargets:
                 locks.enter_context(exclusive(self.base / f"{label}.lock"))
             yield
 
-    def before(self, snapshots, index, logs):
-        return None
 
-
-class SharedTarget:
-    """CI: one run-owned target; dependencies are reused and the package is cleaned between labels."""
-
-    policy = "shared run-owned target, package cleaned between labels"
-
-    def __init__(self, path):
-        self.target = Path(path)
-
-    def path(self, label):
-        return self.target
-
-    def environment(self, label):
-        return {**os.environ, "CARGO_TARGET_DIR": str(self.target), "CARGO_BUILD_JOBS": "2",
-                "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
-
-    def before(self, snapshots, index, logs):
-        if index == 0:
-            return None
-        label = snapshots[index].label
-        environment = self.environment(label)
-        # Package-only clean defaults to dev; explicitly clear release too.
-        # Earlier executables have already been copied out of this target.
-        if any(command(["cargo", "clean", "--locked", "--package", "slither-sim", "--profile", profile],
-                       snapshots[index - 1].checkout, logs / f"{label}-clean-{profile}.log", environment)
-               for profile in ("release", "dev")):
-            return f"{label} package cleanup failed; {label} measurements unavailable"
-        return None
-
-
-def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=600):
+def build_all(snapshots, targets, examples, *, logs, bins, timeout=600):
     """Build each snapshot's release examples and copy them out. Returns (builds, errors).
 
-    `hook(snapshot, build_or_none, environment)` runs after each build attempt that got
-    past target preparation, before the next label can reuse the target. Callers hold
-    any target locks.
+    Callers hold any target locks.
     """
     builds, errors = {}, []
-    for index, snapshot in enumerate(snapshots):
+    for snapshot in snapshots:
         label = snapshot.label
-        error = targets.before(snapshots, index, logs)
-        if error:
-            errors.append(error)
-            continue
         target = targets.path(label)
         environment = targets.environment(label)
         built_names = [f"{name}{SUFFIX}" for name in examples]
@@ -423,7 +375,6 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
         print(f"[{label}] Building release measurement examples", flush=True)
         log = logs / f"{label}-build.log"
         code = command(arguments, snapshot.checkout, log, environment, timeout)
-        build = None
         if code:
             errors.append(f"{label} release build exited {code}")
         else:
@@ -443,10 +394,7 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
                                    for path in binaries.values()}}
             (logs / f"{label}-identity.json").write_text(json.dumps(record, indent=2) + "\n",
                                                          encoding="utf-8", newline="\n")
-            build = Build(label, snapshot, binaries, hashes, record)
-            builds[label] = build
-        if hook:
-            hook(snapshot, build, environment)
+            builds[label] = Build(label, snapshot, binaries, hashes, record)
     return builds, errors
 
 

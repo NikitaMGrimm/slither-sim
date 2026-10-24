@@ -28,9 +28,8 @@ owners, focused tests and the evidence each kind of change needs.
 | Add a regression fixture | [Fixture guide](../tests/fixtures/README.md) |
 | Read dated results and counterexamples | [Research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) |
 
-Maintainer references: [PR comparisons](maintainers/pr-reports.md),
-[releasing](maintainers/releasing.md), [provenance](provenance.md) and
-[changelog](../CHANGELOG.md).
+Maintainer references: [releasing](maintainers/releasing.md),
+[provenance](provenance.md) and [changelog](../CHANGELOG.md).
 
 Update the guide that owns the behavior. Put distinct dated studies under
 `research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; a routine fix needs no new

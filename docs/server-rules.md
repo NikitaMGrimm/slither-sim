@@ -44,6 +44,11 @@ measurements may require those local-only archives.
 | Prey | `prey.rs`, `prey_outward.rs`, `prey_decisions.rs`, `prey_activation.rs`; `prey-*.json` | Speeds constrained; steering, population and outward departure trigger remain approximate. |
 | Kiosk | `kiosk.rs` and core unit tests | Historical model; current official applicability unverified. |
 
+To see how a motion change moves the turn and speed-ramp residuals, run
+`cargo run --locked --example fidelity_metrics -- tests/fixtures` before and
+after it. The JSON lists each error with its sample count; it has no pass/fail
+thresholds and is not an overall accuracy claim.
+
 ## Client delivery and spawning
 
 The [`serve` controller](bot-api.md#frames) exposes immediate simulation state,

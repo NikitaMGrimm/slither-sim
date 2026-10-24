@@ -27,9 +27,8 @@ record interruptions and background activity.
 
 The candidate snapshot includes tracked edits/deletions and untracked non-ignored
 files. A temporary Git index leaves your index, HEAD, stash and files untouched.
-The candidate's measurement examples, selected tests and fixtures are overlaid on
-the detached baseline so both runtimes use the same harness; it must compile
-against the base API.
+The candidate's `examples/perf_baseline.rs` is overlaid on the detached baseline
+so both runtimes use the same harness; it must compile against the base API.
 
 Each side has a separate persistent target under `target/perf-suite/` (or
 `CARGO_TARGET_DIR`). A lock refuses concurrent use; check its owner before removing
@@ -78,7 +77,7 @@ cargo run --release --locked --example perf_baseline -- --list
 The catalog owns names, suites, sample sizes, resolved definitions and profile
 support. The [workload guide](performance-workloads.md) explains scenario
 lifecycles, validity checks, adding cases and the specialized observation/retained
-client harnesses. [PR comparisons](maintainers/pr-reports.md) use the same catalog.
+client harnesses.
 
 ## Controller transport
 

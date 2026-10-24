@@ -18,8 +18,8 @@ cargo run --release --locked --example perf_baseline -- --list
 
 - `name`: the `CASE` argument of
   `perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel]`.
-- `suite`: `ci` rows are timed and traced by PR CI, which allows at most ten;
-  `full` rows are local defaults only.
+- `suite`: `ci` rows are the short default selection of `tools/perf_compare.py`,
+  at most ten; `--suite full` and `tools/perf_baseline.py` add the `full` rows.
 - `iterations` and `traceIterations`: the default timed sample size and parity
   window. Each window keeps an uncompressed trace near 64 MB or less.
 - `mode`, `operation`: informational labels such as `official` and `step+observe`.
@@ -111,7 +111,7 @@ traces contain:
 `--parallel` calls `Simulator::set_parallel(true)` on the timed world, so `observe`
 and `-bot` rows observe on the rayon pool. It needs the default `parallel` feature
 and adds `"parallel": true` to the report; every other trace line must match the
-run without it. Runners and PR comparisons do not pass it.
+run without it. The runners do not pass it.
 
 Snapshots and warmup statistics are taken right after the operation, before dead
 slots respawn: respawning resets a slot's per-life state, which would otherwise

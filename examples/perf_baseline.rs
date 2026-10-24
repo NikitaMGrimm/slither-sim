@@ -28,9 +28,9 @@ const EPOCH_OPERATIONS: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Suite {
-    /// Timed and traced by PR CI.
+    /// `tools/perf_compare.py`'s default selection, kept short.
     Ci,
-    /// Local default only.
+    /// Added by `--suite full` and the `tools/perf_baseline.py` runner.
     Full,
 }
 
@@ -1807,7 +1807,7 @@ mod tests {
     use super::*;
 
     const MAX_TRACE_ITERATIONS: usize = 1000;
-    /// PR CI times and traces every `ci` row within its job budget.
+    /// Keeps the default comparison suite short.
     const MAX_CI_ROWS: usize = 10;
 
     /// Dense and short so debug tests reach deaths, respawns and an epoch quickly.

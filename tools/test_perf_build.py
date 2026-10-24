@@ -99,19 +99,17 @@ class Overlay(unittest.TestCase):
                 for name in perf_build.HARNESS:
                     (checkout / name).parent.mkdir(parents=True, exist_ok=True)
                     (checkout / name).write_text("// same\n")
-                (checkout / "tests/fixtures").mkdir(parents=True)
                 (checkout / "src").mkdir()
                 (checkout / "src/lib.rs").write_text(f"// {checkout.name} runtime\n")
             (source / "examples/perf_baseline.rs").write_text("// candidate harness\n")
-            (source / "tests/fixtures/nested").mkdir()
-            (source / "tests/fixtures/nested/new.json").write_text("{}\n")
-            (destination / "tests/fixtures/base-only.json").write_text("{}\n")
+            (source / "tests/fixtures").mkdir(parents=True)
+            (source / "tests/fixtures/new.json").write_text("{}\n")
             snapshot = lambda label, path: perf_build.Snapshot(label, path, "c" * 40, "t" * 40, "fixture")
             result = perf_build.overlay(snapshot("candidate", source), snapshot("baseline", destination))
-            self.assertEqual(result.suite_changes, ("examples/perf_baseline.rs", "tests/fixtures/nested/new.json"))
-            self.assertEqual(set(result.inputs), {*perf_build.HARNESS, "tests/fixtures/nested/new.json"})
+            self.assertEqual(result.suite_changes, ("examples/perf_baseline.rs",))
+            self.assertEqual(set(result.inputs), set(perf_build.HARNESS))
             self.assertEqual((destination / "examples/perf_baseline.rs").read_text(), "// candidate harness\n")
-            self.assertTrue((destination / "tests/fixtures/base-only.json").exists())
+            self.assertFalse((destination / "tests/fixtures/new.json").exists())
             self.assertEqual((destination / "src/lib.rs").read_text(), "// baseline runtime\n")
             self.assertEqual(result.record()["suite_changes"], list(result.suite_changes))
 
@@ -147,7 +145,6 @@ class Targets(unittest.TestCase):
                 stale = targets.path(label) / f"release/examples/perf_baseline{perf_build.SUFFIX}"
                 stale.parent.mkdir(parents=True)
                 stale.write_bytes(b"stale " + label.encode())
-            hooks = []
 
             def command(args, cwd, log, environment=None, timeout=600):
                 label = Path(cwd).name
@@ -162,11 +159,9 @@ class Targets(unittest.TestCase):
             with patch.object(perf_build, "command", side_effect=command), patch.object(
                     perf_build, "output", return_value="synthetic tool"), contextlib.redirect_stdout(io.StringIO()):
                 builds, errors = perf_build.build_all(
-                    snapshots, targets, ("perf_baseline",), logs=root, bins=root / "out",
-                    hook=lambda snapshot, build, environment: hooks.append((snapshot.label, build is not None)))
+                    snapshots, targets, ("perf_baseline",), logs=root, bins=root / "out")
             self.assertEqual(errors, ["candidate release build exited 101"])
             self.assertEqual(list(builds), ["baseline"])
-            self.assertEqual(hooks, [("baseline", True), ("candidate", False)])
             self.assertFalse((root / "out/bin-candidate").exists())
             build = builds["baseline"]
             self.assertEqual(build.binaries["perf_baseline"].read_bytes(), b"fresh")
