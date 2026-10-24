@@ -172,7 +172,7 @@ struct Scenario {
     epoch: usize,
     /// `<id>-step`: one `Simulator::step`.
     step: Operation,
-    /// `<id>-bot`: `step` then `observe_all_into` one reused buffer.
+    /// `<id>-bot`: `step` then a batch observation into one reused buffer.
     bot: Option<Operation>,
 }
 
@@ -365,7 +365,7 @@ impl Driver {
                     "epochOperations": scenario.epoch,
                 },
                 "warmupTicks": scenario.warmup_ticks,
-                "operation": if bot { "step+observe_all_into" } else { "step" },
+                "operation": if bot { "step+batch_observe" } else { "step" },
             }),
             Driver::Client(client) => json!({
                 "world": client.world.definition(), "config": client.world.config(),
@@ -1746,8 +1746,8 @@ fn run_scenario(
     let operation = match (args.profile, bot) {
         (false, false) => "step",
         (true, false) => "step_profiled",
-        (false, true) => "step then observe_all_into",
-        (true, true) => "step_profiled then observe_all_into",
+        (false, true) => "step then batch observe",
+        (true, true) => "step_profiled then batch observe",
     };
     Ok(report(
         args,
