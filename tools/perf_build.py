@@ -371,9 +371,10 @@ class LocalTargets:
 
 
 class SharedTarget:
-    """CI: one run-owned target; dependencies are reused and the package is cleaned between labels."""
+    """CI: one target, possibly restored from a dependency cache. Dependencies are
+    reused; the package is cleaned before each label builds."""
 
-    policy = "shared run-owned target, package cleaned between labels"
+    policy = "shared target, package cleaned before each label"
 
     def __init__(self, path):
         self.target = Path(path)
@@ -382,18 +383,18 @@ class SharedTarget:
         return self.target
 
     def environment(self, label):
-        return {**os.environ, "CARGO_TARGET_DIR": str(self.target), "CARGO_BUILD_JOBS": "2",
+        # CARGO_BUILD_JOBS comes from the workflow, which knows the runner's cores.
+        return {**os.environ, "CARGO_TARGET_DIR": str(self.target),
                 "CARGO_TERM_COLOR": "never", "RUST_TEST_THREADS": "1"}
 
     def before(self, snapshots, index, logs):
-        if index == 0:
-            return None
         label = snapshots[index].label
         environment = self.environment(label)
-        # Package-only clean defaults to dev; explicitly clear release too.
+        # Package-only clean defaults to dev; explicitly clear release too. A restored
+        # cache holds no package outputs, but the first label must not trust that.
         # Earlier executables have already been copied out of this target.
         if any(command(["cargo", "clean", "--locked", "--package", "slither-sim", "--profile", profile],
-                       snapshots[index - 1].checkout, logs / f"{label}-clean-{profile}.log", environment)
+                       snapshots[max(index - 1, 0)].checkout, logs / f"{label}-clean-{profile}.log", environment)
                for profile in ("release", "dev")):
             return f"{label} package cleanup failed; {label} measurements unavailable"
         return None

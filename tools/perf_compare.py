@@ -9,6 +9,9 @@ listeners or environment changes. --max-wall-seconds shares a deadline across
 metadata and workload children (after the builds in --base mode); reserve cleanup
 time separately. See docs/performance.md#comparison-deadlines.
 
+`sequential()` is the PR comparison's error-controlled sampler (tools/pr_report.py);
+these command-line modes keep a fixed number of descriptive pairs.
+
 Exit 0: complete and every trace equal. Exit 3: complete, but a trace or workload
 definition changed (timings kept, labeled behavior-changed). Exit 1: incomplete;
 failure.json and partial outputs remain.
@@ -24,6 +27,7 @@ import time
 
 from perf_baseline import ROOT, SUITES, capture_trace, command_output, digest, load_catalog, native, same_plan
 import perf_build
+import perf_stats
 
 
 # examples/perf_observation.rs has no --list, so its cases keep this guarded table.
@@ -116,6 +120,152 @@ def compare(binaries, hashes, plan, output, repeats, *, deadline=None):
                          "median_cpu_ratio_candidate_over_baseline": statistics.median(cpu_ratios) if cpu_ratios else None}
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n")
     return summary
+
+
+def child_error(row, workload):
+    """Why a harness timing record cannot be one side of a matched pair, or None."""
+    report = row.get("workload")
+    timing = report.get("timing") if isinstance(report, dict) else None
+    if not isinstance(timing, dict):
+        return "no timing record"
+    # The report's operation name is the harness's internal label, not the catalog's;
+    # the frozen plan pins the operation through the workload definition hash.
+    if (report.get("kind"), report.get("case"), report.get("mode"),
+            report.get("iterations")) != ("report", workload.name, "timing", workload.iterations):
+        return "record does not match the plan's case or operation count"
+    if type(timing.get("operations")) is not int or timing["operations"] != workload.iterations:
+        return f"timed {timing.get('operations')!r} operations instead of {workload.iterations}"
+    wall = timing.get("wallSeconds")
+    if type(wall) not in (int, float) or not math.isfinite(wall) or wall <= 0:
+        return f"invalid operation wall time {wall!r}"
+    return None
+
+
+def sequential(binaries, hashes, workloads, output, deadline, plan):
+    """The PR comparison sampler: statistics contract v1 §1, §2 and §6.
+
+    `workloads` are in frozen catalog order with matched plans on both sides; `deadline`
+    is a perf_counter() value. Writes plan.json before sampling, every child attempt to
+    results.jsonl and every complete pair to pairs.jsonl. Returns {case: perf_stats.final row}.
+    """
+    write_json(output / "plan.json", plan)
+    rows = {w.name: {"pairs": [], "history": [], "termination": None, "failure": None, "attempted": 0}
+            for w in workloads}
+    results = (output / "results.jsonl").open("w", encoding="utf-8", newline="\n")
+    pairs_log = (output / "pairs.jsonl").open("w", encoding="utf-8", newline="\n")
+
+    def child(workload, label, index, position, order):
+        """Returns (status, record): ok, failed or incomplete_due_to_cap."""
+        name = "warmup" if index is None else index
+        record = {"case": workload.name, "label": label, "warmup": index is None, "pair_index": index,
+                  "order": order, "position": position, "started_monotonic": time.perf_counter()}
+        try:
+            row = native(binaries[label], workload.name, workload.iterations,
+                         output / f"{workload.name}-{name}-{label}-stderr.txt", deadline=deadline)
+            error = child_error(row, workload)
+            record.update(row)
+            status = "failed" if error else "ok"
+        except TimeoutError as exception:
+            # Distinguish the global deadline from a hung child at its own 120 s limit.
+            status = "incomplete_due_to_cap" if time.perf_counter() >= deadline else "failed"
+            error = f"{type(exception).__name__}: {exception}"
+        except (RuntimeError, OSError, EOFError, ValueError) as exception:
+            status, error = "failed", f"{type(exception).__name__}: {exception}"
+        record.update(status=status, error=error, ended_monotonic=time.perf_counter())
+        results.write(json.dumps(record, separators=(",", ":")) + "\n")
+        results.flush()
+        return status, record
+
+    def pair(workload, index):
+        """One adjacent pair (§2); a warmup has index None and runs baseline first."""
+        order = 1 if index is None else perf_stats.ORDER[index - 1]
+        labels = ("baseline", "candidate") if order == 1 else ("candidate", "baseline")
+        records = {}
+        for position, label in enumerate(labels):
+            if time.perf_counter() >= deadline:  # §6: never start a child at or after D
+                return "incomplete_due_to_cap", None
+            status, records[label] = child(workload, label, index, position, order)
+            if status != "ok":
+                where = "warmup" if index is None else f"pair {index}"
+                return status, f"{label} failed at {where}"
+        return "ok", records
+
+    def stop(name, termination, failure=None):
+        rows[name].update(termination=termination, failure=failure)
+
+    try:
+        active = list(workloads)
+        capped = False
+        # §2: one fixed, discarded baseline-then-candidate warmup pair per workload.
+        for workload in list(active):
+            status, detail = pair(workload, None)
+            if status == "incomplete_due_to_cap":
+                capped = True
+                break
+            if status != "ok":
+                stop(workload.name, "measurement_failure", detail)
+                active.remove(workload)
+        else:
+            # Rounds in catalog order, one pair per active workload; every row keeps its own index.
+            for _ in perf_stats.ORDER:
+                for workload in list(active):
+                    row = rows[workload.name]
+                    index = len(row["pairs"]) + 1
+                    row["attempted"] = index
+                    status, detail = pair(workload, index)
+                    if status == "incomplete_due_to_cap":
+                        capped = True
+                        break
+                    if status != "ok":
+                        stop(workload.name, "measurement_failure", detail)
+                        active.remove(workload)
+                        continue
+                    record = {"workload_id": workload.name, "pair_index": index,
+                              "order": perf_stats.ORDER[index - 1],
+                              "baseline_wall_seconds": detail["baseline"]["workload"]["timing"]["wallSeconds"],
+                              "candidate_wall_seconds": detail["candidate"]["workload"]["timing"]["wallSeconds"],
+                              "operations_per_block": workload.iterations, "blocks": 1}
+                    row["pairs"].append(record)
+                    pairs_log.write(json.dumps(record, separators=(",", ":")) + "\n")
+                    pairs_log.flush()
+                    print(json.dumps({"case": workload.name, "pair": index,
+                                      "ratio": record["candidate_wall_seconds"] / record["baseline_wall_seconds"]}),
+                          flush=True)
+                    if index not in perf_stats.LOOKS:
+                        continue
+                    if not perf_stats.valid_pairs(row["pairs"], workload.iterations, 1):
+                        stop(workload.name, "measurement_failure", f"invalid pair data at {index} pairs")
+                        active.remove(workload)
+                        continue
+                    look = perf_stats.analyze(row["pairs"])
+                    row["history"].append(look)
+                    print(f"[performance] {workload.name}: {look['label']} at {index} pairs", flush=True)
+                    if look["label"] == "Unavailable":
+                        stop(workload.name, "measurement_failure", f"numeric failure at {index} pairs")
+                    elif look["label"] in perf_stats.RESOLVED:
+                        stop(workload.name, "resolved")
+                    elif index == perf_stats.LOOKS[-1]:
+                        stop(workload.name, "max_pairs")
+                    else:
+                        continue
+                    active.remove(workload)
+                if capped or not active:
+                    break
+        # Deadline: rows never attempted (including after a capped warmup) did not start.
+        for workload in active:
+            stop(workload.name, "time_cap" if rows[workload.name]["attempted"] else "not_started")
+    finally:
+        results.close()
+        pairs_log.close()
+    corrupted = hashes != {key: digest(path) for key, path in binaries.items()}
+    final = {}
+    for name, row in rows.items():
+        if corrupted:  # §6: global binary corruption invalidates every row
+            row.update(termination="measurement_failure", failure="benchmark executable changed during sampling")
+        final[name] = {**perf_stats.final(row["history"], len(row["pairs"]), row["termination"], row["failure"]),
+                       "n_attempted": row["attempted"]}
+    write_json(output / "sequential.json", final)
+    return final
 
 
 def parity(binaries, selections, output, *, deadline=None):

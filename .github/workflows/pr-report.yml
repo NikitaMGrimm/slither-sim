@@ -25,21 +25,41 @@ on:
       - tools/perf_baseline.py
       - tools/perf_compare.py
       - tools/perf_build.py
+      - tools/perf_stats.py
       - .github/workflows/pr-report.yml
+  # Main runs only refresh the dependency cache that PR runs restore. PR runs never
+  # save it, so one PR's build cannot reach another PR's measurement.
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: pr-report-${{ github.event.pull_request.number }}
+  group: pr-report-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
+
+env:
+  # Hosted runners have 4 vCPUs; every build finishes before timing starts.
+  CARGO_BUILD_JOBS: 4
+  # Only the regression tests use the dev profile; measured binaries are release.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   measure:
     name: Measurements
+    if: github.event_name == 'pull_request'
     runs-on: windows-latest
-    timeout-minutes: 25
+    # tools/pr_report.py derives the sampling deadline from this limit
+    # (JOB_TIMEOUT_SECONDS) and keeps 60 seconds for the report and uploads.
+    timeout-minutes: 15
     steps:
+      - name: Record job start
+        shell: python
+        run: |
+          import os, time
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as environment:
+              environment.write(f"PR_REPORT_JOB_START={time.monotonic()!r}\n")
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
@@ -47,21 +67,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
+      # Dependencies only: the cache drops workspace packages, and both revisions'
+      # simulator packages are rebuilt from source after a clean.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: pr-report
+          save-if: false
       - name: Compare target and proposed merge
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           REPORT_DIRECTORY: ${{ runner.temp }}/pr-report
         run: python tools/pr_report.py --output "$env:REPORT_DIRECTORY" --head "$env:PR_HEAD"
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: pr-report
-          path: ${{ runner.temp }}/pr-report
-          if-no-files-found: error
-          retention-days: 14
-          overwrite: true
+      # The small comment artifact goes first so a slow full upload cannot cost the comment.
       - name: Upload comment data
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -72,3 +90,37 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           overwrite: true
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-report
+          path: ${{ runner.temp }}/pr-report
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+  cache:
+    name: Dependency cache
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        id: cache
+        with:
+          shared-key: pr-report
+          lookup-only: true
+      # An exact hit means the lockfile, toolchain and environment are unchanged.
+      - name: Build release dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cargo build --release --locked --example perf_baseline --example fidelity_metrics
+      - name: Build test dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cargo test --locked --no-run --test movement_turns --test physics
