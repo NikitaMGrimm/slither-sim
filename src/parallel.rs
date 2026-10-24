@@ -6,7 +6,11 @@ use std::ops::Range;
 /// Ranges to split work over when `useful` ranges would each pay for their
 /// scheduling cost. A few per thread let idle threads take over uneven work.
 pub(crate) fn parts(useful: usize) -> usize {
-    useful.min(4 * rayon::current_num_threads()).max(1)
+    match rayon::current_num_threads() {
+        // One thread would run the ranges in turn, each with its own buffers.
+        1 => 1,
+        threads => useful.min(4 * threads).max(1),
+    }
 }
 
 /// `work` over each range in parallel, results in range order.
@@ -60,6 +64,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn only_pools_with_several_threads_split() {
+        let parts_on = |threads| {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap()
+                .install(|| (parts(0), parts(3), parts(1000)))
+        };
+        assert_eq!(parts_on(1), (1, 1, 1));
+        assert_eq!(parts_on(2), (1, 3, 8));
     }
 
     #[test]
