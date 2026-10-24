@@ -93,7 +93,7 @@ state and renderer prediction distinct when interpreting a regression.
 - Sliding and hard-boundary modes are available.
 - Prey behavior includes an outward replay mode whose official trigger is unknown.
 
-The [geometric controller](bot-api.md#observation-boundary) returns immediate
+The [geometric controller](bot-api.md#frames) returns immediate
 simulation state, including entire visible opponents. The [portable API](client-api.md)
 reconstructs delivered messages with timing and receipt history; its visibility
 subscriptions and minimap rasterization remain approximate. Neither establishes

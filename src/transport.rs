@@ -1,29 +1,22 @@
-//! Local process transport. Each connection controls one independent world.
-use crate::{Action, Config, DeathEvent, Food, Observation, Prey, Simulator, Snake};
+//! Local process transport. Each connection controls a session of independent worlds.
+use crate::{Action, Config, DeathEvent, Food, Prey, Simulator, Snake};
+use frame::FrameBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::{self, BufRead, Write};
 
-pub const PROTOCOL: &str = "slither-sim-json-v1";
+mod frame;
 
-/// How [`serve`] runs its worlds. Replies never depend on these settings.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct ServeOptions {
-    /// [`Simulator::set_parallel`] for every world the session resets.
-    #[cfg(feature = "parallel")]
-    pub parallel: bool,
-}
+pub const PROTOCOL: &str = "slither-sim-json-v2";
 
-impl ServeOptions {
-    fn apply(self, world: &mut Simulator) {
-        #[cfg(feature = "parallel")]
-        world.set_parallel(self.parallel);
-        #[cfg(not(feature = "parallel"))]
-        let _ = world;
-    }
-}
+const MAX_AGENTS: usize = 128;
+const MAX_WORLDS: usize = 1024;
+const MAX_DECISION_TICKS: usize = 1000;
 
 fn default_seed() -> u32 {
+    1
+}
+fn default_worlds() -> usize {
     1
 }
 fn default_agents() -> usize {
@@ -33,11 +26,13 @@ fn default_decision_ticks() -> usize {
     6
 }
 
+/// One world's actions: a heading and a boost flag per agent slot. Dead slots
+/// may give a null heading.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Command {
-    heading: f64,
-    boost: bool,
+struct WorldActions {
+    heading: Vec<Option<f64>>,
+    boost: Vec<bool>,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +48,8 @@ enum Request {
     Reset {
         #[serde(default = "default_seed")]
         seed: u32,
+        #[serde(default = "default_worlds")]
+        worlds: usize,
         #[serde(default = "default_agents")]
         agents: usize,
         #[serde(default = "default_decision_ticks")]
@@ -61,33 +58,12 @@ enum Request {
         config: Box<Config>,
     },
     Step {
-        actions: Vec<Option<Command>>,
+        actions: Vec<WorldActions>,
     },
-    Observe {
-        slot: usize,
+    Snapshot {
+        #[serde(default)]
+        world: usize,
     },
-    Snapshot {},
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ResetReply<'a> {
-    seed: u32,
-    config: &'a Config,
-    decision_ticks: usize,
-    observations: &'a [Option<Observation>],
-    time: f64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StepReply<'a> {
-    observations: &'a [Option<Observation>],
-    deaths: &'a [DeathEvent],
-    time: f64,
-    elapsed_seconds: f64,
-    ticks: usize,
-    living: usize,
 }
 
 #[derive(Serialize)]
@@ -106,16 +82,55 @@ fn reply(result: &impl Serialize) -> Vec<u8> {
     crate::json::reply(PROTOCOL, result)
 }
 
-struct WorldSession {
-    world: Simulator,
-    decision_ticks: usize,
-    /// Refilled by every reply, so steady-state steps allocate little.
-    observations: Vec<Option<Observation>>,
+/// `{"protocol":..,"result":{<head>"worlds":[<frames>]}}`, where `head` holds any
+/// members that sort before `worlds`, each followed by a comma.
+fn worlds_reply(head: &[u8], frames: &[Vec<u8>]) -> Vec<u8> {
+    let length = frames.iter().map(|frame| frame.len() + 1).sum::<usize>() + head.len() + 64;
+    let mut out = Vec::with_capacity(length);
+    out.extend_from_slice(b"{\"protocol\":");
+    out.extend_from_slice(&serde_json::to_vec(PROTOCOL).expect("strings serialize"));
+    out.extend_from_slice(b",\"result\":{");
+    out.extend_from_slice(head);
+    out.extend_from_slice(b"\"worlds\":[");
+    for (index, frame) in frames.iter().enumerate() {
+        if index > 0 {
+            out.push(b',');
+        }
+        out.extend_from_slice(frame);
+    }
+    out.extend_from_slice(b"]}}");
+    out
 }
 
+struct WorldState {
+    world: Simulator,
+    frames: FrameBuilder,
+    actions: Vec<Option<Action>>,
+}
+
+struct Run {
+    worlds: Vec<WorldState>,
+    agents: usize,
+    decision_ticks: usize,
+}
+
+/// `work` on every world, on the rayon pool when there are several. Worlds are
+/// independent and results return in world order, so replies never depend on it.
+fn each_world<R: Send>(
+    worlds: &mut [WorldState],
+    work: impl Fn(&mut WorldState) -> R + Sync + Send,
+) -> Vec<R> {
+    #[cfg(feature = "parallel")]
+    if worlds.len() > 1 {
+        use rayon::prelude::*;
+        return worlds.par_iter_mut().map(work).collect();
+    }
+    worlds.iter_mut().map(work).collect()
+}
+
+#[derive(Default)]
 struct Session {
-    options: ServeOptions,
-    current: Option<WorldSession>,
+    current: Option<Run>,
 }
 
 impl Session {
@@ -125,90 +140,126 @@ impl Session {
                 "version": env!("CARGO_PKG_VERSION"),
                 "defaultConfig": Config::default(),
                 "defaultDecisionTicks": default_decision_ticks(),
-                "maxAgents": 128,
-                "maxDecisionTicks": 1000,
+                "maxAgents": MAX_AGENTS,
+                "maxWorlds": MAX_WORLDS,
+                "maxDecisionTicks": MAX_DECISION_TICKS,
+                "origins": frame::ORIGINS,
+                "precision": {
+                    "angle": 1.0 / frame::ANGLE_STEPS,
+                    "position": 1.0 / frame::POSITION_STEPS,
+                    "speed": 1.0 / frame::SPEED_STEPS,
+                },
             }))),
             Request::Reset {
                 seed,
+                worlds,
                 agents,
                 decision_ticks,
                 config,
             } => {
-                if !(1..=128).contains(&agents) || !(1..=1000).contains(&decision_ticks) {
-                    return Err("Need 1..128 agents and 1..1000 decisionTicks".into());
+                if !(1..=MAX_WORLDS).contains(&worlds)
+                    || !(1..=MAX_AGENTS).contains(&agents)
+                    || !(1..=MAX_DECISION_TICKS).contains(&decision_ticks)
+                {
+                    return Err(format!(
+                        "Need 1..{MAX_WORLDS} worlds, 1..{MAX_AGENTS} agents and \
+                         1..{MAX_DECISION_TICKS} decisionTicks"
+                    ));
                 }
                 // Construct completely before replacing a working session.
-                let mut world = Simulator::new(seed, *config)?;
-                for slot in 0..agents {
-                    world.add(slot.to_string(), slot, agents)?;
+                let mut built = Vec::with_capacity(worlds);
+                for index in 0..worlds {
+                    let mut world =
+                        Simulator::new(seed.wrapping_add(index as u32), (*config).clone())?;
+                    for slot in 0..agents {
+                        world.add(slot.to_string(), slot, agents)?;
+                    }
+                    built.push(world);
                 }
-                self.options.apply(&mut world);
-                // Keep the previous world's buffer; its vectors fit the next one.
-                let mut observations = self
+                // Earlier frame builders keep their buffers for the new worlds.
+                let mut builders = self
                     .current
                     .take()
-                    .map(|session| session.observations)
-                    .unwrap_or_default();
-                world.observe_all_into(&mut observations);
-                let result = reply(&ResetReply {
-                    seed,
-                    config: &world.config,
-                    decision_ticks,
-                    observations: &observations,
-                    time: world.time,
+                    .map(|run| run.worlds.into_iter().map(|state| state.frames))
+                    .into_iter()
+                    .flatten();
+                let mut states: Vec<_> = built
+                    .into_iter()
+                    .map(|world| WorldState {
+                        world,
+                        frames: builders.next().unwrap_or_default(),
+                        actions: Vec::new(),
+                    })
+                    .collect();
+                let frames = each_world(&mut states, |state| {
+                    state.frames.encode(&state.world, 0, &[])
                 });
-                self.current = Some(WorldSession {
-                    world,
+                let mut head = b"\"config\":".to_vec();
+                head.extend_from_slice(
+                    &crate::json::to_vec(&states[0].world.config).expect("configs serialize"),
+                );
+                head.extend_from_slice(
+                    format!(",\"decisionTicks\":{decision_ticks},\"seed\":{seed},").as_bytes(),
+                );
+                let result = worlds_reply(&head, &frames);
+                self.current = Some(Run {
+                    worlds: states,
+                    agents,
                     decision_ticks,
-                    observations,
                 });
                 Ok(result)
             }
             Request::Step { actions } => {
-                let session = self.current.as_mut().ok_or("Reset first")?;
-                let actions: Vec<_> = actions
-                    .into_iter()
-                    .map(|command| {
-                        command.map(|command| Action {
-                            heading: command.heading,
-                            boost: command.boost,
-                        })
-                    })
-                    .collect();
-                // Reject the whole batch before advancing any physics.
-                session.world.validate_actions(&actions)?;
-                let start = session.world.time;
-                let previous_deaths = session.world.deaths.len();
-                let mut ticks = 0;
-                for _ in 0..session.decision_ticks {
-                    if session.world.living() == 0 {
-                        break;
-                    }
-                    session.world.advance_validated(&actions);
-                    ticks += 1;
+                let run = self.current.as_mut().ok_or("Reset first")?;
+                if actions.len() != run.worlds.len() {
+                    return Err(format!(
+                        "One action entry per world required: got {}, need {}",
+                        actions.len(),
+                        run.worlds.len()
+                    ));
                 }
-                session.world.observe_all_into(&mut session.observations);
-                Ok(reply(&StepReply {
-                    observations: &session.observations,
-                    deaths: &session.world.deaths[previous_deaths..],
-                    time: session.world.time,
-                    elapsed_seconds: session.world.time - start,
-                    ticks,
-                    living: session.world.living(),
-                }))
+                // Reject the whole request before advancing any world.
+                for (index, (state, world_actions)) in
+                    run.worlds.iter_mut().zip(actions).enumerate()
+                {
+                    if world_actions.heading.len() != run.agents
+                        || world_actions.boost.len() != run.agents
+                    {
+                        return Err(format!(
+                            "World {index}: one heading and one boost per agent required"
+                        ));
+                    }
+                    state.actions.clear();
+                    state.actions.extend(
+                        world_actions.heading.iter().zip(&world_actions.boost).map(
+                            |(&heading, &boost)| heading.map(|heading| Action { heading, boost }),
+                        ),
+                    );
+                    state
+                        .world
+                        .validate_actions(&state.actions)
+                        .map_err(|error| format!("World {index}: {error}"))?;
+                }
+                let decision_ticks = run.decision_ticks;
+                let frames = each_world(&mut run.worlds, |state| {
+                    let previous_deaths = state.world.deaths.len();
+                    let mut ticks = 0;
+                    for _ in 0..decision_ticks {
+                        if state.world.living() == 0 {
+                            break;
+                        }
+                        state.world.advance_validated(&state.actions);
+                        ticks += 1;
+                    }
+                    state
+                        .frames
+                        .encode(&state.world, ticks, &state.world.deaths[previous_deaths..])
+                });
+                Ok(worlds_reply(b"", &frames))
             }
-            Request::Observe { slot } => {
-                let world = &self.current.as_ref().ok_or("Reset first")?.world;
-                let snake = world.snakes.get(slot).ok_or("Unknown agent slot")?;
-                let observation = if snake.alive {
-                    Some(world.observe(slot)?)
-                } else {
-                    None
-                };
-                Ok(reply(&json!({ "observation": observation })))
-            }
-            Request::Snapshot {} => {
-                let world = &self.current.as_ref().ok_or("Reset first")?.world;
+            Request::Snapshot { world } => {
+                let run = self.current.as_ref().ok_or("Reset first")?;
+                let world = &run.worlds.get(world).ok_or("Unknown world")?.world;
                 // Deliberately exclude hidden RNG/control state from this debug view.
                 Ok(reply(&SnapshotReply {
                     config: &world.config,
@@ -223,16 +274,10 @@ impl Session {
     }
 }
 
-/// Serve a trusted local controller until EOF. Request errors leave the stream usable.
-pub fn serve(
-    mut input: impl BufRead,
-    mut output: impl Write,
-    options: ServeOptions,
-) -> io::Result<()> {
-    let mut session = Session {
-        options,
-        current: None,
-    };
+/// Serve a trusted local controller until EOF. Request errors leave the stream
+/// usable. Sessions with several worlds step them on the current rayon pool.
+pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> {
+    let mut session = Session::default();
     let mut line = Vec::new();
     loop {
         line.clear();
@@ -251,23 +296,5 @@ pub fn serve(
         output.write_all(&reply)?;
         output.write_all(b"\n")?;
         output.flush()?;
-    }
-}
-
-#[cfg(all(test, feature = "parallel"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resets_apply_the_parallel_option() {
-        for parallel in [false, true] {
-            let mut session = Session {
-                options: ServeOptions { parallel },
-                current: None,
-            };
-            let reset = serde_json::from_str(r#"{"op":"reset","agents":2}"#).unwrap();
-            session.handle(reset).unwrap();
-            assert_eq!(session.current.unwrap().world.parallel(), parallel);
-        }
     }
 }
