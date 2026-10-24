@@ -51,6 +51,8 @@ const SPAWN_ATTEMPTS: usize = 64;
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
 /// the rest of `MAX_IN_FLIGHT` for broadcasts while the host drains.
 const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
+/// Snake IDs are the slots, sent as u16.
+pub(crate) const MAX_AGENTS: usize = u16::MAX as usize + 1;
 const MAX_NICKNAME: usize = 24;
 /// Rows the stock leaderboard shows.
 const LEADERBOARD_ROWS: usize = 10;
@@ -135,12 +137,15 @@ impl SimulationConfig {
         {
             return Err("Protocol-19 simulation supports prey sizes up to 51".into());
         }
-        if !(1..=128).contains(&self.agents) || self.controlled_slot >= self.agents {
-            return Err("Simulation needs 1 to 128 agents and a controlled slot among them".into());
+        if !(1..=MAX_AGENTS).contains(&self.agents) || self.controlled_slot >= self.agents {
+            return Err(format!(
+                "Simulation needs 1 to {MAX_AGENTS} agents, the protocol-19 u16 snake IDs, \
+                 and a controlled slot among them"
+            ));
         }
-        if !(1..=1000).contains(&self.decision_ticks) || !(1..=1000).contains(&self.broadcast_ticks)
-        {
-            return Err("Decision and broadcast ticks must be 1 through 1000".into());
+        // Broadcasts fall on ticks divisible by broadcastTicks.
+        if self.decision_ticks == 0 || self.broadcast_ticks == 0 {
+            return Err("Decision and broadcast ticks must be at least 1".into());
         }
         // Anchors farther behind the front have been contracted and cannot be
         // encoded incrementally; boost speed must not outrun that window.
@@ -609,8 +614,8 @@ impl SimulatorBackend {
     /// no action the slot stays busy for it. The client knows it like its ping.
     pub fn set_slot_processing_seconds(&mut self, slot: usize, seconds: f64) -> Result<(), String> {
         self.slot(slot)?;
-        if !seconds.is_finite() || !(0. ..=2.).contains(&seconds) {
-            return Err("Processing must be 0 to 2 seconds".into());
+        if !seconds.is_finite() || seconds < 0. {
+            return Err("Processing must be finite and nonnegative".into());
         }
         if self.pending(slot) {
             return Err("Slot is still processing its previous decision".into());

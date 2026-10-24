@@ -35,7 +35,6 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
-const MAX_AGENTS: usize = 128;
 /// Largest accepted client message or frame. Logins with a custom skin are the
 /// largest stock-client messages and stay far below this.
 const MAX_INPUT_BYTES: usize = 4 << 10;
@@ -98,10 +97,8 @@ impl HostConfig {
             .max_clients
             .checked_add(self.bots)
             .ok_or("maxClients + bots must fit in usize")?;
-        if self.max_clients == 0 || agents > MAX_AGENTS {
-            return Err(format!(
-                "Host needs 1 or more maxClients and at most {MAX_AGENTS} clients plus bots"
-            ));
+        if self.max_clients == 0 {
+            return Err("Host needs 1 or more maxClients".into());
         }
         if self.simulation.record_wire {
             return Err("The host does not retain wire records; set recordWire to false".into());

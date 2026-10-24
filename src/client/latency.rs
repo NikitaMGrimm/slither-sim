@@ -6,6 +6,16 @@
 //! their own reply time.
 use serde::{Deserialize, Serialize};
 
+/// `Random::unit` is a multiple of 2^-53 below 1, so `1 - unit` is at least
+/// 2^-53: an exponential draw is at most 53 ln 2 (about 36.7) times its mean,
+/// and a Box-Muller normal at most the square root of twice that (about 8.57).
+fn max_exponential() -> f64 {
+    53. * std::f64::consts::LN_2
+}
+fn max_normal() -> f64 {
+    (2. * max_exponential()).sqrt()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 pub struct LatencyConfig {
@@ -65,9 +75,9 @@ impl LatencyConfig {
             .round_trip_seconds
             .iter()
             .chain([&self.jitter_seconds, &self.processing_jitter_seconds])
-            .any(|v| !v.is_finite() || !(0. ..=2.).contains(v))
+            .any(|v| !v.is_finite() || *v < 0.)
         {
-            return Err("Latency must be 0 to 2 seconds".into());
+            return Err("Latency must be finite and nonnegative".into());
         }
         let weights = &self.round_trip_weights;
         let total: f64 = weights.iter().sum();
@@ -79,17 +89,32 @@ impl LatencyConfig {
         {
             return Err("Round-trip weights need one non-negative weight per round trip".into());
         }
-        if !self.round_trip_spread.is_finite() || !(0. ..=2.).contains(&self.round_trip_spread) {
-            return Err("Round-trip spread must be from 0 to 2".into());
+        if !self.round_trip_spread.is_finite() || self.round_trip_spread < 0. {
+            return Err("Round-trip spread must be finite and nonnegative".into());
         }
         if !(0. ..=1.).contains(&self.uplink_share) {
             return Err("Uplink share must be from 0 to 1".into());
         }
         let [least, most] = self.processing_seconds;
-        if !(least.is_finite() && most.is_finite() && 0. <= least && least <= most && most <= 2.) {
-            return Err("Processing needs an ordered range within 0 to 2 seconds".into());
+        if !(least.is_finite() && most.is_finite() && 0. <= least && least <= most) {
+            return Err("Processing needs an ordered finite nonnegative range".into());
         }
-        self.congestion.validate()
+        self.congestion.validate()?;
+        // Delays are added to clocks; the largest possible draw must be finite.
+        let base = self.round_trip_seconds.iter().copied().fold(0., f64::max);
+        let round_trip = base * (self.round_trip_spread * max_normal()).exp();
+        let delay = round_trip + self.congestion.extra_seconds[1] + self.jitter_seconds;
+        if !delay.is_finite() {
+            return Err(
+                "Largest delay (roundTripSeconds × exp(8.57 × roundTripSpread) + \
+                 extraSeconds + jitterSeconds) must be finite"
+                    .into(),
+            );
+        }
+        if !(most + self.processing_jitter_seconds).is_finite() {
+            return Err("processingSeconds + processingJitterSeconds must be finite".into());
+        }
+        Ok(())
     }
 }
 
@@ -124,21 +149,20 @@ impl Default for Congestion {
 }
 impl Congestion {
     fn validate(&self) -> Result<(), String> {
-        let within = |value: f64, max: f64| value.is_finite() && (0. ..=max).contains(&value);
         let [least, most] = self.extra_seconds;
-        if !within(self.rate_per_second, 1.)
-            || !within(self.duration_seconds, 10.)
-            || !within(self.follow_probability, 1.)
-            || !within(self.follow_seconds, 10.)
-            || !within(least, most)
-            || !within(most, 2.)
-            || !self.shape.is_finite()
-            || !(0.1..=100.).contains(&self.shape)
+        // Exponential draws scale their means by at most `max_exponential`.
+        let draw = |mean: f64| mean >= 0. && (mean * max_exponential()).is_finite();
+        if !draw(self.rate_per_second)
+            || !draw(self.duration_seconds)
+            || !draw(self.follow_seconds)
+            || !(0. ..=1.).contains(&self.follow_probability)
+            || !(least.is_finite() && most.is_finite() && 0. <= least && least <= most)
+            || !(self.shape.is_finite() && self.shape > 0.)
         {
             return Err(
-                "Congestion needs a rate up to 1/s, durations and follow-ups up to 10 s, \
-                a follow-up chance up to 1, ordered extra round trips up to 2 s and a \
-                shape from 0.1 to 100"
+                "Congestion needs nonnegative rate, durations and follow-ups whose largest \
+                exponential draws (36.7 × mean) are finite, a follow-up chance from 0 to 1, \
+                an ordered finite nonnegative extra round trip and a positive shape"
                     .into(),
             );
         }
@@ -206,7 +230,7 @@ impl Link {
         } else {
             0.
         };
-        let round_trip = (picked * (spread * normal).exp()).min(2.);
+        let round_trip = picked * (spread * normal).exp();
         let congestion_rate = random.exponential(config.congestion.rate_per_second);
         let [least, most] = config.processing_seconds;
         let processing = if most > least {
@@ -239,7 +263,13 @@ impl Link {
         if followed || (rate > 0. && random.unit() < 1. - (-rate * elapsed).exp()) {
             let duration = random.exponential(congestion.duration_seconds);
             let [least, most] = congestion.extra_seconds;
-            let extra = least * (1. - random.unit()).powf(-1. / congestion.shape);
+            // A small shape overflows the Pareto factor; `min` caps it at
+            // `most`, and a zero lower bound is the zero distribution.
+            let extra = if least > 0. {
+                least * (1. - random.unit()).powf(-1. / congestion.shape)
+            } else {
+                0.
+            };
             self.follow_at = None;
             self.congested_until = now + duration;
             self.congestion = extra.min(most);

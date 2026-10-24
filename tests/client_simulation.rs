@@ -469,6 +469,62 @@ fn background_slots_steer_from_their_own_frames() {
 }
 
 #[test]
+fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
+    let accept = |edit: fn(&mut SimulationConfig)| {
+        let mut config = config(1, LatencyConfig::default());
+        edit(&mut config);
+        config.validate().unwrap();
+    };
+    let reject = |edit: fn(&mut SimulationConfig), needle: &str| {
+        let mut config = config(1, LatencyConfig::default());
+        edit(&mut config);
+        let error = config.validate().unwrap_err();
+        assert!(error.contains(needle), "{error}");
+    };
+    // Snake IDs are u16, so 65536 slots fit; 128 was a policy cap.
+    accept(|c| c.agents = 65_536);
+    reject(|c| c.agents = 65_537, "u16");
+    accept(|c| c.decision_ticks = 1001);
+    reject(|c| c.decision_ticks = 0, "at least 1");
+    reject(|c| c.broadcast_ticks = 0, "at least 1");
+    // Delays have no fixed ceiling; only an unrepresentable largest draw fails.
+    accept(|c| {
+        c.latency.round_trip_seconds = vec![30.];
+        c.latency.round_trip_spread = 3.;
+        c.latency.jitter_seconds = 5.;
+        c.latency.processing_seconds = [3., 4.];
+        c.latency.processing_jitter_seconds = 3.;
+        c.latency.congestion.rate_per_second = 20.;
+        c.latency.congestion.duration_seconds = 60.;
+        c.latency.congestion.follow_seconds = 60.;
+        c.latency.congestion.extra_seconds = [0., 30.];
+        c.latency.congestion.shape = 0.01;
+    });
+    reject(
+        |c| {
+            c.latency.round_trip_seconds = vec![1.];
+            c.latency.round_trip_spread = 1000.;
+        },
+        "Largest delay",
+    );
+    reject(|c| c.latency.congestion.duration_seconds = 1e308, "36.7");
+    reject(|c| c.latency.congestion.shape = 0., "positive shape");
+    reject(|c| c.latency.round_trip_seconds = vec![-1.], "nonnegative");
+
+    let mut slow = config(2, LatencyConfig::fixed(3.));
+    slow.latency.congestion.rate_per_second = 50.;
+    slow.latency.congestion.duration_seconds = 1.;
+    slow.latency.congestion.extra_seconds = [0., 1.];
+    slow.latency.congestion.shape = 0.001;
+    let mut backend = SimulatorBackend::new(4, slow).unwrap();
+    backend.set_slot_processing_seconds(0, 3.).unwrap();
+    backend.advance_ticks((12. / DT) as usize).unwrap();
+    // A zero lower bound with a tiny shape is the zero distribution, not NaN.
+    let ping = backend.frame().unwrap().timing.ping_seconds.unwrap();
+    assert!((3. ..=3. + DT + 1e-9).contains(&ping), "{ping}");
+}
+
+#[test]
 fn unsupported_configurations_are_rejected() {
     let reject = |edit: fn(&mut SimulationConfig)| {
         let mut config = SimulationConfig::default();
