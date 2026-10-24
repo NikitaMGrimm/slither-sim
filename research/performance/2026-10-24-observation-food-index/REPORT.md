@@ -1,8 +1,8 @@
 # Observation food index, October 24, 2026
 
-Status: adopted. The food grid uses finer cells and trims its rows to the vision
-circle. A reused or persistent index was ruled out. Measured on one shared Windows
-desktop; no API change.
+Status: adopted. The food grid uses finer cells, when enough observers repay
+building them, and trims its rows to the vision circle. A reused or persistent
+index was ruled out. Measured on one shared Windows desktop; no API change.
 
 ## Question
 
@@ -24,23 +24,31 @@ observer.
 - A shared desktop, not an isolated host. Other applications and other agent
   sessions stayed open. Total CPU use usually read 5–18% between runs, with
   occasional spikes to about 80%. No quiet window was arranged.
-- Baseline runtime: `main` at `6a812fd`. The harness commit `0b09521` adds the
-  `official-128-step` and `official-128-bot` rows: `Config::official(128)`, 2,000
-  warmup ticks and 800 bot iterations, defined as in the
-  [borrowed-views](../2026-10-24-borrowed-views/REPORT.md) patch. Candidates sit
-  on top of it. The adopted runtime is `13a3c22`, whose sources equal the
-  measured candidate `dc8080e`. `perf_compare --base` overlays the candidate's
-  harness on the baseline. The intermediate commits are local only. v1 is the
-  adopted source without the narrow-food rule, and the other variants are in
-  `variants.diff`.
+- Baseline runtime: `main` at `6a812fd`. Later `main` commits up to `fb71ecd`
+  change no file under `src/` or `examples/` and no lockfile entry. The harness
+  commit `0b09521` adds the `official-128-step` and `official-128-bot` rows:
+  `Config::official(128)`, 2,000 warmup ticks and 800 bot iterations, defined as
+  in the [borrowed-views](../2026-10-24-borrowed-views/REPORT.md) patch.
+- Commit hashes below are the measured local commits. Rebasing onto `main` gave
+  the PR new hashes without changing `src/` or `examples/`. In the PR, the
+  harness is the `test(perf): add official-128 scenario rows` commit, and the
+  adopted runtime is its final `perf(observation)` commit. Intermediate commits
+  are local only: v1 is the first adopted form without the narrow-food and
+  observer rules, and the other variants are in `variants.diff`.
+- `perf_compare --base` overlays the candidate's harness on the baseline. The
+  `observe-sparse` baseline is `main`'s runtime built with the new
+  `perf_observation` harness.
 
 | Executable | Source | SHA-256 |
 | --- | --- | --- |
 | `perf_baseline`, baseline | `0b09521` | `d2a334309984135f7d5c87577f378aec0060dafe1d2d67cd2da1e84986f0786d` |
 | `perf_baseline`, v1 | `2923018` | `4f85e5aeb3f3f8ec6fc5c1998bd64305e439fcd3e54ebde44294b9f489446c6b` |
-| `perf_baseline`, adopted | `13a3c22` | `defc1acd706cf2a110ee896d0efd7243abb7165b352b6292aba5b1d830311c6d` |
-| `perf_observation`, baseline | `6a812fd` | `a2ed5310cd994e2f6935be88f51f1bfc4b3d2e6f81de2db4466374c505e4b109` |
-| `perf_observation`, adopted | `13a3c22` | `733f017530101ec9b2f2d19a67a4c4616ad792f3ec1c7c65b2645bdaaccc81ee` |
+| `perf_baseline`, first review round | `13a3c22` | `defc1acd706cf2a110ee896d0efd7243abb7165b352b6292aba5b1d830311c6d` |
+| `perf_baseline`, adopted | `c513291` | `e31de69be57568481b51b291ed6b4a3a63d19d6300301147261adb346a61d9e7` |
+| `perf_observation`, baseline (six fixtures) | `6a812fd` | `a2ed5310cd994e2f6935be88f51f1bfc4b3d2e6f81de2db4466374c505e4b109` |
+| `perf_observation`, baseline (seven fixtures) | `fb71ecd` and new harness | `39f761899c71af460fbbd723d4fd61da0e57a33c4c89a78b11c2a3af22ca48de` |
+| `perf_observation`, first review round | `13a3c22` | `733f017530101ec9b2f2d19a67a4c4616ad792f3ec1c7c65b2645bdaaccc81ee` |
+| `perf_observation`, adopted | `c513291` | `202cb1cbe7223fc84531b90d886ef5e834fdc817b8cd478ecbe6402c4cb93871` |
 
 After warmup, `official-128` has 128 living snakes and 23,662 pellets in a
 7,580-unit arena, and `dome-proxy-96` has 96 living snakes and 11,032 pellets in
@@ -50,7 +58,7 @@ a 2,500-unit arena. Both worlds use vision 1,500.
 
 [`phase-instrumentation.diff`](phase-instrumentation.diff) (SHA-256
 `2f3198b41e67221370471b0a62d40e2aa4420333b6d491ef032ce749caf8c09e`, applies to
-`0b09521`) adds relaxed atomic counters and `Instant` intervals to the observer.
+`0b09521` and to the PR's harness commit) adds relaxed atomic counters and `Instant` intervals to the observer.
 `perf_baseline --profile` prints them. The diff also holds the exploratory
 switches used below: `SLITHER_CELL_DIV` sets the cell divisor (2 by default), and
 `SLITHER_NO_TRIM=1` disables row trimming. Set `SLITHER_NO_TRIM=1` to reproduce
@@ -106,8 +114,12 @@ Marking was the promising lever. The adopted change is in `FoodGrid::new` and
 `Observer::visit`:
 
 - Cells are an eighth of the vision radius (187.5 units at vision 1,500), not
-  half. The existing doubling still caps the grid at `2 * food + 16` cells. Food
-  narrower than the vision radius on either axis keeps half-vision cells.
+  half, when the extra cells pay for themselves. The existing doubling still caps
+  either grid at `2 * food + 16` cells. Half-vision cells stay when food is
+  narrower than the vision radius on either axis, or when
+  `2 * observers * density * vision²` does not exceed the number of extra cells
+  the fine grid needs. Here density is placed pellets over the food bounding box;
+  see [Sparse batches with few observers](#sparse-batches-with-few-observers).
 - Each queried row scans only the columns that a chord of a circle of radius
   `vision + 1` can reach. The chord uses the row's distance from the head reduced
   by one unit, and adds one unit on each side. The margin leaves the squared chord
@@ -178,11 +190,45 @@ slower than v1 in the large worlds. Five rotating rounds of observation time
 | adopted | 0.820 | 0.918 | 0.825 | 0.884 | 0.869 |
 
 The variants were compared in separate sessions against their own baselines, so
-compare within a column only roughly. The adopted form is v1 plus a build-time
-rule: food narrower than the vision radius on either axis keeps half-vision cells.
-The marking loop is identical to v1's. The rule fixes `observe-strip`'s build
-cost but not the per-row chord cost in `observe-strip` and `observe-wide`; see
-the results.
+compare within a column only roughly. The adopted form is v1 plus build-time
+rules. The first, that food narrower than the vision radius on either axis keeps
+half-vision cells, fixes `observe-strip`'s build cost but not the per-row chord
+cost in `observe-strip` and `observe-wide`; see the results. The second came out
+of independent review and is described next. The marking loop is identical to
+v1's.
+
+### Sparse batches with few observers
+
+Independent review of the first adopted form found a regression the fixtures had
+missed: 8 living snakes at the origin, vision 1,500, and 262,144 pellets on a
+512×512 lattice over x, y = ±65,625. Refining grows the grid from 30,976 to
+491,401 cells, still under the cap. The reviewer measured batches 1.996 → 2.655 ms
+(median ratio 1.33, range 1.28–1.37, slower in all 9 pairs). The case is now the
+`observe-sparse` fixture.
+
+The instrumented build splits that world (five rotating runs, per batch):
+
+| Cells, rows | Batch | Grid build | Cell pass | Prefix sums | Scatter | Marking | Candidates / visible |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| vision/2, full box (baseline) | 2.090 ms | 1.931 ms | 0.670 ms | 0.007 ms | 0.879 ms | 0.011 ms | 1,568 / 896 |
+| vision/2, trimmed | 2.052 ms | 1.912 ms | 0.668 ms | 0.007 ms | 0.885 ms | 0.011 ms | 1,280 / 896 |
+| vision/8, trimmed (first form) | 2.671 ms | 2.480 ms | 0.974 ms | 0.117 ms | 1.011 ms | 0.013 ms | 1,024 / 896 |
+
+The grid build grows with cells: 460,425 extra cells cost 0.55 ms, about 1.2 ns
+each, in count, prefix and scatter passes over a 2 MB `starts` array. The savings
+grow with observers times skipped candidates. Marking cost 2.0 ns (dome) to 2.6 ns
+(`official-128`) per candidate. Per observer, refining skipped 716 candidates in
+`official-128`, 1,430 in `dome-proxy-96` and 68 here. Scaled by mean bounding-box
+density times vision², those are 3.1, 1.4 and 2.0.
+
+The adopted rule refines only when the conservative savings,
+1.4 × observers × density × vision² candidates at 2 ns, exceed the extra cells at
+1.2 ns. That ratio is 2.3 cells per skipped candidate, rounded down to 2. In this
+world, eight observers repay about 550 cells against 460,425, so it keeps
+half-vision cells. `official-128` repays about 59,000 against 6,120 extra cells,
+`dome-proxy-96` about 190,000 against about 700, and `observe-dense` about 11,300
+against 3,936; all three refine. In `observe-wide`, the cap makes both grids
+identical. A unit test pins both outcomes for this lattice (8 and 8,192 observers).
 
 ## Method
 
@@ -198,11 +244,15 @@ candidate/baseline ratios, and ranges are min–max across pairs.
 [`obs_rounds.py`](obs_rounds.py) does the same in rotating order for
 `perf_observation`, with longer samples than the `perf_compare` defaults; Windows
 process noise made 0.2 s samples unreliable. [`results.json`](results.json) holds
-every measured row of the final comparisons.
+every measured row of the final comparisons, and the first review round's rows.
 
-`tools/perf_compare.py --base 6a812fd --suite full --repeats 5` then checked the
+`tools/perf_compare.py --base fb71ecd --suite full --repeats 5` then checked the
 whole `perf_baseline` catalog: full-state trace parity, step profiles and five
 alternating pairs per row.
+
+The results below are for the adopted form (`c513291`), measured after the
+review. The first review round's form (`13a3c22`, without the observer rule)
+measured within a few points of it in the large worlds.
 
 ## Results
 
@@ -210,94 +260,106 @@ Step plus observation (timing mode), in ms per operation:
 
 | World | Batch | Baseline | Adopted | Ratio | Pairs faster |
 | --- | --- | --- | --- | ---: | ---: |
-| `official-128` | sequential | 1.324 [1.285–1.544] | 1.134 [1.104–1.441] | 0.862 [0.835–0.991] | 9/9 |
-| `official-128` | parallel | 0.535 [0.485–0.569] | 0.475 [0.454–0.535] | 0.944 [0.835–0.984] | 9/9 |
-| `dome-proxy-96` | sequential | 1.401 [1.352–1.458] | 1.151 [1.110–1.220] | 0.821 [0.798–0.864] | 9/9 |
-| `dome-proxy-96` | parallel | 0.444 [0.437–0.492] | 0.404 [0.390–0.478] | 0.902 [0.860–1.027] | 7/9 |
-| `dome-proxy-32` | sequential | 0.345 [0.334–0.371] | 0.300 [0.295–0.338] | 0.876 [0.816–0.967] | 9/9 |
-| `dome-proxy-32` | parallel | 0.201 [0.183–0.213] | 0.185 [0.170–0.205] | 0.941 [0.883–1.004] | 8/9 |
+| `official-128` | sequential | 1.319 [1.279–1.416] | 1.135 [1.091–1.193] | 0.860 [0.839–0.878] | 9/9 |
+| `official-128` | parallel | 0.535 [0.492–0.580] | 0.516 [0.471–0.536] | 0.945 [0.894–0.989] | 9/9 |
+| `dome-proxy-96` | sequential | 1.436 [1.352–1.571] | 1.162 [1.132–1.308] | 0.833 [0.793–0.858] | 9/9 |
+| `dome-proxy-96` | parallel | 0.459 [0.436–0.512] | 0.414 [0.401–0.458] | 0.902 [0.873–0.928] | 9/9 |
+| `dome-proxy-32` | sequential | 0.347 [0.336–0.625] | 0.308 [0.297–0.361] | 0.885 [0.577–0.900] | 9/9 |
+| `dome-proxy-32` | parallel | 0.196 [0.187–0.250] | 0.186 [0.173–0.261] | 0.963 [0.918–1.157] | 8/9 |
 
 `observe_all_into` and step intervals (profile mode), in ms per operation:
 
 | World | Batch | Observation: baseline → adopted | Ratio | Pairs faster | Step ratio |
 | --- | --- | --- | ---: | ---: | ---: |
-| `official-128` | sequential | 1.144 → 0.963 | 0.838 [0.826–0.900] | 9/9 | 1.006 [0.976–1.087] |
-| `official-128` | parallel | 0.319 → 0.309 | 0.953 [0.808–1.067] | 7/9 | 0.981 [0.859–1.035] |
-| `dome-proxy-96` | sequential | 1.267 → 1.040 | 0.832 [0.778–0.849] | 9/9 | 1.020 [0.943–1.055] |
-| `dome-proxy-96` | parallel | 0.347 → 0.299 | 0.885 [0.718–0.986] | 9/9 | 0.996 [0.912–1.049] |
-| `dome-proxy-32` | sequential | 0.314 → 0.280 | 0.870 [0.828–1.200] | 8/9 | 0.989 [0.906–1.533] |
-| `dome-proxy-32` | parallel | 0.159 → 0.154 | 0.968 [0.877–1.124] | 7/9 | 1.028 [0.939–1.154] |
+| `official-128` | sequential | 1.192 → 1.002 | 0.842 [0.788–0.852] | 9/9 | 1.014 [0.914–1.023] |
+| `official-128` | parallel | 0.377 → 0.359 | 0.951 [0.873–2.084] | 7/9 | 0.995 [0.953–1.207] |
+| `dome-proxy-96` | sequential | 1.361 → 1.113 | 0.813 [0.686–0.887] | 9/9 | 0.986 [0.691–1.096] |
+| `dome-proxy-96` | parallel | 0.350 → 0.320 | 0.883 [0.633–0.985] | 9/9 | 0.995 [0.889–1.030] |
+| `dome-proxy-32` | sequential | 0.330 → 0.288 | 0.870 [0.742–0.884] | 9/9 | 0.979 [0.903–1.002] |
+| `dome-proxy-32` | parallel | 0.169 → 0.156 | 0.941 [0.735–1.048] | 8/9 | 1.009 [0.913–1.019] |
 
-The parallel `official-128` observation ratio came out at 0.900, 0.916 and 0.918
-in three earlier sessions with near-identical code; 0.953 is the weakest
-measurement. The step code is unchanged, and its ratios stay near 1. Parallel
-gains are smaller because the sequential grid build is untouched and is now about
-40% of a parallel `official-128` batch.
+Some ranges include single disturbed runs (load spikes from other sessions). The
+parallel `official-128` observation ratio has varied between sessions: 0.900,
+0.916, 0.918, 0.953 and 0.951. Nine rotating rounds that compared both forms
+directly measured 0.824 and 0.828 sequentially, and 0.931 and 0.924 in
+parallel, for the adopted and first-round forms. The step code is unchanged, and
+its ratios stay near 1. Parallel gains are smaller because the sequential grid
+build is untouched and is now about 40% of a parallel `official-128` batch.
 
 Frozen `perf_observation` fixtures, 11 rotating rounds, median materialization
 per batch:
 
 | Fixture | Iterations | Baseline | Adopted | Ratio | Pairs slower |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `observe-dense` | 5,000 | 241.6 µs | 208.8 µs | 0.863 [0.824–0.915] | 0/11 |
-| `observe-compact` | 3,000 | 340.0 µs | 327.4 µs | 0.992 [0.794–1.329] | 3/11 |
-| `observe-wide` | 50,000 | 76.6 µs | 79.3 µs | 1.034 [1.011–1.659] | 11/11 |
-| `observe-strip` | 10,000 | 115.5 µs | 119.1 µs | 1.033 [0.908–1.193] | 10/11 |
-| `observe-one` | 50,000 | 6.97 µs | 7.03 µs | 1.018 [0.954–1.056] | 7/11 |
-| `observe-empty` | 100,000 | 0.08 µs | 0.08 µs | 1.020 [0.926–1.083] | 8/11 |
+| `observe-dense` | 5,000 | 252.3 µs | 223.8 µs | 0.869 [0.726–0.946] | 0/11 |
+| `observe-compact` | 3,000 | 357.1 µs | 356.9 µs | 1.008 [0.738–1.386] | 7/11 |
+| `observe-wide` | 50,000 | 78.2 µs | 81.3 µs | 1.025 [0.920–1.083] | 8/11 |
+| `observe-strip` | 10,000 | 122.0 µs | 127.6 µs | 1.040 [1.002–1.288] | 11/11 |
+| `observe-one` | 50,000 | 7.82 µs | 7.85 µs | 0.985 [0.938–1.108] | 5/11 |
+| `observe-empty` | 100,000 | 0.09 µs | 0.08 µs | 1.003 [0.895–1.092] | 6/11 |
+| `observe-sparse` | 500 | 2,235.6 µs | 2,381.0 µs | 1.019 [0.949–1.148] | 6/11 |
 
-`observe-one` and `observe-empty` never build a grid, yet they came out about 2%
-slower, in most pairs. That bias, probably from code layout or run order, is the
-floor for this comparison. `observe-wide` and `observe-strip` are about 3%
-(3 µs per batch) slower, in 11 and 10 of 11 pairs; the same cost appeared in every v1-shaped build. In both
-the chord removes almost nothing: the strip grid has a single column, and a row
-of the wide grid holds about one candidate.
+This session was noisier than the first-round one (baseline ranges up to 25%
+wide). In that earlier session, the first-round form measured `observe-wide`
+1.034 (11/11 slower) and `observe-strip` 1.033 (10/11), while `observe-one` and
+`observe-empty` (which never build a grid) came out about 2% slower. So about
+1 point of that cost is a bias floor from code layout or run order. Here, too,
+`observe-wide` and `observe-strip` are about 3% (3 µs per batch) slower; the same
+cost appeared in every v1-shaped build. In both, the chord removes almost
+nothing: the strip grid has a single column, and a row of the wide grid holds
+about one candidate. `observe-sparse` keeps half-vision cells and is neutral; the
+first-round form was 1.33 there.
 
-The full `perf_baseline` catalog (`perf_compare --base 6a812fd --suite full`, five
+The full `perf_baseline` catalog (`perf_compare --base fb71ecd --suite full`, five
 pairs per row, adopted sources) produced identical full-state traces for all 23
 rows. Median wall ratios for the rows that observe:
 
 | Row | Wall ratio | Pair range |
 | --- | ---: | ---: |
-| `observe` | 0.882 | 0.660–1.315 |
-| `sandbox-16-bot` | 0.980 | 0.843–1.009 |
-| `official-30-bot` | 0.868 | 0.856–0.892 |
-| `official-100-bot` | 0.864 | 0.823–0.905 |
-| `official-200-bot` | 0.885 | 0.860–0.903 |
-| `official-500-bot` | 0.921 | 0.904–0.929 |
-| `dome-proxy-32-bot` | 0.826 | 0.617–0.927 |
-| `dome-proxy-96-bot` | 0.863 | 0.811–0.877 |
-| `official-128-bot` | 0.864 | 0.827–0.953 |
+| `observe` | 0.889 | 0.838–0.934 |
+| `sandbox-16-bot` | 1.028 | 0.995–1.032 |
+| `official-30-bot` | 0.850 | 0.794–0.879 |
+| `official-100-bot` | 0.848 | 0.821–0.884 |
+| `official-200-bot` | 0.910 | 0.881–1.083 |
+| `official-500-bot` | 0.880 | 0.722–0.984 |
+| `dome-proxy-32-bot` | 0.878 | 0.817–0.987 |
+| `dome-proxy-96-bot` | 0.882 | 0.864–0.915 |
+| `official-128-bot` | 0.850 | 0.837–0.855 |
 
-The `-step` rows and `step-default`, `step-food`, `step-body` and `protocol`
-ranged from 0.952 to 1.020. Load spikes during the run widened some step ranges,
-for example `dome-proxy-96-step` (0.603–1.892). `portable` came out at 1.023
-(1.023–1.108) and `client-official-100` at 1.038 (0.971–1.255). Neither calls
-the batch observer. Nine longer alternating pairs on the same executables gave 0.997
-(0.971–1.013) for `portable` at 20,000 iterations and 1.000 (0.888–1.041) for
-`client-official-100` at 300 iterations.
+The other rows do not call the batch observer. Their ratios ranged from 0.952
+to 1.083, and load spikes widened some ranges, for example `official-200-step`
+(0.619–1.176). Three rows came out slower in every pair: `step-body` 1.056,
+`official-500-step` 1.083 and `sandbox-16-bot` 1.028.
+Nine longer alternating pairs on the same executables gave:
 
-Trace parity: the six `perf_observation` fixtures produce identical trace bytes
-(2-iteration traces; digests in `results.json`). Six bot rows (`official-128`,
-`dome-proxy-96`, `official-100`, `official-30`, `sandbox-16`, `dome-proxy-32`,
-each with 24 iterations, sequential and parallel) were byte-identical for v1.
-Their sequential and parallel traces matched each other apart from the report
-line's `parallel` flag.
+- `step-body` (100,000 iterations): 1.000 (0.963–1.408), 4/9 slower.
+- `official-500-step` (200): 1.023 (0.921–1.106), 7/9 slower.
+- `sandbox-16-bot` (6,000): 1.011 (0.914–1.042), 6/9 slower.
+
+In the first review round, the same rows measured 0.974–1.006, 0.961–1.006 and
+0.980–1.044. The step code is unchanged.
+
+Trace parity: the seven `perf_observation` fixtures produce identical trace bytes
+against `main` with the new harness (2-iteration traces; digests in
+`results.json`). For v1, six bot rows (`official-128`, `dome-proxy-96`,
+`official-100`, `official-30`, `sandbox-16`, `dome-proxy-32`, each with 24
+iterations, sequential and parallel) were byte-identical. Their sequential and
+parallel traces matched each other apart from the report line's `parallel` flag.
 
 ## Decision
 
-Adopted. In both target worlds, sequential observation is about 16–17% faster
-and parallel observation 5–12% faster. `dome-proxy-32-bot` and `observe-dense`
-improve 13–14%, and the step and the other `perf_baseline` rows are unchanged
-within noise. The change is a cell-size rule and a per-row chord in the existing
-grid. It needs no cache, so nothing can go stale.
+Adopted. Sequential observation is 16–19% faster in both target worlds, and
+parallel observation 5–12% faster. `dome-proxy-32-bot` and `observe-dense` improve
+13%, and the step and the other `perf_baseline` rows are unchanged within noise.
+The change is a cell-size rule and a per-row chord in the existing grid. It needs
+no cache, so nothing can go stale.
 
 The cost is about 3% (3 µs per batch) in the sparse `observe-wide` and narrow
 `observe-strip` synthetic fixtures. Every form that avoided it, by branching on
 whether to trim, gave up 3–8 points in the large worlds, and one was 10% slower
-in `dome-proxy-32-bot`. The decision rule asked for no slowdown in the
-`perf_baseline` workload set, and none was found there. The fixture cost is
-recorded here rather than hidden.
+in `dome-proxy-32-bot`. The owner accepted this cost after the first review
+round. Batches with too few observers to repay the fine grid, such as
+`observe-sparse`, keep half-vision cells.
 
 No reused or persistent food index is adopted, and none was prototyped (see
 above). In parallel batches, the sequential `FoodGrid::new` is now the largest
@@ -314,6 +376,11 @@ ones.
   instrumented runs. They explain the choices but are not timing claims.
 - Only vision-1,500 worlds were timed. Sparse worlds whose cells hit the
   `2 * food + 16` cap get coarser cells, as before, and pay the per-row chord.
+- The refinement rule uses mean density over the food bounding box. Clustered
+  food or clustered observers can make it refine when refinement does not pay
+  (or the reverse). The 1.2 ns cell cost comes from a 2 MB `starts` array, and
+  smaller grids build cells more cheaply, so the rule leans towards half-vision
+  cells.
 - Gains depend on codegen. Structurally small edits to the row loop moved
   results by several percent in either direction.
 - `transport::Session` frames and `serve` reach the same marking loop through
@@ -324,19 +391,27 @@ ones.
 ## Reproduction
 
 ```sh
-git switch --detach 0b09521
-git apply research/performance/2026-10-24-observation-food-index/phase-instrumentation.diff  # profile only
+STUDY=research/performance/2026-10-24-observation-food-index
+git show perf/observation-food-index:$STUDY/phase-instrumentation.diff > /tmp/phase-instrumentation.diff
+git switch --detach 0b09521  # or the PR's test(perf) harness commit
+git apply /tmp/phase-instrumentation.diff  # profile only
 cargo build --release --locked --example perf_baseline -j 2
 SLITHER_NO_TRIM=1 target/release/examples/perf_baseline official-128-bot 800 --profile
 ```
 
+For the `observe-sparse` phases, copy the PR's `examples/perf_observation.rs`
+into that checkout as well, print `slither_sim::observation::profile::take()` at
+exit, and build `perf_observation`.
+
 Add `--parallel` for the parallel profile. For the paired timings, build
-`perf_baseline` and `perf_observation` at `0b09521` (or `6a812fd`) and at the
-candidate, copy the executables out of the target directory, then run:
+`perf_baseline` at `0b09521` (or the PR's harness commit) and at the candidate.
+Build `perf_observation` from `main` with the PR's `examples/perf_observation.rs`
+copied in, and from the candidate. Copy the executables out of the target
+directory, then run:
 
 ```sh
 python pairs.py BASE CAND rows.jsonl 9 timing official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
 python pairs.py BASE CAND rows.jsonl 9 profile official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
-python obs_rounds.py base,adopted OBS_BASE,OBS_CAND 11 obs.jsonl observe-dense:5000,observe-wide:50000,observe-strip:10000
-uv run --locked --only-group tools python -B tools/perf_compare.py --base 6a812fd --suite full --output outputs/perf/food-index
+python obs_rounds.py base,adopted OBS_BASE,OBS_CAND 11 obs.jsonl observe-sparse:500,observe-dense:5000,observe-wide:50000,observe-strip:10000
+uv run --locked --only-group tools python -B tools/perf_compare.py --base fb71ecd --suite full --output outputs/perf/food-index
 ```

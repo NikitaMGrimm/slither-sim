@@ -17,10 +17,13 @@
 ### Performance
 
 - Batch observations (`observe_all_into`, `observe_selected_into`, transport
-  frames and `serve`) are about 16% faster sequentially and 5–12% faster on the
+  frames and `serve`) are 16–19% faster sequentially and 5–12% faster on the
   parallel pool in the 96- and 128-snake benchmark worlds. The food grid uses
   finer cells and scans only the part of each row the vision circle can reach;
-  results are unchanged. Very sparse or narrow food costs about 3% more. See the [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md).
+  results are unchanged. Batches with too few observers to repay the finer grid
+  keep the previous cells. The synthetic `observe-wide` (sparse food) and
+  `observe-strip` (narrow food) fixtures are about 3% slower. See the
+  [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md).
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 
