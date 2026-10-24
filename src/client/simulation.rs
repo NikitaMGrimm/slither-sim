@@ -185,7 +185,8 @@ impl SimulationConfig {
             .fold(0., f64::max);
         if largest > encode::MAX_RADIUS {
             return Err(format!(
-                "Protocol-19 simulation supports arena radii up to {}",
+                "Protocol-19 simulation supports arena radii up to {}, a margin inside the \
+                 ±32,550 u16 anchor coordinates",
                 encode::MAX_RADIUS
             ));
         }

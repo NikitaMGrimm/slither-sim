@@ -15,7 +15,10 @@ use std::f64::consts::{PI, TAU};
 pub(crate) const GRID_CENTER: u32 = 32550;
 pub(crate) const SECTOR_SIZE: u16 = 300;
 pub(crate) const PROTOCOL: u8 = 19;
-/// Largest radius whose rim stays inside absolute u16 anchor coordinates.
+/// Encoding-margin policy, not a derived limit. Anchors encode as u16 offset by
+/// `GRID_CENTER`, so coordinates must lie within -32,550..32,985, and every
+/// encoder rejects one outside. The 550 units left for heads and bodies near
+/// the rim are not derived: a hard-mode tick's overshoot grows with dt.
 pub(crate) const MAX_RADIUS: f64 = 32000.;
 /// A packet longer than this cannot carry a two-byte frame length prefix.
 const MAX_PACKET: usize = (32 << 8) - 1;
