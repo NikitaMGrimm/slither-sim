@@ -505,11 +505,11 @@ impl SimulatorBackend {
         let mut world = Simulator::new(seed, config.world.clone())?;
         world.food_spawn_events = Some(Vec::new());
         world.pickup_events = Some(Vec::new());
-        for slot in 0..config.agents {
-            world.add(slot.to_string(), slot, config.agents)?;
+        world.add_slots(config.agents)?;
+        for snake in &mut world.snakes {
             // Native experiments retain their synthetic ring initialization.
             // Hosted lives enter through the same admission rule as rejoins.
-            world.snakes[slot].alive = remote == 0;
+            snake.alive = remote == 0;
         }
         let mut backend = Self {
             random: Random::new(u64::from(seed) ^ 0x6c61_7465_6e63_7900),

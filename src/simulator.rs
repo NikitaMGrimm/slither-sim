@@ -508,6 +508,23 @@ impl Simulator {
         if self.snakes.iter().any(|s| s.id == id) {
             return Err("Duplicate agent id".into());
         }
+        Ok(self.push_snake(id, index, count))
+    }
+    /// Adds slots `0..count` of a ring as `add(slot.to_string(), slot, count)`
+    /// would, to a world without snakes. Those IDs are distinct, so the
+    /// duplicate scan, quadratic over a large ring, is skipped.
+    pub(crate) fn add_slots(&mut self, count: usize) -> Result<(), String> {
+        if !self.snakes.is_empty() {
+            return Err("Slots are added to a world without snakes".into());
+        }
+        for slot in 0..count {
+            self.push_snake(slot.to_string(), slot, count);
+        }
+        Ok(())
+    }
+    /// Spawns `id` at slot `index` of a ring of `count`; the caller has checked
+    /// both and that `id` is new.
+    fn push_snake(&mut self, id: String, index: usize, count: usize) -> usize {
         let a = index as f64 / count as f64 * TAU;
         let head = Point {
             x: a.cos() * self.config.radius * 0.5,
@@ -539,7 +556,7 @@ impl Simulator {
         self.death_times.push(None);
         self.joins.push(self.next_join);
         self.next_join += 1;
-        Ok(self.snakes.len() - 1)
+        self.snakes.len() - 1
     }
     pub fn death_time(&self, index: usize) -> Option<f64> {
         self.death_times.get(index).copied().flatten()
@@ -1928,5 +1945,33 @@ mod prey_index_tests {
             .collect();
         world.step(&[Some(Action::default())]).unwrap();
         assert!(world.prey.is_empty(), "{} prey left", world.prey.len());
+    }
+}
+
+#[cfg(test)]
+mod slot_tests {
+    use super::*;
+
+    #[test]
+    fn generated_slots_match_checked_adds_without_a_duplicate_scan() {
+        let mut checked = Simulator::new(3, Config::sandbox()).unwrap();
+        for slot in 0..5 {
+            checked.add(slot.to_string(), slot, 5).unwrap();
+        }
+        let mut generated = Simulator::new(3, Config::sandbox()).unwrap();
+        generated.add_slots(5).unwrap();
+        assert_eq!(
+            serde_json::to_value(&generated).unwrap(),
+            serde_json::to_value(&checked).unwrap()
+        );
+        // Caller-supplied IDs are still checked, and slots need an empty world.
+        assert_eq!(generated.add("3", 0, 1).unwrap_err(), "Duplicate agent id");
+        assert!(generated.add_slots(1).is_err());
+        // The largest protocol-19 ring is linear work: the old per-slot scan
+        // made 2.1 billion ID comparisons here.
+        let mut ring = Simulator::new(3, Config::sandbox()).unwrap();
+        ring.add_slots(65_535).unwrap();
+        assert_eq!(ring.snakes.len(), 65_535);
+        assert_eq!(ring.snakes[65_534].id, "65534");
     }
 }

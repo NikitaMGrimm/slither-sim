@@ -316,9 +316,7 @@ impl Session {
                 for index in 0..worlds {
                     let mut world =
                         Simulator::new(seed.wrapping_add(index as u32), (*config).clone())?;
-                    for slot in 0..agents {
-                        world.add(slot.to_string(), slot, agents)?;
-                    }
+                    world.add_slots(agents)?;
                     states.push(WorldState {
                         world,
                         frame: Frame::default(),
