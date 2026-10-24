@@ -92,6 +92,11 @@ impl HostConfig {
         self.world_config().map(|_| ())
     }
 
+    /// Valid settings outside measured behavior; see [`SimulationConfig::warnings`].
+    pub fn warnings(&self) -> Vec<String> {
+        self.simulation.warnings()
+    }
+
     fn world_config(&self) -> Result<SimulationConfig, String> {
         let agents = self
             .max_clients

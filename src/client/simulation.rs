@@ -184,6 +184,11 @@ impl SimulationConfig {
         }
         Ok(())
     }
+
+    /// Valid settings outside measured behavior; see [`Config::warnings`].
+    pub fn warnings(&self) -> Vec<String> {
+        self.world.warnings()
+    }
 }
 
 #[derive(Clone, Debug)]

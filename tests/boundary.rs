@@ -332,3 +332,55 @@ fn finite_large_radius_does_not_overflow_contact_checks() {
         }
     }
 }
+
+/// Slide a boosting minimum-size head with a fixed heading into the rim at a
+/// shallow angle, for ticks that keep the contact well below the steep limit.
+fn shallow_boost_slide_survives(dt: f64) -> bool {
+    use std::f64::consts::FRAC_PI_2;
+    let radius = 8000.;
+    let mut head = Point {
+        x: radius - 30.,
+        y: 0.,
+    };
+    let heading = FRAC_PI_2 - 0.6;
+    for _ in 0..30 {
+        let step = physics::BOOST_SPEED * dt;
+        let proposed = Point {
+            x: head.x + step * heading.cos(),
+            y: head.y + step * heading.sin(),
+        };
+        let (next, dead) = boundary::constrain(
+            proposed,
+            heading,
+            physics::MIN_SCALE,
+            radius,
+            BoundaryMode::Sliding,
+        );
+        if dead {
+            return false;
+        }
+        head = next;
+    }
+    true
+}
+
+#[test]
+fn sliding_steps_are_bounded_by_the_contact_lead_not_a_literal() {
+    let limit = boundary::CONTACT_LEAD * physics::MIN_SCALE / physics::BOOST_SPEED;
+    assert!((limit - 16. / 437.5).abs() < 1e-15);
+    let config = |dt, boundary_mode| Config {
+        dt,
+        boundary_mode,
+        ..Config::sandbox()
+    };
+    let below = limit * 0.999;
+    let beyond = limit * 1.001;
+    config(below, BoundaryMode::Sliding).validate().unwrap();
+    assert!(shallow_boost_slide_survives(below));
+    let error = config(limit, BoundaryMode::Sliding).validate().unwrap_err();
+    assert!(error.contains("contact"), "{error}");
+    assert!(config(beyond, BoundaryMode::Sliding).validate().is_err());
+    assert!(!shallow_boost_slide_survives(beyond));
+    // Hard boundaries kill on contact anyway, so longer steps stay valid.
+    config(0.1, BoundaryMode::Hard).validate().unwrap();
+}

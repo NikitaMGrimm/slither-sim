@@ -87,6 +87,31 @@ fn official_radius_tracks_living_snakes_but_sandbox_stays_fixed() {
 }
 
 #[test]
+fn unmeasured_physics_steps_warn_without_failing() {
+    assert!(Config::default().warnings().is_empty());
+    for dt in [0.00694, 0.00707] {
+        assert!(
+            Config {
+                dt,
+                ..Config::default()
+            }
+            .warnings()
+            .is_empty()
+        );
+    }
+    for dt in [0.001, 0.008, 0.032] {
+        let config = Config {
+            dt,
+            ..Config::default()
+        };
+        config.validate().unwrap();
+        let warnings = config.warnings();
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("~7 ms server loop"), "{}", warnings[0]);
+    }
+}
+
+#[test]
 fn food_and_prey_targets_have_no_policy_cap() {
     let config = Config {
         food_count: 100_001,

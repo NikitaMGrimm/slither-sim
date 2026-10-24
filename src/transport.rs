@@ -181,6 +181,8 @@ fn each_world<R: Send>(
 #[derive(Default)]
 pub struct Session {
     current: Option<Run>,
+    /// Warnings of the latest reset that `serve` has not printed yet.
+    unprinted: Vec<String>,
 }
 
 impl Session {
@@ -344,12 +346,17 @@ impl Session {
                 head.extend_from_slice(
                     format!(",\"decisionTicks\":{decision_ticks},\"seed\":{seed},").as_bytes(),
                 );
+                let warnings = config.warnings();
+                head.extend_from_slice(b"\"warnings\":");
+                head.extend_from_slice(&crate::json::to_vec(&warnings).expect("strings serialize"));
+                head.push(b',');
                 let result = worlds_reply(&head, &frames)?;
                 self.current = Some(Run {
                     worlds: states,
                     agents,
                     decision_ticks,
                 });
+                self.unprinted = warnings;
                 Ok(result)
             }
             Request::Step { actions } => {
@@ -415,6 +422,7 @@ impl Session {
 
 /// Serve a trusted local controller until EOF. Request errors leave the stream
 /// usable. Sessions with several worlds step them on the current rayon pool.
+/// Reset warnings also go to stderr, since stdout carries only replies.
 pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> {
     let mut session = Session::default();
     let mut line = Vec::new();
@@ -428,5 +436,8 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
         output.write_all(&session.request(request))?;
         output.write_all(b"\n")?;
         output.flush()?;
+        for warning in session.unprinted.drain(..) {
+            eprintln!("warning: {warning}");
+        }
     }
 }

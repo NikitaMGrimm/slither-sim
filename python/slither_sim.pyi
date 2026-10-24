@@ -41,7 +41,10 @@ class Session:
         decision_ticks: int = 6,
         config: dict[str, Any] | None = None,
     ) -> None:
-        """Replace the worlds like a JSON reset; raise ValueError on rejection, keeping the old ones."""
+        """Replace the worlds like a JSON reset; raise ValueError on rejection, keeping the old ones.
+
+        Each reply warning, about valid but unmeasured settings, is issued as a UserWarning.
+        """
     def step(
         self,
         headings: Buffer | Iterable[float | None],

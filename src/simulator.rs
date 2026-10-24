@@ -190,8 +190,20 @@ impl Config {
             return Err("Settings must be positive finite numbers".into());
         }
         check_ambient_rate(self.ambient_replenish_per_second, self.dt)?;
-        if self.dt > 0.032 {
-            return Err("dt must be at most 32ms".into());
+        // A slide leaves the head one contact lead behind the rim along its
+        // heading. Moving at least that far in one tick puts a head that keeps
+        // its heading on or outside the rim, which is lethal, so shallow slides
+        // of a boosting minimum-size snake would become deaths. The old 32 ms
+        // cap claimed body-radius tunneling, but collision tests are swept.
+        let lead = crate::boundary::CONTACT_LEAD * MIN_SCALE;
+        if self.boundary_mode == crate::BoundaryMode::Sliding && self.dt * BOOST_SPEED >= lead {
+            return Err(format!(
+                "With sliding boundaries dt must be below {lead} / {BOOST_SPEED} = {} s: a \
+                 boosting minimum-size snake would pass its {lead}-unit forward contact \
+                 lead in one tick and die on shallow rim contact. Use boundaryMode \"hard\" \
+                 for longer steps",
+                lead / BOOST_SPEED
+            ));
         }
         self.prey.validate()?;
         self.kiosk.validate()?;
@@ -199,6 +211,24 @@ impl Config {
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
         crate::boundary::validate(&self.radius_updates)
+    }
+
+    /// Valid settings outside measured behavior, as sentences. The command-line
+    /// tools print them to stderr when they load a config; `serve` resets also
+    /// return them.
+    pub fn warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let [low, high] = MEASURED_LOOP_SECONDS;
+        if !(low..=high).contains(&self.dt) {
+            warnings.push(format!(
+                "dt {} s differs from the measured ~7 ms server loop ({}-{} ms): contact, \
+                 pickup and event timing may differ; prey still move in fixed 7 ms substeps",
+                self.dt,
+                low * 1000.,
+                high * 1000.
+            ));
+        }
+        warnings
     }
 }
 /// Refill subtracts one attempt interval at a time from a clock below

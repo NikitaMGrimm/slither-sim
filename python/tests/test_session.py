@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import unittest
+import warnings
 
 import slither_sim
 from slither_sim import NO_ORIGIN, NONE, REASONS, Session
@@ -281,6 +282,19 @@ class ErrorTests(unittest.TestCase):
             session.frame(0)
         self.assertEqual(session.request({"op": "step", "actions": []}),
                          {"protocol": slither_sim.PROTOCOL, "error": "Reset first"})
+
+    def test_unmeasured_settings_warn_on_reset(self):
+        session = Session()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            session.reset(config={"dt": 0.01})
+            session.reset()
+        self.assertEqual(len(caught), 1)
+        self.assertIs(caught[0].category, UserWarning)
+        self.assertIn("~7 ms server loop", str(caught[0].message))
+        self.assertEqual(caught[0].filename, __file__)
+        reply = session.request({"op": "reset", "config": {"dt": 0.01}})
+        self.assertEqual(len(reply["result"]["warnings"]), 1)
 
     def test_rejected_resets_keep_the_previous_worlds(self):
         session = Session()

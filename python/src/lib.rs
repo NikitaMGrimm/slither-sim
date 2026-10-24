@@ -1,13 +1,13 @@
 //! The `slither_sim` Python extension: [`transport::Session`] in-process, with
 //! typed steps and frame columns copied into `array.array` objects.
-use pyo3::exceptions::{PyIndexError, PyOverflowError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyIndexError, PyOverflowError, PyTypeError, PyUserWarning, PyValueError};
 use pyo3::ffi;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBytes, PyDict, PyString, PyTuple};
 use serde::Deserialize;
 use slither_sim::transport;
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 
 static ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 static DUMPS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
@@ -204,6 +204,13 @@ fn dumps(py: Python<'_>, object: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
 #[derive(Deserialize)]
 struct Reply {
     error: Option<String>,
+    result: Option<ResetResult>,
+}
+
+#[derive(Deserialize)]
+struct ResetResult {
+    #[serde(default)]
+    warnings: Vec<String>,
 }
 
 /// A `slither-sim-json-v2` session of independent worlds, run in this process.
@@ -231,6 +238,8 @@ impl Session {
 
     /// Replaces the session's worlds like a JSON `reset`. Raises `ValueError`
     /// with the protocol's error text on rejection, keeping the previous worlds.
+    /// Each reply warning, about valid but unmeasured settings, is issued as a
+    /// `UserWarning`.
     #[pyo3(
         signature = (seed=None, worlds=None, agents=None, decision_ticks=None, config=None),
         text_signature = "(self, seed=1, worlds=1, agents=4, decision_ticks=6, config=None)"
@@ -263,10 +272,19 @@ impl Session {
         let inner = &mut self.inner;
         let reply = py.detach(|| inner.request(&line));
         let reply: Reply = serde_json::from_slice(&reply).expect("replies are JSON objects");
-        match reply.error {
-            Some(error) => Err(PyValueError::new_err(error)),
-            None => Ok(()),
+        if let Some(error) = reply.error {
+            return Err(PyValueError::new_err(error));
         }
+        let category = py.get_type::<PyUserWarning>();
+        for warning in reply
+            .result
+            .map(|result| result.warnings)
+            .unwrap_or_default()
+        {
+            let message = CString::new(warning).expect("warnings have no NUL");
+            PyErr::warn(py, &category, &message, 1)?;
+        }
+        Ok(())
     }
 
     /// Steps every world like a JSON `step`. `headings` and `boosts` hold

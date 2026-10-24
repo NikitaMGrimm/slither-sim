@@ -579,6 +579,7 @@ fn executable_emits_only_replies_and_exits_on_eof() {
         let result = child.wait_with_output().unwrap();
         assert!(result.status.success(), "{args:?}");
         assert!(result.stderr.is_empty());
+        assert_eq!(json_line(&in_process, 1)["result"]["warnings"], json!([]));
         let text = String::from_utf8(result.stdout).unwrap();
         assert_eq!(text.lines().count(), requests.len());
         assert!(
@@ -586,6 +587,42 @@ fn executable_emits_only_replies_and_exits_on_eof() {
             "{args:?} replies differ from in-process replies"
         );
     }
+}
+
+fn json_line(text: &str, index: usize) -> Value {
+    serde_json::from_str(text.lines().nth(index).unwrap()).unwrap()
+}
+
+#[test]
+fn reset_warnings_reach_the_reply_and_only_stderr() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let request = json!({"op":"reset","config":{"dt":0.01}});
+    let mut child = Command::new(env!("CARGO_BIN_EXE_slither-sim"))
+        .arg("serve")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(format!("{request}\n").as_bytes())
+        .unwrap();
+    let result = child.wait_with_output().unwrap();
+    assert!(result.status.success());
+    let stdout = String::from_utf8(result.stdout).unwrap();
+    assert_eq!(stdout.lines().count(), 1);
+    let warnings = json_line(&stdout, 0)["result"]["warnings"].clone();
+    assert_eq!(warnings.as_array().unwrap().len(), 1);
+    let stderr = String::from_utf8(result.stderr).unwrap();
+    assert_eq!(
+        stderr.trim_end(),
+        format!("warning: {}", warnings[0].as_str().unwrap())
+    );
 }
 
 #[test]
