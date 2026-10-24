@@ -540,11 +540,11 @@ fn invalid_prey_configuration_is_rejected() {
             ..PreyConfig::default()
         },
         PreyConfig {
-            count: 10001,
+            sprint_speed: -1.,
             ..PreyConfig::default()
         },
         PreyConfig {
-            sprint_speed: 0.,
+            flee_half_width: 0.,
             ..PreyConfig::default()
         },
         PreyConfig {
