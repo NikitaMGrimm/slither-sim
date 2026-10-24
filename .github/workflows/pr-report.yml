@@ -128,8 +128,15 @@ jobs:
       - name: Finish comparison
         shell: bash
         run: '"$PYTHON" tools/pr_report_progress.py finish --output "${{ runner.temp }}/pr-report"'
+      - name: Stop and reap collector before uploads
+        id: cleanup
+        if: always()
+        timeout-minutes: 2
+        shell: bash
+        run: '"$PYTHON" tools/pr_report_progress.py cleanup --output "${{ runner.temp }}/pr-report"'
       # The small comment artifact goes first so a slow full upload cannot cost the comment.
       - name: Upload comment data
+        if: success() && steps.cleanup.outputs.safe_to_upload == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-comment-${{ github.run_attempt }}
@@ -139,7 +146,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload results
-        if: always()
+        if: always() && steps.cleanup.outputs.safe_to_upload == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-${{ github.run_attempt }}
@@ -147,6 +154,7 @@ jobs:
             ${{ runner.temp }}/pr-report
             ${{ runner.temp }}/pr-report.collector.log
             ${{ runner.temp }}/pr-report.pid
+            ${{ runner.temp }}/pr-report.control
           if-no-files-found: error
           retention-days: 14
 

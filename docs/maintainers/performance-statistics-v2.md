@@ -53,6 +53,9 @@ uploads; neither checkpoint pauses nor clock conversion extends the deadline.
 An expired child is killed/reaped and retained as a partial attempt. A normal
 cap keeps the latest covered prefix. Unexpected sampler or binary validation
 failure invalidates affected final claims, including earlier interim claims.
+Observed executable corruption latches that failure globally and stops sampling;
+restoring the original bytes cannot restore a claim. Prior look histories remain
+diagnostic evidence.
 
 Inference looks and publication checkpoints are separate. At most the first
 three covered, complete round checkpoints produce immutable interim snapshots;

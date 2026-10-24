@@ -615,6 +615,29 @@ class Sampling(unittest.TestCase):
         self.assertEqual((rows["one"]["label"], rows["one"]["failure"], len(rows["one"]["history"])),
                          ("Unavailable", "benchmark executable changed during sampling", 1))
 
+    def test_detected_binary_corruption_latches_even_when_callback_restores_bytes(self):
+        original = self.binaries["baseline"].read_bytes()
+        normal = self.scripted({"fast": (.8, .004, None), "noisy": (1.0, .1, None)})
+        snapshots = []
+
+        def behavior(case, label, index, position):
+            value = normal(case, label, index, position)
+            if case == "noisy" and index == 8:
+                self.binaries["baseline"].write_bytes(b"corrupted")
+            return value
+
+        def checkpoint(rows, deadline):
+            snapshots.append(rows)
+            self.binaries["baseline"].write_bytes(original)
+
+        rows, output = self.run_sampler(self.workloads("fast", "noisy"), behavior, checkpoint=checkpoint)
+        self.assertEqual(len(snapshots), 1)
+        for snapshot in (snapshots[0], rows, json.loads((output / "sequential.json").read_text())):
+            for row in snapshot.values():
+                self.assertEqual((row["label"], row["termination"], row["n_used"]), ("Unavailable", "measurement_failure", 0))
+                self.assertEqual(len(row["history"]), 1)
+        self.assertFalse(any(index and index > 8 for _, index, _ in self.calls))
+
 
 if __name__ == "__main__":
     unittest.main()
