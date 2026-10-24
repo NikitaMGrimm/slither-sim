@@ -14,6 +14,26 @@ pub(crate) fn to_vec<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error>
     Ok(writer.out)
 }
 
+/// A JSON-lines reply `{"protocol":..,"result":..}` without its newline.
+pub(crate) fn reply(protocol: &str, result: &impl Serialize) -> Vec<u8> {
+    #[derive(serde::Serialize)]
+    struct Reply<'a, T> {
+        protocol: &'a str,
+        result: T,
+    }
+    to_vec(&Reply { protocol, result }).expect("replies serialize")
+}
+
+/// A JSON-lines reply `{"error":..,"protocol":..}` without its newline.
+pub(crate) fn error_reply(protocol: &str, error: &str) -> Vec<u8> {
+    #[derive(serde::Serialize)]
+    struct Failure<'a> {
+        protocol: &'a str,
+        error: &'a str,
+    }
+    to_vec(&Failure { protocol, error }).expect("errors serialize")
+}
+
 #[derive(Default)]
 struct Writer {
     out: Vec<u8>,
@@ -568,7 +588,7 @@ mod tests {
         );
     }
 
-    #[derive(Serialize)]
+    #[derive(serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     enum Shape {
         Unit,
@@ -614,7 +634,7 @@ mod tests {
         }
     }
 
-    #[derive(Serialize)]
+    #[derive(serde::Serialize)]
     struct Unordered<'a> {
         z: f64,
         y: Option<f64>,

@@ -10,8 +10,8 @@ use crate::client::{
     protocol::PROTOCOL_VERSION,
     simulation::{SimulationConfig, SimulatorBackend},
 };
-use serde::Deserialize;
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::io::{self, BufRead, Write};
 
 pub const PROTOCOL: &str = "slither-client-json-v1";
@@ -57,6 +57,18 @@ enum Request {
     Wire {},
 }
 
+/// Replies keep the sorted-key bytes of the `serde_json::Value` they were once
+/// built through; see `crate::json`.
+fn reply(result: &impl Serialize) -> Vec<u8> {
+    crate::json::reply(PROTOCOL, result)
+}
+
+#[derive(Serialize)]
+struct FrameReply {
+    backend: &'static str,
+    frame: ClientFrame,
+}
+
 enum Active {
     Simulation(Box<SimulatorBackend>),
     Network(Box<NetworkBackend>),
@@ -94,8 +106,11 @@ impl Active {
         }
     }
 
-    fn reply(&mut self) -> Result<Value, String> {
-        Ok(json!({"backend": self.name(), "frame": self.frame()?}))
+    fn reply(&mut self) -> Result<Vec<u8>, String> {
+        Ok(reply(&FrameReply {
+            backend: self.name(),
+            frame: self.frame()?,
+        }))
     }
 }
 
@@ -112,15 +127,15 @@ impl Session {
     }
 
     /// Replace the backend only after the new one is fully constructed.
-    fn replace(&mut self, mut active: Active) -> Result<Value, String> {
+    fn replace(&mut self, mut active: Active) -> Result<Vec<u8>, String> {
         let result = active.reply()?;
         self.active = Some(active);
         Ok(result)
     }
 
-    fn handle(&mut self, request: Request) -> Result<Value, String> {
+    fn handle(&mut self, request: Request) -> Result<Vec<u8>, String> {
         match request {
-            Request::Info {} => Ok(json!({
+            Request::Info {} => Ok(reply(&json!({
                 "version": env!("CARGO_PKG_VERSION"),
                 "contract": CONTRACT,
                 "wireProtocol": PROTOCOL_VERSION,
@@ -129,7 +144,7 @@ impl Session {
                 "defaultSeed": default_seed(),
                 "defaultSimulationConfig": SimulationConfig::default(),
                 "defaultNetworkConfig": NetworkConfig::default(),
-            })),
+            }))),
             Request::Simulation { seed, config } => self.replace(Active::Simulation(Box::new(
                 SimulatorBackend::new(seed, *config)?,
             ))),
@@ -159,7 +174,10 @@ impl Session {
                     backend.send_action(action)?;
                 }
                 let frame = backend.next_frame()?;
-                Ok(json!({"backend": active.name(), "frame": frame}))
+                Ok(reply(&FrameReply {
+                    backend: active.name(),
+                    frame,
+                }))
             }
             Request::Observe {} => self.active()?.reply(),
             Request::Reconnect {} => {
@@ -174,7 +192,11 @@ impl Session {
                     }
                     Active::Network(backend) => backend.drain_records(),
                 };
-                Ok(json!({"records": records}))
+                #[derive(Serialize)]
+                struct Records<T> {
+                    records: T,
+                }
+                Ok(reply(&Records { records }))
             }
         }
     }
@@ -196,10 +218,10 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
             .map_err(|error| error.to_string())
             .and_then(|request| session.handle(request));
         let reply = match result {
-            Ok(result) => json!({"protocol": PROTOCOL, "result": result}),
-            Err(error) => json!({"protocol": PROTOCOL, "error": error}),
+            Ok(reply) => reply,
+            Err(error) => crate::json::error_reply(PROTOCOL, &error),
         };
-        serde_json::to_writer(&mut output, &reply)?;
+        output.write_all(&reply)?;
         output.write_all(b"\n")?;
         output.flush()?;
     }

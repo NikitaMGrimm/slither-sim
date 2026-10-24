@@ -86,16 +86,7 @@ struct SnapshotReply<'a> {
 /// Replies keep the sorted-key bytes of the `serde_json::Value` they were once
 /// built through; see `crate::json`.
 fn reply(result: &impl Serialize) -> Vec<u8> {
-    #[derive(Serialize)]
-    struct Reply<'a, T> {
-        protocol: &'a str,
-        result: T,
-    }
-    crate::json::to_vec(&Reply {
-        protocol: PROTOCOL,
-        result,
-    })
-    .expect("transport replies serialize")
+    crate::json::reply(PROTOCOL, result)
 }
 
 struct WorldSession {
@@ -219,8 +210,7 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
             .and_then(|request| session.handle(request));
         let reply = match result {
             Ok(reply) => reply,
-            Err(error) => crate::json::to_vec(&json!({"protocol": PROTOCOL, "error": error}))
-                .expect("transport errors serialize"),
+            Err(error) => crate::json::error_reply(PROTOCOL, &error),
         };
         output.write_all(&reply)?;
         output.write_all(b"\n")?;
