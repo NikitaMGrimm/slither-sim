@@ -1,12 +1,15 @@
 //! One world's reply frame. Every snake, food item and prey that any observed slot
 //! sees appears once, in columns; each slot's view lists the rows it sees. Replies
 //! used to repeat that data per observer, which made them about ten times larger.
+//!
+//! [`Frame`] collects the columns in the fixed-width types that in-process callers
+//! and the C ABI read directly; JSON is written from them only on request.
 use crate::{
     model::{DeathEvent, DeathReason, Origin},
     observation::Sighting,
     simulator::Simulator,
 };
-use serde::Serialize;
+use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 /// Rounding steps per unit of observed coordinates, angles and speeds; every other
 /// number is exact. Protocol-19 clients receive snake and prey positions in steps
@@ -30,42 +33,158 @@ fn round(x: f64, steps: f64) -> f64 {
     }
 }
 
-/// Codes of the `food.origin` column, in `info.origins` order.
-pub(crate) const ORIGINS: [&str; 3] = ["ambient", "boost", "death"];
-fn origin_code(origin: Origin) -> u8 {
+/// Names of the `food.origin` codes, in `info.origins` order.
+pub const ORIGINS: [&str; 3] = ["ambient", "boost", "death"];
+/// `food.origin` code of food without a recorded origin; JSON prints `null`.
+pub const NO_ORIGIN: u8 = 255;
+/// Names of the `deaths.reason` codes; JSON prints the name.
+pub const REASONS: [&str; 2] = ["body", "boundary"];
+/// Row or slot index meaning none: the `self` row of a dead slot and the killer
+/// of a death without one. JSON prints `null`.
+pub const NONE: u32 = u32::MAX;
+
+fn origin_code(origin: Option<Origin>) -> u8 {
     match origin {
-        Origin::Ambient => 0,
-        Origin::Boost => 1,
-        Origin::Death => 2,
+        Some(Origin::Ambient) => 0,
+        Some(Origin::Boost) => 1,
+        Some(Origin::Death) => 2,
+        None => NO_ORIGIN,
     }
+}
+
+/// Counts and indices are `u32`: worlds hold far fewer than 2³² snakes, anchors
+/// and food items.
+fn index(i: usize) -> u32 {
+    u32::try_from(i).expect("frame indices fit in u32")
+}
+
+/// Read-only columns of one world's current frame, with the values its JSON frame
+/// prints. Column slices of a table have equal length, one element per row.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct FrameRef<'a> {
+    /// World time in seconds.
+    pub time: f64,
+    /// Ticks advanced by the request that produced this frame; 0 after reset.
+    pub ticks: u32,
+    /// Surviving snakes.
+    pub living: u32,
+    /// Arena radius around the origin.
+    pub radius: f64,
+    /// Vision radius.
+    pub vision: f64,
+    pub snakes: SnakeColumns<'a>,
+    pub food: FoodColumns<'a>,
+    pub prey: PreyColumns<'a>,
+    pub views: ViewColumns<'a>,
+    pub deaths: DeathColumns<'a>,
+}
+
+/// One row per snake that some living slot sees. Positions, headings and speeds
+/// are rounded like the JSON frame.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct SnakeColumns<'a> {
+    pub slot: &'a [u32],
+    pub x: &'a [f64],
+    pub y: &'a [f64],
+    pub heading: &'a [f64],
+    pub speed: &'a [f64],
+    pub radius: &'a [f64],
+    pub length: &'a [f64],
+    pub segments: &'a [u32],
+    pub fam: &'a [f64],
+    pub score: &'a [f64],
+    pub kills: &'a [u32],
+    /// One more entry than rows: row `r`'s anchors, head to tail, are
+    /// `body_x[body_start[r]..body_start[r + 1]]` and the same range of `body_y`.
+    pub body_start: &'a [u32],
+    pub body_x: &'a [f64],
+    pub body_y: &'a [f64],
+}
+
+/// One row per food item that some living slot sees.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct FoodColumns<'a> {
+    pub x: &'a [f64],
+    pub y: &'a [f64],
+    pub value: &'a [f64],
+    /// NaN where the item has no size; JSON prints `null`.
+    pub size: &'a [f64],
+    /// Index into [`ORIGINS`], or [`NO_ORIGIN`].
+    pub origin: &'a [u8],
+}
+
+/// One row per prey that some living slot sees.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct PreyColumns<'a> {
+    pub id: &'a [u64],
+    pub x: &'a [f64],
+    pub y: &'a [f64],
+    pub heading: &'a [f64],
+    pub target_heading: &'a [f64],
+    pub speed: &'a [f64],
+    pub size: &'a [f64],
+}
+
+/// Each slot's view in compressed sparse rows. `me` has one entry per slot: its
+/// own `snakes` row, or [`NONE`] when dead. Slot `s` sees the `snakes` rows
+/// `snakes[snakes_start[s]..snakes_start[s + 1]]`, and likewise food and prey;
+/// each `*_start` has one more entry than there are slots, and dead slots have
+/// empty ranges.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct ViewColumns<'a> {
+    pub me: &'a [u32],
+    pub snakes_start: &'a [u32],
+    pub snakes: &'a [u32],
+    pub food_start: &'a [u32],
+    pub food: &'a [u32],
+    pub prey_start: &'a [u32],
+    pub prey: &'a [u32],
+}
+
+/// One row per death during the request that produced this frame.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct DeathColumns<'a> {
+    pub time: &'a [f64],
+    pub victim: &'a [u32],
+    /// Killer slot, or [`NONE`].
+    pub killer: &'a [u32],
+    /// Index into [`REASONS`].
+    pub reason: &'a [u8],
+    /// Food items dropped.
+    pub food: &'a [u32],
 }
 
 // Fields are declared in key order, so the canonical writer never reorders them.
 
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SnakeColumns {
-    /// Row `r`'s anchors are `body_x[body_start[r]..body_start[r + 1]]`.
-    body_start: Vec<usize>,
+struct SnakeTable {
+    body_start: Vec<u32>,
     body_x: Vec<f64>,
     body_y: Vec<f64>,
     fam: Vec<f64>,
     heading: Vec<f64>,
-    kills: Vec<usize>,
+    kills: Vec<u32>,
     length: Vec<f64>,
     radius: Vec<f64>,
     score: Vec<f64>,
-    segments: Vec<usize>,
-    slot: Vec<usize>,
+    segments: Vec<u32>,
+    slot: Vec<u32>,
     speed: Vec<f64>,
     x: Vec<f64>,
     y: Vec<f64>,
 }
 
-#[derive(Default, Serialize)]
-struct FoodColumns {
-    origin: Vec<Option<u8>>,
-    size: Vec<Option<f64>>,
+#[derive(Default)]
+struct FoodTable {
+    origin: Vec<u8>,
+    size: Vec<f64>,
     value: Vec<f64>,
     x: Vec<f64>,
     y: Vec<f64>,
@@ -73,7 +192,7 @@ struct FoodColumns {
 
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PreyColumns {
+struct PreyTable {
     heading: Vec<f64>,
     id: Vec<u64>,
     size: Vec<f64>,
@@ -83,92 +202,158 @@ struct PreyColumns {
     y: Vec<f64>,
 }
 
-#[derive(Default, Serialize)]
-struct View {
-    food: Vec<usize>,
-    prey: Vec<usize>,
-    #[serde(rename = "self")]
-    me: usize,
-    snakes: Vec<usize>,
-}
-
-#[derive(Serialize)]
-struct Death {
-    food: usize,
-    killer: Option<usize>,
-    reason: DeathReason,
-    time: f64,
-    victim: usize,
-}
-
-#[derive(Serialize)]
-struct Frame<'a> {
-    deaths: &'a [Death],
-    food: &'a FoodColumns,
-    living: usize,
-    prey: &'a PreyColumns,
-    radius: f64,
-    snakes: &'a SnakeColumns,
-    ticks: usize,
-    time: f64,
-    views: &'a [Option<View>],
-    vision: f64,
-}
-
-/// Builds the frames of one world, keeping its buffers between replies.
 #[derive(Default)]
-pub(crate) struct FrameBuilder {
+struct ViewTable {
+    me: Vec<u32>,
+    snakes_start: Vec<u32>,
+    snakes: Vec<u32>,
+    food_start: Vec<u32>,
+    food: Vec<u32>,
+    prey_start: Vec<u32>,
+    prey: Vec<u32>,
+}
+
+#[derive(Default)]
+struct DeathTable {
+    food: Vec<u32>,
+    killer: Vec<u32>,
+    reason: Vec<u8>,
+    time: Vec<f64>,
+    victim: Vec<u32>,
+}
+
+/// The current frame of one world, keeping its buffers between requests.
+#[derive(Default)]
+pub(crate) struct Frame {
     sightings: Vec<Option<Sighting>>,
     marks: Vec<u64>,
     food_seen: Vec<u64>,
     /// Row of each seen food item, prey and snake; entries of unseen ones are stale.
-    food_row: Vec<usize>,
-    prey_row: Vec<usize>,
-    snake_row: Vec<usize>,
-    snakes: SnakeColumns,
-    food: FoodColumns,
-    prey: PreyColumns,
-    views: Vec<Option<View>>,
-    deaths: Vec<Death>,
+    food_row: Vec<u32>,
+    prey_row: Vec<u32>,
+    snake_row: Vec<u32>,
+    time: f64,
+    ticks: u32,
+    living: u32,
+    radius: f64,
+    vision: f64,
+    snakes: SnakeTable,
+    food: FoodTable,
+    prey: PreyTable,
+    views: ViewTable,
+    deaths: DeathTable,
 }
 
-const UNSEEN: usize = usize::MAX;
+const UNSEEN: u32 = NONE;
 
-impl FrameBuilder {
-    /// The frame of `world` after `ticks` ticks that produced `deaths`.
-    pub(crate) fn encode(
-        &mut self,
-        world: &Simulator,
-        ticks: usize,
-        deaths: &[DeathEvent],
-    ) -> Vec<u8> {
+impl Frame {
+    /// Collects the frame of `world` after `ticks` ticks that produced `deaths`.
+    pub(crate) fn collect(&mut self, world: &Simulator, ticks: usize, deaths: &[DeathEvent]) {
         world.sight_all_into(&mut self.sightings, &mut self.marks);
+        self.time = world.time;
+        self.ticks = index(ticks);
+        self.living = index(world.living());
+        self.radius = world.config.radius;
+        self.vision = world.config.vision;
         self.collect_snakes(world);
         self.collect_food(world);
         self.collect_prey(world);
         self.collect_views();
         let slot_of = |id: &str| world.snakes.iter().position(|s| s.id == id);
-        self.deaths.clear();
-        self.deaths.extend(deaths.iter().map(|death| Death {
-            food: death.food,
-            killer: death.killer.as_deref().and_then(slot_of),
-            reason: death.reason,
-            time: death.time,
-            victim: slot_of(&death.victim).expect("victims are spawned agents"),
-        }));
-        crate::json::to_vec(&Frame {
-            deaths: &self.deaths,
-            food: &self.food,
-            living: world.living(),
-            prey: &self.prey,
-            radius: world.config.radius,
-            snakes: &self.snakes,
-            ticks,
-            time: world.time,
-            views: &self.views,
-            vision: world.config.vision,
-        })
-        .expect("frames serialize")
+        let d = &mut self.deaths;
+        d.food.clear();
+        d.killer.clear();
+        d.reason.clear();
+        d.time.clear();
+        d.victim.clear();
+        for death in deaths {
+            d.food.push(index(death.food));
+            d.killer.push(
+                death
+                    .killer
+                    .as_deref()
+                    .and_then(slot_of)
+                    .map_or(NONE, index),
+            );
+            d.reason.push(match death.reason {
+                DeathReason::Body => 0,
+                DeathReason::Boundary => 1,
+            });
+            d.time.push(death.time);
+            d.victim.push(index(
+                slot_of(&death.victim).expect("victims are spawned agents"),
+            ));
+        }
+    }
+
+    /// The collected frame as one JSON object.
+    pub(crate) fn encode(&self) -> Vec<u8> {
+        crate::json::to_vec(&Encoded(self)).expect("frames serialize")
+    }
+
+    pub(crate) fn columns(&self) -> FrameRef<'_> {
+        let (s, f, p, v, d) = (
+            &self.snakes,
+            &self.food,
+            &self.prey,
+            &self.views,
+            &self.deaths,
+        );
+        FrameRef {
+            time: self.time,
+            ticks: self.ticks,
+            living: self.living,
+            radius: self.radius,
+            vision: self.vision,
+            snakes: SnakeColumns {
+                slot: &s.slot,
+                x: &s.x,
+                y: &s.y,
+                heading: &s.heading,
+                speed: &s.speed,
+                radius: &s.radius,
+                length: &s.length,
+                segments: &s.segments,
+                fam: &s.fam,
+                score: &s.score,
+                kills: &s.kills,
+                body_start: &s.body_start,
+                body_x: &s.body_x,
+                body_y: &s.body_y,
+            },
+            food: FoodColumns {
+                x: &f.x,
+                y: &f.y,
+                value: &f.value,
+                size: &f.size,
+                origin: &f.origin,
+            },
+            prey: PreyColumns {
+                id: &p.id,
+                x: &p.x,
+                y: &p.y,
+                heading: &p.heading,
+                target_heading: &p.target_heading,
+                speed: &p.speed,
+                size: &p.size,
+            },
+            views: ViewColumns {
+                me: &v.me,
+                snakes_start: &v.snakes_start,
+                snakes: &v.snakes,
+                food_start: &v.food_start,
+                food: &v.food,
+                prey_start: &v.prey_start,
+                prey: &v.prey,
+            },
+            deaths: DeathColumns {
+                time: &d.time,
+                victim: &d.victim,
+                killer: &d.killer,
+                reason: &d.reason,
+                food: &d.food,
+            },
+        }
     }
 
     fn collect_snakes(&mut self, world: &Simulator) {
@@ -209,25 +394,25 @@ impl FrameBuilder {
             if self.snake_row[slot] == UNSEEN {
                 continue;
             }
-            self.snake_row[slot] = c.slot.len();
-            c.body_start.push(c.body_x.len());
+            self.snake_row[slot] = index(c.slot.len());
+            c.body_start.push(index(c.body_x.len()));
             for p in &s.body {
                 c.body_x.push(round(p.x, POSITION_STEPS));
                 c.body_y.push(round(p.y, POSITION_STEPS));
             }
             c.fam.push(s.fam);
             c.heading.push(round(s.heading, ANGLE_STEPS));
-            c.kills.push(s.kills);
+            c.kills.push(index(s.kills));
             c.length.push(s.length);
             c.radius.push(s.radius);
             c.score.push(s.score);
-            c.segments.push(s.segments);
-            c.slot.push(slot);
+            c.segments.push(index(s.segments));
+            c.slot.push(index(slot));
             c.speed.push(round(s.speed, SPEED_STEPS));
             c.x.push(round(s.head.x, POSITION_STEPS));
             c.y.push(round(s.head.y, POSITION_STEPS));
         }
-        c.body_start.push(c.body_x.len());
+        c.body_start.push(index(c.body_x.len()));
     }
 
     fn collect_food(&mut self, world: &Simulator) {
@@ -251,9 +436,9 @@ impl FrameBuilder {
                 let i = word * 64 + bits.trailing_zeros() as usize;
                 bits &= bits - 1;
                 let f = &world.food[i];
-                self.food_row[i] = c.x.len();
-                c.origin.push(f.origin.map(origin_code));
-                c.size.push(f.size);
+                self.food_row[i] = index(c.x.len());
+                c.origin.push(origin_code(f.origin));
+                c.size.push(f.size.unwrap_or(f64::NAN));
                 c.value.push(f.value);
                 c.x.push(round(f.x, POSITION_STEPS));
                 c.y.push(round(f.y, POSITION_STEPS));
@@ -285,7 +470,7 @@ impl FrameBuilder {
             if self.prey_row[i] == UNSEEN {
                 continue;
             }
-            self.prey_row[i] = c.id.len();
+            self.prey_row[i] = index(c.id.len());
             c.heading.push(round(p.heading, ANGLE_STEPS));
             c.id.push(p.id);
             c.size.push(p.size);
@@ -297,31 +482,170 @@ impl FrameBuilder {
     }
 
     fn collect_views(&mut self) {
-        self.views.truncate(self.sightings.len());
-        self.views.resize_with(self.sightings.len(), || None);
-        for (slot, (sighting, view)) in self.sightings.iter().zip(&mut self.views).enumerate() {
-            let Some(sighting) = sighting else {
-                *view = None;
-                continue;
-            };
-            let view = view.get_or_insert_with(View::default);
-            view.me = self.snake_row[slot];
-            view.food.clear();
-            view.food
-                .extend(sighting.food.iter().map(|&i| self.food_row[i]));
-            view.prey.clear();
-            view.prey
-                .extend(sighting.prey.iter().map(|&i| self.prey_row[i]));
-            view.snakes.clear();
-            view.snakes
-                .extend(sighting.opponents.iter().map(|&i| self.snake_row[i]));
+        let v = &mut self.views;
+        for column in [
+            &mut v.me,
+            &mut v.snakes_start,
+            &mut v.snakes,
+            &mut v.food_start,
+            &mut v.food,
+            &mut v.prey_start,
+            &mut v.prey,
+        ] {
+            column.clear();
         }
+        v.snakes_start.push(0);
+        v.food_start.push(0);
+        v.prey_start.push(0);
+        for (slot, sighting) in self.sightings.iter().enumerate() {
+            if let Some(sighting) = sighting {
+                v.me.push(self.snake_row[slot]);
+                v.snakes
+                    .extend(sighting.opponents.iter().map(|&i| self.snake_row[i]));
+                v.food
+                    .extend(sighting.food.iter().map(|&i| self.food_row[i]));
+                v.prey
+                    .extend(sighting.prey.iter().map(|&i| self.prey_row[i]));
+            } else {
+                v.me.push(NONE);
+            }
+            v.snakes_start.push(index(v.snakes.len()));
+            v.food_start.push(index(v.food.len()));
+            v.prey_start.push(index(v.prey.len()));
+        }
+    }
+}
+
+/// Writes the JSON frame from the collected columns: views as nested objects and
+/// codes that mean none as `null`, exactly as before the columns existed.
+struct Encoded<'a>(&'a Frame);
+impl Serialize for Encoded<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let frame = self.0;
+        let mut out = serializer.serialize_struct("Frame", 10)?;
+        out.serialize_field("deaths", &Deaths(&frame.deaths))?;
+        out.serialize_field("food", &Food(&frame.food))?;
+        out.serialize_field("living", &frame.living)?;
+        out.serialize_field("prey", &frame.prey)?;
+        out.serialize_field("radius", &frame.radius)?;
+        out.serialize_field("snakes", &frame.snakes)?;
+        out.serialize_field("ticks", &frame.ticks)?;
+        out.serialize_field("time", &frame.time)?;
+        out.serialize_field("views", &Views(&frame.views))?;
+        out.serialize_field("vision", &frame.vision)?;
+        out.end()
+    }
+}
+
+fn some_index(i: u32) -> Option<u32> {
+    (i != NONE).then_some(i)
+}
+
+/// `[x, ..]` with each `x` mapped through `f`.
+struct Mapped<'a, T, U>(&'a [T], fn(T) -> U);
+impl<T: Copy, U: Serialize> Serialize for Mapped<'_, T, U> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(self.0.iter().map(|&x| (self.1)(x)))
+    }
+}
+
+struct Food<'a>(&'a FoodTable);
+impl Serialize for Food<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let c = self.0;
+        let mut out = serializer.serialize_struct("FoodColumns", 5)?;
+        out.serialize_field(
+            "origin",
+            &Mapped(&c.origin, |code| (code != NO_ORIGIN).then_some(code)),
+        )?;
+        out.serialize_field(
+            "size",
+            &Mapped(&c.size, |size| (!size.is_nan()).then_some(size)),
+        )?;
+        out.serialize_field("value", &c.value)?;
+        out.serialize_field("x", &c.x)?;
+        out.serialize_field("y", &c.y)?;
+        out.end()
+    }
+}
+
+#[derive(Serialize)]
+struct View<'a> {
+    food: &'a [u32],
+    prey: &'a [u32],
+    #[serde(rename = "self")]
+    me: u32,
+    snakes: &'a [u32],
+}
+
+struct Views<'a>(&'a ViewTable);
+impl Serialize for Views<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let v = self.0;
+        let range = |start: &[u32], slot: usize| start[slot] as usize..start[slot + 1] as usize;
+        serializer.collect_seq(v.me.iter().enumerate().map(|(slot, &me)| {
+            some_index(me).map(|me| View {
+                food: &v.food[range(&v.food_start, slot)],
+                prey: &v.prey[range(&v.prey_start, slot)],
+                me,
+                snakes: &v.snakes[range(&v.snakes_start, slot)],
+            })
+        }))
+    }
+}
+
+#[derive(Serialize)]
+struct Death {
+    food: u32,
+    killer: Option<u32>,
+    reason: &'static str,
+    time: f64,
+    victim: u32,
+}
+
+struct Deaths<'a>(&'a DeathTable);
+impl Serialize for Deaths<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let d = self.0;
+        serializer.collect_seq((0..d.time.len()).map(|i| Death {
+            food: d.food[i],
+            killer: some_index(d.killer[i]),
+            reason: REASONS[d.reason[i] as usize],
+            time: d.time[i],
+            victim: d.victim[i],
+        }))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::round;
+    use super::*;
+
+    #[test]
+    fn codes_meaning_none_print_null() {
+        let food = FoodTable {
+            origin: vec![NO_ORIGIN, 2],
+            size: vec![f64::NAN, 1.5],
+            value: vec![1.0, 2.0],
+            x: vec![0.0, 1.0],
+            y: vec![0.0, -1.0],
+        };
+        assert_eq!(
+            crate::json::to_vec(&Food(&food)).unwrap(),
+            br#"{"origin":[null,2],"size":[null,1.5],"value":[1.0,2.0],"x":[0.0,1.0],"y":[0.0,-1.0]}"#
+        );
+        let deaths = DeathTable {
+            food: vec![3, 0],
+            killer: vec![NONE, 4],
+            reason: vec![1, 0],
+            time: vec![0.5, 0.75],
+            victim: vec![0, 2],
+        };
+        assert_eq!(
+            crate::json::to_vec(&Deaths(&deaths)).unwrap(),
+            br#"[{"food":3,"killer":null,"reason":"boundary","time":0.5,"victim":0},{"food":0,"killer":4,"reason":"body","time":0.75,"victim":2}]"#
+        );
+    }
 
     #[test]
     fn rounding_prints_at_most_the_step_decimals() {
