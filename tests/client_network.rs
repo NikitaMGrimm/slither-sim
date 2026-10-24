@@ -335,6 +335,9 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
             .unwrap();
+        // Send each trickled byte at once, as the host does. With Nagle's
+        // algorithm, macOS holds them for delayed ACKs past the idle timeout.
+        stream.set_nodelay(true).unwrap();
         let mut socket = tungstenite::accept(stream).unwrap();
         socket.read().unwrap();
         socket.send(framed(&setup())).unwrap();
@@ -366,9 +369,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         url: format!("ws://{address}/slither"),
         handshake: Handshake::Direct,
         decision_interval_seconds: 0.015,
-        // The 70 ms first trickle must finish well inside this, and the 320 ms
-        // second one well outside it, on slow CI runners too.
-        idle_timeout_seconds: 0.2,
+        idle_timeout_seconds: 0.12,
         ..NetworkConfig::default()
     })
     .unwrap();
@@ -405,7 +406,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         }
     }
     assert!(timed_out, "trickled bytes must not bypass the idle timeout");
-    assert!(started.elapsed() < Duration::from_millis(400));
+    assert!(started.elapsed() < Duration::from_millis(300));
     assert_eq!(backend.frame().unwrap().status, ClientStatus::Disconnected);
     backend.disconnect();
     server.join().unwrap();
