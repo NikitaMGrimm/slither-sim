@@ -59,7 +59,7 @@ struct FoodGrid {
     outliers: Vec<u32>,
 }
 impl FoodGrid {
-    fn new(food: &[Food], vision: f64) -> Self {
+    fn new(food: &[Food], vision: f64, observers: usize) -> Self {
         let mut bounds: Option<Bounds> = None;
         let mut outliers = Vec::new();
         for (i, f) in food.iter().enumerate() {
@@ -71,23 +71,33 @@ impl FoodGrid {
             }
         }
         let bounds = bounds.unwrap_or(Bounds::between(Point::default(), Point::default()));
-        let cap = (2 * (food.len() - outliers.len()) + 16) as f64;
-        // Fine cells let each queried row follow the vision circle: about 1.15
-        // candidates per visible pellet in 96- and 128-snake worlds, against 1.7
-        // to 1.95 with half-radius cells and the full query box. Food narrower
-        // than the vision radius spans too few fine cells to trim and only pays
-        // for building more of them. See
-        // research/performance/2026-10-24-observation-food-index.
-        let narrow = (bounds.max.x - bounds.min.x).min(bounds.max.y - bounds.min.y) < vision;
-        let mut cell = (vision / if narrow { 2.0 } else { 8.0 }).max(1.0);
-        let (cols, rows) = loop {
-            let cols = ((bounds.max.x - bounds.min.x) / cell).floor() + 1.0;
-            let rows = ((bounds.max.y - bounds.min.y) / cell).floor() + 1.0;
+        let placed = food.len() - outliers.len();
+        let (width, height) = (bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y);
+        let cap = (2 * placed + 16) as f64;
+        let shape = |mut cell: f64| loop {
+            let cols = (width / cell).floor() + 1.0;
+            let rows = (height / cell).floor() + 1.0;
             if cols * rows <= cap {
-                break (cols as usize, rows as usize);
+                break (cell, cols, rows);
             }
             cell *= 2.0;
         };
+        let coarse = shape((vision / 2.0).max(1.0));
+        let fine = shape((vision / 8.0).max(1.0));
+        // Fine cells let each queried row follow the vision circle: about 1.15
+        // candidates per visible pellet in 96- and 128-snake worlds, against 1.7
+        // to 1.95 with half-radius cells and the full query box. Each extra cell
+        // costs about 1.2 ns to build, each skipped candidate saves about 2 ns,
+        // and an observer skips at least 1.4 candidates per vision^2 of mean food
+        // density (1.4 to 3.1 measured). Refine only when the savings, at 2 (from
+        // 2.3) cells per candidate, cover the extra cells. Food narrower than the
+        // vision radius spans too few fine cells to trim. See
+        // research/performance/2026-10-24-observation-food-index.
+        let extra = fine.1 * fine.2 - coarse.1 * coarse.2;
+        let skipped = observers as f64 * placed as f64 / (width * height) * vision * vision;
+        let refine = width.min(height) >= vision && 2.0 * skipped > extra;
+        let (cell, cols, rows) = if refine { fine } else { coarse };
+        let (cols, rows) = (cols as usize, rows as usize);
         let mut grid = Self {
             origin: bounds.min,
             cell,
@@ -169,7 +179,7 @@ impl<'a> Observer<'a> {
             food: (observers >= 8
                 && observers.saturating_mul(food) >= 1 << 15
                 && food < u32::MAX as usize)
-                .then(|| FoodGrid::new(world.food, world.vision)),
+                .then(|| FoodGrid::new(world.food, world.vision, observers)),
         });
         Self { world, index }
     }
@@ -747,6 +757,24 @@ mod tests {
             assert!(visible > 0, "case {case}");
             assert_eq!(key(&world.observe_all()), key(&single), "case {case}");
         }
+    }
+
+    /// The `observe-sparse` lattice: refining it adds about 460,000 cells, which
+    /// eight observers cannot repay but thousands can.
+    #[test]
+    fn food_grid_refines_only_when_observers_repay_the_cells() {
+        let step = 131_250.0 / 511.0;
+        let food: Vec<Food> = (0..512 * 512)
+            .map(|i| Food {
+                x: -65_625.0 + step * (i % 512) as f64,
+                y: -65_625.0 + step * (i / 512) as f64,
+                value: 1.0,
+                size: None,
+                origin: None,
+            })
+            .collect();
+        assert_eq!(super::FoodGrid::new(&food, 1500.0, 8).cell, 750.0);
+        assert_eq!(super::FoodGrid::new(&food, 1500.0, 8192).cell, 187.5);
     }
 
     #[cfg(feature = "parallel")]

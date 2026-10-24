@@ -181,7 +181,9 @@ class Comparisons(unittest.TestCase):
         source = (perf_baseline.ROOT / perf_observation_phases.HARNESS).read_text(encoding="utf-8")
         declared = re.search(r'const USAGE: &str = ".*?; CASE = ([a-z|-]+);', source)[1].split("|")
         self.assertEqual(list(perf_compare.FROZEN_OBSERVATION), declared)
-        self.assertEqual(tuple(perf_compare.FROZEN_OBSERVATION), perf_observation_phases.CASES)
+        # The pinned phase recipe predates observe-sparse.
+        phases = perf_observation_phases.CASES
+        self.assertEqual(tuple(perf_compare.FROZEN_OBSERVATION)[:len(phases)], phases)
         self.assertTrue(all(1 <= n <= 100000 for n in perf_compare.FROZEN_OBSERVATION.values()))
 
     def test_observation_cases_resolve_without_a_catalog_and_never_mix(self):

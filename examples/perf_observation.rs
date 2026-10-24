@@ -10,14 +10,15 @@
 //! report/envelope fields differ. No gameplay or telemetry fields are stripped.
 //!
 //! Source hypotheses, not measurements: compact stresses accepted output copies;
-//! wide stresses sparse visibility; strip stresses x-bin candidates rejected by y.
+//! wide stresses sparse visibility; strip stresses x-bin candidates rejected by y;
+//! sparse sets a large food grid against only eight observers.
 //! Before changing an index, independently cover circle/box boundaries (adjacent
 //! floats), negative bin boundaries, 64-bin aliasing, signed zero, tiny vision,
 //! saturated cell casts, dead slots, mask errors, and insertion-order ties. These
-//! six bounded fixtures do not establish parity for all such numerical cases.
+//! seven bounded fixtures do not establish parity for all such numerical cases.
 use serde_json::{Value, json};
 use slither_sim::{
-    Config, Observation, PickupItem, Point, Simulator, physics, profiling::WorldStats,
+    Config, Food, Observation, PickupItem, Point, Simulator, physics, profiling::WorldStats,
 };
 use std::{
     collections::BTreeMap,
@@ -29,7 +30,11 @@ use std::{
 const SEED: u32 = 7;
 const AGENTS: usize = 32;
 const ANCHORS: usize = 32;
-const USAGE: &str = "perf_observation CASE ITERATIONS [--trace]; CASE = observe-dense|observe-compact|observe-wide|observe-strip|observe-one|observe-empty; ITERATIONS = 1..100000";
+/// `observe-sparse`: living slots, and the side of its square food lattice.
+const SPARSE_LIVING: usize = 8;
+const SPARSE_SIDE: usize = 512;
+const SPARSE_HALF_SPAN: f64 = 65_625.0;
+const USAGE: &str = "perf_observation CASE ITERATIONS [--trace]; CASE = observe-dense|observe-compact|observe-wide|observe-strip|observe-one|observe-empty|observe-sparse; ITERATIONS = 1..100000";
 
 struct Args {
     case: String,
@@ -49,6 +54,7 @@ impl Args {
                     | "observe-strip"
                     | "observe-one"
                     | "observe-empty"
+                    | "observe-sparse"
             )
             || args.get(2).is_some_and(|option| option != "--trace")
         {
@@ -70,6 +76,7 @@ fn world(case: &str) -> Result<Simulator, String> {
     let (radius, food_count) = match case {
         "observe-compact" => (1000.0, 2000),
         "observe-wide" | "observe-strip" => (50_000.0, 12_000),
+        "observe-sparse" => (100_000.0, 0),
         _ => (6000.0, 12_000),
     };
     let mut config = Config {
@@ -92,6 +99,9 @@ fn world(case: &str) -> Result<Simulator, String> {
                 x: 0.0,
                 y: (slot as f64 - 15.5) * 750.0,
             };
+        }
+        if case == "observe-sparse" {
+            snake.head = Point::default();
         }
         // Keep the dense construction identical to perf_baseline::core_world.
         snake.body = (0..ANCHORS)
@@ -117,6 +127,23 @@ fn world(case: &str) -> Result<Simulator, String> {
             food.x = ((index * 37 + SEED as usize) % 151) as f64 - 75.0;
             food.y = -48_000.0 + 96_000.0 * index as f64 / (count - 1) as f64;
         }
+    }
+    if case == "observe-sparse" {
+        // SYNTHETIC: eight observers share one head, and a lattice replaces the
+        // (empty) startup food, so the grid has many cells for few observers.
+        for snake in &mut world.snakes[SPARSE_LIVING..] {
+            snake.alive = false;
+        }
+        let step = 2.0 * SPARSE_HALF_SPAN / (SPARSE_SIDE - 1) as f64;
+        world.food = (0..SPARSE_SIDE * SPARSE_SIDE)
+            .map(|i| Food {
+                x: -SPARSE_HALF_SPAN + step * (i % SPARSE_SIDE) as f64,
+                y: -SPARSE_HALF_SPAN + step * (i / SPARSE_SIDE) as f64,
+                value: 1.0,
+                size: None,
+                origin: None,
+            })
+            .collect();
     }
     // Same telemetry path as the original harness, including in timing mode.
     world.pickup_events = Some(Vec::new());
@@ -300,13 +327,14 @@ fn run() -> Result<(), String> {
                     "placement": "32 anchors at head - heading_unit * anchor_index * ANCHOR_SPACING; heading = slot / 32 * TAU + PI",
                     "anchorSpacing": physics::ANCHOR_SPACING, "fam": 0.75,
                     "massAndSpeed": "update_mass and base_speed(32); initialize_speed_state(slot, Some(0.0))",
-                    "heads": if args.case == "observe-strip" { "x=0; y=(slot-15.5)*750; retain ring heading" } else { "Simulator::add ring at radius/2" },
+                    "heads": match args.case.as_str() { "observe-strip" => "x=0; y=(slot-15.5)*750; retain ring heading", "observe-sparse" => "slots 0-7 at the origin, retaining ring heading; slots 8-31 dead", _ => "Simulator::add ring at radius/2" },
                     "compactCaveat": if args.case == "observe-compact" { Some("radial tails extend outside radius=1000; synthetic immutable observation geometry, never stepped") } else { None },
                 },
                 "maskPolicy": {"api": if masked { "observe_selected" } else { "observe_all" }, "selected": selected, "resultOrder": "stable slot order; dead/unselected entries null"},
                 "construction": {
                     "denseReference": "examples/perf_baseline.rs::core_world(observe) at 7d33ebd; dense/one/empty have identical worlds",
                     "compactOverride": if args.case == "observe-compact" { Some("SYNTHETIC: ambient_food.enabled=false before Simulator::new, retaining 2000 startup attempts to trigger index; no package default changes") } else { None },
+                    "sparseLattice": if args.case == "observe-sparse" { Some("SYNTHETIC: radius 100000 and food_count 0; then 512x512 pellets x,y = -65625 + i*131250/511 (row-major, value 1, no size or origin) replace world.food, and slots 8-31 are marked dead") } else { None },
                     "stripRemap": if args.case == "observe-strip" { Some("After seed-7 radius-50000 startup admission, remap each admitted food at insertion index i: x=((i*37+7)%151)-75; y=-48000+96000*i/(admitted_count-1). Retain values/sizes/origins/order and RNG state; no post-remap density cap.") } else { None },
                 },
                 "scalarParity": if args.trace { "canonical observation bytes checked against public scalar observe(slot), which bypasses the batch index; snapshots also check all slots" } else { "not checked in timing mode; run --trace separately" },
