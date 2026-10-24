@@ -205,6 +205,18 @@ impl Config {
                 lead / BOOST_SPEED
             ));
         }
+        // Prey advance in LOOP_SECONDS substeps, and one tick's count (the dt
+        // plus a carried clock below one substep) must fit in usize. That bound,
+        // about 1.29e17 s on 64-bit targets, also keeps a tick of boost travel,
+        // dt × BOOST_SPEED, far inside f64, so heads stay finite.
+        if (self.dt + 2.0 * LOOP_SECONDS) / LOOP_SECONDS >= usize::MAX as f64 {
+            return Err(format!(
+                "dt {} is too long: prey advance in {LOOP_SECONDS} s substeps, and one \
+                 tick's substep count must fit in usize (at most {})",
+                self.dt,
+                usize::MAX
+            ));
+        }
         self.prey.validate()?;
         self.kiosk.validate()?;
         self.death_food.validate()?;

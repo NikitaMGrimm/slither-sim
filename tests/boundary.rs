@@ -384,3 +384,29 @@ fn sliding_steps_are_bounded_by_the_contact_lead_not_a_literal() {
     // Hard boundaries kill on contact anyway, so longer steps stay valid.
     config(0.1, BoundaryMode::Hard).validate().unwrap();
 }
+
+#[test]
+fn hard_steps_are_bounded_by_representable_prey_substeps() {
+    let limit = physics::LOOP_SECONDS * usize::MAX as f64;
+    let config = |dt| Config {
+        dt,
+        boundary_mode: BoundaryMode::Hard,
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        prey: PreyConfig {
+            count: 0,
+            ..PreyConfig::default()
+        },
+        ..Config::sandbox()
+    };
+    let error = config(1e308).validate().unwrap_err();
+    assert!(error.contains("substep"), "{error}");
+    assert!(config(limit * 1.001).validate().is_err());
+    // One tick just inside the bound keeps the head finite.
+    let mut world = Simulator::new(1, config(limit * 0.999)).unwrap();
+    world.add("a", 0, 1).unwrap();
+    world.step(&[Some(Action::default())]).unwrap();
+    let head = world.snakes[0].head;
+    assert!(head.x.is_finite() && head.y.is_finite());
+    assert!(head.distance(Point::default()) > 1e19);
+}
