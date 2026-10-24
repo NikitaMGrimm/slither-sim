@@ -1,0 +1,1491 @@
+From c06bb3987173967a52a08627e3d044b0754254ba Mon Sep 17 00:00:00 2001
+From: Nikita Maximilian Grimm <github@nikitagrimm.de>
+Date: Sat, 24 Oct 2026 16:32:55 +0200
+Subject: [PATCH 1/2] feat(observation): add borrowed sight_all and
+ sight_selected views
+
+Simulator::sight_all and sight_selected fill a reusable Sightings buffer
+through Observer::visit and return a Sighted that borrows the world and
+the buffer. Each ObservationRef lists the snakes, food and prey that
+observe lists, in the same order and at full precision, without copying
+them. Observations and sightings share one batch routine, including the
+parallel path; the transport frame builder fills a Sightings too.
+---
+ CHANGELOG.md             |   6 +
+ docs/bot-api.md          |  35 +++-
+ src/lib.rs               |   1 +
+ src/observation/mod.rs   | 421 +++++++++++++++++++++++++++++++++++----
+ src/simulator.rs         |   5 +-
+ src/transport/frame.rs   |  15 +-
+ tests/observation_ref.rs | 175 ++++++++++++++++
+ 7 files changed, 610 insertions(+), 48 deletions(-)
+ create mode 100644 tests/observation_ref.rs
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index fd83eab..b2bf462 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -38,6 +38,12 @@
+   agents, a Python decision loop took 0.27 ms per step against 0.56 ms through
+   JSON requests. It shares the crate's version, as does `slither-sim-ffi`, through
+   `[workspace.package]`. See the [Python guide](docs/python.md).
++- `Simulator::sight_all` and `sight_selected` observe without copying. They fill
++  a reusable `Sightings` buffer and return a `Sighted` that borrows the world and
++  the buffer; each slot's `ObservationRef` lists the same snakes, food and prey
++  as `observe`, at full precision, and `to_observation()` copies it into an
++  `Observation` equal to `observe(slot)`. Whether skipping the copies is faster
++  depends on what a bot reads; see the [Rust library guide](docs/bot-api.md#rust-library).
+ 
+ ### Migration from slither-sim-json-v1
+ 
+diff --git a/docs/bot-api.md b/docs/bot-api.md
+index d8cb0cd..64026ef 100644
+--- a/docs/bot-api.md
++++ b/docs/bot-api.md
+@@ -163,13 +163,44 @@ buffer, which avoids most per-call allocation. On Windows, bot loops in the
+ [performance workloads](performance-workloads.md) ran 1.8–3.5× faster with
+ `observe_all_into` than with `observe_all`.
+ 
++`sight_all` gives the same views without copying them. It fills a reusable
++`Sightings` buffer and returns a `Sighted` that borrows both the world and the
++buffer. `get(slot)` is `None` for dead slots; otherwise it returns an
++`ObservationRef` whose `me()`, `opponents()`, `food()` and `prey()` borrow from
++the world at full precision, listed in the same order as in `Observation`.
++`time()`, `arena()` and `vision_radius()` complete the view, and
++`to_observation()` copies it into an owned `Observation` equal to
++`observe(slot)`. `sight_selected(&mask, &mut buffer)` takes the same masks as
++`observe_selected`. The world cannot step while a view is in use, so a view
++always describes the world it borrows:
++
++```rust
++let mut buffer = Sightings::default();
++loop {
++    let sighted = world.sight_all(&mut buffer);
++    let actions: Vec<Option<Action>> = sighted
++        .iter()
++        .map(|view| view.map(|view| decide(view.me(), view.opponents(), view.food())))
++        .collect();
++    world.step(&actions)?;
++}
++```
++
++Skipping the copies does not always make a bot faster: reading items through
++world indices costs more than reading a contiguous copy. A bot that reads every
++slot's nearest visible food and opponent head ran 14% faster with `sight_all`
++than with `observe_all_into` in a dense 96-snake arena, and 3% slower in an
++official 128-snake world, where filtering thousands of pellets dominates
++and copying them is cheap. These are the `-nearest-` [performance
++workloads](performance-workloads.md) on one thread, on Windows.
++
+ Set `default-features = false` on a path or Git dependency for the core alone:
+ no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
+ observations, JSON transport and the `basic`/`fidelity_replay` examples remain
+ available. `networking` is enabled by default and restores the full interface.
+ 
+-`Simulator::set_parallel(true)` lets `observe_all` and `observe_selected` split
+-large batches over the current [rayon](https://docs.rs/rayon) thread pool;
++`Simulator::set_parallel(true)` lets `observe_all`, `observe_selected`, their
++`_into` forms, `sight_all` and `sight_selected` split large batches over the current [rayon](https://docs.rs/rayon) thread pool;
+ results are identical. It is off by default so that worlds you already run in
+ parallel do not compete for cores; size the pool with `RAYON_NUM_THREADS` or run
+ inside `ThreadPool::install`. `transport::serve` steps a session's worlds on the
+diff --git a/src/lib.rs b/src/lib.rs
+index 53cb061..06c4d0d 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -23,6 +23,7 @@ pub mod transport;
+ pub use boundary::{BoundaryMode, RadiusUpdate};
+ pub use kiosk::KioskConfig;
+ pub use model::*;
++pub use observation::{ObservationRef, Sighted, Sightings};
+ pub use physics::{SpeedModel, SpeedState};
+ pub use prey::{Prey, PreyConfig, PreyMode};
+ pub use simulator::{
+diff --git a/src/observation/mod.rs b/src/observation/mod.rs
+index b3cec45..50e91a5 100644
+--- a/src/observation/mod.rs
++++ b/src/observation/mod.rs
+@@ -35,6 +35,12 @@ impl<'a> VisibleState<'a> {
+         Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot)?;
+         Ok(slot.expect("observed"))
+     }
++    fn arena(self) -> Arena {
++        Arena {
++            center: Point::default(),
++            radius: self.radius,
++        }
++    }
+ }
+ 
+ /// Within this coordinate range every rounding error in the queries below is
+@@ -204,10 +210,7 @@ impl<'a> Observer<'a> {
+             opponents,
+             food,
+             prey,
+-            arena: Arena {
+-                center: Point::default(),
+-                radius: w.radius,
+-            },
++            arena: w.arena(),
+             vision_radius: Some(w.vision),
+         });
+         Ok(())
+@@ -344,6 +347,13 @@ pub(crate) struct Sighting {
+     pub prey: Vec<usize>,
+     pub opponents: Vec<usize>,
+ }
++impl Sighting {
++    fn clear(&mut self) {
++        self.food.clear();
++        self.prey.clear();
++        self.opponents.clear();
++    }
++}
+ impl Sink for Sighting {
+     fn reserve_food(&mut self, count: usize) {
+         self.food.reserve(count);
+@@ -388,6 +398,140 @@ impl Sink for Copies<'_, '_> {
+         self.kept += 1;
+     }
+ }
++/// Reusable storage for [`Simulator::sight_all`] and
++/// [`Simulator::sight_selected`]: what each slot sees, as indices into world
++/// state, and scratch space for the visibility index. Its contents are reachable
++/// only through the [`Sighted`] those calls return.
++#[derive(Debug, Default)]
++pub struct Sightings {
++    pub(crate) slots: Vec<Option<Sighting>>,
++    marks: Vec<u64>,
++}
++
++/// What every slot of one world sees, borrowed from that world and a
++/// [`Sightings`] buffer. Only [`Simulator::sight_all`] and
++/// [`Simulator::sight_selected`] create it, so its indices always refer to the
++/// world it borrows.
++#[derive(Clone, Copy)]
++pub struct Sighted<'a> {
++    world: VisibleState<'a>,
++    slots: &'a [Option<Sighting>],
++}
++impl<'a> Sighted<'a> {
++    /// The view of `slot`; `None` for dead, unselected and unknown slots.
++    pub fn get(&self, slot: usize) -> Option<ObservationRef<'a>> {
++        let sighting = self.slots.get(slot)?.as_ref()?;
++        Some(ObservationRef {
++            world: self.world,
++            slot,
++            sighting,
++        })
++    }
++    /// Slots in the world, including dead and unselected ones.
++    pub fn len(&self) -> usize {
++        self.slots.len()
++    }
++    pub fn is_empty(&self) -> bool {
++        self.slots.is_empty()
++    }
++    /// [`get`](Self::get) for every slot in order.
++    pub fn iter(&self) -> impl ExactSizeIterator<Item = Option<ObservationRef<'a>>> + use<'a> {
++        let this = *self;
++        (0..this.len()).map(move |slot| this.get(slot))
++    }
++}
++
++/// One slot's view, borrowed from the world: the data of
++/// [`Simulator::observe`] at full precision, without copying it.
++#[derive(Clone, Copy)]
++pub struct ObservationRef<'a> {
++    world: VisibleState<'a>,
++    slot: usize,
++    sighting: &'a Sighting,
++}
++impl<'a> ObservationRef<'a> {
++    pub fn slot(&self) -> usize {
++        self.slot
++    }
++    pub fn me(&self) -> &'a Snake {
++        &self.world.snakes[self.slot]
++    }
++    /// Visible opponents in slot order, as in [`Observation::opponents`].
++    pub fn opponents(&self) -> Refs<'a, Snake> {
++        Refs::new(self.world.snakes, &self.sighting.opponents)
++    }
++    /// Visible food in world order, as in [`Observation::food`].
++    pub fn food(&self) -> Refs<'a, Food> {
++        Refs::new(self.world.food, &self.sighting.food)
++    }
++    /// Visible prey in world order, as in [`Observation::prey`].
++    pub fn prey(&self) -> Refs<'a, Prey> {
++        Refs::new(self.world.prey, &self.sighting.prey)
++    }
++    pub fn time(&self) -> f64 {
++        self.world.time
++    }
++    pub fn arena(&self) -> Arena {
++        self.world.arena()
++    }
++    /// Always known for world views; [`Observation::vision_radius`] is optional
++    /// only because received frames may lack it.
++    pub fn vision_radius(&self) -> f64 {
++        self.world.vision
++    }
++    /// The owned observation, equal to [`Simulator::observe`] of this slot.
++    pub fn to_observation(&self) -> Observation {
++        Observation {
++            time: self.time(),
++            me: self.me().clone(),
++            opponents: self.opponents().cloned().collect(),
++            food: self.food().cloned().collect(),
++            prey: self.prey().cloned().collect(),
++            arena: self.arena(),
++            vision_radius: Some(self.vision_radius()),
++        }
++    }
++}
++
++/// References to the world items an [`ObservationRef`] lists, in its order.
++pub struct Refs<'a, T> {
++    items: &'a [T],
++    indices: std::slice::Iter<'a, usize>,
++}
++// Derived `Clone` would require `T: Clone`; cloning only copies references.
++impl<T> Clone for Refs<'_, T> {
++    fn clone(&self) -> Self {
++        Self {
++            items: self.items,
++            indices: self.indices.clone(),
++        }
++    }
++}
++impl<'a, T> Refs<'a, T> {
++    fn new(items: &'a [T], indices: &'a [usize]) -> Self {
++        Self {
++            items,
++            indices: indices.iter(),
++        }
++    }
++}
++impl<'a, T> Iterator for Refs<'a, T> {
++    type Item = &'a T;
++    fn next(&mut self) -> Option<&'a T> {
++        self.indices.next().map(|&i| &self.items[i])
++    }
++    fn size_hint(&self) -> (usize, Option<usize>) {
++        self.indices.size_hint()
++    }
++}
++impl<T> DoubleEndedIterator for Refs<'_, T> {
++    fn next_back(&mut self) -> Option<Self::Item> {
++        self.indices.next_back().map(|&i| &self.items[i])
++    }
++}
++impl<T> ExactSizeIterator for Refs<'_, T> {}
++impl<T> std::iter::FusedIterator for Refs<'_, T> {}
++
+ impl Simulator {
+     pub fn observe(&self, index: usize) -> Result<Observation, String> {
+         VisibleState::of(self).observe(index)
+@@ -422,35 +566,110 @@ impl Simulator {
+     ) -> Result<(), String> {
+         self.observe_matching(Some(selected), observations)
+     }
+-    /// One entry per slot: what each living slot sees, by the same rules as
+-    /// [`observe_all`](Self::observe_all) but as indices into world state.
+-    /// `marks` is scratch space kept between calls.
+-    pub(crate) fn sight_all_into(
+-        &self,
+-        sightings: &mut Vec<Option<Sighting>>,
+-        marks: &mut Vec<u64>,
+-    ) {
+-        sightings.truncate(self.snakes.len());
+-        sightings.resize_with(self.snakes.len(), || None);
+-        let observer = Observer::new(VisibleState::of(self), self.living());
+-        for (i, slot) in sightings.iter_mut().enumerate() {
+-            if !self.snakes[i].alive {
+-                *slot = None;
+-                continue;
+-            }
+-            let sighting = slot.get_or_insert_with(Sighting::default);
+-            sighting.food.clear();
+-            sighting.prey.clear();
+-            sighting.opponents.clear();
+-            observer
+-                .visit(i, marks, sighting)
+-                .expect("existing slots are observable");
++    /// What every living slot sees, by the same rules as
++    /// [`observe_all`](Self::observe_all), borrowed from this world instead of
++    /// copied. `buffer` keeps its allocations between calls.
++    ///
++    /// ```
++    /// use slither_sim::{Action, Config, Simulator, Sightings};
++    ///
++    /// let mut world = Simulator::new(7, Config::official(2))?;
++    /// world.add("a", 0, 2)?;
++    /// world.add("b", 1, 2)?;
++    /// let mut buffer = Sightings::default();
++    /// for _ in 0..10 {
++    ///     let sighted = world.sight_all(&mut buffer);
++    ///     // Head for the nearest visible food.
++    ///     let actions: Vec<_> = sighted
++    ///         .iter()
++    ///         .map(|view| {
++    ///             view.map(|view| {
++    ///                 let head = view.me().head;
++    ///                 let target = view
++    ///                     .food()
++    ///                     .map(|food| food.point())
++    ///                     .min_by(|a, b| head.distance(*a).total_cmp(&head.distance(*b)))
++    ///                     .unwrap_or(head);
++    ///                 Action {
++    ///                     heading: (target.y - head.y).atan2(target.x - head.x),
++    ///                     boost: false,
++    ///                 }
++    ///             })
++    ///         })
++    ///         .collect();
++    ///     world.step(&actions)?;
++    /// }
++    /// # Ok::<(), String>(())
++    /// ```
++    ///
++    /// Views borrow the world, so it cannot step while one is in use:
++    ///
++    /// ```compile_fail
++    /// # use slither_sim::{Config, Simulator, Sightings};
++    /// # let mut world = Simulator::new(7, Config::official(1)).unwrap();
++    /// # world.add("a", 0, 1).unwrap();
++    /// let mut buffer = Sightings::default();
++    /// let view = world.sight_all(&mut buffer).get(0).unwrap();
++    /// world.step(&[None]).unwrap();
++    /// let _ = view.me();
++    /// ```
++    pub fn sight_all<'a>(&'a self, buffer: &'a mut Sightings) -> Sighted<'a> {
++        self.sight_all_into(buffer);
++        self.sighted(buffer)
++    }
++    /// [`sight_all`](Self::sight_all) for the slots
++    /// [`observe_selected`](Self::observe_selected) would observe, with the same
++    /// mask rules. An invalid mask leaves `buffer` unchanged.
++    pub fn sight_selected<'a>(
++        &'a self,
++        selected: &[bool],
++        buffer: &'a mut Sightings,
++    ) -> Result<Sighted<'a>, String> {
++        self.sight_matching(Some(selected), buffer)?;
++        Ok(self.sighted(buffer))
++    }
++    pub(crate) fn sight_all_into(&self, buffer: &mut Sightings) {
++        self.sight_matching(None, buffer)
++            .expect("sightings of existing slots cannot fail")
++    }
++    fn sighted<'a>(&'a self, buffer: &'a Sightings) -> Sighted<'a> {
++        Sighted {
++            world: VisibleState::of(self),
++            slots: &buffer.slots,
+         }
+     }
+     fn observe_matching(
+         &self,
+         selected: Option<&[bool]>,
+         observations: &mut Vec<Option<Observation>>,
++    ) -> Result<(), String> {
++        self.batch(
++            selected,
++            observations,
++            &mut Vec::new(),
++            |o, i, marks, slot| o.observe_into(i, marks, slot),
++        )
++    }
++    fn sight_matching(
++        &self,
++        selected: Option<&[bool]>,
++        buffer: &mut Sightings,
++    ) -> Result<(), String> {
++        let Sightings { slots, marks } = buffer;
++        self.batch(selected, slots, marks, |o, i, marks, slot| {
++            let sighting = slot.get_or_insert_with(Sighting::default);
++            sighting.clear();
++            o.visit(i, marks, sighting)
++        })
++    }
++    /// Fills one entry per slot: `fill` for each living, selected slot and None
++    /// for the rest. `marks` is the scratch space of the sequential path.
++    fn batch<T: Send>(
++        &self,
++        selected: Option<&[bool]>,
++        slots: &mut Vec<Option<T>>,
++        marks: &mut Vec<u64>,
++        fill: impl Fn(&Observer, usize, &mut Vec<u64>, &mut Option<T>) -> Result<(), String> + Sync,
+     ) -> Result<(), String> {
+         if selected.is_some_and(|flags| flags.len() != self.snakes.len()) {
+             return Err("One selection flag per agent slot required".into());
+@@ -461,18 +680,17 @@ impl Simulator {
+         let observers = wanted.iter().filter(|&&w| w).count();
+         // A dead-only or empty selection needs stable result slots, but no index.
+         if observers == 0 {
+-            observations.clear();
+-            observations.resize_with(self.snakes.len(), || None);
++            slots.clear();
++            slots.resize_with(self.snakes.len(), || None);
+             return Ok(());
+         }
+-        observations.truncate(self.snakes.len());
+-        observations.resize_with(self.snakes.len(), || None);
++        slots.truncate(self.snakes.len());
++        slots.resize_with(self.snakes.len(), || None);
+         let observer = Observer::new(VisibleState::of(self), observers);
+-        let observe_range = |range: Range<usize>, slots: &mut [Option<Observation>]| {
+-            let mut marks = Vec::new();
++        let fill_range = |range: Range<usize>, slots: &mut [Option<T>], marks: &mut Vec<u64>| {
+             for (i, slot) in range.zip(slots) {
+                 if wanted[i] {
+-                    observer.observe_into(i, &mut marks, slot)?;
++                    fill(&observer, i, marks, slot)?;
+                 } else {
+                     *slot = None;
+                 }
+@@ -484,12 +702,16 @@ impl Simulator {
+             let parts = crate::parallel::parts(observers / OBSERVERS_PER_TASK);
+             if parts > 1 {
+                 let ranges = crate::parallel::balanced(&wanted, parts);
+-                return crate::parallel::map_ranges(&ranges, observations, &observe_range)
++                // Each part has its own scratch space.
++                let fill_part = |range: Range<usize>, slots: &mut [Option<T>]| {
++                    fill_range(range, slots, &mut Vec::new())
++                };
++                return crate::parallel::map_ranges(&ranges, slots, &fill_part)
+                     .into_iter()
+                     .collect();
+             }
+         }
+-        observe_range(0..self.snakes.len(), observations)
++        fill_range(0..self.snakes.len(), slots, marks)
+     }
+ }
+ 
+@@ -718,4 +940,131 @@ mod tests {
+             });
+         }
+     }
++
++    /// Checks every view of `sighted` against the owned observations of the same
++    /// slots: each list item by item, then the whole observation.
++    fn check_sighted(sighted: super::Sighted, expected: &[Option<Observation>], case: usize) {
++        assert_eq!(sighted.len(), expected.len(), "case {case}");
++        assert_eq!(sighted.iter().len(), expected.len(), "case {case}");
++        assert!(sighted.get(expected.len()).is_none(), "case {case}");
++        for (slot, (view, expected)) in sighted.iter().zip(expected).enumerate() {
++            let (Some(view), Some(o)) = (view, expected) else {
++                assert_eq!(
++                    view.is_some(),
++                    expected.is_some(),
++                    "case {case} slot {slot}"
++                );
++                continue;
++            };
++            let list = |items: Vec<&dyn std::fmt::Debug>| format!("{items:?}");
++            assert_eq!(view.slot(), slot);
++            assert_eq!(format!("{:?}", view.me()), format!("{:?}", o.me));
++            assert_eq!(view.opponents().len(), o.opponents.len(), "case {case}");
++            assert_eq!(view.food().len(), o.food.len(), "case {case}");
++            assert_eq!(view.prey().len(), o.prey.len(), "case {case}");
++            assert_eq!(
++                list(view.opponents().map(|s| s as _).collect()),
++                list(o.opponents.iter().map(|s| s as _).collect()),
++                "case {case} slot {slot}"
++            );
++            assert_eq!(
++                list(view.food().map(|f| f as _).collect()),
++                list(o.food.iter().map(|f| f as _).collect()),
++                "case {case} slot {slot}"
++            );
++            assert_eq!(
++                list(view.prey().map(|p| p as _).collect()),
++                list(o.prey.iter().map(|p| p as _).collect()),
++                "case {case} slot {slot}"
++            );
++            assert_eq!(
++                format!("{:?}", view.to_observation()),
++                format!("{o:?}"),
++                "case {case} slot {slot}"
++            );
++        }
++    }
++
++    #[test]
++    fn sightings_match_observations() {
++        let mut rng = Rng(0x0bad_5eed_1234_5678);
++        let visions = [
++            1500.0,
++            300.0,
++            0.0,
++            1e-9,
++            1e5,
++            1e13,
++            f64::INFINITY,
++            f64::NAN,
++            -1.0,
++        ];
++        // Reused across worlds of every shape and slot count.
++        let mut buffer = super::Sightings::default();
++        for case in 0..400 {
++            let vision = visions[case % visions.len()];
++            let snakes = [0, 1, 2, 5, 9, 30, 60][rng.below(7)];
++            let food = [0, 1, 256, 700, 3000][rng.below(5)];
++            let world = world(&mut rng, snakes, food, vision);
++            let single: Vec<_> = (0..snakes)
++                .map(|i| world.snakes[i].alive.then(|| world.observe(i).unwrap()))
++                .collect();
++            check_sighted(world.sight_all(&mut buffer), &single, case);
++            let mask: Vec<bool> = (0..snakes).map(|_| rng.below(3) != 0).collect();
++            let selected: Vec<_> = single
++                .iter()
++                .zip(&mask)
++                .map(|(o, &m)| o.clone().filter(|_| m))
++                .collect();
++            let before = format!("{:?}", buffer.slots);
++            assert_eq!(
++                world
++                    .sight_selected(&[true; 61], &mut buffer)
++                    .err()
++                    .as_deref(),
++                Some("One selection flag per agent slot required")
++            );
++            assert_eq!(format!("{:?}", buffer.slots), before, "case {case}");
++            check_sighted(
++                world.sight_selected(&mask, &mut buffer).unwrap(),
++                &selected,
++                case,
++            );
++            let none = vec![false; snakes];
++            check_sighted(
++                world.sight_selected(&none, &mut buffer).unwrap(),
++                &vec![None; snakes],
++                case,
++            );
++        }
++    }
++
++    #[cfg(feature = "parallel")]
++    #[test]
++    fn parallel_sightings_match_sequential_observations() {
++        let pool = rayon::ThreadPoolBuilder::new()
++            .num_threads(4)
++            .build()
++            .unwrap();
++        let mut rng = Rng(0x6a09_e667_f3bc_c908);
++        let mut buffer = super::Sightings::default();
++        for case in 0..40 {
++            let vision = [1500.0, 300.0, f64::NAN, 1e13][case % 4];
++            let snakes = [16, 17, 40, 70][rng.below(4)];
++            let food = [0, 700, 3000][rng.below(3)];
++            let mut world = world(&mut rng, snakes, food, vision);
++            let all = world.observe_all();
++            let mask: Vec<bool> = (0..snakes).map(|_| rng.below(3) != 0).collect();
++            let selected = world.observe_selected(&mask).unwrap();
++            world.set_parallel(true);
++            pool.install(|| {
++                check_sighted(world.sight_all(&mut buffer), &all, case);
++                check_sighted(
++                    world.sight_selected(&mask, &mut buffer).unwrap(),
++                    &selected,
++                    case,
++                );
++            });
++        }
++    }
+ }
+diff --git a/src/simulator.rs b/src/simulator.rs
+index 1d0c1ec..1dde5c9 100644
+--- a/src/simulator.rs
++++ b/src/simulator.rs
+@@ -312,8 +312,9 @@ pub struct Simulator {
+     parallel: bool,
+ }
+ impl Simulator {
+-    /// Let `observe_all` and `observe_selected` split large batches over the
+-    /// current rayon thread pool: the global pool, sized by `RAYON_NUM_THREADS`
++    /// Let the batch observations (`observe_all`, `observe_selected`, their
++    /// `_into` forms, `sight_all` and `sight_selected`) split large batches over
++    /// the current rayon thread pool: the global pool, sized by `RAYON_NUM_THREADS`
+     /// or the core count, unless called inside `ThreadPool::install`. Results are
+     /// identical either way. Off by default, so worlds already run in parallel do
+     /// not compete for cores. Like the event buffers, this is not serialized.
+diff --git a/src/transport/frame.rs b/src/transport/frame.rs
+index 05c8b55..ce5c085 100644
+--- a/src/transport/frame.rs
++++ b/src/transport/frame.rs
+@@ -6,7 +6,7 @@
+ //! and the C ABI read directly; JSON is written from them only on request.
+ use crate::{
+     model::{DeathEvent, DeathReason, Origin},
+-    observation::Sighting,
++    observation::Sightings,
+     simulator::Simulator,
+ };
+ use serde::{Serialize, Serializer, ser::SerializeStruct};
+@@ -225,8 +225,7 @@ struct DeathTable {
+ /// The current frame of one world, keeping its buffers between requests.
+ #[derive(Default)]
+ pub(crate) struct Frame {
+-    sightings: Vec<Option<Sighting>>,
+-    marks: Vec<u64>,
++    sightings: Sightings,
+     food_seen: Vec<u64>,
+     /// Row of each seen food item, prey and snake; entries of unseen ones are stale.
+     food_row: Vec<u32>,
+@@ -249,7 +248,7 @@ const UNSEEN: u32 = NONE;
+ impl Frame {
+     /// Collects the frame of `world` after `ticks` ticks that produced `deaths`.
+     pub(crate) fn collect(&mut self, world: &Simulator, ticks: usize, deaths: &[DeathEvent]) {
+-        world.sight_all_into(&mut self.sightings, &mut self.marks);
++        world.sight_all_into(&mut self.sightings);
+         self.time = world.time;
+         self.ticks = index(ticks);
+         self.living = index(world.living());
+@@ -359,7 +358,7 @@ impl Frame {
+     fn collect_snakes(&mut self, world: &Simulator) {
+         self.snake_row.clear();
+         self.snake_row.resize(world.snakes.len(), UNSEEN);
+-        for (slot, sighting) in self.sightings.iter().enumerate() {
++        for (slot, sighting) in self.sightings.slots.iter().enumerate() {
+             if let Some(sighting) = sighting {
+                 self.snake_row[slot] = 0;
+                 for &i in &sighting.opponents {
+@@ -418,7 +417,7 @@ impl Frame {
+     fn collect_food(&mut self, world: &Simulator) {
+         self.food_seen.clear();
+         self.food_seen.resize(world.food.len().div_ceil(64), 0);
+-        for sighting in self.sightings.iter().flatten() {
++        for sighting in self.sightings.slots.iter().flatten() {
+             for &i in &sighting.food {
+                 self.food_seen[i / 64] |= 1 << (i % 64);
+             }
+@@ -449,7 +448,7 @@ impl Frame {
+     fn collect_prey(&mut self, world: &Simulator) {
+         self.prey_row.clear();
+         self.prey_row.resize(world.prey.len(), UNSEEN);
+-        for sighting in self.sightings.iter().flatten() {
++        for sighting in self.sightings.slots.iter().flatten() {
+             for &i in &sighting.prey {
+                 self.prey_row[i] = 0;
+             }
+@@ -497,7 +496,7 @@ impl Frame {
+         v.snakes_start.push(0);
+         v.food_start.push(0);
+         v.prey_start.push(0);
+-        for (slot, sighting) in self.sightings.iter().enumerate() {
++        for (slot, sighting) in self.sightings.slots.iter().enumerate() {
+             if let Some(sighting) = sighting {
+                 v.me.push(self.snake_row[slot]);
+                 v.snakes
+diff --git a/tests/observation_ref.rs b/tests/observation_ref.rs
+new file mode 100644
+index 0000000..66e26bf
+--- /dev/null
++++ b/tests/observation_ref.rs
+@@ -0,0 +1,175 @@
++//! Borrowed observations against the owned observations of the same worlds.
++use slither_sim::*;
++
++/// A crowded synthetic world: `snakes` on a ring 1,000 units out, inside a
++/// 2,000-unit arena with prey, so every slot sees many opponents.
++fn crowded(seed: u32, snakes: usize) -> Simulator {
++    let mut world = Simulator::new(
++        seed,
++        Config {
++            radius: 2000.0,
++            dynamic_radius: false,
++            prey: PreyConfig {
++                count: 40,
++                ..PreyConfig::default()
++            },
++            ..Config::official(snakes)
++        },
++    )
++    .unwrap();
++    for i in 0..snakes {
++        world.add(format!("s{i}"), i, snakes).unwrap();
++    }
++    world
++}
++
++/// Living snakes head for the center, slightly off line, and some boost, so
++/// they cross each other's bodies and die.
++fn actions(world: &Simulator, tick: usize) -> Vec<Option<Action>> {
++    world
++        .snakes
++        .iter()
++        .enumerate()
++        .map(|(i, s)| {
++            s.alive.then(|| Action {
++                heading: (-s.head.y).atan2(-s.head.x) + 0.3 * ((i + tick / 40) as f64).sin(),
++                boost: (i + tick / 25) % 4 == 0,
++            })
++        })
++        .collect()
++}
++
++#[derive(Default)]
++struct Seen {
++    views: usize,
++    dead: usize,
++    opponents: usize,
++    prey: usize,
++}
++
++/// Checks every slot of `sighted` against `observe(slot)`, list by list and as a
++/// whole, and against the batch observation of the same selection.
++fn check(world: &Simulator, sighted: Sighted, selected: Option<&[bool]>, seen: &mut Seen) {
++    let batch = match selected {
++        Some(mask) => world.observe_selected(mask).unwrap(),
++        None => world.observe_all(),
++    };
++    assert_eq!(sighted.len(), world.snakes.len());
++    assert_eq!(sighted.iter().len(), world.snakes.len());
++    assert!(sighted.get(world.snakes.len()).is_none());
++    for (slot, view) in sighted.iter().enumerate() {
++        let wanted = world.snakes[slot].alive && selected.is_none_or(|mask| mask[slot]);
++        assert_eq!(view.is_some(), wanted, "slot {slot}");
++        assert_eq!(sighted.get(slot).is_some(), wanted, "slot {slot}");
++        let Some(view) = view else {
++            seen.dead += usize::from(!world.snakes[slot].alive);
++            continue;
++        };
++        let owned = world.observe(slot).unwrap();
++        assert_eq!(view.slot(), slot);
++        assert!(std::ptr::eq(view.me(), &world.snakes[slot]));
++        assert_eq!(view.me(), &owned.me);
++        assert_eq!(view.opponents().len(), owned.opponents.len());
++        assert!(view.opponents().eq(&owned.opponents));
++        assert_eq!(view.food().len(), owned.food.len());
++        assert!(view.food().eq(&owned.food));
++        assert_eq!(view.prey().len(), owned.prey.len());
++        assert!(view.prey().eq(&owned.prey));
++        assert!(view.opponents().rev().eq(owned.opponents.iter().rev()));
++        assert_eq!(view.time(), owned.time);
++        assert_eq!(view.arena(), owned.arena);
++        assert_eq!(Some(view.vision_radius()), owned.vision_radius);
++        assert_eq!(view.to_observation(), owned);
++        assert_eq!(batch[slot].as_ref(), Some(&owned));
++        seen.views += 1;
++        seen.opponents += owned.opponents.len();
++        seen.prey += owned.prey.len();
++    }
++}
++
++/// Steps a crowded world, checking full and selected sightings through one
++/// buffer every few ticks until most snakes have died.
++fn run(world: &mut Simulator, buffer: &mut Sightings, seen: &mut Seen) {
++    for tick in 0..600 {
++        if tick % 15 == 0 {
++            check(world, world.sight_all(buffer), None, seen);
++            let mask: Vec<bool> = (0..world.snakes.len())
++                .map(|i| (i + tick) % 3 != 0)
++                .collect();
++            check(
++                world,
++                world.sight_selected(&mask, buffer).unwrap(),
++                Some(&mask),
++                seen,
++            );
++        }
++        if world.living() < 4 {
++            break;
++        }
++        world.step(&actions(world, tick)).unwrap();
++    }
++}
++
++#[test]
++fn sightings_match_observations_through_deaths() {
++    let mut buffer = Sightings::default();
++    let mut seen = Seen::default();
++    let mut world = crowded(3, 96);
++    run(&mut world, &mut buffer, &mut seen);
++    assert!(seen.dead > 0, "no deaths were observed");
++    assert!(seen.views > 1000 && seen.opponents > 10 * seen.views);
++    assert!(seen.prey > 0, "no prey were observed");
++}
++
++#[test]
++fn one_buffer_serves_worlds_of_every_size() {
++    let mut buffer = Sightings::default();
++    let mut seen = Seen::default();
++    let empty = Simulator::new(1, Config::official(1)).unwrap();
++    assert!(empty.sight_all(&mut buffer).is_empty());
++    for (seed, snakes) in [(1, 64), (2, 3), (3, 0), (4, 128), (5, 1), (6, 40)] {
++        let mut world = crowded(seed, snakes);
++        run(&mut world, &mut buffer, &mut seen);
++        check(&world, world.sight_all(&mut buffer), None, &mut seen);
++    }
++    assert!(seen.dead > 0 && seen.prey > 0);
++}
++
++#[test]
++fn selection_masks_are_validated_like_observe_selected() {
++    let world = crowded(9, 12);
++    let mut buffer = Sightings::default();
++    for mask in [vec![true; 11], vec![true; 13], Vec::new()] {
++        let expected = world.observe_selected(&mask).unwrap_err();
++        assert_eq!(expected, "One selection flag per agent slot required");
++        assert_eq!(
++            world.sight_selected(&mask, &mut buffer).err(),
++            Some(expected)
++        );
++    }
++    let mut seen = Seen::default();
++    let none = vec![false; 12];
++    check(
++        &world,
++        world.sight_selected(&none, &mut buffer).unwrap(),
++        Some(&none),
++        &mut seen,
++    );
++    assert_eq!(seen.views, 0);
++}
++
++#[cfg(feature = "parallel")]
++#[test]
++fn parallel_sightings_match_sequential_observations() {
++    let pool = rayon::ThreadPoolBuilder::new()
++        .num_threads(4)
++        .build()
++        .unwrap();
++    let mut buffer = Sightings::default();
++    let mut seen = Seen::default();
++    // `check` compares against single-slot observations, which never split.
++    let mut world = crowded(5, 128);
++    world.set_parallel(true);
++    pool.install(|| run(&mut world, &mut buffer, &mut seen));
++    assert!(seen.dead > 0 && seen.views > 1000);
++}
+-- 
+2.54.0.windows.1
+
+
+From 6d51b5fc4e6524047d3c293d234802f6433871cb Mon Sep 17 00:00:00 2001
+From: Nikita Maximilian Grimm <github@nikitagrimm.de>
+Date: Sat, 24 Oct 2026 16:32:55 +0200
+Subject: [PATCH 2/2] perf(examples): compare owned and borrowed bot reads
+
+Add official-128 scenario rows and -nearest-observe/-nearest-sight rows
+for dome-proxy-96 and official-128. After an untimed step they time a bot
+read of every living slot's nearest visible food and opponent head through
+observe_all_into or sight_all. Bases without sight_all fall back to owned
+observations so PR comparisons still build.
+---
+ CHANGELOG.md                  |   2 +
+ docs/performance-workloads.md |  22 ++-
+ examples/perf_baseline.rs     | 324 +++++++++++++++++++++++++++++-----
+ 3 files changed, 300 insertions(+), 48 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index b2bf462..2191207 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -44,6 +44,8 @@
+   as `observe`, at full precision, and `to_observation()` copies it into an
+   `Observation` equal to `observe(slot)`. Whether skipping the copies is faster
+   depends on what a bot reads; see the [Rust library guide](docs/bot-api.md#rust-library).
++  The new `-nearest-observe` and `-nearest-sight` performance workloads, and
++  `official-128` rows, compare the two.
+ 
+ ### Migration from slither-sim-json-v1
+ 
+diff --git a/docs/performance-workloads.md b/docs/performance-workloads.md
+index dd87e14..bb0e9eb 100644
+--- a/docs/performance-workloads.md
++++ b/docs/performance-workloads.md
+@@ -53,6 +53,16 @@ would. The batch observation is `observe_all_into`, or `observe_all` when
+ Before the reused buffer, `-bot` rows were defined as `step+observe_all` and
+ dropped their observations.
+ 
++Registrations with a `nearest` operation (`dome-proxy-96` and `official-128`)
++also expand into `<id>-nearest-observe` and `<id>-nearest-sight`. After an
++untimed `step`, they time what a simple bot reads each decision: every living
++slot's nearest visible food and nearest visible opponent head. The first reads
++owned observations from `observe_all_into`; the second reads borrowed views from
++`sight_all`. Both read the same values from the same scenes, so their traces
++differ only in the case name and report label. Where `perf_compare --base` builds
++the harness against a baseline without `sight_all`, the `-sight` row reads owned
++observations too. These rows do not support `--profile`.
++
+ ## Steady-state lifecycle
+ 
+ Unlike the legacy cases, which reset after any death, scenario rows measure a
+@@ -103,15 +113,17 @@ traces contain:
+ 1. An `initial` full snapshot after placement.
+ 2. One light `warmup` line per tick: actions, deaths, respawns, events, world
+    statistics and the harness RNG state. Then a `warmed` full snapshot.
+-3. One line per measured operation (`step`, `bot` or client `decision`) with its
+-   actions, deaths, respawns and a full snapshot. `-bot` lines include the
+-   observations; client lines include frames and wire records.
++3. One line per measured operation (`step`, `bot`, `nearest` or client
++   `decision`) with its actions, deaths, respawns and a full snapshot. `-bot`
++   lines include the observations; `nearest` lines include each slot's nearest
++   food and opponent head as view-order index and squared distance; client lines
++   include frames and wire records.
+ 4. An `epoch` snapshot whenever the warmed scene is restored.
+ 5. A terminal `end` record with the operation count, physics ticks and lifecycle
+    counts, followed by the usual report line. A trace without `end` is incomplete.
+ 
+-`--parallel` calls `Simulator::set_parallel(true)` on the timed world, so `observe`
+-and `-bot` rows observe on the rayon pool. It needs the default `parallel` feature
++`--parallel` calls `Simulator::set_parallel(true)` on the timed world, so `observe`,
++`-bot` and `-nearest-` rows observe on the rayon pool. It needs the default `parallel` feature
+ and adds `"parallel": true` to the report; every other trace line must match the
+ run without it. Runners and PR comparisons do not pass it.
+ 
+diff --git a/examples/perf_baseline.rs b/examples/perf_baseline.rs
+index ee4e85e..26210ed 100644
+--- a/examples/perf_baseline.rs
++++ b/examples/perf_baseline.rs
+@@ -5,7 +5,8 @@
+ //! No additional dependencies, sockets, files, or wall-clock bot processing samples.
+ use serde_json::{Value, json};
+ use slither_sim::{
+-    Action, Config, DeathEvent, DeathReason, Observation, Point, PreyConfig, Simulator, physics,
++    Action, Config, DeathEvent, DeathReason, Food, Observation, Point, PreyConfig, Simulator,
++    Snake, physics,
+     profiling::{StepProfile, WorldStats},
+     spawn,
+ };
+@@ -174,6 +175,43 @@ struct Scenario {
+     step: Operation,
+     /// `<id>-bot`: `step` then a batch observation into one reused buffer.
+     bot: Option<Operation>,
++    /// `<id>-nearest-observe` and `<id>-nearest-sight`: an untimed `step`, then a
++    /// timed bot read of every living slot's nearest visible food and opponent head
++    /// through `observe_all_into` or `sight_all`.
++    nearest: Option<Operation>,
++}
++
++/// What a scenario row times.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum Kind {
++    Step,
++    Bot,
++    Nearest(Read),
++}
++
++/// The batch observation a nearest-read row reads through.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum Read {
++    /// Owned copies, refilled in one reused buffer.
++    Observe,
++    /// Borrowed views of the world.
++    Sight,
++}
++
++impl Read {
++    fn name(self) -> &'static str {
++        match self {
++            Read::Observe => "observe",
++            Read::Sight => "sight",
++        }
++    }
++
++    fn method(self) -> &'static str {
++        match self {
++            Read::Observe => "observe_all_into",
++            Read::Sight => "sight_all",
++        }
++    }
+ }
+ 
+ /// In-process client lives on `SimulatorBackend`, timed through `step_all`.
+@@ -210,6 +248,7 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(30_000, 32, Full),
+         bot: Some(op(2000, 24, Full)),
++        nearest: None,
+     }),
+     Registration::Scenario(Scenario {
+         id: "official-30",
+@@ -222,6 +261,7 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(10_000, 32, Full),
+         bot: Some(op(800, 16, Full)),
++        nearest: None,
+     }),
+     Registration::Scenario(Scenario {
+         id: "official-100",
+@@ -234,6 +274,7 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(1000, 16, Ci),
+         bot: Some(op(150, 4, Ci)),
++        nearest: None,
+     }),
+     Registration::Scenario(Scenario {
+         id: "official-200",
+@@ -246,6 +287,7 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(300, 8, Full),
+         bot: Some(op(80, 2, Full)),
++        nearest: None,
+     }),
+     Registration::Scenario(Scenario {
+         id: "official-500",
+@@ -258,6 +300,7 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(100, 4, Full),
+         bot: Some(op(20, 1, Full)),
++        nearest: None,
+     }),
+     Registration::Scenario(Scenario {
+         id: "dome-proxy-32",
+@@ -270,6 +313,7 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(20_000, 32, Ci),
+         bot: Some(op(400, 8, Ci)),
++        nearest: None,
+     }),
+     Registration::Scenario(Scenario {
+         id: "dome-proxy-96",
+@@ -282,6 +326,20 @@ static REGISTRATIONS: &[Registration] = &[
+         epoch: EPOCH_OPERATIONS,
+         step: op(4000, 32, Full),
+         bot: Some(op(130, 2, Full)),
++        nearest: Some(op(900, 8, Full)),
++    }),
++    Registration::Scenario(Scenario {
++        id: "official-128",
++        world: World::Official(128),
++        population: 128,
++        segments: (10, 80),
++        clearance: 0.0,
++        controller: Controller::Wander,
++        warmup_ticks: 2000,
++        epoch: EPOCH_OPERATIONS,
++        step: op(7000, 16, Full),
++        bot: Some(op(800, 3, Full)),
++        nearest: Some(op(800, 8, Full)),
+     }),
+     Registration::Client(ClientScenario {
+         id: "client-official-100",
+@@ -297,7 +355,7 @@ enum Driver {
+     Legacy(Legacy),
+     Scenario {
+         scenario: &'static Scenario,
+-        bot: bool,
++        kind: Kind,
+     },
+     Client(&'static ClientScenario),
+ }
+@@ -314,8 +372,12 @@ impl Driver {
+     fn operation(self) -> &'static str {
+         match self {
+             Driver::Legacy(case) => case.operation(),
+-            Driver::Scenario { bot: false, .. } => "step",
+-            Driver::Scenario { bot: true, .. } => "step+observe",
++            Driver::Scenario { kind, .. } => match kind {
++                Kind::Step => "step",
++                Kind::Bot => "step+observe",
++                Kind::Nearest(Read::Observe) => "observe_all_into+nearest",
++                Kind::Nearest(Read::Sight) => "sight_all+nearest",
++            },
+             Driver::Client(_) => "step_all",
+         }
+     }
+@@ -324,7 +386,10 @@ impl Driver {
+         matches!(
+             self,
+             Driver::Legacy(Legacy::StepDefault | Legacy::StepFood | Legacy::StepBody)
+-                | Driver::Scenario { .. }
++                | Driver::Scenario {
++                    kind: Kind::Step | Kind::Bot,
++                    ..
++                }
+         )
+     }
+ 
+@@ -352,7 +417,7 @@ impl Driver {
+                 let (agents, config) = core_config(case.name())?;
+                 json!({"agents": agents, "config": config})
+             }
+-            Driver::Scenario { scenario, bot } => json!({
++            Driver::Scenario { scenario, kind } => json!({
+                 "world": scenario.world.definition(), "config": scenario.world.config(),
+                 "population": scenario.population,
+                 "segments": {"min": scenario.segments.0, "max": scenario.segments.1},
+@@ -365,7 +430,14 @@ impl Driver {
+                     "epochOperations": scenario.epoch,
+                 },
+                 "warmupTicks": scenario.warmup_ticks,
+-                "operation": if bot { "step+batch_observe" } else { "step" },
++                "operation": match kind {
++                    Kind::Step => "step".into(),
++                    Kind::Bot => "step+batch_observe".into(),
++                    Kind::Nearest(read) => format!(
++                        "untimed step, then {} and nearest food and opponent-head reads",
++                        read.method()
++                    ),
++                },
+             }),
+             Driver::Client(client) => json!({
+                 "world": client.world.definition(), "config": client.world.config(),
+@@ -412,7 +484,7 @@ fn catalog() -> Vec<Workload> {
+                     name: format!("{}-step", scenario.id),
+                     driver: Driver::Scenario {
+                         scenario,
+-                        bot: false,
++                        kind: Kind::Step,
+                     },
+                     operation: scenario.step,
+                 });
+@@ -421,11 +493,23 @@ fn catalog() -> Vec<Workload> {
+                         name: format!("{}-bot", scenario.id),
+                         driver: Driver::Scenario {
+                             scenario,
+-                            bot: true,
++                            kind: Kind::Bot,
+                         },
+                         operation,
+                     });
+                 }
++                for read in [Read::Observe, Read::Sight] {
++                    if let Some(operation) = scenario.nearest {
++                        workloads.push(Workload {
++                            name: format!("{}-nearest-{}", scenario.id, read.name()),
++                            driver: Driver::Scenario {
++                                scenario,
++                                kind: Kind::Nearest(read),
++                            },
++                            operation,
++                        });
++                    }
++                }
+             }
+             Registration::Client(client) => workloads.push(Workload {
+                 name: client.id.into(),
+@@ -801,6 +885,67 @@ impl ObserveAllInto for Simulator {
+     }
+ }
+ 
++/// Likewise where `Simulator::sight_all` is missing: `-nearest-sight` rows there
++/// read owned observations, as `-nearest-observe` rows do. The harness never names
++/// `Sightings`, so it still builds there.
++#[allow(dead_code)]
++trait SightAll {
++    fn sight_all<'a>(&'a self, buffer: &'a mut Vec<Option<Observation>>) -> Owned<'a>;
++}
++
++impl SightAll for Simulator {
++    fn sight_all<'a>(&'a self, buffer: &'a mut Vec<Option<Observation>>) -> Owned<'a> {
++        self.observe_all_into(buffer);
++        Owned(buffer)
++    }
++}
++
++#[allow(dead_code)]
++struct Owned<'a>(&'a [Option<Observation>]);
++
++#[allow(dead_code)]
++impl<'a> Owned<'a> {
++    fn iter(&self) -> impl Iterator<Item = Option<&'a Observation>> + use<'a> {
++        self.0.iter().map(Option::as_ref)
++    }
++}
++
++/// The `ObservationRef` accessors nearest reads use, for the fallback above.
++#[allow(dead_code)]
++trait OwnedView {
++    fn me(&self) -> &Snake;
++    fn food(&self) -> std::slice::Iter<'_, Food>;
++    fn opponents(&self) -> std::slice::Iter<'_, Snake>;
++}
++
++impl OwnedView for Observation {
++    fn me(&self) -> &Snake {
++        &self.me
++    }
++    fn food(&self) -> std::slice::Iter<'_, Food> {
++        self.food.iter()
++    }
++    fn opponents(&self) -> std::slice::Iter<'_, Snake> {
++        self.opponents.iter()
++    }
++}
++
++/// View-order index and squared distance of the point closest to `head`; the
++/// first wins ties.
++fn closest(head: Point, points: impl Iterator<Item = Point>) -> Option<(usize, f64)> {
++    let mut best: Option<(usize, f64)> = None;
++    for (i, p) in points.enumerate() {
++        let d = (p.x - head.x).powi(2) + (p.y - head.y).powi(2);
++        if best.is_none_or(|(_, b)| d < b) {
++            best = Some((i, d));
++        }
++    }
++    best
++}
++
++/// A living slot's nearest visible food and nearest visible opponent head.
++type Nearest = (Option<(usize, f64)>, Option<(usize, f64)>);
++
+ /// Clones of the world keep the setting, including epoch and reset templates.
+ fn set_parallel(world: &mut Simulator, args: &Args) {
+     #[cfg(feature = "parallel")]
+@@ -1632,9 +1777,10 @@ fn settle<T>(
+ fn run_scenario(
+     args: &Args,
+     scenario: &Scenario,
+-    bot: bool,
++    kind: Kind,
+     out: &mut impl Write,
+ ) -> Result<Value, String> {
++    let bot = kind == Kind::Bot;
+     let controller = scenario.controller;
+     let mut scene = Scene::place(scenario)?;
+     set_parallel(&mut scene.world, args);
+@@ -1685,6 +1831,9 @@ fn run_scenario(
+     let mut profile = StepProfile::default();
+     let mut observe_seconds = 0.0;
+     let mut buffer = Vec::new();
++    // Typed by whichever `sight_all` resolves; see `SightAll`.
++    let mut sightings = Default::default();
++    let mut reads: Vec<Option<Nearest>> = Vec::new();
+     for iteration in 0..args.iterations {
+         if iteration > 0 && iteration % scenario.epoch == 0 {
+             scene = template.clone();
+@@ -1697,23 +1846,58 @@ fn run_scenario(
+             }
+         }
+         let actions = controller.actions(&scene.world, tick);
+-        let observations = meter.operation(args.trace, || {
+-            scene.step(&actions, args.profile.then_some(&mut profile))?;
+-            if !bot {
+-                return Ok(None);
+-            }
+-            let started = args.profile.then(Instant::now);
+-            // Bot rows refill one buffer, as a bot loop that observes every decision would.
+-            scene.world.observe_all_into(&mut buffer);
+-            if let Some(started) = started {
+-                observe_seconds += started.elapsed().as_secs_f64();
+-            }
+-            if args.trace {
+-                return Ok(Some(buffer.clone()));
+-            }
+-            black_box(&buffer);
+-            Ok(None)
+-        })?;
++        let observations = if let Kind::Nearest(read) = kind {
++            scene.step(&actions, None)?;
++            let world = &scene.world;
++            meter.operation(args.trace, || {
++                reads.clear();
++                match read {
++                    Read::Observe => {
++                        world.observe_all_into(&mut buffer);
++                        reads.extend(buffer.iter().map(|o| {
++                            o.as_ref().map(|o| {
++                                (
++                                    closest(o.me.head, o.food.iter().map(Food::point)),
++                                    closest(o.me.head, o.opponents.iter().map(|s| s.head)),
++                                )
++                            })
++                        }));
++                    }
++                    Read::Sight => {
++                        let sighted = world.sight_all(&mut sightings);
++                        reads.extend(sighted.iter().map(|view| {
++                            view.map(|v| {
++                                (
++                                    closest(v.me().head, v.food().map(|f| f.point())),
++                                    closest(v.me().head, v.opponents().map(|s| s.head)),
++                                )
++                            })
++                        }));
++                    }
++                }
++                Ok(())
++            })?;
++            black_box(&reads);
++            None
++        } else {
++            meter.operation(args.trace, || {
++                scene.step(&actions, args.profile.then_some(&mut profile))?;
++                if !bot {
++                    return Ok(None);
++                }
++                let started = args.profile.then(Instant::now);
++                // Bot rows refill one buffer, as a bot loop that observes every decision would.
++                scene.world.observe_all_into(&mut buffer);
++                if let Some(started) = started {
++                    observe_seconds += started.elapsed().as_secs_f64();
++                }
++                if args.trace {
++                    return Ok(Some(buffer.clone()));
++                }
++                black_box(&buffer);
++                Ok(None)
++            })?
++        };
+         black_box(&scene.world);
+         tick += 1;
+         let (snapshot, boundary) = settle(&mut scene, tick, &mut lifecycle, |world| {
+@@ -1722,7 +1906,11 @@ fn run_scenario(
+         population.record(&scene.world);
+         if args.trace {
+             let mut record = boundary.json();
+-            record["kind"] = json!(if bot { "bot" } else { "step" });
++            record["kind"] = json!(match kind {
++                Kind::Step => "step",
++                Kind::Bot => "bot",
++                Kind::Nearest(_) => "nearest",
++            });
+             record["iteration"] = json!(iteration);
+             record["tick"] = json!(tick);
+             record["actions"] = json!(actions);
+@@ -1731,6 +1919,9 @@ fn run_scenario(
+             if bot {
+                 record["observations"] = json!(observations);
+             }
++            if let Kind::Nearest(_) = kind {
++                record["nearest"] = json!(reads);
++            }
+             line(out, record)?;
+         }
+         if iteration + 1 == window {
+@@ -1743,11 +1934,13 @@ fn run_scenario(
+             json!({"kind": "end", "case": args.case, "operations": args.iterations, "physicsTicks": tick, "lifecycle": lifecycle.json()}),
+         )?;
+     }
+-    let operation = match (args.profile, bot) {
+-        (false, false) => "step",
+-        (true, false) => "step_profiled",
+-        (false, true) => "step then batch observe",
+-        (true, true) => "step_profiled then batch observe",
++    let operation = match (args.profile, kind) {
++        (false, Kind::Step) => "step",
++        (true, Kind::Step) => "step_profiled",
++        (false, Kind::Bot) => "step then batch observe",
++        (true, Kind::Bot) => "step_profiled then batch observe",
++        (_, Kind::Nearest(Read::Observe)) => "observe_all_into then nearest reads",
++        (_, Kind::Nearest(Read::Sight)) => "sight_all then nearest reads",
+     };
+     Ok(report(
+         args,
+@@ -1783,7 +1976,7 @@ fn run() -> Result<(), String> {
+         Driver::Legacy(Legacy::Portable) => portable::run(&args, &mut out)?,
+         #[cfg(feature = "networking")]
+         Driver::Legacy(Legacy::Protocol) => portable::run_protocol(&args, &mut out)?,
+-        Driver::Scenario { scenario, bot } => run_scenario(&args, scenario, bot, &mut out)?,
++        Driver::Scenario { scenario, kind } => run_scenario(&args, scenario, kind, &mut out)?,
+         #[cfg(feature = "networking")]
+         Driver::Client(client) => portable::run_client(&args, client, &mut out)?,
+         #[cfg(not(feature = "networking"))]
+@@ -1822,6 +2015,7 @@ mod tests {
+         epoch: 48,
+         step: op(100, 16, Full),
+         bot: Some(op(100, 16, Full)),
++        nearest: Some(op(100, 16, Full)),
+     };
+ 
+     fn args(case: &str, driver: Driver, operation: Operation, iterations: usize) -> Args {
+@@ -1950,16 +2144,26 @@ mod tests {
+ 
+     #[test]
+     fn small_scenes_warm_and_pass_validity() {
+-        for bot in [false, true] {
+-            let operation = if bot { SMALL.bot.unwrap() } else { SMALL.step };
++        let kinds = [
++            Kind::Step,
++            Kind::Bot,
++            Kind::Nearest(Read::Observe),
++            Kind::Nearest(Read::Sight),
++        ];
++        for kind in kinds {
++            let operation = match kind {
++                Kind::Step => SMALL.step,
++                Kind::Bot => SMALL.bot.unwrap(),
++                Kind::Nearest(_) => SMALL.nearest.unwrap(),
++            };
+             let driver = Driver::Scenario {
+                 scenario: &SMALL,
+-                bot,
++                kind,
+             };
+             let mut profiled = args("test-small", driver, operation, 100);
+-            profiled.profile = true;
++            profiled.profile = driver.profile();
+             for args in [args("test-small", driver, operation, 100), profiled] {
+-                let report = run_scenario(&args, &SMALL, bot, &mut io::sink()).unwrap();
++                let report = run_scenario(&args, &SMALL, kind, &mut io::sink()).unwrap();
+                 let details = &report["details"];
+                 assert!(details["validity"].is_object());
+                 assert_eq!(details["lifecycle"]["epochs"], 2);
+@@ -1975,12 +2179,12 @@ mod tests {
+             .unwrap();
+         let driver = Driver::Scenario {
+             scenario: sandbox,
+-            bot: false,
++            kind: Kind::Step,
+         };
+         let report = run_scenario(
+             &args("sandbox-16-step", driver, sandbox.step, 4),
+             sandbox,
+-            false,
++            Kind::Step,
+             &mut io::sink(),
+         )
+         .unwrap();
+@@ -2042,13 +2246,13 @@ mod tests {
+     fn scenario_traces_repeat_and_end_with_a_terminal_record() {
+         let driver = Driver::Scenario {
+             scenario: &SMALL,
+-            bot: true,
++            kind: Kind::Bot,
+         };
+         let mut traced = args("test-small-bot", driver, SMALL.bot.unwrap(), 60);
+         traced.trace = true;
+         let trace = || {
+             let mut out = Vec::new();
+-            let report = run_scenario(&traced, &SMALL, true, &mut out).unwrap();
++            let report = run_scenario(&traced, &SMALL, Kind::Bot, &mut out).unwrap();
+             line(&mut out, report).unwrap();
+             out
+         };
+@@ -2071,4 +2275,38 @@ mod tests {
+         assert_eq!(kinds[kinds.len() - 2..], ["end", "report"]);
+         assert_eq!(records[kinds.len() - 2]["operations"], 60);
+     }
++
++    #[test]
++    fn nearest_reads_agree_between_owned_and_borrowed_observations() {
++        let trace = |read| {
++            let kind = Kind::Nearest(read);
++            let driver = Driver::Scenario {
++                scenario: &SMALL,
++                kind,
++            };
++            let mut traced = args("test-small-nearest", driver, SMALL.nearest.unwrap(), 60);
++            traced.trace = true;
++            let mut out = Vec::new();
++            run_scenario(&traced, &SMALL, kind, &mut out).unwrap();
++            out.split(|&b| b == b'\n')
++                .filter(|line| !line.is_empty())
++                .map(|line| serde_json::from_slice(line).unwrap())
++                .collect::<Vec<Value>>()
++        };
++        let (owned, borrowed) = (trace(Read::Observe), trace(Read::Sight));
++        assert_eq!(owned, borrowed);
++        let reads: Vec<_> = owned.iter().filter(|r| r["kind"] == "nearest").collect();
++        assert_eq!(reads.len(), 60);
++        // Some living slot sees food and some sees an opponent head.
++        let seen = |field: usize| {
++            reads.iter().any(|r| {
++                r["nearest"]
++                    .as_array()
++                    .unwrap()
++                    .iter()
++                    .any(|slot| !slot[field].is_null())
++            })
++        };
++        assert!(seen(0) && seen(1));
++    }
+ }
+-- 
+2.54.0.windows.1
+

@@ -15,6 +15,7 @@ scientific rule or product adoption.
 | Fidelity | [Visibility recheck and follow-ups](fidelity/2026-10-23-visibility-recheck/REPORT.md) | Acquisition successes and failures; no validated replacement subscription rule. |
 | Fidelity | [Observation precision](fidelity/2026-10-24-observation-precision/REPORT.md) | Protocol-19 field grids in three local-only captures; adopted 0.01-unit, 0.0001-rad and 0.01-unit/s steps for `serve` frames. |
 | Performance | [Serve transport v1 → v2](performance/2026-10-24-transport-v2/REPORT.md) | Controller-side Python/Node costs on one shared Windows desktop; v2 replies 7–27× smaller and steps 3.5–13.6× faster in four synthetic scenarios; 16 worlds step 4× faster server-side on the default pool than with one thread. |
+| Performance | [Borrowed observation views](performance/2026-10-24-borrowed-views/REPORT.md) | Not adopted: borrowed fill-and-read batches were 14% faster in a dense sequential world but up to 17% slower in the official 128-snake world; attempt kept as a patch. |
 
 ## Adding or updating material
 
