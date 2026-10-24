@@ -52,6 +52,11 @@ class CheckRunnerTests(unittest.TestCase):
         for script, option in (("examples/bot.py", "--binary"), ("examples/ffi_bot.py", "--library")):
             command = next(command for command in commands if script in command)
             self.assertEqual(Path(command[command.index(option) + 1]).parent, expected)
+        wheels = check.ROOT / "some target" / "wheels"
+        build = next(command for command in commands if "maturin" in command)
+        self.assertEqual(Path(build[build.index("--out") + 1]), wheels)
+        test = next(command for command in commands if "python/tests/run.py" in command)
+        self.assertEqual(Path(test[-1]), wheels)
 
 
 if __name__ == "__main__":

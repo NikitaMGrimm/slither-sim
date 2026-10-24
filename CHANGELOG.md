@@ -31,6 +31,12 @@
   language that can call C can reset through JSON, then step from typed arrays
   and read frame columns through pointers. `examples/ffi_bot.py` drives it with
   Python's standard-library `ctypes`. See the [C ABI guide](docs/c-api.md).
+- The `slither-sim` Python package (`python/`, import `slither_sim`; not yet on
+  PyPI) runs these sessions in-process. `Session.step` takes float64 and
+  bool/uint8 buffers, such as numpy arrays, or plain sequences, and releases the
+  GIL; `Session.frame` returns the columns as `array.array` copies. With 128
+  agents, a Python decision loop took 0.27 ms per step against 0.56 ms through
+  JSON requests. See the [Python guide](docs/python.md).
 
 ### Migration from slither-sim-json-v1
 

@@ -34,16 +34,22 @@ def commands(group):
         library = str(target / "debug" / ("slither_sim_ffi.dll" if os.name == "nt" else
                                           "libslither_sim_ffi.dylib" if sys.platform == "darwin" else
                                           "libslither_sim_ffi.so"))
+        wheels = str(target / "wheels")
         return [
             [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"],
             [sys.executable, "-m", "unittest", "discover", "-s", "tools/fidelity", "-p", "test_*.py"],
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
-            ["cargo", "build", "--locked", "--workspace"],
+            # maturin builds the Python extension below, with its interpreter.
+            ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
             [sys.executable, "-B", "tools/perf_transport.py", "--binary", binary,
              "--scenarios", "small", "dense-64", "worlds-16", "--steps", "3", "--repeats", "1"],
             [sys.executable, "examples/bot.py", "--binary", binary, "--steps", "10"],
             [sys.executable, "examples/ffi_bot.py", "--library", library, "--steps", "10"],
             ["node", "examples/bot.mjs", binary, "10"],
+            # Test the wheel from target/, leaving the tools environment unchanged.
+            [sys.executable, "-m", "maturin", "build", "--locked", "--manifest-path", "python/Cargo.toml",
+             "--interpreter", sys.executable, "--out", wheels],
+            [sys.executable, "python/tests/run.py", wheels],
         ]
     if group == "package":
         return [["cargo", "package", "--locked"]]

@@ -25,7 +25,7 @@ include = [
 publish = ["crates-io"]
 
 [workspace]
-members = ["ffi"]
+members = ["ffi", "python"]
 # Plain cargo commands at the root keep building and packaging only this crate.
 default-members = ["."]
 
