@@ -11,6 +11,9 @@ pub enum BoundaryMode {
     Sliding,
 }
 
+/// Forward contact lead per unit of snake scale.
+pub const CONTACT_LEAD: f64 = 16.0;
+
 /// Returns the corrected head and whether contact is lethal. Most snakes only
 /// take the squared-distance fast path; no body/food scans or allocations.
 pub fn constrain(
@@ -25,7 +28,7 @@ pub fn constrain(
         return (head, head.distance(Point::default()) >= radius);
     }
     // Fit to received anchors, not the rendered/predicted head outside the rim.
-    let lead = 16.0 * scale;
+    let lead = CONTACT_LEAD * scale;
     let inner = (radius - lead).max(0.0);
     if distance_squared < inner * inner {
         return (head, false);

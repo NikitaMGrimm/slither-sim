@@ -194,8 +194,9 @@ fn tuning_validation_and_config_round_trip() {
         assert!(Simulator::new(1, config.clone()).is_err());
     }
     config.ambient_food.cell_size = 50.0;
+    // Zero admits no ambient pellet; see tests/config.rs.
     config.ambient_food.max_per_cell = 0;
-    assert!(Simulator::new(1, config.clone()).is_err());
+    assert!(Simulator::new(1, config.clone()).unwrap().food.is_empty());
     config.ambient_food.max_per_cell = 4;
     let mut world = Simulator::new(1, config.clone()).unwrap();
     world.food.clear();
@@ -213,4 +214,26 @@ fn tuning_validation_and_config_round_trip() {
     let restored: Config = serde_json::from_value(old).unwrap();
     assert!(restored.ambient_food.enabled);
     assert_eq!(restored.ambient_food.max_per_cell, 2);
+}
+
+#[test]
+fn refill_intervals_below_the_tolerance_stop_at_spent_credit() {
+    // A 1e-30 s interval is far below the 1e-12 s due tolerance, which used to
+    // drive the clock negative until subtraction stopped changing it.
+    let mut config = Config::sandbox();
+    config.dt = 1e-30;
+    config.ambient_replenish_per_second = 1e30;
+    config.food_count = 0;
+    config.prey.count = 0;
+    let (done, finished) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut world = Simulator::new(7, config).unwrap();
+        world.add("a", 0, 1).unwrap();
+        world.step(&[Some(Action::default())]).unwrap();
+        done.send(world.time).unwrap();
+    });
+    let time = finished
+        .recv_timeout(std::time::Duration::from_secs(30))
+        .expect("one refill step must finish");
+    assert_eq!(time, 1e-30);
 }

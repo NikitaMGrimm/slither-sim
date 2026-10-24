@@ -14,6 +14,9 @@ use std::{
 /// Snake motion scales with elapsed time. Prey coordinate rounding occurs once
 /// per loop, so its effective velocity also depends on this period.
 pub const LOOP_SECONDS: f64 = 0.007;
+/// The per-server average loop periods behind `LOOP_SECONDS`. Other physics
+/// steps are valid but unmeasured.
+pub(crate) const MEASURED_LOOP_SECONDS: [f64; 2] = [0.00694, 0.00707];
 /// Protocol speed divided by this factor gives world units/s; not a server tick.
 pub(crate) const SPEED_UNIT_SECONDS: f64 = 0.032;
 /// Nominal interval for turning and boost-progress coefficients, separate from LOOP_SECONDS.
@@ -30,9 +33,11 @@ pub const BOOST_DROP_SECONDS: f64 = 0.155;
 pub const NUTRITION: f64 = 0.0031535;
 /// Maximum counted segments (`mscps`).
 pub const MAX_SEGMENTS: usize = 430;
+/// Scale of the smallest snake, two segments.
+pub const MIN_SCALE: f64 = 1.0;
 
 pub fn scale(segments: usize) -> f64 {
-    (1.0 + (segments as f64 - 2.0) / 106.0).clamp(1.0, 6.0)
+    (1.0 + (segments as f64 - 2.0) / 106.0).clamp(MIN_SCALE, 6.0)
 }
 /// Empirical server turn factor. Sustained anchor turns support a size denominator
 /// of 111 (validated through 293 segments); the client's drawn scale still uses 106.

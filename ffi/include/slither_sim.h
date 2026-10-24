@@ -1,5 +1,5 @@
 /*
- * slither-sim-abi-v1: a C ABI over slither-sim transport sessions.
+ * slither-sim-abi-v2: a C ABI over slither-sim transport sessions.
  *
  * Guide: https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/c-api.md
  * Written by hand from ffi/src/lib.rs; ffi/tests/abi.rs checks that this
@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-#define SLITHER_ABI_VERSION 1u
+#define SLITHER_ABI_VERSION 2u
 
 /* Status codes. */
 #define SLITHER_OK 0
@@ -28,6 +28,8 @@ extern "C" {
 #define SLITHER_INVALID 2
 /* An internal error; only slither_last_error and slither_session_free remain valid. */
 #define SLITHER_PANICKED 3
+/* Advancement failed and cleared all worlds; reset to continue. */
+#define SLITHER_ENDED 4
 
 /* Row or slot index meaning none: the own row of a dead slot, a missing killer. */
 #define SLITHER_NONE UINT32_MAX
@@ -119,7 +121,7 @@ slither_session *slither_session_new(void);
 void slither_session_free(slither_session *session);
 
 /*
- * Answers one slither-sim-json-v2 request line of line_len bytes, without its
+ * Answers one slither-sim-json-v3 request line of line_len bytes, without its
  * newline, as `slither-sim serve` would. Rejected requests still succeed with
  * an error reply. *reply receives line bytes without a newline, followed by a
  * NUL that *reply_len excludes, valid until the next call that takes the
@@ -132,7 +134,8 @@ int32_t slither_request(slither_session *session, const uint8_t *line, size_t li
  * Steps every world like a JSON step, without writing JSON. headings and
  * boosts hold one entry per slot of every world, world-major: slot s of world
  * w is entry w * agents + s. A NaN heading means no action, which only dead
- * slots may give; a nonzero boost boosts. Rejected steps change nothing.
+ * slots may give; a nonzero boost boosts. SLITHER_REJECTED changes nothing.
+ * SLITHER_ENDED clears all worlds after advancement fails; reset to continue.
  */
 int32_t slither_step(slither_session *session, const double *headings, size_t headings_len,
                      const uint8_t *boosts, size_t boosts_len);

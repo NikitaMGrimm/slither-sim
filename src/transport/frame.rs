@@ -52,10 +52,17 @@ fn origin_code(origin: Option<Origin>) -> u8 {
     }
 }
 
-/// Counts and indices are `u32`: worlds hold far fewer than 2³² snakes, anchors
-/// and food items.
-fn index(i: usize) -> u32 {
-    u32::try_from(i).expect("frame indices fit in u32")
+/// A row or slot index: a `u32` other than the [`NONE`] sentinel.
+fn row(i: usize, what: &str) -> Result<u32, String> {
+    u32::try_from(i)
+        .ok()
+        .filter(|&i| i != NONE)
+        .ok_or_else(|| format!("Frame {what} index {i} must be below u32::MAX, which means none"))
+}
+
+/// A count or column offset: any `u32`.
+fn count(i: usize, what: &str) -> Result<u32, String> {
+    u32::try_from(i).map_err(|_| format!("Frame {what} count {i} exceeds u32::MAX"))
 }
 
 /// Read-only columns of one world's current frame, with the values its JSON frame
@@ -248,17 +255,24 @@ const UNSEEN: u32 = NONE;
 
 impl Frame {
     /// Collects the frame of `world` after `ticks` ticks that produced `deaths`.
-    pub(crate) fn collect(&mut self, world: &Simulator, ticks: usize, deaths: &[DeathEvent]) {
+    /// Fails, leaving the frame partly written, when a column value does not
+    /// fit its `u32` type.
+    pub(crate) fn collect(
+        &mut self,
+        world: &Simulator,
+        ticks: usize,
+        deaths: &[DeathEvent],
+    ) -> Result<(), String> {
         world.sight_all_into(&mut self.sightings, &mut self.marks);
         self.time = world.time;
-        self.ticks = index(ticks);
-        self.living = index(world.living());
+        self.ticks = count(ticks, "tick")?;
+        self.living = count(world.living(), "living snake")?;
         self.radius = world.config.radius;
         self.vision = world.config.vision;
-        self.collect_snakes(world);
-        self.collect_food(world);
-        self.collect_prey(world);
-        self.collect_views();
+        self.collect_snakes(world)?;
+        self.collect_food(world)?;
+        self.collect_prey(world)?;
+        self.collect_views()?;
         let slot_of = |id: &str| world.snakes.iter().position(|s| s.id == id);
         let d = &mut self.deaths;
         d.food.clear();
@@ -267,23 +281,23 @@ impl Frame {
         d.time.clear();
         d.victim.clear();
         for death in deaths {
-            d.food.push(index(death.food));
-            d.killer.push(
-                death
-                    .killer
-                    .as_deref()
-                    .and_then(slot_of)
-                    .map_or(NONE, index),
-            );
+            d.food.push(count(death.food, "death food")?);
+            d.killer
+                .push(match death.killer.as_deref().and_then(slot_of) {
+                    Some(slot) => row(slot, "killer slot")?,
+                    None => NONE,
+                });
             d.reason.push(match death.reason {
                 DeathReason::Body => 0,
                 DeathReason::Boundary => 1,
             });
             d.time.push(death.time);
-            d.victim.push(index(
+            d.victim.push(row(
                 slot_of(&death.victim).expect("victims are spawned agents"),
-            ));
+                "victim slot",
+            )?);
         }
+        Ok(())
     }
 
     /// The collected frame as one JSON object.
@@ -356,7 +370,7 @@ impl Frame {
         }
     }
 
-    fn collect_snakes(&mut self, world: &Simulator) {
+    fn collect_snakes(&mut self, world: &Simulator) -> Result<(), String> {
         self.snake_row.clear();
         self.snake_row.resize(world.snakes.len(), UNSEEN);
         for (slot, sighting) in self.sightings.iter().enumerate() {
@@ -394,28 +408,29 @@ impl Frame {
             if self.snake_row[slot] == UNSEEN {
                 continue;
             }
-            self.snake_row[slot] = index(c.slot.len());
-            c.body_start.push(index(c.body_x.len()));
+            self.snake_row[slot] = row(c.slot.len(), "snake row")?;
+            c.body_start.push(count(c.body_x.len(), "body anchor")?);
             for p in &s.body {
                 c.body_x.push(round(p.x, POSITION_STEPS));
                 c.body_y.push(round(p.y, POSITION_STEPS));
             }
             c.fam.push(s.fam);
             c.heading.push(round(s.heading, ANGLE_STEPS));
-            c.kills.push(index(s.kills));
+            c.kills.push(count(s.kills, "kill")?);
             c.length.push(s.length);
             c.radius.push(s.radius);
             c.score.push(s.score);
-            c.segments.push(index(s.segments));
-            c.slot.push(index(slot));
+            c.segments.push(count(s.segments, "segment")?);
+            c.slot.push(row(slot, "snake slot")?);
             c.speed.push(round(s.speed, SPEED_STEPS));
             c.x.push(round(s.head.x, POSITION_STEPS));
             c.y.push(round(s.head.y, POSITION_STEPS));
         }
-        c.body_start.push(index(c.body_x.len()));
+        c.body_start.push(count(c.body_x.len(), "body anchor")?);
+        Ok(())
     }
 
-    fn collect_food(&mut self, world: &Simulator) {
+    fn collect_food(&mut self, world: &Simulator) -> Result<(), String> {
         self.food_seen.clear();
         self.food_seen.resize(world.food.len().div_ceil(64), 0);
         for sighting in self.sightings.iter().flatten() {
@@ -436,7 +451,7 @@ impl Frame {
                 let i = word * 64 + bits.trailing_zeros() as usize;
                 bits &= bits - 1;
                 let f = &world.food[i];
-                self.food_row[i] = index(c.x.len());
+                self.food_row[i] = row(c.x.len(), "food row")?;
                 c.origin.push(origin_code(f.origin));
                 c.size.push(f.size.unwrap_or(f64::NAN));
                 c.value.push(f.value);
@@ -444,9 +459,10 @@ impl Frame {
                 c.y.push(round(f.y, POSITION_STEPS));
             }
         }
+        Ok(())
     }
 
-    fn collect_prey(&mut self, world: &Simulator) {
+    fn collect_prey(&mut self, world: &Simulator) -> Result<(), String> {
         self.prey_row.clear();
         self.prey_row.resize(world.prey.len(), UNSEEN);
         for sighting in self.sightings.iter().flatten() {
@@ -470,7 +486,7 @@ impl Frame {
             if self.prey_row[i] == UNSEEN {
                 continue;
             }
-            self.prey_row[i] = index(c.id.len());
+            self.prey_row[i] = row(c.id.len(), "prey row")?;
             c.heading.push(round(p.heading, ANGLE_STEPS));
             c.id.push(p.id);
             c.size.push(p.size);
@@ -479,9 +495,10 @@ impl Frame {
             c.x.push(round(p.position.x, POSITION_STEPS));
             c.y.push(round(p.position.y, POSITION_STEPS));
         }
+        Ok(())
     }
 
-    fn collect_views(&mut self) {
+    fn collect_views(&mut self) -> Result<(), String> {
         let v = &mut self.views;
         for column in [
             &mut v.me,
@@ -509,10 +526,11 @@ impl Frame {
             } else {
                 v.me.push(NONE);
             }
-            v.snakes_start.push(index(v.snakes.len()));
-            v.food_start.push(index(v.food.len()));
-            v.prey_start.push(index(v.prey.len()));
+            v.snakes_start.push(count(v.snakes.len(), "viewed snake")?);
+            v.food_start.push(count(v.food.len(), "viewed food")?);
+            v.prey_start.push(count(v.prey.len(), "viewed prey")?);
         }
+        Ok(())
     }
 }
 
@@ -620,6 +638,20 @@ impl Serialize for Deaths<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unrepresentable_columns_are_errors_not_panics() {
+        assert_eq!(row(NONE as usize - 1, "snake row"), Ok(NONE - 1));
+        // u32::MAX is the none sentinel, so it is not a row.
+        assert!(row(NONE as usize, "snake row").is_err());
+        assert_eq!(count(u32::MAX as usize, "body anchor"), Ok(u32::MAX));
+        #[cfg(target_pointer_width = "64")]
+        {
+            let error = count(u32::MAX as usize + 1, "body anchor").unwrap_err();
+            assert!(error.contains("body anchor"), "{error}");
+            assert!(row(usize::MAX, "food row").is_err());
+        }
+    }
 
     #[test]
     fn codes_meaning_none_print_null() {

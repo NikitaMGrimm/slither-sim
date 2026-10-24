@@ -195,6 +195,18 @@ fn jitter_and_congestion_never_reorder_either_stream() {
 }
 
 #[test]
+fn a_two_second_round_trip_is_reported_as_measured() {
+    // Tick rounding puts the measured RTT just above the configured 2 s,
+    // which a fixed 2 s acceptance window used to discard.
+    let mut backend = SimulatorBackend::new(2, config(1, LatencyConfig::fixed(2.))).unwrap();
+    backend.advance_ticks((7. / DT) as usize).unwrap();
+    let timing = backend.frame().unwrap().timing;
+    let ping = timing.ping_seconds.unwrap();
+    assert!((2. ..=2. + DT + 1e-9).contains(&ping), "{ping}");
+    assert!(timing.ping_range_seconds.is_some());
+}
+
+#[test]
 fn ping_is_measured_from_delivered_pongs_not_configured() {
     let mut latency = LatencyConfig::fixed(0.1);
     let mut backend = SimulatorBackend::new(2, config(1, latency.clone())).unwrap();
@@ -457,6 +469,74 @@ fn background_slots_steer_from_their_own_frames() {
 }
 
 #[test]
+fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
+    let accept = |edit: fn(&mut SimulationConfig)| {
+        let mut config = config(1, LatencyConfig::default());
+        edit(&mut config);
+        config.validate().unwrap();
+    };
+    let reject = |edit: fn(&mut SimulationConfig), needle: &str| {
+        let mut config = config(1, LatencyConfig::default());
+        edit(&mut config);
+        let error = config.validate().unwrap_err();
+        assert!(error.contains(needle), "{error}");
+    };
+    // Rank and population are u16, so 65535 slots fit; 128 was a policy cap.
+    accept(|c| c.agents = 65_535);
+    reject(|c| c.agents = 65_536, "rank and population are u16");
+    // Each live prey needs one of the u16 wire IDs.
+    accept(|c| c.world.prey.count = 65_536);
+    reject(|c| c.world.prey.count = 65_537, "prey count");
+    accept(|c| c.decision_ticks = 1001);
+    // A long broadcast interval costs full resends, not correctness.
+    accept(|c| c.broadcast_ticks = 1001);
+    let mut long = config(1, LatencyConfig::default());
+    long.broadcast_ticks = 42;
+    let warnings = long.warnings();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("resent in full"), "{}", warnings[0]);
+    long.broadcast_ticks = 41;
+    assert!(long.warnings().is_empty());
+    reject(|c| c.decision_ticks = 0, "at least 1");
+    reject(|c| c.broadcast_ticks = 0, "at least 1");
+    // Delays have no fixed ceiling; only an unrepresentable largest draw fails.
+    accept(|c| {
+        c.latency.round_trip_seconds = vec![30.];
+        c.latency.round_trip_spread = 3.;
+        c.latency.jitter_seconds = 5.;
+        c.latency.processing_seconds = [3., 4.];
+        c.latency.processing_jitter_seconds = 3.;
+        c.latency.congestion.rate_per_second = 20.;
+        c.latency.congestion.duration_seconds = 60.;
+        c.latency.congestion.follow_seconds = 60.;
+        c.latency.congestion.extra_seconds = [0., 30.];
+        c.latency.congestion.shape = 0.01;
+    });
+    reject(
+        |c| {
+            c.latency.round_trip_seconds = vec![1.];
+            c.latency.round_trip_spread = 1000.;
+        },
+        "Largest delay",
+    );
+    reject(|c| c.latency.congestion.duration_seconds = 1e308, "36.7");
+    reject(|c| c.latency.congestion.shape = 0., "positive shape");
+    reject(|c| c.latency.round_trip_seconds = vec![-1.], "nonnegative");
+
+    let mut slow = config(2, LatencyConfig::fixed(3.));
+    slow.latency.congestion.rate_per_second = 50.;
+    slow.latency.congestion.duration_seconds = 1.;
+    slow.latency.congestion.extra_seconds = [0., 1.];
+    slow.latency.congestion.shape = 0.001;
+    let mut backend = SimulatorBackend::new(4, slow).unwrap();
+    backend.set_slot_processing_seconds(0, 3.).unwrap();
+    backend.advance_ticks((12. / DT) as usize).unwrap();
+    // A zero lower bound with a tiny shape is the zero distribution, not NaN.
+    let ping = backend.frame().unwrap().timing.ping_seconds.unwrap();
+    assert!((3. ..=3. + DT + 1e-9).contains(&ping), "{ping}");
+}
+
+#[test]
 fn unsupported_configurations_are_rejected() {
     let reject = |edit: fn(&mut SimulationConfig)| {
         let mut config = SimulationConfig::default();
@@ -466,7 +546,6 @@ fn unsupported_configurations_are_rejected() {
     reject(|c| c.world.radius = 40_000.);
     reject(|c| c.agents = 0);
     reject(|c| c.controlled_slot = 1);
-    reject(|c| c.broadcast_ticks = 40);
     reject(|c| c.minimap_side = 513);
     reject(|c| c.leaderboard_interval_seconds = 0.);
     reject(|c| c.leaderboard_interval_seconds = -1.);
@@ -549,6 +628,28 @@ fn accepted_prey_size_matches_the_received_appearance() {
         assert_eq!(authoritative[0].size, expected);
         assert_eq!(received[0].size, authoritative[0].size);
     }
+}
+
+#[test]
+fn prey_that_cannot_turn_are_shown_without_turning() {
+    let mut config = SimulationConfig::default();
+    config.world.food_count = 0;
+    config.world.vision = 3000.;
+    config.world.prey.count = 1;
+    config.world.prey.turn_rate = 0.;
+    let mut backend = SimulatorBackend::new(7, config).unwrap();
+    backend.advance_ticks(6).unwrap();
+    let heading = backend.world().prey[0].heading;
+    let shown = |backend: &mut SimulatorBackend| {
+        let prey = backend.frame().unwrap().observation.unwrap().prey;
+        assert_eq!(prey.len(), 1);
+        prey[0].heading
+    };
+    let first = shown(&mut backend);
+    assert!((first - heading).abs() < 1e-6);
+    backend.advance_ticks(200).unwrap();
+    assert_eq!(backend.world().prey[0].heading, heading);
+    assert!((shown(&mut backend) - first).abs() < 1e-6);
 }
 
 #[test]

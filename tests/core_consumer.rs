@@ -370,10 +370,14 @@ fn refill_setter_rejections_same_rate_and_zero_have_defined_state_effects() {
     let mut world = refill_world(10.);
     tick(&mut world, 5);
     let before = snapshot(&world);
-    for rate in [-1., f64::NAN, f64::INFINITY, 10_000.01, f64::from_bits(1)] {
+    // 1e300 attempts/s would subtract intervals too small to change the clock.
+    for rate in [-1., f64::NAN, f64::INFINITY, 1e300, f64::from_bits(1)] {
         assert!(world.set_ambient_rate(rate).is_err());
         assert_eq!(snapshot(&world), before);
     }
+    let mut fast = world.clone();
+    fast.set_ambient_rate(1e6).unwrap();
+    tick(&mut fast, 1);
     world.set_ambient_rate(10.).unwrap();
     assert_eq!(snapshot(&world), before);
     world.set_ambient_rate(0.).unwrap();

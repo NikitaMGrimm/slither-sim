@@ -167,7 +167,18 @@ fn invalid_network_configuration_fails_before_connecting() {
             .is_err()
         );
     }
-    for duration in [0., -1., f64::NAN, f64::INFINITY] {
+    for (decision, idle) in [(0.0005, 1000.), (1e-9, 86_400.)] {
+        NetworkConfig {
+            url: "ws://localhost/slither".into(),
+            decision_interval_seconds: decision,
+            idle_timeout_seconds: idle,
+            ..NetworkConfig::default()
+        }
+        .validate()
+        .unwrap();
+    }
+    // 1e-10 s rounds to a zero Duration, which socket timeouts reject.
+    for duration in [0., -1., 1e-10, f64::NAN, f64::INFINITY, 1e300] {
         assert!(
             NetworkConfig {
                 url: "ws://localhost/slither".into(),

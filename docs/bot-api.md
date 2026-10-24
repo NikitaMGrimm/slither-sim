@@ -1,4 +1,4 @@
-# Geometric controller: slither-sim-json-v2
+# Geometric controller: slither-sim-json-v3
 
 Run `slither-sim serve`, from a checkout with `cargo run --release --locked -- serve`
 or from a [release archive](../README.md#download-a-release) without Rust. One
@@ -7,14 +7,21 @@ stdout reply per request. EOF stops the process. Rust callers can drive the
 same sessions [in-process](#in-process-sessions) or use the library directly.
 
 ```json
-{"protocol":"slither-sim-json-v2","result":{}}
-{"protocol":"slither-sim-json-v2","error":"Reset first"}
+{"protocol":"slither-sim-json-v3","result":{}}
+{"protocol":"slither-sim-json-v3","error":"Reset first","sessionEnded":false}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
 readers ignore additional fields. Error text is descriptive, not a stable code.
 Malformed or rejected requests leave the stream usable; I/O failures stop it.
 This interface is for trusted local controllers.
+
+Every error reply includes `sessionEnded`. When false, no world advanced and
+the session is unchanged. When true, advancement or frame collection failed
+(for example, accumulated pickup mass overflowed); all worlds were cleared.
+Reset before stepping again. The stream remains usable in either case.
+Version 3 replaces version 2 to distinguish these terminal failures from
+unchanged-state rejections; successful reply shapes are unchanged.
 
 Sessions with several worlds step them in parallel, one world per task, on every
 core; `slither-sim serve --threads N` caps the threads. Replies do not depend on
@@ -29,8 +36,12 @@ the thread count.
 ```
 
 Works before reset. Returns `version`, `defaultConfig`, `defaultDecisionTicks`,
-`maxAgents` (128), `maxWorlds` (1024), `maxDecisionTicks` (1000), the food
-`origins` codes and the observation `precision`.
+`maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
+observation `precision`. The maxima are representation limits, not policies:
+`maxAgents` and `maxDecisionTicks` are 4294967295 because frames hold `u32`
+slot indices (`u32::MAX` means none) and tick counts; `maxWorlds` is the
+platform's `usize::MAX`, since only `worlds × agents` must fit `usize` and memory
+bounds worlds in practice.
 
 ### reset
 
@@ -45,9 +56,12 @@ six decision ticks and `Config::official(1)`. Every world shares `agents`,
 world settings are listed in the [configuration reference](configuration.md#world-config).
 Invalid resets preserve the previous session.
 
-Returns `seed`, the resolved `config`, `decisionTicks` and `worlds`, one
-[frame](#frames) per world. Snakes start on a deterministic ring halfway to the
-boundary, facing inward; this is a synthetic test setup.
+Returns `seed`, the resolved `config`, `decisionTicks`, `warnings` and `worlds`,
+one [frame](#frames) per world. `warnings` lists sentences about valid but
+unmeasured settings, such as a `dt` outside the measured server loop; it is
+empty otherwise. `slither-sim serve` also prints them to stderr, never stdout.
+See [limits](configuration.md#limits). Snakes start on a deterministic ring
+halfway to the boundary, facing inward; this is a synthetic test setup.
 
 The same build, config, seed and actions produce the same worlds. Cross-platform
 bitwise floating-point equivalence is not promised; retain these inputs and the
@@ -70,7 +84,10 @@ compute time. `config.dt` is seconds per tick; defaults give a 42 ms decision
 interval. There is no network delay, automatic respawn, reward, victory
 condition or episode timeout. Use `reset` for new worlds.
 
-Returns `worlds`, one frame per world.
+Returns `worlds`, one frame per world. Frame rows, counts and offsets are
+`u32`. A step whose frame cannot hold them, whose pickup would overflow a
+snake's mass or whose reply cannot be allocated ends the session after its
+worlds advanced, so reset to continue.
 
 ### snapshot
 
@@ -202,10 +219,13 @@ Respawn requires all points inside the arena; it does not enforce clearance or
 reject self-intersections. Call `body_is_clear` separately for spawn exclusion.
 The straight-body `spawn_is_clear` and `respawn` methods remain available.
 
-Refill rates must be finite and within 0–10,000; a rate too small to represent
-the rescaled pending clock is rejected. Use the setter instead of directly
+Refill rates must be finite and nonnegative, small enough that one attempt
+interval still changes the refill clock, and large enough to represent the
+rescaled pending clock. Use the setter instead of directly
 editing `config.ambient_replenish_per_second` when changing a running world.
-Rejected operations leave the world unchanged.
+Rejected operations leave the world unchanged. The exception is a pickup whose
+gain would overflow its eater's mass: that step completes its tick without the
+gain and returns an error, and every later step is rejected with it.
 
 ### In-process sessions
 
@@ -220,9 +240,13 @@ requests and typed steps act on the same worlds and may be mixed.
 | `frame(w)` | World `w`'s current frame as a `FrameRef` of read-only columns, after any reset or step; `None` before reset or for unknown worlds. |
 | `worlds()`, `agents()` | Session shape; 0 before the first reset. |
 
-A NaN heading means no action; only dead slots may give it. Typed steps validate
-like JSON steps, with the same error text where it applies, and reject the whole
-step before any world advances. Worlds step on the rayon pool as in `serve`.
+A NaN heading means no action; only dead slots may give it. Typed steps return
+`Result<(), transport::StepError>`. `Rejected(message)` reports validation
+failure before any world advances, leaving the session unchanged. `Ended(message)`
+reports a failure during advancement or frame collection and clears every world,
+including worlds that advanced successfully; `frame` then returns `None` and
+`worlds()` and `agents()` return 0. Reset to continue. Error text matches JSON
+steps. Worlds step on the rayon pool as in `serve`.
 
 `FrameRef` columns hold the values the JSON frame prints, rounded alike, in
 fixed types: `u64` prey `id`; `u8` food `origin` and death `reason`; `u32`

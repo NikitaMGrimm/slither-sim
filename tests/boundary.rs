@@ -332,3 +332,124 @@ fn finite_large_radius_does_not_overflow_contact_checks() {
         }
     }
 }
+
+/// Slide a boosting minimum-size head with a fixed heading into the rim at a
+/// shallow angle, for ticks that keep the contact well below the steep limit.
+fn shallow_boost_slide_survives(dt: f64) -> bool {
+    use std::f64::consts::FRAC_PI_2;
+    let radius = 8000.;
+    let mut head = Point {
+        x: radius - 30.,
+        y: 0.,
+    };
+    let heading = FRAC_PI_2 - 0.6;
+    for _ in 0..30 {
+        let step = physics::BOOST_SPEED * dt;
+        let proposed = Point {
+            x: head.x + step * heading.cos(),
+            y: head.y + step * heading.sin(),
+        };
+        let (next, dead) = boundary::constrain(
+            proposed,
+            heading,
+            physics::MIN_SCALE,
+            radius,
+            BoundaryMode::Sliding,
+        );
+        if dead {
+            return false;
+        }
+        head = next;
+    }
+    true
+}
+
+#[test]
+fn sliding_steps_are_bounded_by_the_contact_lead_not_a_literal() {
+    let limit = boundary::CONTACT_LEAD * physics::MIN_SCALE / physics::BOOST_SPEED;
+    assert!((limit - 16. / 437.5).abs() < 1e-15);
+    let config = |dt, boundary_mode| Config {
+        dt,
+        boundary_mode,
+        ..Config::sandbox()
+    };
+    let below = limit * 0.999;
+    let beyond = limit * 1.001;
+    config(below, BoundaryMode::Sliding).validate().unwrap();
+    assert!(shallow_boost_slide_survives(below));
+    let error = config(limit, BoundaryMode::Sliding).validate().unwrap_err();
+    assert!(error.contains("contact"), "{error}");
+    assert!(config(beyond, BoundaryMode::Sliding).validate().is_err());
+    assert!(!shallow_boost_slide_survives(beyond));
+    // Hard boundaries kill on contact anyway, so longer steps stay valid.
+    config(0.1, BoundaryMode::Hard).validate().unwrap();
+}
+
+#[test]
+fn hard_steps_are_bounded_by_exact_tick_counts() {
+    // Prey substeps per tick must be an exact f64 integer that fits usize.
+    let exact = 2f64.powi(53).min(usize::MAX as f64);
+    let limit = physics::LOOP_SECONDS * exact;
+    let error = long_config(1e308).validate().unwrap_err();
+    assert!(error.contains("substep"), "{error}");
+    assert!(long_config(limit * 1.001).validate().is_err());
+    // One tick just inside the bound keeps the head finite.
+    let mut world = Simulator::new(1, long_config(limit * 0.999)).unwrap();
+    world.add("a", 0, 1).unwrap();
+    world.step(&[Some(Action::default())]).unwrap();
+    let head = world.snakes[0].head;
+    assert!(head.x.is_finite() && head.y.is_finite());
+    assert!(head.distance(Point::default()) > 1e15);
+}
+
+fn long_config(dt: f64) -> Config {
+    Config {
+        dt,
+        boundary_mode: BoundaryMode::Hard,
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        prey: PreyConfig {
+            count: 0,
+            ..PreyConfig::default()
+        },
+        ..Config::sandbox()
+    }
+}
+
+/// A boosting snake of `segments` respawned at the center, after one step.
+fn boosted(dt: f64, segments: usize) -> Simulator {
+    let mut config = long_config(dt);
+    config.radius = 1e6;
+    config.boost_food.enabled = false;
+    let mut world = Simulator::new(1, config).unwrap();
+    world.add("a", 0, 1).unwrap();
+    world.snakes[0].alive = false;
+    world
+        .respawn_body(0, vec![Point::default(); segments], 0.)
+        .unwrap();
+    world
+        .step(&[Some(Action {
+            heading: 0.,
+            boost: true,
+        })])
+        .unwrap();
+    world
+}
+
+#[test]
+fn long_boost_steps_count_their_drops() {
+    // A 430-segment boost costs no mass, and at dt 1e16 subtracting the 0.155 s
+    // drop period no longer changed the clock, so the drop loop never ended.
+    let error = long_config(1e16).validate().unwrap_err();
+    assert!(error.contains("exact integer"), "{error}");
+    let world = boosted(100., 430);
+    assert!(world.time == 100.);
+    // A drop is due at once and then every 0.155 s: floor((0.155 + 1) / 0.155).
+    let world = boosted(1., 100);
+    let drops = world
+        .food
+        .iter()
+        .filter(|food| food.origin == Some(Origin::Boost))
+        .count();
+    assert_eq!(drops, 7);
+}

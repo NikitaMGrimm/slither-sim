@@ -208,6 +208,7 @@ fn constants_and_functions_match_the_header() {
         ("SLITHER_REJECTED", SLITHER_REJECTED),
         ("SLITHER_INVALID", SLITHER_INVALID),
         ("SLITHER_PANICKED", SLITHER_PANICKED),
+        ("SLITHER_ENDED", SLITHER_ENDED),
     ] {
         assert_eq!(number(name), code as u64, "{name}");
     }
@@ -436,6 +437,48 @@ fn sessions_match_the_rust_api() {
         handle.request(snapshot),
         expected.request(snapshot.as_bytes())
     );
+}
+
+#[test]
+fn terminal_failure_is_distinct_from_rejection_and_reset_recovers() {
+    // Synthetic stationary catches: individually finite gains overflow in one tick.
+    let reset = r#"{"op":"reset","worlds":2,"agents":1,"decisionTicks":1,"config":{"radius":100,"dynamicRadius":false,"foodCount":0,"ambientReplenishPerSecond":0,"prey":{"count":100,"size":18.8,"maxSize":18.8,"nutritionFactor":1.6128984555936463e308,"cruiseSpeed":0,"escapeSpeed":0,"sprintSpeed":0,"turnRate":0}}}"#;
+    let handle = Handle::new();
+    let reply = String::from_utf8(handle.request(reset)).unwrap();
+    assert!(reply.contains("\"result\":"), "{reply}");
+    assert_eq!(unsafe { slither_worlds(handle.0) }, 2);
+    assert_eq!(
+        handle.step(&[std::f64::consts::PI; 2], &[0; 2]),
+        SLITHER_ENDED
+    );
+    assert!(handle.error().contains("mass would overflow"));
+    assert_eq!(
+        unsafe { (slither_worlds(handle.0), slither_agents(handle.0)) },
+        (0, 0)
+    );
+    assert_eq!(
+        handle.frame(0).unwrap_err(),
+        (SLITHER_REJECTED, "Reset first".into())
+    );
+    assert_eq!(handle.step(&[], &[]), SLITHER_REJECTED);
+    assert_eq!(handle.error(), "Reset first");
+    handle.request(r#"{"op":"reset","agents":1}"#);
+    assert_eq!(handle.step(&[0.0], &[0]), SLITHER_OK);
+    assert!(handle.frame(0).unwrap().time > 0.0);
+
+    // JSON calls still return SLITHER_OK; the reply carries the failure kind.
+    handle.request(reset);
+    let step = r#"{"op":"step","actions":[{"heading":[3.141592653589793],"boost":[false]},{"heading":[3.141592653589793],"boost":[false]}]}"#;
+    let terminal = String::from_utf8(handle.request(step)).unwrap();
+    assert!(terminal.contains("mass would overflow"), "{terminal}");
+    assert!(terminal.contains("\"sessionEnded\":true"), "{terminal}");
+    assert_eq!(unsafe { slither_worlds(handle.0) }, 0);
+    assert_eq!(
+        handle.request(step),
+        br#"{"error":"Reset first","protocol":"slither-sim-json-v3","sessionEnded":false}"#
+    );
+    handle.request(r#"{"op":"reset","agents":1}"#);
+    assert_eq!(handle.step(&[0.0], &[0]), SLITHER_OK);
 }
 
 #[test]
