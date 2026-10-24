@@ -247,6 +247,62 @@ class GitIntegrationTests(unittest.TestCase):
                     self.assertEqual(automation.manual_release_merge(bump), pr)
                     self.assertIsNone(automation.manual_release_merge(base))
 
+    def test_inherited_workspace_versions_move_with_the_root_package(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(release, "ROOT", Path(directory)):
+            root = Path(directory)
+
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=directory, text=True).strip()
+
+            def commit(files, message):
+                for name, text in files.items():
+                    (root / name).parent.mkdir(parents=True, exist_ok=True)
+                    (root / name).write_text(text)
+                git("add", ".")
+                git("commit", "--quiet", "-m", message)
+                return git("rev-parse", "HEAD")
+
+            def lock(root_version, ffi_version, tool_version="1.0.0"):
+                return "version = 4\n" + "".join(
+                    f'[[package]]\nname = "{name}"\nversion = "{version}"\n'
+                    for name, version in (("slither-sim", root_version), ("slither-sim-ffi", ffi_version),
+                                          ("tool", tool_version)))
+
+            git("init", "--quiet")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.invalid")
+            manifest = ('[package]\nname = "slither-sim"\nversion.workspace = true\n'
+                        '[workspace]\nmembers = ["ffi", "tool"]\n[workspace.package]\nversion = "0.2.0"\n')
+            base = commit({
+                "Cargo.toml": manifest,
+                "ffi/Cargo.toml": '[package]\nname = "slither-sim-ffi"\nversion.workspace = true\n',
+                "tool/Cargo.toml": '[package]\nname = "tool"\nversion = "1.0.0"\n',
+                "Cargo.lock": lock("0.2.0", "0.2.0"),
+                "CHANGELOG.md": "Initial\n",
+            }, "initial")
+            self.assertEqual(release.package_at(base)["version"], "0.2.0")
+            bump = {"Cargo.toml": manifest.replace("0.2.0", "0.2.1"), "CHANGELOG.md": "Release 0.2.1\n"}
+            heads = {}
+            for label, lockfile in (("members follow", lock("0.2.1", "0.2.1")),
+                                    ("member left behind", lock("0.2.1", "0.2.0")),
+                                    ("independent member bumped", lock("0.2.1", "0.2.1", "0.2.1"))):
+                git("checkout", "--quiet", "--detach", base)
+                heads[label] = commit({**bump, "Cargo.lock": lockfile}, label)
+            self.assertEqual(release.package_at(heads["members follow"])["version"], "0.2.1")
+            original_run = subprocess.run
+
+            def local_run(command, **kwargs):
+                if command[:2] == ["git", "fetch"]:
+                    return subprocess.CompletedProcess(command, 0)
+                return original_run(command, **kwargs)
+
+            with patch.object(subprocess, "run", side_effect=local_run):
+                for label, expected in (("members follow", True), ("member left behind", False),
+                                        ("independent member bumped", False)):
+                    with self.subTest(label):
+                        self.assertEqual(automation.metadata_only(base, heads[label], AutomationTests.package),
+                                         expected)
+
 
 class ManualReleaseTests(unittest.TestCase):
     commit = "c" * 40

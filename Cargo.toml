@@ -1,6 +1,6 @@
 [package]
 name = "slither-sim"
-version = "0.3.1"
+version.workspace = true
 edition = "2024"
 rust-version = "1.86"
 description = "Headless Slither.io simulator for bot development, training and custom protocol-19 servers"
@@ -28,6 +28,11 @@ publish = ["crates-io"]
 members = ["ffi", "python"]
 # Plain cargo commands at the root keep building and packaging only this crate.
 default-members = ["."]
+
+# One version for the simulator, the C ABI crate and the Python package;
+# release-plz bumps it here.
+[workspace.package]
+version = "0.3.1"
 
 [features]
 default = ["networking", "parallel"]

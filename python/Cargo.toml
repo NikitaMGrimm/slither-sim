@@ -1,7 +1,6 @@
 [package]
 name = "slither-sim-py"
-# The Python distribution takes this version; keep it equal to the root crate's.
-version = "0.3.1"
+version.workspace = true
 edition = "2024"
 rust-version = "1.86"
 description = "Python bindings for slither-sim transport sessions"

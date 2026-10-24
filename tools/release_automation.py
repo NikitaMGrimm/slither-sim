@@ -56,16 +56,23 @@ def metadata_only(main, head, package, patch_only=True):
         return False
     before = tomllib.loads(git("show", f"{main}:Cargo.toml"))
     after = tomllib.loads(git("show", f"{head}:Cargo.toml"))
-    proposed = after["package"]["version"]
+    proposed = release.version_table(after)["version"]
     if proposed == package["version"] or (patch_only and not is_patch(package["version"], proposed)):
         return False
-    after["package"]["version"] = before["package"]["version"]
+    release.version_table(after)["version"] = release.version_table(before)["version"]
     if before != after:
         return False
+    # Workspace members that inherit the version move with the root package.
+    bumped = {package["name"]}
+    if release.inherits_version(after):
+        for member in after["workspace"].get("members", []):
+            manifest = tomllib.loads(git("show", f"{head}:{member}/Cargo.toml"))
+            if release.inherits_version(manifest):
+                bumped.add(manifest["package"]["name"])
     before_lock = tomllib.loads(git("show", f"{main}:Cargo.lock"))
     after_lock = tomllib.loads(git("show", f"{head}:Cargo.lock"))
     for item in after_lock["package"]:
-        if item["name"] == package["name"] and "source" not in item:
+        if item["name"] in bumped and "source" not in item:
             if item["version"] != proposed:
                 return False
             item["version"] = package["version"]

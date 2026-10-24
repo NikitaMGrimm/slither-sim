@@ -1,6 +1,6 @@
 [package]
 name = "slither-sim-ffi"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 rust-version = "1.86"
 description = "C ABI over slither-sim transport sessions (slither-sim-abi-v1)"

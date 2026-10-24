@@ -36,7 +36,8 @@
   bool/uint8 buffers, such as numpy arrays, or plain sequences, and releases the
   GIL; `Session.frame` returns the columns as `array.array` copies. With 128
   agents, a Python decision loop took 0.27 ms per step against 0.56 ms through
-  JSON requests. See the [Python guide](docs/python.md).
+  JSON requests. It shares the crate's version, as does `slither-sim-ffi`, through
+  `[workspace.package]`. See the [Python guide](docs/python.md).
 
 ### Migration from slither-sim-json-v1
 

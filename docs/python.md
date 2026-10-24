@@ -125,7 +125,7 @@ the same wall time as one.
 
 ## Compatibility
 
-The package version follows the `slither-sim` crate. Requests and replies follow
+The package version is the `slither-sim` crate's, inherited from the workspace. Requests and replies follow
 `slither-sim-json-v2`; check `PROTOCOL`. The Python API is experimental and may
 change between `0.x` versions. As with `serve`, record the commit for
 reproducible results.

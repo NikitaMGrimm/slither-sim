@@ -106,7 +106,8 @@ and the JSON contract fixture. Keep units, field meanings and lifecycle behavior
 consistent; readers ignore additional response fields. Physics changes can alter
 trajectories without changing the API.
 
-`Cargo.toml` owns the simulator version; `pyproject.toml` owns the tools version.
+The root `Cargo.toml`'s `[workspace.package]` owns the simulator version, which
+the C ABI crate and the Python package inherit; `pyproject.toml` owns the tools version.
 Within `0.x`, incompatible Rust API changes bump the minor version. Keep unreleased
 changes together in the changelog; no permanent freeze or multi-version support
 is promised.

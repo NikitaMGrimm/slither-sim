@@ -3,8 +3,10 @@
 `release-pr.yml` maintains one rolling release PR with release-plz, updating
 `Cargo.toml`, `Cargo.lock` and the changelog after merges to main. It compares
 packaged files with crates.io: tools-only changes do not force a crate release,
-while packaged docs, tests and examples can. The Python tools version remains
-independent.
+while packaged docs, tests and examples can. The version lives in the root
+`Cargo.toml`'s `[workspace.package]`; the unpublished C ABI crate and Python
+package inherit it, so their lockfile entries move with the crate's. The Python
+tools version remains independent.
 
 ## Manual releases
 
@@ -19,7 +21,7 @@ UTC, even if the upload completes a few minutes after the merge. The hourly job
 acts on that eligibility; GitHub scheduling can delay it. No empty release is made.
 
 The exception requires a same-repository release-bot PR merged by a user, with
-only the manifest version, its lockfile entry and changelog changed. Ordinary
+only the manifest version, its lockfile entries and changelog changed. Ordinary
 code merges, bot merges, tags and dispatch inputs do not grant it. Publication
 rechecks that provenance before uploading. A retry retains the original merge
 authorization and source commit rather than selecting a later main revision.
@@ -33,7 +35,7 @@ release PR only when all of these hold:
 - The version advances by one patch, such as `0.2.0` to `0.2.1`, and release-plz
   reports a successful Rust API compatibility check.
 - The branch includes current main, required checks pass and GitHub permits the
-  protected merge. Only the manifest's version, its lockfile entry and changelog
+  protected merge. Only the manifest's version, its lockfile entries and changelog
   may differ. The merge is pinned to the inspected PR head.
 - At least 12 hours have elapsed since the latest crates.io upload or published
   GitHub Release, including prereleases and yanked versions. For a verified
