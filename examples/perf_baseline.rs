@@ -1,4 +1,4 @@
-//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel].
+//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel].
 //! `perf_baseline --list` prints the workload catalog as one canonical JSON line;
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
@@ -20,6 +20,8 @@ use std::{
 const SEED: u32 = 7;
 const EPISODE_TICKS: usize = 1000;
 const MAX_ITERATIONS: usize = 100_000;
+/// Calibration repeats a case at most this often in one process.
+const MAX_BLOCKS: usize = 16;
 const PLACEMENT_ATTEMPTS: usize = 4096;
 const RESPAWN_ATTEMPTS: usize = 64;
 const RESPAWN_RETRY_TICKS: usize = 4;
@@ -465,6 +467,8 @@ struct Args {
     trace: bool,
     /// `Simulator::set_parallel(true)` on the timed world.
     parallel: bool,
+    /// Reset-identical timed blocks in this process; None is the ordinary single run.
+    blocks: Option<usize>,
     driver: Driver,
     operation: Operation,
 }
@@ -484,11 +488,11 @@ impl Args {
         let usage = || {
             let names: Vec<_> = workloads.iter().map(|w| w.name.as_str()).collect();
             format!(
-                "perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature",
+                "perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; M = 1..{MAX_BLOCKS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature",
                 names.join("|")
             )
         };
-        if !(2..=4).contains(&args.len()) {
+        if !(2..=5).contains(&args.len()) {
             return Err(usage());
         }
         let workload = workloads
@@ -499,11 +503,20 @@ impl Args {
         if !(1..=MAX_ITERATIONS).contains(&iterations) {
             return Err(usage());
         }
-        let (mut option, mut parallel) = (None, false);
-        for arg in &args[2..] {
+        let (mut option, mut parallel, mut blocks) = (None, false, None);
+        let mut rest = args[2..].iter();
+        while let Some(arg) = rest.next() {
             match arg.as_str() {
                 "--parallel" if !parallel => parallel = true,
                 "--profile" | "--trace" if option.is_none() => option = Some(arg.as_str()),
+                "--blocks" if option.is_none() => {
+                    option = Some("--blocks");
+                    let count = rest.next().and_then(|count| count.parse::<usize>().ok());
+                    blocks = count.filter(|count| (1..=MAX_BLOCKS).contains(count));
+                    if blocks.is_none() {
+                        return Err(usage());
+                    }
+                }
                 _ => return Err(usage()),
             }
         }
@@ -520,6 +533,7 @@ impl Args {
             profile,
             trace: option == Some("--trace"),
             parallel,
+            blocks,
             driver: workload.driver,
             operation: workload.operation,
         }))
@@ -1776,24 +1790,46 @@ fn run() -> Result<(), String> {
         Command::Run(args) => args,
     };
     let mut out = BufWriter::new(io::stdout().lock());
-    let report = match args.driver {
+    let Some(blocks) = args.blocks else {
+        let report = run_case(&args, &mut out)?;
+        line(&mut out, report)?;
+        return out.flush().map_err(|e| e.to_string());
+    };
+    // Each block rebuilds the case from the seed, including its internal warmup, so
+    // every block times the same trajectory from an equivalent state. Setup stays
+    // outside the operation timer but inside each block's elapsed time.
+    let mut timings = Vec::with_capacity(blocks);
+    let mut last = Value::Null;
+    for _ in 0..blocks {
+        let start = Instant::now();
+        let mut report = run_case(&args, &mut out)?;
+        let mut timing = report["timing"].take();
+        timing["elapsedSeconds"] = json!(start.elapsed().as_secs_f64());
+        timings.push(timing);
+        last = report;
+    }
+    last["blocks"] = json!(timings);
+    line(&mut out, last)?;
+    out.flush().map_err(|e| e.to_string())
+}
+
+fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
+    Ok(match args.driver {
         Driver::Legacy(
             Legacy::StepDefault | Legacy::StepFood | Legacy::StepBody | Legacy::Observe,
-        ) => run_core(&args, &mut out)?,
+        ) => run_core(args, out)?,
         #[cfg(feature = "networking")]
-        Driver::Legacy(Legacy::Portable) => portable::run(&args, &mut out)?,
+        Driver::Legacy(Legacy::Portable) => portable::run(args, out)?,
         #[cfg(feature = "networking")]
-        Driver::Legacy(Legacy::Protocol) => portable::run_protocol(&args, &mut out)?,
-        Driver::Scenario { scenario, bot } => run_scenario(&args, scenario, bot, &mut out)?,
+        Driver::Legacy(Legacy::Protocol) => portable::run_protocol(args, out)?,
+        Driver::Scenario { scenario, bot } => run_scenario(args, scenario, bot, out)?,
         #[cfg(feature = "networking")]
-        Driver::Client(client) => portable::run_client(&args, client, &mut out)?,
+        Driver::Client(client) => portable::run_client(args, client, out)?,
         #[cfg(not(feature = "networking"))]
         Driver::Legacy(Legacy::Portable | Legacy::Protocol) | Driver::Client(_) => {
             return Err(format!("{} requires the networking feature", args.case));
         }
-    };
-    line(&mut out, report)?;
-    out.flush().map_err(|e| e.to_string())
+    })
 }
 
 fn main() {
@@ -1832,6 +1868,7 @@ mod tests {
             profile: false,
             trace: false,
             parallel: false,
+            blocks: None,
             driver,
             operation,
         }
@@ -1946,6 +1983,24 @@ mod tests {
                 assert_eq!(scene.world.living(), scenario.population, "{}", scenario.id);
                 assert!(scene.world.deaths.is_empty());
             }
+        }
+    }
+
+    #[test]
+    fn calibration_blocks_repeat_the_same_trajectory() {
+        for bot in [false, true] {
+            let operation = if bot { SMALL.bot.unwrap() } else { SMALL.step };
+            let driver = Driver::Scenario {
+                scenario: &SMALL,
+                bot,
+            };
+            let args = args("test-small", driver, operation, 100);
+            let [mut first, mut second] =
+                [(), ()].map(|_| run_case(&args, &mut io::sink()).unwrap());
+            assert_eq!(first["timing"]["operations"], 100);
+            first["timing"].take();
+            second["timing"].take();
+            assert_eq!(first, second);
         }
     }
 

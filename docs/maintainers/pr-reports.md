@@ -158,6 +158,30 @@ dependency whose inputs changed. Dependencies compile with all four runner
 cores, and test builds keep only line tables for debug information. Cache
 restoration and every build, test and trace finish before the first warmup.
 
+### Calibration
+
+The `PR comparison calibration` workflow runs the same-binary (A/A) pilot from
+the [calibration plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-pr-comparison-statistics/CALIBRATION-PLAN.md).
+It is dispatched manually from the Actions tab with a runner image
+(`windows-latest` or `ubuntu-latest`) and workload group (A or B). Each job
+builds the harness once, copies and hashes it, and runs both roles from that one
+file with identical arguments through `tools/perf_calibration.py`. For every
+workload in the group it times processes with 1, 2 and 4 reset-identical blocks:
+one discarded warmup pair per block count, then six balanced pairs each, with no
+early stopping. It uses the comparison's deadline. The artifact keeps every child
+attempt with its block times, the manifest (executable, catalog, toolchain,
+runner image, CPU) and `summary.json`. The summary holds per-job estimates for
+each block count (order-adjusted paired residual variance, within- and
+between-process components, cost per pair and `Q`) and a linear cost fit. These
+feed the plan's offline analysis; they are not a decision. The plan's pilot is
+two separately dispatched jobs per runner image and group, eight in all. A cell
+the deadline cuts short is reported as incomplete.
+
+The comparison's runner is set once, as the `&runner` anchor in `pr-report.yml`.
+Change it only after a calibration supports the new runner. The cache key
+includes the OS, so the first runs on a new runner miss the cache until a
+`main` push saves one.
+
 ## Publishing and permissions
 
 The comment is updated in place, keyed by a hidden marker and bot author.

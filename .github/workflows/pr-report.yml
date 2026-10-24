@@ -49,17 +49,20 @@ jobs:
   measure:
     name: Measurements
     if: github.event_name == 'pull_request'
-    runs-on: windows-latest
+    # The comparison's runner, set only here; the cache job reuses it because the
+    # cache key includes the OS. Changing it needs a calibration of the new runner
+    # (docs/maintainers/pr-reports.md#calibration).
+    runs-on: &runner windows-latest
     # tools/pr_report.py derives the sampling deadline from this limit
     # (JOB_TIMEOUT_SECONDS) and keeps 60 seconds for the report and uploads.
     timeout-minutes: 15
     steps:
       - name: Record job start
-        shell: python
+        shell: bash
         run: |
-          import os, time
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as environment:
-              environment.write(f"PR_REPORT_JOB_START={time.monotonic()!r}\n")
+          python=python3; if [ "$RUNNER_OS" = Windows ]; then python=python; fi
+          echo "PYTHON=$python" >> "$GITHUB_ENV"
+          echo "PR_REPORT_JOB_START=$("$python" -c 'import time; print(repr(time.monotonic()))')" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
@@ -78,7 +81,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           REPORT_DIRECTORY: ${{ runner.temp }}/pr-report
-        run: python tools/pr_report.py --output "$env:REPORT_DIRECTORY" --head "$env:PR_HEAD"
+        shell: bash
+        run: '"$PYTHON" tools/pr_report.py --output "$REPORT_DIRECTORY" --head "$PR_HEAD"'
       # The small comment artifact goes first so a slow full upload cannot cost the comment.
       - name: Upload comment data
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -103,7 +107,7 @@ jobs:
   cache:
     name: Dependency cache
     if: github.event_name == 'push'
-    runs-on: windows-latest
+    runs-on: *runner
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
