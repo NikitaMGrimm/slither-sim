@@ -123,7 +123,8 @@ impl PreyConfig {
         let catch = nutrition(upper / 5.0, 2.0) * self.nutrition_factor;
         if !(catch + MAX_SEGMENTS as f64).is_finite() {
             return Err(
-                "Prey nutrition (largest size² × 0.0031535 × nutritionFactor), added to a                  snake's mass, must be finite"
+                "Prey nutrition (largest size² × 0.0031535 × nutritionFactor), added to a \
+                 snake's mass, must be finite"
                     .into(),
             );
         }
