@@ -30,7 +30,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
-    f64::consts::{PI, TAU},
+    f64::consts::TAU,
     sync::Arc,
 };
 
@@ -419,7 +419,7 @@ impl Slot {
 /// Simulator backend whose clients reconstruct frames from protocol-19 bytes.
 ///
 /// `reconnect` opens a new connection and respawns the slot with the core
-/// `Simulator::respawn` at a clear pose drawn from `spawn::spawn_distance`;
+/// `Simulator::respawn_body` at a clear pose drawn from `spawn::spawn_distance`;
 /// a living snake is first removed without death food. In-flight messages of the
 /// old connection are dropped.
 pub struct SimulatorBackend {
@@ -514,8 +514,8 @@ impl SimulatorBackend {
                 continue;
             }
             if backend.remote > 0 {
-                if let Ok((head, heading)) = backend.spawn_pose(slot) {
-                    backend.world.respawn(slot, head, heading, 2)?;
+                if let Ok((body, heading)) = backend.spawn_pose(slot) {
+                    backend.world.respawn_body(slot, body, heading)?;
                     backend.slots[slot].control.heading = heading;
                 }
                 // A crowded host leaves the slot dead; the normal background
@@ -680,13 +680,13 @@ impl SimulatorBackend {
         self.client_until(slot, now)?;
         // Deliveries and departures may have consumed the lifecycle records' room.
         self.slots[slot].room([0, 0])?;
-        let (head, heading) = self.spawn_pose(slot)?;
+        let (body, heading) = self.spawn_pose(slot)?;
         let s = &mut self.slots[slot];
         s.state.disconnect();
         s.record(now, WireEvent::Disconnect, &[])?;
         s.living = None;
         self.world.snakes[slot].alive = false;
-        self.world.respawn(slot, head, heading, 2)?;
+        self.world.respawn_body(slot, body, heading)?;
         let s = &mut self.slots[slot];
         s.life += 1;
         s.control = Action {
@@ -702,8 +702,9 @@ impl SimulatorBackend {
         self.client_until(slot, now)
     }
 
-    /// Clear pose for a new life, chosen with this slot treated as absent.
-    fn spawn_pose(&mut self, slot: usize) -> Result<(Point, f64), String> {
+    /// Clear body and heading for a new life, chosen with this slot treated
+    /// as absent; `Simulator::spawn_body` shapes it.
+    fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
         let alive = self.world.snakes[slot].alive;
         self.world.snakes[slot].alive = false;
         let mut pose = None;
@@ -711,13 +712,6 @@ impl SimulatorBackend {
             let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
             let angle = self.spawn_random.unit() * TAU;
             let heading = self.spawn_random.unit() * TAU;
-            // A `spawnRadius` ring faces inward, as `Simulator::add` does: a mode
-            // design choice, see docs/configuration.md#battledome.
-            let heading = if self.world.config.spawn_radius.is_some() {
-                angle + PI
-            } else {
-                heading
-            };
             let head = Point {
                 x: angle.cos() * distance,
                 y: angle.sin() * distance,
@@ -726,8 +720,9 @@ impl SimulatorBackend {
             // receipts support a large exclusion zone, but do not identify the
             // exact official test. Never fall back to near-contact placement
             // when the compact arena is crowded: defer this spawn instead.
-            if self.world.spawn_is_clear(head, heading, 2, 600.) {
-                pose = Some((head, heading));
+            let (body, heading) = self.world.spawn_body(head, heading)?;
+            if self.world.body_is_clear(&body, 600.) {
+                pose = Some((body, heading));
                 break;
             }
         }
@@ -1611,10 +1606,10 @@ impl RawSimulator {
             return Err("Nickname or custom skin is too long".into());
         }
         let b = &mut self.backend;
-        let (head, heading) = b.spawn_pose(slot)?;
+        let (body, heading) = b.spawn_pose(slot)?;
         b.slots[slot].living = None;
         b.world.snakes[slot].alive = false;
-        b.world.respawn(slot, head, heading, 2)?;
+        b.world.respawn_body(slot, body, heading)?;
         b.profiles[slot] = appearance;
         let s = &mut b.slots[slot];
         s.life += 1;

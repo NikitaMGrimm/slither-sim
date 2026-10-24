@@ -1,4 +1,5 @@
-use crate::Config;
+use crate::{Config, Point};
+use std::f64::consts::{FRAC_PI_2, TAU};
 
 /// Head distance of a new life: `config.spawn_radius`, or the official grid of
 /// `sample_spawn_distance`. Callers draw `unit` either way, so the setting never
@@ -7,6 +8,45 @@ pub fn spawn_distance(config: &Config, unit: f64) -> f64 {
     config
         .spawn_radius
         .unwrap_or_else(|| sample_spawn_distance(config.radius, unit))
+}
+
+/// A `segments`-anchor body along the circle through `head` around the center,
+/// trailing the head at the 42-unit anchor spacing, and its tangent heading.
+/// It turns counterclockwise when `heading` leans that way, else clockwise.
+/// `None` when the circle cannot hold the body without wrapping onto itself.
+/// A mode design choice for `spawnRadius` lives; see docs/configuration.md#battledome.
+pub fn ring_body(head: Point, heading: f64, segments: usize) -> Option<(Vec<Point>, f64)> {
+    let radius = head.distance(Point::default());
+    let step = ring_step(radius, segments)?;
+    let angle = head.y.atan2(head.x);
+    let turn = if (heading - angle - FRAC_PI_2).cos() >= 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
+    let body = (0..segments)
+        .map(|i| {
+            if i == 0 {
+                return head;
+            }
+            let a = angle - turn * step * i as f64;
+            Point {
+                x: a.cos() * radius,
+                y: a.sin() * radius,
+            }
+        })
+        .collect();
+    Some((body, angle + turn * FRAC_PI_2))
+}
+
+/// Angle between neighboring anchors 42 units apart on a circle of `radius`
+/// around the center, if `segments` of them fit without wrapping onto the head.
+pub(crate) fn ring_step(radius: f64, segments: usize) -> Option<f64> {
+    if !radius.is_finite() || radius <= 21.0 {
+        return None;
+    }
+    let step = 2.0 * (21.0 / radius).asin();
+    (segments as f64 * step < TAU).then_some(step)
 }
 
 /// Observed own-spawn radii lie on `0.009 + 0.011*n` of the arena radius.

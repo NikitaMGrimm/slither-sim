@@ -14,13 +14,13 @@
   (Apple silicon and Intel) and Windows (x86-64), with a `SHA256SUMS` file. They
   are unsigned. See [download a release](README.md#download-a-release).
 - A Battledome mode: `Config::battledome()`, or `"preset": "battledome"` in JSON,
-  keeps official physics and ecology in a fixed 3,584-unit arena with a one-way
-  pit, spawns on a ring between pit and wall, a 15-minute kill score and no prey.
-  It is built from four general world settings: `pit` (leaving it kills with
-  the new death reason `pit` and drops death food), `spawnRadius` (new lives
-  face inward), `killScoreSeconds` and `minScore`, a least displayed score
-  (400 in Battledome) that boosting or the kiosk penalty never shrink a snake
-  below. At or below it, boosting is free but still drops pellets.
+  raises the minimum snake size to 400 points in a fixed 3,584-unit arena with
+  a one-way pit, a 15-minute kill score and no prey; physics and ecology are
+  otherwise official. It is built from four general world settings: `pit`
+  (leaving it kills with the new death reason `pit` and drops death food),
+  `spawnRadius` (new lives lie along that ring), `killScoreSeconds` and
+  `minScore` (new lives start at it; boosting and the kiosk penalty spend only
+  mass above it, and boosting at it is free and drops no pellets).
   See [Battledome](docs/configuration.md#battledome).
 - World configs accept `"preset": "official" | "sandbox" | "battledome"` in
   `serve` and Python resets and in `host` and `client` config files; explicit
