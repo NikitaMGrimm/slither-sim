@@ -1180,8 +1180,11 @@ impl SimulatorBackend {
     /// Give every living prey a 16-bit wire ID. Truncating 64-bit simulator IDs
     /// would let a survivor and a much later prey share one (0 and 65536), so
     /// IDs are allocated: a prey keeps its ID while it lives, and a new prey
-    /// takes the first free ID from its own truncated value. An ID stays taken
-    /// while any connection still shows it, so a removal always precedes reuse.
+    /// takes the first free ID from its own truncated value. A retired prey's
+    /// ID is free at once. Only set-up connections show prey, and each one gets
+    /// `updates` in this broadcast, which sends every removal before any
+    /// appearance, so a connection still showing a retired ID sees it removed
+    /// before its reuse. All 65,536 IDs can therefore be live.
     fn assign_prey_wire(&mut self) -> Result<(), String> {
         let live: BTreeSet<u64> = self.world.prey.iter().map(|prey| prey.id).collect();
         self.prey_wire.retain(|id, _| live.contains(id));
@@ -1190,21 +1193,11 @@ impl SimulatorBackend {
             if self.prey_wire.contains_key(&id) {
                 continue;
             }
-            let taken = taken.get_or_insert_with(|| {
-                self.prey_wire
-                    .values()
-                    .copied()
-                    .chain(
-                        self.slots
-                            .iter()
-                            .flat_map(|slot| slot.connection.prey.values().map(|known| known.wire)),
-                    )
-                    .collect()
-            });
+            let taken = taken.get_or_insert_with(|| self.prey_wire.values().copied().collect());
             let wire = (0..=u16::MAX)
                 .map(|offset| (id as u16).wrapping_add(offset))
                 .find(|wire| !taken.contains(wire))
-                .ok_or("Protocol-19 prey IDs are 16-bit: more than 65536 prey are live or shown")?;
+                .ok_or("Protocol-19 prey IDs are 16-bit: more than 65536 prey are live")?;
             taken.insert(wire);
             self.prey_wire.insert(id, wire);
         }
@@ -2827,19 +2820,60 @@ mod tests {
         assert_eq!(appearances, BTreeSet::from([0, 1]));
         assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
 
-        // The ID of a removed prey is reused only after its removal was shown.
+        // A removed prey's ID is reused in the same broadcast, after its removal.
         sim.backend.world.prey.retain(|prey| prey.id != 0);
         sim.backend.world.prey.push(prey(131_072, 0.));
         sim.backend.broadcast().unwrap();
         let packets = remote.pump(&mut sim, 0);
-        assert!(packets.contains(&encode::prey_removal(0, None)));
-        let added: Vec<u16> = packets
+        let removal = packets
             .iter()
-            .filter(|p| p[0] == b'y' && p.len() == 20)
-            .map(|p| u16::from_be_bytes([p[1], p[2]]))
+            .position(|p| *p == encode::prey_removal(0, None));
+        let added: Vec<(usize, u16)> = packets
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p[0] == b'y' && p.len() == 20)
+            .map(|(index, p)| (index, u16::from_be_bytes([p[1], p[2]])))
             .collect();
-        assert_eq!(added, [2]);
+        assert_eq!(added.len(), 1);
+        assert_eq!(added[0].1, 0);
+        assert!(removal.unwrap() < added[0].0);
         assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
+    }
+
+    #[test]
+    fn every_prey_id_can_be_live_when_a_shown_prey_is_replaced() {
+        let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey ids");
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let head = sim.backend.world.snakes[0].head;
+        // One shown prey; the rest live beyond vision.
+        let prey = |id: u64, near: bool| crate::prey::Prey {
+            id,
+            position: Point {
+                x: head.x + if near { 0. } else { 1e6 },
+                y: head.y + 600.,
+            },
+            heading: 0.,
+            target_heading: 0.,
+            speed: 0.,
+            size: 6.,
+        };
+        sim.backend.world.prey = (0..65_536).map(|id| prey(id, id == 0)).collect();
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        // A catch and an immediate respawn: the shown ID retires as it is reused.
+        sim.backend.world.prey.retain(|prey| prey.id != 0);
+        sim.backend.world.prey.push(prey(65_536, true));
+        sim.backend.broadcast().unwrap();
+        let packets = remote.pump(&mut sim, 0);
+        let removal = packets
+            .iter()
+            .position(|p| *p == encode::prey_removal(0, None));
+        let added = packets
+            .iter()
+            .position(|p| p[0] == b'y' && p.len() == 20 && p[1..3] == [0, 0]);
+        assert!(removal.unwrap() < added.unwrap());
+        assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 1);
     }
 
     #[test]
