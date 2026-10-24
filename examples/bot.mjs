@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-const protocol = 'slither-sim-json-v2';
+const protocol = 'slither-sim-json-v3';
 const filename = process.platform === 'win32' ? 'slither-sim.exe' : 'slither-sim';
 const [binary = fileURLToPath(new URL(`../target/release/${filename}`, import.meta.url)), count = '200'] = process.argv.slice(2);
 const steps = Number(count);

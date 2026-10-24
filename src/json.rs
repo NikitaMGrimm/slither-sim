@@ -57,6 +57,7 @@ pub(crate) fn reply(protocol: &str, result: &impl Serialize) -> Vec<u8> {
 }
 
 /// A JSON-lines reply `{"error":..,"protocol":..}` without its newline.
+#[cfg(feature = "networking")]
 pub(crate) fn error_reply(protocol: &str, error: &str) -> Vec<u8> {
     #[derive(serde::Serialize)]
     struct Failure<'a> {

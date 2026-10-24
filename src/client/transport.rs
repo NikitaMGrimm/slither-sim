@@ -145,9 +145,17 @@ impl Session {
                 "defaultSimulationConfig": SimulationConfig::default(),
                 "defaultNetworkConfig": NetworkConfig::default(),
             }))),
-            Request::Simulation { seed, config } => self.replace(Active::Simulation(Box::new(
-                SimulatorBackend::new(seed, *config)?,
-            ))),
+            Request::Simulation { seed, config } => {
+                let warnings = config.warnings();
+                let reply = self.replace(Active::Simulation(Box::new(SimulatorBackend::new(
+                    seed, *config,
+                )?)))?;
+                // Only `serve` drives this session, and stdout carries only replies.
+                for warning in warnings {
+                    eprintln!("warning: {warning}");
+                }
+                Ok(reply)
+            }
             Request::Network { config } => {
                 self.replace(Active::Network(Box::new(NetworkBackend::connect(*config)?)))
             }

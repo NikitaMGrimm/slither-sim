@@ -262,9 +262,9 @@ fn rejected_requests_preserve_every_world() {
         json!({"op":"step","actions":[ok, {"heading":[0,1],"boost":[false,false],"x":1}]}),
         json!({"op":"reset","agents":0}),
         json!({"op":"reset","worlds":0}),
-        json!({"op":"reset","worlds":1025}),
+        json!({"op":"reset","agents":u64::from(u32::MAX) + 1}),
         json!({"op":"reset","config":{"dt":0}}),
-        json!({"op":"reset","decisionTicks":1001}),
+        json!({"op":"reset","decisionTicks":0}),
         json!({"op":"reset","config":{"unknownRule":true}}),
         json!({"op":"snapshot","world":2}),
         snapshots[0].clone(),
@@ -297,7 +297,9 @@ fn malformed_lines_and_unknown_requests_do_not_break_framing() {
         let info = &reply["result"];
         assert_eq!(info["version"], env!("CARGO_PKG_VERSION"));
         assert_eq!(info["defaultConfig"]["dt"], 0.007);
-        assert_eq!(info["maxWorlds"], 1024);
+        assert_eq!(info["maxAgents"], u32::MAX);
+        assert_eq!(info["maxWorlds"], usize::MAX);
+        assert_eq!(info["maxDecisionTicks"], u32::MAX);
         assert_eq!(info["origins"], json!(["ambient", "boost", "death"]));
         assert_eq!(
             info["precision"],
@@ -493,7 +495,10 @@ fn typed_steps_match_json_steps() {
 #[test]
 fn rejected_typed_steps_change_nothing() {
     let mut session = transport::Session::new();
-    assert_eq!(session.step(&[], &[]).unwrap_err(), "Reset first");
+    assert_eq!(
+        session.step(&[], &[]).unwrap_err(),
+        transport::StepError::Rejected("Reset first".into())
+    );
     result(&session.request(br#"{"op":"reset","seed":3,"agents":2,"worlds":2}"#));
     let state = |session: &mut transport::Session| {
         (0..2)
@@ -509,12 +514,16 @@ fn rejected_typed_steps_change_nothing() {
     let error = session
         .step(&[0.0, 1.0, 0.0, f64::NAN], &[false; 4])
         .unwrap_err();
-    assert_eq!(error, "World 1: Missing or invalid action for 1");
+    assert_eq!(
+        error,
+        transport::StepError::Rejected("World 1: Missing or invalid action for 1".into())
+    );
     let reply: Value = serde_json::from_slice(&session.request(
         br#"{"op":"step","actions":[{"heading":[0,1],"boost":[false,false]},{"heading":[0,null],"boost":[false,false]}]}"#,
     ))
     .unwrap();
-    assert_eq!(reply["error"], error);
+    assert_eq!(reply["error"], error.to_string());
+    assert_eq!(reply["sessionEnded"], false);
     for (headings, boosts) in [
         (&[0.0, 1.0, 0.0, f64::INFINITY][..], &[false; 4][..]),
         (&[0.0, 1.0, 0.0, f64::NEG_INFINITY], &[false; 4]),
@@ -527,6 +536,51 @@ fn rejected_typed_steps_change_nothing() {
     assert_eq!(state(&mut session), before);
     session.step(&[0.0, 1.0, 2.0, 3.0], &[false; 4]).unwrap();
     assert_ne!(state(&mut session), before);
+}
+
+#[test]
+fn terminal_steps_clear_all_worlds_and_allow_reset() {
+    use slither_sim::transport::StepError;
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/serve-errors-v3.json")).unwrap();
+    let reset = serde_json::to_vec(&fixture["reset"]).unwrap();
+    let step = serde_json::to_vec(&fixture["step"]).unwrap();
+    let mut session = transport::Session::new();
+    result(&session.request(&reset));
+    assert_eq!(session.worlds(), 2);
+    let error = session
+        .step(&[std::f64::consts::PI; 2], &[false; 2])
+        .unwrap_err();
+    assert!(matches!(error, StepError::Ended(_)), "{error}");
+    assert!(error.to_string().contains("mass would overflow"), "{error}");
+    assert_eq!((session.worlds(), session.agents()), (0, 0));
+    assert!(session.frame(0).is_none() && session.frame(1).is_none());
+    assert_eq!(
+        session.step(&[], &[]),
+        Err(StepError::Rejected("Reset first".into()))
+    );
+    let rejected: Value = serde_json::from_slice(&session.request(&step)).unwrap();
+    assert_eq!(rejected, fixture["rejectedReply"]);
+    result(&session.request(br#"{"op":"reset","agents":1}"#));
+    session.step(&[0.0], &[false]).unwrap();
+    assert!(session.frame(0).unwrap().time > 0.0);
+
+    // Exercise the stream and JSON error envelope independently of typed steps.
+    let replies = exchange(&[
+        fixture["step"].clone(),
+        fixture["reset"].clone(),
+        fixture["step"].clone(),
+        json!({"op":"snapshot"}),
+        json!({"op":"reset","agents":1}),
+        json!({"op":"step","actions":[{"heading":[0],"boost":[false]}]}),
+    ]);
+    assert_eq!(replies[0], fixture["rejectedReply"]);
+    assert_eq!(replies[2]["error"], error.to_string());
+    let mut terminal = replies[2].clone();
+    terminal["error"] = fixture["terminalReply"]["error"].clone();
+    assert_eq!(terminal, fixture["terminalReply"]);
+    assert_eq!(replies[3], fixture["rejectedReply"]);
+    assert!(replies[5]["result"]["worlds"][0]["time"].as_f64().unwrap() > 0.0);
 }
 
 #[test]
@@ -577,6 +631,7 @@ fn executable_emits_only_replies_and_exits_on_eof() {
         let result = child.wait_with_output().unwrap();
         assert!(result.status.success(), "{args:?}");
         assert!(result.stderr.is_empty());
+        assert_eq!(json_line(&in_process, 1)["result"]["warnings"], json!([]));
         let text = String::from_utf8(result.stdout).unwrap();
         assert_eq!(text.lines().count(), requests.len());
         assert!(
@@ -584,4 +639,80 @@ fn executable_emits_only_replies_and_exits_on_eof() {
             "{args:?} replies differ from in-process replies"
         );
     }
+}
+
+#[cfg(feature = "networking")]
+fn json_line(text: &str, index: usize) -> Value {
+    serde_json::from_str(text.lines().nth(index).unwrap()).unwrap()
+}
+
+#[test]
+#[cfg(feature = "networking")]
+fn reset_warnings_reach_the_reply_and_only_stderr() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let request = json!({"op":"reset","config":{"dt":0.01}});
+    let mut child = Command::new(env!("CARGO_BIN_EXE_slither-sim"))
+        .arg("serve")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(format!("{request}\n").as_bytes())
+        .unwrap();
+    let result = child.wait_with_output().unwrap();
+    assert!(result.status.success());
+    let stdout = String::from_utf8(result.stdout).unwrap();
+    assert_eq!(stdout.lines().count(), 1);
+    let warnings = json_line(&stdout, 0)["result"]["warnings"].clone();
+    assert_eq!(warnings.as_array().unwrap().len(), 1);
+    let stderr = String::from_utf8(result.stderr).unwrap();
+    assert_eq!(
+        stderr.trim_end(),
+        format!("warning: {}", warnings[0].as_str().unwrap())
+    );
+}
+
+#[test]
+fn reset_sizes_are_bounded_by_frame_types_and_memory_not_policy() {
+    let small = json!({"radius":300,"dynamicRadius":false,"foodCount":0,"prey":{"count":0}});
+    let wide = json!({"radius":5000,"dynamicRadius":false,"foodCount":0,"prey":{"count":0}});
+    let replies = exchange(&[
+        json!({"op":"reset","worlds":1025,"agents":1,"config":small}),
+        json!({"op":"reset","agents":1,"decisionTicks":1001,"config":wide}),
+        json!({"op":"step","actions":[{"heading":[0],"boost":[false]}]}),
+        json!({"op":"reset","agents":129,"config":small}),
+        json!({"op":"reset","agents":u64::from(u32::MAX) + 1,"config":small}),
+        json!({"op":"reset","decisionTicks":u64::from(u32::MAX) + 1,"config":small}),
+        json!({"op":"reset","worlds":usize::MAX,"agents":2,"config":small}),
+        json!({"op":"reset","worlds":usize::MAX,"agents":1,"config":small}),
+        json!({"op":"reset","worlds":0}),
+        json!({"op":"snapshot"}),
+    ]);
+    assert_eq!(
+        replies[0]["result"]["worlds"].as_array().unwrap().len(),
+        1025
+    );
+    assert_eq!(replies[1]["result"]["decisionTicks"], 1001);
+    assert_eq!(replies[2]["result"]["worlds"][0]["ticks"], 1001);
+    let errors: Vec<&str> = replies[4..9]
+        .iter()
+        .map(|reply| reply["error"].as_str().unwrap())
+        .collect();
+    assert!(errors[0].contains("u32::MAX means none"), "{}", errors[0]);
+    assert!(errors[1].contains("ticks as u32"), "{}", errors[1]);
+    assert!(errors[2].contains("worlds * agents"), "{}", errors[2]);
+    assert!(errors[3].contains("do not fit in memory"), "{}", errors[3]);
+    assert!(errors[4].contains("at least one world"), "{}", errors[4]);
+    // Rejected resets keep the 129-agent session.
+    assert_eq!(
+        replies[9]["result"]["snakes"].as_array().unwrap().len(),
+        129
+    );
 }

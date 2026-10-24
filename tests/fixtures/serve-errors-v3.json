@@ -1,0 +1,42 @@
+{
+  "description": "Synthetic numeric-overflow lifecycle regression, not server evidence. Error text is descriptive; terminalReply shows its shape with example text. The literal protocol and sessionEnded fields define the v3 error contract.",
+  "reset": {
+    "op": "reset",
+    "worlds": 2,
+    "agents": 1,
+    "decisionTicks": 1,
+    "config": {
+      "radius": 100,
+      "dynamicRadius": false,
+      "foodCount": 0,
+      "ambientReplenishPerSecond": 0,
+      "prey": {
+        "count": 100,
+        "size": 18.8,
+        "maxSize": 18.8,
+        "nutritionFactor": 1.6128984555936463e308,
+        "cruiseSpeed": 0,
+        "escapeSpeed": 0,
+        "sprintSpeed": 0,
+        "turnRate": 0
+      }
+    }
+  },
+  "step": {
+    "op": "step",
+    "actions": [
+      {"heading": [3.141592653589793], "boost": [false]},
+      {"heading": [3.141592653589793], "boost": [false]}
+    ]
+  },
+  "rejectedReply": {
+    "protocol": "slither-sim-json-v3",
+    "error": "Reset first",
+    "sessionEnded": false
+  },
+  "terminalReply": {
+    "protocol": "slither-sim-json-v3",
+    "error": "Advancement failed; the session has ended, reset to continue",
+    "sessionEnded": true
+  }
+}
