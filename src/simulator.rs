@@ -612,7 +612,18 @@ impl Simulator {
         };
         // Two segments face inward; a `minScore` body follows the ring counterclockwise.
         let (body, heading) = if self.spawn_segments() > 2 {
-            self.spawn_body(head, a + FRAC_PI_2)
+            let (body, heading) = self.spawn_body(head, a + FRAC_PI_2);
+            // A floor body too long for its ring falls back to straight anchors.
+            if body
+                .iter()
+                .any(|p| p.distance(Point::default()) >= self.config.radius)
+            {
+                return Err(
+                    "minScore spawn body extends outside arena; lower minScore or enlarge radius"
+                        .into(),
+                );
+            }
+            (body, heading)
         } else {
             let tail = Point {
                 x: head.x + a.cos() * 42.0,

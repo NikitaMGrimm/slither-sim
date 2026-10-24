@@ -645,9 +645,17 @@ fn ring_bodies_fall_back_on_circles_too_small_to_hold_them() {
     assert!((heading - PI).abs() < 1e-12);
     let mut config = Config::sandbox();
     config.min_score = Some(400.0);
-    let world = Simulator::new(1, config).unwrap();
+    let mut world = Simulator::new(1, config).unwrap();
     let head = Point { x: 100.0, y: 0.0 };
     let (body, heading) = world.spawn_body(head, 0.3);
     assert_eq!((body.len(), heading), (26, 0.3));
     assert!((body[25].distance(head) - 42.0 * 25.0).abs() < 1e-9);
+    // A straight fallback longer than the arena allows is rejected, not placed.
+    world.config.spawn_radius = Some(10.0);
+    let error = world.add("a", 0, 1).unwrap_err();
+    assert!(
+        error.starts_with("minScore spawn body extends outside arena"),
+        "{error}"
+    );
+    assert!(world.snakes.is_empty());
 }
