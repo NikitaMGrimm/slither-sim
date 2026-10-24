@@ -214,31 +214,27 @@ impl<'de> Deserialize<'de> for Config {
         Config::deserialize(Value::Object(fields)).map_err(D::Error::custom)
     }
 }
-/// Whether segment `a`-`b` passes within `radius` of the center. The closest
-/// point is found with coordinates divided by their largest magnitude, so a
-/// tiny path's squared length cannot underflow to zero and look like a point.
-/// An endpoint closest point is measured unscaled, as the head test is, since
-/// rescaling can move a point on the circle just inside it.
+/// Whether segment `a`-`b` passes within `radius` of the center. Endpoints
+/// are measured unscaled, as the head test is, since rescaling can move a
+/// point across the circle. An interior closest point is found with
+/// coordinates divided by their largest magnitude, so a tiny path's squared
+/// length cannot underflow to zero and look like a point.
 fn reaches_center(a: Point, b: Point, radius: f64) -> bool {
-    let scale = a.x.abs().max(a.y.abs()).max(b.x.abs()).max(b.y.abs());
-    if scale == 0.0 {
-        return radius > 0.0;
+    let origin = Point::default();
+    // The segment is never farther from the center than either endpoint.
+    if a.distance(origin) < radius || b.distance(origin) < radius {
+        return true;
     }
+    let scale = a.x.abs().max(a.y.abs()).max(b.x.abs()).max(b.y.abs());
     let (ax, ay) = (a.x / scale, a.y / scale);
     let (dx, dy) = (b.x / scale - ax, b.y / scale - ay);
     let length = dx * dx + dy * dy;
-    let t = if length == 0.0 {
-        0.0
-    } else {
-        -(ax * dx + ay * dy) / length
-    };
-    if t <= 0.0 {
-        return a.distance(Point::default()) < radius;
+    // An endpoint closest point was measured above.
+    if length == 0.0 {
+        return false;
     }
-    if t >= 1.0 {
-        return b.distance(Point::default()) < radius;
-    }
-    (ax + t * dx).hypot(ay + t * dy) * scale < radius
+    let t = -(ax * dx + ay * dy) / length;
+    t > 0.0 && t < 1.0 && (ax + t * dx).hypot(ay + t * dy) * scale < radius
 }
 /// Distance every spawn anchor keeps from the wall.
 const SPAWN_WALL_MARGIN: f64 = 60.0;

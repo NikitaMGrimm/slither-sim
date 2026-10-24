@@ -125,6 +125,29 @@ fn an_outward_step_from_the_pit_edge_does_not_enter() {
 }
 
 #[test]
+fn a_tiny_step_into_the_pit_counts_as_entry() {
+    // Synthetic: one ulp inward, which rescaling by 10000 collapses to a point.
+    let start = Point {
+        x: -7190.000000000015,
+        y: 10_000.0,
+    };
+    let radius = 12316.497066942378;
+    let step = start.x.abs() - start.x.abs().next_down();
+    let mut config = pit_world().config;
+    config.radius = 30_000.0;
+    config.pit = Some(PitConfig { radius });
+    config.dt = step / slither_sim::physics::base_speed(2);
+    let mut world = Simulator::new(11, config).unwrap();
+    world.add("creeper", 0, 1).unwrap();
+    place(&mut world, 0, start, 0.0);
+    assert!(distance(start) >= radius);
+    world.step(&straight(&world)).unwrap();
+    assert!(world.snakes[0].alive && distance(world.snakes[0].head) < radius);
+    let state = serde_json::to_value(&world).unwrap();
+    assert_eq!(state["pit_entered"][0], true);
+}
+
+#[test]
 fn clipping_the_pit_edge_within_one_tick_kills() {
     // A chord near the rim of the Battledome pit: both ends lie outside it.
     let mut config = Config::battledome();
