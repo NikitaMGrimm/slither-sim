@@ -4,6 +4,13 @@ Run `slither-sim serve`. One controller owns the world and all player slots.
 Send UTF-8 JSON objects, one per stdin line; read one stdout reply per request.
 EOF stops the process. Rust callers can use the library directly.
 
+`slither-sim serve --parallel` computes each reply's observations on every core,
+through rayon's global pool; set `RAYON_NUM_THREADS` to use fewer. Replies are
+byte-identical, so controllers cannot tell the difference. Writing the JSON reply
+usually costs far more than observing, so expect little: with dense food or wide
+vision, observing got about 3× faster but whole steps only 2–4%, and small
+worlds can get slightly slower.
+
 ```json
 {"protocol":"slither-sim-json-v1","result":{}}
 {"protocol":"slither-sim-json-v1","error":"Reset first"}
@@ -134,6 +141,7 @@ large batches over the current [rayon](https://docs.rs/rayon) thread pool;
 results are identical. It is off by default so that worlds you already run in
 parallel do not compete for cores; size the pool with `RAYON_NUM_THREADS` or run
 inside `ThreadPool::install`. It needs the default-enabled `parallel` feature.
+`transport::serve` takes the same switch in `ServeOptions`.
 
 ```sh
 cargo build --lib --no-default-features --locked

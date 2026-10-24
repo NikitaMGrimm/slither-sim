@@ -6,6 +6,23 @@ use std::io::{self, BufRead, Write};
 
 pub const PROTOCOL: &str = "slither-sim-json-v1";
 
+/// How [`serve`] runs its worlds. Replies never depend on these settings.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ServeOptions {
+    /// [`Simulator::set_parallel`] for every world the session resets.
+    #[cfg(feature = "parallel")]
+    pub parallel: bool,
+}
+
+impl ServeOptions {
+    fn apply(self, world: &mut Simulator) {
+        #[cfg(feature = "parallel")]
+        world.set_parallel(self.parallel);
+        #[cfg(not(feature = "parallel"))]
+        let _ = world;
+    }
+}
+
 fn default_seed() -> u32 {
     1
 }
@@ -96,8 +113,8 @@ struct WorldSession {
     observations: Vec<Option<Observation>>,
 }
 
-#[derive(Default)]
 struct Session {
+    options: ServeOptions,
     current: Option<WorldSession>,
 }
 
@@ -125,6 +142,7 @@ impl Session {
                 for slot in 0..agents {
                     world.add(slot.to_string(), slot, agents)?;
                 }
+                self.options.apply(&mut world);
                 // Keep the previous world's buffer; its vectors fit the next one.
                 let mut observations = self
                     .current
@@ -206,8 +224,15 @@ impl Session {
 }
 
 /// Serve a trusted local controller until EOF. Request errors leave the stream usable.
-pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> {
-    let mut session = Session::default();
+pub fn serve(
+    mut input: impl BufRead,
+    mut output: impl Write,
+    options: ServeOptions,
+) -> io::Result<()> {
+    let mut session = Session {
+        options,
+        current: None,
+    };
     let mut line = Vec::new();
     loop {
         line.clear();
@@ -226,5 +251,23 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
         output.write_all(&reply)?;
         output.write_all(b"\n")?;
         output.flush()?;
+    }
+}
+
+#[cfg(all(test, feature = "parallel"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resets_apply_the_parallel_option() {
+        for parallel in [false, true] {
+            let mut session = Session {
+                options: ServeOptions { parallel },
+                current: None,
+            };
+            let reset = serde_json::from_str(r#"{"op":"reset","agents":2}"#).unwrap();
+            session.handle(reset).unwrap();
+            assert_eq!(session.current.unwrap().world.parallel(), parallel);
+        }
     }
 }

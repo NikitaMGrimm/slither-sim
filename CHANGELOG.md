@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- `slither-sim serve --parallel` splits each reply's observations over every
+  core with byte-identical replies. JSON encoding still dominates each step, so
+  the gain is small. Library callers pass `transport::ServeOptions` to
+  `transport::serve`, which now takes it as a third argument.
+
 ## [0.3.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.0...v0.3.1) - 2026-10-24
 
 ### Added

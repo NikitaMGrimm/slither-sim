@@ -9,7 +9,7 @@ fn exchange(requests: &[Value]) -> Vec<Value> {
         input.push('\n');
     }
     let mut output = Vec::new();
-    transport::serve(Cursor::new(input), &mut output).unwrap();
+    transport::serve(Cursor::new(input), &mut output, Default::default()).unwrap();
     String::from_utf8(output)
         .unwrap()
         .lines()
@@ -84,7 +84,7 @@ fn malformed_lines_and_unknown_requests_do_not_break_framing() {
     let input =
         b"not json\n\n{\"op\":\"unknown\"}\n{\"op\":\"info\",\"extra\":1}\n\xff\n{\"op\":\"info\"}\r\n{\"op\":\"info\"}";
     let mut output = Vec::new();
-    transport::serve(Cursor::new(input), &mut output).unwrap();
+    transport::serve(Cursor::new(input), &mut output, Default::default()).unwrap();
     let lines: Vec<Value> = String::from_utf8(output)
         .unwrap()
         .lines()
@@ -171,4 +171,28 @@ fn executable_emits_only_replies_and_exits_on_eof() {
     assert_eq!(text.lines().count(), 1);
     let reply: Value = serde_json::from_str(text.trim()).unwrap();
     assert_eq!(reply["protocol"], transport::PROTOCOL);
+}
+
+#[cfg(feature = "parallel")]
+#[test]
+fn parallel_serving_writes_the_same_bytes() {
+    let mut requests = vec![json!({"op":"reset","seed":3,"agents":64})];
+    for step in 0..12 {
+        let actions: Vec<Value> = (0..64)
+            .map(|slot| json!({"heading": f64::from(slot * step) * 0.1, "boost": slot % 5 == 0}))
+            .collect();
+        requests.push(json!({"op":"step","actions":actions}));
+    }
+    let input: String = requests.iter().map(|r| format!("{r}\n")).collect();
+    let run = |parallel| {
+        let mut output = Vec::new();
+        let options = transport::ServeOptions { parallel };
+        transport::serve(Cursor::new(input.as_bytes()), &mut output, options).unwrap();
+        output
+    };
+    let sequential = run(false);
+    let replies = String::from_utf8(sequential.clone()).unwrap();
+    assert_eq!(replies.lines().count(), requests.len());
+    assert!(replies.lines().all(|line| line.contains("\"result\"")));
+    assert_eq!(run(true), sequential);
 }
