@@ -47,6 +47,7 @@ fn tame(p: Point) -> bool {
 /// Food positions bucketed into square cells, contiguous per cell row.
 struct FoodGrid {
     origin: Point,
+    cell: f64,
     inv_cell: f64,
     cols: usize,
     rows: usize,
@@ -71,7 +72,14 @@ impl FoodGrid {
         }
         let bounds = bounds.unwrap_or(Bounds::between(Point::default(), Point::default()));
         let cap = (2 * (food.len() - outliers.len()) + 16) as f64;
-        let mut cell = (vision * 0.5).max(1.0);
+        // Fine cells let each queried row follow the vision circle: about 1.15
+        // candidates per visible pellet in 96- and 128-snake worlds, against 1.7
+        // to 1.95 with half-radius cells and the full query box. Food narrower
+        // than the vision radius spans too few fine cells to trim and only pays
+        // for building more of them. See
+        // research/performance/2026-10-24-observation-food-index.
+        let narrow = (bounds.max.x - bounds.min.x).min(bounds.max.y - bounds.min.y) < vision;
+        let mut cell = (vision / if narrow { 2.0 } else { 8.0 }).max(1.0);
         let (cols, rows) = loop {
             let cols = ((bounds.max.x - bounds.min.x) / cell).floor() + 1.0;
             let rows = ((bounds.max.y - bounds.min.y) / cell).floor() + 1.0;
@@ -82,6 +90,7 @@ impl FoodGrid {
         };
         let mut grid = Self {
             origin: bounds.min,
+            cell,
             inv_cell: 1.0 / cell,
             cols,
             rows,
@@ -260,8 +269,18 @@ impl<'a> Observer<'a> {
                     count += usize::from(seen);
                     first = first.min(if seen { i / 64 } else { usize::MAX });
                 };
-                let (lo, hi) = (grid.col(b.min.x), grid.col(b.max.x));
                 for row in grid.row(b.min.y)..=grid.row(b.max.y) {
+                    // Only a chord of the circle can be visible in this row. Moving
+                    // the row a unit closer and using `reach` as the radius leave the
+                    // squared chord a margin above 2 * vision, far beyond its rounding
+                    // error for tame values, and the added unit covers the rest.
+                    let top = grid.origin.y + row as f64 * grid.cell;
+                    let dy = (top - me.head.y)
+                        .max(me.head.y - (top + grid.cell))
+                        .max(1.0)
+                        - 1.0;
+                    let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
+                    let (lo, hi) = (grid.col(me.head.x - half), grid.col(me.head.x + half));
                     let cells = row * grid.cols;
                     let span =
                         grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
@@ -683,6 +702,50 @@ mod tests {
             assert_eq!(key(&buffer), before, "case {case}");
             world.observe_selected_into(&mask, &mut buffer).unwrap();
             assert_eq!(key(&buffer), key(&selected), "case {case}");
+        }
+    }
+
+    /// Rows of the food grid are trimmed to a chord of the vision circle, which is
+    /// narrowest near the top and bottom of the circle.
+    #[test]
+    fn batches_keep_food_on_the_vision_edge_of_trimmed_rows() {
+        let mut rng = Rng(0x853c_49e6_748f_ea9b);
+        let ulps = |v: f64, n: i64| f64::from_bits((v.to_bits() as i64 + n) as u64);
+        for case in 0..60 {
+            let vision = [1500.0, 300.0, 1.0, 0.5, 1e5, (1u64 << 40) as f64][case % 6];
+            let offset = [0.0, 3e4, (1u64 << 39) as f64][rng.below(3)];
+            let mut world = world(&mut rng, 16, 0, vision);
+            for (i, snake) in world.snakes.iter_mut().enumerate() {
+                snake.alive = true;
+                snake.head = Point {
+                    x: offset + (i % 4) as f64 * vision * 0.7 + rng.unit(),
+                    y: -offset + (i / 4) as f64 * vision * 0.7 + rng.unit(),
+                };
+            }
+            let heads: Vec<Point> = world.snakes.iter().map(|s| s.head).collect();
+            world.food = (0..4096)
+                .map(|_| {
+                    let h = heads[rng.below(heads.len())];
+                    // Near the poles of the circle, and exactly on the vertical axis.
+                    let a = std::f64::consts::FRAC_PI_2 * [1.0, -1.0][rng.below(2)]
+                        + (rng.unit() - 0.5) * [0.0, 1e-6, 1e-3, 0.2][rng.below(4)];
+                    let r = ulps(vision, rng.below(9) as i64 - 4);
+                    let (sin, cos) = a.sin_cos();
+                    let x = ulps(h.x + cos * r, rng.below(5) as i64 - 2);
+                    let y = ulps(h.y + sin * r, rng.below(5) as i64 - 2);
+                    Food {
+                        x,
+                        y,
+                        value: rng.unit(),
+                        size: None,
+                        origin: None,
+                    }
+                })
+                .collect();
+            let single: Vec<_> = (0..16).map(|i| Some(world.observe(i).unwrap())).collect();
+            let visible: usize = single.iter().flatten().map(|o| o.food.len()).sum();
+            assert!(visible > 0, "case {case}");
+            assert_eq!(key(&world.observe_all()), key(&single), "case {case}");
         }
     }
 
