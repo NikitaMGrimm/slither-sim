@@ -805,12 +805,16 @@ impl Simulator {
                 Some(bounds)
             })
             .collect();
-        // Each snake's tip, heading direction and scale, as `head_tip` and
-        // `strikes` compute them, evaluated once rather than per pair.
+        // Each living snake's tip, heading direction and scale, as `head_tip` and
+        // `strikes` compute them, evaluated once rather than per pair. Dead
+        // slots are never probed or tested.
         let heads: Vec<(Point, (f64, f64), f64)> = self
             .snakes
             .iter()
             .map(|s| {
+                if !s.alive {
+                    return (Point::default(), (0.0, 0.0), 0.0);
+                }
                 let scale = scale(s.segments);
                 let direction = (s.heading.cos(), s.heading.sin());
                 let r = BODY_RADIUS * scale;
@@ -1224,30 +1228,37 @@ impl Simulator {
             .collect();
         // Index each living snake's swept circle path for many prey. Beyond the
         // largest radius plus one unit, a sweep's both ends lie past the
-        // `sweep_misses` limit on one axis, so skipped pairs never eat. The
-        // magnitude cap keeps rounding far inside that unit.
+        // `sweep_misses` limit on one axis, so skipped pairs never eat. Capping
+        // every operand of the exact test, not only the sums indexed here, keeps
+        // rounding far inside that unit; huge operands could cancel differently.
         const MAGNITUDE: f64 = 1e7;
-        let small = |b: &Bounds| {
-            [b.min.x, b.min.y, b.max.x, b.max.y]
-                .iter()
-                .all(|v| v.abs() <= MAGNITUDE)
-        };
+        let small = |values: &[f64]| values.iter().all(|v| v.abs() <= MAGNITUDE);
         let mut slots = vec![];
         let mut sweeps = vec![];
         let mut reach = 0.0f64;
+        let mut regular = true;
         for (i, circle) in circles.iter().enumerate() {
             if let Some((center, radius, lead)) = *circle {
                 let from = Point {
                     x: previous[i].x + lead.x,
                     y: previous[i].y + lead.y,
                 };
+                regular &= small(&[
+                    previous[i].x,
+                    previous[i].y,
+                    lead.x,
+                    lead.y,
+                    center.x,
+                    center.y,
+                    radius,
+                ]);
                 slots.push(i);
                 sweeps.push(Bounds::between(from, center));
                 reach = reach.max(radius + 1.0);
             }
         }
-        let index = (slots.len() * self.prey.len() >= 512 && sweeps.iter().all(small))
-            .then(|| BoundsIndex::new(&sweeps));
+        let index =
+            (regular && slots.len() * self.prey.len() >= 512).then(|| BoundsIndex::new(&sweeps));
         let mut candidates = vec![];
         self.prey.retain_mut(|prey| {
             let old = prey.position;
@@ -1296,7 +1307,8 @@ impl Simulator {
             };
             let query = Bounds::between(old, prey.position);
             let indexed = index.as_ref().is_some_and(|index| {
-                small(&query) && index.candidates(query, reach, &mut candidates)
+                small(&[old.x, old.y, prey.position.x, prey.position.y])
+                    && index.candidates(query, reach, &mut candidates)
             });
             // Both visit slots in ascending order, so ties resolve as before.
             let eater = if indexed {
@@ -1668,5 +1680,42 @@ mod prey_index_tests {
             assert!(sweep_misses(a, b, radius), "{a:?} {b:?} {radius}");
         }
         assert!(skipped > 10_000, "{skipped}");
+    }
+
+    /// Indexed sums near the origin can come from huge operands that cancel
+    /// differently in the exact test, which then still eats every prey.
+    #[test]
+    fn huge_cancelling_operands_skip_the_index() {
+        let mut config = Config::sandbox();
+        config.radius = 1e30;
+        config.dt = 1e-300;
+        config.food_count = 0;
+        config.ambient_replenish_per_second = 0.0;
+        config.kiosk.enabled = false;
+        let mut world = Simulator::new(123, config).unwrap();
+        world.add("0", 0, 1).unwrap();
+        let head = Point {
+            x: -(2f64.powi(70)),
+            y: 0.0,
+        };
+        let s = &mut world.snakes[0];
+        s.head = head;
+        s.heading = 0.0;
+        s.body = vec![head; s.segments];
+        // The pickup lead almost cancels the head, leaving the circle near the prey.
+        s.speed = f64::from_bits((-head.x / (0.032 * 7.55)).to_bits() + 1);
+        world.initialize_speed_state(0, Some(0.0)).unwrap();
+        world.prey = (0..512)
+            .map(|id| Prey {
+                id,
+                position: Point { x: 2048.0, y: 0.0 },
+                heading: 0.0,
+                target_heading: 0.0,
+                speed: 0.0,
+                size: 6.0,
+            })
+            .collect();
+        world.step(&[Some(Action::default())]).unwrap();
+        assert!(world.prey.is_empty(), "{} prey left", world.prey.len());
     }
 }
