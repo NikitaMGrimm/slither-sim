@@ -1,6 +1,8 @@
+import contextlib
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,6 +11,24 @@ from unittest.mock import patch
 
 import release
 import release_automation as automation
+
+# Variables that point Git away from the working directory; hooks set GIT_DIR, for example.
+GIT_LOCATION = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_NAMESPACE")
+
+
+@contextlib.contextmanager
+def fixture_repository():
+    """A new temporary repository as `release.ROOT` that inherited Git variables cannot redirect."""
+    with (tempfile.TemporaryDirectory() as directory, patch.dict(os.environ),
+          patch.object(release, "ROOT", Path(directory))):
+        for name in GIT_LOCATION:
+            os.environ.pop(name, None)
+        subprocess.run(["git", "init", "--quiet"], cwd=directory, check=True)
+        git_dir = subprocess.check_output(["git", "rev-parse", "--absolute-git-dir"], cwd=directory, text=True)
+        if not os.path.samefile(git_dir.strip(), Path(directory) / ".git"):
+            raise AssertionError(f"fixture Git commands reached {git_dir.strip()}")
+        yield directory
 
 
 class AutomationTests(unittest.TestCase):
@@ -196,11 +216,10 @@ class AutomationTests(unittest.TestCase):
 
 class GitIntegrationTests(unittest.TestCase):
     def test_original_version_commit_and_metadata_validation_with_real_git_history(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(release, "ROOT", Path(directory)):
+        with fixture_repository() as directory:
             def git(*args):
                 return subprocess.check_output(["git", *args], cwd=directory, text=True).strip()
 
-            git("init", "--quiet")
             git("config", "user.name", "Test")
             git("config", "user.email", "test@example.invalid")
             root = Path(directory)
@@ -246,6 +265,61 @@ class GitIntegrationTests(unittest.TestCase):
                         patch.object(release, "github", return_value=pr):
                     self.assertEqual(automation.manual_release_merge(bump), pr)
                     self.assertIsNone(automation.manual_release_merge(base))
+
+    def test_inherited_workspace_versions_move_with_the_root_package(self):
+        with fixture_repository() as directory:
+            root = Path(directory)
+
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=directory, text=True).strip()
+
+            def commit(files, message):
+                for name, text in files.items():
+                    (root / name).parent.mkdir(parents=True, exist_ok=True)
+                    (root / name).write_text(text)
+                git("add", ".")
+                git("commit", "--quiet", "-m", message)
+                return git("rev-parse", "HEAD")
+
+            def lock(root_version, ffi_version, tool_version="1.0.0"):
+                return "version = 4\n" + "".join(
+                    f'[[package]]\nname = "{name}"\nversion = "{version}"\n'
+                    for name, version in (("slither-sim", root_version), ("slither-sim-ffi", ffi_version),
+                                          ("tool", tool_version)))
+
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.invalid")
+            manifest = ('[package]\nname = "slither-sim"\nversion.workspace = true\n'
+                        '[workspace]\nmembers = ["ffi", "tool"]\n[workspace.package]\nversion = "0.2.0"\n')
+            base = commit({
+                "Cargo.toml": manifest,
+                "ffi/Cargo.toml": '[package]\nname = "slither-sim-ffi"\nversion.workspace = true\n',
+                "tool/Cargo.toml": '[package]\nname = "tool"\nversion = "1.0.0"\n',
+                "Cargo.lock": lock("0.2.0", "0.2.0"),
+                "CHANGELOG.md": "Initial\n",
+            }, "initial")
+            self.assertEqual(release.package_at(base)["version"], "0.2.0")
+            bump = {"Cargo.toml": manifest.replace("0.2.0", "0.2.1"), "CHANGELOG.md": "Release 0.2.1\n"}
+            heads = {}
+            for label, lockfile in (("members follow", lock("0.2.1", "0.2.1")),
+                                    ("member left behind", lock("0.2.1", "0.2.0")),
+                                    ("independent member bumped", lock("0.2.1", "0.2.1", "0.2.1"))):
+                git("checkout", "--quiet", "--detach", base)
+                heads[label] = commit({**bump, "Cargo.lock": lockfile}, label)
+            self.assertEqual(release.package_at(heads["members follow"])["version"], "0.2.1")
+            original_run = subprocess.run
+
+            def local_run(command, **kwargs):
+                if command[:2] == ["git", "fetch"]:
+                    return subprocess.CompletedProcess(command, 0)
+                return original_run(command, **kwargs)
+
+            with patch.object(subprocess, "run", side_effect=local_run):
+                for label, expected in (("members follow", True), ("member left behind", False),
+                                        ("independent member bumped", False)):
+                    with self.subTest(label):
+                        self.assertEqual(automation.metadata_only(base, heads[label], AutomationTests.package),
+                                         expected)
 
 
 class ManualReleaseTests(unittest.TestCase):

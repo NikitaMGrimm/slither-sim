@@ -10,7 +10,8 @@ to find its source owner and focused check.
 | --- | --- |
 | Write a bot using received client state | [Portable bot API](client-api.md) |
 | Control a world directly or embed the Rust core | [Geometric controller and library](bot-api.md) |
-| Run geometric sessions in-process from C, Python or another language | [C ABI](c-api.md) |
+| Run geometric sessions in-process from Python | [Python package](python.md) |
+| Run geometric sessions in-process from C or another language | [C ABI](c-api.md) |
 | Connect the stock browser or host WebSocket clients | [Server guide](raw-server.md) |
 | Choose world, latency and network settings | [Configuration reference](configuration.md) |
 | Understand food colors and renderer differences | [Client presentation](presentation.md) |

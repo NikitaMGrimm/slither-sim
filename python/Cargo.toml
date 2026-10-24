@@ -1,0 +1,19 @@
+[package]
+name = "slither-sim-py"
+version.workspace = true
+edition = "2024"
+rust-version = "1.86"
+description = "Python bindings for slither-sim transport sessions"
+repository = "https://github.com/NikitaMGrimm/slither-sim"
+license = "MIT"
+publish = false
+
+[lib]
+name = "slither_sim_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.30", features = ["abi3-py311"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+slither-sim = { path = "..", default-features = false, features = ["parallel"] }

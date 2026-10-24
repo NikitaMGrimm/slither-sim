@@ -74,6 +74,7 @@ The host binds loopback by default. Stop it with Ctrl+C.
 | Run a bot in simulation or on protocol-19 servers | [`client` JSON API](docs/client-api.md), or Rust `BotRunner`. |
 | Connect WebSocket clients to a shared world | [`host`](docs/raw-server.md). |
 | Control all slots with direct simulation observations | [`serve` JSON API](docs/bot-api.md), or Rust `Simulator`. |
+| Run `serve` sessions in-process from Python | [Python package](docs/python.md). |
 | Run `serve` sessions in-process from any language | [C ABI](docs/c-api.md), or Rust `transport::Session`. |
 
 The portable backends share a Rust packet decoder; bots in other languages use

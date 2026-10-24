@@ -90,9 +90,18 @@ def cooldown_ready(name, now=None, manual_release=None):
     return ready
 
 
+def inherits_version(manifest):
+    return manifest["package"].get("version") == {"workspace": True}
+
+
+def version_table(manifest):
+    """The table holding the root package's version: `[package]` or `[workspace.package]`."""
+    return manifest["workspace"]["package"] if inherits_version(manifest) else manifest["package"]
+
+
 def package_at(commit):
-    manifest = subprocess.check_output(["git", "show", f"{commit}:Cargo.toml"], cwd=ROOT, text=True)
-    return tomllib.loads(manifest)["package"]
+    manifest = tomllib.loads(subprocess.check_output(["git", "show", f"{commit}:Cargo.toml"], cwd=ROOT, text=True))
+    return {**manifest["package"], "version": version_table(manifest)["version"]}
 
 
 def published_commit(name, version):
