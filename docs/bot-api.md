@@ -78,8 +78,9 @@ interval. There is no network delay, automatic respawn, reward, victory
 condition or episode timeout. Use `reset` for new worlds.
 
 Returns `worlds`, one frame per world. Frame rows, counts and offsets are
-`u32`. A step whose frame cannot hold them, or whose pickup would overflow a
-snake's mass, ends the session after its worlds advanced, so reset to continue.
+`u32`. A step whose frame cannot hold them, whose pickup would overflow a
+snake's mass or whose reply cannot be allocated ends the session after its
+worlds advanced, so reset to continue.
 
 ### snapshot
 

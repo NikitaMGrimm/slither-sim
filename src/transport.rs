@@ -386,17 +386,16 @@ impl Session {
                         .map_err(|error| format!("World {index}: {error}"))?;
                 }
                 let decision_ticks = run.decision_ticks;
-                let frames = each_ok(each_world(&mut run.worlds, |state| {
+                let reply = each_ok(each_world(&mut run.worlds, |state| {
                     state.advance(decision_ticks)?;
                     Ok(state.frame.encode())
-                }));
-                match frames {
-                    Ok(frames) => worlds_reply(b"", &frames),
-                    Err(error) => {
-                        self.current = None;
-                        Err(error + ENDED)
-                    }
-                }
+                }))
+                .and_then(|frames| worlds_reply(b"", &frames));
+                // Either failure follows advancement, so a retry would step twice.
+                reply.map_err(|error| {
+                    self.current = None;
+                    error + ENDED
+                })
             }
             Request::Snapshot { world } => {
                 let run = self.current.as_ref().ok_or("Reset first")?;
