@@ -109,6 +109,22 @@ fn a_tiny_pit_crossing_does_not_underflow() {
 }
 
 #[test]
+fn an_outward_step_from_the_pit_edge_does_not_enter() {
+    // The start lies just outside the pit; rescaling it put it just inside.
+    let mut world = pit_world();
+    world.add("edge", 0, 1).unwrap();
+    let start = Point {
+        x: 198.7222621040017,
+        y: 22.57127697469633,
+    };
+    assert!(distance(start) >= 200.0);
+    place(&mut world, 0, start, 0.11309733552923254);
+    world.step(&straight(&world)).unwrap();
+    assert!(world.snakes[0].alive, "{:?}", world.deaths);
+    assert!(distance(world.snakes[0].head) > distance(start));
+}
+
+#[test]
 fn clipping_the_pit_edge_within_one_tick_kills() {
     // A chord near the rim of the Battledome pit: both ends lie outside it.
     let mut config = Config::battledome();

@@ -214,19 +214,31 @@ impl<'de> Deserialize<'de> for Config {
         Config::deserialize(Value::Object(fields)).map_err(D::Error::custom)
     }
 }
-/// Whether segment `a`-`b` passes within `radius` of the center. Coordinates
-/// are first divided by their largest magnitude, so a tiny path's squared
-/// length cannot underflow to zero and look like a point.
+/// Whether segment `a`-`b` passes within `radius` of the center. The closest
+/// point is found with coordinates divided by their largest magnitude, so a
+/// tiny path's squared length cannot underflow to zero and look like a point.
+/// An endpoint closest point is measured unscaled, as the head test is, since
+/// rescaling can move a point on the circle just inside it.
 fn reaches_center(a: Point, b: Point, radius: f64) -> bool {
     let scale = a.x.abs().max(a.y.abs()).max(b.x.abs()).max(b.y.abs());
     if scale == 0.0 {
         return radius > 0.0;
     }
-    let unit = |p: Point| Point {
-        x: p.x / scale,
-        y: p.y / scale,
+    let (ax, ay) = (a.x / scale, a.y / scale);
+    let (dx, dy) = (b.x / scale - ax, b.y / scale - ay);
+    let length = dx * dx + dy * dy;
+    let t = if length == 0.0 {
+        0.0
+    } else {
+        -(ax * dx + ay * dy) / length
     };
-    segment_distance(Point::default(), unit(a), unit(b)) * scale < radius
+    if t <= 0.0 {
+        return a.distance(Point::default()) < radius;
+    }
+    if t >= 1.0 {
+        return b.distance(Point::default()) < radius;
+    }
+    (ax + t * dx).hypot(ay + t * dy) * scale < radius
 }
 /// Distance every spawn anchor keeps from the wall.
 const SPAWN_WALL_MARGIN: f64 = 60.0;
