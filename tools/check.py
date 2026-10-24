@@ -6,24 +6,39 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST_GROUPS = ("rust", "tools", "package")
-GROUPS = (*HOST_GROUPS, "wasm")
+# `rust` is `lint` followed by `test`; CI runs the two parts as separate jobs.
+GROUPS = (*HOST_GROUPS, "lint", "test", "wasm")
+
+
+def clippy(*features):
+    return ["cargo", "clippy", "--all-targets", *features, "--locked", "--", "-D", "warnings"]
 
 
 def commands(group):
     if group == "rust":
+        return commands("lint") + commands("test")
+    if group == "lint":
+        # Without -p or --workspace, the root package builds alone, so the C ABI
+        # crate's `parallel` dependency cannot re-enable a feature under test.
         return [
             ["cargo", "fmt", "--all", "--check"],
+            clippy("--workspace"),
+            clippy("--no-default-features"),
+            clippy("--no-default-features", "--features", "networking"),
+            clippy("--no-default-features", "--features", "parallel"),
+        ]
+    if group == "test":
+        return [
             ["cargo", "test", "--all-targets", "--locked"],
             ["cargo", "test", "--all-targets", "--no-default-features", "--locked"],
             ["cargo", "test", "--doc", "--locked"],
             ["cargo", "test", "--doc", "--no-default-features", "--locked"],
             ["cargo", "test", "-p", "slither-sim-ffi", "--all-targets", "--locked"],
-            ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"],
-            ["cargo", "clippy", "--all-targets", "--no-default-features", "--locked", "--", "-D", "warnings"],
             ["cargo", "run", "--locked", "--example", "basic"],
         ]
     if group == "tools":
@@ -67,30 +82,55 @@ def select_groups(requested):
     return result
 
 
+def summarize(timings):
+    """Appends a per-command timing table to the GitHub job summary, when there is one."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path or not timings:
+        return
+    rows = ["| Group | Command | Seconds | Result |", "| --- | --- | ---: | --- |"]
+    for group, command, seconds, code in timings:
+        shown = shlex.join(command).replace(str(ROOT), ".").replace("|", "\\|")
+        result = "ok" if code == 0 else f"exit {code}"
+        rows.append(f"| {group} | `{shown}` | {seconds:.1f} | {result} |")
+    with open(path, "a", encoding="utf-8") as summary:
+        summary.write("\n".join(rows) + "\n\n")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("groups", nargs="*", metavar="GROUP", help="rust, tools, package, wasm, or all (default)")
+    parser.add_argument("groups", nargs="*", metavar="GROUP",
+                        help="rust (lint and test), tools, package, wasm, lint, test, or all (default)")
     parser.add_argument("--list", action="store_true", help="print commands without running them")
     args = parser.parse_args(argv)
     requested = args.groups or ["all"]
     if any(group not in (*GROUPS, "all") for group in requested):
-        parser.error("groups must be rust, tools, package, wasm, or all")
+        parser.error("groups must be rust, tools, package, wasm, lint, test, or all")
     environment = os.environ.copy()
+    # Bounded defaults for shared machines; CI sets both to its runners' cores.
     environment.setdefault("CARGO_BUILD_JOBS", "2")
     environment.setdefault("RUST_TEST_THREADS", "2")
-    for group in select_groups(requested):
-        for command in commands(group):
-            print(f"[{group}] {shlex.join(command)}", flush=True)
-            if args.list:
-                continue
-            try:
-                result = subprocess.run(command, cwd=ROOT, env=environment, check=False)
-            except OSError as error:
-                print(f"Cannot run {command[0]}: {error}", file=sys.stderr)
-                return 1
-            if result.returncode:
-                return result.returncode if result.returncode > 0 else 1
-    return 0
+    timings = []
+    try:
+        for group in select_groups(requested):
+            for command in commands(group):
+                print(f"[{group}] {shlex.join(command)}", flush=True)
+                if args.list:
+                    continue
+                start = time.monotonic()
+                try:
+                    result = subprocess.run(command, cwd=ROOT, env=environment, check=False)
+                except OSError as error:
+                    print(f"Cannot run {command[0]}: {error}", file=sys.stderr)
+                    timings.append((group, command, time.monotonic() - start, 1))
+                    return 1
+                seconds = time.monotonic() - start
+                timings.append((group, command, seconds, result.returncode))
+                print(f"[{group}] {seconds:.1f} s, exit {result.returncode}", flush=True)
+                if result.returncode:
+                    return result.returncode if result.returncode > 0 else 1
+        return 0
+    finally:
+        summarize(timings)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import io
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -37,6 +38,36 @@ class CheckRunnerTests(unittest.TestCase):
                 self.assertEqual(check.main(["rust", "tools"]), 7)
         self.assertEqual(run.call_count, 1)
         self.assertEqual(run.call_args.kwargs["cwd"], check.ROOT)
+
+    def test_rust_is_lint_then_test(self):
+        self.assertEqual(check.commands("rust"), check.commands("lint") + check.commands("test"))
+        lint = check.commands("lint")
+        for features in ([], ["--features", "networking"], ["--features", "parallel"]):
+            self.assertIn(check.clippy("--no-default-features", *features), lint)
+        # Feature checks build the root package alone, never with the whole workspace.
+        self.assertTrue(all("--workspace" not in command for command in lint if "--no-default-features" in command))
+
+    def test_job_summary_records_each_command_until_the_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "summary.md"
+            results = [subprocess.CompletedProcess([], 0), subprocess.CompletedProcess([], 3)]
+            with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary)}), \
+                    patch.object(check.subprocess, "run", side_effect=results), \
+                    redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(check.main(["lint"]), 3)
+            rows = summary.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(rows), 2 + 2 + 1)
+        self.assertRegex(rows[2], r"^\| lint \| `cargo fmt --all --check` \| \d+\.\d \| ok \|$")
+        self.assertTrue(rows[3].endswith("| exit 3 |"))
+        self.assertIn("[lint] ", output.getvalue())
+
+    def test_no_summary_outside_ci_or_when_listing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "summary.md"
+            with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary)}), \
+                    redirect_stdout(io.StringIO()):
+                self.assertEqual(check.main(["rust", "--list"]), 0)
+            self.assertFalse(summary.exists())
 
     def test_tool_children_use_the_running_python_and_expanded_node_paths(self):
         commands = check.commands("tools")

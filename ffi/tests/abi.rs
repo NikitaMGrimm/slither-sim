@@ -146,7 +146,8 @@ fn frame_layout_matches_the_header() {
 
 /// Has a real C compiler check the header against the Rust layout, so a bug in
 /// the parser above cannot hide a mismatch. Hosts without `cc` (or `$CC`), such
-/// as plain Windows shells, skip this part; Linux CI has one.
+/// as plain Windows shells, skip this part unless `SLITHER_SIM_REQUIRE_CC` is
+/// set, as it is in the Linux and macOS CI jobs.
 fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
     use std::process::Command;
     let mut source = String::from("#include <stddef.h>\n#include \"slither_sim.h\"\n");
@@ -174,7 +175,10 @@ fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
             "{compiler} rejected the header layout:\n{}",
             String::from_utf8_lossy(&output.stderr)
         ),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                && std::env::var_os("SLITHER_SIM_REQUIRE_CC").is_none_or(|v| v.is_empty()) =>
+        {
             eprintln!("skipped the C compiler layout check: {compiler} not found");
         }
         Err(error) => panic!("could not run {compiler}: {error}"),
