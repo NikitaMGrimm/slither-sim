@@ -93,19 +93,22 @@ impl PreyConfig {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        let values = [
+        // Zero is a stationary, non-turning or non-nourishing prey.
+        let nonnegative = [
             self.cruise_speed,
             self.escape_speed,
             self.sprint_speed,
             self.turn_rate,
+            self.nutrition_factor,
+        ];
+        let positive = [
             self.flee_half_width,
             self.size,
             self.max_size,
-            self.nutrition_factor,
             self.respawn_seconds,
         ];
-        if self.count > 10000
-            || values.iter().any(|x| !x.is_finite() || *x <= 0.0)
+        if nonnegative.iter().any(|x| !x.is_finite() || *x < 0.0)
+            || positive.iter().any(|x| !x.is_finite() || *x <= 0.0)
             || self.escape_speed < self.cruise_speed
             || self.sprint_speed < self.escape_speed
             || self.max_size < self.size

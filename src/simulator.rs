@@ -28,8 +28,8 @@ impl Default for DeathFoodConfig {
 }
 impl DeathFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 || self.max_per_cell == 0 {
-            return Err("Invalid death-food density configuration".into());
+        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
+            return Err("Death-food cellSize must be positive and finite".into());
         }
         Ok(())
     }
@@ -54,8 +54,8 @@ impl Default for AmbientFoodConfig {
 }
 impl AmbientFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 || self.max_per_cell == 0 {
-            return Err("Invalid ambient-food density configuration".into());
+        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
+            return Err("Ambient-food cellSize must be positive and finite".into());
         }
         Ok(())
     }
@@ -80,8 +80,8 @@ impl Default for BoostFoodConfig {
 }
 impl BoostFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 || self.max_per_cell == 0 {
-            return Err("Invalid boost-food density configuration".into());
+        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
+            return Err("Boost-food cellSize must be positive and finite".into());
         }
         Ok(())
     }
@@ -183,20 +183,13 @@ impl Config {
         }
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.food_count > 100_000 {
-            return Err("foodCount must be at most 100000".into());
-        }
         if [self.radius, self.vision, self.dt]
             .iter()
             .any(|n| !n.is_finite() || *n <= 0.0)
         {
             return Err("Settings must be positive finite numbers".into());
         }
-        if !self.ambient_replenish_per_second.is_finite()
-            || !(0.0..=10_000.0).contains(&self.ambient_replenish_per_second)
-        {
-            return Err("ambientReplenishPerSecond must be finite and between 0 and 10000".into());
-        }
+        check_ambient_rate(self.ambient_replenish_per_second, self.dt)?;
         if self.dt > 0.032 {
             return Err("dt must be at most 32ms".into());
         }
@@ -208,6 +201,24 @@ impl Config {
         crate::boundary::validate(&self.radius_updates)
     }
 }
+/// Refill subtracts one attempt interval at a time from a clock below
+/// `interval + dt` until it runs out. Unless that subtraction changes the clock,
+/// the loop never ends, so f64 resolution, not a policy cap, bounds the rate.
+fn check_ambient_rate(rate: f64, dt: f64) -> Result<(), String> {
+    if !rate.is_finite() || rate < 0.0 {
+        return Err("ambientReplenishPerSecond must be finite and nonnegative".into());
+    }
+    let interval = 1.0 / rate;
+    let clock = dt + interval;
+    if rate > 0.0 && clock - interval >= clock {
+        return Err(format!(
+            "ambientReplenishPerSecond {rate} with dt {dt} is too high: one attempt interval \
+             no longer changes the refill clock in f64"
+        ));
+    }
+    Ok(())
+}
+
 /// Constant-density boundary heuristic. Population/radius pairs do not identify
 /// the server's controller; measured replay uses `Config::radius_updates` instead.
 pub fn population_radius(snakes: usize) -> f64 {
@@ -330,9 +341,7 @@ impl Simulator {
     /// Zero disables refill and discards pending credit. Invalid rates or unrepresentable
     /// clock rescaling leave the world unchanged. Use this instead of editing the rate directly.
     pub fn set_ambient_rate(&mut self, rate: f64) -> Result<(), String> {
-        if !rate.is_finite() || !(0.0..=10_000.0).contains(&rate) {
-            return Err("Ambient rate must be finite and between 0 and 10000".into());
-        }
+        check_ambient_rate(rate, self.config.dt)?;
         if rate != self.config.ambient_replenish_per_second {
             let credit = self.ambient_clock * self.config.ambient_replenish_per_second;
             let clock = if rate > 0.0 { credit / rate } else { 0.0 };
@@ -377,7 +386,15 @@ impl Simulator {
             parallel: false,
         };
         world.update_radius(0.0);
-        world.food.reserve(world.config.food_count);
+        world
+            .food
+            .try_reserve(world.config.food_count)
+            .map_err(|_| {
+                format!(
+                    "foodCount {} does not fit in memory",
+                    world.config.food_count
+                )
+            })?;
         world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
         // candidate is not retried, so crowded small worlds can start below it.

@@ -53,12 +53,13 @@ impl KioskConfig {
             || self.grace_seconds < 0.0
             || !self.stationary_radius.is_finite()
             || self.stationary_radius <= 0.0
+            // A zero rate freezes that phase: exp(-0 * dt) keeps the score.
             || !self.shrink_per_second.is_finite()
-            || self.shrink_per_second <= 0.0
+            || self.shrink_per_second < 0.0
             || !self.score_decay_per_second.is_finite()
-            || self.score_decay_per_second <= 0.0
+            || self.score_decay_per_second < 0.0
             || !self.recovery_per_second.is_finite()
-            || self.recovery_per_second <= 0.0
+            || self.recovery_per_second < 0.0
         {
             return Err("Invalid kiosk penalty configuration".into());
         }

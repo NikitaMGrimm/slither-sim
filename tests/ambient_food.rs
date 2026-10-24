@@ -194,8 +194,9 @@ fn tuning_validation_and_config_round_trip() {
         assert!(Simulator::new(1, config.clone()).is_err());
     }
     config.ambient_food.cell_size = 50.0;
+    // Zero admits no ambient pellet; see tests/config.rs.
     config.ambient_food.max_per_cell = 0;
-    assert!(Simulator::new(1, config.clone()).is_err());
+    assert!(Simulator::new(1, config.clone()).unwrap().food.is_empty());
     config.ambient_food.max_per_cell = 4;
     let mut world = Simulator::new(1, config.clone()).unwrap();
     world.food.clear();
