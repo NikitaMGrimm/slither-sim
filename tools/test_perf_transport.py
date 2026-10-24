@@ -6,10 +6,35 @@ tests need neither Rust nor Node.
 
 import json
 import math
+import subprocess
+import sys
 import unittest
 
 import perf_transport
 import perf_transport_client
+
+
+class Watchdog(unittest.TestCase):
+    def test_a_silent_process_is_killed_so_its_reader_sees_eof(self):
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                   stdout=subprocess.PIPE)
+        watchdog = perf_transport.Watchdog(process, 0.2)
+        with watchdog:
+            self.assertEqual(process.stdout.read1(1024), b"")
+        process.wait()
+        process.stdout.close()
+        self.assertTrue(watchdog.fired)
+
+    def test_a_finished_process_is_left_alone(self):
+        process = subprocess.Popen([sys.executable, "-c", "print('done')"], stdout=subprocess.PIPE)
+        watchdog = perf_transport.Watchdog(process, 30)
+        with watchdog:
+            output = process.stdout.read()
+            process.wait()
+        process.stdout.close()
+        self.assertEqual(output.strip(), b"done")
+        self.assertFalse(watchdog.fired)
+        self.assertFalse(watchdog.timer.is_alive())
 
 
 def frame(heads, food, views):

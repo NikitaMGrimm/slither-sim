@@ -22,6 +22,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 
@@ -108,30 +109,54 @@ def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+class Watchdog:
+    """Kills `process` after `seconds`, so a stalled serve cannot hold a blocking read forever."""
+
+    def __init__(self, process, seconds):
+        self.fired = False
+        self.timer = threading.Timer(seconds, self._fire, (process,))
+        self.timer.daemon = True
+
+    def _fire(self, process):
+        self.fired = True
+        process.kill()
+
+    def __enter__(self):
+        self.timer.start()
+        return self
+
+    def __exit__(self, *exception):
+        self.timer.cancel()
+
+
 def run_server(binary, script_path, serve_args):
     """Pipe the whole script into serve; time from the end of the reset reply to EOF."""
     with open(script_path, "rb") as requests:
         start = time.perf_counter_ns()
         process = subprocess.Popen([str(binary), "serve", *serve_args], stdin=requests, stdout=subprocess.PIPE)
+        watchdog = Watchdog(process, RUN_TIMEOUT_SECONDS)
         total = 0
         reset_done = None
         # Keep references to recent chunks for the final-reply check. Scanning every
         # chunk for newlines slowed the reader enough to stall serve on a full pipe.
         tail = collections.deque(maxlen=TAIL_CHUNKS)
         try:
-            while chunk := process.stdout.read1(CHUNK_BYTES):
-                if reset_done is None and b"\n" in chunk:
-                    reset_done = time.perf_counter_ns()
-                    reset_bytes = total + chunk.index(b"\n") + 1
-                total += len(chunk)
-                tail.append(chunk)
-            end = time.perf_counter_ns()
-            process.wait(timeout=RUN_TIMEOUT_SECONDS)
+            with watchdog:
+                while chunk := process.stdout.read1(CHUNK_BYTES):
+                    if reset_done is None and b"\n" in chunk:
+                        reset_done = time.perf_counter_ns()
+                        reset_bytes = total + chunk.index(b"\n") + 1
+                    total += len(chunk)
+                    tail.append(chunk)
+                end = time.perf_counter_ns()
+                process.wait(timeout=RUN_TIMEOUT_SECONDS)
         finally:
             if process.poll() is None:
                 process.kill()
                 process.wait()
             process.stdout.close()
+    if watchdog.fired:
+        raise RuntimeError(f"serve did not finish within {RUN_TIMEOUT_SECONDS} s")
     if process.returncode:
         raise RuntimeError(f"serve exited with {process.returncode}")
     if reset_done is None:
@@ -152,11 +177,16 @@ def run_client(mode, binary, script_path, serve_args):
         command = [sys.executable, "-B", str(ROOT / "tools" / "perf_transport_client.py")]
     else:
         command = ["node", str(ROOT / "tools" / "perf_transport_client.mjs")]
-    result = subprocess.run([*command, str(binary), str(script_path), *serve_args], cwd=ROOT, capture_output=True,
-                            timeout=RUN_TIMEOUT_SECONDS, check=False)
-    if result.returncode:
-        detail = result.stderr.decode(errors="replace").strip()[-2000:]
-        raise RuntimeError(f"{mode} client exited with {result.returncode}: {detail}")
+    # serve inherits the client's stderr. A captured pipe would keep subprocess.run
+    # waiting on a stalled serve even after the timeout kills the client: on Windows
+    # it drains captured pipes after the kill. A file has no such reader.
+    with tempfile.TemporaryFile() as stderr:
+        result = subprocess.run([*command, str(binary), str(script_path), *serve_args], cwd=ROOT,
+                                stdout=subprocess.PIPE, stderr=stderr, timeout=RUN_TIMEOUT_SECONDS, check=False)
+        if result.returncode:
+            stderr.seek(0)
+            detail = stderr.read().decode(errors="replace").strip()[-2000:]
+            raise RuntimeError(f"{mode} client exited with {result.returncode}: {detail}")
     return json.loads(result.stdout.decode().strip().splitlines()[-1])
 
 
