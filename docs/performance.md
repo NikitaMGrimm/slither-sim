@@ -86,9 +86,11 @@ client harnesses. [PR comparisons](https://github.com/NikitaMGrimm/slither-sim/b
 report's `observeSeconds` holds the observation interval alone. Observation
 changes have been measured on `official-128-bot` and `dome-proxy-96-bot`, sequentially
 and with `--parallel`, and on the frozen `observe-*` fixtures. Filtering food by
-each slot's vision dominates batch cost. The food grid is rebuilt for
-every batch: a small share of a sequential batch, but it runs before the parallel
-split. The [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md)
+each slot's vision dominates batch cost. A batch builds a food grid only with
+at least 8 observers, at least 32,768 observers × pellets and a vision radius
+from 0 to 2^40; smaller batches scan the food list directly. That grid is rebuilt
+for each such batch, with finer cells only when enough observers repay them. It
+is a small share of a sequential batch, but it runs before the parallel split. The [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md)
 has the phase breakdown and explains why the grid is not reused across steps.
 
 ## Controller transport

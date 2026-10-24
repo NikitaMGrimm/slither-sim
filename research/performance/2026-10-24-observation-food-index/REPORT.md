@@ -390,6 +390,10 @@ ones.
 
 ## Reproduction
 
+The profile runs in a separate scratch checkout of the repository, detached at
+the harness commit. It reads the patch from the PR branch first, because the
+study directory does not exist at that commit:
+
 ```sh
 STUDY=research/performance/2026-10-24-observation-food-index
 git show perf/observation-food-index:$STUDY/phase-instrumentation.diff > /tmp/phase-instrumentation.diff
@@ -407,11 +411,14 @@ Add `--parallel` for the parallel profile. For the paired timings, build
 `perf_baseline` at `0b09521` (or the PR's harness commit) and at the candidate.
 Build `perf_observation` from `main` with the PR's `examples/perf_observation.rs`
 copied in, and from the candidate. Copy the executables out of the target
-directory, then run:
+directories. Then run these from the root of a PR checkout, where the study
+directory and `tools/` exist. `BASE`, `CAND`, `OBS_BASE` and `OBS_CAND` are
+absolute paths to the copied executables:
 
 ```sh
-python pairs.py BASE CAND rows.jsonl 9 timing official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
-python pairs.py BASE CAND rows.jsonl 9 profile official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
-python obs_rounds.py base,adopted OBS_BASE,OBS_CAND 11 obs.jsonl observe-sparse:500,observe-dense:5000,observe-wide:50000,observe-strip:10000
+STUDY=research/performance/2026-10-24-observation-food-index
+python "$STUDY/pairs.py" BASE CAND rows.jsonl 9 timing official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
+python "$STUDY/pairs.py" BASE CAND rows.jsonl 9 profile official-128-bot:800,dome-proxy-96-bot:900,dome-proxy-32-bot:2000
+python "$STUDY/obs_rounds.py" base,adopted OBS_BASE,OBS_CAND 11 obs.jsonl observe-sparse:500,observe-dense:5000,observe-wide:50000,observe-strip:10000
 uv run --locked --only-group tools python -B tools/perf_compare.py --base fb71ecd --suite full --output outputs/perf/food-index
 ```
