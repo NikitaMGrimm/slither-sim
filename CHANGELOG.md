@@ -9,6 +9,10 @@
   with each slot's view as row indices into them. With 128 living snakes, replies
   are about 12× smaller, the server answers about twice as fast and Python's
   `json.loads` is about 11× faster.
+- To migrate, send one `{"heading":[...],"boost":[...]}` step entry per world
+  (`null` headings for dead slots) and read `result.worlds[w].views[slot]`.
+  `observe` and `elapsedSeconds` are removed (use `ticks × config.dt`), and
+  `snapshot` takes `world`. See the [bot API](docs/bot-api.md).
 - Frames round coordinates to 0.01 world units, headings to 0.0001 rad and speeds
   to 0.01 units/s; other numbers stay exact. Real players mostly receive coarser
   protocol-19 data, and the worst error is 0.05% of the smallest snake radius;
