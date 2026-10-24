@@ -135,7 +135,7 @@ class Targets(unittest.TestCase):
                 self.assertEqual(perf_build.LocalTargets(Path(temporary)).base, Path(temporary) / "shared/perf-suite")
 
     def test_failed_builds_never_reuse_stale_outputs(self):
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"CARGO_TARGET_DIR": ""}):
             root = Path(temporary)
             targets = perf_build.LocalTargets(root)
             snapshots = []
