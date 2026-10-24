@@ -4,6 +4,11 @@
 
 ### Added
 
+- A stateless Rust reference bot seeks food with a turn-cost penalty and a
+  13-heading collision-avoidance fan. The observation-only kernel works without
+  networking; `client::ReferenceBot` supports both portable backends. Decisions
+  never boost or allocate. The host's background seekers are unchanged. See the
+  [reference policy guide](docs/client-api.md#reference-policy).
 - The `slither-sim` Python package is on PyPI: `pip install slither-sim`. From
   this release on, each crate release publishes the same version there.
   Stable-ABI wheels serve CPython 3.11+ on Linux (x86-64 and ARM64), macOS (Apple

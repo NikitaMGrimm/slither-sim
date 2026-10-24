@@ -16,6 +16,7 @@ mod parallel;
 pub mod physics;
 pub mod prey;
 pub mod profiling;
+pub mod reference;
 pub mod simulator;
 pub mod spawn;
 pub mod transport;

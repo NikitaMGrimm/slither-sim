@@ -40,6 +40,37 @@ ends. Reconnection is explicit.
 Headings are absolute radians: zero is +x, pi/2 is +y. Both backends quantize them
 to bytes 0–250, with separate boost-on/off commands.
 
+### Reference policy
+
+`client::ReferenceBot` is a stateless food seeker with short-horizon collision
+avoidance. It reselects food using distance plus turn cost, evaluates 13 headings
+over four turn-limited samples spanning 0.36 seconds, and penalizes nearby walls,
+heads and body edges. Decisions allocate no heap memory and never boost. Reset
+is a no-op; the adapter returns no action for non-playing/incompatible frames or
+an absent observation. The host's existing background seekers are unchanged.
+
+```rust
+use slither_sim::client::{BotRunner, ReferenceBot, SimulationConfig, SimulatorBackend};
+
+fn main() -> Result<(), String> {
+    let backend = SimulatorBackend::new(7, SimulationConfig::default())?;
+    let mut runner = BotRunner::new(backend);
+    let mut bot = ReferenceBot;
+    for _ in 0..200 {
+        runner.step(&mut bot)?;
+    }
+    Ok(())
+}
+```
+
+The same adapter accepts `NetworkBackend`. Core-only callers can use
+`reference::decide(&Observation)` without the `networking` feature. The kernel
+reads only that observation; network bots must supply received state, never a
+debug snapshot. Safety margins are heuristic policy choices, not server rules.
+The [portable qualification study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-24-reference-policy/REPORT.md)
+records measured cost, negative controls and limits. This bot is a starting
+reference, not a combat benchmark, enforced competition gate or capacity claim.
+
 ## Python, JavaScript and other languages
 
 Run `slither-sim client` and exchange one JSON object per stdin/stdout line:

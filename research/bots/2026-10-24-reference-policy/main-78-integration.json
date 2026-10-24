@@ -1,0 +1,90 @@
+{
+  "dataOrigin": "local-simulator",
+  "codeCommit": "863eb42fe53bb394988b9e58e945e6183b3e961a",
+  "codeTree": "e589573d8bdbb8791f0e24517e9180dead04cb29",
+  "mergedMain": "9996dc4cfe0ba2b33307908e443f9a6c8e8d80a1",
+  "mergeConflicts": 0,
+  "environment": "Same Windows 11/Ryzen/MSVC environment as main-integration.json",
+  "unchangedSince266c600": [
+    "src",
+    "Cargo.toml",
+    "Cargo.lock",
+    "examples/reference_study.rs",
+    "tests/reference.rs",
+    "tests/client_reference.rs",
+    "tests/reference_half_turn.rs"
+  ],
+  "perfSourcesUnchangedFromMain": [
+    "examples/perf_baseline.rs",
+    "tools/perf_build.py",
+    "tools/perf_compare.py",
+    "tools/perf_stats.py",
+    "tools/pr_report.py",
+    "tools/test_perf_build.py",
+    "tools/test_perf_stats.py",
+    "tools/test_pr_report.py"
+  ],
+  "evidenceImpact": "All policy/simulator/reference harness code unchanged since #77 integration; keep prior qualification/cost/probe source pins. No gate refit or statistical pack/cost rerun. #78 statistics apply to perf reports, not the frozen bot-study bootstrap.",
+  "perfOverlay": {
+    "base": "9996dc4cfe0ba2b33307908e443f9a6c8e8d80a1",
+    "plan": [
+      {
+        "name": "step-default",
+        "iterations": 100000,
+        "traceIterations": 32
+      }
+    ],
+    "parity": [
+      {
+        "case": "step-default",
+        "traceIterations": 32,
+        "reading": "Equal",
+        "definition": "Equal",
+        "synthetic": null,
+        "baseline": {
+          "case": "step-default",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 4743305,
+          "sha256": "ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637"
+        },
+        "candidate": {
+          "case": "step-default",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 4743305,
+          "sha256": "ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637"
+        },
+        "errors": {}
+      }
+    ],
+    "repeats": 1,
+    "exitCode": 0,
+    "limit": "Compatibility smoke alongside checks, no performance claim."
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked --test reference --test client_reference --test reference_half_turn",
+      "exitCode": 0,
+      "log": "post78-focused.log"
+    },
+    {
+      "command": "uv run --locked --only-group tools python -B tools/check.py rust",
+      "exitCode": 0,
+      "log": "post78-rust-checks.log"
+    },
+    {
+      "command": "uv run --locked --only-group tools python -B tools/check.py tools",
+      "exitCode": 0,
+      "log": "post78-tools-checks.log",
+      "note": "One optional NumPy case skipped; existing target reused after main #78 isolated the build-target test environment."
+    }
+  ],
+  "rawSha256": {
+    "post78-focused.log": "9d563a7bbb6b5745c6403c7b1662b43797138231e0ecee7c6ff8662ac3ff6799",
+    "post78-rust-checks.log": "2101f61a9a77d45da615ed36773bb6735fa6e6109a867250337150408aa65637",
+    "post78-tools-checks.log": "35e440983a7534aad75d18f72d4275b48b77c98a53835404b0ea56e4e47e7ce2",
+    "post78-overlay.log": "ac5814470f7e8bce79f0b2cbc258dd7239587615f29b4f3894820fa5a1f7bc1a"
+  },
+  "comparisonSha256": "8b30137315987aa8c5f50b370d1504d1dad1dd66fb7b4138057b4f84a6fe9a8c"
+}

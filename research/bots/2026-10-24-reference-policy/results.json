@@ -1,0 +1,260 @@
+{
+  "dataOrigin": "local-simulator",
+  "contract": "slither-client-v2",
+  "wireProtocol": 19,
+  "environment": {
+    "os": "Windows 11 Pro 10.0.26200",
+    "cpu": "AMD Ryzen 7 9800X3D",
+    "logical_processors": 16,
+    "affinity_mask": 4,
+    "toolchain": "rustc 1.99.0 x86_64-pc-windows-msvc, LLVM 23.1.1",
+    "profile": "release, thin LTO, codegen-units=1, default features",
+    "isolation": "shared desktop; Rust/tools checks finished before cost measurements"
+  },
+  "build": {
+    "base": "a019c2b3f63f2e555d2a71984392dfc9b222e2b6",
+    "branch": "feat/reference-bot",
+    "time": "2026-10-24T22:34:52.7093479+02:00",
+    "rust": [
+      "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binary: rustc",
+      "commit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4",
+      "commit-date: 2026-09-28",
+      "host: x86_64-pc-windows-msvc",
+      "release: 1.99.0",
+      "LLVM version: 23.1.1"
+    ],
+    "affinity_mask": 4,
+    "binary_sha256": "5d5ca8daf68ecacd45e1ebab12f337e12050342d2116bb951f32083f30cab7c0",
+    "inputs": [
+      {
+        "path": "src/reference.rs",
+        "sha256": "0af5242b1544a2c402d0dfd309d2a647f0ff085a5a99fdd34946a7d9da456034"
+      },
+      {
+        "path": "src/client/mod.rs",
+        "sha256": "cf5f92bc6efb645c8c17e16d3baed3629cb3dbedfd8637ec91539886803e53bb"
+      },
+      {
+        "path": "examples/reference_study.rs",
+        "sha256": "8acd7ac444077d53f04ac9d79c8e89c5731875c01f832af6cf781aa1dd5b3299"
+      },
+      {
+        "path": "research/bots/2026-10-24-reference-policy/plan.json",
+        "sha256": "3861975d208abad66d38b315fed5954b0ef22bc37b498ff31a231e1d414cae79"
+      },
+      {
+        "path": "research/bots/2026-10-24-reference-policy/analyze.py",
+        "sha256": "2371e3a22ce963a87d7e2d394829d49522f5f9825ca34def96fb9c6d5d0a9c1e"
+      },
+      {
+        "path": "Cargo.lock",
+        "sha256": "4f9d5d1be5778018ffd3e90f2767c572a36b222ca44e0f6a096d67e63fea80a4"
+      }
+    ]
+  },
+  "thresholds": {
+    "survival": 0.8,
+    "food_value": 0.55
+  },
+  "calibration_p05": {
+    "survival": 0.8264776926676152,
+    "food_value": 0.5887371239533095
+  },
+  "calibration_negative_p95": {
+    "idle_survival": 0.10737018345730318,
+    "suicide_survival": 0.06244828813491916,
+    "circle_food": 0.02836998688622036
+  },
+  "validation": {
+    "reference-control": {
+      "survival": {
+        "mean": 1.007297673187999,
+        "p05": 0.7891992235096671,
+        "p95": 1.2520181416580087,
+        "ci95": [
+          0.9430010813100431,
+          1.0762809873668207
+        ]
+      },
+      "food_value": {
+        "mean": 1.0533007867430864,
+        "p05": 0.6864275317942747,
+        "p95": 1.6251655155743587,
+        "ci95": [
+          0.9436841729151092,
+          1.1694603241953871
+        ]
+      }
+    },
+    "greedy": {
+      "survival": {
+        "mean": 0.674689373260821,
+        "p05": 0.39183656577245213,
+        "p95": 0.9300666378983128,
+        "ci95": [
+          0.5994430505926054,
+          0.7527045333463177
+        ]
+      },
+      "food_value": {
+        "mean": 0.2389557097055761,
+        "p05": 0.08245287643927943,
+        "p95": 0.454469055898464,
+        "ci95": [
+          0.19608274918033505,
+          0.2823040813774283
+        ]
+      }
+    },
+    "circle": {
+      "survival": {
+        "mean": 0.9973796734147049,
+        "p05": 0.7141991719723425,
+        "p95": 1.228827239166075,
+        "ci95": [
+          0.9238445684709261,
+          1.0697605603467568
+        ]
+      },
+      "food_value": {
+        "mean": 0.021654821953144516,
+        "p05": 0.012445969579477759,
+        "p95": 0.03207165693659695,
+        "ci95": [
+          0.018844253268111982,
+          0.024833164278073874
+        ]
+      }
+    },
+    "idle": {
+      "survival": {
+        "mean": 0.07587068032522068,
+        "p05": 0.05436555833984726,
+        "p95": 0.09979582165080023,
+        "ci95": [
+          0.07040396007977585,
+          0.0815520014767934
+        ]
+      },
+      "food_value": {
+        "mean": 0.02901971238755897,
+        "p05": 0.021336806509853756,
+        "p95": 0.0363477233705413,
+        "ci95": [
+          0.027055148708237903,
+          0.031047042595042852
+        ]
+      }
+    },
+    "suicide": {
+      "survival": {
+        "mean": 0.05277337334208107,
+        "p05": 0.04804033668632951,
+        "p95": 0.058192140295496186,
+        "ci95": [
+          0.05140524587049172,
+          0.05420713774167727
+        ]
+      },
+      "food_value": {
+        "mean": 0.014213107598965304,
+        "p05": 0.011726360926031245,
+        "p95": 0.01891636208668666,
+        "ci95": [
+          0.013323389126122612,
+          0.015240152282090563
+        ]
+      }
+    }
+  },
+  "qualified": {
+    "reference-control": true,
+    "greedy": false,
+    "circle": false,
+    "idle": false,
+    "suicide": false
+  },
+  "absolute_reference_validation": {
+    "lives": 384,
+    "mean_survival": 0.8506439423401001,
+    "mean_food_value": 74.67980964317711
+  },
+  "cost": [
+    {
+      "agents": 4,
+      "frames": 60,
+      "mean_food": 297.21666666666664,
+      "cpu_us": {
+        "median": 5.9375,
+        "min": 5.546875,
+        "max": 8.125
+      },
+      "wall_us_median": 5.907194500000001
+    },
+    {
+      "agents": 16,
+      "frames": 240,
+      "mean_food": 419.2416666666667,
+      "cpu_us": {
+        "median": 9.84375,
+        "min": 9.765625,
+        "max": 10.15625
+      },
+      "wall_us_median": 10.4646415
+    },
+    {
+      "agents": 64,
+      "frames": 951,
+      "mean_food": 404.7854889589905,
+      "cpu_us": {
+        "median": 10.703125,
+        "min": 10.546875,
+        "max": 11.25
+      },
+      "wall_us_median": 11.84103
+    },
+    {
+      "agents": 128,
+      "frames": 1917,
+      "mean_food": 380.6452790818988,
+      "cpu_us": {
+        "median": 12.109375,
+        "min": 12.03125,
+        "max": 12.890625
+      },
+      "wall_us_median": 13.4566295
+    }
+  ],
+  "replay_byte_identical": true,
+  "raw_access": "local-only, C:/Users/Nikita/.t3/scratch/bot-capacity-design-20261024/reference-policy/raw",
+  "raw_sha256": {
+    "build-identity.json": "885af2cac7f712d7aced5e67f7205e990f4c3bf90d33128fcc6362e8b43796ff",
+    "build-study.log": "58ed058a0c9367a61fe8db0b2fed2b94d864dca383245a05b93eb68fa0d8770e",
+    "calibration.jsonl": "06e1d3f32d44dcf894de53b6e3fc4e00957a825efad37aff832091ffb1295614",
+    "calibration.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost-128.jsonl": "216de6ef2059a76fe1f552d2683d54236e3536dc9ac34199748f9dd0b19d558f",
+    "cost-128.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost-16.jsonl": "a68a98a876102ce4e9cafdd2a49e10e61886b54abf59c613101c3736fec29129",
+    "cost-16.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost-4.jsonl": "3572b2c098de13ca22b844ea2c0f01e0402eb2ffde5c1c2e788f2ce20aae5e4f",
+    "cost-4.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost-64.jsonl": "d61a8de6c5e321ac8909b7a3da4dff4cbc7ec14517385d9d7e3357e0c76937b3",
+    "cost-64.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused-clippy.log": "c3a25616f363a0f084324bf0d6094ace652598650007cbbfadec24882bc57551",
+    "focused-first.log": "f6bd25e52b8c78a703f1f049289972de056a9c36848de573fbad8430ceeb3667",
+    "focused-second.log": "31c4df9e52ab22fc28ec4a06f1c7a31bed36dd50b7aea9d23942cd7186e55285",
+    "freeze.log": "1a9b0a3b3b3b2efa8e126e983315cbfb8337998bc9f211fb13a797d72fe966b5",
+    "frozen.json": "0e3b27a33bdfd46d7cbac54797d1f044465c29c7db30fe10cec45c3be80e9a98",
+    "package.log": "4a5e2db7104ce90814511c19bc1f3946e7105e7e9fe642c215bccf30890226ca",
+    "replay.jsonl": "028dcc3917c77abbb7e7a6f5ede10939acd5a4cc8fb52df30d5bd6bb194dfbb5",
+    "replay.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rust-checks.log": "ddd71a0b82d3d867063860c020f0d65d55d6d9cd276f9f4a700c743e0496b254",
+    "tools-checks.log": "859fe468ac9419e9a4794bc1b24fafef39cff6abaaa50dd48fff29d5a0ccbdbb",
+    "validate.log": "dc17cbd9a38a955aac5647954e3699ec45c9401c9c28d696cf4e3b4d9447f7f0",
+    "validation-results.json": "c5fc98a867f66d746c37b9e9951c677d19b00ccd785fa34bf9651fbb6d17246d",
+    "validation.jsonl": "f1e1e4a5523387ccb71e7ff3b09360191e516f6e152e30f0a56597e10a98cac3",
+    "validation.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "selection": "All 48 calibration and 48 fresh validation worlds retained; all three cost repeats per population retained"
+}

@@ -8,6 +8,7 @@ scientific rule or product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Bots | [Reference policy](bots/2026-10-24-reference-policy/REPORT.md) | Portable received-state qualification and decision cost for the shared reference; synthetic controls, not a combat or capacity claim. |
 | Fidelity | [Official baseline selection](fidelity/2026-10-23-official-defaults/REPORT.md) | Configuration choices and explicit model assumptions; no new measurements. |
 | Performance | [Initial cost baseline](performance/2026-10-23-baseline/REPORT.md) | Exploratory synthetic costs; not an isolated host or stable production comparison. |
 | Performance | [Collision bounds lookup](performance/2026-10-23-collision-bounds/REPORT.md) | Adopted lookup change; gain specific to the separated-body fixture. |
@@ -40,8 +41,9 @@ scientific rule or product adoption.
   selected JSON are original provenance, not new relative file links.
 
 SlitherSim owns simulator/protocol fidelity and simulator/client performance.
-Arena owns policy, reward, planner and training/evaluation research and consumes
-SlitherSim as a dependency. Do not copy private Arena data into this archive.
+SlitherSim also owns its shared reference policy and qualification studies.
+Arena owns application-specific policy, reward, planner and training/evaluation
+research and consumes SlitherSim as a dependency. Do not copy private Arena data into this archive.
 The existing import manifests stay at their historical paths under `docs/`.
 
 `research/` is repository material, excluded from the published Rust crate.

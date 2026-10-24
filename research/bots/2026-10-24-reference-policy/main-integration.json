@@ -1,0 +1,109 @@
+{
+  "dataOrigin": "local-simulator",
+  "environment": "Windows 11 Pro 10.0.26200; Ryzen 7 9800X3D; rustc 1.99.0 x86_64-pc-windows-msvc",
+  "postMergeCodeCommit": "266c600273493375c86771cd0fdc147ba47404ef",
+  "postMergeCodeTree": "200b2060ccb0f682cb2e29b47b3674b9bdf5f6e2",
+  "mergedMain": "b88fdb4fefe524ce870052a9f82b981e14c84d3b",
+  "mergeConflicts": 0,
+  "unchangedFromMain": [
+    "src/transport.rs",
+    "src/simulator.rs",
+    "src/client/simulation.rs",
+    "src/client/server.rs",
+    "src/client/transport.rs",
+    "ffi",
+    "examples/bot.py",
+    "examples/bot.mjs",
+    "examples/ffi_bot.py",
+    "examples/perf_baseline.rs",
+    "tools/perf_build.py",
+    "tools/perf_compare.py"
+  ],
+  "policySha256": "011cd24744da399910eb7f2dd325652849e81297a8c9336586fffbe788605a1b",
+  "qualificationAndCost": "Pre-main corrected-policy measurements retain their original pins in half-turn-fix-results.json; summary reanalysis reproduced all values and qualification decisions without refitting gates. Full packs/costs not rerun after main merge.",
+  "probe": {
+    "command": [
+      "C:\\Users\\Nikita\\.t3\\scratch\\bot-capacity-design-20261024\\reference-policy\\target\\release\\examples\\reference_study.exe",
+      "matches",
+      "31001",
+      "1",
+      "180"
+    ],
+    "executableSha256": "785ee84dab1706e8fedf3805af8a2a8b225093e80a45ae509b5b734b2bb4be26",
+    "seed": 31001,
+    "rotations": [
+      0,
+      5
+    ],
+    "ticksPerWorld": 25714,
+    "matchesPreMergeBytes": true,
+    "jsonlSha256": "946a46e60dec5ff2c195d199428b26b0ddbabe43379e25d382c650aa5515cdfd",
+    "limit": "Two-world trajectory regression only; elapsed time not treated as performance evidence."
+  },
+  "perfOverlay": {
+    "base": "b88fdb4fefe524ce870052a9f82b981e14c84d3b",
+    "candidateTree": "200b2060ccb0f682cb2e29b47b3674b9bdf5f6e2",
+    "plan": [
+      {
+        "name": "step-default",
+        "iterations": 100000,
+        "traceIterations": 32
+      }
+    ],
+    "parity": [
+      {
+        "case": "step-default",
+        "traceIterations": 32,
+        "reading": "Equal",
+        "definition": "Equal",
+        "synthetic": null,
+        "baseline": {
+          "case": "step-default",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 4743305,
+          "sha256": "ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637"
+        },
+        "candidate": {
+          "case": "step-default",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 4743305,
+          "sha256": "ff1a5c2d4bf7b2378cef4f892a9cc76fa886d008b5eeff506e2e00e108853637"
+        },
+        "errors": {}
+      }
+    ],
+    "repeats": 1,
+    "exitCode": 0,
+    "limit": "Compatibility smoke alongside checks; no speed claim."
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked --test reference --test client_reference --test reference_half_turn",
+      "exitCode": 0,
+      "log": "combined-focused.log"
+    },
+    {
+      "command": "uv run --locked --only-group tools python -B tools/check.py rust",
+      "exitCode": 0,
+      "log": "combined-rust-checks.log"
+    },
+    {
+      "command": "uv run --locked --only-group tools python -B tools/check.py tools",
+      "exitCode": 0,
+      "log": "combined-tools-checks.log",
+      "note": "Fresh combined-check-target; optional NumPy test skipped."
+    }
+  ],
+  "rawSha256": {
+    "combined-focused.log": "91cc11ecc5d83314f72c94ae9d3af7dc25afc8ebf223f86a50a3db9736990563",
+    "combined-rust-checks.log": "9e62ece1b61f80782a1b25625f7cb58c67f5c43b7e1bea57aef0f9df5948d361",
+    "combined-tools-checks.log": "cbb9bfacefe77682e3d10f63eaf132d419022973da179b5550b804d371ee6d8f",
+    "combined-release-build.log": "64a10ceef83e276e91bef54e83e5f6f8fbb3497a781e92a1919d6dabe0321ab2",
+    "combined-overlay.log": "0b1e1156a3c62df4ea7f9383ac95ad81592b4956ca6dac313b061dcd8945d8c5",
+    "combined-workload-probe.jsonl": "946a46e60dec5ff2c195d199428b26b0ddbabe43379e25d382c650aa5515cdfd",
+    "combined-workload-probe-identity.json": "cda44952033e410c4b5ffa940ea9ecb703e475f7be41c9f2c7a27051277338ac"
+  },
+  "comparisonSha256": "f80aadf879e35daa5538f09a052e0f4b79d2e8675e61b0234354128c4b79b980"
+}
