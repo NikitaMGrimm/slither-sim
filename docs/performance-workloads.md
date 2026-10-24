@@ -17,7 +17,11 @@ cargo run --release --locked --example perf_baseline -- --list
 `slither-perf-catalog-v1`, and exits 0. Each workload in registration order has:
 
 - `name`: the `CASE` argument of
-  `perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel]`.
+  `perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel]`.
+  `--blocks M` (1–16) runs the timed case M times in one process for
+  [calibration](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md#calibration);
+  each block rebuilds the case from the seed, including its warmup, and the report
+  lists every block's timing and elapsed time under `blocks`.
 - `suite`: `ci` rows are timed and traced by PR CI, which allows at most ten;
   `full` rows are local defaults only.
 - `iterations` and `traceIterations`: the default timed sample size and parity

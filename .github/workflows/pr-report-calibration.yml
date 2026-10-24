@@ -1,0 +1,66 @@
+name: PR comparison calibration
+
+# Manual same-binary (A/A) pilot for the PR comparison's timing model; see
+# docs/maintainers/pr-reports.md#calibration. Dispatch each OS and group twice:
+# separately provisioned jobs are the independent host replicates.
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Runner image
+        type: choice
+        options: [windows-latest, ubuntu-latest]
+      group:
+        description: Workload group from the calibration plan
+        type: choice
+        options: [A, B]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_BUILD_JOBS: 4
+
+jobs:
+  calibrate:
+    name: Calibration (${{ inputs.os }}, group ${{ inputs.group }})
+    runs-on: ${{ inputs.os }}
+    # Same budget as the PR comparison: tools/perf_calibration.py takes its deadline
+    # from tools/pr_report.py.
+    timeout-minutes: 15
+    steps:
+      - name: Record job start
+        shell: bash
+        run: |
+          python=python3; if [ "$RUNNER_OS" = Windows ]; then python=python; fi
+          echo "PYTHON=$python" >> "$GITHUB_ENV"
+          echo "PR_REPORT_JOB_START=$("$python" -c 'import time; print(repr(time.monotonic()))')" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: pr-report
+          save-if: false
+      - name: Build the harness
+        run: cargo build --release --locked --example perf_baseline
+      - name: Run the pilot
+        shell: bash
+        env:
+          GROUP: ${{ inputs.group }}
+          OUTPUT: ${{ runner.temp }}/calibration
+        run: |
+          binary=target/release/examples/perf_baseline
+          if [ "$RUNNER_OS" = Windows ]; then binary="$binary.exe"; fi
+          "$PYTHON" tools/perf_calibration.py --binary "$binary" --group "$GROUP" --output "$OUTPUT"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: calibration-${{ inputs.os }}-${{ inputs.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/calibration
+          if-no-files-found: error
+          retention-days: 90
