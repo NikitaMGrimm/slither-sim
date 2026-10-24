@@ -141,6 +141,44 @@ fn frame_layout_matches_the_header() {
     );
     #[cfg(target_pointer_width = "64")]
     assert_eq!(size_of::<SlitherFrame>(), 32 + 6 * 8 + 38 * 8);
+    compile_layout_assertions(&rust);
+}
+
+/// Has a real C compiler check the header against the Rust layout, so a bug in
+/// the parser above cannot hide a mismatch. Hosts without `cc` (or `$CC`), such
+/// as plain Windows shells, skip this part; Linux CI has one.
+fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
+    use std::process::Command;
+    let mut source = String::from("#include <stddef.h>\n#include \"slither_sim.h\"\n");
+    source.push_str(&format!(
+        "_Static_assert(sizeof(slither_frame) == {}, \"size\");\n",
+        size_of::<SlitherFrame>()
+    ));
+    for (name, offset, _) in rust {
+        source.push_str(&format!(
+            "_Static_assert(offsetof(slither_frame, {name}) == {offset}, \"{name}\");\n"
+        ));
+    }
+    let path = std::env::temp_dir().join(format!("slither_sim_layout_{}.c", std::process::id()));
+    std::fs::write(&path, source).unwrap();
+    let compiler = std::env::var("CC").unwrap_or_else(|_| "cc".into());
+    let result = Command::new(&compiler)
+        .args(["-std=c11", "-fsyntax-only", "-I"])
+        .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/include"))
+        .arg(&path)
+        .output();
+    let _ = std::fs::remove_file(&path);
+    match result {
+        Ok(output) => assert!(
+            output.status.success(),
+            "{compiler} rejected the header layout:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("skipped the C compiler layout check: {compiler} not found");
+        }
+        Err(error) => panic!("could not run {compiler}: {error}"),
+    }
 }
 
 #[test]

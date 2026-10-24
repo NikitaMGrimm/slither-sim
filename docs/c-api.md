@@ -51,7 +51,7 @@ changes nothing. JSON and typed steps act on the same worlds.
 | `SLITHER_OK` (0) | Success. |
 | `SLITHER_REJECTED` (1) | The session rejected the call, for example a step before reset, and changed nothing. |
 | `SLITHER_INVALID` (2) | A required pointer was null; nothing changed. Arrays may be null when their length is 0. |
-| `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_session_free` remains valid. |
+| `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_last_error` and `slither_session_free` remain valid. |
 
 ## Frames
 

@@ -26,7 +26,7 @@ extern "C" {
 #define SLITHER_REJECTED 1
 /* A required pointer was null; nothing changed. */
 #define SLITHER_INVALID 2
-/* An internal error; only slither_session_free remains valid. */
+/* An internal error; only slither_last_error and slither_session_free remain valid. */
 #define SLITHER_PANICKED 3
 
 /* Row or slot index meaning none: the own row of a dead slot, a missing killer. */

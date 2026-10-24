@@ -3,7 +3,7 @@
 //! `include/slither_sim.h` declares these functions and [`SlitherFrame`];
 //! `tests/abi.rs` checks that the two agree. No panic unwinds across the
 //! boundary: a panicking call returns [`SLITHER_PANICKED`] and leaves its
-//! session usable only for [`slither_session_free`].
+//! session usable only for [`slither_last_error`] and [`slither_session_free`].
 //!
 //! A session must not be used by two threads at once; separate sessions may
 //! run on separate threads.
@@ -20,7 +20,8 @@ pub const SLITHER_OK: i32 = 0;
 pub const SLITHER_REJECTED: i32 = 1;
 /// A required pointer was null; nothing changed.
 pub const SLITHER_INVALID: i32 = 2;
-/// An internal error; only [`slither_session_free`] remains valid.
+/// An internal error; only [`slither_last_error`] and [`slither_session_free`]
+/// remain valid.
 pub const SLITHER_PANICKED: i32 = 3;
 
 /// An opaque session handle.
@@ -188,7 +189,11 @@ unsafe fn with_session(
             (SLITHER_PANICKED, "Internal panic; free this session".into())
         }
     };
-    s.error = CString::new(message.replace('\0', " ")).expect("NULs were replaced");
+    // Successful calls usually follow successful calls; reuse the empty error
+    // instead of allocating a new one on the hot path.
+    if !(message.is_empty() && s.error.is_empty()) {
+        s.error = CString::new(message.replace('\0', " ")).expect("NULs were replaced");
+    }
     code
 }
 
@@ -356,6 +361,34 @@ pub unsafe extern "C" fn slither_last_error(session: *const SlitherSession) -> *
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn successful_calls_reuse_the_empty_error() {
+        let session = slither_session_new();
+        let mut frame = std::mem::MaybeUninit::<SlitherFrame>::uninit();
+        let code = unsafe { slither_read_frame(session, 0, frame.as_mut_ptr()) };
+        assert_eq!(code, SLITHER_REJECTED);
+        let request = br#"{"op":"reset","agents":2}"#;
+        let (mut reply, mut reply_len) = (ptr::null(), 0);
+        let code = unsafe {
+            slither_request(
+                session,
+                request.as_ptr(),
+                request.len(),
+                &mut reply,
+                &mut reply_len,
+            )
+        };
+        assert_eq!(code, SLITHER_OK);
+        let empty = unsafe { slither_last_error(session) };
+        assert_eq!(unsafe { CStr::from_ptr(empty) }, c"");
+        for _ in 0..3 {
+            let code = unsafe { slither_read_frame(session, 0, frame.as_mut_ptr()) };
+            assert_eq!(code, SLITHER_OK);
+            assert_eq!(unsafe { slither_last_error(session) }, empty);
+        }
+        unsafe { slither_session_free(session) };
+    }
 
     #[test]
     fn panics_poison_the_session_instead_of_unwinding() {
