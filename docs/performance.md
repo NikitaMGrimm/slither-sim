@@ -129,6 +129,9 @@ metadata or 120-second native-child limits. It is not an OS CPU/memory cap.
 Expiry prevents the next child or interrupts the current one. Cleanup kills the
 owned child, waits up to ten seconds and closes its pipes/error file. Flushed rows
 and diagnostics remain, and `failure.json` records the budget and elapsed time.
+Failed native attempts retain exact stdout bytes in a `.stdout.bin` file and
+failure metadata in `.failure.json`, beside that attempt's stderr file (replacing
+its `.txt` suffix). These diagnostics never count as completed measurements.
 An incomplete run has no comparison summary. Rehash retained binaries before a
 separate attempt; use a fresh output directory.
 

@@ -14,9 +14,10 @@ import tempfile
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from perf_baseline import digest
+import perf_baseline
 import perf_compare
 import perf_stats
 import pr_report
@@ -488,6 +489,45 @@ class Sampling(unittest.TestCase):
         self.clock.now = 0
         rows, _ = self.run_sampler(workloads, behavior, deadline=2.5)
         self.assertEqual([r["termination"] for r in rows.values()], ["not_started"] * 2)
+
+    def test_exit_wait_timeout_keeps_last_looks_or_only_fails_affected_workload(self):
+        for capped in (False, True):
+            with self.subTest(capped=capped):
+                self.calls.clear()
+                self.clock.now = 0
+                normal = self.scripted({"first": (1.0, .1, None), "healthy": (1.0, .1, None)})
+
+                def behavior(case, label, index, position):
+                    if case != "first" or index != 10 or position != 0:
+                        return normal(case, label, index, position)
+                    if capped:
+                        self.clock.now = 1000
+                    child = Mock(stdin=None, stdout=io.BytesIO(), stderr=None, returncode=0)
+                    child.poll.return_value = 0
+                    child.wait.side_effect = subprocess.TimeoutExpired("fixture", 120)
+                    with patch.object(perf_baseline.subprocess, "Popen", return_value=child), \
+                            patch.object(perf_baseline.Lines, "read", return_value=b"{}"), \
+                            patch.object(perf_baseline, "time", SimpleNamespace(perf_counter=lambda: 0)):
+                        try:
+                            perf_baseline.native("fixture", case, 1000, self.directory / "stderr.txt", deadline=120)
+                        except TimeoutError as error:
+                            return error
+
+                rows, output = self.run_sampler(self.workloads("first", "healthy"), behavior, deadline=1000)
+                self.assertEqual(rows["first"]["n_complete"], 9)
+                self.assertEqual([look["n"] for look in rows["first"]["history"]], [8])
+                if capped:
+                    for result in rows.values():
+                        self.assertEqual((result["termination"], result["n_used"]), ("time_cap", 8))
+                else:
+                    self.assertEqual((rows["first"]["termination"], rows["first"]["label"]),
+                                     ("measurement_failure", "Unavailable"))
+                    self.assertEqual((rows["healthy"]["termination"], rows["healthy"]["n_used"]),
+                                     ("max_pairs", 26))
+                attempts = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
+                failed = next(a for a in attempts if a["case"] == "first" and a["pair_index"] == 10)
+                self.assertEqual(failed["status"], "incomplete_due_to_cap" if capped else "failed")
+                self.assertEqual(json.loads((output / "sequential.json").read_text()), rows)
 
     def test_hung_children_invalid_records_and_changed_binaries_are_failures(self):
         workloads = self.workloads("hung", "count")

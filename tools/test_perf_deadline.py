@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,50 @@ from test_perf_baseline import catalog
 
 
 class SharedDeadline(unittest.TestCase):
+    def test_native_exit_wait_timeout_is_a_builtin_timeout_with_diagnostics(self):
+        child = Mock(stdin=None, stdout=io.BytesIO(), stderr=None, returncode=0)
+        child.poll.return_value = 0
+        child.wait.side_effect = subprocess.TimeoutExpired("fixture", .5)
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+                perf_baseline.subprocess, "Popen", return_value=child), patch.object(
+                perf_baseline.Lines, "read", return_value=b"{}"), patch.object(
+                perf_baseline.time, "perf_counter", return_value=10):
+            errors = Path(temporary) / "stderr.txt"
+            with self.assertRaises(TimeoutError) as caught:
+                perf_baseline.native(Path(sys.executable), "observe", 1, errors, deadline=10.5)
+            self.assertIsInstance(caught.exception.__cause__, subprocess.TimeoutExpired)
+            self.assertEqual(errors.with_suffix(".stdout.bin").read_bytes(), b"{}\n")
+            failure = json.loads(errors.with_suffix(".failure.json").read_text())
+            self.assertEqual(failure["type"], "TimeoutError")
+            self.assertIn("exit", failure["error"])
+        self.assertTrue(child.stdout.closed)
+
+    def test_native_failures_preserve_exact_stdout_bytes(self):
+        for name, payload, ending, exception in (
+                ("partial", b'{"x":\xff', "import time; time.sleep(60)", TimeoutError),
+                ("exit-timeout", b'{}\r\ntrailing\xff', "import time; time.sleep(60)", TimeoutError),
+                ("exit-code", b'{}\r\ntrailing\xff', "sys.exit(3)", RuntimeError),
+                ("malformed", b'not JSON\xff\r\ntrailing\xfe', "", ValueError)):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                errors = Path(temporary) / "stderr.txt"
+                script = Path(temporary) / "fixture.py"
+                script.write_text(f"import sys\nsys.stdout.buffer.write({payload!r})\n"
+                                  f"sys.stdout.buffer.flush()\n{ending}\n", encoding="utf-8")
+                executable = sys._base_executable  # Avoid the Windows venv launcher child.
+                with self.assertRaises(exception):
+                    perf_baseline.native(executable, str(script), 1, errors,
+                                         deadline=perf_baseline.time.perf_counter() + 1)
+                stdout = errors.with_suffix(".stdout.bin")
+                self.assertEqual(stdout.read_bytes(), payload)
+                failure = json.loads(errors.with_suffix(".failure.json").read_text())
+                self.assertEqual(failure["stdout"], str(stdout))
+                self.assertEqual(failure["stderr"], str(errors))
+                self.assertEqual(failure["command"], [executable, str(script), "1"])
+                if name in ("exit-code", "malformed"):
+                    self.assertEqual(failure["exit_code"], 3 if name == "exit-code" else 0)
+                else:
+                    self.assertIsInstance(failure["exit_code"], int)
+
     def test_metadata_uses_remaining_budget_and_never_spawns_after_expiry(self):
         with patch.object(perf_baseline.time, "perf_counter", return_value=10), patch.object(
                 perf_baseline.subprocess, "check_output", return_value="fixture\n") as command:

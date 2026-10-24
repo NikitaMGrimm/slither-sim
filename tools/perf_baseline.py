@@ -322,19 +322,42 @@ def native(executable, case, iterations, stderr_path, profile=False, *, deadline
     with ExitStack() as cleanup:
         errors = cleanup.enter_context(stderr_path.open("wb"))
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
-        cleanup.callback(close_child, process)
-        line = Lines(process.stdout).read(child_deadline)
-        process.wait(timeout=max(.1 if deadline is None else 0.0,
-                                 child_deadline - time.perf_counter()))
-        if deadline is not None and time.perf_counter() >= deadline:
-            raise TimeoutError("performance run deadline exceeded during native child")
-        wall = time.perf_counter() - started
-        metrics = process_metrics(process)
-        if process.returncode:
-            raise RuntimeError(f"{case} exited {process.returncode}; see {stderr_path}")
-        return {"case": case, "command": args, "process_wall_seconds": wall,
-                **metrics, "exit_code": process.returncode, "stderr": str(stderr_path),
-                "workload": json.loads(line)}
+        reader, line = Lines(process.stdout), None
+        try:
+            line = reader.read(child_deadline)
+            try:
+                process.wait(timeout=max(.1 if deadline is None else 0.0,
+                                         child_deadline - time.perf_counter()))
+            except subprocess.TimeoutExpired as error:
+                # Both samplers distinguish a child hang from the global cap via TimeoutError.
+                raise TimeoutError("native child exit deadline exceeded") from error
+            if deadline is not None and time.perf_counter() >= deadline:
+                raise TimeoutError("performance run deadline exceeded during native child")
+            wall = time.perf_counter() - started
+            metrics = process_metrics(process)
+            if process.returncode:
+                raise RuntimeError(f"{case} exited {process.returncode}; see {stderr_path}")
+            result = {"case": case, "command": args, "process_wall_seconds": wall,
+                      **metrics, "exit_code": process.returncode, "stderr": str(stderr_path),
+                      "workload": json.loads(line)}
+        except BaseException as error:
+            # Contract §6: failed stdout is diagnostic evidence, never a completed pair.
+            stdout_path = stderr_path.with_suffix(".stdout.bin")
+            with stdout_path.open("wb") as raw:
+                if line is not None:
+                    raw.write(line + b"\n")  # Lines removes only the LF delimiter.
+                try:
+                    close_child(process, reader, raw)
+                finally:
+                    stderr_path.with_suffix(".failure.json").write_text(json.dumps({
+                        "type": type(error).__name__, "error": str(error), "command": args,
+                        "exit_code": process.returncode if type(process.returncode) is int else None,
+                        "stdout": str(stdout_path), "stderr": str(stderr_path)
+                    }, indent=2) + "\n", encoding="utf-8", newline="\n")
+            raise
+        else:
+            close_child(process)
+            return result
 
 
 class TraceSequence:
