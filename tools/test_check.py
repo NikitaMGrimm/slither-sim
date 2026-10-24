@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -15,6 +16,13 @@ import check
 
 
 class CheckRunnerTests(unittest.TestCase):
+    def setUp(self):
+        # Keep fake failures out of the real job summary when CI runs these tests.
+        environment = patch.dict(os.environ)
+        environment.start()
+        self.addCleanup(environment.stop)
+        os.environ.pop("GITHUB_STEP_SUMMARY", None)
+
     def test_all_is_host_only_and_explicit_groups_are_deduplicated(self):
         self.assertEqual(check.select_groups(["tools", "all", "wasm", "tools"]),
                          ["tools", "rust", "package", "wasm"])
@@ -108,6 +116,18 @@ class CheckRunnerTests(unittest.TestCase):
                     redirect_stdout(io.TextIOWrapper(io.BytesIO(), encoding="utf-8")):
                 self.assertEqual(check.main(["tools"]), 5)
             self.assertFalse(marker.exists())
+
+    def test_a_command_that_cannot_start_is_named_and_stops_its_step(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "finished"
+            slow = [sys.executable, "-c", f"import time; time.sleep(0.5); open({str(marker)!r}, 'w').close()"]
+            missing = ["slither-sim-no-such-command"]
+            errors = io.StringIO()
+            with patch.object(check, "steps", return_value=[[slow, missing]]),                     redirect_stdout(io.TextIOWrapper(io.BytesIO(), encoding="utf-8")),                     patch.object(check.sys, "stderr", errors):
+                self.assertEqual(check.main(["tools"]), 1)
+            time.sleep(1)  # A surviving child would have written the marker by now.
+            self.assertFalse(marker.exists())
+        self.assertIn("Cannot run slither-sim-no-such-command", errors.getvalue())
 
     def test_tool_children_use_the_running_python_and_expanded_node_paths(self):
         commands = check.commands("tools")

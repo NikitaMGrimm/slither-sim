@@ -41,6 +41,9 @@ def commands(group):
             ["cargo", "test", "--doc", "--locked"],
             ["cargo", "test", "--doc", "--no-default-features", "--locked"],
             ["cargo", "test", "-p", "slither-sim-ffi", "--all-targets", "--locked"],
+            # The Python crate has no Rust tests; this builds it with each
+            # toolchain, including the 1.86 it declares.
+            ["cargo", "check", "-p", "slither-sim-py", "--all-targets", "--locked"],
             ["cargo", "run", "--locked", "--example", "basic"],
         ]
     if group == "tools":
@@ -96,31 +99,39 @@ def steps(group):
 def run_concurrently(step, environment):
     """Runs a step's commands at once and replays each one's output in order.
 
-    Returns (seconds, exit code) per command.
+    Returns (seconds, exit code) per command. A command that cannot start raises
+    OSError with a `command` attribute.
     """
+    # Each command runs as a process tree, so no cargo, rustc or node descendant
+    # outlives its suite or an interruption.
+    from perf_build import ProcessTree
     outputs, running, finished = [], {}, {}
     try:
         for index, command in enumerate(step):
             output = tempfile.TemporaryFile()
             outputs.append(output)
-            running[index] = (subprocess.Popen(command, cwd=ROOT, env=environment,
-                                               stdout=output, stderr=subprocess.STDOUT), time.monotonic())
+            try:
+                running[index] = (ProcessTree(command, ROOT, environment, output), time.monotonic())
+            except OSError as error:
+                error.command = command
+                raise
         while running:
-            for index, (process, start) in list(running.items()):
-                if process.poll() is not None:
-                    finished[index] = (time.monotonic() - start, process.returncode)
+            for index, (tree, start) in list(running.items()):
+                code = tree.process.poll()
+                if code is not None:
+                    tree.stop()
+                    finished[index] = (time.monotonic() - start, code)
                     del running[index]
             time.sleep(0.05)
     finally:
-        for process, _ in running.values():
-            process.kill()
-            process.wait()
-    for output in outputs:
-        output.seek(0)
-        sys.stdout.flush()
-        sys.stdout.buffer.write(output.read())
-        sys.stdout.buffer.flush()
-        output.close()
+        for tree, _ in running.values():
+            tree.stop()
+        for output in outputs:
+            output.seek(0)
+            sys.stdout.flush()
+            sys.stdout.buffer.write(output.read())
+            sys.stdout.buffer.flush()
+            output.close()
     return [finished[index] for index in range(len(step))]
 
 
@@ -177,8 +188,9 @@ def main(argv=None):
                         code = subprocess.run(step[0], cwd=ROOT, env=environment, check=False).returncode
                         results = [(time.monotonic() - start, code)]
                 except OSError as error:
-                    print(f"Cannot run {shlex.join(step[0])}: {error}", file=sys.stderr)
-                    timings.append((group, step[0], time.monotonic() - start, 1))
+                    command = getattr(error, "command", step[0])
+                    print(f"Cannot run {shlex.join(command)}: {error}", file=sys.stderr)
+                    timings.append((group, command, time.monotonic() - start, 1))
                     return 1
                 for command, (seconds, code) in zip(step, results):
                     timings.append((group, command, seconds, code))
