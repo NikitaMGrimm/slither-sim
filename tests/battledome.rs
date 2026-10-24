@@ -404,7 +404,7 @@ fn mode_settings_reject_unreachable_rules() {
         config.validate()
     };
     let pit = "pit.radius must be positive and less than radius";
-    let ring = "spawnRadius must lie inside radius and outside pit.radius";
+    let ring = "spawnRadius must lie outside pit.radius and more than 60 inside radius";
     let window = "killScoreSeconds must be positive and finite";
     let floor = "minScore must be from a newborn's displayed 10 to";
     for (change, error) in [
@@ -415,6 +415,8 @@ fn mode_settings_reject_unreachable_rules() {
         (|c| c.pit = Some(PitConfig { radius: 3584.0 }), pit),
         (|c| c.pit = Some(PitConfig { radius: f64::NAN }), pit),
         (|c| c.spawn_radius = Some(3584.0), ring),
+        // Hosted spawns keep every anchor 60 inside the wall, so they never fit here.
+        (|c| c.spawn_radius = Some(3524.0), ring),
         (|c| c.spawn_radius = Some(1784.0), ring),
         (|c| c.spawn_radius = Some(-1.0), ring),
         (|c| c.spawn_radius = Some(f64::NAN), ring),
@@ -447,12 +449,13 @@ fn mode_settings_reject_unreachable_rules() {
         error.to_string().contains("invalid type: floating point"),
         "{error}"
     );
-    // Without a pit, any distance inside the wall is a valid ring.
+    // Without a pit, any distance inside the wall margin is a valid ring.
     with(|c| {
         c.pit = None;
         c.spawn_radius = Some(0.0);
     })
     .unwrap();
+    with(|c| c.spawn_radius = Some(3523.0)).unwrap();
     assert!(
         Simulator::new(
             1,
@@ -486,7 +489,7 @@ fn serve_resets_accept_a_preset() {
         reply["error"]
             .as_str()
             .unwrap()
-            .starts_with("spawnRadius must lie inside radius and outside pit.radius")
+            .starts_with("spawnRadius must lie outside pit.radius")
     );
 }
 

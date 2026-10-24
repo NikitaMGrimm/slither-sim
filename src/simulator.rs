@@ -275,6 +275,8 @@ impl<'de> serde::de::Visitor<'de> for UniqueVisitor {
         Ok(Unique(fields.into()))
     }
 }
+/// Distance every spawn anchor keeps from the wall.
+const SPAWN_WALL_MARGIN: f64 = 60.0;
 /// Protocol sector area used by the modeled official ecology below.
 const SECTOR_AREA: f64 = 300.0 * 300.0;
 /// Official food target and ambient attempts/s for an arena of `radius`:
@@ -398,9 +400,14 @@ impl Config {
             return Err("pit.radius must be positive and less than radius, so the pit lies inside the arena".into());
         }
         if self.spawn_radius.is_some_and(|spawn| {
-            !(spawn >= 0.0 && spawn < self.radius && pit.is_none_or(|pit| spawn > pit))
+            !(spawn >= 0.0
+                && spawn < self.radius - SPAWN_WALL_MARGIN
+                && pit.is_none_or(|pit| spawn > pit))
         }) {
-            return Err("spawnRadius must lie inside radius and outside pit.radius, where new snakes can live".into());
+            return Err(format!(
+                "spawnRadius must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
+                 radius, the wall margin every spawn keeps"
+            ));
         }
         if self
             .kill_score_seconds
@@ -830,7 +837,7 @@ impl Simulator {
             || clearance < 0.0
             || line
                 .iter()
-                .any(|p| p.distance(Point::default()) >= self.config.radius - 60.)
+                .any(|p| p.distance(Point::default()) >= self.config.radius - SPAWN_WALL_MARGIN)
         {
             return false;
         }

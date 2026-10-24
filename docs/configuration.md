@@ -101,7 +101,7 @@ only produce representable sizes (for example, `size: 51, maxSize: 51.01`).
 | `ambientFood` | Defaults below | Ambient-food admission limit. |
 | `boostFood` | Defaults below | Boost-food admission limit. |
 | `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary. A snake whose head center has been inside (distance `< r`) dies with reason `pit`, dropping no food, when its head center reaches `r` again. Each tick tests the head center's swept path, so crossing the pit or clipping its edge within one tick also kills. Each life starts outside it. |
-| `spawnRadius` | `null` | Fixed head distance of new lives, `0 ≤ d < radius` and `d > pit.radius`. Ring joins keep their angles; the host draws a uniform angle. `null` keeps the official radial grid. |
+| `spawnRadius` | `null` | Fixed head distance of new lives, `0 ≤ d < radius - 60` (the wall margin every spawn keeps) and `d > pit.radius`. Ring joins keep their angles; the host draws a uniform angle. `null` keeps the official radial grid. |
 | `killScoreSeconds` | `null` | Positive finite kill-score window: each credited kill counts this long, kept per slot across lives. `null` keeps no kill score; it reads 0. |
 | `minScore` | `null` | Least displayed score, an integer from a newborn's 10 to 31,066,725, the most a 430-segment snake displays. Its floor mass is the least mass on the protocol-19 fam grid that displays it, so clients decode the same score. New lives start at that mass; boosting and the kiosk penalty never shrink a snake below it, and boosting there is free and drops nothing. Growth and death food are unchanged. Read when a world is created. |
 
