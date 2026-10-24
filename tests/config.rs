@@ -144,6 +144,8 @@ fn zero_food_cell_limits_admit_nothing() {
     config.ambient_food.max_per_cell = 0;
     config.boost_food.max_per_cell = 0;
     config.death_food.max_per_cell = 0;
+    // No pellet can be admitted, so even an unrepresentable target starts at once.
+    config.food_count = usize::MAX;
     let mut world = Simulator::new(7, config).unwrap();
     assert!(world.food.is_empty());
     world.add("a", 0, 1).unwrap();

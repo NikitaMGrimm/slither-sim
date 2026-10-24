@@ -416,19 +416,20 @@ impl Simulator {
             parallel: false,
         };
         world.update_radius(0.0);
-        world
-            .food
-            .try_reserve(world.config.food_count)
-            .map_err(|_| {
-                format!(
-                    "foodCount {} does not fit in memory",
-                    world.config.food_count
-                )
-            })?;
+        // A zero cell limit rejects every candidate, so there is nothing to store.
+        let ambient = &world.config.ambient_food;
+        let admits = !ambient.enabled || ambient.max_per_cell > 0;
+        let startup = if admits { world.config.food_count } else { 0 };
+        world.food.try_reserve(startup).map_err(|_| {
+            format!(
+                "foodCount {} does not fit in memory",
+                world.config.food_count
+            )
+        })?;
         world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
         // candidate is not retried, so crowded small worlds can start below it.
-        for _ in 0..world.config.food_count {
+        for _ in 0..startup {
             let f = world.new_food();
             if admit_ambient_food(
                 &f,
@@ -441,8 +442,9 @@ impl Simulator {
             }
         }
         world.food_cache.end();
+        // A new world has no prey, so IDs 0..count need no collision scan.
         for _ in 0..world.config.prey.count {
-            world.spawn_prey();
+            world.push_prey();
         }
         Ok(world)
     }
@@ -1197,6 +1199,11 @@ impl Simulator {
         while self.prey.iter().any(|prey| prey.id == self.next_prey_id) {
             self.next_prey_id = self.next_prey_id.wrapping_add(1);
         }
+        self.push_prey();
+    }
+
+    /// Spawn a prey with `next_prey_id`, which the caller has made unique.
+    fn push_prey(&mut self) {
         let angle = self.prey_random.next() * TAU;
         let radius = self.prey_random.next().sqrt() * self.config.radius * 0.95;
         let heading = self.prey_random.next() * TAU;
