@@ -9,13 +9,23 @@ readme = "README.md"
 license = "MIT"
 keywords = ["slither", "simulation", "bots", "headless"]
 categories = ["simulation", "games"]
+# Maintainer-only examples, guides, manifests and integration tests stay in Git.
+# Unit tests in src/ read the listed fixtures with include_str!.
 include = [
     "/src",
-    "/examples/*.rs",
-    "/examples/*.py",
-    "/examples/*.mjs",
-    "/tests",
-    "/docs",
+    "/examples/basic.rs",
+    "/examples/portable_bot.rs",
+    "/examples/portable_bot.py",
+    "/examples/bot.py",
+    "/examples/bot.mjs",
+    "/examples/ffi_bot.py",
+    "/tests/fixtures/client-food-interest.json",
+    "/tests/fixtures/client-hud-leaderboard.json",
+    "/tests/fixtures/client-presentation.json",
+    "/tests/fixtures/client-reporting-cadence.json",
+    "/docs/*.md",
+    # CHANGELOG.md links this guide.
+    "/docs/maintainers/releasing.md",
     "/assets/logo.svg",
     "/README.md",
     "/CONTRIBUTING.md",

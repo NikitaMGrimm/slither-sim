@@ -25,15 +25,17 @@ owners, focused tests and the evidence each kind of change needs.
 | Add a workload or use a specialized harness | [Performance workloads](performance-workloads.md) |
 | Collect, audit, replay or compare evidence | [Evidence workflow](research-workflow.md) |
 | Read the evidence file contract | [Bundle format](evidence-format.md) |
-| Add a regression fixture | [Fixture guide](../tests/fixtures/README.md) |
+| Add a regression fixture | [Fixture guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/README.md) |
 | Read dated results and counterexamples | [Research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) |
 
-Maintainer references: [PR comparisons](maintainers/pr-reports.md),
-[releasing](maintainers/releasing.md), [provenance](provenance.md) and
-[changelog](../CHANGELOG.md).
+Maintainer references:
+[PR comparisons](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md),
+[releasing](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md),
+[provenance](provenance.md) and [changelog](../CHANGELOG.md).
 
 Update the guide that owns the behavior. Put distinct dated studies under
 `research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; a routine fix needs no new
 report. Keep selected regressions in `tests/fixtures/` and full recordings,
-binaries and generated outputs outside Git. Current guides ship in the Rust
-crate; use repository URLs for research and tools excluded from that package.
+binaries and generated outputs outside Git. Current guides and the release
+guide ship in the Rust crate; use repository URLs for research, tools,
+integration tests and other maintainer files excluded from that package.

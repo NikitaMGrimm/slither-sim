@@ -27,7 +27,8 @@ rim sliding are provisional. In particular:
 
 ## Packaged regression evidence
 
-Tests are under `tests/`, fixtures under `tests/fixtures/`. Fixtures identify their
+Tests are under `tests/`, fixtures under `tests/fixtures/`; the published crate
+omits both, apart from fixtures its unit tests read. Fixtures identify their
 sources, methods and hashes. Tests run without the full recordings, but repeating
 measurements may require those local-only archives.
 

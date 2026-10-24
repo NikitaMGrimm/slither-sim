@@ -6,9 +6,9 @@ SlitherSim builds and tests independently of that repository.
 
 | Manifest | Imported components |
 | --- | --- |
-| [extraction.json](extraction.json) | Simulator mechanics, tests, fixtures and lockfile. |
-| [toolkit-import.json](toolkit-import.json) | 17 capture, decoder, audit and replay files and their tests. |
-| [client-import.json](client-import.json) | Receipt tracker, minimap decoder, latency model and selected tests. |
+| [extraction.json](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/extraction.json) | Simulator mechanics, tests, fixtures and lockfile. |
+| [toolkit-import.json](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/toolkit-import.json) | 17 capture, decoder, audit and replay files and their tests. |
+| [client-import.json](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/client-import.json) | Receipt tracker, minimap decoder, latency model and selected tests. |
 
 Each entry records its original and packaged SHA-256, source path and adaptations
 through the historical snapshot `f4d9f8b994c8714429ebe4cb1618209a34d9c45b`.

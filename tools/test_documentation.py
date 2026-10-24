@@ -40,10 +40,18 @@ def anchors(text):
 
 
 def packaged(path, includes):
-    """Current include entries are literal directories/files or single-level globs."""
-    return any(path == entry.lstrip("/")
-               or path.startswith(entry.lstrip("/") + "/")
-               or fnmatch.fnmatchcase(path, entry.lstrip("/")) for entry in includes)
+    """Matches anchored include entries without `**` or negation, as Cargo does.
+
+    Like gitignore, a wildcard stays within one path segment, and an entry
+    matching a directory includes everything below it.
+    """
+    parts = path.split("/")
+    for entry in includes:
+        pattern = entry.lstrip("/").split("/")
+        if len(pattern) <= len(parts) and all(
+                fnmatch.fnmatchcase(part, glob) for part, glob in zip(parts, pattern)):
+            return True
+    return False
 
 
 def broken_links(files, available):
@@ -124,6 +132,15 @@ class DocumentationTests(unittest.TestCase):
                          [("notes here.md", "section"), ("", "here")])
         self.assertEqual(anchors('# Same\n# Same\n<a id="old-link"></a>\n'),
                          {"same", "same-1", "old-link"})
+
+    def test_include_globs_stay_within_one_segment(self):
+        includes = ["/src", "/docs/*.md", "/README.md"]
+        self.assertTrue(packaged("src/client/mod.rs", includes))
+        self.assertTrue(packaged("docs/python.md", includes))
+        self.assertTrue(packaged("README.md", includes))
+        self.assertFalse(packaged("docs/maintainers/releasing.md", includes))
+        self.assertFalse(packaged("docs/extraction.json", includes))
+        self.assertFalse(packaged("srcs/lib.rs", includes))
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ fields; requests, actions and configs reject unknown fields.
 Changes to types, units, coordinates, nullability, status values, action mapping,
 receipt meanings or resets require a new affected contract ID and updated
 examples. Physics can change trajectories without changing that contract.
-The [JSON fixture](../tests/fixtures/client-contract-v2.json) checks the current
+The [JSON fixture](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/client-contract-v2.json) checks the current
 shape independently of Rust structs; it does not freeze this preview permanently.
 
 ## Rust
