@@ -11,6 +11,8 @@ mod json;
 pub mod kiosk;
 pub mod model;
 pub mod observation;
+#[cfg(feature = "parallel")]
+mod parallel;
 pub mod physics;
 pub mod prey;
 pub mod profiling;

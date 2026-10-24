@@ -15,6 +15,10 @@
   in separate targets, checks full-state trace parity, records phase profiles and
   runs paired timings. Runners and PR comparisons take workloads, sample sizes
   and trace windows from the catalog; PR CI times and traces its `ci` suite.
+- Observe on several cores: `Simulator::set_parallel(true)` splits large
+  `observe_all` and `observe_selected` batches over the rayon thread pool, with
+  identical results. Off by default; needs the new default `parallel` feature.
+  `perf_baseline --parallel` times it.
 
 ## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23
 

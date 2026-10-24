@@ -1,4 +1,4 @@
-//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace].
+//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel].
 //! `perf_baseline --list` prints the workload catalog as one canonical JSON line;
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
@@ -463,6 +463,8 @@ struct Args {
     iterations: usize,
     profile: bool,
     trace: bool,
+    /// `Simulator::set_parallel(true)` on the timed world.
+    parallel: bool,
     driver: Driver,
     operation: Operation,
 }
@@ -482,11 +484,11 @@ impl Args {
         let usage = || {
             let names: Vec<_> = workloads.iter().map(|w| w.name.as_str()).collect();
             format!(
-                "perf_baseline CASE ITERATIONS [--profile|--trace] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; --profile requires a profiled case (see --list)",
+                "perf_baseline CASE ITERATIONS [--profile|--trace] [--parallel] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature",
                 names.join("|")
             )
         };
-        if !(2..=3).contains(&args.len()) {
+        if !(2..=4).contains(&args.len()) {
             return Err(usage());
         }
         let workload = workloads
@@ -497,8 +499,15 @@ impl Args {
         if !(1..=MAX_ITERATIONS).contains(&iterations) {
             return Err(usage());
         }
-        let option = args.get(2).map(String::as_str);
-        if !matches!(option, None | Some("--profile" | "--trace")) {
+        let (mut option, mut parallel) = (None, false);
+        for arg in &args[2..] {
+            match arg.as_str() {
+                "--parallel" if !parallel => parallel = true,
+                "--profile" | "--trace" if option.is_none() => option = Some(arg.as_str()),
+                _ => return Err(usage()),
+            }
+        }
+        if parallel && !cfg!(feature = "parallel") {
             return Err(usage());
         }
         let profile = option == Some("--profile");
@@ -510,6 +519,7 @@ impl Args {
             iterations,
             profile,
             trace: option == Some("--trace"),
+            parallel,
             driver: workload.driver,
             operation: workload.operation,
         }))
@@ -777,22 +787,36 @@ fn world_trace(world: &Simulator) -> Result<Value, String> {
     Ok(trace)
 }
 
+/// Clones of the world keep the setting, including epoch and reset templates.
+fn set_parallel(world: &mut Simulator, args: &Args) {
+    #[cfg(feature = "parallel")]
+    world.set_parallel(args.parallel);
+    #[cfg(not(feature = "parallel"))]
+    let _ = (world, args);
+}
+
 fn line(out: &mut impl Write, value: Value) -> Result<(), String> {
     serde_json::to_writer(&mut *out, &canonical(value)).map_err(|e| e.to_string())?;
     writeln!(out).map_err(|e| e.to_string())
 }
 
 fn report(args: &Args, meter: Meter, operation: &str, details: Value) -> Value {
-    json!({
+    let mut report = json!({
         "kind": "report", "format": "slither-perf-baseline-v1", "case": args.case,
         "iterations": args.iterations, "seed": SEED, "release": !cfg!(debug_assertions),
         "mode": if args.trace { "trace" } else if args.profile { "profile" } else { "timing" },
         "operation": operation, "timing": meter.report(), "details": details,
-    })
+    });
+    // Present only when set, so default trace bytes stay comparable with older harnesses.
+    if args.parallel {
+        report["parallel"] = json!(true);
+    }
+    report
 }
 
 fn run_core(args: &Args, out: &mut impl Write) -> Result<Value, String> {
     let (mut world, centers, orbit) = core_world(&args.case)?;
+    set_parallel(&mut world, args);
     let initial = WorldStats::from_world(&world);
     let template = world.clone();
     let mut progress = Progress::new(&world);
@@ -1599,6 +1623,7 @@ fn run_scenario(
 ) -> Result<Value, String> {
     let controller = scenario.controller;
     let mut scene = Scene::place(scenario)?;
+    set_parallel(&mut scene.world, args);
     let death_food = scene.world.config.death_food.enabled;
     let initial = WorldStats::from_world(&scene.world);
     if args.trace {
@@ -1790,6 +1815,7 @@ mod tests {
             iterations,
             profile: false,
             trace: false,
+            parallel: false,
             driver,
             operation,
         }
