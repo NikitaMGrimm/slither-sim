@@ -31,7 +31,7 @@ import perf_build
 FROZEN_OBSERVATION = {"observe-dense": 1000, "observe-compact": 500,
                       "observe-wide": 10000, "observe-strip": 1000,
                       "observe-one": 10000, "observe-empty": 100000,
-                      "observe-sparse": 500}
+                      "observe-sparse": 500, "observe-clustered": 2000}
 CHANGED = 3
 
 
