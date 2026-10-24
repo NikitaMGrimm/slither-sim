@@ -35,26 +35,41 @@ use std::{
 };
 
 /// Messages in flight per direction of one connection before the run fails.
+/// A local resource budget; the protocol has no such field.
 const MAX_IN_FLIGHT: usize = 4096;
 /// Fit the host's 1 MiB send buffer and native client's message limit, leaving
 /// room for the largest unmasked WebSocket header.
 const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
 /// Retained wire bytes per slot before the run fails; drain to continue. Each
-/// record also counts a fixed overhead so empty events stay bounded.
+/// record also counts a fixed overhead so empty events stay bounded. A local
+/// resource budget.
 const MAX_RECORD_BYTES: usize = 32 << 20;
 const RECORD_OVERHEAD: usize = 32;
-/// New anchors per broadcast that keep an exact incremental encoding; the
-/// fourth-newest anchor has already moved by the body contraction.
-const FRESH_ANCHORS: usize = 3;
+/// Front anchors searched for a known snake's previous front. Contraction runs
+/// before each insertion from index 3 on, so that front stays unchanged at
+/// indices 1, 2 and 3 through three insertions and moves on the fourth: up to
+/// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
+/// snake in full.
+const FRESH_ANCHORS: usize = 4;
+/// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
+/// pose may exist after this many failures.
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
 /// the rest of `MAX_IN_FLIGHT` for broadcasts while the host drains.
 const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
-const MAX_NICKNAME: usize = 24;
+/// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
+/// leaderboard's u16 rank and living population must also count every snake.
+pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
+/// Prey IDs are sent as u16; `assign_prey_wire` gives each living prey one.
+const MAX_PREY: usize = u16::MAX as usize + 1;
+/// Stock-client compatibility: its nickname input keeps 24 characters, while
+/// the u8 length field could carry 255 Latin-1 bytes.
+pub(crate) const MAX_NICKNAME: usize = 24;
 /// Rows the stock leaderboard shows.
 const LEADERBOARD_ROWS: usize = 10;
-/// The stock client's victory input keeps 140 ASCII characters.
+/// Stock-client compatibility: its victory input keeps 140 ASCII characters;
+/// the record packet carries the remainder without a length field.
 pub(crate) const MAX_VICTORY_TEXT: usize = 140;
 static NATIVE_PROFILE: PlayerAppearance = PlayerAppearance {
     nickname: Vec::new(),
@@ -116,6 +131,12 @@ impl Default for SimulationConfig {
 impl SimulationConfig {
     pub fn validate(&self) -> Result<(), String> {
         self.world.validate()?;
+        // Live prey refill to `count`, and each needs one of the u16 wire IDs.
+        if self.world.prey.count > MAX_PREY {
+            return Err(format!(
+                "Protocol-19 prey IDs are u16: prey count must be at most {MAX_PREY}"
+            ));
+        }
         self.latency.validate()?;
         encode::setup(self.world.radius, self.world.prey.turn_rate)?;
         for speed in [
@@ -135,19 +156,15 @@ impl SimulationConfig {
         {
             return Err("Protocol-19 simulation supports prey sizes up to 51".into());
         }
-        if !(1..=128).contains(&self.agents) || self.controlled_slot >= self.agents {
-            return Err("Simulation needs 1 to 128 agents and a controlled slot among them".into());
+        if !(1..=MAX_AGENTS).contains(&self.agents) || self.controlled_slot >= self.agents {
+            return Err(format!(
+                "Simulation needs 1 to {MAX_AGENTS} agents, since protocol-19 snake IDs, \
+                 leaderboard rank and population are u16, and a controlled slot among them"
+            ));
         }
-        if !(1..=1000).contains(&self.decision_ticks) || !(1..=1000).contains(&self.broadcast_ticks)
-        {
-            return Err("Decision and broadcast ticks must be 1 through 1000".into());
-        }
-        // Anchors farther behind the front have been contracted and cannot be
-        // encoded incrementally; boost speed must not outrun that window.
-        if self.broadcast_ticks as f64 * self.world.dt * physics::BOOST_SPEED
-            >= (FRESH_ANCHORS - 1) as f64 * physics::ANCHOR_SPACING
-        {
-            return Err("Broadcast interval is too long for incremental body updates".into());
+        // Broadcasts fall on ticks divisible by broadcastTicks.
+        if self.decision_ticks == 0 || self.broadcast_ticks == 0 {
+            return Err("Decision and broadcast ticks must be at least 1".into());
         }
         if !self.minimap_interval_seconds.is_finite() || self.minimap_interval_seconds <= 0. {
             return Err("Minimap interval must be positive".into());
@@ -156,8 +173,11 @@ impl SimulationConfig {
         {
             return Err("Leaderboard interval must be positive".into());
         }
-        if !(1..=512).contains(&self.minimap_side) {
-            return Err("Minimap side must be 1 through 512".into());
+        if !(1..=super::minimap::MAX_SIDE).contains(&self.minimap_side) {
+            return Err(format!(
+                "Minimap side must be 1 through {}: the stock client clamps larger sides",
+                super::minimap::MAX_SIDE
+            ));
         }
         let largest = self
             .world
@@ -173,11 +193,28 @@ impl SimulationConfig {
             .fold(0., f64::max);
         if largest > encode::MAX_RADIUS {
             return Err(format!(
-                "Protocol-19 simulation supports arena radii up to {}",
+                "Protocol-19 simulation supports arena radii up to {}, a margin inside the \
+                 ±32,550 u16 anchor coordinates",
                 encode::MAX_RADIUS
             ));
         }
         Ok(())
+    }
+
+    /// Valid settings outside measured behavior; see [`Config::warnings`].
+    pub fn warnings(&self) -> Vec<String> {
+        let mut warnings = self.world.warnings();
+        // A head less than one spacing past its front anchor that travels less
+        // than `FRESH_ANCHORS - 1` spacings crosses at most that many anchors.
+        let window = (FRESH_ANCHORS - 1) as f64 * physics::ANCHOR_SPACING;
+        if self.broadcast_ticks as f64 * self.world.dt * physics::BOOST_SPEED >= window {
+            warnings.push(format!(
+                "broadcastTicks × dt × {} exceeds the {window}-unit incremental body-update \
+                 window: snakes that outrun it are resent in full (more bandwidth)",
+                physics::BOOST_SPEED
+            ));
+        }
+        warnings
     }
 }
 
@@ -203,6 +240,7 @@ struct KnownSnake {
 }
 #[derive(Clone, Debug)]
 struct KnownPrey {
+    wire: u16,
     motion: [u32; 3],
     reported_at: f64,
 }
@@ -275,7 +313,8 @@ struct Connection {
     snakes: KnownSnakes,
     food: KnownSectors,
     food_interest: SectorInterest,
-    prey: BTreeMap<u16, KnownPrey>,
+    /// Keyed by simulator ID; each entry keeps the wire ID it was shown with.
+    prey: BTreeMap<u64, KnownPrey>,
     radius: u32,
     minimap_at: f64,
     /// XOR bases belong to recipients: missed deadlines and reconnects differ.
@@ -431,7 +470,10 @@ pub struct SimulatorBackend {
     food_presentation: FoodPresentation,
     /// Exact pickup positions since the last broadcast, before buffers reset.
     food_eaters: BTreeMap<(u64, u64), u16>,
-    prey_eaters: BTreeMap<u16, u16>,
+    /// Eater slot by simulator prey ID since the last broadcast.
+    prey_eaters: BTreeMap<u64, u16>,
+    /// Wire ID of each living prey. Simulator IDs are 64-bit; see `assign_prey_wire`.
+    prey_wire: BTreeMap<u64, u16>,
     /// Listings of the subscribed sectors at the last broadcast, indexed by
     /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
     /// so a connection already holding it can skip the comparison.
@@ -463,11 +505,11 @@ impl SimulatorBackend {
         let mut world = Simulator::new(seed, config.world.clone())?;
         world.food_spawn_events = Some(Vec::new());
         world.pickup_events = Some(Vec::new());
-        for slot in 0..config.agents {
-            world.add(slot.to_string(), slot, config.agents)?;
+        world.add_slots(config.agents)?;
+        for snake in &mut world.snakes {
             // Native experiments retain their synthetic ring initialization.
             // Hosted lives enter through the same admission rule as rejoins.
-            world.snakes[slot].alive = remote == 0;
+            snake.alive = remote == 0;
         }
         let mut backend = Self {
             random: Random::new(u64::from(seed) ^ 0x6c61_7465_6e63_7900),
@@ -475,6 +517,7 @@ impl SimulatorBackend {
             food_presentation: FoodPresentation::new(seed, config.agents),
             food_eaters: BTreeMap::new(),
             prey_eaters: BTreeMap::new(),
+            prey_wire: BTreeMap::new(),
             food_sectors: Vec::new(),
             listed: Vec::new(),
             food_buckets: Vec::new(),
@@ -603,8 +646,8 @@ impl SimulatorBackend {
     /// no action the slot stays busy for it. The client knows it like its ping.
     pub fn set_slot_processing_seconds(&mut self, slot: usize, seconds: f64) -> Result<(), String> {
         self.slot(slot)?;
-        if !seconds.is_finite() || !(0. ..=2.).contains(&seconds) {
-            return Err("Processing must be 0 to 2 seconds".into());
+        if !seconds.is_finite() || seconds < 0. {
+            return Err("Processing must be finite and nonnegative".into());
         }
         if self.pending(slot) {
             return Err("Slot is still processing its previous decision".into());
@@ -1026,7 +1069,7 @@ impl SimulatorBackend {
         for event in self.world.pickup_events.as_deref().unwrap_or(&[]) {
             if let PickupItem::Prey(prey) = &event.item {
                 self.prey_eaters
-                    .entry(encode::prey_id(prey))
+                    .entry(prey.id)
                     .or_insert(event.eater as u16);
             }
             if let PickupItem::Food(food) = &event.item {
@@ -1096,6 +1139,7 @@ impl SimulatorBackend {
             }
         }
         self.sync_food_sectors()?;
+        self.assign_prey_wire()?;
         let eaten = eaten_sectors(&self.food_eaters);
         let bounds: Vec<[f64; 4]> = self
             .world
@@ -1142,6 +1186,35 @@ impl SimulatorBackend {
         self.food_eaters.clear();
         self.prey_eaters.clear();
         self.minimaps()?;
+        Ok(())
+    }
+
+    /// Give every living prey a 16-bit wire ID. Truncating 64-bit simulator IDs
+    /// would let a survivor and a much later prey share one (0 and 65536), so
+    /// IDs are allocated: a prey keeps its ID while it lives, and a new prey
+    /// takes the first free ID from its own truncated value. A retired prey's
+    /// ID is free at once. Only set-up connections show prey, and each one gets
+    /// `updates` in this broadcast, which sends every removal before any
+    /// appearance, so a connection still showing a retired ID sees it removed
+    /// before its reuse. All 65,536 IDs can therefore be live.
+    fn assign_prey_wire(&mut self) -> Result<(), String> {
+        let live: BTreeSet<u64> = self.world.prey.iter().map(|prey| prey.id).collect();
+        self.prey_wire.retain(|id, _| live.contains(id));
+        let mut taken: Option<BTreeSet<u16>> = None;
+        for &id in &live {
+            if self.prey_wire.contains_key(&id) {
+                continue;
+            }
+            let taken = taken.get_or_insert_with(|| self.prey_wire.values().copied().collect());
+            let wire = (0..=u16::MAX)
+                .map(|offset| (id as u16).wrapping_add(offset))
+                .find(|wire| !taken.contains(wire))
+                .ok_or(format!(
+                    "Protocol-19 prey IDs are 16-bit: more than {MAX_PREY} prey are live"
+                ))?;
+            taken.insert(wire);
+            self.prey_wire.insert(id, wire);
+        }
         Ok(())
     }
 
@@ -1413,21 +1486,26 @@ impl SimulatorBackend {
         let mut visible = BTreeMap::new();
         for prey in &world.prey {
             if prey.position.distance(head) <= vision {
-                visible.entry(encode::prey_id(prey)).or_insert(prey);
+                visible.entry(prey.id).or_insert(prey);
             }
         }
-        let gone: Vec<u16> = connection
+        let gone: Vec<u64> = connection
             .prey
             .keys()
             .filter(|id| !visible.contains_key(id))
             .copied()
             .collect();
         for id in gone {
-            connection.prey.remove(&id);
-            packets.push(encode::prey_removal(id, self.prey_eaters.get(&id).copied()));
+            let known = connection.prey.remove(&id).expect("known prey");
+            packets.push(encode::prey_removal(
+                known.wire,
+                self.prey_eaters.get(&id).copied(),
+            ));
         }
         for (id, prey) in visible {
+            let wire = self.prey_wire[&id];
             let current = KnownPrey {
+                wire,
                 motion: [
                     encode::angle_u24(prey.heading),
                     encode::angle_u24(prey.target_heading),
@@ -1436,7 +1514,7 @@ impl SimulatorBackend {
                 reported_at: now,
             };
             match connection.prey.get(&id) {
-                None => packets.push(encode::prey_appearance(prey)?),
+                None => packets.push(encode::prey_appearance(wire, prey)?),
                 Some(known) => {
                     let changed = known.motion != current.motion;
                     // Ordinary receipts cluster near one third second. The
@@ -1448,7 +1526,7 @@ impl SimulatorBackend {
                     if now + 1e-9 < known.reported_at + interval {
                         continue;
                     }
-                    packets.push(encode::prey_motion(prey, changed)?)
+                    packets.push(encode::prey_motion(wire, prey, changed)?)
                 }
             }
             connection.prey.insert(id, current);
@@ -2759,6 +2837,178 @@ mod tests {
                 .contains(&encode::prey_removal(123, None))
         );
     }
+    #[test]
+    fn prey_ids_that_share_their_low_16_bits_get_distinct_wire_ids() {
+        let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey ids");
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let head = sim.backend.world.snakes[0].head;
+        let prey = |id: u64, dx: f64| crate::prey::Prey {
+            id,
+            position: Point {
+                x: head.x + dx,
+                y: head.y + 600.,
+            },
+            heading: 0.,
+            target_heading: 0.,
+            speed: 0.,
+            size: 6.,
+        };
+        // A surviving early prey and a late-life prey whose truncated IDs collide.
+        sim.backend
+            .world
+            .prey
+            .extend([prey(0, -100.), prey(65_536, 100.)]);
+        sim.backend.broadcast().unwrap();
+        let appearances: BTreeSet<u16> = remote
+            .pump(&mut sim, 0)
+            .iter()
+            .filter(|p| p[0] == b'y' && p.len() == 20)
+            .map(|p| u16::from_be_bytes([p[1], p[2]]))
+            .collect();
+        assert_eq!(appearances, BTreeSet::from([0, 1]));
+        assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
+
+        // A removed prey's ID is reused in the same broadcast, after its removal.
+        sim.backend.world.prey.retain(|prey| prey.id != 0);
+        sim.backend.world.prey.push(prey(131_072, 0.));
+        sim.backend.broadcast().unwrap();
+        let packets = remote.pump(&mut sim, 0);
+        let removal = packets
+            .iter()
+            .position(|p| *p == encode::prey_removal(0, None));
+        let added: Vec<(usize, u16)> = packets
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p[0] == b'y' && p.len() == 20)
+            .map(|(index, p)| (index, u16::from_be_bytes([p[1], p[2]])))
+            .collect();
+        assert_eq!(added.len(), 1);
+        assert_eq!(added[0].1, 0);
+        assert!(removal.unwrap() < added[0].0);
+        assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 2);
+    }
+
+    #[test]
+    fn every_prey_id_can_be_live_when_a_shown_prey_is_replaced() {
+        let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "Prey ids");
+        run(&mut sim, &mut [(0, &mut remote)], 7);
+        let head = sim.backend.world.snakes[0].head;
+        // One shown prey; the rest live beyond vision.
+        let prey = |id: u64, near: bool| crate::prey::Prey {
+            id,
+            position: Point {
+                x: head.x + if near { 0. } else { 1e6 },
+                y: head.y + 600.,
+            },
+            heading: 0.,
+            target_heading: 0.,
+            speed: 0.,
+            size: 6.,
+        };
+        sim.backend.world.prey = (0..65_536).map(|id| prey(id, id == 0)).collect();
+        sim.backend.broadcast().unwrap();
+        remote.pump(&mut sim, 0);
+        // A catch and an immediate respawn: the shown ID retires as it is reused.
+        sim.backend.world.prey.retain(|prey| prey.id != 0);
+        sim.backend.world.prey.push(prey(65_536, true));
+        sim.backend.broadcast().unwrap();
+        let packets = remote.pump(&mut sim, 0);
+        let removal = packets
+            .iter()
+            .position(|p| *p == encode::prey_removal(0, None));
+        let added = packets
+            .iter()
+            .position(|p| p[0] == b'y' && p.len() == 20 && p[1..3] == [0, 0]);
+        assert!(removal.unwrap() < added.unwrap());
+        assert_eq!(remote.frame(&sim).observation.unwrap().prey.len(), 1);
+    }
+
+    #[test]
+    fn three_new_anchors_encode_incrementally_and_four_resend() {
+        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
+        world.add("0", 0, 1).unwrap();
+        let mut snake = world.snakes[0].clone();
+        snake.heading = 0.;
+        snake.body = (0..20)
+            .map(|i| Point {
+                x: -42. * f64::from(i),
+                y: 3. * f64::from(i % 2),
+            })
+            .collect();
+        snake.head = snake.body[0];
+        snake.segments = 20;
+        for insertions in 1..=FRESH_ANCHORS {
+            let mut moved = snake.clone();
+            let mut known = KnownSnake::new(0, &moved, 0.).unwrap();
+            for k in 1..=insertions {
+                let anchor = Point {
+                    x: 42. * k as f64,
+                    y: 0.,
+                };
+                physics::append_anchor(&mut moved.body, anchor, false);
+                moved.head = anchor;
+            }
+            let mut packets = Vec::new();
+            changes(
+                &mut packets,
+                false,
+                1,
+                &mut known,
+                &moved,
+                0.,
+                &NATIVE_PROFILE,
+            )
+            .unwrap();
+            let anchors = packets
+                .iter()
+                .filter(|p| matches!(p[0], b'g' | b'='))
+                .count();
+            if insertions < FRESH_ANCHORS {
+                // The old front is still unchanged at index `insertions`.
+                assert_eq!(moved.body[insertions], snake.body[0]);
+                assert_eq!(anchors, insertions);
+                assert!(!packets.iter().any(|p| is_full(p)), "{insertions}");
+            } else {
+                assert_ne!(moved.body[insertions], snake.body[0]);
+                assert!(packets.iter().any(|p| is_full(p)), "{insertions}");
+            }
+            assert_eq!(known.front, moved.body[0]);
+        }
+    }
+
+    #[test]
+    fn boosting_within_the_window_never_resends_the_body() {
+        let mut config = raw_config(2);
+        config.world.radius = 6000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        // 40 ticks of boost travel 122.5 units: up to three anchors per broadcast.
+        config.broadcast_ticks = 40;
+        assert!(config.warnings().is_empty());
+        let mut sim = RawSimulator::new(7, config, 2).unwrap();
+        let mut a = Remote::connect(&mut sim, 0, "Observer");
+        let mut b = Remote::connect(&mut sim, 1, "Booster");
+        for (slot, y, segments) in [(0, 1000., 2), (1, 0., 60)] {
+            sim.backend.world.snakes[slot].alive = false;
+            sim.backend
+                .world
+                .respawn(slot, Point { x: -1500., y }, 0., segments)
+                .unwrap();
+            sim.backend.slots[slot].control = Action {
+                heading: 0.,
+                boost: slot == 1,
+            };
+        }
+        run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 200);
+        a.packets.clear();
+        run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 400);
+        assert!(sim.backend.world.is_boosting(1));
+        assert!(a.packets.iter().any(|p| p[0] == b'g' && p[1..3] == [0, 1]));
+        assert!(!a.packets.iter().any(|p| is_full(p) && p[1..3] == [0, 1]));
+    }
+
     fn profile(nickname: &str) -> PlayerAppearance {
         PlayerAppearance {
             nickname: nickname.as_bytes().to_vec(),
@@ -3176,7 +3426,7 @@ mod tests {
             speed: 100.,
             size: 6.,
         };
-        let appear = encode::prey_appearance(&prey).unwrap();
+        let appear = encode::prey_appearance(123, &prey).unwrap();
         // Synthetic world edits isolate visibility even with no living sessions.
         sim.backend.world.food.push(food);
         sim.backend.world.prey.push(prey);

@@ -57,9 +57,11 @@ gameplay, not a measured global population. See [rules and limits](server-rules.
 cargo run --release --locked -- host --config arena.json
 ```
 
-`maxClients` reserves remote slots; `bots` adds food-seeking bots. Their combined
-limit is 128. The host derives `simulation.agents` and `controlledSlot` from
-these counts. Host `recordWire` must be false; enable recording on a client instead.
+`maxClients` reserves remote slots; `bots` adds food-seeking bots. Together they
+may number 65,535, which the `u16` snake IDs, leaderboard rank and population
+fields can count. The host derives `simulation.agents`
+and `controlledSlot` from these counts. `slither-sim host` prints warnings about
+valid but unmeasured settings to stderr; see [limits](configuration.md#limits). Host `recordWire` must be false; enable recording on a client instead.
 
 `--bind IP:PORT` overrides the file. Real sockets already include network and
 compute delay; configured latency adds another ordered link. Keep added latency

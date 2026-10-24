@@ -7,7 +7,7 @@
 //!
 //! A session must not be used by two threads at once; separate sessions may
 //! run on separate threads.
-use slither_sim::transport::{FrameRef, Session};
+use slither_sim::transport::{FrameRef, Session, StepError};
 use std::ffi::{CStr, CString, c_char};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::{ptr, slice};
@@ -23,6 +23,8 @@ pub const SLITHER_INVALID: i32 = 2;
 /// An internal error; only [`slither_last_error`] and [`slither_session_free`]
 /// remain valid.
 pub const SLITHER_PANICKED: i32 = 3;
+/// Advancement failed and cleared all worlds; reset to continue.
+pub const SLITHER_ENDED: i32 = 4;
 
 /// An opaque session handle.
 pub struct SlitherSession {
@@ -290,7 +292,10 @@ pub unsafe extern "C" fn slither_step(
             s.boosts.extend(boosts.iter().map(|&boost| boost != 0));
             s.session
                 .step(headings, &s.boosts)
-                .map_err(|error| (SLITHER_REJECTED, error))
+                .map_err(|error| match error {
+                    StepError::Rejected(message) => (SLITHER_REJECTED, message),
+                    StepError::Ended(message) => (SLITHER_ENDED, message),
+                })
         })
     }
 }

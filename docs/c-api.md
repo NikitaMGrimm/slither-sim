@@ -35,14 +35,15 @@ load another build.
 | --- | --- |
 | `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 2 for `slither-sim-abi-v2`. Check it first. |
 | `slither_session_new()`, `slither_session_free(s)` | Create and free a session; free ignores null. |
-| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v2` request line as `serve` would. |
+| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v3` request line as `serve` would. |
 | `slither_step(s, headings, n, boosts, n)` | Steps every world like a JSON `step`, without JSON. |
 | `slither_read_frame(s, world, &frame)` | Fills a `slither_frame` with one world's current frame. |
 | `slither_worlds(s)`, `slither_agents(s)` | Worlds and slots per world; 0 before reset. |
 | `slither_last_error(s)` | Why the latest request, step or frame read failed, or an empty string. |
 
-Use `slither_request` for `info`, `reset` and `snapshot`. Requests the session
-rejects still return `SLITHER_OK`, with an error reply. The reply has no newline;
+Use `slither_request` for `info`, `reset` and `snapshot`. JSON errors, including
+terminal failures, return `SLITHER_OK`; inspect `error` and `sessionEnded` in
+the reply. The reply has no newline;
 a NUL that `reply_len` excludes follows it.
 
 `slither_step` takes `worlds × agents` entries per array, world-major: slot `s`
@@ -50,6 +51,9 @@ of world `w` is entry `w × agents + s`. Headings are `double` radians, with NaN
 for no action, which only dead slots may give. Boosts are `uint8_t`; any nonzero
 value boosts. Validation and error text match the JSON step, and a rejected step
 changes nothing. JSON and typed steps act on the same worlds.
+If advancement or frame collection fails, `SLITHER_ENDED` clears every world;
+`slither_worlds` and `slither_agents` return 0, and frame reads require a reset.
+The handle remains usable: reset it to continue.
 
 | Code | Meaning |
 | --- | --- |
@@ -57,6 +61,7 @@ changes nothing. JSON and typed steps act on the same worlds.
 | `SLITHER_REJECTED` (1) | The session rejected the call, for example a step before reset, and changed nothing. |
 | `SLITHER_INVALID` (2) | A required pointer was null; nothing changed. Arrays may be null when their length is 0. |
 | `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_last_error` and `slither_session_free` remain valid. |
+| `SLITHER_ENDED` (4) | Advancement failed and cleared every world; reset to continue. |
 
 ## Frames
 
@@ -94,6 +99,9 @@ separate threads. Steps advance several worlds in parallel on the library's
 `slither-sim-abi-v2` covers the function signatures, the `slither_frame` layout,
 the codes and the column meanings. An incompatible change needs a new identifier
 and `SLITHER_ABI_VERSION`. Version 2 inserted `snake_kill_score` after
-`snake_kills` and added `SLITHER_DEATH_PIT`; v1 callers must be rebuilt. Requests and replies follow `slither-sim-json-v2`;
+`snake_kills` and added `SLITHER_DEATH_PIT`; v1 callers must be rebuilt.
+Requests and replies follow `slither-sim-json-v3`;
 check `protocol` in replies. As with `serve`, record the commit for reproducible
 results.
+Version 2 adds `SLITHER_ENDED`, distinguishing terminal failure from
+`SLITHER_REJECTED`.

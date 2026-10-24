@@ -125,8 +125,9 @@ fn configurable_threshold_public_edits_and_settings() {
         assert!(Simulator::new(1, config.clone()).is_err());
     }
     config.boost_food.cell_size = 50.0;
+    // Zero admits no boost pellet; see tests/config.rs.
     config.boost_food.max_per_cell = 0;
-    assert!(Simulator::new(1, config).is_err());
+    assert!(Simulator::new(1, config).is_ok());
 
     let mut old = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("boostFood");

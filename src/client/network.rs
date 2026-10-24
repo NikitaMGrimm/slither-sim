@@ -15,8 +15,24 @@ use tungstenite::{
     stream::MaybeTlsStream,
 };
 
+use super::simulation::MAX_NICKNAME;
+
+/// Largest accepted server message; a local resource budget matching the
+/// simulator's frames.
 const MAX_MESSAGE_BYTES: usize = 1 << 20;
+/// Retained wire record bytes before the backend fails; drain to continue.
 const MAX_RECORD_BYTES: usize = 32 << 20;
+/// Each decision reads the socket at least this long, so a bot behind its
+/// schedule still receives traffic. A polling policy, not a protocol rule.
+const MIN_READ_SECONDS: f64 = 0.001;
+
+/// `from + seconds`, or an error when the platform cannot represent it.
+fn deadline(from: Instant, seconds: f64) -> Result<Instant, String> {
+    Duration::try_from_secs_f64(seconds)
+        .ok()
+        .and_then(|duration| from.checked_add(duration))
+        .ok_or_else(|| format!("A deadline {seconds} s ahead cannot be represented"))
+}
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -77,22 +93,20 @@ impl NetworkConfig {
         {
             return Err("Need an explicit ws:// or wss:// server URL without credentials".into());
         }
-        for (name, value, maximum) in [
-            (
-                "decisionIntervalSeconds",
-                self.decision_interval_seconds,
-                10.,
-            ),
-            ("connectTimeoutSeconds", self.connect_timeout_seconds, 60.),
-            ("idleTimeoutSeconds", self.idle_timeout_seconds, 600.),
+        for (name, value) in [
+            ("decisionIntervalSeconds", self.decision_interval_seconds),
+            ("connectTimeoutSeconds", self.connect_timeout_seconds),
+            ("idleTimeoutSeconds", self.idle_timeout_seconds),
         ] {
-            if !value.is_finite() || !(0.001..=maximum).contains(&value) {
-                return Err(format!("Invalid {name}: need 0.001..{maximum}"));
+            // Socket timeouts reject a zero duration, so the value must not
+            // round to zero nanoseconds.
+            if !Duration::try_from_secs_f64(value).is_ok_and(|duration| !duration.is_zero()) {
+                return Err(format!(
+                    "Invalid {name}: need a positive duration of at least 1 ns"
+                ));
             }
         }
-        if self.nickname.chars().count() > 24 || self.nickname.chars().any(|c| c as u32 > 255) {
-            return Err("Nickname must have at most 24 Latin-1 characters".into());
-        }
+        login_packet(&self.nickname, self.skin)?;
         if self.custom_skin.len() > 255 {
             return Err("Custom skin must have at most 255 bytes".into());
         }
@@ -105,8 +119,11 @@ impl NetworkConfig {
 
 /// Build the protocol-19 login, without executing any downloaded client code.
 pub fn login_packet(nickname: &str, skin: u8) -> Result<Vec<u8>, String> {
-    if nickname.chars().count() > 24 || nickname.chars().any(|c| c as u32 > 255) {
-        return Err("Nickname must have at most 24 Latin-1 characters".into());
+    if nickname.chars().count() > MAX_NICKNAME || nickname.chars().any(|c| c as u32 > 255) {
+        return Err(format!(
+            "Nickname must have at most {MAX_NICKNAME} Latin-1 characters, as the stock \
+             client allows"
+        ));
     }
     let name: Vec<_> = nickname.chars().map(|c| c as u8).collect();
     let mut packet = vec![
@@ -211,8 +228,7 @@ impl NetworkBackend {
             });
         // DNS uses the system resolver; the socket and HTTP/TLS handshakes are bounded.
         let addresses = (host, port).to_socket_addrs().map_err(|e| e.to_string())?;
-        let deadline =
-            Instant::now() + Duration::from_secs_f64(self.config.connect_timeout_seconds);
+        let deadline = deadline(Instant::now(), self.config.connect_timeout_seconds)?;
         let mut last_error = "Server resolved to no addresses".to_string();
         let mut connected = None;
         for address in addresses {
@@ -291,7 +307,7 @@ impl NetworkBackend {
             .as_mut()
             .ok_or("Disconnected; reconnect explicitly")?;
         transport_stream(socket.get_mut())?.write_deadline =
-            Instant::now() + Duration::from_secs_f64(self.config.connect_timeout_seconds);
+            deadline(Instant::now(), self.config.connect_timeout_seconds)?;
         socket
             .send(Message::Binary(bytes.to_vec().into()))
             .map_err(|e| e.to_string())?;
@@ -362,7 +378,7 @@ impl NetworkBackend {
         if self.socket.is_none() {
             return self.frame();
         }
-        let deadline = self.next_decision.max(self.now() + 0.001);
+        let deadline = self.next_decision.max(self.now() + MIN_READ_SECONDS);
         loop {
             let now = self.now();
             if now - self.last_received >= self.config.idle_timeout_seconds {
@@ -377,9 +393,9 @@ impl NetworkBackend {
             let read_until = deadline.min(self.last_received + self.config.idle_timeout_seconds);
             let socket = self.socket.as_mut().ok_or("Disconnected")?;
             let transport = transport_stream(socket.get_mut())?;
-            transport.read_deadline = self.epoch + Duration::from_secs_f64(read_until);
+            transport.read_deadline = self::deadline(self.epoch, read_until)?;
             transport.write_deadline =
-                Instant::now() + Duration::from_secs_f64(self.config.connect_timeout_seconds);
+                self::deadline(Instant::now(), self.config.connect_timeout_seconds)?;
             match socket.read() {
                 Ok(Message::Binary(bytes)) => {
                     let at = self.now();

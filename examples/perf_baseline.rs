@@ -1383,10 +1383,13 @@ struct Lifecycle {
 impl Lifecycle {
     fn deaths(&mut self, deaths: &[DeathEvent]) {
         for death in deaths {
-            match death.reason {
-                DeathReason::Body => self.body_deaths += 1,
-                // Workloads configure no pit; count its deaths as wall deaths.
-                DeathReason::Boundary | DeathReason::Pit => self.boundary_deaths += 1,
+            if death.reason == DeathReason::Body {
+                self.body_deaths += 1;
+            } else {
+                // Workloads configure no pit. Keep that invariant without
+                // naming variants absent from older overlaid baselines.
+                assert_eq!(death.reason, DeathReason::Boundary);
+                self.boundary_deaths += 1;
             }
             self.death_food += death.food;
         }

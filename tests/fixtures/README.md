@@ -13,8 +13,15 @@ live inline in `tests/client_challenge.rs`; there is no `login-challenges.json`.
 `wireProtocol` (the actual binary wire version, currently literal `19`) and
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
 The client frame ID is distinct from the `slither-client-json-v1` request/reply
-envelope and the geometric `slither-sim-json-v2` controller; see
+envelope and the geometric `slither-sim-json-v3` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
+
+[`serve-errors-v3.json`](serve-errors-v3.json) separately pins the geometric
+controller's `slither-sim-json-v3` error envelope and a synthetic overflow
+reproducer used by Rust and Python lifecycle tests. It has no wire
+protocol or client-frame contract and is outside the wire/client inventory.
+Its error text is illustrative; the literal protocol and `sessionEnded` flag
+are checked independently of runtime defaults.
 
 `dataOrigin: captured` identifies retained packet bytes, with
 `expectedOrigin: reference-decoder` identifying decoded expectations. Source

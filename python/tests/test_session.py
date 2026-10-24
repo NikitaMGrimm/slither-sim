@@ -7,6 +7,7 @@ from array import array
 import ast
 from collections import UserDict
 import ctypes
+import json
 import math
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ import subprocess
 import sys
 import threading
 import unittest
+import warnings
 
 import slither_sim
 from slither_sim import NO_ORIGIN, NONE, REASONS, Session
@@ -308,15 +310,28 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "^Reset first$"):
             session.frame(0)
         self.assertEqual(session.request({"op": "step", "actions": []}),
-                         {"protocol": slither_sim.PROTOCOL, "error": "Reset first"})
+                         {"protocol": slither_sim.PROTOCOL, "error": "Reset first", "sessionEnded": False})
+
+    def test_unmeasured_settings_warn_on_reset(self):
+        session = Session()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            session.reset(config={"dt": 0.01})
+            session.reset()
+        self.assertEqual(len(caught), 1)
+        self.assertIs(caught[0].category, UserWarning)
+        self.assertIn("~7 ms server loop", str(caught[0].message))
+        self.assertEqual(caught[0].filename, __file__)
+        reply = session.request({"op": "reset", "config": {"dt": 0.01}})
+        self.assertEqual(len(reply["result"]["warnings"]), 1)
 
     def test_rejected_resets_keep_the_previous_worlds(self):
         session = Session()
         reset(session)
         before = fingerprint(session)
         for options, message in [
-            ({"worlds": 0}, "Need 1..1024 worlds, 1..128 agents and 1..1000 decisionTicks"),
-            ({"agents": 129}, "Need 1..1024 worlds, 1..128 agents and 1..1000 decisionTicks"),
+            ({"worlds": 0}, "Need at least one world, agent and decision tick"),
+            ({"agents": 2**32}, "agents must be at most 4294967295"),
             ({"seed": -1}, "invalid value: integer `-1`, expected u32"),
             ({"config": {"radius": 700, "colour": 1}}, "unknown field `colour`"),
             ({"config": {"preset": "battledome", "colour": 1}}, "unknown field `colour`"),
@@ -378,6 +393,35 @@ class ErrorTests(unittest.TestCase):
         self.assertTrue(str(caught.exception).startswith("World 1: "))
         self.assertEqual(str(caught.exception), json_step(encoded, headings, boosts)["error"])
 
+    def test_terminal_steps_clear_worlds_and_reset_recovers(self):
+        fixture = json.loads((Path(__file__).resolve().parents[2]
+                              / "tests/fixtures/serve-errors-v3.json").read_text(encoding="utf-8"))
+        typed, encoded = Session(), Session()
+        options = fixture["reset"]
+        typed.reset(worlds=options["worlds"], agents=options["agents"],
+                    decision_ticks=options["decisionTicks"], config=options["config"])
+        self.assertIn("result", encoded.request(options))
+        with self.assertRaises(slither_sim.SessionEndedError) as caught:
+            typed.step([math.pi] * 2, bytes(2))
+        self.assertIsInstance(caught.exception, RuntimeError)
+        self.assertNotIsInstance(caught.exception, ValueError)
+        self.assertIn("mass would overflow", str(caught.exception))
+        reply = encoded.request(fixture["step"])
+        self.assertEqual(reply["error"], str(caught.exception))
+        reply["error"] = fixture["terminalReply"]["error"]
+        self.assertEqual(reply, fixture["terminalReply"])
+        for session in (typed, encoded):
+            self.assertEqual((session.worlds, session.agents), (0, 0))
+            for world in (0, 1):
+                with self.assertRaisesRegex(ValueError, "^Reset first$"):
+                    session.frame(world)
+            with self.assertRaisesRegex(ValueError, "^Reset first$"):
+                session.step([], b"")
+            self.assertEqual(session.request(fixture["step"]), fixture["rejectedReply"])
+            session.reset(agents=1)
+            session.step([0.0], b"\0")
+            self.assertGreater(session.frame(0).time, 0)
+
     def test_unknown_world(self):
         session = Session()
         with self.assertRaisesRegex(ValueError, "^Reset first$"):
@@ -416,7 +460,7 @@ class ErrorTests(unittest.TestCase):
         self.assertEqual(replies[0], replies[2])
         info = replies[0]["result"]
         self.assertEqual(tuple(info["origins"]), slither_sim.ORIGINS)
-        self.assertEqual(info["maxAgents"], 128)
+        self.assertEqual(info["maxAgents"], 2**32 - 1)
         self.assertIn("error", session.request(b"{not json"))
         self.assertIn("error", session.request({"op": "fly"}))
 

@@ -15,7 +15,7 @@ of older versions. Check the envelope and frame contract before acting.
 | Protocol `19` | Binary WebSocket packets and commands. |
 | `slither-client-v2` | Bot frame fields, units and lifecycle. |
 | `slither-client-json-v1` | The `client` JSON requests and reply envelope. |
-| `slither-sim-json-v2` | The separate geometric [`serve` controller](bot-api.md). |
+| `slither-sim-json-v3` | The separate geometric [`serve` controller](bot-api.md). |
 | `slither-sim-abi-v2` | The in-process [C ABI](c-api.md) over `serve` sessions. |
 | Package version | Rust API and simulator implementation; also pin the commit for reproducibility. |
 
@@ -90,8 +90,7 @@ repeated full-grid work even for empty snapshots or deltas. Exceeding it rejects
 the whole frame before committing received state; each new frame has a fresh
 budget. The separate L limit remains 1,048,576 cells across its team layers.
 
-`processingSeconds` is measured bot compute time, between 0 and 2 seconds in
-simulation. It replaces the configured sample for that decision, including when
+`processingSeconds` is measured bot compute time, finite and nonnegative. It replaces the configured sample for that decision, including when
 no action is sent. Network computation has already elapsed, so the value is
 recorded as metadata. Invalid actions are rejected before recording the duration;
 later I/O or record-buffer errors do not roll back sent bytes or advanced time.

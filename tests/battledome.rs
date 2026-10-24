@@ -378,6 +378,53 @@ fn the_smallest_validated_floor_rings_spawn_at_every_sampled_angle() {
     }
 }
 
+#[test]
+fn the_largest_validated_floor_rings_spawn_at_every_sampled_angle() {
+    let mut config = Config::sandbox();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.0;
+    config.kiosk.enabled = false;
+    config.radius = 1e15;
+    config.spawn_radius = Some(937_684_932_592_310.0);
+    config.min_score = Some(10);
+    assert!(config.validate().is_err(), "reviewer's upper-limit repro");
+
+    for score in [10, 400, *MassFloor::score_range().end()] {
+        config.radius = 1e21;
+        config.min_score = Some(score);
+        let (mut lower, mut upper) = (15_000.0, 1e20);
+        // Find adjacent floats at the upper numerical limit, where the
+        // occupied arc becomes too small to resolve head-tail clearance.
+        loop {
+            let middle = lower + (upper - lower) / 2.0;
+            if middle == lower || middle == upper {
+                break;
+            }
+            config.spawn_radius = Some(middle);
+            if config.validate().is_ok() {
+                lower = middle;
+            } else {
+                upper = middle;
+            }
+        }
+        config.spawn_radius = Some(upper);
+        assert!(config.validate().is_err());
+        config.spawn_radius = Some(lower);
+        let mut world = Simulator::new(1, config.clone()).unwrap();
+        world.add("edge", 0, 1).unwrap();
+        for i in 0..4096 {
+            let angle = std::f64::consts::TAU * f64::from(i) / 4096.0;
+            let head = Point {
+                x: lower * angle.cos(),
+                y: lower * angle.sin(),
+            };
+            for turn in [-FRAC_PI_2, FRAC_PI_2] {
+                world.spawn_body(head, angle + turn).unwrap();
+            }
+        }
+    }
+}
+
 /// A victim at the origin whose tip meets the killer's body at x = -25.
 fn kill_world(window: Option<f64>) -> Simulator {
     let mut config = Config::sandbox();

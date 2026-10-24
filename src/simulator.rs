@@ -28,8 +28,8 @@ impl Default for DeathFoodConfig {
 }
 impl DeathFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 || self.max_per_cell == 0 {
-            return Err("Invalid death-food density configuration".into());
+        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
+            return Err("Death-food cellSize must be positive and finite".into());
         }
         Ok(())
     }
@@ -54,8 +54,8 @@ impl Default for AmbientFoodConfig {
 }
 impl AmbientFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 || self.max_per_cell == 0 {
-            return Err("Invalid ambient-food density configuration".into());
+        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
+            return Err("Ambient-food cellSize must be positive and finite".into());
         }
         Ok(())
     }
@@ -80,8 +80,8 @@ impl Default for BoostFoodConfig {
 }
 impl BoostFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 || self.max_per_cell == 0 {
-            return Err("Invalid boost-food density configuration".into());
+        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
+            return Err("Boost-food cellSize must be positive and finite".into());
         }
         Ok(())
     }
@@ -332,22 +332,41 @@ impl Config {
         }
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.food_count > 100_000 {
-            return Err("foodCount must be at most 100000".into());
-        }
         if [self.radius, self.vision, self.dt]
             .iter()
             .any(|n| !n.is_finite() || *n <= 0.0)
         {
             return Err("Settings must be positive finite numbers".into());
         }
-        if !self.ambient_replenish_per_second.is_finite()
-            || !(0.0..=10_000.0).contains(&self.ambient_replenish_per_second)
-        {
-            return Err("ambientReplenishPerSecond must be finite and between 0 and 10000".into());
+        check_ambient_rate(self.ambient_replenish_per_second, self.dt)?;
+        // A slide leaves the head one contact lead behind the rim along its
+        // heading. Moving at least that far in one tick puts a head that keeps
+        // its heading on or outside the rim, which is lethal, so shallow slides
+        // of a boosting minimum-size snake would become deaths. The old 32 ms
+        // cap claimed body-radius tunneling, but collision tests are swept.
+        let lead = crate::boundary::CONTACT_LEAD * MIN_SCALE;
+        if self.boundary_mode == crate::BoundaryMode::Sliding && self.dt * BOOST_SPEED >= lead {
+            return Err(format!(
+                "With sliding boundaries dt must be below {lead} / {BOOST_SPEED} = {} s: a \
+                 boosting minimum-size snake would pass its {lead}-unit forward contact \
+                 lead in one tick and die on shallow rim contact. Use boundaryMode \"hard\" \
+                 for longer steps",
+                lead / BOOST_SPEED
+            ));
         }
-        if self.dt > 0.032 {
-            return Err("dt must be at most 32ms".into());
+        // Prey advance in LOOP_SECONDS substeps and boosting snakes drop food
+        // every BOOST_DROP_SECONDS, so one tick counts dt plus a carried clock
+        // below one period of each. Counting the shorter period below
+        // `max_tick_count` keeps both counts exact integers that fit usize,
+        // about 6.3e13 s on 64-bit targets. It also keeps a tick of boost
+        // travel, dt × BOOST_SPEED, far inside f64, so heads stay finite.
+        if (self.dt + 2.0 * LOOP_SECONDS) / LOOP_SECONDS >= max_tick_count() {
+            return Err(format!(
+                "dt {} is too long: prey advance in {LOOP_SECONDS} s substeps, and one \
+                 tick's count of them must be an exact integer that fits usize (below {})",
+                self.dt,
+                max_tick_count()
+            ));
         }
         self.prey.validate()?;
         self.kiosk.validate()?;
@@ -386,8 +405,8 @@ impl Config {
             return Err("minScore requires spawnRadius, the ring new lives lie along".into());
         }
         // The whole centerline must clear the pit: the midpoint of a 42-unit
-        // chord is sqrt(spawn^2 - 21^2) from the center. Validate the lower
-        // rounded radius so every sin/cos -> hypot spawn angle still fits.
+        // chord is sqrt(spawn^2 - 21^2) from the center. Check both rounded
+        // radii: small rings can wrap, but large ones lose angular resolution.
         let segments = self
             .min_score
             .and_then(MassFloor::for_score)
@@ -395,9 +414,11 @@ impl Config {
         if self.spawn_radius.is_some_and(|spawn| {
             let roundoff = crate::spawn::ring_roundoff(spawn);
             let lower = spawn - roundoff;
-            !(spawn + roundoff < self.radius - SPAWN_WALL_MARGIN
+            let upper = spawn + roundoff;
+            !(upper < self.radius - SPAWN_WALL_MARGIN
                 && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
-                && crate::spawn::ring_step(lower, segments).is_some())
+                && crate::spawn::ring_step(lower, segments).is_some()
+                && crate::spawn::ring_step(upper, segments).is_some())
         }) {
             return Err(format!(
                 "spawnRadius must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
@@ -407,7 +428,44 @@ impl Config {
         }
         Ok(())
     }
+
+    /// Valid settings outside measured behavior, as sentences. The command-line
+    /// tools print them to stderr when they load a config; `serve` resets also
+    /// return them.
+    pub fn warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let [low, high] = MEASURED_LOOP_SECONDS;
+        if !(low..=high).contains(&self.dt) {
+            warnings.push(format!(
+                "dt {} s differs from the measured ~7 ms server loop ({}-{} ms): contact, \
+                 pickup and event timing may differ; prey still move in fixed 7 ms substeps",
+                self.dt,
+                low * 1000.,
+                high * 1000.
+            ));
+        }
+        warnings
+    }
 }
+/// Refill subtracts one attempt interval at a time from a positive clock below
+/// `interval + dt` until it runs out. Unless that subtraction changes the
+/// largest such clock (and so every smaller one), the loop never ends, so f64
+/// resolution, not a policy cap, bounds the rate.
+fn check_ambient_rate(rate: f64, dt: f64) -> Result<(), String> {
+    if !rate.is_finite() || rate < 0.0 {
+        return Err("ambientReplenishPerSecond must be finite and nonnegative".into());
+    }
+    let interval = 1.0 / rate;
+    let clock = dt + interval;
+    if rate > 0.0 && clock - interval >= clock {
+        return Err(format!(
+            "ambientReplenishPerSecond {rate} with dt {dt} is too high: one attempt interval \
+             no longer changes the refill clock in f64"
+        ));
+    }
+    Ok(())
+}
+
 /// Constant-density boundary heuristic. Population/radius pairs do not identify
 /// the server's controller; measured replay uses `Config::radius_updates` instead.
 pub fn population_radius(snakes: usize) -> f64 {
@@ -506,6 +564,10 @@ pub struct Simulator {
     prey_outward: HashSet<u64>,
     prey_motion_clock: f64,
     radius_update_index: usize,
+    /// Why the world stopped: a pickup whose gain would overflow the eater's
+    /// mass. Validation rejects every later step with it.
+    #[serde(skip)]
+    failure: Option<String>,
     #[serde(skip)]
     food_cache: FoodCache,
     #[serde(skip)]
@@ -536,9 +598,7 @@ impl Simulator {
     /// Zero disables refill and discards pending credit. Invalid rates or unrepresentable
     /// clock rescaling leave the world unchanged. Use this instead of editing the rate directly.
     pub fn set_ambient_rate(&mut self, rate: f64) -> Result<(), String> {
-        if !rate.is_finite() || !(0.0..=10_000.0).contains(&rate) {
-            return Err("Ambient rate must be finite and between 0 and 10000".into());
-        }
+        check_ambient_rate(rate, self.config.dt)?;
         if rate != self.config.ambient_replenish_per_second {
             let credit = self.ambient_clock * self.config.ambient_replenish_per_second;
             let clock = if rate > 0.0 { credit / rate } else { 0.0 };
@@ -585,13 +645,23 @@ impl Simulator {
             buffers: StepBuffers::default(),
             #[cfg(feature = "parallel")]
             parallel: false,
+            failure: None,
         };
         world.update_radius(0.0);
-        world.food.reserve(world.config.food_count);
+        // A zero cell limit rejects every candidate, so there is nothing to store.
+        let ambient = &world.config.ambient_food;
+        let admits = !ambient.enabled || ambient.max_per_cell > 0;
+        let startup = if admits { world.config.food_count } else { 0 };
+        world.food.try_reserve(startup).map_err(|_| {
+            format!(
+                "foodCount {} does not fit in memory",
+                world.config.food_count
+            )
+        })?;
         world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
         // candidate is not retried, so crowded small worlds can start below it.
-        for _ in 0..world.config.food_count {
+        for _ in 0..startup {
             let f = world.new_food();
             if admit_ambient_food(
                 &f,
@@ -604,8 +674,18 @@ impl Simulator {
             }
         }
         world.food_cache.end();
+        world
+            .prey
+            .try_reserve(world.config.prey.count)
+            .map_err(|_| {
+                format!(
+                    "prey count {} does not fit in memory",
+                    world.config.prey.count
+                )
+            })?;
+        // A new world has no prey, so IDs 0..count need no collision scan.
         for _ in 0..world.config.prey.count {
-            world.spawn_prey();
+            world.push_prey();
         }
         Ok(world)
     }
@@ -651,6 +731,23 @@ impl Simulator {
         if self.snakes.iter().any(|s| s.id == id) {
             return Err("Duplicate agent id".into());
         }
+        self.push_snake(id, index, count)
+    }
+    /// Adds slots `0..count` of a ring as `add(slot.to_string(), slot, count)`
+    /// would, to a world without snakes. Those IDs are distinct, so the
+    /// duplicate scan, quadratic over a large ring, is skipped.
+    pub(crate) fn add_slots(&mut self, count: usize) -> Result<(), String> {
+        if !self.snakes.is_empty() {
+            return Err("Slots are added to a world without snakes".into());
+        }
+        for slot in 0..count {
+            self.push_snake(slot.to_string(), slot, count)?;
+        }
+        Ok(())
+    }
+    /// Spawns `id` at slot `index` of a ring of `count`; the caller has checked
+    /// both and that `id` is new.
+    fn push_snake(&mut self, id: String, index: usize, count: usize) -> Result<usize, String> {
         let a = index as f64 / count as f64 * TAU;
         let (body, heading) = match self.config.spawn_radius {
             // A ring life lies along the ring, counterclockwise.
@@ -912,12 +1009,17 @@ impl Simulator {
     }
     /// One physics tick (`config.dt`, the 7 ms server loop by default). Actions use stable
     /// spawn slots; dead slots may be None.
+    /// Advance one tick. Rejected actions change nothing. A pickup whose gain
+    /// would overflow its eater's mass completes the tick without that gain,
+    /// returns the error and stops the world: every later step is rejected.
     pub fn step(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
         self.validate_actions(actions)?;
-        self.advance_validated(actions);
-        Ok(())
+        self.advance_validated(actions)
     }
     pub fn validate_actions(&self, actions: &[Option<Action>]) -> Result<(), String> {
+        if let Some(failure) = &self.failure {
+            return Err(failure.clone());
+        }
         // The public configuration may have changed since construction. Reject
         // invalid prey settings before movement, clocks or refill mutate state.
         self.config.prey.validate()?;
@@ -938,10 +1040,12 @@ impl Simulator {
     ) -> Result<(), String> {
         self.validate_actions(actions)?;
         self.advance::<true>(actions, profile);
-        Ok(())
+        self.failure.clone().map_or(Ok(()), Err)
     }
-    pub(crate) fn advance_validated(&mut self, actions: &[Option<Action>]) {
+    /// Advance validated actions; errors only when the tick stopped the world.
+    pub(crate) fn advance_validated(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
         self.advance::<false>(actions, &mut StepProfile::default());
+        self.failure.clone().map_or(Ok(()), Err)
     }
     fn advance<const PROFILE: bool>(
         &mut self,
@@ -1025,9 +1129,16 @@ impl Simulator {
             }
             s.speed = speed.step(boosting, s.segments, c.dt, c.speed_model);
             if boosting {
-                let mut elapsed = state.clock + c.dt;
-                while elapsed >= BOOST_DROP_SECONDS && state.active {
-                    elapsed -= BOOST_DROP_SECONDS;
+                let elapsed = state.clock + c.dt;
+                // Counted, not subtracted until the clock runs out: at a long dt
+                // the subtraction stops changing the clock, and a 430-segment
+                // snake's boost costs no mass, so nothing else ends the loop.
+                // With at most one drop, as at any measured dt, this matches
+                // that subtraction exactly.
+                let (drops, rest) = drops_in(elapsed);
+                let mut dropped = 0;
+                while dropped < drops && state.active {
+                    dropped += 1;
                     let tail = s.body.last().copied().unwrap_or(s.head);
                     let mult = multiplier(s.segments as f64 + s.fam);
                     // Pellets match the mass spent: nothing at the floor, so free
@@ -1037,7 +1148,7 @@ impl Simulator {
                     });
                     let cost =
                         available.min(boost_cost(s.segments) * (0.94 + 0.14 * self.random.next()));
-                    let removed = remove_mass(&mut s.segments, &mut s.fam, cost, floor);
+                    let removed = remove_mass_above_floor(&mut s.segments, &mut s.fam, cost, floor);
                     state.boost_mass_spent += cost;
                     s.body.truncate(s.body.len() - removed);
                     let size = ((cost * 0.95 / (NUTRITION * mult)).sqrt() * 5.0).floor() / 5.0;
@@ -1072,7 +1183,11 @@ impl Simulator {
                         state.exhausted = true;
                     }
                 }
-                state.clock = elapsed;
+                state.clock = if dropped == drops {
+                    rest
+                } else {
+                    elapsed - dropped as f64 * BOOST_DROP_SECONDS
+                };
             } else {
                 state.clock = 0.0;
             }
@@ -1359,10 +1474,10 @@ impl Simulator {
                 });
             }
             let s = &mut self.snakes[i];
-            s.fam += f
+            let gain = f
                 .size
                 .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
-            Self::update_mass(s);
+            gain_mass(s, gain, "food", &mut self.failure);
         }
         if !hits.is_empty() {
             eaten.clear();
@@ -1397,7 +1512,11 @@ impl Simulator {
             self.ambient_clock += dt;
             if self.ambient_clock + 1e-12 >= interval {
                 let mut ambient_food_count = self.food_cache.ambient(&self.food);
-                while self.ambient_clock + 1e-12 >= interval {
+                // The tolerance spends an attempt a rounding error early, but only
+                // while credit remains: below a 1e-12 s interval it would otherwise
+                // drive the clock negative until subtraction stopped changing it.
+                // Above that interval a qualifying clock is always positive.
+                while self.ambient_clock > 0.0 && self.ambient_clock + 1e-12 >= interval {
                     self.ambient_clock -= interval;
                     if ambient_food_count < target {
                         let f = self.new_food();
@@ -1451,6 +1570,11 @@ impl Simulator {
         while self.prey.iter().any(|prey| prey.id == self.next_prey_id) {
             self.next_prey_id = self.next_prey_id.wrapping_add(1);
         }
+        self.push_prey();
+    }
+
+    /// Spawn a prey with `next_prey_id`, which the caller has made unique.
+    fn push_prey(&mut self) {
         let angle = self.prey_random.next() * TAU;
         let radius = self.prey_random.next().sqrt() * self.config.radius * 0.95;
         let heading = self.prey_random.next() * TAU;
@@ -1694,8 +1818,8 @@ impl Simulator {
                     });
                 }
                 let s = &mut self.snakes[i];
-                s.fam += nutrition(prey.size, s.segments as f64 + s.fam) * p.nutrition_factor;
-                Self::update_mass(s);
+                let gain = nutrition(prey.size, s.segments as f64 + s.fam) * p.nutrition_factor;
+                gain_mass(s, gain, "prey", &mut self.failure);
                 false
             } else {
                 true
@@ -1806,6 +1930,46 @@ impl std::fmt::Debug for StepBuffers {
     }
 }
 
+/// Largest per-tick count of a fixed-period event that is an exact f64 integer
+/// and fits usize.
+fn max_tick_count() -> f64 {
+    (2f64)
+        .powi(f64::MANTISSA_DIGITS as i32)
+        .min(usize::MAX as f64)
+}
+
+/// Boost drops due in `elapsed` seconds and the clock left after them. The dt
+/// bound keeps the count below `max_tick_count`; the corrections make the
+/// rest lie in `0..BOOST_DROP_SECONDS` despite rounding.
+fn drops_in(elapsed: f64) -> (usize, f64) {
+    let mut drops = (elapsed / BOOST_DROP_SECONDS).floor();
+    let mut rest = elapsed - drops * BOOST_DROP_SECONDS;
+    if rest < 0.0 && drops > 0.0 {
+        drops -= 1.0;
+        rest += BOOST_DROP_SECONDS;
+    } else if rest >= BOOST_DROP_SECONDS {
+        drops += 1.0;
+        rest -= BOOST_DROP_SECONDS;
+    }
+    (drops as usize, rest.max(0.0))
+}
+
+/// Add `gain` to `s`'s mass, or record why not when the sum overflows f64.
+/// Validation bounds one catch, not the mass that catches accumulate.
+fn gain_mass(s: &mut Snake, gain: f64, item: &str, failure: &mut Option<String>) {
+    let fam = s.fam + gain;
+    if fam.is_finite() {
+        s.fam = fam;
+        Simulator::update_mass(s);
+    } else if failure.is_none() {
+        *failure = Some(format!(
+            "Snake {}'s mass would overflow f64 after eating {item} worth {gain:e}; the tick \
+             completed without that gain and the world cannot advance further",
+            s.id
+        ));
+    }
+}
+
 fn admit_ambient_food(
     food: &Food,
     config: &AmbientFoodConfig,
@@ -1881,7 +2045,7 @@ fn find_eater<const PROFILE: bool>(
 #[cfg(test)]
 mod death_food_density_tests {
     use super::*;
-    use crate::food_grid::food_cell;
+    use crate::food_grid::{Axis, food_cell};
 
     fn world(enabled: bool) -> Simulator {
         let mut world = Simulator::new(
@@ -1945,7 +2109,7 @@ mod death_food_density_tests {
             world
                 .food
                 .iter()
-                .all(|f| food_cell(f.x, f.y, 75.0) == (0, 0))
+                .all(|f| food_cell(f.x, f.y, 75.0) == (Axis::Index(0), Axis::Index(0)))
         );
     }
 
@@ -1985,7 +2149,10 @@ mod death_food_density_tests {
         world.snakes[0].head = negative;
         world.snakes[0].body.fill(negative);
         world.food = vec![existing(2.0, 2.0, Origin::Ambient); 22];
-        assert_eq!(food_cell(-37.5, -37.5, 75.0), (-1, -1));
+        assert_eq!(
+            food_cell(-37.5, -37.5, 75.0),
+            (Axis::Index(-1), Axis::Index(-1))
+        );
         assert_eq!(world.death_food(0), 22);
         assert_eq!(world.food.len(), 44);
     }
@@ -2163,5 +2330,33 @@ mod pit_sweep_tests {
             tested += 1;
         }
         assert!(tested > 0);
+    }
+}
+
+#[cfg(test)]
+mod slot_tests {
+    use super::*;
+
+    #[test]
+    fn generated_slots_match_checked_adds_without_a_duplicate_scan() {
+        let mut checked = Simulator::new(3, Config::sandbox()).unwrap();
+        for slot in 0..5 {
+            checked.add(slot.to_string(), slot, 5).unwrap();
+        }
+        let mut generated = Simulator::new(3, Config::sandbox()).unwrap();
+        generated.add_slots(5).unwrap();
+        assert_eq!(
+            serde_json::to_value(&generated).unwrap(),
+            serde_json::to_value(&checked).unwrap()
+        );
+        // Caller-supplied IDs are still checked, and slots need an empty world.
+        assert_eq!(generated.add("3", 0, 1).unwrap_err(), "Duplicate agent id");
+        assert!(generated.add_slots(1).is_err());
+        // The largest protocol-19 ring is linear work: the old per-slot scan
+        // made 2.1 billion ID comparisons here.
+        let mut ring = Simulator::new(3, Config::sandbox()).unwrap();
+        ring.add_slots(65_535).unwrap();
+        assert_eq!(ring.snakes.len(), 65_535);
+        assert_eq!(ring.snakes[65_534].id, "65534");
     }
 }

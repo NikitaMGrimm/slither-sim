@@ -2,7 +2,7 @@
 //! Labs study; the detector, rates and recovery curve await current captures.
 
 use crate::model::{Point, Snake};
-use crate::physics::{MAX_SEGMENTS, MassFloor, remove_mass, score_exact};
+use crate::physics::{MAX_SEGMENTS, MassFloor, remove_mass_above_floor, score_exact};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -53,12 +53,13 @@ impl KioskConfig {
             || self.grace_seconds < 0.0
             || !self.stationary_radius.is_finite()
             || self.stationary_radius <= 0.0
+            // A zero rate freezes that phase: exp(-0 * dt) keeps the score.
             || !self.shrink_per_second.is_finite()
-            || self.shrink_per_second <= 0.0
+            || self.shrink_per_second < 0.0
             || !self.score_decay_per_second.is_finite()
-            || self.score_decay_per_second <= 0.0
+            || self.score_decay_per_second < 0.0
             || !self.recovery_per_second.is_finite()
-            || self.recovery_per_second <= 0.0
+            || self.recovery_per_second < 0.0
         {
             return Err("Invalid kiosk penalty configuration".into());
         }
@@ -128,7 +129,7 @@ impl KioskState {
             };
             let old_mass = snake.segments as f64 + snake.fam;
             if target_mass < old_mass {
-                let removed = remove_mass(
+                let removed = remove_mass_above_floor(
                     &mut snake.segments,
                     &mut snake.fam,
                     old_mass - target_mass,
