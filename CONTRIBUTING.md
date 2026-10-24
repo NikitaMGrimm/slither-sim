@@ -69,7 +69,7 @@ The [evidence comparison workflow](docs/research-workflow.md#compare-contributed
 screens contributed bundles for declared reporting differences. Its statistical
 report supports review; it neither approves physics changes nor replaces fixtures.
 
-Keep bounded, selected [regression fixtures](tests/fixtures/README.md#selecting-and-updating-cases)
+Keep bounded, selected [regression fixtures](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/README.md#selecting-and-updating-cases)
 in Git and full recordings, credentials and generated outputs outside it. Use
 Conventional Commits and LF; avoid unrelated formatting. Run the
 [relevant checks](#setup-and-checks); PR CI runs
@@ -85,7 +85,7 @@ Required CI must pass with the latest main; new commits need the relevant checks
 and review again. Auto-merge can finish an approved PR once these requirements
 pass. An independent agent review is useful evidence, but agents using the same
 GitHub account cannot approve that account's own PR. The owner-authorized
-[release automation](docs/maintainers/releasing.md) can merge compatible patch release PRs
+[release automation](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md) can merge compatible patch release PRs
 containing only version/changelog metadata after required CI. Other release
 bumps require maintainer review and merge; publication then runs automatically.
 
@@ -139,8 +139,9 @@ is promised.
 Write one user-facing changelog entry per change, with a link to its PR when
 useful. Avoid repeating generated commit titles in a second prose list.
 
-The `package` check group verifies a local crate containing Rust tests and fixtures.
-Evidence tools and schemas require the Git checkout.
+The `package` check group builds the local crate. It ships the library, binary,
+user guides and examples, plus the fixtures its unit tests read; integration tests,
+other fixtures, evidence tools, schemas and maintainer files require the Git checkout.
 [Historical provenance](docs/provenance.md) records imported components and adaptations;
 routine edits do not refresh import hashes. Per-study source pins remain required.
 Do not publish releases, change repository visibility,

@@ -387,7 +387,7 @@ Ordinary PR CI tests this pipeline offline without downloading contributed data.
 
 ## Add or update a fixture
 
-Use the [fixture guide](../tests/fixtures/README.md) for selection, independent
+Use the [fixture guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/README.md) for selection, independent
 expectations, protocol labels and replay-export provenance. Routine tool/API fixes
 need a focused regression; a new capture is required only when the existing
 evidence cannot support the claim.

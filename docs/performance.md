@@ -78,7 +78,7 @@ cargo run --release --locked --example perf_baseline -- --list
 The catalog owns names, suites, sample sizes, resolved definitions and profile
 support. The [workload guide](performance-workloads.md) explains scenario
 lifecycles, validity checks, adding cases and the specialized observation/retained
-client harnesses. [PR comparisons](maintainers/pr-reports.md) use the same catalog.
+client harnesses. [PR comparisons](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md) use the same catalog.
 
 ## Controller transport
 
