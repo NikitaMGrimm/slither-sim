@@ -140,8 +140,9 @@ Write one user-facing changelog entry per change, with a link to its PR when
 useful. Avoid repeating generated commit titles in a second prose list.
 
 The `package` check group builds the local crate. It ships the library, binary,
-user guides and examples, plus the fixtures its unit tests read; integration tests,
-other fixtures, evidence tools, schemas and maintainer files require the Git checkout.
+user guides and examples, the release guide and the fixtures its unit tests read;
+integration tests, other fixtures, evidence tools, schemas and other maintainer
+files require the Git checkout.
 [Historical provenance](docs/provenance.md) records imported components and adaptations;
 routine edits do not refresh import hashes. Per-study source pins remain required.
 Do not publish releases, change repository visibility,

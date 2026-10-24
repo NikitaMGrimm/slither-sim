@@ -36,6 +36,6 @@ Maintainer references:
 Update the guide that owns the behavior. Put distinct dated studies under
 `research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; a routine fix needs no new
 report. Keep selected regressions in `tests/fixtures/` and full recordings,
-binaries and generated outputs outside Git. Current guides ship in the Rust
-crate; use repository URLs for research, tools, integration tests and maintainer
-files excluded from that package.
+binaries and generated outputs outside Git. Current guides and the release
+guide ship in the Rust crate; use repository URLs for research, tools,
+integration tests and other maintainer files excluded from that package.
