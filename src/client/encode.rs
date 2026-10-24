@@ -15,7 +15,10 @@ use std::f64::consts::{PI, TAU};
 pub(crate) const GRID_CENTER: u32 = 32550;
 pub(crate) const SECTOR_SIZE: u16 = 300;
 pub(crate) const PROTOCOL: u8 = 19;
-/// Largest radius whose rim stays inside absolute u16 anchor coordinates.
+/// Encoding-margin policy, not a derived limit. Anchors encode as u16 offset by
+/// `GRID_CENTER`, so coordinates must lie within -32,550..32,985, and every
+/// encoder rejects one outside. The 550 units left for heads and bodies near
+/// the rim are not derived: a hard-mode tick's overshoot grows with dt.
 pub(crate) const MAX_RADIUS: f64 = 32000.;
 /// A packet longer than this cannot carry a two-byte frame length prefix.
 const MAX_PACKET: usize = (32 << 8) - 1;
@@ -131,9 +134,6 @@ pub(crate) fn setup(radius: f64, prey_turn_rate: f64) -> Result<Vec<u8>, String>
         u16::MAX as f64,
         "Prey turn rate",
     )? as u16;
-    if prey_turn == 0 {
-        return Err("Prey turn rate rounds to zero on the wire".into());
-    }
     let mut p = vec![b'a'];
     p.extend(u24be(GRID_CENTER));
     p.extend(u16be(physics::MAX_SEGMENTS as u16));
@@ -377,9 +377,6 @@ pub(crate) fn sector_clear(sector: [u8; 2]) -> Vec<u8> {
     vec![b'w', sector[0], sector[1]]
 }
 
-pub(crate) fn prey_id(prey: &Prey) -> u16 {
-    prey.id as u16
-}
 /// Prey motion position on the wire's 3-unit grid.
 pub(crate) fn prey_grid(point: Point) -> Result<[u16; 2], String> {
     let cell = |value: f64| {
@@ -387,9 +384,10 @@ pub(crate) fn prey_grid(point: Point) -> Result<[u16; 2], String> {
     };
     Ok([cell(point.x)?, cell(point.y)?])
 }
-pub(crate) fn prey_appearance(prey: &Prey) -> Result<Vec<u8>, String> {
+/// `id` is the connection-unique wire ID, not the 64-bit simulator ID.
+pub(crate) fn prey_appearance(id: u16, prey: &Prey) -> Result<Vec<u8>, String> {
     let mut p = vec![b'y'];
-    p.extend(u16be(prey_id(prey)));
+    p.extend(u16be(id));
     p.push(0); // color
     p.extend(coord_u24(prey.position.x)?);
     p.extend(coord_u24(prey.position.y)?);
@@ -402,9 +400,9 @@ pub(crate) fn prey_appearance(prey: &Prey) -> Result<Vec<u8>, String> {
     Ok(p)
 }
 /// Position, plus heading, wanted heading and speed when `full`.
-pub(crate) fn prey_motion(prey: &Prey, full: bool) -> Result<Vec<u8>, String> {
+pub(crate) fn prey_motion(id: u16, prey: &Prey, full: bool) -> Result<Vec<u8>, String> {
     let mut p = vec![b'j'];
-    p.extend(u16be(prey_id(prey)));
+    p.extend(u16be(id));
     for value in prey_grid(prey.position)? {
         p.extend(u16be(value));
     }
@@ -889,9 +887,9 @@ mod tests {
                 speed: 100.,
                 size: 4.,
             };
-            let appearance = prey_appearance(&prey).unwrap();
+            let appearance = prey_appearance(3, &prey).unwrap();
             assert_eq!((appearance[3], appearance[11]), (0, expected));
-            assert_eq!(prey_motion(&prey, true).unwrap()[7], expected);
+            assert_eq!(prey_motion(3, &prey, true).unwrap()[7], expected);
         }
     }
 
@@ -982,7 +980,8 @@ mod tests {
         assert!(setup(MAX_RADIUS + 1., turn_rate).is_err());
         assert!(setup(1000., f64::INFINITY).is_err());
         assert!(setup(1000., f64::MAX).is_err());
-        assert!(setup(1000., 0.001).is_err());
+        // Prey that cannot turn are valid; the field holds zero.
+        assert_eq!(&setup(1000., 0.001).unwrap()[19..21], &[0, 0]);
     }
 
     /// Stock-client `l` handler: position, rank, count, then sct/fam/color/name.

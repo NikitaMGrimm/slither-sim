@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 
-PROTOCOL = "slither-sim-json-v2"
+PROTOCOL = "slither-sim-json-v3"
 
 
 def heading(frame, view):

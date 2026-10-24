@@ -14,7 +14,7 @@
 //! accepted.
 use super::{
     SimulationConfig, challenge,
-    simulation::{MAX_VICTORY_TEXT, PlayerAppearance, RawSimulator},
+    simulation::{MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, RawSimulator},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,17 +35,22 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
-const MAX_AGENTS: usize = 128;
+// The budgets and timeouts below are host resource policies, not protocol or
+// physics limits.
 /// Largest accepted client message or frame. Logins with a custom skin are the
 /// largest stock-client messages and stay far below this.
 const MAX_INPUT_BYTES: usize = 4 << 10;
+/// Output batched per socket write.
 const WRITE_BUFFER_BYTES: usize = 16 << 10;
 /// Queued output beyond this closes the connection as too slow.
 const MAX_SEND_BUFFER_BYTES: usize = 1 << 20;
 /// Connections that have not joined, including those being closed.
 const MAX_PENDING: usize = 32;
+/// Fairness budgets per poll, so one busy listener or socket cannot starve
+/// physics or the other connections.
 const MAX_ACCEPTS_PER_POLL: usize = 16;
 const MAX_READS_PER_POLL: usize = 32;
+/// Lifecycle deadlines from acceptance: upgrade, login and close handshakes.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(10);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(1);
@@ -56,8 +61,11 @@ const MAX_CATCHUP_TICKS: u64 = 8;
 const MAX_BACKLOG_SECONDS: f64 = 0.25;
 /// Longest sleep in `run`, so socket service never waits a long tick.
 const MAX_IDLE: Duration = Duration::from_millis(5);
-const MAX_NICKNAME: usize = 24;
-const MAX_CUSTOM_SKIN: usize = 255;
+/// Appearances carry the custom skin after a u8 length.
+const MAX_CUSTOM_SKIN: usize = u8::MAX as usize;
+/// WebSocket control frames carry at most 125 payload bytes (RFC 6455 5.5),
+/// two of which hold the close code.
+const MAX_CLOSE_REASON: usize = 125 - 2;
 /// Printable letters only: both accepted replies stay valid stock-client text.
 const CHALLENGE_LITERAL: (&[u8; 5], &[u8; 22]) = (b"Slith", b"erSimLocalHostChalleng");
 
@@ -93,12 +101,18 @@ impl HostConfig {
         self.world_config().map(|_| ())
     }
 
+    /// Valid settings outside measured behavior; see [`SimulationConfig::warnings`].
+    pub fn warnings(&self) -> Vec<String> {
+        self.simulation.warnings()
+    }
+
     fn world_config(&self) -> Result<SimulationConfig, String> {
-        let agents = self.max_clients.saturating_add(self.bots);
-        if self.max_clients == 0 || agents > MAX_AGENTS {
-            return Err(format!(
-                "Host needs 1 or more maxClients and at most {MAX_AGENTS} clients plus bots"
-            ));
+        let agents = self
+            .max_clients
+            .checked_add(self.bots)
+            .ok_or("maxClients + bots must fit in usize")?;
+        if self.max_clients == 0 {
+            return Err("Host needs 1 or more maxClients".into());
         }
         if self.simulation.record_wire {
             return Err("The host does not retain wire records; set recordWire to false".into());
@@ -278,10 +292,13 @@ impl Host {
     pub fn run(&mut self) -> Result<(), String> {
         loop {
             self.poll()?;
-            let next = (self.ticks + self.deferred + 1) as f64 * self.dt;
-            let wait = Duration::from_secs_f64(next)
-                .saturating_sub(self.epoch.elapsed())
-                .min(MAX_IDLE);
+            // Tiny steps can saturate the tick counts; then only poll.
+            let next = (self.ticks.checked_add(self.deferred))
+                .and_then(|ticks| ticks.checked_add(1))
+                .and_then(|ticks| Duration::try_from_secs_f64(ticks as f64 * self.dt).ok());
+            let wait = next.map_or(Duration::ZERO, |next| {
+                next.saturating_sub(self.epoch.elapsed()).min(MAX_IDLE)
+            });
             if !wait.is_zero() {
                 thread::sleep(wait);
             }
@@ -289,6 +306,7 @@ impl Host {
     }
 
     fn due_ticks(&mut self, now: Instant) -> u64 {
+        // Casts saturate, and ticks + deferred never exceeds an earlier schedule.
         let scheduled = (now.duration_since(self.epoch).as_secs_f64() / self.dt) as u64;
         let backlog = scheduled.saturating_sub(self.deferred + self.ticks);
         let limit = (MAX_BACKLOG_SECONDS / self.dt).ceil() as u64;
@@ -560,8 +578,7 @@ impl Open {
     fn reject(&mut self, game: &mut Game, now: Instant, reason: &str) -> Result<(), String> {
         self.release(game)?;
         self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
-        // Close reasons are limited to 123 bytes on the wire.
-        let mut end = reason.len().min(120);
+        let mut end = reason.len().min(MAX_CLOSE_REASON);
         while !reason.is_char_boundary(end) {
             end -= 1;
         }
@@ -629,6 +646,16 @@ mod tests {
         assert_eq!(solved.len(), 27);
         assert_ne!(literal, solved);
         assert!(solved.iter().all(u8::is_ascii_alphabetic));
+    }
+
+    #[test]
+    fn overflowing_client_and_bot_counts_are_errors() {
+        let config = HostConfig {
+            max_clients: usize::MAX,
+            bots: 1,
+            ..HostConfig::default()
+        };
+        assert!(config.validate().unwrap_err().contains("maxClients + bots"));
     }
 
     #[test]
