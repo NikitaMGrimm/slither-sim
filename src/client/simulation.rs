@@ -59,7 +59,7 @@ mod pit_tests;
 mod remote;
 mod snakes;
 
-pub use config::SimulationConfig;
+pub use config::{DeliveryProfile, SimulationConfig};
 pub(crate) use remote::RawSimulator;
 
 use broadcast::{PreyClock, Record};

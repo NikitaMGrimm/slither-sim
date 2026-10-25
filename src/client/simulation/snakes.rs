@@ -1,5 +1,5 @@
 //! Snake report state, coverage candidates and ordered wire diffs.
-use super::PlayerAppearance;
+use super::{DeliveryProfile, PlayerAppearance};
 use crate::{
     client::encode,
     model::{Point, Snake},
@@ -78,7 +78,14 @@ impl KnownSnake {
 impl SnakeReports {
     /// Open this tick's opportunities for a living snake. A new life starts
     /// from the state its appearance carries.
-    pub(super) fn update(&mut self, life: u64, motion: [u8; 3], fam: u32, tick: u64) {
+    pub(super) fn update(
+        &mut self,
+        life: u64,
+        motion: [u8; 3],
+        fam: u32,
+        tick: u64,
+        delivery: DeliveryProfile,
+    ) {
         if self.life != life {
             *self = Self {
                 life,
@@ -90,13 +97,21 @@ impl SnakeReports {
             };
             return;
         }
-        self.motion_due = (motion != self.motion || self.motion_stale) && tick >= self.motion_at;
+        // Our responsive design reflects wanted-heading/speed changes promptly;
+        // the stock client already turns toward a held target between reports.
+        // Standalone mass drives its smoothed length and own score display.
+        // See the delivery-profiles study (2026-10-25), not an official rule:
+        // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-delivery-profiles/REPORT.md
+        let responsive = delivery == DeliveryProfile::Responsive;
+        let urgent = responsive && motion[1..] != self.motion[1..];
+        self.motion_due =
+            (motion != self.motion || self.motion_stale) && (urgent || tick >= self.motion_at);
         if self.motion_due {
             self.motion = motion;
             self.motion_at = tick + MOTION_REPORT_TICKS;
             self.motion_stale = false;
         }
-        self.fam_due = (fam != self.fam || self.fam_stale) && tick >= self.fam_at;
+        self.fam_due = (fam != self.fam || self.fam_stale) && (responsive || tick >= self.fam_at);
         if self.fam_due {
             self.fam = fam;
             self.fam_at = tick + FAM_REPORT_TICKS;

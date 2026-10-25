@@ -1,0 +1,467 @@
+[
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\PLAN.md",
+    "sha256": "8586e01a07f86a00ac045051b735811fe1a55d96bbec806f91580d9285c61c6b",
+    "bytes": 1758
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\NOTES.md",
+    "sha256": "76106527a1c3845aca9ffc7c87898fe3aa12a6fda578cd150e4542d46c285d13",
+    "bytes": 2025
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\delivery_study.rs",
+    "sha256": "5a8548166df366e3d1dc3e9d0dafbb728dde66a0b18e10f13a438eb2d0edfd1e",
+    "bytes": 3706
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\delivery_load.rs",
+    "sha256": "e7064a77790b997849fadfea1454ed3c75cb990e097a348a5b07557fc5521ee1",
+    "bytes": 1009
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\host-instrumentation.patch",
+    "sha256": "5e3eea13196b2e2e6a859eb49104562a75f09ddc3517c3720ca3bdefa86805b6",
+    "bytes": 753
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\simulation-probe-hook.patch",
+    "sha256": "16450b12b3027284579917a632729c34454b2e511425a85eb7ec5a603f19fbbd",
+    "bytes": 510
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\snakes-responsive.rs",
+    "sha256": "7b8a3adb7163f3e8303d0dc8f417459fd23daa2612e771083ce7bb82900a1f96",
+    "bytes": 12648
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\snakes-naive.rs",
+    "sha256": "42e88f06b7272872c18e5416c586d2e77064fac4e40b12efd1f36da412f5db37",
+    "bytes": 12647
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\live.py",
+    "sha256": "b5a6853ecd86d0408d454e93e5c645f49c1299a8172c3c62fa7867db2424e172",
+    "bytes": 1695
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\analyze.py",
+    "sha256": "d475bbcf11c78e294ca4930e8e95f995bf47f2c828c034ffdd938c59a57356d7",
+    "bytes": 3435
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\turn_prediction.py",
+    "sha256": "f752289f53d014b82abd715bcc4bb6ddc211fea20dcd1198922ad5e12dd00051",
+    "bytes": 874
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\select_results.py",
+    "sha256": "92d9c12ce2ad3327eb1d928e5172053f7f87d5deb7c680be49b7c92a465b6823",
+    "bytes": 3001
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\run.ps1",
+    "sha256": "c4b27616de760cf2873fd66a87b0c88c9f82d838395b4ea0c8f077c66c0efa53",
+    "bytes": 413
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\summary.json",
+    "sha256": "6238953be25a0f766a7cceb1104ea463f694162040cbf79799631739e86f3342",
+    "bytes": 22284
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\latency-naive.log",
+    "sha256": "630e221efdce9d1b3c5b12df8e0141f804d5052cca7c591583808ab6b35ccd54",
+    "bytes": 22270
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\latency-official-overlap-failed.log",
+    "sha256": "a5c010c916f0d2a39e1a0c0cc466c41e35f858682138a51e16b5418ccebff033",
+    "bytes": 278
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\latency-official.log",
+    "sha256": "03dde67b8337209164b1ac8b61d3f56d69f709fa4b44716edaa0c52e21b51f56",
+    "bytes": 22343
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\latency-responsive-overlap-failed.log",
+    "sha256": "a5c010c916f0d2a39e1a0c0cc466c41e35f858682138a51e16b5418ccebff033",
+    "bytes": 278
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\latency-responsive.log",
+    "sha256": "05a4953eb6655efa3271bdf33ee9ca2b1c9ec8cd7457e3592967951e16923260",
+    "bytes": 22275
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\probe-naive.exe",
+    "sha256": "f8908b1becd572bccc8e5eeceea40b68330b111b7729951581fa2e8640cc20a6",
+    "bytes": 2953216
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\probe-official.exe",
+    "sha256": "3597d73d84bd678237d0c3df9c30dd13083ed32cfb6384addcb137532fc9975d",
+    "bytes": 2953216
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\load-naive.exe",
+    "sha256": "0b431b0fcaad88cacdc03abb02f922f66c8875f3b9022247a069471146d6397c",
+    "bytes": 1642496
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\load-official.exe",
+    "sha256": "e8596d057245ce30c6f1e8b3955f38859faa991084234c3deb448a80e0e0c92e",
+    "bytes": 1642496
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\load-responsive.exe",
+    "sha256": "e8596d057245ce30c6f1e8b3955f38859faa991084234c3deb448a80e0e0c92e",
+    "bytes": 1642496
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\jitter-study-20261025\\tailjitter.py",
+    "sha256": "f3a49aa0104faa9903f3ae1e8d2b2c60eb6234926af454936ab5d2574f4974fa",
+    "bytes": 3274
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\jitter-study-20261025\\delayspread.py",
+    "sha256": "bad9d9838ea772d3fedc4d2cc7b5e8846e20c90dfb3923f9bbfba884a166f6b7",
+    "bytes": 726
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\tools\\fidelity\\slither_protocol.py",
+    "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+    "bytes": 22341
+  },
+  {
+    "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\outputs\\original-client\\s\\game1107249518.js",
+    "sha256": "5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095",
+    "bytes": 224092
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\client.log",
+    "sha256": "530f9dde48c376f1bcf862a9cc745c0dbd45d29780cd5ff6414a3c30a85bae74",
+    "bytes": 151
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\command.json",
+    "sha256": "f8e6ad8a19167d8bdcec69a6809f2f1388ffa424febdcab7c281722a3ab1e896",
+    "bytes": 246
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\config.json",
+    "sha256": "671dda59aa0804063ec745d0abc341a9ad514bfbc6d277ca90fecff734ddfe05",
+    "bytes": 211
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\delayspread.py.txt",
+    "sha256": "5aef51ed5b2188261414d4c296110fcbe2d5cb09bdb13856482d355960bd6ced",
+    "bytes": 497
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\host.err",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\host.log",
+    "sha256": "39ce731347908983f6fd5f1a9336fac0c6bb169080a87a6bbbca439610a64dec",
+    "bytes": 1219
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\tailjitter.py.txt",
+    "sha256": "1678ce8fd608540c91014246ca5a0259b0f7f9ab43f607a41901b59b44185b17",
+    "bytes": 645
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-naive\\capture\\bot0.jsonl.gz",
+    "sha256": "4cb5f38a78c169a0af8011c3e5d7f3723f6883298e7ed8c5d67f826519d578f7",
+    "bytes": 2079
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\client.log",
+    "sha256": "4975afe29703df7b69727817b290d31a4910c048e09af7180182df94787f4572",
+    "bytes": 154
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\command.json",
+    "sha256": "3cd31f7bf49b8fb35341fee939188b49c838c1f444b3439ae4701c9d06b8d9aa",
+    "bytes": 249
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\config.json",
+    "sha256": "671dda59aa0804063ec745d0abc341a9ad514bfbc6d277ca90fecff734ddfe05",
+    "bytes": 211
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\delayspread.py.txt",
+    "sha256": "5aef51ed5b2188261414d4c296110fcbe2d5cb09bdb13856482d355960bd6ced",
+    "bytes": 497
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\host.err",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\host.log",
+    "sha256": "1a6ef5f894951c98156b41619a9d4f941402a412fe2b0e6d855dd117b23e55c3",
+    "bytes": 1201
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\tailjitter.py.txt",
+    "sha256": "1678ce8fd608540c91014246ca5a0259b0f7f9ab43f607a41901b59b44185b17",
+    "bytes": 645
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-official\\capture\\bot0.jsonl.gz",
+    "sha256": "9de7602ae7bb1b8b1c9bd9ec209b3343439a1355bb6527b3c541e04d90fd78e9",
+    "bytes": 2049
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\client.log",
+    "sha256": "cfebfafb3db65cf90b81956046b207e52c733ae91a4ca4ce27b4cc1d3ee4e96f",
+    "bytes": 156
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\command.json",
+    "sha256": "39f1978173b9761caeb7809263bcd82898ce75d6246e27d78605eb35d3a24270",
+    "bytes": 251
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\config.json",
+    "sha256": "20713fe938cd84db852fd7c6778bb1e171f6efe892f13e60971828108186f549",
+    "bytes": 213
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\delayspread.py.txt",
+    "sha256": "5aef51ed5b2188261414d4c296110fcbe2d5cb09bdb13856482d355960bd6ced",
+    "bytes": 497
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\host.err",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\host.log",
+    "sha256": "dd20ca5dd5384d2b10a3ee70605f09cec1cef6ca696dd9f55afef0f77fbaea05",
+    "bytes": 1202
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\tailjitter.py.txt",
+    "sha256": "1678ce8fd608540c91014246ca5a0259b0f7f9ab43f607a41901b59b44185b17",
+    "bytes": 645
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\battledome64-responsive\\capture\\bot0.jsonl.gz",
+    "sha256": "391e9d55efe898b679c959297f52cc4909d095c4e894909f379a91508decd4b1",
+    "bytes": 2053
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\client.log",
+    "sha256": "9c43105f1999e4283f75ed53704a7ddf0e86b3d34819f6a081acb5f547443b6c",
+    "bytes": 150
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\command.json",
+    "sha256": "269b66491a3b4a0162906f525fbc6c693eeabe81005d200a83666eb4fa006d61",
+    "bytes": 245
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\config.json",
+    "sha256": "71ef7c80a1c62009a220f799cfc5ae76878ce5b938dcdf32b803c74e73e49366",
+    "bytes": 210
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\delayspread.py.txt",
+    "sha256": "5e6311883dee6e3f3347591d994a5e657246e71680e2196d4f27621e1553d094",
+    "bytes": 70
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\host.err",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\host.log",
+    "sha256": "03186c714f88438fbf715731f9ad9b5949b12a7f9fed1b05db949aa46abb723c",
+    "bytes": 3611
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\tailjitter.py.txt",
+    "sha256": "320d1e2a08ebcbedb694e30dab897bec308aebe5ac6237242b94ef08c195060e",
+    "bytes": 300
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-naive\\capture\\bot0.jsonl.gz",
+    "sha256": "2c6307bcdd08eafe27747b2b7eb7ed88969d5bd8f6e1d0c13e4325671419cff0",
+    "bytes": 159340
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\client.log",
+    "sha256": "2ccb13f6f6f6b0c803332285295655bd2fce74e13b00a18f76eade5ef70a7328",
+    "bytes": 153
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\command.json",
+    "sha256": "f2b6b9eb9127dbab38059ebb5fd4b564915b23ffff5e919e824af11f51564c9a",
+    "bytes": 248
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\config.json",
+    "sha256": "71ef7c80a1c62009a220f799cfc5ae76878ce5b938dcdf32b803c74e73e49366",
+    "bytes": 210
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\delayspread.py.txt",
+    "sha256": "54e890cec7eb1ed90d563350ba55a0d4faabf15284bbfd2b81237d117ee22878",
+    "bytes": 71
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\host.err",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\host.log",
+    "sha256": "ea0d2467c98a49d08c7832e46d17f5cd64d74bfd216c9e4e971833f3498ba724",
+    "bytes": 3114
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\tailjitter.py.txt",
+    "sha256": "bd296aa4aa09cd1ae8c30cd09afdc52dc79686ed48fff875b8b7df5d5f57c5a2",
+    "bytes": 298
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-official\\capture\\bot0.jsonl.gz",
+    "sha256": "2f69b14ae1e1de73e0b8269921d7e7e218cb15757e7553c1918ec5763d0c6da0",
+    "bytes": 82531
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\client.log",
+    "sha256": "ea13ae135fe976e644ee8f682f711268916a0856143af11e672f1bddcc1bd144",
+    "bytes": 155
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\command.json",
+    "sha256": "6a79f78e12b6b0d0dccf9d249c36d4fb76cb9a0615f2a55ff3e7d733733a1353",
+    "bytes": 250
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\config.json",
+    "sha256": "b9212f4e1c83646345ef9d38c4f30364f93d27110db1210cecafd19dda3e863e",
+    "bytes": 212
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\delayspread.py.txt",
+    "sha256": "6520a9fb4eef7b5130a5ce33e8255175ef0b42465144d0ae7f74db0f285f8d09",
+    "bytes": 68
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\host.err",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\host.log",
+    "sha256": "8381e372a0502286155f7d99a185f87555f6084f6db48d0a57313b1ab97268d2",
+    "bytes": 3114
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\tailjitter.py.txt",
+    "sha256": "25ab76c8ab57f887abbc5eb1fc63c3b959e03988acd4b72383f01c15f4a08f43",
+    "bytes": 297
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\official500-responsive\\capture\\bot0.jsonl.gz",
+    "sha256": "4b8612b6ea0019692d308cd2c5bf65b95934215d484a45aed4b80f1ab5efcf6b",
+    "bytes": 81712
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\check-rust.log",
+    "sha256": "93a61021d1dbccf604169055d480dd06b30ffbb78c301524d42efebdf390a41e",
+    "bytes": 82611
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\check-rust-final.log",
+    "sha256": "dd4b9486bf33204a3f59d8d3ebd5408395f34b94a44fe7d89d7a540359796cf2",
+    "bytes": 79743
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-final.log",
+    "sha256": "063872cfe0d5c019ab31776db6a4fe82e73649cf4598b756eb5ac91517d7e706",
+    "bytes": 4746
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\check-rust-integrated.log",
+    "sha256": "867de92a39d80cd9db5b72e6f9e4a1117c1c03a788395cec4bcbb702d0355019",
+    "bytes": 81076
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-integrated.log",
+    "sha256": "7f17d421d73c4b98da37bc20e986fb493947fac204f0ed2ef083a0ba88403f3b",
+    "bytes": 4786
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity\\comparison.json",
+    "sha256": "60811887698aec157ff5d5e29c59ad613cd99037ab0568119ab9e11f3a144076",
+    "bytes": 18290
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity\\baseline-identity.json",
+    "sha256": "d182fb2e5cb52ee11f880cf0f3cd4cd8915ed250a53f8693b6406f37747a10e0",
+    "bytes": 5221
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity\\candidate-identity.json",
+    "sha256": "9b17e559b7dab6217dae329932f256482bb8f7162ed242d83e41d50e09a8b90a",
+    "bytes": 1494
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity\\manifest.json",
+    "sha256": "c1091ed979e2fbc0b31267489ccaeb663d69b97c9a0faa5acb2d7e9057afa220",
+    "bytes": 30811
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-final\\comparison.json",
+    "sha256": "b46b2e73fba06988be0f44e82a6fe6f658d4c464f7d1c1ca4489b4d3f042b616",
+    "bytes": 18316
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-final\\baseline-identity.json",
+    "sha256": "21f6be52c3750431fbeb05cb07e5218bb4bfde727620c34b399828b61d62b23f",
+    "bytes": 5239
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-final\\candidate-identity.json",
+    "sha256": "88b5c2d2bc2d17ea16c6682cc62277b692dec6de09e80943b08f69ce6604067c",
+    "bytes": 1512
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-final\\manifest.json",
+    "sha256": "680903c7b4cd27dc0ec5346d4469b7d551ed4c9a1cdc8ce840f750a48c21a506",
+    "bytes": 30859
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-integrated\\comparison.json",
+    "sha256": "af6d106c941f26d8c3a18644650918db34f02302005b410d4f25dbcdc12cf79b",
+    "bytes": 18346
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-integrated\\baseline-identity.json",
+    "sha256": "f80b06e8b737088990a04846e02cf7105f20b759f68f4451d696043b549ca6dc",
+    "bytes": 5254
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-integrated\\candidate-identity.json",
+    "sha256": "0e71801ac5fa3dd2cc47e545df409291c071379186f796ef4874832a5a0333a6",
+    "bytes": 1527
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\delivery-profiles-20261025-805feb91\\parity-integrated\\manifest.json",
+    "sha256": "3ccef8135c0a6337f79c57620c9ee7cf3dbba00b1c6eb3f584a65e130675c36d",
+    "bytes": 30589
+  }
+]

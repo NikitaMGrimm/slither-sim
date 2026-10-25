@@ -94,6 +94,10 @@
   from physics and sockets. The `host_load` example measures simulation load,
   deferred ticks and extra delivery delay
   ([hosting](docs/raw-server.md#embedding-and-load-checks)).
+- `SimulationConfig.delivery` chooses when visible state is sent: `official`
+  (the default) keeps the measured pacing, and `responsive`, our own design and
+  the Battledome default in JSON configs, sends steering, speed and mass changes
+  in the next frame ([configuration](docs/configuration.md#simulationconfig)).
 - A localhost-only host/capture/compare command records transport baselines and
   checks them against official-reference gates
   ([transport parity](docs/research-workflow.md#transport-parity)).

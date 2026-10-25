@@ -1283,24 +1283,24 @@ fn a_viewer_holding_a_newer_value_is_corrected_when_the_snake_returns() {
     };
     let (a, b) = ([10, 20, 30], [10, 21, 30]);
     let mut reports = SnakeReports::default();
-    reports.update(1, [0; 3], 100, 0);
-    reports.update(1, a, 150, 10);
+    reports.update(1, [0; 3], 100, 0, DeliveryProfile::Official);
+    reports.update(1, a, 150, 10, DeliveryProfile::Official);
     assert!(reports.motion_due && reports.fam_due);
     // A viewer appearing at tick 11 holds B; a growth anchor told every
     // viewer mass 200 while the mass gate was closed.
-    reports.update(1, b, 200, 11);
+    reports.update(1, b, 200, 11, DeliveryProfile::Official);
     reports.observe(&known(b, 200));
     // The snake returns to the reported A and mass 150 before the gates
     // open: six ticks for motion, 15 for mass.
     for tick in 12..25 {
-        reports.update(1, a, 150, tick);
+        reports.update(1, a, 150, tick, DeliveryProfile::Official);
         assert_eq!(reports.motion_due, tick == 16, "{tick}");
         assert!(!reports.fam_due, "{tick}");
     }
     assert_eq!(reports.motion, a);
-    reports.update(1, a, 150, 25);
+    reports.update(1, a, 150, 25, DeliveryProfile::Official);
     assert!(reports.fam_due && reports.fam == 150);
-    reports.update(1, a, 150, 40);
+    reports.update(1, a, 150, 40, DeliveryProfile::Official);
     assert!(!reports.motion_due && !reports.fam_due);
 }
 
@@ -1447,6 +1447,92 @@ fn about(packets: &[Vec<Vec<u8>>], id: u16, codes: &[u8]) -> Vec<(usize, Vec<u8>
         .collect()
 }
 const MOTION: &[u8] = b"eE345d7";
+
+#[test]
+fn responsive_inputs_reach_self_and_opponents_in_the_next_tick() {
+    for delivery in [DeliveryProfile::Official, DeliveryProfile::Responsive] {
+        let mut config = raw_config(2);
+        config.delivery = delivery;
+        config.world.radius = 6000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        config.world.prey.count = 0;
+        let mut sim = RawSimulator::new(5, config, 2).unwrap();
+        let mut viewer = Remote::connect(&mut sim, 0, "Viewer");
+        let mut mover = Remote::connect(&mut sim, 1, "Mover");
+        for (slot, x) in [(0, -500.), (1, 500.)] {
+            sim.backend.world.snakes[slot].alive = false;
+            sim.backend
+                .world
+                .respawn(slot, Point { x: 0., y: x }, 0., 30)
+                .unwrap();
+            sim.backend.slots[slot].control.heading = 0.;
+        }
+        run(&mut sim, &mut [(0, &mut viewer), (1, &mut mover)], 60);
+        assert!(sim.backend.world.snakes.iter().all(|snake| snake.alive));
+        // Two fractional gains inside the standalone mass gate; no motion
+        // changes or segment growth are needed for the second responsive h.
+        for (first, fam) in [(true, 0.1), (false, 0.2)] {
+            sim.backend.world.snakes[1].fam = fam;
+            sim.advance_ticks(1).unwrap();
+            for packets in [viewer.pump(&mut sim, 0), mover.pump(&mut sim, 1)] {
+                assert_eq!(
+                    packets.iter().any(|p| p[0] == b'h'),
+                    first || delivery == DeliveryProfile::Responsive
+                );
+                assert!(!packets.iter().any(|p| MOTION.contains(&p[0])));
+            }
+        }
+        // Seed a recent report, then change the target inside its six-tick gate.
+        sim.receive(1, &[60]).unwrap();
+        let mut reported = false;
+        for _ in 0..MOTION_REPORT_TICKS {
+            run(&mut sim, &mut [(0, &mut viewer), (1, &mut mover)], 1);
+            if sim.backend.reports[1].motion_due {
+                reported = true;
+                break;
+            }
+        }
+        assert!(reported);
+        for input in [vec![61], vec![253], vec![254]] {
+            sim.receive(1, &input).unwrap();
+            sim.advance_ticks(1).unwrap();
+            let other = viewer.pump(&mut sim, 0);
+            let own = mover.pump(&mut sim, 1);
+            assert!(sim.backend.world.snakes.iter().all(|snake| snake.alive));
+            let prompt = delivery == DeliveryProfile::Responsive;
+            assert_eq!(
+                other.iter().any(|p| MOTION.contains(&p[0])),
+                prompt,
+                "{delivery:?} {input:?}"
+            );
+            assert_eq!(
+                own.iter().any(|p| MOTION.contains(&p[0])),
+                prompt,
+                "{delivery:?} {input:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn responsive_held_target_keeps_six_tick_motion_spacing_and_prompt_mass() {
+    let mut reports = SnakeReports::default();
+    let delivery = DeliveryProfile::Responsive;
+    reports.update(1, [0, 120, 80], 0, 0, delivery);
+    let mut sent = Vec::new();
+    for tick in 1..=60 {
+        reports.update(1, [tick as u8, 120, 80], tick as u32, tick, delivery);
+        if reports.motion_due {
+            sent.push(tick);
+        }
+        assert!(reports.fam_due, "changed mass at {tick}");
+    }
+    assert_eq!(sent, (1..=60).step_by(6).collect::<Vec<_>>());
+    reports.update(1, [60, 120, 80], 60, 100, delivery);
+    reports.update(1, [60, 120, 80], 60, 106, delivery);
+    assert!(!reports.motion_due && !reports.fam_due);
+}
 const ANCHORS: &[u8] = b"gn=+";
 
 #[test]
