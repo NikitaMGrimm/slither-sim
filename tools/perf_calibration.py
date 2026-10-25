@@ -1,6 +1,6 @@
 """Same-binary (A/A) calibration pilot for the PR comparison; standard library only.
 
-Implements the pilot in
+Retains the sampling schedule of the pilot in
 research/performance/2026-10-24-pr-comparison-statistics/CALIBRATION-PLAN.md: one
 workload group, m = 1, 2 and 4 reset-identical blocks per process, six fresh pairs
 per workload and m, no early stopping. Both roles run the same copied, hashed
@@ -23,14 +23,14 @@ import time
 from perf_baseline import digest, load_catalog, native
 import perf_compare
 import perf_stats
-# Frozen pilot v1 retains its original operational budget when PR reporting
-# moves to a new plan. Never silently reinterpret source-pinned pilot records.
+# Retain the pilot budget and schedule; v2 changes the retired proxy rows.
+# Historical source-pinned v1 records keep their original definitions.
 JOB_TIMEOUT_SECONDS, RESERVE_SECONDS, STAGE_CAP_SECONDS = 900, 60, 620
 
 
-PLAN = "slither-perf-calibration-pilot-v1"
-GROUPS = {"A": ("step-default", "portable", "official-100-bot", "dome-proxy-32-step"),
-          "B": ("step-food", "step-body", "observe", "protocol", "official-100-step", "dome-proxy-32-bot")}
+PLAN = "slither-perf-calibration-pilot-v2"
+GROUPS = {"A": ("step-default", "portable", "official-100-bot", "battledome-8-step"),
+          "B": ("step-food", "step-body", "observe", "protocol", "official-100-step", "client-battledome-64")}
 BLOCKS = (1, 2, 4)
 # Every permutation of m once, balancing m's position within a workload's round.
 BLOCK_ORDER = ((1, 2, 4), (1, 4, 2), (4, 2, 1), (2, 4, 1), (4, 1, 2), (2, 1, 4))
