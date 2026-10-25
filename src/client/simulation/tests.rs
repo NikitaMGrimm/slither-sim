@@ -57,6 +57,42 @@ fn failed_ring_spawn_restores_the_existing_life() {
     assert!(!backend.world.snakes[0].alive);
 }
 
+#[test]
+fn a_full_arena_refuses_a_join_inside_contact_range() {
+    let mut world = Config::sandbox();
+    world.food_count = 0;
+    world.ambient_replenish_per_second = 0.0;
+    world.kiosk.enabled = false;
+    let mut backend = SimulatorBackend::new(
+        5,
+        SimulationConfig {
+            world,
+            agents: 2,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    // Rows 100 apart leave every point within 50 of slot 1's body, inside
+    // even a two-segment contact range plus 40.
+    let mut rows = Vec::new();
+    for (i, y) in (-1000..=1000).step_by(100).enumerate() {
+        let (x, y) = (if i % 2 == 0 { -1000. } else { 1000. }, y as f64);
+        rows.extend([Point { x, y }, Point { x: -x, y }]);
+    }
+    let neighbor = &mut backend.world.snakes[1];
+    neighbor.head = rows[0];
+    neighbor.body = rows[1..].to_vec();
+    let neighbor = neighbor.clone();
+    let life = backend.slots[0].life;
+
+    assert_eq!(
+        backend.reconnect_slot(0).unwrap_err(),
+        "No spawn position is clear of other snakes"
+    );
+    assert_eq!(backend.world.snakes[1], neighbor);
+    assert_eq!(backend.slots[0].life, life);
+}
+
 /// Diff against freshly allocated listings, as after a changed broadcast.
 fn diff_food(
     packets: &mut Vec<Vec<u8>>,

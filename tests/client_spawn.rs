@@ -59,7 +59,7 @@ fn living_slot_rejoins_keep_the_new_body_clear_of_other_lives() {
 }
 
 #[test]
-fn crowded_rejoin_defers_without_replacing_either_life() {
+fn crowded_rejoin_takes_the_most_open_candidate_without_replacing_the_neighbor() {
     let mut backend = SimulatorBackend::new(7, config(500.)).unwrap();
     // Move inward from the constructor's test ring. Once the remaining head is
     // within 175 of center, even the farthest candidate (radius <= 400) is too close.
@@ -69,28 +69,29 @@ fn crowded_rejoin_defers_without_replacing_either_life() {
         assert!(snake.head.distance(Point::default()) < 175.);
         assert!(snake.head.distance(Point::default()) + 400. < 600.);
     }
-    let before = backend.world().clone();
 
-    // Retrying either living slot must preserve its life as well as its neighbor.
-    for slot in [0, 1, 0, 1] {
+    // No candidate clears 600 units at first; each join still succeeds, out
+    // of contact. Later joins may find room beside the outward newborn.
+    for (join, slot) in [0, 1, 0, 1].into_iter().enumerate() {
+        let other = 1 - slot;
+        let neighbor = backend.world().snakes[other].clone();
         let frame = backend.frame_for(slot).unwrap();
-        assert_eq!(
-            backend.reconnect_slot(slot).unwrap_err(),
-            "No clear spawn position"
-        );
-        assert_eq!(backend.world().snakes, before.snakes);
-        assert_eq!(backend.world().time, before.time);
-        assert_eq!(backend.world().food, before.food);
-        for index in 0..2 {
-            assert_eq!(backend.world().death_time(index), before.death_time(index));
-        }
+        backend.reconnect_slot(slot).unwrap();
+        assert_eq!(backend.world().snakes[other], neighbor);
+        let newborn = backend.world().snakes[slot].clone();
+        assert!(newborn.alive);
         let after = backend.frame_for(slot).unwrap();
-        assert_eq!(after.life, frame.life);
         assert_eq!(
             after.received.connection_generation,
-            frame.received.connection_generation
+            frame.received.connection_generation + 1
         );
-        assert_eq!(after.status, frame.status);
+        let mut others = backend.world().clone();
+        others.snakes[slot].alive = false;
+        let mut body = vec![newborn.head];
+        body.extend(&newborn.body);
+        let margin = others.spawn_margin(&body).unwrap();
+        assert!(margin > 0., "join {join} margin {margin}");
+        assert!(join > 0 || !others.body_is_clear(&body, 600.));
     }
 }
 

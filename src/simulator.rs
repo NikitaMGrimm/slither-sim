@@ -897,6 +897,35 @@ impl Simulator {
             && body.iter().all(|p| p.finite())
             && self.line_is_clear(body, body.len(), clearance)
     }
+    /// Least distance between a supplied head-first body's centerline and any
+    /// living snake, beyond that snake's contact range (collision distance plus
+    /// 40), as `body_is_clear` measures it; infinite without other snakes.
+    /// `None` for a body that check rejects whatever the neighbors: a length
+    /// outside 2..=430, a non-finite point, or a point within the wall margin.
+    pub fn spawn_margin(&self, body: &[Point]) -> Option<f64> {
+        let limit = self.config.radius - SPAWN_WALL_MARGIN;
+        if !(2..=430).contains(&body.len())
+            || body
+                .iter()
+                .any(|p| !p.finite() || p.distance(Point::default()) >= limit)
+        {
+            return None;
+        }
+        let mut margin = f64::INFINITY;
+        for s in self.snakes.iter().filter(|s| s.alive) {
+            let contact = collision_distance(s.segments, body.len()) + 40.;
+            for edge in body.windows(2) {
+                let (head, tail) = (edge[0], edge[1]);
+                margin = margin.min(segment_distance(s.head, head, tail) - contact);
+                let mut a = s.head;
+                for &b in &s.body {
+                    margin = margin.min(swept_distance(head, tail, a, b) - contact);
+                    a = b;
+                }
+            }
+        }
+        Some(margin)
+    }
     fn line_is_clear(&self, line: &[Point], segments: usize, clearance: f64) -> bool {
         if !clearance.is_finite()
             || clearance < 0.0

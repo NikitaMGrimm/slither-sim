@@ -367,12 +367,19 @@ impl SimulatorBackend {
         self.client_until(slot, now)
     }
 
-    /// Clear body and heading for a new life, chosen with this slot treated
-    /// as absent; `Simulator::spawn_body` shapes it.
+    /// Body and heading for a new life, chosen with this slot treated as
+    /// absent; `Simulator::spawn_body` shapes it. The first candidate clear by
+    /// 600 units wins. When none is, the candidate with the largest
+    /// `Simulator::spawn_margin` does: no official join has been seen refused,
+    /// and refusing would disconnect a socket player. That candidate must still
+    /// clear every contact range, or the first tick could kill the newborn or
+    /// its neighbor; only an arena too full for that refuses. Evidence:
+    /// research/fidelity/2026-10-25-spawn-admission/REPORT.md.
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
         let alive = self.world.snakes[slot].alive;
         self.world.snakes[slot].alive = false;
         let pose = (|| {
+            let mut open: Option<(f64, Vec<Point>, f64)> = None;
             for _ in 0..SPAWN_ATTEMPTS {
                 let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
                 let angle = self.spawn_random.unit() * TAU;
@@ -381,16 +388,23 @@ impl SimulatorBackend {
                     x: angle.cos() * distance,
                     y: angle.sin() * distance,
                 };
-                // Restore the earlier browser lobby's separation model. Own-join
-                // receipts support a large exclusion zone, but do not identify the
-                // exact official test. Never fall back to near-contact placement
-                // when the compact arena is crowded: defer this spawn instead.
+                // Local policy: official joins keep a median 925 units from
+                // visible bodies, but three came within 550-600.
                 let (body, heading) = self.world.spawn_body(head, heading)?;
                 if self.world.body_is_clear(&body, 600.) {
                     return Ok((body, heading));
                 }
+                if let Some(margin) = self.world.spawn_margin(&body)
+                    && open.as_ref().is_none_or(|(best, ..)| margin > *best)
+                {
+                    open = Some((margin, body, heading));
+                }
             }
-            Err("No clear spawn position".into())
+            match open {
+                Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
+                Some(_) => Err("No spawn position is clear of other snakes".into()),
+                None => Err("No spawn position fits inside the arena".into()),
+            }
         })();
         self.world.snakes[slot].alive = alive;
         pose

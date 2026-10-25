@@ -105,6 +105,9 @@
 
 ### Fixed
 
+- A default `host` no longer refuses every player with `No clear spawn
+  position`. Dynamic host arenas start sized for all seats, and a crowded world
+  places a join at the most open spot ([hosting](docs/raw-server.md#presets)).
 - Prey IDs sharing low 16 bits (such as 0 and 65536) no longer share a wire ID
   and hide each other. Immediate reuse after removal allows 65,536 live IDs
   ([prey settings](docs/configuration.md#prey)).
