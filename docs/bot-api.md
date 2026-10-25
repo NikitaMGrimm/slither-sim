@@ -1,10 +1,11 @@
 # Geometric controller: slither-sim-json-v3
 
-Run `slither-sim serve`, from a checkout with `cargo run --release --locked -- serve`
-or from a [release archive](../README.md#download-a-release) without Rust. One
-controller owns a session of independent worlds and all their player slots. Send UTF-8 JSON objects, one per stdin line; read one
-stdout reply per request. EOF stops the process. Rust callers can drive the
-same sessions [in-process](#in-process-sessions) or use the library directly.
+Run `slither-sim serve` from a [release archive](../README.md#download-a-release)
+without Rust, or `cargo run --release --locked -- serve` from a checkout. One
+controller owns independent worlds and all their player slots. Send one UTF-8
+JSON object per stdin line; read one stdout reply per request. EOF stops the
+process. Rust callers can use [in-process sessions](#in-process-sessions) or the
+library directly.
 
 ```json
 {"protocol":"slither-sim-json-v3","result":{}}
@@ -13,19 +14,16 @@ same sessions [in-process](#in-process-sessions) or use the library directly.
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
 readers ignore additional fields. Error text is descriptive, not a stable code.
-Malformed or rejected requests leave the stream usable; I/O failures stop it.
-This interface is for trusted local controllers.
+I/O failures stop the stream. Use trusted local controllers.
 
 Every error reply includes `sessionEnded`. When false, no world advanced and
 the session is unchanged. When true, advancement or frame collection failed
 (for example, accumulated pickup mass overflowed); all worlds were cleared.
-Reset before stepping again. The stream remains usable in either case.
-Version 3 replaces version 2 to distinguish these terminal failures from
-unchanged-state rejections; successful reply shapes are unchanged.
+Reset before stepping again. The stream survives malformed requests, rejections
+and terminal session failures.
 
-Sessions with several worlds step them in parallel, one world per task, on every
-core; `slither-sim serve --threads N` caps the threads. Replies do not depend on
-the thread count.
+Worlds step in parallel, one task per world, using every core;
+`slither-sim serve --threads N` caps threads without changing replies.
 
 ## Requests
 
@@ -37,11 +35,10 @@ the thread count.
 
 Works before reset. Returns `version`, `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
-observation `precision`. The maxima are representation limits, not policies:
-`maxAgents` and `maxDecisionTicks` are 4294967295 because frames hold `u32`
-slot indices (`u32::MAX` means none) and tick counts; `maxWorlds` is the
-platform's `usize::MAX`, since only `worlds × agents` must fit `usize` and memory
-bounds worlds in practice.
+observation `precision`. Representation limits: `maxAgents` and
+`maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
+`u32::MAX` means no slot). `maxWorlds` is the platform's `usize::MAX`;
+`worlds × agents` must fit `usize`, with memory limiting practical world counts.
 
 ### reset
 
@@ -52,20 +49,18 @@ bounds worlds in practice.
 All fields except `op` are optional. Defaults: seed 1, one world, four agents,
 six decision ticks and `Config::official(1)`. Every world shares `agents`,
 `decisionTicks` and `config`; world `w` uses seed `seed + w` (wrapping at 2³²).
-`config` and nested settings use camelCase; omitted fields use defaults. All
-world settings are listed in the [configuration reference](configuration.md#world-config).
+`config` and nested objects use camelCase [world settings](configuration.md#world-config)
+with defaults for omitted fields and an optional [`preset`](configuration.md#presets),
+such as `{"preset":"battledome"}`. Replies print resolved fields.
 Invalid resets preserve the previous session.
 
 Returns `seed`, the resolved `config`, `decisionTicks`, `warnings` and `worlds`,
-one [frame](#frames) per world. `warnings` lists sentences about valid but
-unmeasured settings, such as a `dt` outside the measured server loop; it is
-empty otherwise. `slither-sim serve` also prints them to stderr, never stdout.
-See [limits](configuration.md#limits). Snakes start on a deterministic ring
-halfway to the boundary, facing inward; this is a synthetic test setup. With `config.spawnRadius`,
-they lie along that ring instead, counterclockwise, heading along it, and with
-`config.minScore` they start at its floor.
-`config` may name a [`preset`](configuration.md#presets), such as
-`{"preset":"battledome"}`; the reply prints the resolved fields.
+one [frame](#frames) per world. `warnings` lists valid but unmeasured settings
+([limits](configuration.md#limits)), such as `dt` outside the measured server
+loop; otherwise it is empty. `serve` also prints warnings to stderr.
+Snakes start on a deterministic ring halfway to the boundary, facing inward:
+a synthetic test setup. With `config.spawnRadius`, they instead lie and head
+counterclockwise along that ring; with `config.minScore`, they start at its floor.
 
 The same build, config, seed and actions produce the same worlds. Cross-platform
 bitwise floating-point equivalence is not promised; retain these inputs and the
@@ -80,7 +75,7 @@ commit when recording results.
 `actions` has one entry per world, each with a `heading` and a `boost` array of
 one entry per agent slot. Living slots require a finite heading in radians; dead
 slots may use `null`. Headings are absolute: zero is +x and pi/2 is +y. The
-whole request is validated before any world advances; rejection changes nothing.
+whole request is validated before any world advances.
 
 Each world holds its actions for `decisionTicks` physics ticks, stopping early if
 all its snakes die. Time follows simulation ticks, independent of controller
@@ -88,10 +83,9 @@ compute time. `config.dt` is seconds per tick; defaults give a 42 ms decision
 interval. There is no network delay, automatic respawn, reward, victory
 condition or episode timeout. Use `reset` for new worlds.
 
-Returns `worlds`, one frame per world. Frame rows, counts and offsets are
-`u32`. A step whose frame cannot hold them, whose pickup would overflow a
-snake's mass or whose reply cannot be allocated ends the session after its
-worlds advanced, so reset to continue.
+Returns `worlds`, one frame per world. Frame rows, counts and offsets are `u32`.
+Unrepresentable frames, pickup mass overflow and reply allocation failure end
+the session after advancement, as described above.
 
 ### snapshot
 
@@ -106,8 +100,8 @@ checkpoint. Keep it out of limited-visibility bot evaluations.
 
 ## Frames
 
-A frame holds everything any living slot of that world can see, once, in
-columns, plus each slot's view as row indices into those columns.
+A frame stores visible entities once in columns; each living slot's view
+indexes those rows.
 
 | Member | Meaning |
 | --- | --- |
@@ -139,8 +133,8 @@ units per second.
 
 Food and prey are filtered by the vision circle. If an opponent's head or any
 anchor is visible, **its entire stored snake record is included**, even outside
-that circle. This is authoritative simulation data, including metadata that may
-be unavailable to a network client.
+that circle. This authoritative simulation data includes metadata that may be
+unavailable to network clients.
 
 The controller can read every slot and debug snapshots. A shared competition
 must separately restrict observations, isolate bots and define timing and
@@ -151,9 +145,8 @@ disconnection rules.
 Frames round coordinates (head, anchors, food, prey) to 0.01 world units,
 headings to 0.0001 radians and speeds to 0.01 units per second; every other
 number is exact. `info.precision` reports these steps. Rounding happens only
-when a frame is written: the simulation, snapshots, the [portable bot
-API](client-api.md) and the [WebSocket host](raw-server.md) keep full precision,
-so players connected to a hosted server receive exactly what they did before.
+when a frame is written; simulation, snapshots, the [portable bot
+API](client-api.md) and the [WebSocket host](raw-server.md) keep full precision.
 
 Nearest rounding changes a heading by at most 0.00005 radians and a point by at
 most 0.0071 world units. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
@@ -174,24 +167,21 @@ coverage, prediction, receipt ages or network latency. Use the
 see [the basic example](../examples/basic.rs). Rust callers can build their own
 admission, respawn and match rules around the core.
 
-A bot that observes every decision should keep one buffer and call
-`observe_all_into` or `observe_selected_into`. They return the same observations
-as `observe_all` and `observe_selected`, but refill the vectors already in the
-buffer, which avoids most per-call allocation. On Windows, bot loops in the
-[performance workloads](performance-workloads.md) ran 1.8–3.5× faster with
-`observe_all_into` than with `observe_all`.
+Use `observe_all_into` or `observe_selected_into` to reuse a buffer's vectors
+and avoid most per-call allocation, with the same observations as `observe_all`
+and `observe_selected`. Windows bot loops ran 1.8–3.5× faster with
+`observe_all_into` than `observe_all`; see [workloads](performance-workloads.md).
 
 Set `default-features = false` on a path or Git dependency for the core alone:
 no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
 observations, JSON transport and the `basic`/`fidelity_replay` examples remain
 available. `networking` is enabled by default and restores the full interface.
 
-`Simulator::set_parallel(true)` lets `observe_all` and `observe_selected` split
-large batches over the current [rayon](https://docs.rs/rayon) thread pool;
-results are identical. It is off by default so that worlds you already run in
-parallel do not compete for cores; size the pool with `RAYON_NUM_THREADS` or run
-inside `ThreadPool::install`. `transport::serve` steps a session's worlds on the
-same pool. Both need the default-enabled `parallel` feature.
+`Simulator::set_parallel(true)` splits large `observe_all` and `observe_selected`
+batches over the current [rayon](https://docs.rs/rayon) pool without changing
+results. It defaults off to avoid competing with parallel worlds. Size the pool
+with `RAYON_NUM_THREADS` or use `ThreadPool::install`. `transport::serve` steps
+worlds on the same pool. Both need the default-enabled `parallel` feature.
 
 ```sh
 cargo build --lib --no-default-features --locked
@@ -199,16 +189,13 @@ cargo build --lib --no-default-features --locked
 
 Before embedding:
 
-- Pin a dependency version or Git revision and record the resolved `Config` and
-  seed. Choose settings explicitly: default geometric `vision` is 1,500 units;
-  defaults and seeded trajectories can change between versions. See
-  [configuration](configuration.md) for the full settings.
+- Pin a dependency version or Git revision; record the resolved `Config` and
+  seed. Defaults and seeded trajectories can change between versions. Choose
+  [settings](configuration.md) explicitly, including geometric `vision`.
 - Handle fallible core calls before committing related command queues or timers
   in your application. A rejected operation preserves the simulator world, not
   changes you already made to your own driver state.
-- Define admission and respawn policy in your application. If clearance is
-  required, use the clearance checks below before respawning; respawn alone
-  does not enforce it.
+- Define admission and respawn policy in your application.
 
 | Method | Purpose |
 | --- | --- |
@@ -245,12 +232,10 @@ requests and typed steps act on the same worlds and may be mixed.
 | `worlds()`, `agents()` | Session shape; 0 before the first reset. |
 
 A NaN heading means no action; only dead slots may give it. Typed steps return
-`Result<(), transport::StepError>`. `Rejected(message)` reports validation
-failure before any world advances, leaving the session unchanged. `Ended(message)`
-reports a failure during advancement or frame collection and clears every world,
-including worlds that advanced successfully; `frame` then returns `None` and
-`worlds()` and `agents()` return 0. Reset to continue. Error text matches JSON
-steps. Worlds step on the rayon pool as in `serve`.
+`Result<(), transport::StepError>` with JSON error text: `Rejected(message)`
+leaves the session unchanged; `Ended(message)` clears every world after an
+advancement or frame-collection failure, including worlds that succeeded.
+Then `frame` returns `None`, `worlds()` and `agents()` return 0; reset to continue.
 
 `FrameRef` columns hold the values the JSON frame prints, rounded alike, in
 fixed types: `u64` prey `id`; `u8` food `origin` and death `reason`; `u32`

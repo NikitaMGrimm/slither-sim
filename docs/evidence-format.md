@@ -1,8 +1,7 @@
 # Evidence bundle v1
 
-A bundle is a gzip-compressed tar of regular files, described by the
-[bundle schema](https://github.com/NikitaMGrimm/slither-sim/blob/main/schemas/evidence-bundle-v1.schema.json). Raw captures retain
-schema-1 JSONL/gzip bytes.
+A bundle is a gzip-compressed tar of regular files ([schema](https://github.com/NikitaMGrimm/slither-sim/blob/main/schemas/evidence-bundle-v1.schema.json)).
+Raw captures retain schema-1 JSONL/gzip bytes.
 
 ```text
 manifest.json
@@ -26,28 +25,27 @@ software/*
 | `software/` | Required source snapshot: core, Cargo inputs, scripts, schemas, replay examples, Python lockfile and license. `software/LICENSE` covers bundled project code. |
 
 Allowed origins are `official-server`, `community-server` and `local-simulator`.
-Synthetic data stays labelled `local-simulator` in both plan and capture header;
-origin labels do not authenticate a server.
+Label synthetic data `local-simulator` in plan and capture header; origin labels
+do not authenticate servers.
 
 ## Source pins
 
 Collector digests must match the bundled source snapshot. Synthetic studies also
 record `captureProvenance.sources.files`, mapping relative paths to SHA-256.
-`combinedSha256` hashes that map as UTF-8 compact JSON, keys sorted, comma/colon
+`combinedSha256` hashes the map as compact UTF-8 JSON: sorted keys, comma/colon
 separators, no trailing newline. Missing, malformed or mismatched pins quarantine
-the capture even if the archive inventory matches.
+captures even with a matching archive inventory.
 
 ## Verification and bounds
 
-The packager snapshots data before auditing and inventories the snapshot. It
-rejects symlinks and case collisions, verifies the result and writes exclusively.
-The verifier stages regular files in a temporary directory, checks exact membership
-and hashes, then recomputes the audit. It never executes bundled scripts or
-extracts links.
+The packager snapshots data, audits and inventories that snapshot, rejects
+symlinks/case collisions, verifies the result and writes exclusively. The verifier
+stages regular files temporarily, checks exact membership and hashes, then
+recomputes the audit; it never executes bundled scripts or extracts links.
 
-Version 1 requires the original 33-file source minimum (`V1_SOURCE_FLOOR` in
-`evidence.py`) and checks all declared source pins. Later source additions in the
-verifier's checkout do not become requirements for historical bundles.
+Version 1 requires the original 33-file `V1_SOURCE_FLOOR` in `evidence.py` and
+checks all declared source pins. Later checkout additions do not change
+historical bundle requirements.
 
 Paths must be portable across Windows/Linux: no traversal, absolute/drive paths,
 backslashes, device names, trailing dots, case aliases or file/directory collisions.
@@ -60,8 +58,8 @@ backslashes, device names, trailing dots, case aliases or file/directory collisi
 | JSON/ledger metadata | 4 MiB |
 | Expanded text per raw gzip capture | 256 MiB |
 
-Bounds fail validation, never silently truncate evidence. Corrupt/interrupted raw
-files may be retained, but audits remain quarantined/incomplete with CLI exit 2.
+Exceeded bounds fail validation without truncation. Retained corrupt/interrupted
+raw files leave audits quarantined/incomplete with CLI exit 2.
 
 Hashes detect byte changes, not honest acquisition, independent trials, server
 versions or scientific validity. Sampling, timing/visibility limits, alternative
