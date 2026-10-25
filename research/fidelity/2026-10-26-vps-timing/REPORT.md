@@ -77,14 +77,11 @@ no assertion of a completely stall-free VPS is made. These maxima include
 collector startup; they do not identify the abnormal socket-close cause.
 
 All **21** files in the remote SHA-256 manifest were copied to local scratch
-and independently matched before cleanup. The first unprivileged removal hit
-`Permission denied` on the no-network gauge's root-owned `gauge/load.jsonl`.
-Only that exact scratch file was removed with `sudo -n rm`; the remaining empty
-scratch directories were removed with `rmdir`. The study image was newly pulled
+and independently matched before cleanup. One root-owned scratch file needed
+elevated removal. The study image was newly pulled
 (absent from the saved pre-study image inventory) and removed without force.
-Read-only checks at **23:33:53 UTC** verified that
-`/home/ubuntu/slither-capture-20261026`, the study container and the pinned image
-were all absent. Existing service containers, volumes and directories were not
+Read-only checks at **23:33:53 UTC** verified that the remote scratch directory,
+the study container and the pinned image were all absent. Existing service containers, volumes and directories were not
 modified.
 
 ## Questions and method
@@ -101,11 +98,10 @@ The base was `f11c830df1af541805c73e6f1f64ee6e0ac2452d` ([#108](https://github.c
    wire-level motion/mass minima, reverse mass/motion ordering and repeat prey
    correction gaps, using both server and receipt clocks.
 
-The owner supplied this host description: Oracle Ampere A1 in Frankfurt,
-four Neoverse-N1 cores, 24 GB RAM, Ubuntu 24.04; pre-study ICMP RTT
-1.64 ms (mdev 0.017 ms) to `57.129.37.42` and 17.9 ms (mdev 0.02 ms) to
-`198.244.231.35`. These are owner-reported ICMP measurements, not this study's
-game-ping observations or guarantees about later TCP traffic.
+Collection used a remote Linux ARM64 VM with four vCPUs. Reported pre-study
+ICMP RTT was 1.64 ms (mdev 0.017 ms) to `57.129.37.42` and 17.9 ms
+(mdev 0.02 ms) to `198.244.231.35`. These are pre-study ICMP measurements,
+not this study's game-ping observations or guarantees about later TCP traffic.
 
 The official `https://slither.io/i80124.txt` response was saved with HTTP headers
 and decoded before collection. Both IPs were active port-444 entries. The plan's
@@ -122,8 +118,8 @@ additional probes, controlled input interventions or spawn experiments.
 
 ## Collector and resource controls
 
-Windows OpenSSH is the only SSH/SCP transport used. Acquisition runs in a
-single ephemeral ARM64 Node container, with `--rm --cpus=1 --memory=1g`,
+Acquisition runs in a single ephemeral ARM64 Node container, with
+`--rm --cpus=1 --memory=1g`,
 one libuv worker, a read-only source mount, and the host user's UID/GID.
 `--network host` avoids Docker bridge/NAT timing; the preflight gauge used
 `--network none`. The pinned image is
