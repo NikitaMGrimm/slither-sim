@@ -1,0 +1,663 @@
+[
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\handshake-origin\\probe0.jsonl.gz",
+    "archiveSha256": "a52ffbe6500ede67e559a682acc01ddf3720c2ab775f0db4f68bf8fa8a35cf45",
+    "payloadSha256": "a4a3f18e9ffe75873079cc6a468967c5a19d7c8c5f456056b1501733a3a97316",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 1,
+    "joins": 1,
+    "counts": {
+      "i": {
+        "frames": 1130,
+        "bytes": 25986
+      },
+      "o": {
+        "frames": 109,
+        "bytes": 179
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792964785640,
+    "wallEndMs": 1792964795977.7598,
+    "durationMs": 10337.759699999999,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 3925
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-1\\network0.jsonl.gz",
+    "archiveSha256": "9ea8d48a3ed3bfb4cd311099bcbfec403dacf1fc0ead35f0e5c9effd9b0a5f45",
+    "payloadSha256": "ac6f6a3691a26cf035bfd157146cf57fdccd7b9044162208b7663bc3f1f19c75",
+    "status": "quarantine",
+    "issues": [
+      "no_gameplay_setup",
+      "no_incoming_frames"
+    ],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 3,
+    "joins": 0,
+    "counts": {
+      "i": {
+        "frames": 0,
+        "bytes": 0
+      },
+      "o": {
+        "frames": 0,
+        "bytes": 0
+      }
+    },
+    "setupSignatures": [],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792964364357,
+    "wallEndMs": 1792964964707.7017,
+    "durationMs": 600350.7017,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 1247
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-1\\spawn0.jsonl.gz",
+    "archiveSha256": "281d1774c44b2c313622e63ade5782cb0c59268496dee82d1470bd9ca5b96071",
+    "payloadSha256": "4252d7f351a315976727c0705ffccf7d70645f3817f0f1109cca3fb56d40db28",
+    "status": "quarantine",
+    "issues": [
+      "no_gameplay_setup",
+      "no_incoming_frames"
+    ],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 3,
+    "joins": 0,
+    "counts": {
+      "i": {
+        "frames": 0,
+        "bytes": 0
+      },
+      "o": {
+        "frames": 0,
+        "bytes": 0
+      }
+    },
+    "setupSignatures": [],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792964364380,
+    "wallEndMs": 1792964964708.6938,
+    "durationMs": 600328.694,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 1248
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-2\\network0.jsonl.gz",
+    "archiveSha256": "329a4cf5071c249b76db403c16430ae9d38717ac1a60e2250c8afd021eedd9c2",
+    "payloadSha256": "aca50fa4488eeaeec1623a405b91f372a9973835253f1422f5736f8133ac88d1",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 11,
+    "joins": 11,
+    "counts": {
+      "i": {
+        "frames": 59098,
+        "bytes": 1338464
+      },
+      "o": {
+        "frames": 6566,
+        "bytes": 7391
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792965335658,
+    "wallEndMs": 1792965935991.7505,
+    "durationMs": 600333.7505000001,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 12042
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-2\\spawn0.jsonl.gz",
+    "archiveSha256": "d1feb687038f5936f580fad3081a8352f082818f0d0134a9435ce137fa9ac7be",
+    "payloadSha256": "e6a8fa249ef88d84383513365b43e50068f7622c2382f467df138b0f8a85438b",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 34,
+    "joins": 34,
+    "counts": {
+      "i": {
+        "frames": 44036,
+        "bytes": 1016322
+      },
+      "o": {
+        "frames": 5541,
+        "bytes": 8091
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792965335676,
+    "wallEndMs": 1792965935992.9465,
+    "durationMs": 600316.9466,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 5456
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-3\\network0.jsonl.gz",
+    "archiveSha256": "5cc9f4038a0e1d789cce6c4702657c92acfbbd3c045e3cc18909a10df1fa67fb",
+    "payloadSha256": "df26ed1844ac39b8b8c4cebe82d691b1c94b854d58a0e76f99f000a396b59c88",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 7,
+    "joins": 7,
+    "counts": {
+      "i": {
+        "frames": 62701,
+        "bytes": 1429132
+      },
+      "o": {
+        "frames": 6446,
+        "bytes": 6971
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792966011709,
+    "wallEndMs": 1792966612047.752,
+    "durationMs": 600338.7519,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 4682
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-3\\spawn0.jsonl.gz",
+    "archiveSha256": "bb1e58585dc6f70eacad60eaee32d0a2432624480c9e991caafaa827493118d2",
+    "payloadSha256": "c4deab0bcf7eeb7edb0b3dafbf822f9fce278e21eea0c4792622e85a474dc862",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 33,
+    "joins": 33,
+    "counts": {
+      "i": {
+        "frames": 45338,
+        "bytes": 1035881
+      },
+      "o": {
+        "frames": 5512,
+        "bytes": 7987
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792966011730,
+    "wallEndMs": 1792966612049.2583,
+    "durationMs": 600319.2583,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 4436
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-4\\network0.jsonl.gz",
+    "archiveSha256": "1c5adf1f2d50693009305ecd750994e4845d3df36d4f8ef2047f52601ab75a74",
+    "payloadSha256": "0ad54a2327d317ff5e9b1dbd6f67649ab12aa41dff37309076f51ecef5076d06",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 6,
+    "joins": 6,
+    "counts": {
+      "i": {
+        "frames": 61180,
+        "bytes": 1371524
+      },
+      "o": {
+        "frames": 6273,
+        "bytes": 6723
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792966686589,
+    "wallEndMs": 1792967286948.5964,
+    "durationMs": 600359.5964,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 13023
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\low-4\\spawn0.jsonl.gz",
+    "archiveSha256": "ce321549eda2403599f24042980fe3118dde1c2ae60dcf1d5111e3ef45191d51",
+    "payloadSha256": "181976ba7c83e30905888ae18019e2f8604fea38eac8ed04faf7b2d82ef1f184",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 34,
+    "joins": 34,
+    "counts": {
+      "i": {
+        "frames": 43690,
+        "bytes": 966840
+      },
+      "o": {
+        "frames": 5461,
+        "bytes": 8011
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "57.129.37.42",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792966686613,
+    "wallEndMs": 1792967286950.4158,
+    "durationMs": 600337.4157,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 9588
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\second-1\\network0.jsonl.gz",
+    "archiveSha256": "aa9288406f843b7b1ee88a4d14a95b872f9178d8d316aea9d58fe540b48c2d5a",
+    "payloadSha256": "8bec8a50643a9b6223fe2884c755b6395d7132bdd2ccd469b20f78a3c4feba75",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 6,
+    "joins": 6,
+    "counts": {
+      "i": {
+        "frames": 63505,
+        "bytes": 1536322
+      },
+      "o": {
+        "frames": 6357,
+        "bytes": 6807
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "198.244.231.35",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792967336153,
+    "wallEndMs": 1792967936506.8145,
+    "durationMs": 600353.8145,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 14955
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\second-1\\spawn0.jsonl.gz",
+    "archiveSha256": "afa195b58a696f1555ced5916963c0f191ede66503db58cdb12598ab8f47607a",
+    "payloadSha256": "aa4eceb3c8c2e6ab9a5b8ed91ffd2b353e366b0320153cf2a0d27598bff9ef39",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 34,
+    "joins": 34,
+    "counts": {
+      "i": {
+        "frames": 42898,
+        "bytes": 937385
+      },
+      "o": {
+        "frames": 5605,
+        "bytes": 8155
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "198.244.231.35",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792967336202,
+    "wallEndMs": 1792967936508.2644,
+    "durationMs": 600306.2646,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 4879
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\second-2\\network0.jsonl.gz",
+    "archiveSha256": "ec9cbfa88b1b35817b7762d7310c193759584a15fd097e599ac9b2ec97139921",
+    "payloadSha256": "6ca7cfef1d970c2705b0463333bc4e715c8c2371bc0b13e022cf7f2afd2d6492",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 5,
+    "joins": 5,
+    "counts": {
+      "i": {
+        "frames": 58889,
+        "bytes": 1246190
+      },
+      "o": {
+        "frames": 6625,
+        "bytes": 7000
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "198.244.231.35",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792968010808,
+    "wallEndMs": 1792968611198.1084,
+    "durationMs": 600390.1084,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 12336
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\second-2\\spawn0.jsonl.gz",
+    "archiveSha256": "81f1a3efee7cfe1dd2904f0332108d35fb6934e703fc01879c40ded070c68f6e",
+    "payloadSha256": "06f72c8e9942efd1e4c70536d2ed80cf20f1449a1805ffd806a621212d77c079",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 34,
+    "joins": 34,
+    "counts": {
+      "i": {
+        "frames": 45860,
+        "bytes": 1075893
+      },
+      "o": {
+        "frames": 5664,
+        "bytes": 8214
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "198.244.231.35",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792968010880,
+    "wallEndMs": 1792968611198.821,
+    "durationMs": 600318.8208999999,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 15285
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\second-3\\network0.jsonl.gz",
+    "archiveSha256": "e0ce4ccddb398ef1e6178a92643bbb68dbf8a3fa1cc1c077b9d4d610f83d4cac",
+    "payloadSha256": "10f71b12b71249f62e24a698a8509283280797898e6121907b464ef89bc38600",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 5,
+    "joins": 5,
+    "counts": {
+      "i": {
+        "frames": 59156,
+        "bytes": 1350015
+      },
+      "o": {
+        "frames": 6386,
+        "bytes": 6761
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "198.244.231.35",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792968667704,
+    "wallEndMs": 1792969268099.4243,
+    "durationMs": 600395.4242,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 11507
+    }
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\raw\\second-3\\spawn0.jsonl.gz",
+    "archiveSha256": "ed445a58db7dfd1de7681f1807553fc899154ccf43c4963694e17721ecf9a445",
+    "payloadSha256": "46b5bd2c9ec66b86d42c8b89717cd461fe330f8cad6dd2ea00463ea3ae7a83a2",
+    "status": "verified",
+    "issues": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 34,
+    "joins": 34,
+    "counts": {
+      "i": {
+        "frames": 44583,
+        "bytes": 1034875
+      },
+      "o": {
+        "frames": 5455,
+        "bytes": 8005
+      }
+    },
+    "setupSignatures": [
+      {
+        "protocolVersion": 19,
+        "grd": 32550,
+        "mscps": 430,
+        "sectorSize": 300,
+        "cstWire": 430,
+        "msl": 42,
+        "remainingStaticSetupHex": "006630021b002805780021001d"
+      }
+    ],
+    "observedServers": [
+      {
+        "ip": "198.244.231.35",
+        "port": 444
+      }
+    ],
+    "wallStartMs": 1792968667785,
+    "wallEndMs": 1792969268099.3308,
+    "durationMs": 600314.3307,
+    "recorderQueue": {
+      "backpressureWrites": 0,
+      "maxQueuedBytes": 17848
+    }
+  }
+]

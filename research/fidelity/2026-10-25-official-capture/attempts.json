@@ -1,0 +1,197 @@
+[
+  {
+    "batch": {
+      "id": "low-1",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    "phase": "reserved",
+    "planSha256": "b7274f46ef3fca4840e3151c33d46475862cf13804ddb9a7e915ccfd46f282bf",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T21:39:24.288494+00:00"
+  },
+  {
+    "batchId": "low-1",
+    "phase": "started",
+    "pid": 55564,
+    "utc": "2026-10-25T21:39:24.296260+00:00"
+  },
+  {
+    "batchId": "handshake-origin",
+    "phase": "reserved",
+    "connections": 1,
+    "seconds": 10,
+    "utc": "2026-10-25T21:46:25.593786+00:00"
+  },
+  {
+    "batchId": "handshake-origin",
+    "phase": "exited",
+    "exitCode": 0,
+    "utc": "2026-10-25T21:46:35.997986+00:00"
+  },
+  {
+    "batchId": "low-1",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 600.4451962000458,
+    "utc": "2026-10-25T21:49:24.725483+00:00"
+  },
+  {
+    "batch": {
+      "id": "low-2",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    "phase": "reserved",
+    "planSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T21:55:35.600425+00:00"
+  },
+  {
+    "batchId": "low-2",
+    "phase": "started",
+    "pid": 52856,
+    "utc": "2026-10-25T21:55:35.607330+00:00"
+  },
+  {
+    "batchId": "low-2",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 631.4167134999298,
+    "utc": "2026-10-25T22:06:07.007433+00:00"
+  },
+  {
+    "batch": {
+      "id": "low-3",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    "phase": "reserved",
+    "planSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T22:06:51.638459+00:00"
+  },
+  {
+    "batchId": "low-3",
+    "phase": "started",
+    "pid": 49292,
+    "utc": "2026-10-25T22:06:51.645890+00:00"
+  },
+  {
+    "batchId": "low-3",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 629.9016500000143,
+    "utc": "2026-10-25T22:17:21.530289+00:00"
+  },
+  {
+    "batch": {
+      "id": "low-4",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "heldout"
+    },
+    "phase": "reserved",
+    "planSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T22:18:06.520769+00:00"
+  },
+  {
+    "batchId": "low-4",
+    "phase": "started",
+    "pid": 66692,
+    "utc": "2026-10-25T22:18:06.527584+00:00"
+  },
+  {
+    "batchId": "low-4",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 600.7119581999723,
+    "utc": "2026-10-25T22:28:07.223470+00:00"
+  },
+  {
+    "batch": {
+      "id": "second-1",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    "phase": "reserved",
+    "planSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T22:28:55.720555+00:00"
+  },
+  {
+    "batchId": "second-1",
+    "phase": "started",
+    "pid": 48616,
+    "utc": "2026-10-25T22:28:55.738283+00:00"
+  },
+  {
+    "batchId": "second-1",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 627.5544140000129,
+    "utc": "2026-10-25T22:39:23.272360+00:00"
+  },
+  {
+    "batch": {
+      "id": "second-2",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    "phase": "reserved",
+    "planSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T22:40:10.503362+00:00"
+  },
+  {
+    "batchId": "second-2",
+    "phase": "started",
+    "pid": 40760,
+    "utc": "2026-10-25T22:40:10.512359+00:00"
+  },
+  {
+    "batchId": "second-2",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 604.021204699995,
+    "utc": "2026-10-25T22:50:14.517109+00:00"
+  },
+  {
+    "batch": {
+      "id": "second-3",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "heldout"
+    },
+    "phase": "reserved",
+    "planSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+    "affinityMask": 48,
+    "connectionCeiling": 2,
+    "utc": "2026-10-25T22:51:07.138667+00:00"
+  },
+  {
+    "batchId": "second-3",
+    "phase": "started",
+    "pid": 54460,
+    "utc": "2026-10-25T22:51:07.146788+00:00"
+  },
+  {
+    "batchId": "second-3",
+    "phase": "exited",
+    "exitCode": 0,
+    "wallSeconds": 624.9124011000386,
+    "utc": "2026-10-25T23:01:32.041557+00:00"
+  }
+]

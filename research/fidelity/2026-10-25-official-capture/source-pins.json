@@ -1,0 +1,182 @@
+{
+  "access": "local-only full recordings, source snapshots and analyses; selected metadata only is committed",
+  "baseCommit": "421e384c3738e7c4d08e1eb12275733266d7a629",
+  "sealedUtc": "2026-10-25T23:05:26.353178+00:00",
+  "originalFrozenPlanSha256": "b7274f46ef3fca4840e3151c33d46475862cf13804ddb9a7e915ccfd46f282bf",
+  "continuationFrozenPlanSha256": "24513baf9a989184e1d9709a4ddf3a51debd384ef993238a8a36d148fde29501",
+  "originalCollectionSources": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\capture.mjs",
+      "sha256": "491744c585c2e5c0fcbe1f7c6a2997f102d37575aada24f94a969866eca6e6db"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\run.py",
+      "sha256": "8605d266d955247fee684fc1545a8700fe4a3b819b5700520d65a2957766bd51"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\src\\client\\latency.rs",
+      "sha256": "06176d47cf6b295d8e69c29b80dd8574d79222dba4f129fbb4c7e49490b8c709"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list.txt",
+      "sha256": "f1b7c1c3475d64bf3c8b260936f1b9fc246320c57dcfcbcde14b6d73c5cb7bbe"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list.headers.txt",
+      "sha256": "dceb7cd73b82e94a8b448db411f887a5f10e97bf35d537cbee6b39187b00d740"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list-decoded.json",
+      "sha256": "73841a5b57a292bb0cc2e5ba13dfcd36238dbd7e8ace8c48a68f22aef3d446ed"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "86f9a7ff486e362875212cd644f4a14f9b6989cd60f97dfeb8f441c167422fa3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "1e82c660defd85867eafc453a6fe08b4dadd77314f0d8766f86f80c0f1939dad"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-headless-ecology.py",
+      "sha256": "382de546579aaa8cb0f4701f9f6d1008fe8127e0d50961c1390bd9af4623c023"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-spawn-placement.py",
+      "sha256": "0102c76d6a218c2a469adfa6f01a3813f5e808c70c49c11bd687849a562c85af"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-spawn-neighbors.py",
+      "sha256": "99a2ed1f77231fa6e1c8edbf698e42b4c10c2493b9bbd434c7afa1edc0a82a29"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\analyze.py",
+      "sha256": "d61f3192a1bf0e9e3aede9fb22d0c97b7c38bc2991cbf406b763c9e1746f781f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit.py",
+      "sha256": "0a854f34b635e729f3d80b3294f2e1f8056d5e5830c9d998607c84098d846b71"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit.json",
+      "sha256": "9620fde64c4097f3929b6ccfeab4832cadacc121ce8342f3e6c6125be99c1e80"
+    }
+  ],
+  "continuationCollectionSources": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\capture.mjs",
+      "sha256": "491744c585c2e5c0fcbe1f7c6a2997f102d37575aada24f94a969866eca6e6db"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\run.py",
+      "sha256": "8605d266d955247fee684fc1545a8700fe4a3b819b5700520d65a2957766bd51"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\src\\client\\latency.rs",
+      "sha256": "06176d47cf6b295d8e69c29b80dd8574d79222dba4f129fbb4c7e49490b8c709"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list.txt",
+      "sha256": "f1b7c1c3475d64bf3c8b260936f1b9fc246320c57dcfcbcde14b6d73c5cb7bbe"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list.headers.txt",
+      "sha256": "dceb7cd73b82e94a8b448db411f887a5f10e97bf35d537cbee6b39187b00d740"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list-decoded.json",
+      "sha256": "73841a5b57a292bb0cc2e5ba13dfcd36238dbd7e8ace8c48a68f22aef3d446ed"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "86f9a7ff486e362875212cd644f4a14f9b6989cd60f97dfeb8f441c167422fa3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "1e82c660defd85867eafc453a6fe08b4dadd77314f0d8766f86f80c0f1939dad"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-headless-ecology.py",
+      "sha256": "382de546579aaa8cb0f4701f9f6d1008fe8127e0d50961c1390bd9af4623c023"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-spawn-placement.py",
+      "sha256": "0102c76d6a218c2a469adfa6f01a3813f5e808c70c49c11bd687849a562c85af"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-spawn-neighbors.py",
+      "sha256": "99a2ed1f77231fa6e1c8edbf698e42b4c10c2493b9bbd434c7afa1edc0a82a29"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\analyze.py",
+      "sha256": "d61f3192a1bf0e9e3aede9fb22d0c97b7c38bc2991cbf406b763c9e1746f781f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit.py",
+      "sha256": "0a854f34b635e729f3d80b3294f2e1f8056d5e5830c9d998607c84098d846b71"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit.json",
+      "sha256": "9620fde64c4097f3929b6ccfeab4832cadacc121ce8342f3e6c6125be99c1e80"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\capture-origin.mjs",
+      "sha256": "0e13172b797ef7c6ff6509bda4d25493c71435407ebfdd2864e340a41aa19758"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\run-origin.py",
+      "sha256": "6cd54618fe49965cd386ddabd41c2a0903d0c0bdec7b84c1b2cc63d234980313"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\probe.mjs",
+      "sha256": "cfd89be0871063ca4f41c1e1678002257f0d7e6b32c98d9268cf47d54e132e9c"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\handshake-plan.json",
+      "sha256": "f1be9dc7b6cebd8bdbfe9d9115898e2c4d9d0f0b6f04a82c114c6dd10eca4924"
+    }
+  ],
+  "analysisSha256": "89e1c197e71bbf7a83c3acfad9f568bce8658d97fda1e506ad1e2b58f5caf4ae",
+  "artifactManifest": {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\artifact-manifest.json",
+    "sha256": "285d3500ca10dc502d93b7d5674d3e4bdf7bcd223ebd2f44c80f4abfa8190104",
+    "files": 101,
+    "bytes": 43739582
+  },
+  "selectedArtifactSha256": {
+    "selected-results.json": "3b07c9c478628080784404ab7f5a5867c1947d52f2ea65a910e7faa40855e53e",
+    "capture-receipts.json": "cba36ccbfd84e57f9fe06f51e0b8c0901303874876f7edfa7efb09178207e3cc",
+    "attempts.json": "ceb070f746dfbc3d4141f982c28078560574c1988e88639301ff09549ba3f382"
+  },
+  "versions": {
+    "node": "24.15.0",
+    "python": "3.13.13",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1"
+  },
+  "analysisSourceAccess": "historical scripts snapshotted outside Git with source-manifest paths; no historical tracked or user-dirty source changed"
+}
