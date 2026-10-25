@@ -22,9 +22,13 @@ fn browser(sim: &mut RawSimulator) -> ClientState {
 }
 
 fn pump(sim: &mut RawSimulator, state: &mut ClientState) -> Vec<Vec<u8>> {
+    pump_for(sim, state, 0)
+}
+
+fn pump_for(sim: &mut RawSimulator, state: &mut ClientState, slot: usize) -> Vec<Vec<u8>> {
     let now = sim.time();
     let mut packets = Vec::new();
-    for frame in sim.drain(0).unwrap() {
+    for frame in sim.drain(slot).unwrap() {
         state.receive_frame(&frame, now).unwrap();
         packets.extend(
             super::super::protocol::split_frame(&frame)
@@ -34,6 +38,106 @@ fn pump(sim: &mut RawSimulator, state: &mut ClientState) -> Vec<Vec<u8>> {
         );
     }
     packets
+}
+
+#[test]
+fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
+    let mut config = config();
+    config.agents = 2;
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    let mut readers = [ClientState::new(), ClientState::new()];
+    for (slot, reader) in readers.iter_mut().enumerate() {
+        sim.connect(slot, PlayerAppearance::default()).unwrap();
+        reader.new_connection(0.).unwrap();
+        // Synthetic, separated poses give both readers the same pit sectors.
+        sim.backend.world.snakes[slot].alive = false;
+        sim.backend
+            .world
+            .respawn(
+                slot,
+                Point {
+                    x: 2000.,
+                    y: if slot == 0 { 300. } else { -300. },
+                },
+                0.,
+                26,
+            )
+            .unwrap();
+        sim.backend.slots[slot].control.heading = 0.;
+    }
+    sim.physical_food(1);
+    sim.advance_ticks(1).unwrap();
+    for (slot, reader) in readers.iter_mut().enumerate() {
+        pump_for(&mut sim, reader, slot);
+    }
+    let marker = food(&readers[0], sim.time())
+        .into_iter()
+        .max_by(|a, b| a.x.total_cmp(&b.x))
+        .unwrap();
+    assert!(food(&readers[1], sim.time()).is_empty());
+    let real = Food {
+        size: Some(2.),
+        value: 1.,
+        origin: Some(crate::model::Origin::Ambient),
+        ..marker.clone()
+    };
+    let key = encode::food_key(real.point()).unwrap();
+    sim.backend.world.food.push(real.clone());
+    sim.backend.broadcast().unwrap();
+    let browser_birth = pump_for(&mut sim, &mut readers[0], 0);
+    let bot_birth = pump_for(&mut sim, &mut readers[1], 1);
+    let at_key =
+        |p: &Vec<u8>| p.len() >= 5 && matches!(p[0], b'f' | b'b' | b'c' | b'<') && p[1..5] == key;
+    assert!(!browser_birth.iter().any(at_key));
+    assert!(bot_birth.iter().any(|p| at_key(p) && p[0] == b'f'));
+    assert!(food(&readers[0], sim.time()).contains(&marker));
+    let bot_food = food(&readers[1], sim.time());
+    assert_eq!(bot_food.len(), 1);
+    assert_eq!(
+        (bot_food[0].point(), bot_food[0].size),
+        (real.point(), real.size)
+    );
+
+    // Put the bot's pickup circle over the real pellet, then let physics eat it.
+    // The readers stay connected; no pickup event or wire delta is fabricated.
+    let heading = std::f64::consts::FRAC_PI_2;
+    let snake = &sim.backend.world.snakes[1];
+    let (lead, _) =
+        crate::physics::pickup_circle(Point::default(), heading, snake.speed, snake.segments);
+    sim.backend.world.snakes[1].alive = false;
+    sim.backend
+        .world
+        .respawn(
+            1,
+            Point {
+                x: real.x - lead.x,
+                y: real.y - lead.y,
+            },
+            heading,
+            26,
+        )
+        .unwrap();
+    sim.backend.slots[1].control.heading = heading;
+    sim.advance_ticks(1).unwrap();
+    assert!(sim.backend.world.snakes.iter().all(|s| s.alive));
+    assert!(sim.backend.world.food.is_empty());
+    let events = sim.backend.world.pickup_events.as_ref().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].eater, 1);
+    assert_eq!(events[0].item, crate::simulator::PickupItem::Food(real));
+    let browser_pickup = pump_for(&mut sim, &mut readers[0], 0);
+    let bot_pickup = pump_for(&mut sim, &mut readers[1], 1);
+    assert!(
+        !browser_pickup.iter().any(at_key),
+        "no marker removal or pickup animation"
+    );
+    assert!(
+        bot_pickup
+            .iter()
+            .any(|p| at_key(p) && p[0] == b'<' && p[5..] == [0, 1])
+    );
+    assert!(food(&readers[0], sim.time()).contains(&marker));
+    assert!(food(&readers[1], sim.time()).is_empty());
 }
 
 fn food(state: &ClientState, now: f64) -> Vec<Food> {

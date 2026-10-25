@@ -418,3 +418,132 @@ fn frame_groups(packets: &[Vec<u8>]) -> Vec<&[Vec<u8>]> {
     }
     groups
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Config,
+        client::{LatencyConfig, SimulationConfig},
+    };
+
+    fn backend() -> SimulatorBackend {
+        let mut config = SimulationConfig {
+            world: Config::sandbox(),
+            latency: LatencyConfig::measured_route(),
+            ..Default::default()
+        };
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut backend = SimulatorBackend::new(7, config).unwrap();
+        backend.slots[0].connection.downlink.clear();
+        backend
+    }
+
+    fn packets(frames: usize) -> Vec<Vec<u8>> {
+        // A synthetic ignored packet beyond the 8191-byte length-prefix bound
+        // must travel alone, giving an explicit, independent frame count.
+        let packet = vec![b'i'; 8192];
+        assert!(!encode::frameable(&packet));
+        vec![packet; frames]
+    }
+
+    #[test]
+    fn pit_markers_unequal_frame_counts_advance_only_physical_latency_draws() {
+        for (physical_count, browser_count) in [(1, 3), (3, 1), (3, 0), (0, 3), (0, 0)] {
+            let mut actual = backend();
+            let mut physical_reader = backend();
+            let physical = packets(physical_count);
+            let presented = packets(browser_count);
+            let before = format!("{:?}", actual.random);
+            actual
+                .emit_presented(0, 1., &presented, Some(&physical))
+                .unwrap();
+            physical_reader.emit(0, 1., &physical).unwrap();
+            assert_eq!(
+                format!("{:?}", actual.random),
+                format!("{:?}", physical_reader.random),
+                "{physical_count} physical / {browser_count} browser"
+            );
+            assert_eq!(
+                format!("{:?}", actual.slots[0].connection.link),
+                format!("{:?}", physical_reader.slots[0].connection.link)
+            );
+            assert_eq!(actual.slots[0].connection.downlink.len(), browser_count);
+            let baseline = &physical_reader.slots[0].connection.downlink;
+            assert_eq!(baseline.len(), physical_count);
+            if physical_count > 0 {
+                assert_ne!(
+                    before,
+                    format!("{:?}", actual.random),
+                    "latency variation must draw randomness"
+                );
+                for (index, (at, bytes)) in actual.slots[0].connection.downlink.iter().enumerate() {
+                    assert_eq!(*at, baseline[index.min(physical_count - 1)].0);
+                    assert_eq!(
+                        protocol::split_frame(bytes).unwrap(),
+                        [&presented[index][..]]
+                    );
+                }
+            } else {
+                assert_eq!(before, format!("{:?}", actual.random));
+            }
+            // Pin the next ordinary release too: hidden physical frames still
+            // advance the stream; extra browser frames must not advance it.
+            actual.emit(0, 2., &[encode::pong()]).unwrap();
+            physical_reader.emit(0, 2., &[encode::pong()]).unwrap();
+            let delivered = actual.slots[0].connection.downlink.back().unwrap();
+            let expected = physical_reader.slots[0].connection.downlink.back().unwrap();
+            assert_eq!(delivered.0, expected.0);
+            // Elapsed headers belong to the frames each reader actually got.
+            assert_eq!(
+                protocol::split_frame(&delivered.1).unwrap(),
+                protocol::split_frame(&expected.1).unwrap()
+            );
+            assert_eq!(
+                format!("{:?}", actual.random),
+                format!("{:?}", physical_reader.random)
+            );
+        }
+    }
+
+    #[test]
+    fn pit_markers_marker_only_frames_preserve_latency_rng_and_delivery_order() {
+        let mut actual = backend();
+        let mut baseline = backend();
+        let random = format!("{:?}", actual.random);
+        let link = format!("{:?}", actual.slots[0].connection.link);
+        let mut previous: f64 = 0.;
+        for now in [1., 1., 1.001] {
+            let expected = actual.slots[0]
+                .connection
+                .link
+                .clone()
+                .downlink(&actual.config.latency, &mut actual.random.clone(), now)
+                .max(previous);
+            actual
+                .emit_presented(0, now, &packets(2), Some(&[]))
+                .unwrap();
+            for (at, _) in actual.slots[0].connection.downlink.drain(..) {
+                assert_eq!(at, expected);
+                assert!(at >= previous);
+                previous = at;
+            }
+            assert_eq!(format!("{:?}", actual.random), random);
+            assert_eq!(format!("{:?}", actual.slots[0].connection.link), link);
+        }
+        // Draining presentation frames must not lose the ordering floor when
+        // an ordinary release follows at the same emission time.
+        actual.emit(0, 1.001, &[encode::pong()]).unwrap();
+        baseline.emit(0, 1.001, &[encode::pong()]).unwrap();
+        assert!(actual.slots[0].connection.downlink.back().unwrap().0 >= previous);
+        assert_eq!(
+            format!("{:?}", actual.random),
+            format!("{:?}", baseline.random)
+        );
+        assert_eq!(
+            format!("{:?}", actual.slots[0].connection.link),
+            format!("{:?}", baseline.slots[0].connection.link)
+        );
+    }
+}
