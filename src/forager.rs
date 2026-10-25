@@ -1021,15 +1021,58 @@ fn rim_kills(arena: &Arena, head: Point, heading: f64, segments: usize) -> bool 
         && x * heading.cos() + y * heading.sin() > boundary::LETHAL_OUTWARD * distance
 }
 
+/// Whether a branch `at(t)` (head and heading) dies at the rim within
+/// `TRAP_CHORDS` samples `dt` apart. Its first contact, located between
+/// samples by bisection, is lethal or starts a slide; while sliding, the head
+/// stays on the rim, so later samples die once their heading points outward
+/// steeply at the sample's bearing.
+fn branch_hits_rim(
+    arena: &Arena,
+    segments: usize,
+    dt: f64,
+    at: impl Fn(f64) -> (Point, f64),
+) -> bool {
+    let lead = boundary::CONTACT_LEAD * scale(segments);
+    let contact = |t: f64| {
+        let (q, h) = at(t);
+        forward(q, h, lead).distance(arena.center) >= arena.radius
+    };
+    let Some(j) = (0..=TRAP_CHORDS).find(|&j| contact(dt * j as f64)) else {
+        return false;
+    };
+    let (mut lo, mut hi) = (dt * j.saturating_sub(1) as f64, dt * j as f64);
+    if j > 0 {
+        for _ in 0..6 {
+            let mid = (lo + hi) / 2.0;
+            if contact(mid) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+    }
+    let (q, h) = at(hi);
+    rim_kills(arena, q, h, segments)
+        || (j + 1..=TRAP_CHORDS).any(|i| {
+            let (q, h) = at(dt * i as f64);
+            let (x, y) = (q.x - arena.center.x, q.y - arena.center.y);
+            x * h.cos() + y * h.sin() > boundary::LETHAL_OUTWARD * x.hypot(y)
+        })
+}
+
 /// A victim's hard-left, straight and hard-right escape branches from its
 /// forecast head, as the path of its tip (`physics::strikes` kills through the
 /// tip), with whether the rim or a gathered body already blocks each.
 /// Bodies beyond our gathering radius are unknown and count as open.
 struct Escapes {
-    tips: [[Point; 3]; 3],
+    tips: [[Point; TRAP_CHORDS + 1]; 3],
     blocked: [bool; 3],
     seconds: f64,
 }
+
+/// Chords of each escape branch; at 50 ms (the default 0.4 s span) a boosting
+/// victim moves less than a small snake's width between samples.
+const TRAP_CHORDS: usize = 8;
 
 impl Escapes {
     #[allow(clippy::too_many_arguments)]
@@ -1046,8 +1089,8 @@ impl Escapes {
         let o = view.o;
         let radius = width(enemy);
         let turn = turn_rate(enemy.segments);
-        let half = p.kill_trap_seconds / 2.0;
-        let mut tips = [[head; 3]; 3];
+        let dt = p.kill_trap_seconds / TRAP_CHORDS as f64;
+        let mut tips = [[head; TRAP_CHORDS + 1]; 3];
         let mut blocked = [false; 3];
         for (b, delta) in [-std::f64::consts::PI, 0.0, std::f64::consts::PI]
             .into_iter()
@@ -1057,11 +1100,9 @@ impl Escapes {
                 let q = turn_then_straight(head, heading, delta, enemy.speed, turn, t);
                 (q, heading + delta.signum() * delta.abs().min(turn * t))
             };
-            let heads = [at(0.0), at(half), at(2.0 * half)];
+            let heads: [(Point, f64); TRAP_CHORDS + 1] = std::array::from_fn(|j| at(dt * j as f64));
             tips[b] = heads.map(|(q, h)| forward(q, h, radius));
-            blocked[b] = heads
-                .iter()
-                .any(|&(q, h)| rim_kills(&o.arena, q, h, enemy.segments));
+            blocked[b] = branch_hits_rim(&o.arena, enemy.segments, dt, at);
         }
         // Other snakes' gathered bodies: a tip crossing their centre line, or
         // within their radius of it, dies.
@@ -1097,9 +1138,10 @@ impl Escapes {
 
     /// Share of branches blocked by a wall our head lays from `from` to `to`
     /// at a steady pace, arriving after `arrival` seconds. A branch chord
-    /// meets only the part laid by the time the chord ends.
+    /// meets only the part laid by the time the chord starts, so a wall still
+    /// growing during that chord counts as open.
     fn blocked_with_wall(&self, from: Point, to: Point, width: f64, arrival: f64) -> f64 {
-        let chord = self.seconds / 2.0;
+        let chord = self.seconds / TRAP_CHORDS as f64;
         let laid = |t: f64| {
             let f = if arrival > 0.0 {
                 (t / arrival).min(1.0)
@@ -1114,9 +1156,10 @@ impl Escapes {
         let mut count = 0;
         for (tip, &blocked) in self.tips.iter().zip(&self.blocked) {
             if blocked
-                || tip.windows(2).enumerate().any(|(j, w)| {
-                    swept_distance(w[0], w[1], from, laid(chord * (j + 1) as f64)) < width
-                })
+                || tip
+                    .windows(2)
+                    .enumerate()
+                    .any(|(j, w)| swept_distance(w[0], w[1], from, laid(chord * j as f64)) < width)
             {
                 count += 1;
             }
@@ -1655,9 +1698,8 @@ mod tests {
             x: radius + speed * t,
             y: 0.0,
         };
-        let open = [[Point { x: 0.0, y: 500.0 }; 3]; 3];
-        let mut tips = open;
-        tips[1] = [tip(0.0), tip(0.2), tip(0.4)];
+        let mut tips = [[Point { x: 0.0, y: 500.0 }; TRAP_CHORDS + 1]; 3];
+        tips[1] = std::array::from_fn(|j| tip(0.05 * j as f64));
         let escapes = Escapes {
             tips,
             blocked: [false; 3],
@@ -1666,6 +1708,49 @@ mod tests {
         let (from, to) = (Point { x: 50.0, y: -100.0 }, Point { x: 50.0, y: 100.0 });
         assert_eq!(escapes.blocked_with_wall(from, to, 10.0, 1.0), 0.0);
         assert_eq!(escapes.blocked_with_wall(from, to, 10.0, 0.1), 1.0 / 3.0);
+
+        // Review round 7: the branch crosses at 50 ms, the wall reaches it
+        // at 150 ms.
+        let mut tips = [[Point { x: 0.0, y: 500.0 }; TRAP_CHORDS + 1]; 3];
+        tips[1] = std::array::from_fn(|j| Point {
+            x: 40.953125 + 180.9375 * 0.05 * j as f64,
+            y: 0.0,
+        });
+        let escapes = Escapes { tips, ..escapes };
+        let (from, to) = (
+            Point {
+                x: 50.0,
+                y: -65.625,
+            },
+            Point { x: 50.0, y: 65.625 },
+        );
+        assert_eq!(escapes.blocked_with_wall(from, to, 14.5, 0.3), 0.0);
+    }
+
+    #[test]
+    fn escape_branches_meet_the_rim_at_first_contact() {
+        let arena = Arena {
+            center: Point::default(),
+            radius: 1000.0,
+        };
+        let (speed, turn) = (base_speed(2), turn_rate(2));
+        let branches = |head: Point, heading: f64| {
+            [-std::f64::consts::PI, 0.0, std::f64::consts::PI].map(|delta| {
+                branch_hits_rim(&arena, 2, 0.05, |t| {
+                    (
+                        turn_then_straight(head, heading, delta, speed, turn, t),
+                        heading + delta.signum() * delta.abs().min(turn * t),
+                    )
+                })
+            })
+        };
+        // Review round 7: every branch dies at 84-98 ms (`boundary::constrain`
+        // at 7 ms steps), between the old 0.2 s samples.
+        assert_eq!(branches(Point { x: 970.0, y: 0.0 }, 0.1), [true; 3]);
+        // A tangent slides and turning inward escapes; turning outward while
+        // sliding dies.
+        let tangent = branches(Point { x: 990.0, y: 0.0 }, std::f64::consts::FRAC_PI_2);
+        assert_eq!(tangent, [true, false, false]);
     }
 
     #[test]
