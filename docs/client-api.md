@@ -161,8 +161,9 @@ selects header-free framing, including bundled packets. Body contraction outside
 See the [configuration reference](configuration.md) for all world, simulation,
 latency and network fields, their defaults and limits.
 
-Defaults: one snake, six 7 ms ticks per decision/broadcast, 136×136 minimap every
-2.5 seconds, leaderboard on entry/every 3 seconds and zero added delay.
+Defaults: one snake, six 7 ms ticks per decision, gameplay emission every tick
+with [per-family release rules](server-rules.md#packet-timing), 136×136 minimap
+every 2.5 seconds, leaderboard on entry/every 3 seconds and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.
 
 Latency settings include `roundTripSeconds`, `roundTripWeights`, `roundTripSpread`,

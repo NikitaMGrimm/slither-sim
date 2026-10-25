@@ -7,6 +7,9 @@
 - Offline transport parity measurements and official-reference gates, with a
   localhost-only host/capture/compare command for recording transport baselines.
 
+- Host `botThreads` (default 2) runs background clients separately from physics
+  and sockets; the checkout's `host_load` example measures load, deferred ticks
+  and watcher excess delay. See [hosting](docs/raw-server.md#embedding-and-load-checks).
 - Advisory PR performance comparisons publish up to three covered progress
   updates and a terminal report, retain verified original-preview results after
   merge, and consolidate evidence on the rolling release PR. A pre-budgeted v2
@@ -40,12 +43,19 @@
   `slither-sim-json-v3`, and `pit` deaths only occur with the new opt-in `pit`.
 - `Config::warnings`, `SimulationConfig::warnings` and `HostConfig::warnings`
   describe valid but unmeasured settings, starting with a `dt` outside the
-  measured 6.94–7.07 ms loop and long broadcast intervals. `serve` reset replies
+  measured 6.94–7.07 ms loop and ticks that outrun the incremental body-update
+  window (`dt × 437.5 ≥ 126`). `serve` reset replies
   carry them as `warnings`, the CLI prints them to stderr, and Python's
   `Session.reset` issues each as a `UserWarning`.
 
 ### Breaking
 
+- `SimulationConfig.broadcastTicks` is removed; JSON configs containing it are
+  rejected as unknown fields. Remove it to use per-tick gameplay emission.
+- `Host::poll()` is removed. `Host::bind(config)?.start()?` returns a
+  `RunningHost` with address/load counters, `wait()` and `stop()`; dropping it
+  stops its threads. `Host::run()` starts and waits. Hosts now use separate
+  simulation, socket and background bot threads.
 - The unreleased C ABI `slither-sim-abi-v2` (`SLITHER_ABI_VERSION` 2) also gains
   `snake_kill_score` after `snake_kills` in `slither_frame`, and
   `SLITHER_DEATH_PIT` is a new `death_reason` code. Rebuild callers against the
@@ -58,7 +68,7 @@
   agents for simulated clients and the host (now 65,535, which the protocol-19
   `u16` snake IDs, rank and population fields count), `serve`'s 128 agents,
   1,024 worlds and 1,000 decision ticks (now `u32` frame bounds and memory),
-  1,000 decision and broadcast ticks, the latency model's 2 s, 10 s and 1/s
+  1,000 decision ticks, the latency model's 2 s, 10 s and 1/s
   ceilings and Pareto-shape interval, the 2 s cap on measured processing time
   and the network backend's interval caps. `info` reports the new `serve`
   maxima.
@@ -112,6 +122,14 @@
   `observe-clustered`). The synthetic `observe-wide` (sparse food) and
   `observe-strip` (narrow food) fixtures are about 2.5–4% slower. See the
   [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md).
+
+### Changed
+
+- Gameplay updates are emitted every physics tick (default 7 ms). Motion and
+  standalone mass use shared per-snake six-/15-tick gates, anchors are prompt,
+  ambient food joins shared 504 ms maintenance, and prey corrections share one
+  clock per prey across viewers. These are partial models with retained
+  counterexamples; see [packet timing](docs/server-rules.md#packet-timing).
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 

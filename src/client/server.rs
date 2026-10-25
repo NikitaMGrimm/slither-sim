@@ -9,7 +9,9 @@
 //! their own slots: they decode frames, decide, ping and model processing time
 //! off the simulation thread, and reach the world only through timestamped
 //! commands. Running 480 seekers on the host thread delayed remote frames by up
-//! to ~20 ms depending on tick phase (jitter study, 2026-10-25).
+//! to ~20 ms depending on tick phase ([jitter study], 2026-10-25).
+//!
+//! [jitter study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-tail-jitter/REPORT.md
 //!
 //! Sockets stay nonblocking: interrupted HTTP upgrades, partial WebSocket
 //! messages and unflushed output stay inside their tungstenite state, so a slow

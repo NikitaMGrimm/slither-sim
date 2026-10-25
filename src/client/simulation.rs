@@ -52,14 +52,16 @@ const RECORD_OVERHEAD: usize = 32;
 /// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
 /// snake in full.
 const FRESH_ANCHORS: usize = 4;
-/// Release rules from the official scheduler study (2026-10-25; 1.93 million
-/// retained frames, `research/2026-10-25-scheduler/`): body anchors leave in
-/// the tick that makes them. A snake's motion (heading, wanted heading,
+/// Release rules from the [scheduler study] (2026-10-25; 1.93 million
+/// retained frames): body anchors leave in the tick that makes them.
+/// A snake's motion (heading, wanted heading,
 /// speed) is reported when it changed, at most every six ~7 ms ticks: busy
 /// gaps sit near 42 ms, a straight snake stays silent for seconds and one
 /// snake's reports share a phase across recipients. Changed mass follows its
 /// own ~105 ms opportunity. The exact comparators and rearm rules are not
 /// identified; these minimum gaps are inferences.
+///
+/// [scheduler study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md
 const MOTION_REPORT_TICKS: u64 = 6;
 const FAM_REPORT_TICKS: u64 = 15;
 /// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
@@ -2185,8 +2187,9 @@ fn full(
 
 /// Incremental body, mass and motion reports for a known snake. Body changes
 /// go out in the tick that makes them; motion and standalone mass wait for the
-/// snake's shared opportunities in `reports`. Official frames put a snake's
-/// mass and tail reports before its motion, and motion before its anchors.
+/// snake's shared opportunities in `reports`. We adopt the common observed
+/// order: tail/standalone mass, motion, then anchors. The scheduler study above
+/// retains 27 reverse mass/motion pairs; this is not a universal official sort.
 #[allow(clippy::too_many_arguments)]
 fn changes(
     packets: &mut Vec<Vec<u8>>,

@@ -208,9 +208,11 @@ may reconnect dead background slots in `next_frame` mode.
 
 The explicit workload overrides are radius 6,000, 12,000 food placement attempts,
 eight prey, vision 3,000, eight agents, zero added link/processing delays, wire
-recording and a 136-square minimap. Broadcast/decision, minimap and leaderboard
-cadences are six ticks, 2.5 seconds and three seconds. Other defaults remain
-unchanged. Normal spawn bodies are used; available anchor counts are reported.
+recording and a 136-square minimap. Decisions use six ticks; gameplay updates
+are emitted every tick with [per-family release rules](server-rules.md#packet-timing).
+Minimap and leaderboard intervals are 2.5 seconds and three seconds. Other
+defaults remain unchanged. Normal spawn bodies are used; available anchor counts
+are reported.
 These are local engineering fixtures, not official-server presets.
 
 ```sh

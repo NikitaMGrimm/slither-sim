@@ -1,0 +1,142 @@
+[
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\fidelity-motion-clock-20260927\\bot0.jsonl.gz",
+    "relative": "headless\\fidelity-motion-clock-20260927\\bot0.jsonl.gz",
+    "sha256": "a9b2477cb29c4534d973818df32730227e183817fb2fe6c32f616482a90d4698",
+    "connection": 1,
+    "server_ms": [
+      4000,
+      11000
+    ],
+    "receipt_ms": [
+      4073.722,
+      11061.522
+    ],
+    "jsonl_lines": [
+      527,
+      1475
+    ],
+    "exercise": "motion silence, changing reports, anchors and prey 16407",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  },
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\anchor-encoder-holdout-20260928\\bot0.jsonl.gz",
+    "relative": "headless\\anchor-encoder-holdout-20260928\\bot0.jsonl.gz",
+    "sha256": "07998f1c967fde0e6c78f88399b89d2ab27b33516c83051db0ac9ff659e6d7be",
+    "connection": 1,
+    "server_ms": [
+      25200,
+      26300
+    ],
+    "receipt_ms": [
+      26157.975,
+      27257.432
+    ],
+    "jsonl_lines": [
+      3691,
+      3874
+    ],
+    "exercise": "minimap work followed by 3ms frame and 31ms same-snake motion gap",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  },
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\death-cell-prospective-20260928\\bot0.jsonl.gz",
+    "relative": "headless\\death-cell-prospective-20260928\\bot0.jsonl.gz",
+    "sha256": "6a8d3ab71ea6fd2372bc3ea29ca6986ac339c4b16aec4d90bf29bddf18826a56",
+    "connection": 1,
+    "server_ms": [
+      5000,
+      20000
+    ],
+    "receipt_ms": [
+      5078.633,
+      20065.298
+    ],
+    "jsonl_lines": [
+      390,
+      1646
+    ],
+    "exercise": "paired global food/map/leaderboard phases; compare bot1 connection 1",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  },
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\paired-prey-overlap-20260927\\bot0.jsonl.gz",
+    "relative": "headless\\paired-prey-overlap-20260927\\bot0.jsonl.gz",
+    "sha256": "42aaaeef3208973f63ee96ab10363f90693694c1500bd56725618ea3c7b09401",
+    "connection": 1,
+    "server_ms": [
+      56973,
+      60667
+    ],
+    "receipt_ms": [
+      57081.021,
+      60750.271
+    ],
+    "jsonl_lines": [
+      8812,
+      9356
+    ],
+    "exercise": "maximum retained prey correction gap, prey 41377",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  },
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\anchor-encoder-holdout-20260928\\bot0.jsonl.gz",
+    "relative": "headless\\anchor-encoder-holdout-20260928\\bot0.jsonl.gz",
+    "sha256": "07998f1c967fde0e6c78f88399b89d2ab27b33516c83051db0ac9ff659e6d7be",
+    "connection": 1,
+    "server_ms": [
+      5080,
+      6295
+    ],
+    "receipt_ms": [
+      6036.195,
+      7250.294
+    ],
+    "jsonl_lines": [
+      706,
+      873
+    ],
+    "exercise": "short prey correction/flight transition, prey 35806",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  },
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\anchor-encoder-holdout-20260928\\bot0.jsonl.gz",
+    "relative": "headless\\anchor-encoder-holdout-20260928\\bot0.jsonl.gz",
+    "sha256": "07998f1c967fde0e6c78f88399b89d2ab27b33516c83051db0ac9ff659e6d7be",
+    "connection": 1,
+    "server_ms": [
+      5295,
+      6795
+    ],
+    "receipt_ms": [
+      6259.337,
+      7747.687
+    ],
+    "jsonl_lines": [
+      737,
+      938
+    ],
+    "exercise": "death removal, food dump and packet order",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  },
+  {
+    "file": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\recordings\\headless\\fidelity-motion-clock-20260927\\bot0.jsonl.gz",
+    "relative": "headless\\fidelity-motion-clock-20260927\\bot0.jsonl.gz",
+    "sha256": "a9b2477cb29c4534d973818df32730227e183817fb2fe6c32f616482a90d4698",
+    "connection": 1,
+    "server_ms": [
+      0,
+      514
+    ],
+    "receipt_ms": [
+      65.718,
+      575.389
+    ],
+    "jsonl_lines": [
+      7,
+      68
+    ],
+    "exercise": "isolated steering reflection with causal ping clock bounds",
+    "initialization": "Replay this connection from its setup frame or retain a causal decoded prefix; do not initialize from future state."
+  }
+]
