@@ -1,6 +1,6 @@
 # Official protocol-19 packet scheduler: retained-capture study
 
-2026-10-25. Exploratory, offline research, adapted from the local study identified below. The analysis used read-only repositories and contacted no server. This record adds adoption notes for simulator commit `20dd5a4`; it does not rerun the study. Full derived files remain local-only. The observations below constrain a scheduler, but **do not identify a complete exact official implementation**. In particular, there is no official physics-tick number, inbound server timestamp, or hidden world-event timestamp in these recordings.
+2026-10-25. Exploratory, offline research, adapted from the local study identified below. The analysis used read-only repositories and contacted no server. This record adds adoption notes for simulator commit `ccc4e65` (local `20dd5a4`) and later commits of [#85](https://github.com/NikitaMGrimm/slither-sim/pull/85); it does not rerun the study. Full derived files remain local-only. The observations below constrain a scheduler, but **do not identify a complete exact official implementation**. In particular, there is no official physics-tick number, inbound server timestamp, or hidden world-event timestamp in these recordings.
 
 The most consequential findings are independent release paths for anchors, changed motion, mass, food/sector maintenance, prey and HUD; shared server-wide food/HUD phases; and prompt anchor delivery. A six-tick batch of all gameplay packets is inconsistent with the traffic. A fixed per-snake six-tick heartbeat is also inconsistent with the silence and variable report intervals.
 
@@ -163,7 +163,8 @@ An implementation can already remove blanket 42-ms batching, keep independent fa
 
 ## Adoption
 
-Implemented by `9e4b630`, `c97b89e` and `20dd5a4` (relative to `964d28c`):
+Implemented by `4683aed`, `50e7edd` and `ccc4e65` (local `9e4b630`, `c97b89e` and
+`20dd5a4`; base `964d28c`):
 
 - Encode gameplay updates every physics tick (default 7 ms), omitting empty
   emissions. `SimulationConfig.broadcastTicks` is removed and rejected in JSON.
@@ -184,6 +185,14 @@ Implemented by `9e4b630`, `c97b89e` and `20dd5a4` (relative to `964d28c`):
   model processing, ping and rejoin through their own client slots. This is a
   local execution design, not evidence of official threading. `RunningHost`
   replaces manual polling; host `botThreads` defaults to 2.
+- Later (`8526588`): run minimap and leaderboard clocks server-wide, with
+  absolute periods `floor(t / interval)` at the observed mean periods
+  2.504/3.008 s; joining connections meet the running phase, and the map
+  precedes gameplay in its frame.
+- Later (`16aa243`): input and pings arriving during a tick take effect in that
+  tick's frame, and pongs lead it, as the section 10 reflection and pong-order
+  measurements suggest. This is a chosen model, not an identified official
+  input-application tick.
 
 The incremental food index and snake coverage grid are performance mechanisms
 intended to preserve wire output under these release rules; they are not inferred
@@ -197,10 +206,9 @@ relationships, visibility geometry and triggers, input-application tick,
 event-to-send deadlines, mass exceptions, long prey omissions, kill/credit
 timing and whether ambient creation itself waits for maintenance. The strict
 six-/15-tick gates and regular prey corrections are model choices with the
-counterexamples retained above. Shared official HUD phases and observed
-2504/3008 ms drift have **not** been adopted: the simulator keeps its existing
-connection-relative nominal 2.5/3-second schedules. The study is not an exact
-official scheduler specification.
+counterexamples retained above. The HUD clocks adopt the observed mean periods;
+why official periods exceed 2.5/3 s, and their rearm rule, remain unknown. The
+study is not an exact official scheduler specification.
 
 ## Candidate regression windows
 

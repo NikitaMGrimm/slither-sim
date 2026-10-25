@@ -93,8 +93,8 @@ cargo run --release --locked --features networking --example host_load -- --bots
 
 | Stage | Simulation-thread load | Deferred ticks in 60 s | Other reported result |
 | --- | ---: | ---: | --- |
-| Threading only (`c97b89e`) | ≈100% | 2,518 | ≈100 ticks/s instead of ≈143 |
-| Family cadences + food index/coverage grid (`20dd5a4`) | 43% | 0 | Watcher 69 frames/s |
+| Threading only (`50e7edd`, local `c97b89e`) | ≈100% | 2,518 | ≈100 ticks/s instead of ≈143 |
+| Family cadences + food index/coverage grid (`ccc4e65`, local `20dd5a4`) | 43% | 0 | Watcher 69 frames/s |
 
 After watcher excess delay: **p50 0.32 ms, p90 0.52 ms, p99 0.73 ms,
 maximum 21.59 ms**. This measures receipt-minus-server-time spread above each
