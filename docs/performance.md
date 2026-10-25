@@ -8,6 +8,9 @@ Automatic PR comparisons use a separate [covered sequential protocol](https://gi
 with early resolution, a finite 30-minute job cap and at most three interim
 comment updates. The commands below remain fixed-repeat descriptive comparisons.
 
+The separate [on-demand release comparison](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/release-performance.md)
+measures a pinned published release against an explicit candidate commit.
+
 ## Compare a change
 
 ```sh
