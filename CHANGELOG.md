@@ -134,6 +134,8 @@
   periods, now the defaults: `minimapIntervalSeconds` 2.504 and
   `leaderboardIntervalSeconds` 3.008. A joining connection meets the running
   phase, so its first board no longer arrives on entry; the map leads its frame.
+- Input and pings arriving during a tick take effect in that tick's frame, and
+  pongs lead it, removing a tick from input reflection and measured ping.
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 

@@ -38,7 +38,9 @@ Ping is a measured round trip, not a target the server needs you to set. Native
 clients send game pings automatically after setup, with at most one outstanding.
 For a real host, leave artificial latency at zero: sockets and server processing
 already take time. The [server example](raw-server.md#configuration) adds none.
-Zero added delay does not imply a measured ping of zero.
+Zero added delay does not imply a measured ping of zero: input and pings that
+arrive during a tick are answered in that tick's frame, pongs first, so the
+host adds 0–7 ms before the reply.
 
 For virtual-time training, `latency.roundTripSeconds: [0.06]` models a 60 ms base
 round trip; it is split evenly unless `uplinkShare` changes. Tick scheduling,

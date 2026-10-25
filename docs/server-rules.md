@@ -107,6 +107,12 @@ rules, event-to-send deadlines and visibility triggers remain unknown.
 An incremental food index and snake coverage grid reduce work while preserving
 wire selection and ordering; they are performance mechanisms, not official rules.
 
+Each tick reads every input and ping that arrived during it, and the frame it
+sends leads with any pongs. Officially, input reflection takes about one ping
+round trip (median 13.2 vs 13.4 ms on one route) and pings return in as little
+as 4.9 ms, so neither waits an extra tick; the exact receive-to-send deadline
+is unknown. Pongs lead 81,830 of 81,843 official pong frames.
+
 Minimaps and leaderboards follow two independent server-wide clocks. Officially
 both are shared by all recipients, reconnects join the running phase, and mean
 periods are 2503.994/3008.062 ms rather than 2500/3000. The simulator services

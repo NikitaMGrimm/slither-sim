@@ -501,8 +501,9 @@ impl Simulation {
             }
             let started = Instant::now();
             for _ in 0..due {
-                // Commands take effect at the first tick after they arrive;
-                // their send times, not this loop, set when that is.
+                // Commands shape the tick during which they arrive, so a
+                // frame reflects input that reached it by its due time; their
+                // send times, not this loop, set which tick that is.
                 self.apply_commands()?;
                 self.world.advance_ticks(1)?;
                 self.ticks += 1;

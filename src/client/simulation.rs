@@ -358,6 +358,8 @@ struct Connection {
     minimap_sent: Option<Minimap>,
     /// The connection's own snake has appeared; HUD packets wait for it.
     appeared: bool,
+    /// Pongs owed after setup; they lead the next broadcast.
+    pongs: usize,
     /// Rank frozen when the connection's snake died.
     final_rank: Option<usize>,
     /// Version of the session record last sent; zero before any.
@@ -989,7 +991,12 @@ impl SimulatorBackend {
                 // victory entry. Missing pongs trips its lag detector and slows
                 // the animation to one fifth speed, delaying Play Again.
                 Uplink::Message(ref bytes) if bytes == &[251] => {
-                    self.emit(slot, now, &[encode::pong()])?;
+                    let connection = &mut self.slots[slot].connection;
+                    if connection.setup {
+                        connection.pongs += 1;
+                    } else {
+                        self.emit(slot, now, &[encode::pong()])?;
+                    }
                 }
                 _ if over => {}
                 Uplink::Connect => {
@@ -1097,9 +1104,15 @@ impl SimulatorBackend {
     /// One server tick. Client sides are then brought up to the new time, so
     /// frames polled between ticks are already complete.
     fn advance(&mut self) -> Result<(), String> {
-        let now = self.time();
+        // A server loop pass reads what arrived by the time it sends: input
+        // arriving during this tick shapes this tick's frame. Official input
+        // reflection takes about one ping round trip (13.2 vs 13.4 ms median)
+        // and pings return in as little as 4.9 ms; ingesting only arrivals
+        // before the tick began added a full tick to both. See section 10 of
+        // the scheduler study linked from `MOTION_REPORT_TICKS`.
+        let end = (self.tick + 1) as f64 * self.world.config.dt;
         for slot in 0..self.slots.len() {
-            self.ingest(slot, now)?;
+            self.ingest(slot, end)?;
         }
         let actions: Vec<_> = self
             .world
@@ -1244,13 +1257,17 @@ impl SimulatorBackend {
                 let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
-            let mut packets = self.updates(slot, &eaten, &bounds, &grid)?;
-            // Official mixed frames put the map before gameplay updates.
+            // Official frames lead with pongs (81,830 of 81,843 pong frames),
+            // and put the map before gameplay updates.
+            let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
+            let mut packets = vec![encode::pong(); pongs];
+            let updates = self.updates(slot, &eaten, &bounds, &grid)?;
             if minimap_due {
                 if let Some(packet) = self.minimap(slot, &mut map)? {
-                    packets.insert(0, packet);
+                    packets.push(packet);
                 }
             }
+            packets.extend(updates);
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
             let live_board = board
@@ -3573,6 +3590,21 @@ mod tests {
     }
 
     #[test]
+    fn input_arriving_during_a_tick_shapes_that_ticks_frame() {
+        let mut sim = RawSimulator::new(2, raw_config(1), 1).unwrap();
+        let mut remote = Remote::connect(&mut sim, 0, "");
+        run(&mut sim, &mut [(0, &mut remote)], 12);
+        let sent = sim.time() + sim.dt() / 2.;
+        sim.receive_at(0, &[251], sent).unwrap();
+        sim.receive_at(0, &[253], sent).unwrap();
+        sim.advance_ticks(1).unwrap();
+        assert!(sim.backend.slots[0].control.boost);
+        let packets = remote.pump(&mut sim, 0);
+        assert_eq!(packets[0], encode::pong());
+        assert_eq!(packets.iter().filter(|p| **p == encode::pong()).count(), 1);
+    }
+
+    #[test]
     fn raw_queues_are_bounded_and_rejections_are_atomic() {
         let mut sim = RawSimulator::new(2, raw_config(1), 1).unwrap();
         let mut remote = Remote::connect(&mut sim, 0, "");
@@ -3585,12 +3617,14 @@ mod tests {
         let uplink = sim.backend.slots[0].connection.uplink.len();
         assert!(sim.receive(0, &[3]).is_err());
         assert_eq!(sim.backend.slots[0].connection.uplink.len(), uplink);
-        // Pongs fill the downlink until drained; undrained frames still count.
+        // Pongs lead the tick's frame after setup rather than taking one
+        // frame each.
         sim.advance_ticks(1).unwrap();
-        assert!(sim.receive(0, &[251]).is_err());
+        assert!(sim.backend.slots[0].connection.downlink.len() < 4);
         let packets = remote.pump(&mut sim, 0);
-        let pongs = packets.iter().filter(|p| **p == encode::pong()).count();
-        assert_eq!(pongs, accepted);
+        assert_eq!(packets[0][0], b'a');
+        assert!(packets[1..=accepted].iter().all(|p| *p == encode::pong()));
+        assert!(packets[accepted + 1..].iter().all(|p| *p != encode::pong()));
         sim.receive(0, &[251]).unwrap();
     }
 
@@ -4442,8 +4476,13 @@ mod tests {
             .map(|r| u16::from_be_bytes([r.bytes[0], r.bytes[1]]))
             .collect();
         assert_eq!(headers[1..], [0, 0]);
+        let last = records
+            .iter()
+            .filter(|r| r.event == WireEvent::Receive)
+            .map(|r| r.time)
+            .fold(now, f64::max);
         let connection = &backend.slots[0].connection;
-        let since_setup = (now - connection.setup_at.unwrap()) * 1000.;
+        let since_setup = (last - connection.setup_at.unwrap()) * 1000.;
         assert!((connection.header_ms as f64 - since_setup).abs() <= 1.);
     }
 
