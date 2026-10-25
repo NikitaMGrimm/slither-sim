@@ -65,7 +65,10 @@ valid but unmeasured settings to stderr; see [limits](configuration.md#limits). 
 
 `--bind IP:PORT` overrides the file. Real sockets already include network and
 compute delay; configured latency adds another ordered link. Keep added latency
-at zero for normal remote use. Client processing delay is not simulated twice.
+at zero for normal remote use; on loopback, the
+[measured route](configuration.md#variation-and-pauses) gives every connection,
+bots included, an official-like path. Client processing delay is not simulated
+twice.
 
 ### Presets
 

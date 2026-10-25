@@ -4,7 +4,9 @@ use slither_sim::{
     Action,
     client::{
         Backend, ClientFrame, ClientState, ClientStatus, HostConfig, SimulationConfig,
-        SimulatorBackend, WireEvent, WireRecord, latency::LatencyConfig, protocol::split_frame,
+        SimulatorBackend, WireEvent, WireRecord,
+        latency::{LatencyConfig, Pauses, Variation},
+        protocol::split_frame,
         replay_record,
     },
     physics,
@@ -132,12 +134,18 @@ fn commands_wait_for_the_uplink_and_frames_for_the_downlink() {
 }
 
 #[test]
-fn jitter_and_congestion_never_reorder_either_stream() {
+fn variation_and_pauses_never_reorder_either_stream() {
     let mut latency = LatencyConfig::fixed(0.12);
-    latency.jitter_seconds = 0.05;
-    latency.congestion.rate_per_second = 1.;
-    latency.congestion.duration_seconds = 0.5;
-    latency.congestion.extra_seconds = [0.05, 0.3];
+    latency.variation = Variation {
+        median_seconds: 0.02,
+        log_sigma: 0.8,
+        correlated_share: 0.3,
+        correlation_seconds: 1.,
+    };
+    latency.pauses = Pauses {
+        rate_per_second: 1.,
+        mean_seconds: 0.3,
+    };
     let mut backend = SimulatorBackend::new(9, config(2, latency)).unwrap();
     playing(&mut backend, 0);
     let mut last = 0;
@@ -223,14 +231,18 @@ fn ping_is_measured_from_delivered_pongs_not_configured() {
             .all(|r| r.bytes == [251])
     );
 
-    latency.jitter_seconds = 0.03;
+    latency.variation = Variation {
+        median_seconds: 0.005,
+        log_sigma: 0.3,
+        ..Variation::default()
+    };
     let mut backend = SimulatorBackend::new(2, config(1, latency)).unwrap();
     backend.advance_ticks(1000).unwrap();
     let frame = backend.frame().unwrap();
     let [low, high] = frame.timing.ping_range_seconds.unwrap();
     assert!(low < high && low >= 0.04 && high <= 0.16 + DT);
     let json = serde_json::to_string(&frame).unwrap();
-    for hidden in ["roundTrip", "jitter", "uplink", "downlink", "congestion"] {
+    for hidden in ["roundTrip", "variation", "uplink", "downlink", "pauses"] {
         assert!(!json.contains(hidden));
     }
 }
@@ -307,7 +319,11 @@ fn next_frame_waits_for_virtual_processing_longer_than_a_decision() {
 #[test]
 fn wire_records_replay_to_identical_frames() {
     let mut latency = LatencyConfig::fixed(0.08);
-    latency.jitter_seconds = 0.02;
+    latency.variation = Variation {
+        median_seconds: 0.01,
+        log_sigma: 0.5,
+        ..Variation::default()
+    };
     let mut config = config(3, latency);
     config.world.prey.count = 4;
     let mut backend = SimulatorBackend::new(11, config).unwrap();
@@ -503,14 +519,18 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
     accept(|c| {
         c.latency.round_trip_seconds = vec![30.];
         c.latency.round_trip_spread = 3.;
-        c.latency.jitter_seconds = 5.;
+        c.latency.variation = Variation {
+            median_seconds: 5.,
+            log_sigma: 3.,
+            correlated_share: 0.5,
+            correlation_seconds: 60.,
+        };
+        c.latency.pauses = Pauses {
+            rate_per_second: 20.,
+            mean_seconds: 0.05,
+        };
         c.latency.processing_seconds = [3., 4.];
         c.latency.processing_jitter_seconds = 3.;
-        c.latency.congestion.rate_per_second = 20.;
-        c.latency.congestion.duration_seconds = 60.;
-        c.latency.congestion.follow_seconds = 60.;
-        c.latency.congestion.extra_seconds = [0., 30.];
-        c.latency.congestion.shape = 0.01;
     });
     reject(
         |c| {
@@ -519,19 +539,26 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
         },
         "Largest delay",
     );
-    reject(|c| c.latency.congestion.duration_seconds = 1e308, "36.7");
-    reject(|c| c.latency.congestion.shape = 0., "positive shape");
+    reject(|c| c.latency.pauses.mean_seconds = 1e308, "36.7");
+    reject(
+        |c| {
+            c.latency.pauses.rate_per_second = 30.;
+            c.latency.pauses.mean_seconds = 0.05;
+        },
+        "≤ 1",
+    );
+    reject(
+        |c| c.latency.variation.correlated_share = 0.5,
+        "positive correlation time",
+    );
     reject(|c| c.latency.round_trip_seconds = vec![-1.], "nonnegative");
 
     let mut slow = config(2, LatencyConfig::fixed(3.));
-    slow.latency.congestion.rate_per_second = 50.;
-    slow.latency.congestion.duration_seconds = 1.;
-    slow.latency.congestion.extra_seconds = [0., 1.];
-    slow.latency.congestion.shape = 0.001;
+    slow.latency.variation.log_sigma = 1e300;
     let mut backend = SimulatorBackend::new(4, slow).unwrap();
     backend.set_slot_processing_seconds(0, 3.).unwrap();
     backend.advance_ticks((12. / DT) as usize).unwrap();
-    // A zero lower bound with a tiny shape is the zero distribution, not NaN.
+    // A zero median with a huge log sigma adds nothing, not NaN.
     let ping = backend.frame().unwrap().timing.ping_seconds.unwrap();
     assert!((3. ..=3. + DT + 1e-9).contains(&ping), "{ping}");
 }

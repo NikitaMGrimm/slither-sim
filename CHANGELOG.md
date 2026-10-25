@@ -136,6 +136,11 @@
   phase, so its first board no longer arrives on entry; the map leads its frame.
 - Input and pings arriving during a tick take effect in that tick's frame, and
   pongs lead it, removing a tick from input reflection and measured ping.
+- `LatencyConfig` replaces uniform `jitterSeconds` and `congestion` episodes with
+  `variation` (lognormal per-message delay with a slow correlated part) and
+  `pauses` (short per-direction delivery holds), fitted to retained official
+  captures; `LatencyConfig::measured_route()` is that route. Configs with the old
+  fields are rejected. See [variation and pauses](docs/configuration.md#variation-and-pauses).
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 

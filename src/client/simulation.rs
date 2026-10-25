@@ -2,9 +2,9 @@
 //! and every slot is a client fed only by the bytes delivered to it.
 //!
 //! Each slot owns one connection. Commands and pings travel its uplink and are
-//! applied at the next server tick after arrival; frames emitted at a tick travel
-//! its downlink. Both directions keep their order like one TCP stream, so jitter
-//! and congestion delay messages but never reorder them. Configured delays stay
+//! applied in the server tick during which they arrive; frames emitted at a tick
+//! travel its downlink. Both directions keep their order like one TCP stream, so
+//! variation and pauses delay messages but never reorder them. Configured delays stay
 //! private: a client only measures its pings and knows its own reply time.
 //!
 //! Snake/prey visibility uses approximate circular coverage: a
@@ -841,7 +841,6 @@ impl SimulatorBackend {
             link: Link::connect(latency, &mut self.random),
             ..Default::default()
         };
-        connection.link.update(latency, &mut self.random, now);
         let arrival = connection.link.uplink(latency, &mut self.random, now);
         connection.uplink.push_back((arrival, Uplink::Connect));
         let s = &mut self.slots[slot];
@@ -1179,10 +1178,6 @@ impl SimulatorBackend {
 
     fn broadcast(&mut self) -> Result<(), String> {
         let now = self.time();
-        let latency = self.config.latency.clone();
-        for slot in &mut self.slots {
-            slot.connection.link.update(&latency, &mut self.random, now);
-        }
         // Ambient births reach the wire at the shared food maintenance, with
         // sector cleanup; see `FoodIndex`.
         let epoch = (now / super::visibility::CLEANUP_SECONDS).floor() as u64;

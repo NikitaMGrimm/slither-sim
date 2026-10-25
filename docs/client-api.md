@@ -167,11 +167,11 @@ and leaderboard on server-wide 2.504/3.008-second clocks and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.
 
 Latency settings include `roundTripSeconds`, `roundTripWeights`, `roundTripSpread`,
-`uplinkShare`, `jitterSeconds`, `congestion`, `processingSeconds` and
+`uplinkShare`, `variation`, `pauses`, `processingSeconds` and
 `processingJitterSeconds`:
 
 ```json
-{"op":"simulation","seed":7,"config":{"agents":4,"latency":{"roundTripSeconds":[0.04,0.12],"roundTripWeights":[3,1],"jitterSeconds":0.003,"processingSeconds":[0.005,0.02]}}}
+{"op":"simulation","seed":7,"config":{"agents":4,"latency":{"roundTripSeconds":[0.04,0.12],"roundTripWeights":[3,1],"variation":{"medianSeconds":0.002,"logSigma":0.5},"processingSeconds":[0.005,0.02]}}}
 ```
 
 The same build, seed, config, actions and processing durations reproduce virtual

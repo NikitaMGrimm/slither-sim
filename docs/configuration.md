@@ -44,7 +44,7 @@ host adds 0–7 ms before the reply.
 
 For virtual-time training, `latency.roundTripSeconds: [0.06]` models a 60 ms base
 round trip; it is split evenly unless `uplinkShare` changes. Tick scheduling,
-jitter and congestion can affect the measured result. Do not add the same delay
+variation and pauses can affect the measured result. Do not add the same delay
 at both ends of a real connection unless that extra delay is intentional.
 
 ## HostConfig
@@ -274,31 +274,52 @@ apply to in-process bots, not remote clients.
 | `roundTripWeights` | `[]` | Empty means equal weights; otherwise one finite nonnegative weight per candidate, with a positive finite sum. |
 | `roundTripSpread` | `0` | Log-normal spread around the selected RTT; finite and nonnegative. |
 | `uplinkShare` | `0.5` | Fraction of RTT assigned to client-to-server travel, 0–1. |
-| `jitterSeconds` | `0` | Uniform ± spread per one-way message, finite and nonnegative; delays cannot be negative. |
-| `congestion` | Disabled | Episode settings below. |
+| `variation` | Disabled | Per-message extra delay; see below. |
+| `pauses` | Disabled | Per-direction delivery pauses; see below. |
 | `processingSeconds` | `[0, 0]` | Ordered finite nonnegative range; connection draws a base bot processing time. |
 | `processingJitterSeconds` | `0` | Uniform ± spread per decision, finite and nonnegative. |
 
 The largest possible delay must be finite. The generator's normal draw is at
 most about 8.57 and its exponential draws at most about 36.7 times their mean,
-so `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + extraSeconds[1] +
-jitterSeconds` and `processingSeconds[1] + processingJitterSeconds` must be
-finite. Measured `processingSeconds` supplied with a bot decision replaces its
-modeled duration. Rust also provides `LatencyConfig::fixed(rtt)` and
-`LatencyConfig::one_way(uplink, downlink)`.
+so `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + medianSeconds ×
+exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` must
+be finite. Measured `processingSeconds` supplied with a bot decision replaces its
+modeled duration. Rust also provides `LatencyConfig::fixed(rtt)`,
+`LatencyConfig::one_way(uplink, downlink)` and `LatencyConfig::measured_route()`.
 
-### Congestion
+### Variation and pauses
 
-All values must be finite. Means must also stay finite at 36.7 times their value.
+Each direction is one ordered stream. A message's delay is its base share plus
+`medianSeconds × exp(logSigma × (√c·X + √(1−c)·Z))`, with `c` the
+`correlatedShare`, `Z` a fresh normal draw and `X` a slow unit-variance
+Ornstein–Uhlenbeck state per direction. Delivery pauses then hold every message
+due inside them until they end, so held frames arrive together.
 
-| Field under `congestion` | Default | Meaning / limits |
+| Field | Default | Meaning / limits |
 | --- | --- | --- |
-| `ratePerSecond` | `0` | Mean episode starts/connection-second, nonnegative; zero disables episodes. |
-| `durationSeconds` | `0` | Mean exponentially drawn episode duration, nonnegative. |
-| `followProbability` | `0` | Chance of a follow-up episode, 0–1. |
-| `followSeconds` | `0` | Mean exponentially drawn wait for a follow-up, nonnegative. |
-| `extraSeconds` | `[0, 0]` | Ordered nonnegative extra RTT bounds; Pareto draw from the lower bound, capped at the upper. A zero lower bound adds nothing. |
-| `shape` | `1` | Pareto shape, positive. |
+| `variation.medianSeconds` | `0` | Median extra delay, finite and nonnegative; zero disables variation. |
+| `variation.logSigma` | `0` | Log standard deviation, finite and nonnegative. |
+| `variation.correlatedShare` | `0` | Share of log variance from the slow state, 0–1. |
+| `variation.correlationSeconds` | `0` | Decorrelation time of the slow state; positive when the share is. |
+| `pauses.ratePerSecond` | `0` | Poisson pause starts per second and direction; zero disables pauses. |
+| `pauses.meanSeconds` | `0` | Mean exponential pause length. `ratePerSecond × meanSeconds` must be at most 1: merged pauses last `(e^(rate × mean) − 1) / rate` on average, so more covers nearly all time. |
+
+`LatencyConfig::measured_route()` is the retained low-RTT official route fitted
+on training sessions and checked on held-out ones by the
+[network path study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-network-path/REPORT.md):
+
+```json
+{"roundTripSeconds": [0.004974],
+ "variation": {"medianSeconds": 0.001901, "logSigma": 0.5066,
+               "correlatedShare": 0.1771, "correlationSeconds": 1.837},
+ "pauses": {"ratePerSecond": 1.646, "meanSeconds": 0.01393}}
+```
+
+It matches the route's delay quantiles far better than uniform jitter (held-out
+KS distance 0.04 instead of 0.30) but overpredicts the p99 by about 30% and
+misses some correlation. Its base round trip assumes replies within a tick, as
+the host gives; its even split and mirrored uplink are assumptions. Add it only
+where no real path exists, such as in-process bots or a loopback player.
 
 ## NetworkConfig
 
