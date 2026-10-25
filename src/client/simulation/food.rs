@@ -15,6 +15,8 @@ use std::{
 pub(super) struct KnownFood {
     pub(super) point: Point,
     pub(super) style: encode::FoodStyle,
+    /// Decorations have no pickup lifetime, even at an eaten physical point.
+    pub(super) decorative: bool,
 }
 
 /// One sector's food by wire offset, in ascending offset order.
@@ -188,6 +190,7 @@ impl FoodIndex {
                     entry.offset,
                     KnownFood {
                         point: food.point(),
+                        decorative: false,
                         style: encode::FoodStyle {
                             color: entry.color,
                             size: encode::food_size(size),
@@ -224,9 +227,15 @@ impl SimulatorBackend {
         }
         let table = &mut self.food_sectors;
         table.resize(1 << 16, None);
+        if self.pit_markers.is_some() {
+            self.decorated_food_sectors.resize(1 << 16, None);
+        }
         for &index in &self.listed {
             if buckets[usize::from(index)] == u32::MAX {
                 table[usize::from(index)] = None;
+                if self.pit_markers.is_some() {
+                    self.decorated_food_sectors[usize::from(index)] = None;
+                }
             }
         }
         for &index in &sectors {
@@ -235,6 +244,14 @@ impl SimulatorBackend {
                 let run = self.food_index.listing(index);
                 if listing.as_ref().is_none_or(|old| old.0 != run) {
                     *listing = Some(Arc::new(SectorFood(run)));
+                    if let Some(markers) = &self.pit_markers {
+                        let physical = listing.as_ref().unwrap();
+                        self.decorated_food_sectors[usize::from(index)] = Some(
+                            markers
+                                .overlay(index, &physical.0)
+                                .map_or_else(|| physical.clone(), |run| Arc::new(SectorFood(run))),
+                        );
+                    }
                 }
             }
         }
@@ -290,16 +307,18 @@ pub(super) fn food_updates(
             Some(previous) if Arc::ptr_eq(&previous, current) && !eaten.contains(&sector) => {}
             Some(previous) => {
                 for (offset, food) in &previous.0 {
-                    let eater = eaters.get(&food_identity(food.point)).copied();
+                    let eater = (!food.decorative)
+                        .then(|| eaters.get(&food_identity(food.point)).copied())
+                        .flatten();
                     if current.get(offset) != Some(food) || eater.is_some() {
                         packets.push(encode::food_remove(key(*offset), eater));
                     }
                 }
                 for (offset, food) in &current.0 {
                     if previous.get(offset) != Some(food)
-                        || previous
-                            .get(offset)
-                            .is_some_and(|old| eaters.contains_key(&food_identity(old.point)))
+                        || previous.get(offset).is_some_and(|old| {
+                            !old.decorative && eaters.contains_key(&food_identity(old.point))
+                        })
                     {
                         packets.push(encode::food_add(key(*offset), food.style));
                     }

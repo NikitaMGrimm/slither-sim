@@ -123,6 +123,7 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     let [sx, sy, rx, ry] = encode::food_key(point).unwrap();
     let food = KnownFood {
         point,
+        decorative: false,
         style: encode::FoodStyle {
             color: 3,
             size: 20,
@@ -180,6 +181,7 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
     let [sx, sy, rx, ry] = encode::food_key(point).unwrap();
     let first = KnownFood {
         point,
+        decorative: false,
         style: encode::FoodStyle {
             color: 3,
             size: 20,
@@ -188,6 +190,7 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
     };
     let second = KnownFood {
         point,
+        decorative: false,
         style: encode::FoodStyle {
             color: 7,
             size: 40,
@@ -314,6 +317,7 @@ fn sector_announcements_follow_subscription_entries_and_exits() {
     let point = Point { x: 650., y: -149. };
     let food = KnownFood {
         point,
+        decorative: false,
         style: encode::FoodStyle {
             color: 3,
             size: 20,

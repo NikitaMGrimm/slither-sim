@@ -53,6 +53,9 @@ mod broadcast;
 mod config;
 mod connection;
 mod food;
+mod markers;
+#[cfg(test)]
+mod pit_tests;
 mod remote;
 mod snakes;
 
@@ -86,6 +89,9 @@ pub struct SimulatorBackend {
     /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
     /// so a connection already holding it can skip the comparison.
     food_sectors: Vec<Option<Arc<SectorFood>>>,
+    /// Socket presentation only; native clients keep the physical listings.
+    decorated_food_sectors: Vec<Option<Arc<SectorFood>>>,
+    pit_markers: Option<markers::PitMarkers>,
     food_index: FoodIndex,
     /// Food maintenance periods begun since virtual zero.
     food_epoch: u64,
@@ -135,6 +141,13 @@ impl SimulatorBackend {
             prey_eaters: BTreeMap::new(),
             prey_wire: BTreeMap::new(),
             food_sectors: Vec::new(),
+            decorated_food_sectors: Vec::new(),
+            pit_markers: config
+                .world
+                .pit
+                .as_ref()
+                .map(|pit| markers::PitMarkers::new(pit.radius))
+                .transpose()?,
             food_index: FoodIndex::default(),
             food_epoch: 0,
             next_minimap: 1,

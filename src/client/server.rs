@@ -53,6 +53,9 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
+/// Automatic bot handshake: preserve physical food even at decorative wire keys.
+/// An HTTP header keeps the stock binary protocol and other servers unchanged.
+pub(crate) const PHYSICAL_FOOD_HEADER: &str = "x-slithersim-food";
 // The budgets and timeouts below are host resource policies, not protocol or
 // physics limits.
 /// Largest accepted client message or frame. Logins with a custom skin are the
@@ -233,6 +236,7 @@ enum Command {
         generation: u64,
         appearance: PlayerAppearance,
         session_id: bool,
+        physical_food: bool,
     },
     /// A game command sent at wall time `sent`.
     Message {
@@ -607,9 +611,13 @@ impl Simulation {
                 generation,
                 appearance,
                 session_id,
+                physical_food,
             } => {
                 self.generations[slot] = generation;
                 let mut joined = self.world.connect(slot, appearance);
+                if joined.is_ok() && physical_food {
+                    self.world.physical_food(slot);
+                }
                 if joined.is_ok() && session_id {
                     joined = self.world.request_session_id(slot);
                 }
@@ -747,7 +755,20 @@ enum Phase {
     Closing(Instant),
 }
 
-type Upgrade = fn(&Request, Response) -> Result<Response, ErrorResponse>;
+struct Upgrade(Arc<AtomicBool>);
+
+impl tungstenite::handshake::server::Callback for Upgrade {
+    fn on_request(self, request: &Request, response: Response) -> Result<Response, ErrorResponse> {
+        self.0.store(
+            request
+                .headers()
+                .get(PHYSICAL_FOOD_HEADER)
+                .is_some_and(|value| value == "physical"),
+            Ordering::Relaxed,
+        );
+        upgrade(request, response)
+    }
+}
 
 #[expect(
     clippy::result_large_err,
@@ -826,6 +847,7 @@ struct Open {
     phase: Phase,
     framing: Framing,
     want_session_id: bool,
+    physical_food: bool,
     generation: u64,
     /// Frames from the world waiting for their delivery time, in order.
     queued: VecDeque<(f64, Vec<u8>)>,
@@ -839,6 +861,7 @@ enum Stage {
 
 struct Session {
     accepted: Instant,
+    physical_food: Arc<AtomicBool>,
     stage: Stage,
 }
 
@@ -937,17 +960,22 @@ impl Gateway {
             {
                 continue;
             }
+            let physical_food = Arc::new(AtomicBool::new(false));
             let stage = match tungstenite::accept_hdr_with_config(
                 stream,
-                upgrade as Upgrade,
+                Upgrade(physical_food.clone()),
                 Some(socket_config()),
             ) {
-                Ok(socket) => Stage::Open(Box::new(Open::new(socket))),
+                Ok(socket) => Stage::Open(Box::new(Open::new(
+                    socket,
+                    physical_food.load(Ordering::Relaxed),
+                ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             };
             self.sessions.push(Session {
                 accepted: now,
+                physical_food,
                 stage,
             });
         }
@@ -964,7 +992,10 @@ impl Session {
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
             Stage::Http(mid) => match mid.handshake() {
-                Ok(socket) => Stage::Open(Box::new(Open::new(socket))),
+                Ok(socket) => Stage::Open(Box::new(Open::new(
+                    socket,
+                    self.physical_food.load(Ordering::Relaxed),
+                ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             },
@@ -982,12 +1013,13 @@ impl Session {
 }
 
 impl Open {
-    fn new(socket: WebSocket<TcpStream>) -> Self {
+    fn new(socket: WebSocket<TcpStream>, physical_food: bool) -> Self {
         Self {
             socket,
             phase: Phase::Hello { framed: false },
             framing: Framing::Elapsed,
             want_session_id: false,
+            physical_food,
             generation: 0,
             queued: VecDeque::new(),
         }
@@ -1116,6 +1148,7 @@ impl Open {
             generation: self.generation,
             appearance,
             session_id: self.want_session_id,
+            physical_food: self.physical_food,
         });
         Ok(())
     }
@@ -1449,6 +1482,7 @@ impl Seat {
             generation: self.generation,
             appearance: PlayerAppearance::default(),
             session_id: false,
+            physical_food: true,
         });
         Ok(())
     }
@@ -1611,6 +1645,7 @@ mod tests {
             generation: 1,
             appearance: PlayerAppearance::default(),
             session_id: false,
+            physical_food: true,
         });
         for _ in 0..40 {
             step(&mut simulation);
@@ -1748,6 +1783,7 @@ mod tests {
                     generation: 1,
                     appearance: PlayerAppearance::default(),
                     session_id: false,
+                    physical_food: true,
                 })
                 .unwrap();
         }
@@ -1852,6 +1888,265 @@ mod tests {
         assert_eq!(solved.len(), 27);
         assert_ne!(literal, solved);
         assert!(solved.iter().all(u8::is_ascii_alphabetic));
+    }
+
+    /// Manually clocked socket gateway and world: no worker races or sleeps are
+    /// needed to interrupt an upgrade or deliver an obsolete generation late.
+    fn pit_gateway() -> (Gateway, Simulation) {
+        let mut config = SimulationConfig {
+            world: crate::Config::battledome(),
+            latency: LatencyConfig::one_way(0., 0.2),
+            ..Default::default()
+        };
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let world = RawSimulator::new(7, config, 1).unwrap();
+        let shared = shared(world.dt(), 1);
+        let (commands, inbox) = mpsc::channel();
+        let (route, deliveries) = mpsc::channel();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let gateway = Gateway {
+            listener,
+            sessions: Vec::new(),
+            gate: Gate {
+                occupied: vec![false],
+                generations: vec![0],
+                challenge: Vec::new(),
+                replies: [Vec::new(), Vec::new()],
+                commands,
+                shared: shared.clone(),
+            },
+            deliveries,
+        };
+        let simulation = Simulation {
+            world,
+            commands: inbox,
+            routes: vec![route],
+            batches: vec![Vec::new()],
+            max_clients: 1,
+            generations: vec![0],
+            shared,
+            ticks: 0,
+            deferred: 0,
+        };
+        (gateway, simulation)
+    }
+
+    #[test]
+    fn pit_markers_fragmented_upgrade_preserves_physical_food_header() {
+        use std::io::Write;
+        let (mut gateway, mut simulation) = pit_gateway();
+        let mut client = TcpStream::connect(gateway.listener.local_addr().unwrap()).unwrap();
+        client.set_nodelay(true).unwrap();
+        // The upgrade is first interrupted before any bytes, then inside both
+        // the header name and its value, forcing the saved HTTP state to resume.
+        gateway.accept(Instant::now());
+        assert!(matches!(gateway.sessions[0].stage, Stage::Http(_)));
+        for fragment in [
+            &b"GET /slither HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nX-SlitherSim-F"[..],
+            &b"ood: phys"[..],
+        ] {
+            client.write_all(fragment).unwrap();
+            gateway.poll().unwrap();
+            assert!(matches!(gateway.sessions[0].stage, Stage::Http(_)));
+        }
+        client.write_all(b"ical\r\n\r\n").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            gateway.poll().unwrap();
+            if matches!(gateway.sessions[0].stage, Stage::Open(_)) {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "fragmented upgrade never completed"
+            );
+            thread::yield_now();
+        }
+        let Stage::Open(open) = &mut gateway.sessions[0].stage else {
+            unreachable!()
+        };
+        assert!(open.physical_food);
+        open.join(
+            &mut gateway.gate,
+            &crate::client::network::login_packet("Fragmented", 0).unwrap(),
+        )
+        .unwrap();
+        step(&mut simulation);
+        // Apply the actual Connect command and decode the host's queued frames:
+        // this empty physical world must contain no decorative food for the bot.
+        let mut reader = ClientState::new();
+        reader.new_connection(0.).unwrap();
+        let mut receipt: f64 = 0.;
+        for delivery in gateway.deliveries.try_iter().flatten() {
+            let Delivery::Frames { frames, .. } = delivery else {
+                panic!("join failed")
+            };
+            for (at, bytes) in frames {
+                reader.receive_frame(&bytes, at).unwrap();
+                receipt = at;
+            }
+        }
+        assert!(
+            reader
+                .frame(receipt)
+                .unwrap()
+                .observation
+                .unwrap()
+                .food
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn pit_markers_reused_slot_rejects_late_deliveries_between_food_modes() {
+        use tungstenite::protocol::Role;
+        struct LateFrames {
+            generation: u64,
+            frames: Vec<(f64, Vec<u8>)>,
+        }
+        let (mut gateway, mut simulation) = pit_gateway();
+        let mut late: Option<LateFrames> = None;
+        // One slot traverses both directions, resetting its listings each time.
+        for physical_food in [false, true, false] {
+            if let Some(session) = gateway.sessions.first_mut() {
+                let Stage::Open(open) = &mut session.stage else {
+                    panic!("session closed")
+                };
+                assert!(
+                    !open.queued.is_empty(),
+                    "old generation has a queued future delivery"
+                );
+                open.release(&mut gateway.gate);
+                assert!(open.queued.is_empty());
+                gateway.sessions.clear();
+                simulation.apply_commands().unwrap();
+            }
+            let client = TcpStream::connect(gateway.listener.local_addr().unwrap()).unwrap();
+            client
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let (server, _) = gateway.listener.accept().unwrap();
+            server.set_nonblocking(true).unwrap();
+            let mut client = WebSocket::from_raw_socket(client, Role::Client, None);
+            let mut open = Open::new(
+                WebSocket::from_raw_socket(server, Role::Server, Some(socket_config())),
+                physical_food,
+            );
+            open.join(
+                &mut gateway.gate,
+                &crate::client::network::login_packet("Reuse", 0).unwrap(),
+            )
+            .unwrap();
+            let generation = open.generation;
+            assert_eq!(open.phase, Phase::Playing(0));
+            gateway.sessions.push(Session {
+                accepted: Instant::now(),
+                physical_food: Arc::new(AtomicBool::new(physical_food)),
+                stage: Stage::Open(Box::new(open)),
+            });
+            simulation.apply_commands().unwrap();
+            assert!(simulation.world.take(0).unwrap().is_empty());
+            step(&mut simulation);
+            let mut current = Vec::new();
+            for delivery in gateway.deliveries.try_iter().flatten() {
+                let Delivery::Frames {
+                    slot,
+                    generation: actual,
+                    frames,
+                } = delivery
+                else {
+                    panic!("join failed")
+                };
+                assert_eq!((slot, actual), (0, generation));
+                current.extend(frames);
+            }
+            assert!(!current.is_empty());
+            if let Some(old) = &late {
+                gateway.deliver(
+                    Delivery::Frames {
+                        slot: 0,
+                        generation: old.generation,
+                        frames: old.frames.clone(),
+                    },
+                    Instant::now(),
+                );
+            }
+            let Stage::Open(open) = &gateway.sessions[0].stage else {
+                panic!("session closed")
+            };
+            assert!(
+                open.queued.is_empty(),
+                "obsolete mode leaked before the new listing"
+            );
+            gateway.deliver(
+                Delivery::Frames {
+                    slot: 0,
+                    generation,
+                    frames: current.clone(),
+                },
+                Instant::now(),
+            );
+            if let Some(old) = &late {
+                gateway.deliver(
+                    Delivery::Frames {
+                        slot: 0,
+                        generation: old.generation,
+                        frames: old.frames.clone(),
+                    },
+                    Instant::now(),
+                );
+                gateway.deliver(
+                    Delivery::Closed {
+                        slot: 0,
+                        generation: old.generation,
+                        reason: "obsolete close".into(),
+                    },
+                    Instant::now(),
+                );
+            }
+            let Stage::Open(open) = &mut gateway.sessions[0].stage else {
+                panic!("session closed")
+            };
+            assert_eq!(open.phase, Phase::Playing(0));
+            assert_eq!(open.queued.iter().cloned().collect::<Vec<_>>(), current);
+            open.send_due(&mut gateway.gate, Instant::now(), 1000.)
+                .unwrap();
+            assert!(open.flush(&mut gateway.gate));
+            let mut reader = ClientState::new();
+            reader.new_connection(0.).unwrap();
+            let mut receipt = 0.;
+            for (at, expected) in &current {
+                let Message::Binary(bytes) = client.read().unwrap() else {
+                    panic!("expected frame")
+                };
+                assert_eq!(&bytes[..], expected);
+                reader.receive_frame(&bytes, *at).unwrap();
+                receipt = *at;
+            }
+            let frame = reader.frame(receipt).unwrap();
+            assert_eq!(frame.status, ClientStatus::Playing);
+            assert_eq!(frame.observation.unwrap().food.is_empty(), physical_food);
+            // Keep another real delivery queued until the old session releases;
+            // an identical delayed batch also arrives after slot reuse.
+            let future = current
+                .into_iter()
+                .map(|(_, bytes)| (1001., bytes))
+                .collect::<Vec<_>>();
+            gateway.deliver(
+                Delivery::Frames {
+                    slot: 0,
+                    generation,
+                    frames: future.clone(),
+                },
+                Instant::now(),
+            );
+            late = Some(LateFrames {
+                generation,
+                frames: future,
+            });
+        }
     }
 
     #[test]

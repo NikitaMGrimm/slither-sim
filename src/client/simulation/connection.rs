@@ -56,6 +56,12 @@ pub(super) struct Connection {
     pub(super) header_ms: u64,
     pub(super) snakes: KnownSnakes,
     pub(super) food: KnownSectors,
+    pub(super) decorated_food: KnownSectors,
+    /// Stock sockets get decoration; bot clients retain physical food at every key.
+    pub(super) decorations: bool,
+    /// Last presented delivery, including marker-only frames. The physical
+    /// latency stream must not advance for decorations, but output stays ordered.
+    pub(super) presented_at: f64,
     pub(super) food_interest: SectorInterest,
     /// Keyed by simulator ID; each entry keeps the wire ID it was shown with.
     pub(super) prey: BTreeMap<u64, KnownPrey>,
@@ -252,43 +258,62 @@ impl SimulatorBackend {
         now: f64,
         packets: &[Vec<u8>],
     ) -> Result<(), String> {
-        let mut groups: Vec<&[Vec<u8>]> = Vec::new();
-        let mut start = 0;
-        let mut bytes = 2; // Elapsed-ms header.
-        for (index, packet) in packets.iter().enumerate() {
-            if !encode::frameable(packet) {
-                if start < index {
-                    groups.push(&packets[start..index]);
-                }
-                groups.push(&packets[index..=index]);
-                start = index + 1;
-                bytes = 2;
-            } else {
-                let packet_bytes = packet.len() + 2;
-                if bytes + packet_bytes > MAX_FRAME_BYTES && start < index {
-                    groups.push(&packets[start..index]);
-                    start = index;
-                    bytes = 2;
-                }
-                bytes += packet_bytes;
-            }
-        }
-        if start < packets.len() {
-            groups.push(&packets[start..]);
-        }
+        self.emit_presented(slot, now, packets, None)
+    }
+
+    pub(super) fn emit_presented(
+        &mut self,
+        slot: usize,
+        now: f64,
+        packets: &[Vec<u8>],
+        physical: Option<&[Vec<u8>]>,
+    ) -> Result<(), String> {
+        let groups = frame_groups(packets);
         let connection = &mut self.slots[slot].connection;
         if connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
             return Err("Downlink queue is full".into());
         }
-        for group in groups {
+        // Decorations must not consume extra shared latency RNG draws: that
+        // would change other bots' receipts and eventually physics. Advance
+        // the baseline stream exactly as physical packets would, even when a
+        // browser hides a colliding pellet. Extra presentation frames share
+        // the last physical release; marker-only releases sample clones.
+        let arrivals = physical.map(|packets| {
+            frame_groups(packets)
+                .iter()
+                .map(|_| {
+                    connection
+                        .link
+                        .downlink(&self.config.latency, &mut self.random, now)
+                })
+                .collect::<Vec<_>>()
+        });
+        let extra = if arrivals.as_ref().is_some_and(Vec::is_empty) && !groups.is_empty() {
+            connection
+                .link
+                .clone()
+                .downlink(&self.config.latency, &mut self.random.clone(), now)
+        } else {
+            now
+        };
+        for (index, group) in groups.into_iter().enumerate() {
             let setup = *connection.setup_at.get_or_insert(now);
             let target = ((now - setup) * 1000.).round().max(0.) as u64;
             let elapsed = target.saturating_sub(connection.header_ms).min(65535);
             connection.header_ms += elapsed;
             let bytes = encode::frame(elapsed as u16, group)?;
-            let arrival = connection
-                .link
-                .downlink(&self.config.latency, &mut self.random, now);
+            let arrival = match &arrivals {
+                Some(arrivals) => arrivals
+                    .get(index)
+                    .or_else(|| arrivals.last())
+                    .copied()
+                    .unwrap_or(extra),
+                None => connection
+                    .link
+                    .downlink(&self.config.latency, &mut self.random, now),
+            };
+            let arrival = arrival.max(connection.presented_at);
+            connection.presented_at = arrival;
             connection.downlink.push_back((arrival, bytes));
         }
         Ok(())
@@ -363,4 +388,162 @@ fn session_id(serial: u32, key: u32) -> u32 {
     x ^= x >> 16;
     x = x.wrapping_mul(0x85eb_ca6b);
     x ^ x >> 13
+}
+
+/// Stock transport grouping, shared by physical scheduling and presentation.
+fn frame_groups(packets: &[Vec<u8>]) -> Vec<&[Vec<u8>]> {
+    let mut groups: Vec<&[Vec<u8>]> = Vec::new();
+    let mut start = 0;
+    let mut bytes = 2; // Elapsed-ms header.
+    for (index, packet) in packets.iter().enumerate() {
+        if !encode::frameable(packet) {
+            if start < index {
+                groups.push(&packets[start..index]);
+            }
+            groups.push(&packets[index..=index]);
+            start = index + 1;
+            bytes = 2;
+        } else {
+            let packet_bytes = packet.len() + 2;
+            if bytes + packet_bytes > MAX_FRAME_BYTES && start < index {
+                groups.push(&packets[start..index]);
+                start = index;
+                bytes = 2;
+            }
+            bytes += packet_bytes;
+        }
+    }
+    if start < packets.len() {
+        groups.push(&packets[start..]);
+    }
+    groups
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Config,
+        client::{LatencyConfig, SimulationConfig},
+    };
+
+    fn backend() -> SimulatorBackend {
+        let mut config = SimulationConfig {
+            world: Config::sandbox(),
+            latency: LatencyConfig::measured_route(),
+            ..Default::default()
+        };
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut backend = SimulatorBackend::new(7, config).unwrap();
+        backend.slots[0].connection.downlink.clear();
+        backend
+    }
+
+    fn packets(frames: usize) -> Vec<Vec<u8>> {
+        // A synthetic ignored packet beyond the 8191-byte length-prefix bound
+        // must travel alone, giving an explicit, independent frame count.
+        let packet = vec![b'i'; 8192];
+        assert!(!encode::frameable(&packet));
+        vec![packet; frames]
+    }
+
+    #[test]
+    fn pit_markers_unequal_frame_counts_advance_only_physical_latency_draws() {
+        for (physical_count, browser_count) in [(1, 3), (3, 1), (3, 0), (0, 3), (0, 0)] {
+            let mut actual = backend();
+            let mut physical_reader = backend();
+            let physical = packets(physical_count);
+            let presented = packets(browser_count);
+            let before = format!("{:?}", actual.random);
+            actual
+                .emit_presented(0, 1., &presented, Some(&physical))
+                .unwrap();
+            physical_reader.emit(0, 1., &physical).unwrap();
+            assert_eq!(
+                format!("{:?}", actual.random),
+                format!("{:?}", physical_reader.random),
+                "{physical_count} physical / {browser_count} browser"
+            );
+            assert_eq!(
+                format!("{:?}", actual.slots[0].connection.link),
+                format!("{:?}", physical_reader.slots[0].connection.link)
+            );
+            assert_eq!(actual.slots[0].connection.downlink.len(), browser_count);
+            let baseline = &physical_reader.slots[0].connection.downlink;
+            assert_eq!(baseline.len(), physical_count);
+            if physical_count > 0 {
+                assert_ne!(
+                    before,
+                    format!("{:?}", actual.random),
+                    "latency variation must draw randomness"
+                );
+                for (index, (at, bytes)) in actual.slots[0].connection.downlink.iter().enumerate() {
+                    assert_eq!(*at, baseline[index.min(physical_count - 1)].0);
+                    assert_eq!(
+                        protocol::split_frame(bytes).unwrap(),
+                        [&presented[index][..]]
+                    );
+                }
+            } else {
+                assert_eq!(before, format!("{:?}", actual.random));
+            }
+            // Pin the next ordinary release too: hidden physical frames still
+            // advance the stream; extra browser frames must not advance it.
+            actual.emit(0, 2., &[encode::pong()]).unwrap();
+            physical_reader.emit(0, 2., &[encode::pong()]).unwrap();
+            let delivered = actual.slots[0].connection.downlink.back().unwrap();
+            let expected = physical_reader.slots[0].connection.downlink.back().unwrap();
+            assert_eq!(delivered.0, expected.0);
+            // Elapsed headers belong to the frames each reader actually got.
+            assert_eq!(
+                protocol::split_frame(&delivered.1).unwrap(),
+                protocol::split_frame(&expected.1).unwrap()
+            );
+            assert_eq!(
+                format!("{:?}", actual.random),
+                format!("{:?}", physical_reader.random)
+            );
+        }
+    }
+
+    #[test]
+    fn pit_markers_marker_only_frames_preserve_latency_rng_and_delivery_order() {
+        let mut actual = backend();
+        let mut baseline = backend();
+        let random = format!("{:?}", actual.random);
+        let link = format!("{:?}", actual.slots[0].connection.link);
+        let mut previous: f64 = 0.;
+        for now in [1., 1., 1.001] {
+            let expected = actual.slots[0]
+                .connection
+                .link
+                .clone()
+                .downlink(&actual.config.latency, &mut actual.random.clone(), now)
+                .max(previous);
+            actual
+                .emit_presented(0, now, &packets(2), Some(&[]))
+                .unwrap();
+            for (at, _) in actual.slots[0].connection.downlink.drain(..) {
+                assert_eq!(at, expected);
+                assert!(at >= previous);
+                previous = at;
+            }
+            assert_eq!(format!("{:?}", actual.random), random);
+            assert_eq!(format!("{:?}", actual.slots[0].connection.link), link);
+        }
+        // Draining presentation frames must not lose the ordering floor when
+        // an ordinary release follows at the same emission time.
+        actual.emit(0, 1.001, &[encode::pong()]).unwrap();
+        baseline.emit(0, 1.001, &[encode::pong()]).unwrap();
+        assert!(actual.slots[0].connection.downlink.back().unwrap().0 >= previous);
+        assert_eq!(
+            format!("{:?}", actual.random),
+            format!("{:?}", baseline.random)
+        );
+        assert_eq!(
+            format!("{:?}", actual.slots[0].connection.link),
+            format!("{:?}", baseline.slots[0].connection.link)
+        );
+    }
 }
