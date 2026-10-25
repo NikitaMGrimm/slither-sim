@@ -52,6 +52,8 @@
 
 - `SimulationConfig.broadcastTicks` is removed; JSON configs containing it are
   rejected as unknown fields. Remove it to use per-tick gameplay emission.
+- `LatencyConfig.jitterSeconds` and `congestion` are removed; JSON configs
+  containing them are rejected as unknown fields. Use `variation` and `pauses`.
 - `Host::poll()` is removed. `Host::bind(config)?.start()?` returns a
   `RunningHost` with address/load counters, `wait()` and `stop()`; dropping it
   stops its threads. `Host::run()` starts and waits. Hosts now use separate
@@ -139,8 +141,8 @@
 - `LatencyConfig` replaces uniform `jitterSeconds` and `congestion` episodes with
   `variation` (lognormal per-message delay with a slow correlated part) and
   `pauses` (short per-direction delivery holds), fitted to retained official
-  captures; `LatencyConfig::measured_route()` is that route. Configs with the old
-  fields are rejected. See [variation and pauses](docs/configuration.md#variation-and-pauses).
+  captures; `LatencyConfig::measured_route()` is that route. See
+  [variation and pauses](docs/configuration.md#variation-and-pauses).
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 
