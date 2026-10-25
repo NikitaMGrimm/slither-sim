@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const HEADING_LEAD: f64 = 100.;
 const RETENTION_SECONDS: f64 = 2.6;
-const CLEANUP_SECONDS: f64 = 0.504;
+pub(super) const CLEANUP_SECONDS: f64 = 0.504;
 
 /// Recipient state, reset with its connection rather than shared with the world.
 #[derive(Clone, Debug, Default)]

@@ -58,6 +58,10 @@ required-features = ["networking"]
 name = "portable_bot"
 required-features = ["networking"]
 
+[[example]]
+name = "host_load"
+required-features = ["networking"]
+
 [dependencies]
 rayon = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }

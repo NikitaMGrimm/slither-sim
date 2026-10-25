@@ -5,18 +5,13 @@ use slither_sim::{
     Action,
     client::{
         Backend, ClientFrame, ClientStatus, Host, HostConfig, NetworkBackend, NetworkConfig,
-        SimulationConfig, challenge::solve_challenge, network::Handshake, network::login_packet,
+        RunningHost, SimulationConfig, challenge::solve_challenge, network::Handshake,
+        network::login_packet,
     },
 };
 use std::{
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpStream},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc,
-    },
-    thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 
@@ -24,29 +19,15 @@ const WAIT: Duration = Duration::from_secs(5);
 
 struct Running {
     address: SocketAddr,
-    stop: Arc<AtomicBool>,
-    thread: Option<JoinHandle<Result<u64, String>>>,
+    host: RunningHost,
 }
 
 impl Running {
     fn start(config: HostConfig) -> Self {
-        let stop = Arc::new(AtomicBool::new(false));
-        let flag = stop.clone();
-        let (sender, receiver) = mpsc::channel();
-        let thread = thread::spawn(move || {
-            let mut host = Host::bind(config)?;
-            sender.send(host.local_addr()?).unwrap();
-            while !flag.load(Ordering::Relaxed) {
-                host.poll()?;
-                thread::sleep(Duration::from_millis(1));
-            }
-            Ok(host.ticks())
-        });
-        let address = receiver.recv_timeout(WAIT).expect("host did not bind");
+        let host = Host::bind(config).unwrap().start().unwrap();
         Self {
-            address,
-            stop,
-            thread: Some(thread),
+            address: host.local_addr(),
+            host,
         }
     }
 
@@ -54,19 +35,11 @@ impl Running {
         format!("ws://{}/slither", self.address)
     }
 
-    /// Stop the loop and require that no simulator error occurred.
-    fn finish(mut self) -> u64 {
-        self.stop.store(true, Ordering::Relaxed);
-        self.thread.take().unwrap().join().unwrap().unwrap()
-    }
-}
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+    /// Stop the host and require that no simulator error occurred.
+    fn finish(self) -> u64 {
+        let ticks = self.host.ticks();
+        self.host.stop().unwrap();
+        ticks
     }
 }
 
@@ -83,6 +56,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
         max_clients,
         bots,
         simulation,
+        ..HostConfig::default()
     }
 }
 
@@ -175,6 +149,37 @@ fn native_client_joins_plays_and_measures_ping() {
     // Two background bots share the world with this client.
     assert!(frame.observation.unwrap().opponents.len() >= 2);
     bot.disconnect();
+    assert!(host.finish() > 0);
+}
+
+#[test]
+fn bot_threads_steer_their_snakes() {
+    let mut config = config(1, 4);
+    config.bot_threads = 2;
+    let host = Running::start(config);
+    let mut watcher = network(host.url(), "Watcher", Handshake::Direct);
+    let first = until(&mut watcher, "every bot", |f| {
+        f.observation
+            .as_ref()
+            .is_some_and(|o| o.opponents.len() == 4)
+    })
+    .observation
+    .unwrap();
+    // A hosted snake keeps its spawn heading until its client sends a command,
+    // so a turn shows that bot's thread decoded frames and steered.
+    let mut turned = std::collections::BTreeSet::new();
+    let start = Instant::now();
+    while turned.len() < 4 {
+        assert!(start.elapsed() < WAIT, "only {} bots turned", turned.len());
+        let frame = watcher.next_frame().unwrap();
+        for snake in frame.observation.iter().flat_map(|o| &o.opponents) {
+            let spawned = first.opponents.iter().find(|o| o.id == snake.id);
+            if spawned.is_some_and(|o| (o.heading - snake.heading).abs() > 0.2) {
+                turned.insert(snake.id.clone());
+            }
+        }
+    }
+    watcher.disconnect();
     assert!(host.finish() > 0);
 }
 
@@ -708,6 +713,11 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     derived.simulation.agents = 99;
     derived.simulation.controlled_slot = 50;
     derived.validate().unwrap();
+    let mut threadless = config(1, 2);
+    threadless.bot_threads = 0;
+    assert!(threadless.validate().unwrap_err().contains("botThreads"));
+    threadless.bots = 0;
+    threadless.validate().unwrap();
     let parsed: HostConfig =
         serde_json::from_str(r#"{"bind":"0.0.0.0:9000","maxClients":3,"bots":0}"#).unwrap();
     assert_eq!(parsed.bind.port(), 9000);

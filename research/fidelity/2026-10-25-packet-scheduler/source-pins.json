@@ -1,0 +1,22 @@
+[
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\scheduler-study-20261025\\slither_protocol.py",
+    "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither-headless.mjs",
+    "sha256": "86f9a7ff486e362875212cd644f4a14f9b6989cd60f97dfeb8f441c167422fa3"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\outputs\\original-client\\s\\game1107249518.js",
+    "sha256": "5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\src\\client\\simulation.rs",
+    "sha256": "3ae6fb0c1a2b777e213f4df992292311f6f5412083676173dd4c26ab86842114"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\docs\\server-rules.md",
+    "sha256": "ee0f7bda939cfacaeb7061cf0eb0cdfb2263f0ca46951eb02a797a5d1b4dfe50"
+  }
+]

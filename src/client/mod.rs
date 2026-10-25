@@ -25,7 +25,7 @@ pub use hud::{
     ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MinimapTeams,
     SessionIdentifiers, SnakeProfile, SnakeRemoval, TeamScores,
 };
-pub use latency::{Congestion, LatencyConfig};
+pub use latency::{LatencyConfig, Pauses, Variation};
 pub use minimap::{MAX_FRAME_MINIMAP_CELLS, MAX_TEAM_MINIMAP_CELLS, Minimap};
 pub use network::{NetworkBackend, NetworkConfig};
 pub use protocol::ClientState;
@@ -33,7 +33,7 @@ pub use received::{
     CategoryKnowledge, ReceivedField, ReceivedHistory, ReceivedMetadata, ReceivedSnake,
     ReceivedTracker,
 };
-pub use server::{Host, HostConfig};
+pub use server::{Host, HostConfig, RunningHost};
 pub use simulation::{SimulationConfig, SimulatorBackend};
 
 pub const CONTRACT: &str = "slither-client-v2";

@@ -244,9 +244,15 @@ impl FoodPresentation {
         Ok(visible)
     }
 
-    /// Call after births and a successful sync of the current world food.
-    pub(super) fn color(&self, food: &Food) -> u8 {
-        self.colors[&identity(food)][0]
+    /// Color of the `lifetime`-th pellet, in food order, at this food's
+    /// position. Call after births and a successful sync of the world food.
+    pub(super) fn color(&self, food: &Food, lifetime: usize) -> u8 {
+        self.colors[&identity(food)][lifetime]
+    }
+
+    /// Color of the latest birth at this food's position.
+    pub(super) fn newest(&self, food: &Food) -> u8 {
+        *self.colors[&identity(food)].back().unwrap()
     }
 
     fn ambient_color(random: &mut Random) -> u8 {
@@ -290,7 +296,9 @@ mod tests {
     }
 
     fn colors(presentation: &FoodPresentation, food: &[Food]) -> Vec<u8> {
-        food.iter().map(|food| presentation.color(food)).collect()
+        food.iter()
+            .map(|food| presentation.color(food, 0))
+            .collect()
     }
 
     #[test]
@@ -393,7 +401,7 @@ mod tests {
             .unwrap();
         let fresh = food(30., Some(Origin::Boost));
         births(&mut presentation, 0, std::slice::from_ref(&fresh));
-        assert_eq!(presentation.color(&fresh), 4);
+        assert_eq!(presentation.color(&fresh, 0), 4);
         assert_eq!(presentation.colors.len(), 1);
     }
 
@@ -405,7 +413,7 @@ mod tests {
         births(&mut presentation, 0, &items);
         presentation.register(0, 9, &[]);
         presentation.sync(&items).unwrap();
-        assert_eq!(presentation.color(&items[0]), 5);
+        assert_eq!(presentation.color(&items[0], 0), 5);
         items.push(food(2., Some(Origin::Boost)));
         presentation
             .births(&[FoodSpawnEvent {
@@ -496,7 +504,7 @@ mod tests {
             presentation.sync(&[]).unwrap();
             presentation.register(0, 0, &custom);
             births(&mut presentation, 0, &food);
-            let color = presentation.color(&food[0]);
+            let color = presentation.color(&food[0], 0);
             assert!(color <= 2);
             assert!(
                 colors(&presentation, &food)
@@ -514,7 +522,7 @@ mod tests {
         presentation.register(0, 250, &[]);
         let food = food(1., Some(Origin::Death));
         births(&mut presentation, 0, std::slice::from_ref(&food));
-        assert_eq!(presentation.color(&food), 7);
+        assert_eq!(presentation.color(&food, 0), 7);
     }
 
     #[test]
@@ -525,15 +533,15 @@ mod tests {
         let same = food(0., Some(Origin::Death));
         let nearby = food(f64::from_bits(1), Some(Origin::Death));
         births(&mut presentation, 0, &[first, nearby.clone()]);
-        assert_eq!(presentation.color(&same), 1);
-        assert_eq!(presentation.color(&nearby), 7);
+        assert_eq!(presentation.color(&same, 0), 1);
+        assert_eq!(presentation.color(&nearby, 0), 7);
         assert_eq!(presentation.colors.len(), 2);
         presentation.register(0, 3, &[]);
         presentation.sync(&[same.clone(), nearby.clone()]).unwrap();
-        assert_eq!(presentation.color(&same), 1);
+        assert_eq!(presentation.color(&same, 0), 1);
         presentation.picked_up(&same).unwrap();
         births(&mut presentation, 0, std::slice::from_ref(&same));
-        assert_eq!(presentation.color(&same), 3);
+        assert_eq!(presentation.color(&same, 0), 3);
         assert_eq!(presentation.colors.len(), 1);
     }
 
@@ -552,12 +560,12 @@ mod tests {
                 .unwrap();
         }
         presentation.sync(&[item.clone(), item.clone()]).unwrap();
-        assert_eq!(presentation.color(&item), 3);
+        assert_eq!(presentation.color(&item, 0), 3);
         assert!(!presentation.picked_up(&item).unwrap());
-        assert_eq!(presentation.color(&item), 3);
+        assert_eq!(presentation.color(&item, 0), 3);
         assert!(presentation.picked_up(&item).unwrap());
         // Replenishment after pickup starts a new lifetime at the same point.
         births(&mut presentation, 1, std::slice::from_ref(&item));
-        assert_eq!(presentation.color(&item), 7);
+        assert_eq!(presentation.color(&item, 0), 7);
     }
 }

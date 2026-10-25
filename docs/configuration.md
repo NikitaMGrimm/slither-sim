@@ -20,28 +20,31 @@ Every world `Config` object also accepts a [`preset`](#presets).
 ## Timing and ping
 
 - `world.dt: 0.007`: physics advances every 7 ms, about 143 ticks/s.
-- `broadcastTicks: 6`: gameplay updates are sent every six physics ticks,
-  so `6 × 7 ms = 42 ms`, about 24 updates/s. It does not mean six milliseconds.
+- Gameplay updates are encoded every physics tick; empty frames are omitted.
+  Packet families have separate release rules, not a recipient-wide batch.
 - `decisionTicks: 6`: virtual-time bot decisions and host background bots use
   a nominal 42 ms cadence; processing can delay a decision. Remote clients choose
   their own decision interval.
 
-Broadcast cadence is a local setting, not an exact recovered official schedule.
-Pongs can be sent between broadcasts. Physics keeps advancing between updates.
-Minimaps and leaderboards have independent nominal 2.5/3-second clocks, serviced
-at physics ticks; deadlines do not accumulate gameplay-broadcast rounding. Prey
-position refreshes have their own bounded reporting intervals; see
-[host fidelity](server-rules.md#packet-timing).
+Motion and standalone mass reports use shared per-snake gates of at least six
+and 15 ticks (42/105 ms at the default `dt`); anchors are prompt. Ordinary food
+births wait for shared 504 ms maintenance. Prey corrections have a shared clock
+per prey. Minimaps and leaderboards follow separate server-wide clocks that
+connections join mid-phase, at the official mean periods 2.504/3.008 s. These
+are partial scheduling models; see
+[packet timing and evidence limits](server-rules.md#packet-timing).
 
 Ping is a measured round trip, not a target the server needs you to set. Native
 clients send game pings automatically after setup, with at most one outstanding.
 For a real host, leave artificial latency at zero: sockets and server processing
 already take time. The [server example](raw-server.md#configuration) adds none.
-Zero added delay does not imply a measured ping of zero.
+Zero added delay does not imply a measured ping of zero: input and pings that
+arrive during a tick are answered in that tick's frame, pongs first, so the
+host adds 0–7 ms before the reply.
 
 For virtual-time training, `latency.roundTripSeconds: [0.06]` models a 60 ms base
 round trip; it is split evenly unless `uplinkShare` changes. Tick scheduling,
-jitter and congestion can affect the measured result. Do not add the same delay
+variation and pauses can affect the measured result. Do not add the same delay
 at both ends of a real connection unless that extra delay is intentional.
 
 ## HostConfig
@@ -52,6 +55,7 @@ at both ends of a real connection unless that extra delay is intentional.
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
 | `maxClients` | `4` | Reserved remote slots; at least 1. |
 | `bots` | `4` | Background food-seeking bots; clients + bots must be at most 65,535. |
+| `botThreads` | `2` | Background bot worker threads, separate from simulation and sockets; at least 1 when `bots > 0`. At most `bots` workers are started. |
 | `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false. |
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
@@ -66,18 +70,17 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `agents` | `1` | Slots, 1–65,535; overridden by the host. |
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, at least 1. |
-| `broadcastTicks` | `6` | Physics ticks per gameplay broadcast, at least 1; see the warning below. |
-| `minimapIntervalSeconds` | `2.5` | Positive finite interval. |
+| `minimapIntervalSeconds` | `2.504` | Positive finite period of the server-wide minimap clock. |
 | `minimapSide` | `136` | Received protocol-19 minimap resolution; 1–512, the stock client's clamp. Rasterization remains approximate. |
-| `leaderboardIntervalSeconds` | `3` | Positive finite interval; a board also arrives on entry. |
+| `leaderboardIntervalSeconds` | `3.008` | Positive finite period of the server-wide leaderboard clock; the first board waits for it. |
 | `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
 
-Broadcasts send at most three new body anchors per snake incrementally. When
-`broadcastTicks × world.dt × 437.5` reaches 126 world units, a boosting snake
-can outrun that window and is resent in full, which costs bandwidth but stays
-correct; such configs load with a warning. All possible arena radii must be at
+Each tick sends at most three new body anchors per snake incrementally. When
+`world.dt × 437.5 ≥ 126` world units, a boosting snake can outrun that window in
+one tick and is resent in full, which costs bandwidth but stays correct; such
+configs load with a warning. All possible arena radii must be at
 most 32,000 (an encoding-margin [policy](#limits)), and configured prey speeds
 must satisfy `round(speed × 32) ≤ 65535` and the turn rate
 `round(turnRate × 8) ≤ 65535`. The largest attainable prey
@@ -143,8 +146,8 @@ official prey population remains unresolved. The
 [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
 records the sources and caveats of these choices.
 
-Neither constructor changes ping, broadcasts or decision timing. Those belong to
-`SimulationConfig`, which wraps either world:
+Both constructors use the default 7 ms physics step. Link and decision settings
+belong to `SimulationConfig`, which wraps either world:
 
 ```rust
 use slither_sim::{Config, client::{HostConfig, SimulationConfig}};
@@ -194,7 +197,7 @@ rule of the mode or our design choice, with its reason:
 | Death food | Pit deaths drop normal death food; wall deaths drop none | Design choice for the pit, so its victims' mass returns to play; official model for the wall |
 | Prey | `prey.count: 0` | Stated rule: snakes only |
 | Food | Official density at radius 3584: `foodCount` 3138, about 45.9 attempts/s; normal admission caps, death and boost food | Official model |
-| Everything else | As `Config::official(1)`: `dt`, broadcast and decision ticks, vision, kiosk, speed model, boundary mode | Official model |
+| Everything else | Default 7 ms `dt`, decision ticks, vision, kiosk, speed model, boundary mode and per-family delivery | Official model |
 
 Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
@@ -271,31 +274,52 @@ apply to in-process bots, not remote clients.
 | `roundTripWeights` | `[]` | Empty means equal weights; otherwise one finite nonnegative weight per candidate, with a positive finite sum. |
 | `roundTripSpread` | `0` | Log-normal spread around the selected RTT; finite and nonnegative. |
 | `uplinkShare` | `0.5` | Fraction of RTT assigned to client-to-server travel, 0–1. |
-| `jitterSeconds` | `0` | Uniform ± spread per one-way message, finite and nonnegative; delays cannot be negative. |
-| `congestion` | Disabled | Episode settings below. |
+| `variation` | Disabled | Per-message extra delay; see below. |
+| `pauses` | Disabled | Per-direction delivery pauses; see below. |
 | `processingSeconds` | `[0, 0]` | Ordered finite nonnegative range; connection draws a base bot processing time. |
 | `processingJitterSeconds` | `0` | Uniform ± spread per decision, finite and nonnegative. |
 
 The largest possible delay must be finite. The generator's normal draw is at
 most about 8.57 and its exponential draws at most about 36.7 times their mean,
-so `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + extraSeconds[1] +
-jitterSeconds` and `processingSeconds[1] + processingJitterSeconds` must be
-finite. Measured `processingSeconds` supplied with a bot decision replaces its
-modeled duration. Rust also provides `LatencyConfig::fixed(rtt)` and
-`LatencyConfig::one_way(uplink, downlink)`.
+so `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + medianSeconds ×
+exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` must
+be finite. Measured `processingSeconds` supplied with a bot decision replaces its
+modeled duration. Rust also provides `LatencyConfig::fixed(rtt)`,
+`LatencyConfig::one_way(uplink, downlink)` and `LatencyConfig::measured_route()`.
 
-### Congestion
+### Variation and pauses
 
-All values must be finite. Means must also stay finite at 36.7 times their value.
+Each direction is one ordered stream. A message's delay is its base share plus
+`medianSeconds × exp(logSigma × (√c·X + √(1−c)·Z))`, with `c` the
+`correlatedShare`, `Z` a fresh normal draw and `X` a slow unit-variance
+Ornstein–Uhlenbeck state per direction. Delivery pauses then hold every message
+due inside them until they end, so held frames arrive together.
 
-| Field under `congestion` | Default | Meaning / limits |
+| Field | Default | Meaning / limits |
 | --- | --- | --- |
-| `ratePerSecond` | `0` | Mean episode starts/connection-second, nonnegative; zero disables episodes. |
-| `durationSeconds` | `0` | Mean exponentially drawn episode duration, nonnegative. |
-| `followProbability` | `0` | Chance of a follow-up episode, 0–1. |
-| `followSeconds` | `0` | Mean exponentially drawn wait for a follow-up, nonnegative. |
-| `extraSeconds` | `[0, 0]` | Ordered nonnegative extra RTT bounds; Pareto draw from the lower bound, capped at the upper. A zero lower bound adds nothing. |
-| `shape` | `1` | Pareto shape, positive. |
+| `variation.medianSeconds` | `0` | Median extra delay, finite and nonnegative; zero disables variation. |
+| `variation.logSigma` | `0` | Log standard deviation, finite and nonnegative. |
+| `variation.correlatedShare` | `0` | Share of log variance from the slow state, 0–1. |
+| `variation.correlationSeconds` | `0` | Decorrelation time of the slow state; positive when the share is. |
+| `pauses.ratePerSecond` | `0` | Poisson pause starts per second and direction, at most 1000 (a processing bound; delivery cannot resolve finer pauses); zero disables pauses. |
+| `pauses.meanSeconds` | `0` | Mean exponential pause length. `ratePerSecond × meanSeconds` must be at most 1: merged pauses last `(e^(rate × mean) − 1) / rate` on average, so more covers nearly all time. |
+
+`LatencyConfig::measured_route()` is the retained low-RTT official route fitted
+on training sessions and checked on held-out ones by the
+[network path study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-network-path/REPORT.md):
+
+```json
+{"roundTripSeconds": [0.004974],
+ "variation": {"medianSeconds": 0.001901, "logSigma": 0.5066,
+               "correlatedShare": 0.1771, "correlationSeconds": 1.837},
+ "pauses": {"ratePerSecond": 1.646, "meanSeconds": 0.01393}}
+```
+
+It matches the route's delay quantiles far better than uniform jitter (held-out
+KS distance 0.04 instead of 0.30) but overpredicts the p99 by about 30% and
+misses some correlation. Its base round trip assumes replies within a tick, as
+the host gives; its even split and mirrored uplink are assumptions. Add it only
+where no real path exists, such as in-process bots or a loopback player.
 
 ## NetworkConfig
 
@@ -344,7 +368,7 @@ beside the owning code.
 | Wire prey speeds, turn rate, size | Their `u16`/`u8` packet fields; see [SimulationConfig](#simulationconfig). |
 | Wire prey `count ≤ 65,536`; at most 65,536 prey live | Protocol-19 prey IDs are `u16`; each living prey keeps a unique one. A retired ID is free at once, since every connection receives its removal before any reuse in the same broadcast. |
 | `customSkin` ≤ 255 bytes | Appearances give its length in one byte. |
-| `minimapSide ≥ 1`, positive intervals, `decisionTicks`/`broadcastTicks ≥ 1` | Empty maps and zero periods have no meaning; broadcasts fall on ticks divisible by `broadcastTicks`. |
+| `minimapSide ≥ 1`, positive intervals, `decisionTicks ≥ 1` | Empty maps and zero periods have no meaning. |
 
 Domains such as finite values, nonnegative delays, probabilities in 0–1 and
 ordered ranges follow from each field's meaning.
@@ -360,7 +384,7 @@ line, `warnings` in `serve` reset replies, `UserWarning` in Python):
 
 - `dt` outside the measured 6.94–7.07 ms server loop. Contact, pickup and event
   timing may differ; prey still move in fixed 7 ms substeps.
-- `broadcastTicks × dt × 437.5 ≥ 126`: snakes that outrun the incremental
+- `dt × 437.5 ≥ 126`: snakes that outrun the incremental
   body-update window are resent in full, costing bandwidth.
 
 Defaults such as food admission cells, kiosk rates, prey behavior, vision and

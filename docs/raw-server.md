@@ -32,6 +32,7 @@ Save as `arena.json`:
   "seed": 7,
   "maxClients": 4,
   "bots": 4,
+  "botThreads": 2,
   "simulation": {
     "world": {
       "radius": 1500,
@@ -41,8 +42,7 @@ Save as `arena.json`:
       "dt": 0.007,
       "prey": { "count": 6 }
     },
-    "broadcastTicks": 6,
-    "leaderboardIntervalSeconds": 3.0
+    "leaderboardIntervalSeconds": 3.008
   }
 }
 ```
@@ -65,7 +65,10 @@ valid but unmeasured settings to stderr; see [limits](configuration.md#limits). 
 
 `--bind IP:PORT` overrides the file. Real sockets already include network and
 compute delay; configured latency adds another ordered link. Keep added latency
-at zero for normal remote use. Client processing delay is not simulated twice.
+at zero for normal remote use; on loopback, the
+[measured route](configuration.md#variation-and-pauses) gives every connection,
+bots included, an official-like path. Client processing delay is not simulated
+twice.
 
 ### Presets
 
@@ -101,9 +104,50 @@ The host serves plain `ws`. For `wss`, use a TLS reverse proxy forwarding
 WebSocket upgrades on `/slither`; HTTPS browser pages require `wss`.
 Game assets are not included.
 
-One nonblocking loop owns the world and bounded connection queues. Slow clients
-are disconnected before exhausting output buffers. An overloaded host may slow
-world time; it does not skip physics ticks to catch up.
+The simulation thread owns the world, runs physics and encodes updates every
+tick. A separate socket thread owns the listener and nonblocking connections;
+it sends each frame at its latency-model delivery time, without waiting for the
+next physics tick. Actual delivery also depends on OS scheduling and host load.
+Slow clients are disconnected before exhausting output buffers. An overloaded
+host defers wall-clock ticks and shifts the shared delivery schedule; it slows
+world time without skipping physics.
+
+`botThreads` (default 2) runs background seekers off the simulation thread.
+Each bot decodes its own slot's frames, decides every `decisionTicks × dt` with
+staggered phases, models processing delay, pings and rejoins after death.
+At least one worker is required when `bots > 0`; the host starts no more workers
+than bots. Socket clients choose their own decision intervals.
+
+## Embedding and load checks
+
+`Host::bind(config)?.start()?` consumes the bound host and returns `RunningHost`.
+Keep that handle alive while serving. `Host::poll()` has been removed.
+
+| `RunningHost` method | Meaning |
+| --- | --- |
+| `local_addr()` | Bound socket address. |
+| `ticks()` / `deferred_ticks()` | Executed physics ticks / wall-clock ticks postponed under load. |
+| `simulation_seconds()` | Wall seconds spent running simulation ticks; divide its increase by elapsed wall time for simulation-thread load. |
+| `players()` | Connected socket players, excluding background bots. |
+| `wait()` | Consume the handle and block until a host thread fails; return its error. |
+| `stop()` | Consume the handle, stop and join all threads; report any earlier failure. |
+
+Dropping `RunningHost` also stops and joins its threads. `Host::run()` is
+`start()` followed by `wait()`.
+
+From a checkout, the
+[`host_load` example](https://github.com/NikitaMGrimm/slither-sim/blob/main/examples/host_load.rs)
+measures simulation-thread load, deferred ticks and loopback watcher excess delay:
+
+```sh
+cargo run --release --locked --features networking --example host_load -- --bots 500 --seconds 60
+```
+
+Options include `--bot-threads` (default 2) and `--round-trip-ms` (default 40,
+without jitter). Excess delay is receipt time minus server time, relative to
+the minimum in each 1,200-frame chunk; it is not absolute one-way latency.
+The [tail-jitter study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-tail-jitter/REPORT.md)
+records exploratory results from one shared Windows desktop.
 
 ## Packet compatibility
 
@@ -129,14 +173,16 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 
 ### Reports and game-over
 
-- `l`: top ten living snakes, recipient rank and population, on entry and every
-  `leaderboardIntervalSeconds` (default 3; positive and finite).
+- `l`: top ten living snakes, recipient rank and population, on a server-wide
+  clock of `leaderboardIntervalSeconds` (default 3.008) after the recipient's
+  own snake appears.
 - `k`: simulator collision-attributed kills.
 - `F`: nonempty sector listings on entry; empty subscriptions stay internal and
   send neither `W` nor an empty `F`. Births/pickups update subscribed food;
   `w` clears on exit. See [food delivery](server-rules.md#food-sector-delivery).
 - `M`/`V`: a global minimap (136×136 by default, configurable via
-  `simulation.minimapSide`) on an independent nominal 2.5-second clock.
+  `simulation.minimapSide`) on its own server-wide clock (default 2.504 s),
+  first in its frame.
   First, reconnected and resized maps use full `M`; later maps use XOR `V` only
   when strictly shorter than `M`, against that connection's last queued bitmap.
   Living heads and body centerlines are rasterized; the stock client draws its
@@ -166,8 +212,9 @@ streaming and answering pings until the client closes, including during victory
 entry. It sets no fixed menu timer. Delivery remains subject to configured tick
 cadence, link delays and host load.
 
-These ranking, cadence and record rules are local policies, not recovered official
-server rules. Keyboard turns use 0.033 times the size turn factor per count;
+These ranking and record rules are local policies; packet cadences use a
+[partial model with measured constraints](server-rules.md#packet-timing).
+Keyboard turns use 0.033 times the size turn factor per count;
 this remains an approximation. Ignored unknown packets are not decoded features.
 
 ## Presentation

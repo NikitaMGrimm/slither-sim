@@ -161,16 +161,17 @@ selects header-free framing, including bundled packets. Body contraction outside
 See the [configuration reference](configuration.md) for all world, simulation,
 latency and network fields, their defaults and limits.
 
-Defaults: one snake, six 7 ms ticks per decision/broadcast, 136×136 minimap every
-2.5 seconds, leaderboard on entry/every 3 seconds and zero added delay.
+Defaults: one snake, six 7 ms ticks per decision, gameplay emission every tick
+with [per-family release rules](server-rules.md#packet-timing), 136×136 minimap
+and leaderboard on server-wide 2.504/3.008-second clocks and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.
 
 Latency settings include `roundTripSeconds`, `roundTripWeights`, `roundTripSpread`,
-`uplinkShare`, `jitterSeconds`, `congestion`, `processingSeconds` and
+`uplinkShare`, `variation`, `pauses`, `processingSeconds` and
 `processingJitterSeconds`:
 
 ```json
-{"op":"simulation","seed":7,"config":{"agents":4,"latency":{"roundTripSeconds":[0.04,0.12],"roundTripWeights":[3,1],"jitterSeconds":0.003,"processingSeconds":[0.005,0.02]}}}
+{"op":"simulation","seed":7,"config":{"agents":4,"latency":{"roundTripSeconds":[0.04,0.12],"roundTripWeights":[3,1],"variation":{"medianSeconds":0.002,"logSigma":0.5},"processingSeconds":[0.005,0.02]}}}
 ```
 
 The same build, seed, config, actions and processing durations reproduce virtual
