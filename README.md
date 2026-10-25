@@ -17,7 +17,7 @@
   <a href="https://github.com/NikitaMGrimm/slither-sim/actions/workflows/checks.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/NikitaMGrimm/slither-sim/checks.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
   <a href="https://github.com/NikitaMGrimm/slither-sim/releases"><img alt="Release" src="https://img.shields.io/github/v/release/NikitaMGrimm/slither-sim?style=flat-square"></a>
   <a href="https://crates.io/crates/slither-sim"><img alt="crates.io" src="https://img.shields.io/crates/v/slither-sim?style=flat-square"></a>
-  <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/Cargo.toml"><img alt="Rust 1.86+" src="https://img.shields.io/badge/rust-1.86%2B-orange?style=flat-square"></a>
+  <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/Cargo.toml"><img alt="Rust 1.99+" src="https://img.shields.io/badge/rust-1.99%2B-orange?style=flat-square"></a>
   <a href="https://github.com/NikitaMGrimm/slither-sim/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
 </p>
 
@@ -27,7 +27,7 @@
 
 ## Quick start
 
-Install [Rust](https://www.rust-lang.org/tools/install) 1.86 or newer and its
+Install [Rust](https://www.rust-lang.org/tools/install) 1.99 or newer and its
 platform build tools, then run a food-seeking bot:
 
 ```sh

@@ -15,7 +15,7 @@ Go directly to the task you need:
 
 For development setup and test commands, use [contributing](../CONTRIBUTING.md#setup-and-checks).
 
-For the evidence workflow below, use Python 3.12, uv, Rust 1.86+ and Node.js 22+
+For the evidence workflow below, use Python 3.12, uv, Rust 1.99+ and Node.js 22+
 (24 recommended). Rust-only and documentation work can skip this setup:
 
 ```sh

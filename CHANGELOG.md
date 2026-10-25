@@ -20,7 +20,7 @@
   this release on, each crate release publishes the same version there.
   Stable-ABI wheels serve CPython 3.11+ on Linux (x86-64 and ARM64), macOS (Apple
   silicon and Intel) and Windows (x86-64); elsewhere the source distribution
-  builds with Rust 1.86+. See the [Python guide](docs/python.md).
+  builds with Rust 1.99+. See the [Python guide](docs/python.md).
 - GitHub Releases include prebuilt archives of the `slither-sim` CLI and the C
   ABI library with its header, for Linux (x86-64 and ARM64, glibc 2.17+), macOS
   (Apple silicon and Intel) and Windows (x86-64), with a `SHA256SUMS` file. They
@@ -50,6 +50,8 @@
 
 ### Breaking
 
+- The minimum supported Rust version is now 1.99 (was 1.86), so the code can
+  use let chains and other recent language features.
 - `SimulationConfig.broadcastTicks` is removed; JSON configs containing it are
   rejected as unknown fields. Remove it to use per-tick gameplay emission.
 - `LatencyConfig.jitterSeconds` and `congestion` are removed; JSON configs

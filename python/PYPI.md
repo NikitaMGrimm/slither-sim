@@ -24,7 +24,7 @@ print(session.frame(1).time)
 
 Wheels use the stable ABI for CPython 3.11 and later. They cover Linux
 (x86-64 and ARM64, glibc 2.17+), macOS (Apple silicon and Intel) and Windows
-(x86-64). Elsewhere, pip builds the source distribution, which needs Rust 1.86+.
+(x86-64). Elsewhere, pip builds the source distribution, which needs Rust 1.99+.
 
 - [Python package guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/python.md):
   API, frame columns, threads and timing

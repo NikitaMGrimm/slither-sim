@@ -27,7 +27,7 @@ the source owner and its callers, then start with the matching test.
 ## Setup and checks
 
 Run focused tests for the affected owner first, then the relevant group from the
-repository root. Rust work needs Rust 1.86+ and platform build tools; the check
+repository root. Rust work needs Rust 1.99+ and platform build tools; the check
 runner uses standard-library Python 3.11+. Documentation-only changes need
 accuracy/link review and the documentation test above, without a Rust build.
 
@@ -43,7 +43,7 @@ Before the tools group, run `uv sync --locked --only-group tools`. `all` runs
 to inspect its commands without running them. Each command reports its time,
 and CI adds a timing table to the job summary. Tests use doubles or loopback,
 never outside game servers. PR CI invokes the same runner automatically: `lint`,
-WASM and package once on Linux, `test` on Linux, Windows, macOS and Rust 1.86,
+WASM and package once on Linux, `test` on Linux, Windows, macOS and Rust 1.99,
 and `tools` on Linux, Windows and macOS. The weekly
 [extended checks](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/workflows/extended.yml) add release-profile tests,
 Linux ARM tests and a RustSec audit; they block nothing and can be dispatched.

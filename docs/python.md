@@ -16,7 +16,7 @@ pip install slither-sim
 per platform serves CPython 3.11 and later. They cover Linux (x86-64 and ARM64,
 glibc 2.17+), macOS (Apple silicon and Intel) and Windows (x86-64), and have no
 runtime dependencies. Elsewhere, pip builds the source distribution, which needs
-Rust 1.86+. Each crate release publishes the same version to PyPI.
+Rust 1.99+. Each crate release publishes the same version to PyPI.
 
 ## Install from a checkout
 

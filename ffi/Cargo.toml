@@ -2,7 +2,7 @@
 name = "slither-sim-ffi"
 version.workspace = true
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.99"
 description = "C ABI over slither-sim transport sessions (slither-sim-abi-v2)"
 repository = "https://github.com/NikitaMGrimm/slither-sim"
 license = "MIT"
