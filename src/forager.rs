@@ -302,6 +302,7 @@ impl Params {
         if !(1..=MAX_CELLS).contains(&self.cells)
             || !(1..=MAX_FAN).contains(&self.fan_len)
             || self.race_cells == 0
+            || self.reach_extra < 0.0
             || self.cell <= 0.0
             || self.lookahead_seconds <= 0.0
             || !(0.0..=1.0).contains(&self.uplink_share)
@@ -792,7 +793,7 @@ fn rival_arrival(rivals: &[(Point, f64, f64)], q: Point, by: f64) -> f64 {
         let reach = (best * speed + mouth) * (1.0 + 1e-9);
         let d2 = (head.x - q.x).powi(2) + (head.y - q.y).powi(2);
         if d2 < reach * reach {
-            best = best.min((d2.sqrt() - mouth).max(0.0) / speed);
+            best = best.min((head.distance(q) - mouth).max(0.0) / speed);
         }
     }
     best
@@ -1287,8 +1288,7 @@ impl Scene {
             reach =
                 reach.max(speed * p.lookahead_seconds + 2.0 * me.width + me.speed * p.exit_seconds);
         }
-        let near_within =
-            |q: Point, reach2: f64| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2) < reach2;
+        let from_head = |q: Point| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2);
         let steps = p.head_path_steps.max(1);
         for (k, enemy) in o.opponents.iter().enumerate() {
             if !enemy.alive {
@@ -1317,7 +1317,20 @@ impl Scene {
                 );
             }
             let reach2 = reach * reach;
-            let close = |q: Point| near_within(q, reach2);
+            let close = |q: Point| from_head(q) < reach2;
+            // Exit branches are tested against whole segments, so a segment
+            // whose ends both miss the gathering disc may still cross it.
+            let crosses = |a: Point, b: Point, margin: f64| {
+                p.exit_weight > 0.0
+                    && crosses_disc(
+                        a,
+                        b,
+                        from_head(a),
+                        from_head(b),
+                        me.head,
+                        (reach + margin).powi(2),
+                    )
+            };
             // Forecast trail points between the forecast and observed heads
             // when the head turns during the lead, newest first.
             let mut trail = [Point::default(); 2];
@@ -1344,10 +1357,15 @@ impl Scene {
                 }
                 let middle = path(view.lead + p.lookahead_seconds / 2.0);
                 let ahead = path(view.lead + p.lookahead_seconds);
-                if close(head) || close(middle) || close(ahead) {
+                let half = p.lookahead_seconds / 2.0;
+                let bow = bow(enemy.speed * half, (turn * half).min(delta.abs()));
+                if close(head)
+                    || close(middle)
+                    || close(ahead)
+                    || crosses(head, middle, bow)
+                    || crosses(middle, ahead, bow)
+                {
                     let w = width + unsure * enemy.speed;
-                    let half = p.lookahead_seconds / 2.0;
-                    let bow = bow(enemy.speed * half, (turn * half).min(delta.abs()));
                     near.push(
                         Obstacle::new(head, middle, w, k, true)
                             .during(0.0, half)
@@ -1374,7 +1392,7 @@ impl Scene {
                     }
                 }
                 let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
-                if close(head) || close(ahead) {
+                if close(head) || close(ahead) || crosses(head, ahead, 0.0) {
                     near.push(
                         Obstacle::new(head, ahead, width + unsure * enemy.speed, k, true)
                             .during(0.0, p.lookahead_seconds),
@@ -1384,7 +1402,7 @@ impl Scene {
             };
             // During the lead the observed head became body behind the forecast head.
             let mut previous = head;
-            let mut was_close = close(previous);
+            let mut previous2 = from_head(previous);
             let observed = (view.lead > 0.0).then_some(enemy.head);
             for point in trail[..trail_len]
                 .iter()
@@ -1392,8 +1410,12 @@ impl Scene {
                 .chain(observed)
                 .chain(enemy.body.iter().copied())
             {
-                let is_close = close(point);
-                if is_close || was_close {
+                let point2 = from_head(point);
+                if point2 < reach2
+                    || previous2 < reach2
+                    || (p.exit_weight > 0.0
+                        && crosses_disc(previous, point, previous2, point2, me.head, reach2))
+                {
                     near.push(Obstacle::new(previous, point, width, k, false));
                 }
                 // A boost-reach regather keeps the cruise scene's occupancy.
@@ -1401,7 +1423,7 @@ impl Scene {
                     scene.occupied[i] = true;
                 }
                 previous = point;
-                was_close = is_close;
+                previous2 = point2;
             }
         }
         scene
@@ -2179,6 +2201,16 @@ fn exit_branches(me: &Me, head: Point, heading: f64, dt: f64, tip: f64) -> (Bran
     (heads, tips)
 }
 
+/// Whether segment `a`-`b`, both ends further than `r` (squared `r2`) from
+/// `c`, still passes within it. Its nearest point is then interior, so the
+/// segment is at least as long as both tangent lengths: a cheap test leaves
+/// only long segments near the disc for the exact distance.
+/// `a2` and `b2` are the ends' squared distances from `c`.
+fn crosses_disc(a: Point, b: Point, a2: f64, b2: f64, c: Point, r2: f64) -> bool {
+    (a.x - b.x).powi(2) + (a.y - b.y).powi(2) >= a2 - r2 + b2 - r2
+        && segment_distance(c, a, b).powi(2) < r2
+}
+
 /// Chords per exit branch: at the default 0.4 s a cruising snake moves
 /// about 18 units per chord, less than two minimum widths.
 const EXIT_CHORDS: usize = 4;
@@ -2380,6 +2412,37 @@ mod tests {
                 y: 210.0 - i as f64 * 42.0,
             })
             .collect();
+        o.opponents.push(enemy);
+        let p = Params {
+            exit_weight: 3.0,
+            ..Params::default()
+        };
+        let mut me = Me::new(&o.me);
+        me.safe = p.safe;
+        let mut s = Scratch::default();
+        let lists = scratch_lists(&mut s.near, &mut s.arcs, &mut s.exits);
+        gather(&still_view(&o), &me, &p, &[], false, lists);
+        let (path, points, _) = arc(&me, &p, 0.0, None);
+        let (end, heading) = path[points - 1];
+        assert!(blocked_exits(&o, &me, &p, &s.exits, end, heading, 0.0, f64::INFINITY) > 0.0);
+    }
+
+    #[test]
+    fn exit_gathering_keeps_a_segment_whose_ends_lie_outside_its_reach() {
+        // Follow-up review of 859b215: both ends of this short segment lie
+        // just beyond the gathering radius, yet the straight exit branch
+        // passes within its width.
+        let mut o = lone();
+        let mut enemy = o.me.clone();
+        enemy.head = Point {
+            x: 181.796875,
+            y: 21.0,
+        };
+        enemy.heading = std::f64::consts::FRAC_PI_2;
+        enemy.body = vec![Point {
+            x: 181.796875,
+            y: -21.0,
+        }];
         o.opponents.push(enemy);
         let p = Params {
             exit_weight: 3.0,

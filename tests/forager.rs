@@ -454,6 +454,10 @@ fn invalid_parameters_are_rejected() {
             race_cells: 0,
             ..defaults
         },
+        Params {
+            reach_extra: -1.0,
+            ..defaults
+        },
     ] {
         assert!(bad.validate().is_err(), "{bad:?}");
     }
