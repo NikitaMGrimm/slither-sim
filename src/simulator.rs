@@ -114,15 +114,7 @@ impl Preset {
     }
 }
 
-// `remote = "Self"` turns the derived impls into inherent functions, which the
-// trait impls below wrap to accept `preset`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(
-    remote = "Self",
-    default,
-    rename_all = "camelCase",
-    deny_unknown_fields
-)]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// Boundary radius; the starting radius when `dynamicRadius` is set.
     pub radius: f64,
@@ -155,24 +147,56 @@ pub struct Config {
     /// Provisional local admission cap on new boost pellets.
     pub boost_food: BoostFoodConfig,
     /// Optional one-way inner boundary; leaving it kills with `DeathReason::Pit`.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub pit: Option<PitConfig>,
     /// Fixed distance of new lives from the center; `None` keeps the official
     /// radial grid of `spawn::sample_spawn_distance`.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub spawn_radius: Option<f64>,
     /// Window of `Simulator::kill_score`: each credited kill counts for this
     /// many seconds, across the slot's lives. `None` keeps no kill score.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub kill_score_seconds: Option<f64>,
     /// Least displayed score: new lives start at the least mass that displays
     /// it, and boosting or the kiosk penalty spend only mass above that floor;
     /// boosting at the floor is free.
     /// Requires `spawn_radius`, the ring that new bodies lie along. Read when a
     /// world is created.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub min_score: Option<u32>,
 }
+
+// Private wire representation; public serde calls must go through preset handling.
+#[derive(Serialize, Deserialize)]
+#[serde(
+    remote = "Config",
+    default = "Config::default",
+    rename_all = "camelCase",
+    deny_unknown_fields
+)]
+struct ConfigWire {
+    radius: f64,
+    dynamic_radius: bool,
+    vision: f64,
+    food_count: usize,
+    ambient_replenish_per_second: f64,
+    dt: f64,
+    food_index: bool,
+    emit_boost_food: bool,
+    speed_model: SpeedModel,
+    prey: PreyConfig,
+    radius_updates: Vec<crate::RadiusUpdate>,
+    boundary_mode: crate::BoundaryMode,
+    kiosk: KioskConfig,
+    death_food: DeathFoodConfig,
+    ambient_food: AmbientFoodConfig,
+    boost_food: BoostFoodConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pit: Option<PitConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    spawn_radius: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kill_score_seconds: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min_score: Option<u32>,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self::official(1)
@@ -180,7 +204,7 @@ impl Default for Config {
 }
 impl Serialize for Config {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        Config::serialize(self, serializer)
+        ConfigWire::serialize(self, serializer)
     }
 }
 impl<'de> Deserialize<'de> for Config {
@@ -214,7 +238,7 @@ impl<'de> Deserialize<'de> for Config {
                 base
             }
         };
-        Config::deserialize(Value::Object(fields)).map_err(D::Error::custom)
+        ConfigWire::deserialize(Value::Object(fields)).map_err(D::Error::custom)
     }
 }
 /// Whether segment `a`-`b` passes within `radius` of the center. Endpoints

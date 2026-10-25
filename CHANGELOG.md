@@ -113,6 +113,9 @@
 
 ### Fixed
 
+- Rust `Config::deserialize` now accepts presets just like JSON parsing; it no
+  longer bypasses preset handling ([presets](docs/configuration.md#presets)).
+
 - A default `host` no longer refuses every player with `No clear spawn
   position`. Dynamic host arenas start sized for all seats, and a crowded world
   places a join at the most open spot ([hosting](docs/raw-server.md#presets)).
