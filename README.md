@@ -51,10 +51,10 @@ embed the simulator directly; see [the basic example](examples/basic.rs).
 
 ### Download a release
 
-Without Rust, download an archive from a [release](https://github.com/NikitaMGrimm/slither-sim/releases).
-Each holds the `slither-sim` CLI and the [C ABI](docs/c-api.md) library with its
-header, for Linux x86-64 and ARM64 (glibc 2.17+), macOS (Apple silicon and
-Intel) and Windows x86-64. `SHA256SUMS` lists their checksums.
+[Release archives](https://github.com/NikitaMGrimm/slither-sim/releases) need no
+Rust installation. They contain the `slither-sim` CLI, [C ABI](docs/c-api.md)
+library and header for Linux x86-64 and ARM64 (glibc 2.17+), macOS (Apple silicon
+and Intel) and Windows x86-64. Verify checksums with `SHA256SUMS`.
 
 ```sh
 curl -LO https://github.com/NikitaMGrimm/slither-sim/releases/latest/download/slither-sim-x86_64-unknown-linux-gnu.tar.gz
@@ -96,26 +96,22 @@ The host binds loopback by default. Stop it with Ctrl+C.
 | Run `serve` sessions in-process from Python | [Python package](docs/python.md). |
 | Run `serve` sessions in-process from any language | [C ABI](docs/c-api.md), or Rust `transport::Session`. |
 
-The portable backends share a Rust packet decoder; bots in other languages use
-JSON, or the C ABI for `serve` sessions. The geometric `serve` API provides direct observations without network delay.
+Portable backends share a Rust packet decoder; other languages use JSON or the
+C ABI for `serve`. The geometric `serve` API has no network delay.
 See [interface versions](docs/client-api.md#interface-versions) for compatibility.
 
 ## Defaults and fidelity
 
-The defaults combine measured movement and protocol constants with approximate
-visibility, spawning and ecology; see [rules and evidence limits](docs/server-rules.md).
+The default world, [`Config::official(1)`](docs/configuration.md#official-and-sandbox),
+initializes for one snake. It combines measured movement and protocol constants
+with provisional visibility, spawning and ecology models; it is not an exact
+official replica. [`Config::sandbox()`](docs/configuration.md#official-and-sandbox)
+uses the same mechanics in a compact fixed arena.
 
-The default world is `Config::official(1)`: the best current approximation of an
-official server, initialized for one snake, with dynamic radius, scaled food and
-one prey. It includes provisional models and is not an exact official replica.
-`Config::sandbox()` keeps the same mechanics in a compact fixed arena. See
-[official and sandbox](docs/configuration.md#official-and-sandbox) for both and
-[rules and evidence limits](docs/server-rules.md) for what has been measured.
-
-`Config::battledome()` adds our custom arena mode: a one-way pit, a permanent
-400-point size floor and a rolling kill score. Boosting at the floor is free and
-drops no pellets. These are mode design choices, not measured official rules.
-See [Battledome settings and bot visibility](docs/configuration.md#battledome).
+[`Config::battledome()`](docs/configuration.md#battledome) adds a custom one-way
+pit, permanent 400-point size floor, free boost at the floor without pellets and
+rolling kill score. These are mode design choices. See
+[rules and evidence limits](docs/server-rules.md) for measured behavior and gaps.
 
 ## Development
 
