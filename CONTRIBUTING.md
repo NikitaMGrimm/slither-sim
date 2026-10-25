@@ -15,6 +15,7 @@ the source owner and its callers, then start with the matching test.
 | Task | Guide and source / tests | Focused check |
 | --- | --- | --- |
 | Mechanics, motion, food, prey | [Rules, limits and next steps](docs/server-rules.md#packaged-regression-evidence); `src/simulator.rs`, `src/physics.rs`, `src/prey.rs`; matching `tests/*.rs` and `tests/fixtures/` | `cargo test --locked --test movement_turns` (choose the affected test) |
+| Custom Battledome rules and presets | [Battledome](docs/configuration.md#battledome); `src/simulator.rs`, `src/spawn.rs`; `tests/battledome.rs` | `cargo test --locked --test battledome` |
 | Bot JSON API and lifecycle | [Client API](docs/client-api.md), [direct API](docs/bot-api.md); `src/main.rs`, `src/client/mod.rs`, `src/client/received.rs`; `tests/client_contract.rs`, `tests/client_runner.rs`, `tests/transport.rs` | `cargo test --locked --test client_contract` |
 | In-process C ABI | [C ABI](docs/c-api.md); `ffi/src/lib.rs`, `ffi/include/slither_sim.h`, `examples/ffi_bot.py`; `ffi/tests/abi.rs` | `cargo test --locked -p slither-sim-ffi` |
 | Python package | [Python package](docs/python.md); `python/src/lib.rs`, `python/slither_sim.pyi`, `python/examples/`; `python/tests/test_session.py` | `uv run --locked --only-group tools python -m maturin build --locked -m python/Cargo.toml`, then `python python/tests/run.py target/wheels` |

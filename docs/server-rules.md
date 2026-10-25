@@ -12,6 +12,10 @@ retain dated measurements, failed fits and counterexamples.
 mechanics in a compact fixed arena. Neither is an exact official replica. See
 [configuration](configuration.md#official-and-sandbox) for all defaults and overrides.
 
+[`Config::battledome()`](configuration.md#battledome) is a custom mode. Its pit,
+size floor and free boost at the floor are design choices, not official-server
+measurements; the linked reference owns those rules and their regression tests.
+
 The radius controller, food admission limits, prey population, kiosk penalty and
 rim sliding are provisional. In particular:
 
@@ -57,7 +61,7 @@ A receipt, a reconstructed pose and renderer prediction are different states.
 | Food interest | 45 sectors: 7×7 without four corners, 300 units per sector, center led 100 units along physical heading. Retain last-touched sectors for 2.6 s; cleanup on nominal 504 ms opportunities. | `client-food-interest.json` pins selected receipts. Later food-model counterexamples remain; scheduler and size scaling are provisional. |
 | Snakes | Complete centerline intersects `world.vision`, default 1,500. | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
 | Prey coverage | Points checked independently at the same configurable distance. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
-| Hosted spawning | Radial-lattice candidates; complete newborn body clears living heads/body edges by 600 units. Crowded admission waits or fails without a cramped fallback. | `spawn.rs` and host tests. Observed own joins include exceptions below 600; this is conservative local admission. Initial geometric test rings are synthetic. |
+| Hosted spawning | Radial-lattice candidates, or the configured `spawnRadius` ring; complete newborn body clears living heads/body edges by 600 units. Crowded admission waits or fails without a cramped fallback. | `spawn.rs` and host tests. Observed own joins include exceptions below 600; this is conservative local admission. Initial geometric test rings are synthetic. |
 | Minimap | Global living centerlines, 136×136 by default, server-wide 2.504 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
 | Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins select boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes and pooled ambient counts. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
 
@@ -97,7 +101,7 @@ following gates are adopted inferences, not an exact recovered implementation:
 | Standalone mass `h` | Changed mass, at least 15 ticks apart (105 ms at default `dt`), shared per snake. Tail removals and growth anchors can carry mass outside this gate. |
 | Body | Prompt anchors and tail changes. Incremental per-snake order is tail/standalone mass, then motion, then anchors; growth anchors carry their own mass. |
 | Food | Ambient births become wire-visible when `floor(t / 0.504)` advances, with sector cleanup on the shared maintenance epoch. Boost/death `b` and pickups are prompt; `F` listings remain an interest-entry path. Physical ambient generation is unchanged. |
-| Prey `j` | One correction clock per prey shared across viewers, nominal one third second. Exact-11 pulse transitions use a 210 ms guard; ordinary turning alone does not accelerate reporting. Quantized position need not change. Viewer entry does not restart the clock. |
+| Prey `j` | One correction clock per prey shared across viewers, with a nominal one-third-second interval. When the current or last reported speed encodes as exactly 11, the interval is 210 ms; ordinary turning alone does not accelerate reporting. Quantized position need not change. Viewer entry does not restart the clock. |
 
 The corpus includes sub-35 ms motion gaps, sub-100 ms mass gaps, 27 reverse
 mass/motion pairs and a 2,694 ms same-prey correction gap with other traffic
@@ -117,7 +121,8 @@ Minimaps and leaderboards follow two independent server-wide clocks. Officially
 both are shared by all recipients, reconnects join the running phase, and mean
 periods are 2503.994/3008.062 ms rather than 2500/3000. The simulator services
 absolute periods of 2.504/3.008 s at the first tick in each, so a first map or
-board arrives 0–2.5/3 s after entry, and puts the map first in its frame. Why
+board waits for the next clock opportunity after entry, plus tick and link delay.
+Maps precede gameplay updates, after any pongs. Why
 official periods exceed 2.5/3 s is unknown; nominal thresholds rearmed after
 service would fit, but the simulator only reproduces the mean.
 
