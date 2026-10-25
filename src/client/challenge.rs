@@ -11,7 +11,10 @@ const SUFFIX: &[u8] = b"\";for (var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}";
 /// Only the observed two-literal template (5 + 22 printable ASCII bytes) is
 /// supported. Unknown syntax fails closed; this is not a JavaScript interpreter.
 pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, String> {
-    if encoded.is_empty() || encoded.len() > MAX_SOURCE_BYTES * 2 || encoded.len() % 2 != 0 {
+    if encoded.is_empty()
+        || encoded.len() > MAX_SOURCE_BYTES * 2
+        || !encoded.len().is_multiple_of(2)
+    {
         return Err("Invalid challenge size".into());
     }
     let mut source = Vec::with_capacity(encoded.len() / 2);

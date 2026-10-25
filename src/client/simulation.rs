@@ -614,13 +614,13 @@ impl SimulatorBackend {
             if remote {
                 continue;
             }
-            if backend.remote > 0 {
-                if let Ok((body, heading)) = backend.spawn_pose(slot) {
-                    backend.world.respawn_body(slot, body, heading)?;
-                    backend.slots[slot].control.heading = heading;
-                }
-                // A crowded host leaves the slot dead; the normal background
-                // lifecycle retries admission after its first death report.
+            // A crowded host leaves the slot dead; the normal background
+            // lifecycle retries admission after its first death report.
+            if backend.remote > 0
+                && let Ok((body, heading)) = backend.spawn_pose(slot)
+            {
+                backend.world.respawn_body(slot, body, heading)?;
+                backend.slots[slot].control.heading = heading;
             }
             backend.connect(slot)?;
             backend.client_until(slot, 0.)?;
@@ -1296,10 +1296,8 @@ impl SimulatorBackend {
             let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
             let mut packets = vec![encode::pong(); pongs];
             let updates = self.updates(slot, &eaten, &bounds, &grid)?;
-            if minimap_due {
-                if let Some(packet) = self.minimap(slot, &mut map)? {
-                    packets.push(packet);
-                }
+            if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
+                packets.push(packet);
             }
             packets.extend(updates);
             // The stock client ignores a leaderboard after game over, so the
@@ -1930,7 +1928,7 @@ impl RawSimulator {
             return Err("Early slots must be remote".into());
         }
         let b = &mut self.backend;
-        if b.tick % b.config.decision_ticks as u64 == 0 {
+        if b.tick.is_multiple_of(b.config.decision_ticks as u64) {
             b.drive_background()?;
         }
         b.advance_with(early, hand_over)
@@ -4191,7 +4189,7 @@ mod tests {
         let mut a = Remote::connect(&mut sim, 0, "");
         let mut b = Remote::connect(&mut sim, 1, "");
         run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 13);
-        while sim.backend.tick % 6 != 0 {
+        while !sim.backend.tick.is_multiple_of(6) {
             run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
         }
         let snake = &mut sim.backend.world.snakes[0];
@@ -4272,7 +4270,7 @@ mod tests {
         loop {
             sim.advance_ticks(1).unwrap();
             packets.extend(remote.pump(sim, slot));
-            if sim.backend.tick % MOTION_REPORT_TICKS == 0 {
+            if sim.backend.tick.is_multiple_of(MOTION_REPORT_TICKS) {
                 return packets;
             }
         }

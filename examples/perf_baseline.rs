@@ -1369,7 +1369,7 @@ fn wander(world: &Simulator, tick: usize) -> Vec<Option<Action>> {
                 let target = (hash >> 8) as usize % count;
                 let heading = if x.hypot(y) > radius - margin {
                     (-y).atan2(-x) + jitter
-                } else if hash % 4 == 0 && target != slot && world.snakes[target].alive {
+                } else if hash.is_multiple_of(4) && target != slot && world.snakes[target].alive {
                     let other = &world.snakes[target];
                     (other.head.y + other.heading.sin() * CHASE_LEAD - y)
                         .atan2(other.head.x + other.heading.cos() * CHASE_LEAD - x)
