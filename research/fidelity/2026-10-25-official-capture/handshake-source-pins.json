@@ -1,0 +1,18 @@
+[
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\probe.mjs",
+    "sha256": "cfd89be0871063ca4f41c1e1678002257f0d7e6b32c98d9268cf47d54e132e9c"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\handshake-plan.json",
+    "sha256": "f1be9dc7b6cebd8bdbfe9d9115898e2c4d9d0f0b6f04a82c114c6dd10eca4924"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-client.js",
+    "sha256": "5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095"
+  },
+  {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-index.html",
+    "sha256": "86a86bbada89f63b57d567ce78558c35a448e294bcbd677169b4ca8c9e465643"
+  }
+]
