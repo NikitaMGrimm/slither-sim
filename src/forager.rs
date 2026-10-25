@@ -380,6 +380,10 @@ impl Timing {
 #[derive(Clone, Debug)]
 pub struct Scratch {
     near: Vec<Obstacle>,
+    /// Obstacles an exit branch from some fan arc's end can reach.
+    exits: Vec<Obstacle>,
+    /// Obstacles that can lower a fan arc's capped clearance.
+    arcs: Vec<Obstacle>,
     sweep: Vec<Point>,
 }
 
@@ -387,6 +391,8 @@ impl Default for Scratch {
     fn default() -> Self {
         Self {
             near: Vec::with_capacity(4096),
+            exits: Vec::with_capacity(4096),
+            arcs: Vec::with_capacity(4096),
             sweep: Vec::with_capacity(MAX_LEAD_SUBSTEPS + 1),
         }
     }
@@ -440,6 +446,43 @@ pub fn decide(
     let boosts = p.kill_boost || p.escape_boost || p.food_boost_value > 0.0;
     let ramp = (can_boost && boosts).then(|| me.boost_ramp());
     let scene = Scene::new(&view, &me, p, intents, ramp.is_some(), &mut scratch.near);
+    // Arc points (and their tips) lie within the fastest arc's travel plus
+    // the tip offset of the head, and exit branch tips within cruise travel
+    // plus the tip offset of an arc end. An obstacle further than that plus
+    // its half length, width and the clearance cap cannot lower a capped
+    // clearance, so fan searches scan only the obstacles that can.
+    let fastest = if ramp.is_some() {
+        me.speed.max(BOOST_SPEED)
+    } else {
+        me.speed
+    };
+    let tip = (1.0 - p.own_width_factor) * me.width;
+    let head = me.head;
+    let within = |ob: &Obstacle, r: f64| {
+        let b = r + ob.half + ob.width;
+        let (dx, dy) = (ob.mid.x - head.x, ob.mid.y - head.y);
+        dx * dx + dy * dy <= b * b * (1.0 + 1e-9) + 1e-6
+    };
+    let arc_reach = fastest * p.lookahead_seconds + tip + me.safe.max(0.0);
+    scratch.arcs.clear();
+    scratch.arcs.extend(
+        scratch
+            .near
+            .iter()
+            .copied()
+            .filter(|ob| ob.head || within(ob, arc_reach)),
+    );
+    scratch.exits.clear();
+    if p.exit_weight > 0.0 {
+        let exit_reach = fastest * p.lookahead_seconds + me.speed * p.exit_seconds + tip;
+        scratch.exits.extend(
+            scratch
+                .near
+                .iter()
+                .copied()
+                .filter(|ob| within(ob, exit_reach)),
+        );
+    }
     let mut goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
     // The best goal reachable at cruise speed, should boosting turn out unsafe.
     let mut cruise = goal;
@@ -471,7 +514,7 @@ pub fn decide(
     if goal.boost {
         if let Some(action) = ramp
             .as_ref()
-            .and_then(|r| boost_toward(o, &me, p, &scratch.near, &goal, r))
+            .and_then(|r| boost_toward(o, &me, p, &scratch.arcs, &scratch.exits, &goal, r))
         {
             return action;
         }
@@ -487,7 +530,8 @@ pub fn decide(
         o,
         &me,
         p,
-        &scratch.near,
+        &scratch.arcs,
+        &scratch.exits,
         goal,
         ramp.as_ref().filter(|_| p.escape_boost),
     )
@@ -877,16 +921,16 @@ impl Scene {
             me.speed
         };
         // A width-scaled safety margin counts obstacles that much further out.
-        let exits = if p.exit_weight > 0.0 {
-            me.speed * p.exit_seconds
-        } else {
-            0.0
-        };
-        let reach = speed * p.lookahead_seconds
+        let mut reach = speed * p.lookahead_seconds
             + 2.0 * me.width
             + p.reach_extra
-            + p.safe_width_factor * me.width
-            + exits;
+            + p.safe_width_factor * me.width;
+        if p.exit_weight > 0.0 {
+            // Exit branches run on from an arc's end; `reach_extra` usually
+            // covers them already.
+            reach =
+                reach.max(speed * p.lookahead_seconds + 2.0 * me.width + me.speed * p.exit_seconds);
+        }
         let near_within =
             |q: Point, reach2: f64| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2) < reach2;
         let steps = p.head_path_steps.max(1);
@@ -1053,7 +1097,7 @@ fn rim_kills(arena: &Arena, head: Point, heading: f64, segments: usize) -> bool 
 }
 
 /// Whether a branch `at(t)` (head and heading) dies at the rim within
-/// `TRAP_CHORDS` samples `dt` apart. Its first contact, located between
+/// `chords` samples `dt` apart. Its first contact, located between
 /// samples by bisection, is lethal or starts a slide; while sliding, the head
 /// stays on the rim, so later samples die once their heading points outward
 /// steeply at the bearing of their contact point.
@@ -1061,6 +1105,7 @@ fn branch_hits_rim(
     arena: &Arena,
     segments: usize,
     dt: f64,
+    chords: usize,
     at: impl Fn(f64) -> (Point, f64),
 ) -> bool {
     let lead = boundary::CONTACT_LEAD * scale(segments);
@@ -1068,7 +1113,7 @@ fn branch_hits_rim(
         let (q, h) = at(t);
         forward(q, h, lead).distance(arena.center) >= arena.radius
     };
-    let Some(j) = (0..=TRAP_CHORDS).find(|&j| contact(dt * j as f64)) else {
+    let Some(j) = (0..=chords).find(|&j| contact(dt * j as f64)) else {
         return false;
     };
     let (mut lo, mut hi) = (dt * j.saturating_sub(1) as f64, dt * j as f64);
@@ -1085,7 +1130,7 @@ fn branch_hits_rim(
     let (q, h) = at(hi);
     rim_kills(arena, q, h, segments)
         // Sample j itself follows the bisected contact.
-        || (j..=TRAP_CHORDS).any(|i| {
+        || (j..=chords).any(|i| {
             let (q, h) = at(dt * i as f64);
             let tip = forward(q, h, lead);
             let (x, y) = (tip.x - arena.center.x, tip.y - arena.center.y);
@@ -1135,7 +1180,7 @@ impl Escapes {
             };
             let heads: [(Point, f64); TRAP_CHORDS + 1] = std::array::from_fn(|j| at(dt * j as f64));
             tips[b] = heads.map(|(q, h)| forward(q, h, radius));
-            blocked[b] = branch_hits_rim(&o.arena, enemy.segments, dt, at);
+            blocked[b] = branch_hits_rim(&o.arena, enemy.segments, dt, TRAP_CHORDS, at);
         }
         // Other snakes' gathered bodies: a tip crossing their centre line, or
         // within their radius of it, dies.
@@ -1592,11 +1637,13 @@ fn timed_clearance(
 
 /// (cost, heading, clearance, offset) of the cheapest fan arc toward `goal`,
 /// at cruise speed or, with `ramp`, accelerating.
+#[allow(clippy::too_many_arguments)]
 fn search(
     o: &Observation,
     me: &Me,
     p: &Params,
     near: &[Obstacle],
+    exits: &[Obstacle],
     goal: &Goal,
     ramp: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> (f64, f64, f64, f64) {
@@ -1613,7 +1660,7 @@ fn search(
         if p.exit_weight > 0.0 && cost < best.0 {
             let (path, points, _) = arc(me, p, heading, ramp);
             let (end, end_heading) = path[points - 1];
-            cost += p.exit_weight * blocked_exits(o, me, p, near, end, end_heading);
+            cost = blocked_exits(o, me, p, exits, end, end_heading, cost, best.0);
         }
         if cost < best.0 {
             best = (cost, heading, clearance, offset);
@@ -1622,12 +1669,64 @@ fn search(
     best
 }
 
+/// Heads and tips of our hard-left, straight and hard-right exit branches
+/// at `EXIT_CHORDS + 1` samples `dt` apart.
+type Branches = [[Point; EXIT_CHORDS + 1]; 3];
+fn exit_branches(me: &Me, head: Point, heading: f64, dt: f64, tip: f64) -> (Branches, Branches) {
+    // The left branch mirrors the right one across our heading line, so only
+    // the right one needs the turn's trigonometry.
+    let (ux, uy) = (heading.cos(), heading.sin());
+    let mirror = |x: f64, y: f64| {
+        let (a, b) = (x * ux + y * uy, y * ux - x * uy);
+        (a * ux + b * uy, a * uy - b * ux)
+    };
+    let mut heads: Branches = [[Point::default(); EXIT_CHORDS + 1]; 3];
+    let mut tips: Branches = [[Point::default(); EXIT_CHORDS + 1]; 3];
+    for j in 0..=EXIT_CHORDS {
+        let t = dt * j as f64;
+        let q = turn_then_straight(head, heading, std::f64::consts::PI, me.speed, me.turn, t);
+        let h = heading + std::f64::consts::PI.min(me.turn * t);
+        let (dx, dy) = (h.cos() * tip, h.sin() * tip);
+        heads[2][j] = q;
+        tips[2][j] = Point {
+            x: q.x + dx,
+            y: q.y + dy,
+        };
+        let (mx, my) = mirror(q.x - head.x, q.y - head.y);
+        let (tx, ty) = mirror(dx, dy);
+        heads[0][j] = Point {
+            x: head.x + mx,
+            y: head.y + my,
+        };
+        tips[0][j] = Point {
+            x: heads[0][j].x + tx,
+            y: heads[0][j].y + ty,
+        };
+        let d = me.speed * t;
+        heads[1][j] = Point {
+            x: head.x + ux * d,
+            y: head.y + uy * d,
+        };
+        tips[1][j] = Point {
+            x: heads[1][j].x + ux * tip,
+            y: heads[1][j].y + uy * tip,
+        };
+    }
+    (heads, tips)
+}
+
+/// Chords per exit branch: at the default 0.4 s a cruising snake moves
+/// about 18 units per chord, less than two minimum widths.
+const EXIT_CHORDS: usize = 4;
+
 /// Share of our hard-left, straight and hard-right branches from `head`
 /// (heading `heading`) over `exit_seconds` at cruise speed that the rim or a
 /// gathered obstacle blocks. Branch tips follow `to_tip`, as arcs do; a
 /// segment blocks where a tip chord comes within its width. Head paths count
 /// as laid for the whole span (conservative); unseen or ungathered snakes
-/// count as open.
+/// count as open. Returns `cost` plus `exit_weight` per blocked share,
+/// stopping once that reaches `beaten` (the arc then loses anyway).
+#[allow(clippy::too_many_arguments)]
 fn blocked_exits(
     o: &Observation,
     me: &Me,
@@ -1635,36 +1734,69 @@ fn blocked_exits(
     near: &[Obstacle],
     head: Point,
     heading: f64,
+    cost: f64,
+    beaten: f64,
 ) -> f64 {
-    let dt = p.exit_seconds / TRAP_CHORDS as f64;
+    let dt = p.exit_seconds / EXIT_CHORDS as f64;
     let tip = (1.0 - p.own_width_factor) * me.width;
-    let span = me.speed * p.exit_seconds + tip;
+    let (heads, tips) = exit_branches(me, head, heading, dt, tip);
+    // Branches whose samples all stay further inside than the rim's contact
+    // lead plus half a chord cannot touch it; others take the exact check.
+    let inside =
+        o.arena.radius - boundary::CONTACT_LEAD * scale(o.me.segments) - me.speed * dt / 2.0 - 1e-6;
     let mut blocked = 0;
-    for delta in [-std::f64::consts::PI, 0.0, std::f64::consts::PI] {
+    for (b, delta) in [-std::f64::consts::PI, 0.0, std::f64::consts::PI]
+        .into_iter()
+        .enumerate()
+    {
+        if blocked > 0 && cost + p.exit_weight * blocked as f64 / 3.0 >= beaten {
+            break;
+        }
+        let near_rim = heads[b]
+            .iter()
+            .any(|q| q.distance(o.arena.center) >= inside);
         let at = |t: f64| {
             let q = turn_then_straight(head, heading, delta, me.speed, me.turn, t);
             (q, heading + delta.signum() * delta.abs().min(me.turn * t))
         };
-        if branch_hits_rim(&o.arena, o.me.segments, dt, at) {
+        if near_rim && branch_hits_rim(&o.arena, o.me.segments, dt, EXIT_CHORDS, at) {
             blocked += 1;
             continue;
         }
-        let tips: [Point; TRAP_CHORDS + 1] = std::array::from_fn(|j| {
-            let (q, h) = at(dt * j as f64);
-            forward(q, h, tip)
+        let tips = &tips[b];
+        let (lo, hi) = bounds(tips);
+        // Chord midpoints and half lengths for the same lower bound as
+        // `clearance`: segment distance >= midpoint distance - both halves.
+        let chords: [(Point, f64); EXIT_CHORDS] = std::array::from_fn(|j| {
+            let (a, b) = (tips[j], tips[j + 1]);
+            (
+                Point {
+                    x: (a.x + b.x) / 2.0,
+                    y: (a.y + b.y) / 2.0,
+                },
+                a.distance(b) / 2.0,
+            )
         });
         let hit = near.iter().any(|ob| {
-            // Branches stay within `span` of `head`.
-            let bound = span + ob.half + ob.width;
-            let (dx, dy) = (ob.mid.x - head.x, ob.mid.y - head.y);
-            dx * dx + dy * dy <= bound * bound
-                && tips
-                    .windows(2)
-                    .any(|w| swept_distance(w[0], w[1], ob.from, ob.to) < ob.width)
+            let w = ob.width;
+            if ob.from.x.max(ob.to.x) + w < lo.x
+                || ob.from.x.min(ob.to.x) - w > hi.x
+                || ob.from.y.max(ob.to.y) + w < lo.y
+                || ob.from.y.min(ob.to.y) - w > hi.y
+            {
+                return false;
+            }
+            (0..EXIT_CHORDS).any(|j| {
+                let (mid, half) = chords[j];
+                let bound = w + ob.half + half + 1e-6;
+                let (dx, dy) = (mid.x - ob.mid.x, mid.y - ob.mid.y);
+                dx * dx + dy * dy <= bound * bound
+                    && swept_distance(tips[j], tips[j + 1], ob.from, ob.to) < w
+            })
         });
         blocked += usize::from(hit);
     }
-    blocked as f64 / 3.0
+    cost + p.exit_weight * blocked as f64 / 3.0
 }
 
 /// Boost toward a goal that needs it, like the original Hunter: only along a
@@ -1674,10 +1806,11 @@ fn boost_toward(
     me: &Me,
     p: &Params,
     near: &[Obstacle],
+    exits: &[Obstacle],
     goal: &Goal,
     ramp: &[f64; RAMP_SUBSTEPS],
 ) -> Option<Action> {
-    let best = search(o, me, p, near, goal, Some(ramp));
+    let best = search(o, me, p, near, exits, goal, Some(ramp));
     (best.2 >= me.safe && best.3.abs() < 0.4).then(|| Action {
         heading: wrap(best.1),
         boost: true,
@@ -1690,10 +1823,11 @@ fn steer(
     me: &Me,
     p: &Params,
     near: &[Obstacle],
+    exits: &[Obstacle],
     goal: Goal,
     escape: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> Action {
-    let best = search(o, me, p, near, &goal, None);
+    let best = search(o, me, p, near, exits, &goal, None);
     if let Some(ramp) = escape.filter(|_| best.2 < me.safe) {
         // The cheapest arc may trade clearance for a smaller turn.
         let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
@@ -1702,7 +1836,7 @@ fn steer(
             clearance(o, me, p, near, heading, me.safe, goal.crosses, None) >= me.safe
         });
         if !any_clear {
-            let fast = search(o, me, p, near, &goal, Some(ramp));
+            let fast = search(o, me, p, near, exits, &goal, Some(ramp));
             if fast.2 >= me.safe {
                 return Action {
                     heading: wrap(fast.1),
@@ -1823,7 +1957,7 @@ mod tests {
         let (speed, turn) = (base_speed(2), turn_rate(2));
         let branches = |head: Point, heading: f64| {
             [-std::f64::consts::PI, 0.0, std::f64::consts::PI].map(|delta| {
-                branch_hits_rim(&arena, 2, 0.05, |t| {
+                branch_hits_rim(&arena, 2, 0.05, TRAP_CHORDS, |t| {
                     (
                         turn_then_straight(head, heading, delta, speed, turn, t),
                         heading + delta.signum() * delta.abs().min(turn * t),
@@ -1842,7 +1976,7 @@ mod tests {
         // bearing (simulator death at 392 ms).
         let hard_turn = |arena: &Arena, segments: usize, head: Point, heading: f64| {
             let (speed, turn) = (base_speed(segments), turn_rate(segments));
-            branch_hits_rim(arena, segments, 0.05, |t| {
+            branch_hits_rim(arena, segments, 0.05, TRAP_CHORDS, |t| {
                 (
                     turn_then_straight(head, heading, std::f64::consts::PI, speed, turn, t),
                     heading + std::f64::consts::PI.min(turn * t),
@@ -1862,6 +1996,44 @@ mod tests {
             Point { x: 21534.0, y: 0.0 },
             -1.488
         ));
+    }
+
+    #[test]
+    fn mirrored_exit_branches_match_the_direct_turns() {
+        let mut seed = 7;
+        for _ in 0..500 {
+            let segments = 2 + (lcg(&mut seed) * 600.0) as usize;
+            let heading = (lcg(&mut seed) - 0.5) * 20.0;
+            let head = Point {
+                x: (lcg(&mut seed) - 0.5) * 4e4,
+                y: (lcg(&mut seed) - 0.5) * 4e4,
+            };
+            let me = Me {
+                head,
+                heading,
+                speed: base_speed(segments),
+                turn: turn_rate(segments),
+                width: 0.0,
+                segments,
+                state: SpeedState::from_observed_speed(base_speed(segments), segments),
+                safe: 0.0,
+            };
+            let (dt, tip) = (0.1 + lcg(&mut seed) * 0.4, lcg(&mut seed) * 30.0);
+            let (heads, tips) = exit_branches(&me, head, heading, dt, tip);
+            for (b, delta) in [-std::f64::consts::PI, 0.0, std::f64::consts::PI]
+                .into_iter()
+                .enumerate()
+            {
+                for j in 0..=EXIT_CHORDS {
+                    let t = dt * j as f64;
+                    let q = turn_then_straight(head, heading, delta, me.speed, me.turn, t);
+                    let h = heading + delta.signum() * delta.abs().min(me.turn * t);
+                    let tipped = forward(q, h, tip);
+                    assert!(heads[b][j].distance(q) < 1e-6, "{b} {j}");
+                    assert!(tips[b][j].distance(tipped) < 1e-6, "{b} {j}");
+                }
+            }
+        }
     }
 
     #[test]
