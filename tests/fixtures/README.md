@@ -1,37 +1,34 @@
 # Regression fixtures
 
-For a new case or changed expectation, start with
+Start new cases or changed expectations with
 [selecting and updating cases](#selecting-and-updating-cases).
 
-[manifest.json](manifest.json) inventories the existing wire/client protocol and
-client-frame contract fixtures. Paths are relative to the repository root.
-Generic mechanics fixtures are outside this inventory: their protocol must not
-be guessed from the current decoder default. Recorded login challenge examples
-live inline in `tests/client_challenge.rs`; there is no `login-challenges.json`.
+[manifest.json](manifest.json) inventories wire/client protocol and client-frame
+contract fixtures, with repository-relative paths. Generic mechanics fixtures
+are excluded; never guess their protocol from the decoder default. Recorded
+login challenges are inline in `tests/client_challenge.rs`, not `login-challenges.json`.
 
-`schemaVersion` versions the inventory format. Each entry separately pins
+`schemaVersion` versions the inventory. Each entry pins
 `wireProtocol` (the actual binary wire version, currently literal `19`) and
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
-The client frame ID is distinct from the `slither-client-json-v1` request/reply
+The frame ID differs from the `slither-client-json-v1` request/reply
 envelope and the geometric `slither-sim-json-v3` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
-[`serve-errors-v3.json`](serve-errors-v3.json) separately pins the geometric
-controller's `slither-sim-json-v3` error envelope and a synthetic overflow
-reproducer used by Rust and Python lifecycle tests. It has no wire
-protocol or client-frame contract and is outside the wire/client inventory.
-Its error text is illustrative; the literal protocol and `sessionEnded` flag
-are checked independently of runtime defaults.
+[`serve-errors-v3.json`](serve-errors-v3.json) pins the geometric controller's
+`slither-sim-json-v3` error envelope and a synthetic overflow reproducer for
+Rust/Python lifecycle tests. Without a wire protocol or client-frame contract,
+it stays outside this inventory. Error text is illustrative; tests check literal
+protocol and `sessionEnded` independently of runtime defaults.
 
-`dataOrigin: captured` identifies retained packet bytes, with
-`expectedOrigin: reference-decoder` identifying decoded expectations. Source
-locations, hashes, reference implementations and limitations remain in each
-fixture. Those expectations check decoder consistency; they are not official
-server state or proof of server origin. The contract example instead has both
-origins set to `synthetic`; its protocol field is example metadata, not captured
-wire evidence. This inventory does not duplicate source hashes.
-`client-food-interest.json` contains selected decoded receipt/pose witnesses,
-with source identity and selection limits, rather than full raw frames.
+`dataOrigin: captured` labels retained packet bytes;
+`expectedOrigin: reference-decoder` labels decoded expectations. Each fixture
+owns source locations/hashes, reference implementations and limits. Expectations
+check decoder consistency, not official server state or server origin. Both
+contract-example origins are `synthetic`; its protocol is example metadata, not
+captured wire evidence. The inventory does not duplicate source hashes.
+`client-food-interest.json` holds selected decoded receipt/pose witnesses with
+source identity and selection limits, rather than full raw frames.
 
 [`transport-official-reference.json`](transport-official-reference.json) is a
 separate wire-19 measurement summary (`schemaVersion: 1`), outside the packet
@@ -41,37 +38,34 @@ decoder-derived transport quantiles, without raw gameplay bytes. See its
 
 ## Changing a protocol or contract
 
-The runtime default may advance independently. Do not derive historical tags
-from `protocol::PROTOCOL_VERSION`, rewrite old packet bytes, or relabel old
-expected values to make a new default pass. The inventory checks compare literal
-historical tags with setup bytes and explicit fixture metadata, without importing
-the runtime decoder or its current default.
+Runtime defaults advance independently. Never derive historical tags from
+`protocol::PROTOCOL_VERSION`, rewrite old packets or relabel expectations to pass
+a new default. Inventory checks compare literal historical tags with setup bytes
+and explicit metadata, without importing the runtime decoder/default.
 
-Add a new named fixture, inventory entry and tag-validation test for a new wire
-version or contract, with its own source/limitations or explicit synthetic label.
-Retain older cases and their evidence. Decide explicitly whether the current
-decoder supports or rejects each older version: keep replay assertions for supported cases, and add
-explicit unsupported-version rejection tests for rejected cases. Retaining a
-fixture does not promise runtime compatibility. Update tests deliberately if the
-supported set changes; do not turn rejection tests into implicit support.
+For a new wire version or contract, add a named fixture, inventory entry and
+tag-validation test, with source/limits or an explicit synthetic label. Retain
+older cases/evidence. Explicitly decide support or rejection for each older
+version: keep supported replay assertions and unsupported-version rejection
+tests. Retention promises no runtime compatibility. Deliberately update tests
+when support changes; never turn rejection tests into implicit support.
 
-Currently the default remains 19. Rust's `setup_order_and_protocol_are_enforced`
+The default is 19. Rust's `setup_order_and_protocol_are_enforced`
 tests protocol-11 rejection; Python's
 `test_other_protocols_are_rejected_before_setup_changes_state` tests rejection of
-11, 18 and 20. No additional decoder support is implied by this inventory.
+11, 18 and 20. The inventory implies no additional decoder support.
 
 ## Checks
 
-From the repository root, the inventory check uses only the standard library:
+From the repository root (the inventory check uses only the standard library):
 
 ```sh
 uv run --locked --only-group tools python -m unittest discover -s tools -p 'test_fixture_versions.py'
 uv run --locked --only-group tools python -m unittest discover -s tools/fidelity -p 'test_slither_protocol.py'
 ```
 
-The first is also discovered by the tools group's `test_*.py` check. For changes
-to runtime decoding or client contracts, additionally run the relevant Rust
-tests (these compile the networking client):
+The tools group's `test_*.py` check includes the first. For runtime decoding or
+client contracts, also run relevant Rust tests (compiling the networking client):
 
 ```sh
 cargo test --locked --features networking --test client_protocol --test client_hud --test client_contract --test client_challenge
@@ -79,38 +73,35 @@ cargo test --locked --features networking --test client_protocol --test client_h
 
 ## Selecting and updating cases
 
-Keep bounded selected cases in `tests/fixtures/`; keep full recordings and study
-bundles outside Git. Add a case for each new scenario and preserve valid old
-regressions. Avoid wholesale fixture reformatting. Record the source study/window
-and distinguish raw recorded packets from decoder- or model-derived expectations;
-label observed and synthetic inputs explicitly. Synthetic cases test a specified
-contract, not an empirical server claim.
+Keep bounded selected cases in `tests/fixtures/`; full recordings/study bundles
+stay outside Git. Add cases for new scenarios, preserve valid regressions and
+avoid wholesale reformatting. Record source study/window; distinguish raw
+packets from decoder- or model-derived expectations and label observed/synthetic
+inputs. Synthetic cases test specified contracts, not empirical server claims.
 
-Expected results must have an independent justification: recorded bytes, a
-specified contract, a checked calculation or supporting evidence. Regenerating
-expectations from the changed implementation cannot by itself approve a regression.
-If an expectation was wrong, document its independent correction and preserve the
-original evidence. Deprecating a case requires a reason tied to the supported
-contract or invalid evidence, with a replacement or retained rejection test where
-applicable. A passing decoder cross-check is not independent proof of its model.
+Independently justify expectations with recorded bytes, a specified contract,
+checked calculation or supporting evidence. Regeneration from changed code alone
+cannot approve a regression. Document independent corrections and preserve
+original evidence. Deprecation needs a supported-contract or invalid-evidence
+reason, with replacement or retained rejection tests where applicable. A decoder
+cross-check is not independent proof of its model.
 
-Keep a measured calibration gate tied to its recorded corpus. Test configurable
-mechanisms with deliberately synthetic parameters, so a new supported default
-does not require changing many unrelated lifecycle tests. Protocol bytes,
+Tie measured calibration gates to their recorded corpus. Test configurable
+mechanisms with deliberately synthetic parameters to keep new supported defaults
+from changing unrelated lifecycle tests. Protocol bytes,
 rejection cases, invariants and frozen-corpus selection checks stay explicit.
-New conflicting observations need a new corpus and explained regime/supersession;
-replacing old data merely to make the current model pass hides a regression.
+Conflicting observations need a new corpus and explained regime/supersession;
+replacing old data to pass the current model hides regressions.
 
-For a new regression, retain a small selected raw packet/window with the archive
-SHA-256, record indices, wire version, decoder identity and selection rule. Derive
-expected fields with the existing decoder or replay exporter, label that derivation,
-then have the focused test consume the fixture. Keep the full audited study outside
-Git; the [worked study](https://github.com/NikitaMGrimm/slither-sim/blob/main/tools/fidelity/worked_study.py) demonstrates this path.
+For new regressions, retain a small raw packet/window with archive SHA-256,
+record indices, wire version, decoder identity and selection rule. Label fields
+derived by the existing decoder/replay exporter; consume the fixture in a focused
+test. The [worked study](https://github.com/NikitaMGrimm/slither-sim/blob/main/tools/fidelity/worked_study.py)
+demonstrates this path with the full audited study outside Git.
 
-The standalone replay exporter hashes and decodes one temporary archive snapshot.
-Its schema-1 `provenance` retains the archive, selected window/connection, wire
-protocol and decoder/exporter source digests. These additional metadata fields
-leave replay values unchanged; older fixtures keep their original provenance.
-The exporter checks gzip completion and window coverage, but does not perform
-the full capture/study audit. Its output labels that limit explicitly; audit the
-study separately before treating the derivative as evidence.
+The standalone replay exporter hashes/decodes one temporary archive snapshot.
+Schema-1 `provenance` retains archive, selected window/connection, wire protocol
+and decoder/exporter source digests without changing replay values; older
+fixtures keep original provenance. Export checks gzip completion/window coverage,
+not full capture/study integrity, and labels that limit. Audit the study
+separately before treating derivatives as evidence.

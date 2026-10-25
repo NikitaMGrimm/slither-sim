@@ -1,16 +1,16 @@
 # Contributing
 
-Keep each PR focused on one problem. For larger features or interface changes,
-discuss the scope with the maintainer before starting; small fixes can go straight
-to a PR. Use one task, branch and worktree; preserve other contributors' work.
+Keep each PR focused on one problem. Discuss larger features or interface changes
+with the maintainer before starting; small fixes can go straight to a PR.
+Use one task, branch and worktree; preserve others' work.
 Start with the [API guides](README.md#choose-an-interface) and
 [rules and limits](docs/server-rules.md), or use the [documentation map](docs/README.md)
-to find a research or maintenance task.
+for research or maintenance tasks.
 
 ## Find the change
 
-Paths below are relative to the repository root. Read the relevant guide, trace
-the source owner and its callers, then start with the matching test.
+Paths are repository-relative. Read the guide, trace the source owner and callers,
+then run the matching test.
 
 | Task | Guide and source / tests | Focused check |
 | --- | --- | --- |
@@ -27,10 +27,10 @@ the source owner and its callers, then start with the matching test.
 
 ## Setup and checks
 
-Run focused tests for the affected owner first, then the relevant group from the
-repository root. Rust work needs Rust 1.99+ and platform build tools; the check
-runner uses standard-library Python 3.11+. Documentation-only changes need
-accuracy/link review and the documentation test above, without a Rust build.
+Run focused tests first, then the relevant group from the repository root.
+Rust needs Rust 1.99+ and platform build tools; the check runner uses
+standard-library Python 3.11+. Documentation-only changes need accuracy/link
+review and the documentation test above, without a Rust build.
 
 | Group | Command | Coverage / prerequisites |
 | --- | --- | --- |
@@ -40,114 +40,109 @@ accuracy/link review and the documentation test above, without a Rust build.
 | WASM | `python tools/check.py wasm` | Core target check; install `wasm32-unknown-unknown` first |
 
 Before the tools group, run `uv sync --locked --only-group tools`. `all` runs
-`rust`, `tools` and `package`; WASM is explicit. Append `--list` to a group command
-to inspect its commands without running them. Each command reports its time,
-and CI adds a timing table to the job summary. Tests use doubles or loopback,
-never outside game servers. PR CI invokes the same runner automatically: `lint`,
+`rust`, `tools` and `package`; WASM is explicit. Append `--list` to inspect commands
+without running them. Commands report their time; CI adds a job-summary timing
+table. Tests use doubles or loopback, never outside game servers.
+PR CI runs the same runner automatically: `lint`,
 WASM and package once on Linux, `test` on Linux, Windows, macOS and Rust 1.99,
 and `tools` on Linux, Windows and macOS. The weekly
 [extended checks](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/workflows/extended.yml) add release-profile tests,
 Linux ARM tests and a RustSec audit; they block nothing and can be dispatched.
 
-Transport measurement regressions (`tools/fidelity/test_transport_parity.py`)
-are discovered by the tools group's fidelity suite. Run them alone with
+The tools group's fidelity suite includes transport measurement regressions
+(`tools/fidelity/test_transport_parity.py`). Run them alone with
 `uv run --locked --only-group tools python -B -m unittest discover -s tools/fidelity -p test_transport_parity.py`.
 The [local transport check](docs/research-workflow.md#transport-parity) is an
-explicit measurement, separate from unit tests; a current-host gate failure is
-a recorded baseline rather than a reason to loosen official tolerances.
+explicit measurement, separate from unit tests. Record current-host gate failures
+as baselines; do not loosen official tolerances.
 
 ## Evidence proportional to the change
 
-- Explain the problem and resulting behavior. Include a reproducer and relevant
-  tests; add a short before/after example when useful, such as a request and response.
+- Explain the problem and resulting behavior with a reproducer, relevant tests
+  and, when useful, a short before/after example such as a request and response.
 - **Documentation:** review accuracy and links against current sources.
 - **Tool/API fixes:** minimal reproducer and regression using existing evidence
-  or clearly labelled synthetic inputs. Fresh capture is not required.
+  or clearly labelled synthetic inputs; no fresh capture required.
 - **Behavior-preserving optimizations:** demonstrate output parity on relevant
   cases; provide matched before/after measurements only when claiming performance.
-- **Mechanics corrections:** cite the existing evidence that justifies the rule
-  and add a focused regression fixture. Collect more only if that evidence cannot
-  support the correction.
+- **Mechanics corrections:** cite supporting evidence and add a focused regression
+  fixture. Collect more only if existing evidence cannot support the correction.
 - **New empirical or fitted claims:** follow the [research workflow](docs/research-workflow.md)
   with the complete relevant study, failed/inconclusive attempts, selection rules,
-  uncertainty and held-out validation where applicable. State why a method does
-  not apply rather than adding a ceremonial requirement.
+  uncertainty and applicable held-out validation. Explain inapplicable methods;
+  do not add ceremonial requirements.
 
 The [evidence comparison workflow](docs/research-workflow.md#compare-contributed-evidence)
-screens contributed bundles for declared reporting differences. Its statistical
-report supports review; it neither approves physics changes nor replaces fixtures.
+screens contributed bundles for declared reporting differences; its statistical
+report supports review without approving physics changes or replacing fixtures.
 
 Keep bounded, selected [regression fixtures](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/README.md#selecting-and-updating-cases)
-in Git and full recordings, credentials and generated outputs outside it. Use
-Conventional Commits and LF; avoid unrelated formatting. Run the
-[relevant checks](#setup-and-checks); PR CI runs
-automatically. Maintainer review checks ownership, callers, contracts and evidence
-independently of contributor-written tests. Passing those tests alone is not
-acceptance. Tests stay offline; collection or publication needs separate authorization.
+in Git; keep full recordings, credentials and generated outputs outside it.
+Use Conventional Commits and LF; avoid unrelated formatting. Maintainers review
+ownership, callers, contracts and evidence independently of contributor tests;
+passing tests alone is not acceptance. Collection or publication needs separate
+authorization.
 
 Preserve third-party license notices. For external data, note its source and any
 sharing restrictions in `REPORT.md`.
 
-A maintainer reviews the current PR revision and its evidence before merging.
-Required CI must pass with the latest main; new commits need the relevant checks
-and review again. Auto-merge can finish an approved PR once these requirements
-pass. An independent agent review is useful evidence, but agents using the same
-GitHub account cannot approve that account's own PR. The owner-authorized
+A maintainer reviews the current revision and evidence before merging. Required
+CI must pass with latest main; new commits need relevant checks and renewed review.
+Auto-merge can then finish an approved PR. Independent agent review is useful
+evidence, but agents cannot approve their GitHub account's own PR. The owner-authorized
 [release automation](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md) can merge compatible patch release PRs
 containing only version/changelog metadata after required CI. Other release
 bumps require maintainer review and merge; publication then runs automatically.
 
-For geometry or motion changes, a before/after plot, diagram or clip can help.
-Visualizations are optional; attach or link PR-only media rather than committing it.
+For geometry or motion changes, optional before/after plots, diagrams or clips
+can help. Attach or link PR-only media; do not commit it.
 
 ## Rationale and evidence
 
-Put non-obvious reasons, units, invariants and model limitations beside the owning
-code. Keep formulas/defaults in their implementation; link to their declarations
-instead of maintaining another explanation in a separate agent guide. A short
-comment should identify whether a rule is measured, protocol/client-derived or
-provisional, and point to its canonical note and regression when useful.
+Keep non-obvious reasons, units, invariants and model limits beside the owning
+code. Link formulas/defaults to their declarations instead of repeating them in
+an agent guide. Brief comments should label rules as measured,
+protocol/client-derived or provisional and link canonical notes/regressions when useful.
 
 Keep current instructions in `docs/`. Put dated studies and selected results in
 `research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; follow the
 [research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md) for placement and access labels.
-Keep experimental methods, source/archive hashes, selected windows, failed cases
-and uncertainty in the evidence note/fixture, with full recordings outside Git.
-Tests consume selected fixtures; synthetic cases establish their stated contract.
-When changing a rule, update its owner, linked evidence and focused regression
-together. Preserve historical plans and contradictory results rather than
-regenerating expectations to agree with the new code.
+Evidence notes/fixtures own methods, source/archive hashes, selected windows,
+failed cases and uncertainty. Tests consume selected fixtures; synthetic cases
+establish their stated contract. Change a rule's owner, linked evidence and
+focused regression together. Preserve historical plans and contradictory results;
+do not regenerate expectations to agree with new code.
 
 ## AI assistance
 
-If you use AI, review its work and verify the result. End the PR description
-with a short footer naming actual models, harnesses and roles, including material
-delegated work. Use display names and report review and checks accurately. Example:
+Review and verify AI work. End the PR description with a short footer naming
+actual models, harnesses and roles, including material delegated work.
+Use display names; report review and checks accurately. Example:
 
 > [!NOTE]
 > 🤖 **Agent assistance: GPT 6.1 Sol via Codex** — implementation; supporting work (verification).
 
-Group multiple credits by harness in the same closing note. Transcripts and a
-fixed number of reviewers are not required.
+Group credits by harness in one closing note. Neither transcripts nor a reviewer
+quota are required.
 
 ## Interfaces and packaging
 
-Interfaces are experimental. Incompatible bot changes need a new
+Interfaces are experimental. Incompatible bot changes require a new
 [contract identifier](docs/client-api.md#interface-versions), updated examples
 and the JSON contract fixture. Keep units, field meanings and lifecycle behavior
 consistent; readers ignore additional response fields. Physics changes can alter
 trajectories without changing the API.
 
-The root `Cargo.toml`'s `[workspace.package]` owns the simulator version, which
-the C ABI crate and the Python package inherit; `pyproject.toml` owns the tools version.
-Within `0.x`, incompatible Rust API changes bump the minor version. Keep unreleased
-changes together in the changelog; no permanent freeze or multi-version support
+The root `Cargo.toml`'s `[workspace.package]` owns the simulator version, inherited
+by the C ABI crate and Python package; `pyproject.toml` owns the tools version.
+Within `0.x`, incompatible Rust API changes bump the minor version. Group
+unreleased changes in the changelog; no permanent freeze or multi-version support
 is promised.
 
 Write one user-facing changelog entry per change, with a link to its PR when
 useful. Avoid repeating generated commit titles in a second prose list.
 
-The `package` check group builds the local crate. It ships the library, binary,
+The `package` check builds the local crate. It ships the library, binary,
 user guides and examples, the release guide and the fixtures its unit tests read;
 integration tests, other fixtures, evidence tools, schemas and other maintainer
 files require the Git checkout.

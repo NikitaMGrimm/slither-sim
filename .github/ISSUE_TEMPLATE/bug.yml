@@ -6,20 +6,20 @@ body:
     id: reproduce
     attributes:
       label: Steps to reproduce
-      description: Include the command, seed and relevant configuration. Keep credentials and full recordings out of the issue.
+      description: Command, seed and relevant configuration; exclude credentials and full recordings.
     validations:
       required: true
   - type: textarea
     id: behavior
     attributes:
       label: Expected and actual behavior
-      description: Include the error or a short output excerpt, if relevant.
+      description: Include relevant errors or a short output excerpt.
     validations:
       required: true
   - type: input
     id: environment
     attributes:
       label: Version and environment
-      description: Commit or version, operating system, and Rust, Python or Node.js version as applicable.
+      description: Commit/version, operating system and applicable Rust, Python or Node.js version.
     validations:
       required: true
