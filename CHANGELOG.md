@@ -4,6 +4,8 @@
 
 ### Added
 
+- A [cautious bot example](examples/cautious_bot.rs) that avoids walls and other
+  snakes while seeking food. The `portable_bot` examples are now under 100 lines.
 - Offline transport parity measurements, official-reference gates and a
   localhost-only host/capture/compare command; see
   [transport parity](docs/research-workflow.md#transport-parity).

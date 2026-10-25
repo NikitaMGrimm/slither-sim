@@ -2,7 +2,9 @@
 
 Simulator and WebSocket backends share a Rust decoder and `ClientFrame`, so bots
 can keep their inputs, action mapping and state handling across backends. See the
-[Rust](../examples/portable_bot.rs) and [Python](../examples/portable_bot.py) examples.
+[Rust](../examples/portable_bot.rs) and [Python](../examples/portable_bot.py)
+examples, and the [cautious bot](../examples/cautious_bot.rs), which also avoids
+walls and snakes.
 
 ## Interface versions
 

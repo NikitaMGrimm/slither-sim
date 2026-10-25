@@ -46,8 +46,10 @@ python examples/portable_bot.py --steps 200
 ```
 
 Run from the checkout after building. Python 3.11+ is optional; the example uses
-only its standard library. On Windows, use `py -3` if needed. Rust users can
-embed the simulator directly; see [the basic example](examples/basic.rs).
+only its standard library. On Windows, use `py -3` if needed.
+
+More examples: [embedding the simulator](examples/basic.rs) and
+[a bot that also avoids walls and snakes](examples/cautious_bot.rs).
 
 ### Download a release
 
