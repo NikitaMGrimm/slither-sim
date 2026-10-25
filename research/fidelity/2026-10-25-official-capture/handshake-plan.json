@@ -1,0 +1,12 @@
+{
+  "dataOrigin": "official-server",
+  "question": "Does supplying the stock HTTP Origin allow the frozen official endpoint handshake?",
+  "endpoint": "57.129.37.42:444",
+  "origin": "http://slither.io",
+  "connections": 1,
+  "seconds": 10,
+  "attempts": 1,
+  "precondition": "Both original clients reached connection-failed after three errors and have no remaining sockets. Verify this before acquisition; do not exceed two total connections.",
+  "metrics": "HTTP upgrade status or connect error from Node diagnostics; retain raw bytes and integrity receipt. No timing or spawn model fit from this diagnostic.",
+  "decision": "If successful, predeclare and commit a separate continuation before further batches. If unsuccessful, report the exact error and preserve the original six-batch attempt budget. No endpoint substitution."
+}
