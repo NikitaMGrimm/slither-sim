@@ -488,17 +488,14 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
     accept(|c| c.world.prey.count = 65_536);
     reject(|c| c.world.prey.count = 65_537, "prey count");
     accept(|c| c.decision_ticks = 1001);
-    // A long broadcast interval costs full resends, not correctness.
-    accept(|c| c.broadcast_ticks = 1001);
+    // A tick longer than the incremental body window costs full resends.
     let mut long = config(1, LatencyConfig::default());
-    long.broadcast_ticks = 42;
+    long.world.dt = 0.29;
     let warnings = long.warnings();
-    assert_eq!(warnings.len(), 1);
-    assert!(warnings[0].contains("resent in full"), "{}", warnings[0]);
-    long.broadcast_ticks = 41;
-    assert!(long.warnings().is_empty());
+    assert!(warnings.iter().any(|w| w.contains("resent in full")), "{warnings:?}");
+    long.world.dt = 0.28;
+    assert!(!long.warnings().iter().any(|w| w.contains("resent in full")));
     reject(|c| c.decision_ticks = 0, "at least 1");
-    reject(|c| c.broadcast_ticks = 0, "at least 1");
     // Delays have no fixed ceiling; only an unrepresentable largest draw fails.
     accept(|c| {
         c.latency.round_trip_seconds = vec![30.];
@@ -555,7 +552,8 @@ fn unsupported_configurations_are_rejected() {
     assert!(serde_json::from_str::<SimulationConfig>(r#"{"agents":2,"unknown":1}"#).is_err());
     let config: SimulationConfig =
         serde_json::from_str(r#"{"agents":2,"latency":{"roundTripSeconds":[0.1]}}"#).unwrap();
-    assert_eq!(config.broadcast_ticks, 6);
+    // Updates go out every tick; the removed batching field is rejected.
+    assert!(serde_json::from_str::<SimulationConfig>(r#"{"broadcastTicks":6}"#).is_err());
     assert_eq!(config.leaderboard_interval_seconds, 3.);
     let config: SimulationConfig =
         serde_json::from_str(r#"{"leaderboardIntervalSeconds":1.5}"#).unwrap();

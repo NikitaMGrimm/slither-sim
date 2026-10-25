@@ -170,7 +170,6 @@ mod retained {
             agents: SLOTS,
             controlled_slot: 0,
             decision_ticks: TICKS,
-            broadcast_ticks: TICKS,
             minimap_interval_seconds: 2.5,
             minimap_side: 136,
             leaderboard_interval_seconds: 3.0,

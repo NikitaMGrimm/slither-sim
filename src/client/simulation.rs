@@ -51,6 +51,11 @@ const RECORD_OVERHEAD: usize = 32;
 /// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
 /// snake in full.
 const FRESH_ANCHORS: usize = 4;
+/// Ticks between motion (heading, wanted heading, speed) reports for one
+/// snake to one recipient. Official receipts space a snake's rotation reports
+/// about 42 ms apart while frames arrive every ~7 ms tick, and body anchors
+/// arrive in the tick that makes them (scheduler study, 2026-10-25).
+const MOTION_REPORT_TICKS: u64 = 6;
 /// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
 /// pose may exist after this many failures.
 const SPAWN_ATTEMPTS: usize = 64;
@@ -94,8 +99,6 @@ pub struct SimulationConfig {
     pub controlled_slot: usize,
     /// Physics ticks between `next_frame`/`step_all` decisions.
     pub decision_ticks: usize,
-    /// Physics ticks between update frames.
-    pub broadcast_ticks: usize,
     pub minimap_interval_seconds: f64,
     pub minimap_side: usize,
     /// Seconds between leaderboards to each playing connection, starting with
@@ -116,7 +119,6 @@ impl Default for SimulationConfig {
             agents: 1,
             controlled_slot: 0,
             decision_ticks: 6,
-            broadcast_ticks: 6,
             minimap_interval_seconds: 2.5,
             // Retained protocol-19 minimap receipts and the earlier browser
             // bridge use 136 cells per side; 32 was a local backend shortcut.
@@ -162,9 +164,8 @@ impl SimulationConfig {
                  leaderboard rank and population are u16, and a controlled slot among them"
             ));
         }
-        // Broadcasts fall on ticks divisible by broadcastTicks.
-        if self.decision_ticks == 0 || self.broadcast_ticks == 0 {
-            return Err("Decision and broadcast ticks must be at least 1".into());
+        if self.decision_ticks == 0 {
+            return Err("Decision ticks must be at least 1".into());
         }
         if !self.minimap_interval_seconds.is_finite() || self.minimap_interval_seconds <= 0. {
             return Err("Minimap interval must be positive".into());
@@ -207,10 +208,10 @@ impl SimulationConfig {
         // A head less than one spacing past its front anchor that travels less
         // than `FRESH_ANCHORS - 1` spacings crosses at most that many anchors.
         let window = (FRESH_ANCHORS - 1) as f64 * physics::ANCHOR_SPACING;
-        if self.broadcast_ticks as f64 * self.world.dt * physics::BOOST_SPEED >= window {
+        if self.world.dt * physics::BOOST_SPEED >= window {
             warnings.push(format!(
-                "broadcastTicks × dt × {} exceeds the {window}-unit incremental body-update \
-                 window: snakes that outrun it are resent in full (more bandwidth)",
+                "dt × {} exceeds the {window}-unit incremental body-update window: snakes \
+                 that outrun it in one tick are resent in full (more bandwidth)",
                 physics::BOOST_SPEED
             ));
         }
@@ -237,6 +238,8 @@ struct KnownSnake {
     speed: u8,
     fam: u32,
     kills: usize,
+    /// First tick at which this recipient's next motion report may go out.
+    motion_at: u64,
 }
 #[derive(Clone, Debug)]
 struct KnownPrey {
@@ -1104,12 +1107,7 @@ impl SimulatorBackend {
                 slot.processing_override = None;
             }
         }
-        if self.tick % self.config.broadcast_ticks as u64 == 0 {
-            self.broadcast()?;
-        } else {
-            self.minimaps()?;
-            self.leaderboards()?;
-        }
+        self.broadcast()?;
         for slot in 0..self.slots.len() {
             self.client_until(slot, now)?;
         }
@@ -1357,28 +1355,6 @@ impl SimulatorBackend {
         Ok(())
     }
 
-    /// Service HUD deadlines between gameplay broadcasts too. A death waits
-    /// for its game-over broadcast so it cannot leak an unfrozen final rank.
-    fn leaderboards(&mut self) -> Result<(), String> {
-        let now = self.time();
-        let mut board = None;
-        for slot in 0..self.slots.len() {
-            let connection = &self.slots[slot].connection;
-            if !connection.setup
-                || (!self.world.snakes[slot].alive && !connection.over)
-                || !connection.leaderboard_at.is_some_and(|at| now + 1e-9 >= at)
-            {
-                continue;
-            }
-            if board.is_none() {
-                board = Some(Board::new(&self.world, &self.profiles)?);
-            }
-            let packets = self.hud(slot, now, board.as_ref())?;
-            self.emit(slot, now, &packets)?;
-        }
-        Ok(())
-    }
-
     /// Changes since this connection's last frame, own snake first.
     fn updates(
         &mut self,
@@ -1387,6 +1363,7 @@ impl SimulatorBackend {
         eaten: &BTreeSet<[u8; 2]>,
         bounds: &[[f64; 4]],
     ) -> Result<Vec<Vec<u8>>, String> {
+        let tick = self.tick;
         let world = &self.world;
         let me = &world.snakes[slot];
         let record = self
@@ -1439,7 +1416,7 @@ impl SimulatorBackend {
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
                     let wanted = physics::quantize_heading(control);
-                    changes(&mut packets, own, id, known, snake, wanted, profile)?;
+                    changes(&mut packets, own, id, known, snake, wanted, profile, tick)?;
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
@@ -1455,7 +1432,7 @@ impl SimulatorBackend {
                     full(&mut packets, own, id, snake, wanted, profile)?;
                     connection
                         .snakes
-                        .insert(i, KnownSnake::new(life, snake, wanted)?);
+                        .insert(i, KnownSnake::new(life, snake, wanted, tick)?);
                 }
             }
             let connection = &mut self.slots[slot].connection;
@@ -1807,7 +1784,8 @@ impl Backend for SimulatorBackend {
 }
 
 impl KnownSnake {
-    fn new(life: u64, snake: &Snake, wanted: f64) -> Result<Self, String> {
+    /// Shown in full at `tick`, including its complete motion.
+    fn new(life: u64, snake: &Snake, wanted: f64, tick: u64) -> Result<Self, String> {
         Ok(Self {
             life,
             front: snake.body[0],
@@ -1817,6 +1795,7 @@ impl KnownSnake {
             speed: encode::speed_byte(snake.speed)?,
             fam: encode::fam_u24(snake.fam),
             kills: snake.kills,
+            motion_at: tick + MOTION_REPORT_TICKS,
         })
     }
 }
@@ -1894,7 +1873,10 @@ fn full(
     Ok(())
 }
 
-/// Incremental body, mass and motion reports for a known snake.
+/// Incremental body, mass and motion reports for a known snake at `tick`.
+/// Body changes go out in the tick that makes them; motion follows its own
+/// per-snake schedule (see `MOTION_REPORT_TICKS`).
+#[allow(clippy::too_many_arguments)]
 fn changes(
     packets: &mut Vec<Vec<u8>>,
     own: bool,
@@ -1903,6 +1885,7 @@ fn changes(
     snake: &Snake,
     wanted: f64,
     profile: &PlayerAppearance,
+    tick: u64,
 ) -> Result<(), String> {
     let body = &snake.body;
     let fam = encode::fam_u24(snake.fam);
@@ -1943,7 +1926,7 @@ fn changes(
         None => {
             // Unrecognizable continuity (e.g. an externally edited body): resend.
             full(packets, own, id, snake, wanted, profile)?;
-            *known = KnownSnake::new(known.life, snake, wanted)?;
+            *known = KnownSnake::new(known.life, snake, wanted, tick)?;
             return Ok(());
         }
     }
@@ -1955,21 +1938,28 @@ fn changes(
         known.fam = fam;
         packets.push(encode::fam(id, fam));
     }
-    let heading = encode::angle_byte(snake.heading);
-    let target = encode::angle_byte(wanted);
-    let speed = encode::speed_byte(snake.speed)?;
-    let report = encode::motion(
-        own,
-        id,
-        (heading != known.heading).then_some(heading),
-        (target != known.wanted).then_some(target),
-        (speed != known.speed).then_some(speed),
-        encode::direction(snake.heading, wanted),
-    );
-    packets.extend(report);
-    known.heading = heading;
-    known.wanted = target;
-    known.speed = speed;
+    if tick >= known.motion_at {
+        // A fixed per-snake phase from its appearance; an unchanged motion
+        // sends nothing and waits for the next slot.
+        while known.motion_at <= tick {
+            known.motion_at += MOTION_REPORT_TICKS;
+        }
+        let heading = encode::angle_byte(snake.heading);
+        let target = encode::angle_byte(wanted);
+        let speed = encode::speed_byte(snake.speed)?;
+        let report = encode::motion(
+            own,
+            id,
+            (heading != known.heading).then_some(heading),
+            (target != known.wanted).then_some(target),
+            (speed != known.speed).then_some(speed),
+            encode::direction(snake.heading, wanted),
+        );
+        packets.extend(report);
+        known.heading = heading;
+        known.wanted = target;
+        known.speed = speed;
+    }
     if known.kills != snake.kills {
         known.kills = snake.kills;
         packets.push(encode::kills(id, snake.kills));
@@ -2941,7 +2931,7 @@ mod tests {
         snake.segments = 20;
         for insertions in 1..=FRESH_ANCHORS {
             let mut moved = snake.clone();
-            let mut known = KnownSnake::new(0, &moved, 0.).unwrap();
+            let mut known = KnownSnake::new(0, &moved, 0., 0).unwrap();
             for k in 1..=insertions {
                 let anchor = Point {
                     x: 42. * k as f64,
@@ -2959,6 +2949,7 @@ mod tests {
                 &moved,
                 0.,
                 &NATIVE_PROFILE,
+                0,
             )
             .unwrap();
             let anchors = packets
@@ -2984,8 +2975,6 @@ mod tests {
         config.world.radius = 6000.;
         config.world.food_count = 0;
         config.world.ambient_replenish_per_second = 0.;
-        // 40 ticks of boost travel 122.5 units: up to three anchors per broadcast.
-        config.broadcast_ticks = 40;
         assert!(config.warnings().is_empty());
         let mut sim = RawSimulator::new(7, config, 2).unwrap();
         let mut a = Remote::connect(&mut sim, 0, "Observer");
@@ -3084,14 +3073,15 @@ mod tests {
         let mut a = Remote::connect(&mut sim, 0, "Zero");
         assert!(a.pump(&mut sim, 0).is_empty());
         sim.advance_ticks(1).unwrap();
+        // Setup leads the tick's frame; that tick's updates follow it.
         let setup = a.pump(&mut sim, 0);
         assert_eq!(
-            setup,
-            [encode::setup(
+            setup[0],
+            encode::setup(
                 sim.backend.world.config.radius,
                 sim.backend.world.config.prey.turn_rate
             )
-            .unwrap()]
+            .unwrap()
         );
         assert!(sim.drain(0).unwrap().is_empty());
         let mut b = Remote::connect(&mut sim, 1, "One");
@@ -3347,7 +3337,7 @@ mod tests {
             let mut config = raw_config(2);
             config.latency.round_trip_seconds = vec![rtt];
             config.minimap_interval_seconds = 0.01;
-            let interval = config.broadcast_ticks as f64 * config.world.dt;
+            let interval = MOTION_REPORT_TICKS as f64 * config.world.dt;
             let mut sim = RawSimulator::new(6, config, 2).unwrap();
             let mut a = Remote::connect(&mut sim, 0, "Dead");
             let mut b = Remote::connect(&mut sim, 1, "Moving");
@@ -3536,13 +3526,13 @@ mod tests {
         snake.fam = fam;
         snake.score = physics::score(segments, fam);
     }
-    /// Run until the next broadcast has been delivered; returns its packets.
+    /// Run to the next motion-report boundary; returns the packets delivered.
     fn next_broadcast(sim: &mut RawSimulator, slot: usize, remote: &mut Remote) -> Vec<Vec<u8>> {
         let mut packets = Vec::new();
         loop {
             sim.advance_ticks(1).unwrap();
             packets.extend(remote.pump(sim, slot));
-            if sim.backend.tick % sim.backend.config.broadcast_ticks as u64 == 0 {
+            if sim.backend.tick % MOTION_REPORT_TICKS == 0 {
                 return packets;
             }
         }
