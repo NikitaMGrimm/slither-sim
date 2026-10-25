@@ -416,9 +416,10 @@ impl ReceivedTracker {
         track.mass.receipt(now);
         Ok(())
     }
-    /// Set only the receiver's displayed score, without refreshing mass receipts.
-    /// Opponents' private credits remain unknown. A later `mass` report replaces
-    /// this value with the mass-derived score until own score is reported again.
+    /// Set the receiver's displayed score. Use only the receiver's own slot:
+    /// opponents' private credits are unknown. Mass receipts are not refreshed,
+    /// and a later `mass` report restores the mass-derived score until the own
+    /// score arrives again.
     pub fn own_score(&mut self, slot: usize, score: f64) -> Result<(), String> {
         if !score.is_finite() || score < 0. {
             return Err("Invalid received own score".into());

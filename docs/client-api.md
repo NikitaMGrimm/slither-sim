@@ -1,7 +1,7 @@
 # Portable bots: slither-client-v2
 
-Simulator and WebSocket backends share a Rust decoder and `ClientFrame`, so bots
-can keep their inputs, action mapping and state handling across backends. See the
+The simulator and WebSocket backends hand bots the same `ClientFrame`, decoded
+by the same Rust code, so one bot runs on both unchanged. See the
 [Rust](../examples/portable_bot.rs) and [Python](../examples/portable_bot.py)
 examples, and the [cautious bot](../examples/cautious_bot.rs), which also avoids
 walls and snakes.

@@ -1,7 +1,9 @@
 # PR comparison statistics, October 24, 2026
 
-Status: adopted for the advisory PR comparison. Design and synthetic reference
-vectors only; no new simulator measurements. Hosted-runner calibration pending.
+Status: v1, adopted for the advisory PR comparison; new runs use
+[protocol v2](../../../docs/maintainers/performance-statistics-v2.md) since
+2026-10-25. Design and synthetic reference vectors only; no new simulator
+measurements. Hosted-runner calibration pending.
 
 ## Question
 

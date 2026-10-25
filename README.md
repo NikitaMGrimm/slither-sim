@@ -45,18 +45,20 @@ For the same bot in Python:
 python examples/portable_bot.py --steps 200
 ```
 
-Run from the checkout after building. Python 3.11+ is optional; the example uses
-only its standard library. On Windows, use `py -3` if needed.
+It needs Python 3.11+ and the build above, and uses only the standard library.
+On Windows, use `py -3` if `python` is missing.
 
 More examples: [embedding the simulator](examples/basic.rs) and
-[a bot that also avoids walls and snakes](examples/cautious_bot.rs).
+[a bot that also avoids walls and snakes](examples/cautious_bot.rs). To use the
+library elsewhere, run `cargo add slither-sim`; for the CLI alone,
+`cargo install slither-sim --locked`.
 
 ### Download a release
 
-[Release archives](https://github.com/NikitaMGrimm/slither-sim/releases) need no
-Rust installation. They contain the `slither-sim` CLI, [C ABI](docs/c-api.md)
-library and header for Linux x86-64 and ARM64 (glibc 2.17+), macOS (Apple silicon
-and Intel) and Windows x86-64. Verify checksums with `SHA256SUMS`.
+[Release archives](https://github.com/NikitaMGrimm/slither-sim/releases) hold the
+`slither-sim` CLI and the [C ABI](docs/c-api.md) library and header, so Rust is
+not needed. Builds cover Linux x86-64 and ARM64 (glibc 2.17+), macOS (Apple silicon
+and Intel) and Windows x86-64. Check downloads against `SHA256SUMS`.
 
 ```sh
 curl -LO https://github.com/NikitaMGrimm/slither-sim/releases/latest/download/slither-sim-x86_64-unknown-linux-gnu.tar.gz
@@ -98,34 +100,34 @@ The host binds loopback by default. Stop it with Ctrl+C.
 | Run `serve` sessions in-process from Python | [Python package](docs/python.md). |
 | Run `serve` sessions in-process from any language | [C ABI](docs/c-api.md), or Rust `transport::Session`. |
 
-Portable backends share a Rust packet decoder; other languages use JSON or the
-C ABI for `serve`. The geometric `serve` API has no network delay.
-See [interface versions](docs/client-api.md#interface-versions) for compatibility.
+`client` bots decode the same packets in simulation as on a real server.
+`serve` observations come straight from the world, with no network delay. See
+[interface versions](docs/client-api.md#interface-versions) for compatibility.
 
 ## Defaults and fidelity
 
 The default world, [`Config::official(1)`](docs/configuration.md#official-and-sandbox),
-initializes for one snake. It combines measured movement and protocol constants
-with provisional visibility, spawning and ecology models; it is not an exact
-official replica. [`Config::sandbox()`](docs/configuration.md#official-and-sandbox)
-uses the same mechanics in a compact fixed arena.
+starts sized for one snake and grows with the population. It combines measured
+movement and protocol constants with provisional visibility, spawning and
+ecology models; it is not an exact official replica.
+[`Config::sandbox()`](docs/configuration.md#official-and-sandbox) uses the same
+mechanics in a compact fixed arena.
 
-[`Config::battledome()`](docs/configuration.md#battledome) adds a custom one-way
-pit, permanent 400-point size floor, free boost at the floor without pellets and
-rolling kill score. These are mode design choices. See
+[`Config::battledome()`](docs/configuration.md#battledome) is our own mode, not an
+official one: a one-way pit, a permanent 400-point size floor with free boosting
+at it, and a rolling kill score. See
 [rules and evidence limits](docs/server-rules.md) for measured behavior and gaps.
 
 ## Development
 
 - [Contributing](CONTRIBUTING.md): changes, tests and packaging.
 - [Documentation map](docs/README.md): API guides, research tasks and maintenance.
-- [Research workflow](docs/research-workflow.md): capture, audit and replay tools.
-  These separately require uv, Python 3.12 and Node.js 22+ (24 recommended).
+- [Research workflow](docs/research-workflow.md): capture, audit and replay tools
+  (uv, Python 3.12, Node.js 22+).
 - [Performance](docs/performance.md): reproducible release workloads.
 - [Research records](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md): dated results and evidence limits.
 
-Report bugs in [Issues](https://github.com/NikitaMGrimm/slither-sim/issues), with
-the command, configuration and expected behavior. Add the Rust library with
-`cargo add slither-sim`, or install the CLI with `cargo install slither-sim --locked`.
+Report bugs in [Issues](https://github.com/NikitaMGrimm/slither-sim/issues) with
+the command, configuration and expected behavior.
 
 [MIT](LICENSE). Independent of Slither.io.
