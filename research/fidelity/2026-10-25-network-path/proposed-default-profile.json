@@ -1,0 +1,37 @@
+{
+  "schema": "slither-network-study-proposal-v1",
+  "name": "retained-low-rtt-route-effective-delivery",
+  "status": "provisional-research-profile-not-current-LatencyConfig",
+  "baselineRoundTripSeconds": 0.004973680552051357,
+  "uplinkShare": 0.5,
+  "ordinary": {
+    "distribution": "lognormal-OU-plus-iid-in-log-space",
+    "medianSeconds": 0.001901395726025303,
+    "logSigma": 0.506615071647472,
+    "correlatedVarianceShare": 0.17706847130783426,
+    "correlationTimeSeconds": 1.8374055509510452
+  },
+  "deliveryPauses": {
+    "ratePerSecond": 1.6462607728944314,
+    "durationDistribution": "exponential",
+    "meanDurationSeconds": 0.013933564610439401,
+    "mergeOverlapping": true,
+    "timeBase": "wall-clock"
+  },
+  "uplinkModel": "mirror-downlink-provisional",
+  "directionCoupling": "independent-provisional",
+  "pongProcessingWaitSeconds": [
+    0,
+    0.007
+  ],
+  "delayUnit": "complete-WebSocket-frame",
+  "preserveOrderPerDirection": true,
+  "evidence": {
+    "downlink": "effective receipt-minus-elapsed-clock variation, train fit and held-out session validation",
+    "baseline": "RTT fit conditional on mirrored directional model and chosen uniform pong wait; not measured propagation",
+    "uplinkShare": "chosen; not identifiable",
+    "uplinkModel": "chosen; not separately validated",
+    "directionCoupling": "chosen; not identifiable",
+    "pongProcessingWaitSeconds": "chosen 7 ms approximation; not inferred handling law"
+  }
+}

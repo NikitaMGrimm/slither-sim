@@ -11,6 +11,7 @@ scientific rule or product adoption.
 | Fidelity | [Official baseline selection](fidelity/2026-10-23-official-defaults/REPORT.md) | Configuration choices and explicit model assumptions; no new measurements. |
 | Fidelity | [Transport parity reference](fidelity/2026-10-25-transport-parity/REPORT.md) | Offline official headless summaries, empirical transport gates and a localhost host baseline. |
 | Fidelity | [Packet scheduler](fidelity/2026-10-25-packet-scheduler/REPORT.md) | Offline retained protocol-19 census; adopted per-tick emission and partial per-family gates; counterexamples and unknown exact rules retained. |
+| Fidelity | [Network path](fidelity/2026-10-25-network-path/REPORT.md) | Retained official-route delivery fit with retrospective held-out checks; p99/ACF mismatches, chosen uplink assumptions and parent-reported latency/input-timing adoption. |
 | Fidelity | [Tail/turn jitter](fidelity/2026-10-25-tail-jitter/REPORT.md) | Exploratory shared Windows desktop; batching/stall diagnosis, reverted staggering and owner-reported 500-bot after evidence (43% simulation load, zero deferrals). |
 | Performance | [Initial cost baseline](performance/2026-10-23-baseline/REPORT.md) | Exploratory synthetic costs; not an isolated host or stable production comparison. |
 | Performance | [Collision bounds lookup](performance/2026-10-23-collision-bounds/REPORT.md) | Adopted lookup change; gain specific to the separated-body fixture. |

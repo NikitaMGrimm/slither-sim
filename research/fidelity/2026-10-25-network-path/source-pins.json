@@ -1,0 +1,227 @@
+{
+  "access": "local-only; paths and SHA-256 identify retained files, not downloadable evidence",
+  "scope": "Selected source pins and small results; not a packaged evidence-bundle-v1 archive or scientific approval",
+  "studyDirectory": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025",
+  "studyInspectedHeads": {
+    "slitherSim": "9e4b6300f7cf10d1fe018fecaa22d79e18dab609",
+    "slitherArena": "aab1149460c0f5606fbdc7d73e295ba79d094789"
+  },
+  "inputManifest": {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\input-sha256.json",
+    "bytes": 466360,
+    "sha256": "a1c7cb060c0e70a3322fe21721e08366d463cc431379a89c2af1baf670720728",
+    "entries": 2608
+  },
+  "artifactManifest": {
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\artifact-sha256.json",
+    "bytes": 45294,
+    "sha256": "d258c9e25989123f3be6df33760063d3643ace94a6cee678d46a9dea7479a0b2",
+    "entries": 435
+  },
+  "materialSourceInputs": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\tools\\fidelity\\capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\perf-workload-matrix\\src\\client\\latency.rs",
+      "sha256": "1346c54ce0c3561fc1d93371938c0216b6b5e9a99772cd01f0741a1ecf001e50"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\jitter-study-20261025\\REPORT.md",
+      "sha256": "37fbc409123863d91f4bcf1d51620602b27c6cb88eecdb6fe699a6336d5d08a7"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\jitter-study-20261025\\delayspread.py",
+      "sha256": "bad9d9838ea772d3fedc4d2cc7b5e8846e20c90dfb3923f9bbfba884a166f6b7"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\jitter-study-20261025\\runtime-config.480.json",
+      "sha256": "48d26b856d71de704ba1cb717ba55e4b85cd01153f69d64ba595debde0075e46"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\jitter-study-20261025\\tailjitter.py",
+      "sha256": "f3a49aa0104faa9903f3ae1e8d2b2c60eb6234926af454936ab5d2574f4974fa"
+    }
+  ],
+  "analysisScripts": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\analyze.py",
+      "sha256": "d61f3192a1bf0e9e3aede9fb22d0c97b7c38bc2991cbf406b763c9e1746f781f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\browser_inventory.py",
+      "sha256": "3eb37984155482c0ccd4200331b6c56f373865741c1319c17a7ff9c20917d91a"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\build_report.py",
+      "sha256": "22719bf4ae10abfb6798263313466d35d44eaa3a9c925cb021ef27d9c3940681"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\details.py",
+      "sha256": "c827a34a4fd518a53b36aeecc9226f914c97d64ce980b8756bcbfcaf9c3bede2"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\extract.py",
+      "sha256": "95083d0504daefa4ec0d81686903aa38ac8b176348aba4333f540dabc548caa3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit-per-frame-v1.py",
+      "sha256": "08a092344e95ec675e7140fd61e073e24eaaf109448554c00935e48ac521346f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit-poisson-unmerged-v1.py",
+      "sha256": "5b81cab24ce1c14c67c2e74e60baec2283db212c92ffdbcca59bc719235ef8e3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit.py",
+      "sha256": "0a854f34b635e729f3d80b3294f2e1f8056d5e5830c9d998607c84098d846b71"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\inventory.py",
+      "sha256": "6c939c693d3e3d6103916bcc9b02cdd7948b5404ce475efa8be8467a4f71177c"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\rtt_fit-floored-gauge-v1.py",
+      "sha256": "0b9317533bbceca3c9c7f7028b65dbc43c69c9300ac207ae255d4877faa55211"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\rtt_fit.py",
+      "sha256": "dee5fbcb395cc7d5140f5347212c5c69c1c0fab751de7d3154dc37b15f0ad3c8"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\seal_artifacts.py",
+      "sha256": "054d94ef040e733fbe5013b2cd2522fab44bd2f902ed81af0c02bafcfce378ef"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\test_analysis.py",
+      "sha256": "c5fa5aa87f981ab99fb40cb2be9fc8be8a42b7bfac4947acf650509c0c24e87e"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\validate.py",
+      "sha256": "8b903fa81cfd947834ba40f8d8c765fe109f4431d8df4fe5fd15baca50f2f47f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\verify_inputs.py",
+      "sha256": "fa2d8c8fe62da641b0bbe324104808fc1e71d6717385b6679b0b01edcde4144b"
+    }
+  ],
+  "retainedArtifacts": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\REPORT.md",
+      "bytes": 39232,
+      "sha256": "9cf24c8d903205e648ed509c09ddcdb4d246227d24aee6b48be883fba4386035"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\REPRODUCE.md",
+      "bytes": 4622,
+      "sha256": "f6f58eae7768c80be1f0d1ebc9b9995259891794a3e17ba555e719fc3ac2a9f5"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\ATTEMPTS.md",
+      "bytes": 3585,
+      "sha256": "645ae614a6ec32942a128b7dcb606673f31d2544a10c64358104fdf0bf5e25aa"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit.json",
+      "bytes": 65270,
+      "sha256": "9620fde64c4097f3929b6ccfeab4832cadacc121ce8342f3e6c6125be99c1e80"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\rtt-fit.json",
+      "bytes": 5457,
+      "sha256": "60d1b901bfd6ae4866a609e5b0adfd3df23936654c7e3f9b779c39474c54a133"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\details.json",
+      "bytes": 71634,
+      "sha256": "d4f0dea8fca6ce28ff466e37ae29942c19df00e418bfd5be05d121b1efc60684"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\captures.json",
+      "bytes": 681488,
+      "sha256": "41f7a83a32d9b3a334961e1d470d66570faba56052dcc779a6a8e19614fd9c72"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\segments.json",
+      "bytes": 2246338,
+      "sha256": "022bf13fb2565108fac79acf13455cd52984710ebd73a02a8fe2d36ac0a57bf9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\segments.csv",
+      "bytes": 54738,
+      "sha256": "8bf017296f27fdd29d7d600685c4c6661901fe2950e8636206d874793699afd9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\browser-inventory.json",
+      "bytes": 465371,
+      "sha256": "57afd4fbc8e8be07e016037a1a82ca0fe55b4b19a869fe226fdda0cf8d2f07e2"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\inventory.json",
+      "bytes": 729127,
+      "sha256": "7efde4fda83df8b90c03b657a690773ee19ce39daaeaef1fce8387ae063ec5e9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\details-initial-browser-unsplit.json",
+      "bytes": 70576,
+      "sha256": "43cf248bb46bd4b44e07319875a2b724dca0ef63acc6c06650bb53ff6fa88dd3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit-per-frame-v1.json",
+      "bytes": 65261,
+      "sha256": "ace0e364dda7b538e4e2fd61fefe6d6b0055d76866fcec0047b29aa45bbc115f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit-poisson-unmerged-v1.json",
+      "bytes": 65277,
+      "sha256": "976bab2bbdab32ff95d41c5e351c237495091c276ee749c153ff8a4f9b3475ed"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\rtt-fit-floored-gauge-v1.json",
+      "bytes": 5449,
+      "sha256": "923349739aa06f18f89d0f5e32e9ef43e700fc302b380d4ba30123554192a5e0"
+    }
+  ],
+  "selectedResults": [
+    {
+      "recordPath": "proposed-default-profile.json",
+      "recordBytes": 1459,
+      "recordSha256": "de61f7d6e82da656fcabeec09b59bcb30f322e2797b8f7d44492ae7ca3d19866",
+      "source": {
+        "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\proposed-default-profile.json",
+        "bytes": 1496,
+        "sha256": "c92398fcfe90b99ecf68a42ab7d28f33b3423a38580cc4163d3aaf2483652dde"
+      },
+      "adaptation": "CRLF normalized to LF only; JSON content unchanged"
+    },
+    {
+      "recordPath": "validation.json",
+      "recordBytes": 9062,
+      "recordSha256": "150c5a62da4e14b92801e2b1a467f586ddc8d2c542a695b556cab27a6902d90c",
+      "source": {
+        "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\validation.json",
+        "bytes": 9390,
+        "sha256": "7a5720b1db6619480a4bcd2ccd6b0582c241af021dbbd7da4eefe1b965a00e29"
+      },
+      "adaptation": "CRLF normalized to LF only; JSON content unchanged"
+    }
+  ],
+  "verificationLimits": "Adaptation checked listed top-level artifact/script hashes against the retained artifact manifest; historical material-source hashes are preserved from the input manifest. Full 2608-input verification and numerical pipeline were not rerun. Adoption and localhost measurements are parent-reported, not study outputs."
+}
