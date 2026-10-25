@@ -580,11 +580,10 @@ pub struct Simulator {
     parallel: bool,
 }
 impl Simulator {
-    /// Let `observe_all` and `observe_selected` split large batches over the
-    /// current rayon thread pool: the global pool, sized by `RAYON_NUM_THREADS`
-    /// or the core count, unless called inside `ThreadPool::install`. Results are
-    /// identical either way. Off by default, so worlds already run in parallel do
-    /// not compete for cores. Like the event buffers, this is not serialized.
+    /// Split large `observe_all` and `observe_selected` batches over the current
+    /// rayon pool, with identical results. The global pool uses `RAYON_NUM_THREADS`
+    /// or the core count; `ThreadPool::install` overrides it. Off by default so
+    /// parallel worlds do not compete for cores. Not serialized, like event buffers.
     #[cfg(feature = "parallel")]
     pub fn set_parallel(&mut self, parallel: bool) {
         self.parallel = parallel;
@@ -1007,11 +1006,11 @@ impl Simulator {
     pub fn living(&self) -> usize {
         self.snakes.iter().filter(|s| s.alive).count()
     }
-    /// One physics tick (`config.dt`, the 7 ms server loop by default). Actions use stable
-    /// spawn slots; dead slots may be None.
-    /// Advance one tick. Rejected actions change nothing. A pickup whose gain
-    /// would overflow its eater's mass completes the tick without that gain,
-    /// returns the error and stops the world: every later step is rejected.
+    /// Advance one physics tick (`config.dt`, the 7 ms server loop by default).
+    /// Actions use stable spawn slots; dead slots may be None. Rejected actions
+    /// change nothing. If a pickup would overflow its eater's mass, the tick
+    /// completes without that gain, returns an error and stops the world;
+    /// every later step is rejected.
     pub fn step(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
         self.validate_actions(actions)?;
         self.advance_validated(actions)
@@ -1609,10 +1608,10 @@ impl Simulator {
     /// so observations retain their public schema. The exact-11 pulse is not
     /// modeled: its advertised speed does not reproduce recorded displacement.
     pub fn set_prey_mode(&mut self, id: u64, mode: PreyMode) -> Result<(), String> {
-        if self.prey.iter().filter(|prey| prey.id == id).count() != 1 {
+        let mut matching = self.prey.iter_mut().filter(|prey| prey.id == id);
+        let (Some(prey), None) = (matching.next(), matching.next()) else {
             return Err("prey mode requires exactly one matching identity".into());
-        }
-        let prey = self.prey.iter_mut().find(|prey| prey.id == id).unwrap();
+        };
         match mode {
             PreyMode::Roaming => {
                 self.prey_outward.remove(&id);

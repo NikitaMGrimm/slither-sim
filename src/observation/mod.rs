@@ -186,9 +186,8 @@ impl<'a> Observer<'a> {
         });
         Self { world, index }
     }
-    /// Writes the observation of `index` into `slot`, refilling the vectors of the
-    /// observation already there. `marks` is empty or has one zeroed bit per food
-    /// item; it is zeroed again on return.
+    /// Refill `slot` for `index`, reusing its vectors. `marks` is empty or has one
+    /// zeroed bit per food item; it is zeroed again on return.
     fn observe_into(
         &self,
         index: usize,
@@ -430,9 +429,8 @@ impl Simulator {
         self.observe_all_into(&mut observations);
         observations
     }
-    /// [`observe_all`](Self::observe_all) into `observations`, refilling the
-    /// vectors of the observations already there. A bot that observes every
-    /// decision through one buffer then allocates little per call.
+    /// [`observe_all`](Self::observe_all) into `observations`, reusing its vectors
+    /// to keep allocation low when observing every decision.
     pub fn observe_all_into(&self, observations: &mut Vec<Option<Observation>>) {
         self.observe_matching(None, observations)
             .expect("observations of existing slots cannot fail")

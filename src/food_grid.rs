@@ -71,6 +71,9 @@ impl Entry {
             ambient: food.origin == Some(Origin::Ambient),
         }
     }
+    fn cell(self, size: f64) -> (Axis, Axis) {
+        food_cell(f64::from_bits(self.x), f64::from_bits(self.y), size)
+    }
 }
 
 /// Per-cell pellet counts and the ambient count, derived from a mirror of the
@@ -141,9 +144,7 @@ impl FoodCache {
                 }
                 let mut counts = Counts::default();
                 for e in &self.entries {
-                    *counts
-                        .entry(food_cell(f64::from_bits(e.x), f64::from_bits(e.y), size))
-                        .or_default() += 1;
+                    *counts.entry(e.cell(size)).or_default() += 1;
                 }
                 self.grids.push((key, counts));
                 self.grids.len() - 1
@@ -160,9 +161,7 @@ impl FoodCache {
         let entry = Entry::of(pellet);
         self.ambient += usize::from(entry.ambient);
         for (key, counts) in &mut self.grids {
-            *counts
-                .entry(food_cell(pellet.x, pellet.y, f64::from_bits(*key)))
-                .or_default() += 1;
+            *counts.entry(entry.cell(f64::from_bits(*key))).or_default() += 1;
         }
         self.entries.push(entry);
     }
@@ -178,11 +177,7 @@ impl FoodCache {
         for (e, _) in self.entries.iter().zip(removed).filter(|(_, r)| **r) {
             self.ambient -= usize::from(e.ambient);
             for (key, counts) in &mut self.grids {
-                let cell = food_cell(
-                    f64::from_bits(e.x),
-                    f64::from_bits(e.y),
-                    f64::from_bits(*key),
-                );
+                let cell = e.cell(f64::from_bits(*key));
                 if let Some(count) = counts.get_mut(&cell) {
                     *count -= 1;
                     if *count == 0 {
