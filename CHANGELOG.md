@@ -4,6 +4,10 @@
 
 ### Breaking
 
+- Rust helpers no longer expose unused arguments or test-only reconstruction:
+  `crossed_anchor` takes only head and last anchor, `append_client_anchor` is
+  removed, and `Minimap::from_snakes` returns `Result` for invalid sides.
+
 - Network wire drains now return an error when recording is disabled, matching
   simulation. Rust `NetworkBackend::drain_records` returns `Result`; JSON `wire`
   reports the error under `slither-client-json-v2` ([recording](docs/client-api.md#recording-and-network-bounds)).

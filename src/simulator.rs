@@ -1270,7 +1270,7 @@ impl Simulator {
                     }
                 }
             }
-            if let Some(anchor) = crossed_anchor(previous[i], s.head, s.body[0]) {
+            if let Some(anchor) = crossed_anchor(s.head, s.body[0]) {
                 let grow = s.fam >= 1.0;
                 if grow {
                     s.fam -= 1.0;
