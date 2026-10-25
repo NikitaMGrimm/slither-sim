@@ -148,9 +148,10 @@
 
 ### Performance
 
-- Crowded hosts stop scoring spawn candidates that cannot be admitted or beat
-  the current best, without changing the selected pose. Background bots wait a
-  wall second after refused admission, reducing retry load; socket players keep
+- Crowded hosts spend far less time choosing spawn positions: candidates stop
+  being scored once they cannot win, and the chosen pose is unchanged. A
+  64-seat Battledome host drops from about 45 to 3.5 ms per tick. Background
+  bots refused a spawn wait one second before retrying; socket players keep
   their own join timing
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-25-battledome-spawn-cost/REPORT.md)).
 - Batch observations (`observe_all_into`, `observe_selected_into`, transport
