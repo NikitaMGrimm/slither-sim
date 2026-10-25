@@ -15,6 +15,7 @@
 //! are sent. Native and remote recipients use the same coverage policies.
 use super::{
     Backend, ClientFrame, ClientState, ClientStatus, Minimap, WireEvent, WireRecord, encode,
+    fast_hash::FastMap,
     latency::{LatencyConfig, Link, Random},
     presentation::FoodPresentation,
     protocol,
@@ -22,14 +23,14 @@ use super::{
 };
 use crate::{
     Action, Config, Simulator,
-    model::{Arena, Origin, Point, Snake},
+    model::{Arena, Food, Origin, Point, Snake},
     physics,
     simulator::PickupItem,
     spawn,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     f64::consts::TAU,
     sync::Arc,
 };
@@ -51,11 +52,16 @@ const RECORD_OVERHEAD: usize = 32;
 /// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
 /// snake in full.
 const FRESH_ANCHORS: usize = 4;
-/// Ticks between motion (heading, wanted heading, speed) reports for one
-/// snake to one recipient. Official receipts space a snake's rotation reports
-/// about 42 ms apart while frames arrive every ~7 ms tick, and body anchors
-/// arrive in the tick that makes them (scheduler study, 2026-10-25).
+/// Release rules from the official scheduler study (2026-10-25; 1.93 million
+/// retained frames, `research/2026-10-25-scheduler/`): body anchors leave in
+/// the tick that makes them. A snake's motion (heading, wanted heading,
+/// speed) is reported when it changed, at most every six ~7 ms ticks: busy
+/// gaps sit near 42 ms, a straight snake stays silent for seconds and one
+/// snake's reports share a phase across recipients. Changed mass follows its
+/// own ~105 ms opportunity. The exact comparators and rearm rules are not
+/// identified; these minimum gaps are inferences.
 const MOTION_REPORT_TICKS: u64 = 6;
+const FAM_REPORT_TICKS: u64 = 15;
 /// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
 /// pose may exist after this many failures.
 const SPAWN_ATTEMPTS: usize = 64;
@@ -238,14 +244,37 @@ struct KnownSnake {
     speed: u8,
     fam: u32,
     kills: usize,
-    /// First tick at which this recipient's next motion report may go out.
-    motion_at: u64,
 }
+
+/// One snake's report opportunities, shared by every recipient. Recipients
+/// differ only in which fields they still lack.
+#[derive(Clone, Debug, Default)]
+struct SnakeReports {
+    life: u64,
+    /// Heading, wanted heading and speed bytes last reported.
+    motion: [u8; 3],
+    motion_at: u64,
+    fam: u32,
+    fam_at: u64,
+    /// Reported in the current tick.
+    motion_due: bool,
+    fam_due: bool,
+}
+
 #[derive(Clone, Debug)]
 struct KnownPrey {
     wire: u16,
     motion: [u32; 3],
+}
+
+/// One prey's correction clock, shared by every recipient: official
+/// corrections for one prey align across clients, and a new viewer does not
+/// restart it.
+#[derive(Clone, Copy, Debug)]
+struct PreyClock {
     reported_at: f64,
+    speed: u32,
+    due: bool,
 }
 
 /// The physical identity disambiguates food collapsed onto the same wire grid.
@@ -481,6 +510,11 @@ pub struct SimulatorBackend {
     /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
     /// so a connection already holding it can skip the comparison.
     food_sectors: Vec<Option<Arc<SectorFood>>>,
+    food_index: FoodIndex,
+    /// Food maintenance periods begun since virtual zero.
+    food_epoch: u64,
+    prey_clocks: BTreeMap<u64, PreyClock>,
+    reports: Vec<SnakeReports>,
     /// Sectors listed at the last broadcast.
     listed: Vec<u16>,
     /// Scratch sector-to-bucket table, all `u32::MAX` between broadcasts.
@@ -522,6 +556,10 @@ impl SimulatorBackend {
             prey_eaters: BTreeMap::new(),
             prey_wire: BTreeMap::new(),
             food_sectors: Vec::new(),
+            food_index: FoodIndex::default(),
+            food_epoch: 0,
+            prey_clocks: BTreeMap::new(),
+            reports: vec![SnakeReports::default(); config.agents],
             listed: Vec::new(),
             food_buckets: Vec::new(),
             slots: Vec::with_capacity(config.agents),
@@ -1068,6 +1106,7 @@ impl SimulatorBackend {
         // co-located lifetimes, including a refill at a just-eaten point.
         for event in births.iter().filter(|event| event.source.is_some()) {
             self.food_presentation.births(std::slice::from_ref(event))?;
+            self.food_index.add(&event.food, true);
         }
         for event in self.world.pickup_events.as_deref().unwrap_or(&[]) {
             if let PickupItem::Prey(prey) = &event.item {
@@ -1076,6 +1115,7 @@ impl SimulatorBackend {
                     .or_insert(event.eater as u16);
             }
             if let PickupItem::Food(food) = &event.item {
+                self.food_index.remove(food);
                 // Only the oldest co-located lifetime is on the wire. Eating
                 // a hidden newer pellet must not animate that visible pellet.
                 if self.food_presentation.picked_up(food)? {
@@ -1087,6 +1127,7 @@ impl SimulatorBackend {
         }
         for event in births.iter().filter(|event| event.source.is_none()) {
             self.food_presentation.births(std::slice::from_ref(event))?;
+            self.food_index.add(&event.food, false);
         }
         self.settle_lives();
         self.tick += 1;
@@ -1120,7 +1161,19 @@ impl SimulatorBackend {
         for slot in &mut self.slots {
             slot.connection.link.update(&latency, &mut self.random, now);
         }
-        self.food_presentation.sync(&self.world.food)?;
+        // Ambient births reach the wire at the shared food maintenance, with
+        // sector cleanup; see `FoodIndex`.
+        let epoch = (now / super::visibility::CLEANUP_SECONDS).floor() as u64;
+        if epoch > self.food_epoch {
+            self.food_epoch = epoch;
+            self.food_index.reveal();
+        }
+        // Food edited outside physics (fixtures) leaves the index behind.
+        if self.food_index.stale || self.food_index.count != self.world.food.len() {
+            self.food_presentation.sync(&self.world.food)?;
+            self.food_index.rebuild(&self.world.food);
+        }
+        self.update_reports()?;
         if !self.slots.iter().any(|slot| slot.connection.setup) {
             self.food_eaters.clear();
             self.prey_eaters.clear();
@@ -1138,6 +1191,7 @@ impl SimulatorBackend {
         }
         self.sync_food_sectors()?;
         self.assign_prey_wire()?;
+        self.update_prey_clocks()?;
         let eaten = eaten_sectors(&self.food_eaters);
         let bounds: Vec<[f64; 4]> = self
             .world
@@ -1150,6 +1204,7 @@ impl SimulatorBackend {
                 )
             })
             .collect();
+        let grid = CoverageGrid::new(&self.world.snakes, &bounds, self.world.config.vision);
         let mut board = None;
         for slot in 0..self.slots.len() {
             let connection = &self.slots[slot].connection;
@@ -1172,7 +1227,7 @@ impl SimulatorBackend {
                 let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
-            let mut packets = self.updates(slot, now, &eaten, &bounds)?;
+            let mut packets = self.updates(slot, now, &eaten, &bounds, &grid)?;
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
             let live_board = board.as_ref().filter(|_| alive || was_over);
@@ -1216,8 +1271,60 @@ impl SimulatorBackend {
         Ok(())
     }
 
+    /// Open each living snake's shared report opportunities for this tick.
+    fn update_reports(&mut self) -> Result<(), String> {
+        for (slot, snake) in self.world.snakes.iter().enumerate() {
+            let reports = &mut self.reports[slot];
+            if !snake.alive {
+                reports.motion_due = false;
+                reports.fam_due = false;
+                continue;
+            }
+            let wanted = physics::quantize_heading(self.slots[slot].control.heading);
+            let motion = [
+                encode::angle_byte(snake.heading),
+                encode::angle_byte(wanted),
+                encode::speed_byte(snake.speed)?,
+            ];
+            let fam = encode::fam_u24(snake.fam);
+            reports.update(self.slots[slot].life, motion, fam, self.tick);
+        }
+        Ok(())
+    }
+
+    /// Advance every living prey's correction clock. Ordinary corrections
+    /// recur near one third second; the 210 ms pulse guard is an engineering
+    /// choice, not a universal receipt bound. See docs/server-rules.md.
+    fn update_prey_clocks(&mut self) -> Result<(), String> {
+        let now = self.time();
+        let mut clocks = BTreeMap::new();
+        for prey in &self.world.prey {
+            let speed = u32::from(encode::speed_u16(prey.speed)?);
+            let mut clock = self
+                .prey_clocks
+                .get(&prey.id)
+                .copied()
+                .unwrap_or(PreyClock {
+                    reported_at: now,
+                    speed,
+                    due: false,
+                });
+            let pulse = clock.speed == 11000 || speed == 11000;
+            let interval = if pulse { 0.210 } else { 1. / 3. };
+            clock.due = now + 1e-9 >= clock.reported_at + interval;
+            if clock.due {
+                clock.reported_at = now;
+                clock.speed = speed;
+            }
+            clocks.insert(prey.id, clock);
+        }
+        self.prey_clocks = clocks;
+        Ok(())
+    }
+
     /// List the food of every sector a connection subscribes to. Each wire cell
-    /// shows its first pellet in world order.
+    /// shows its first shown pellet in world order. Only new and changed
+    /// listings are rebuilt, from the index.
     fn sync_food_sectors(&mut self) -> Result<(), String> {
         // Taken so an early error drops a partly filled table.
         let mut buckets = std::mem::take(&mut self.food_buckets);
@@ -1232,41 +1339,6 @@ impl SimulatorBackend {
                 }
             }
         }
-        let mut entries = Vec::new();
-        let mut starts = vec![0_usize; sectors.len() + 1];
-        for food in &self.world.food {
-            let key = encode::food_key(food.point())?;
-            let bucket = buckets[usize::from(u16::from_be_bytes([key[0], key[1]]))];
-            if bucket == u32::MAX {
-                continue;
-            }
-            let size = food
-                .size
-                .unwrap_or_else(|| (food.value / physics::nutrition(1., 2.)).max(0.).sqrt());
-            starts[bucket as usize + 1] += 1;
-            entries.push((
-                bucket,
-                [key[2], key[3]],
-                KnownFood {
-                    point: food.point(),
-                    style: encode::FoodStyle {
-                        color: self.food_presentation.color(food),
-                        size: encode::food_size(size),
-                        snake_food: matches!(food.origin, Some(Origin::Boost | Origin::Death)),
-                    },
-                },
-            ));
-        }
-        for bucket in 1..starts.len() {
-            starts[bucket] += starts[bucket - 1];
-        }
-        // Counting sort by sector, keeping world order within each sector.
-        let mut order = vec![0_u32; entries.len()];
-        let mut next = starts.clone();
-        for (index, &(bucket, ..)) in entries.iter().enumerate() {
-            order[next[bucket as usize]] = index as u32;
-            next[bucket as usize] += 1;
-        }
         let table = &mut self.food_sectors;
         table.resize(1 << 16, None);
         for &index in &self.listed {
@@ -1274,25 +1346,17 @@ impl SimulatorBackend {
                 table[usize::from(index)] = None;
             }
         }
-        let mut run = Vec::new();
-        for (bucket, &index) in sectors.iter().enumerate() {
-            run.clear();
-            run.extend(
-                order[starts[bucket]..starts[bucket + 1]]
-                    .iter()
-                    .map(|&entry| {
-                        let (_, offset, food) = entries[entry as usize];
-                        (offset, food)
-                    }),
-            );
-            // Stable, so deduplication keeps the earliest pellet of each wire cell.
-            run.sort_by_key(|(offset, _)| *offset);
-            run.dedup_by_key(|(offset, _)| *offset);
+        for &index in &sectors {
             let listing = &mut table[usize::from(index)];
-            if listing.as_ref().is_none_or(|old| old.0 != run) {
-                *listing = Some(Arc::new(SectorFood(run.clone())));
+            if listing.is_none() || self.food_index.dirty.contains(&index) {
+                let run = self.food_index.listing(index, &self.food_presentation);
+                if listing.as_ref().is_none_or(|old| old.0 != run) {
+                    *listing = Some(Arc::new(SectorFood(run)));
+                }
             }
         }
+        // Unlisted sectors are built afresh when a connection subscribes.
+        self.food_index.dirty.clear();
         for &index in &sectors {
             buckets[usize::from(index)] = u32::MAX;
         }
@@ -1362,8 +1426,8 @@ impl SimulatorBackend {
         now: f64,
         eaten: &BTreeSet<[u8; 2]>,
         bounds: &[[f64; 4]],
+        grid: &CoverageGrid,
     ) -> Result<Vec<Vec<u8>>, String> {
-        let tick = self.tick;
         let world = &self.world;
         let me = &world.snakes[slot];
         let record = self
@@ -1402,7 +1466,14 @@ impl SimulatorBackend {
         }
         let vision = world.config.vision;
         let head = me.head;
-        let order = std::iter::once(slot).chain((0..world.snakes.len()).filter(|&i| i != slot));
+        // Snakes that may cover the head, or that this connection shows and may
+        // need removing; every other snake is neither shown nor eligible.
+        let known = &self.slots[slot].connection.snakes;
+        let mut others: Vec<usize> = grid.near(head).to_vec();
+        others.extend(known.slots());
+        others.sort_unstable();
+        others.dedup();
+        let order = std::iter::once(slot).chain(others.into_iter().filter(|&i| i != slot));
         for i in order {
             let snake = &world.snakes[i];
             let life = self.slots[i].life;
@@ -1416,7 +1487,17 @@ impl SimulatorBackend {
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
                     let wanted = physics::quantize_heading(control);
-                    changes(&mut packets, own, id, known, snake, wanted, profile, tick)?;
+                    let reports = &self.reports[i];
+                    changes(
+                        &mut packets,
+                        own,
+                        id,
+                        known,
+                        snake,
+                        wanted,
+                        profile,
+                        reports,
+                    )?;
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
@@ -1432,7 +1513,7 @@ impl SimulatorBackend {
                     full(&mut packets, own, id, snake, wanted, profile)?;
                     connection
                         .snakes
-                        .insert(i, KnownSnake::new(life, snake, wanted, tick)?);
+                        .insert(i, KnownSnake::new(life, snake, wanted)?);
                 }
             }
             let connection = &mut self.slots[slot].connection;
@@ -1488,23 +1569,15 @@ impl SimulatorBackend {
                     encode::angle_u24(prey.target_heading),
                     u32::from(encode::speed_u16(prey.speed)?),
                 ],
-                reported_at: now,
             };
             match connection.prey.get(&id) {
                 None => packets.push(encode::prey_appearance(wire, prey)?),
-                Some(known) => {
+                // Keep corrections even when quantized position is still.
+                Some(known) if self.prey_clocks[&id].due => {
                     let changed = known.motion != current.motion;
-                    // Ordinary receipts cluster near one third second. The
-                    // 210 ms pulse guard is an engineering choice, not a
-                    // universal receipt bound; see docs/server-rules.md.
-                    // Keep corrections even when quantized position is still.
-                    let pulse = known.motion[2] == 11000 || current.motion[2] == 11000;
-                    let interval = if pulse { 0.210 } else { 1. / 3. };
-                    if now + 1e-9 < known.reported_at + interval {
-                        continue;
-                    }
                     packets.push(encode::prey_motion(wire, prey, changed)?)
                 }
+                Some(_) => continue,
             }
             connection.prey.insert(id, current);
         }
@@ -1805,8 +1878,8 @@ impl Backend for SimulatorBackend {
 }
 
 impl KnownSnake {
-    /// Shown in full at `tick`, including its complete motion.
-    fn new(life: u64, snake: &Snake, wanted: f64, tick: u64) -> Result<Self, String> {
+    /// Shown in full, including its complete motion.
+    fn new(life: u64, snake: &Snake, wanted: f64) -> Result<Self, String> {
         Ok(Self {
             life,
             front: snake.body[0],
@@ -1816,8 +1889,35 @@ impl KnownSnake {
             speed: encode::speed_byte(snake.speed)?,
             fam: encode::fam_u24(snake.fam),
             kills: snake.kills,
-            motion_at: tick + MOTION_REPORT_TICKS,
         })
+    }
+}
+
+impl SnakeReports {
+    /// Open this tick's opportunities for a living snake. A new life starts
+    /// from the state its appearance carries.
+    fn update(&mut self, life: u64, motion: [u8; 3], fam: u32, tick: u64) {
+        if self.life != life {
+            *self = Self {
+                life,
+                motion,
+                motion_at: tick,
+                fam,
+                fam_at: tick,
+                ..Self::default()
+            };
+            return;
+        }
+        self.motion_due = motion != self.motion && tick >= self.motion_at;
+        if self.motion_due {
+            self.motion = motion;
+            self.motion_at = tick + MOTION_REPORT_TICKS;
+        }
+        self.fam_due = fam != self.fam && tick >= self.fam_at;
+        if self.fam_due {
+            self.fam = fam;
+            self.fam_at = tick + FAM_REPORT_TICKS;
+        }
     }
 }
 
@@ -1839,6 +1939,195 @@ impl KnownSnakes {
             self.0.resize(slot + 1, None);
         }
         self.0[slot] = Some(known);
+    }
+    fn slots(&self) -> impl Iterator<Item = usize> + '_ {
+        self.0
+            .iter()
+            .enumerate()
+            .filter_map(|(slot, known)| known.as_ref().map(|_| slot))
+    }
+}
+
+/// World food by wire sector, in world order, kept current from birth and
+/// pickup events so a broadcast never scans every pellet.
+///
+/// Ordinary (ambient) births stay off the wire until the next shared food
+/// maintenance: official ordinary-food `f` packets come in bursts ~504 ms apart
+/// that align across clients, together with sector clears, while boost and
+/// death food and pickups go out promptly (scheduler study, 2026-10-25).
+/// Whether the official server creates ambient food at maintenance or only
+/// announces it then is not identified; physics here is unchanged.
+#[derive(Default)]
+struct FoodIndex {
+    sectors: FastMap<u16, Vec<IndexedFood>>,
+    count: usize,
+    /// A pickup did not match the index; rebuild before the next listing.
+    stale: bool,
+    /// Sectors whose shown food changed since the last listing.
+    dirty: BTreeSet<u16>,
+    /// Sectors holding ambient births not yet shown.
+    hidden: BTreeSet<u16>,
+}
+
+#[derive(Clone)]
+struct IndexedFood {
+    offset: [u8; 2],
+    food: Food,
+    shown: bool,
+}
+
+impl FoodIndex {
+    fn rebuild(&mut self, food: &[Food]) {
+        self.dirty.extend(self.sectors.keys());
+        self.sectors.clear();
+        self.hidden.clear();
+        self.count = 0;
+        self.stale = false;
+        for item in food {
+            self.add(item, true);
+        }
+    }
+
+    fn sector(food: &Food) -> Option<(u16, [u8; 2])> {
+        let key = encode::food_key(food.point()).ok()?;
+        Some((u16::from_be_bytes([key[0], key[1]]), [key[2], key[3]]))
+    }
+
+    fn add(&mut self, food: &Food, shown: bool) {
+        self.count += 1;
+        let Some((sector, offset)) = Self::sector(food) else {
+            // Off the wire grid; listings never include it.
+            return;
+        };
+        self.sectors.entry(sector).or_default().push(IndexedFood {
+            offset,
+            food: food.clone(),
+            shown,
+        });
+        if shown {
+            self.dirty.insert(sector);
+        } else {
+            self.hidden.insert(sector);
+        }
+    }
+
+    /// Physics visits pickups in reverse food order, so of several pellets at
+    /// one position the newest goes first.
+    fn remove(&mut self, food: &Food) {
+        self.count = self.count.wrapping_sub(1);
+        let Some((sector, _)) = Self::sector(food) else {
+            return;
+        };
+        let identity = food_identity(food.point());
+        let Some(entries) = self.sectors.get_mut(&sector) else {
+            self.stale = true;
+            return;
+        };
+        match entries
+            .iter()
+            .rposition(|entry| food_identity(entry.food.point()) == identity)
+        {
+            Some(index) => {
+                let removed = entries.remove(index);
+                if entries.is_empty() {
+                    self.sectors.remove(&sector);
+                }
+                if removed.shown {
+                    self.dirty.insert(sector);
+                }
+            }
+            None => self.stale = true,
+        }
+    }
+
+    /// Show every ambient birth held since the last maintenance.
+    fn reveal(&mut self) {
+        for sector in std::mem::take(&mut self.hidden) {
+            if let Some(entries) = self.sectors.get_mut(&sector) {
+                for entry in entries {
+                    entry.shown = true;
+                }
+            }
+            self.dirty.insert(sector);
+        }
+    }
+
+    /// The first shown pellet of each wire cell, in offset order.
+    fn listing(&self, sector: u16, presentation: &FoodPresentation) -> Vec<([u8; 2], KnownFood)> {
+        let mut run: Vec<_> = self
+            .sectors
+            .get(&sector)
+            .into_iter()
+            .flatten()
+            .filter(|entry| entry.shown)
+            .map(|entry| {
+                let food = &entry.food;
+                let size = food
+                    .size
+                    .unwrap_or_else(|| (food.value / physics::nutrition(1., 2.)).max(0.).sqrt());
+                (
+                    entry.offset,
+                    KnownFood {
+                        point: food.point(),
+                        style: encode::FoodStyle {
+                            color: presentation.color(food),
+                            size: encode::food_size(size),
+                            snake_food: matches!(food.origin, Some(Origin::Boost | Origin::Death)),
+                        },
+                    },
+                )
+            })
+            .collect();
+        // Stable, so deduplication keeps the earliest pellet of each wire cell.
+        run.sort_by_key(|(offset, _)| *offset);
+        run.dedup_by_key(|(offset, _)| *offset);
+        run
+    }
+}
+
+/// Living snakes listed by every grid cell their widened bounds overlap.
+/// `covered` rejects a head outside a snake's bounds widened by the vision
+/// reach, so the cell holding a head lists every snake that can cover it.
+/// Testing all snakes for each of ~500 connections every tick cost ~2.3 ms.
+struct CoverageGrid {
+    cell: f64,
+    cells: HashMap<(i64, i64), Vec<usize>>,
+}
+
+impl CoverageGrid {
+    fn new(snakes: &[Snake], bounds: &[[f64; 4]], vision: f64) -> Self {
+        let reach = vision + 1.;
+        let mut grid = Self {
+            cell: reach.max(256.),
+            cells: HashMap::new(),
+        };
+        for (slot, &[x0, y0, x1, y1]) in bounds.iter().enumerate() {
+            if !snakes[slot].alive {
+                continue;
+            }
+            let (left, top) = grid.key(x0 - reach, y0 - reach);
+            let (right, bottom) = grid.key(x1 + reach, y1 + reach);
+            for x in left..=right {
+                for y in top..=bottom {
+                    grid.cells.entry((x, y)).or_default().push(slot);
+                }
+            }
+        }
+        grid
+    }
+
+    fn key(&self, x: f64, y: f64) -> (i64, i64) {
+        (
+            (x / self.cell).floor() as i64,
+            (y / self.cell).floor() as i64,
+        )
+    }
+
+    /// Ascending slots of the snakes that may cover `point`.
+    fn near(&self, point: Point) -> &[usize] {
+        self.cells
+            .get(&self.key(point.x, point.y))
+            .map_or(&[], Vec::as_slice)
     }
 }
 
@@ -1894,9 +2183,10 @@ fn full(
     Ok(())
 }
 
-/// Incremental body, mass and motion reports for a known snake at `tick`.
-/// Body changes go out in the tick that makes them; motion follows its own
-/// per-snake schedule (see `MOTION_REPORT_TICKS`).
+/// Incremental body, mass and motion reports for a known snake. Body changes
+/// go out in the tick that makes them; motion and standalone mass wait for the
+/// snake's shared opportunities in `reports`. Official frames put a snake's
+/// mass and tail reports before its motion, and motion before its anchors.
 #[allow(clippy::too_many_arguments)]
 fn changes(
     packets: &mut Vec<Vec<u8>>,
@@ -1906,7 +2196,7 @@ fn changes(
     snake: &Snake,
     wanted: f64,
     profile: &PlayerAppearance,
-    tick: u64,
+    reports: &SnakeReports,
 ) -> Result<(), String> {
     let body = &snake.body;
     let fam = encode::fam_u24(snake.fam);
@@ -1925,6 +2215,25 @@ fn changes(
             for _ in 0..grown - change {
                 packets.push(encode::tail(id, fam));
                 fam_sent = true;
+            }
+            // Growth anchors carry the mass themselves.
+            if !fam_sent && grown == 0 && reports.fam_due && known.fam != fam {
+                packets.push(encode::fam(id, fam));
+                fam_sent = true;
+            }
+            if reports.motion_due {
+                let [heading, target, speed] = reports.motion;
+                packets.extend(encode::motion(
+                    own,
+                    id,
+                    (heading != known.heading).then_some(heading),
+                    (target != known.wanted).then_some(target),
+                    (speed != known.speed).then_some(speed),
+                    encode::direction(snake.heading, wanted),
+                ));
+                known.heading = heading;
+                known.wanted = target;
+                known.speed = speed;
             }
             for j in (0..fresh).rev() {
                 let grows = (j as isize) < grown;
@@ -1947,7 +2256,7 @@ fn changes(
         None => {
             // Unrecognizable continuity (e.g. an externally edited body): resend.
             full(packets, own, id, snake, wanted, profile)?;
-            *known = KnownSnake::new(known.life, snake, wanted, tick)?;
+            *known = KnownSnake::new(known.life, snake, wanted)?;
             return Ok(());
         }
     }
@@ -1955,31 +2264,6 @@ fn changes(
     known.len = body.len();
     if fam_sent {
         known.fam = fam;
-    } else if known.fam != fam {
-        known.fam = fam;
-        packets.push(encode::fam(id, fam));
-    }
-    if tick >= known.motion_at {
-        // A fixed per-snake phase from its appearance; an unchanged motion
-        // sends nothing and waits for the next slot.
-        while known.motion_at <= tick {
-            known.motion_at += MOTION_REPORT_TICKS;
-        }
-        let heading = encode::angle_byte(snake.heading);
-        let target = encode::angle_byte(wanted);
-        let speed = encode::speed_byte(snake.speed)?;
-        let report = encode::motion(
-            own,
-            id,
-            (heading != known.heading).then_some(heading),
-            (target != known.wanted).then_some(target),
-            (speed != known.speed).then_some(speed),
-            encode::direction(snake.heading, wanted),
-        );
-        packets.extend(report);
-        known.heading = heading;
-        known.wanted = target;
-        known.speed = speed;
     }
     if known.kills != snake.kills {
         known.kills = snake.kills;
@@ -2691,6 +2975,8 @@ mod tests {
             .unwrap();
         sim.advance_ticks(1).unwrap();
         sim.backend.world.food[0].size = Some(3.);
+        // Physics reports births and pickups; an in-place edit is not one.
+        sim.backend.food_index.stale = true;
         sim.backend.broadcast().unwrap();
         let changed = remote.pump(&mut sim, 0);
         assert!(
@@ -2973,7 +3259,7 @@ mod tests {
         snake.segments = 20;
         for insertions in 1..=FRESH_ANCHORS {
             let mut moved = snake.clone();
-            let mut known = KnownSnake::new(0, &moved, 0., 0).unwrap();
+            let mut known = KnownSnake::new(0, &moved, 0.).unwrap();
             for k in 1..=insertions {
                 let anchor = Point {
                     x: 42. * k as f64,
@@ -2991,7 +3277,7 @@ mod tests {
                 &moved,
                 0.,
                 &NATIVE_PROFILE,
-                0,
+                &SnakeReports::default(),
             )
             .unwrap();
             let anchors = packets
@@ -3371,6 +3657,177 @@ mod tests {
             }
         }
         assert!(seen.iter().all(|&count| count > 0), "{seen:?}");
+    }
+
+    /// Packets about another snake `id`, grouped by the tick they arrived in.
+    fn about(packets: &[Vec<Vec<u8>>], id: u16, codes: &[u8]) -> Vec<(usize, Vec<u8>)> {
+        packets
+            .iter()
+            .enumerate()
+            .flat_map(|(tick, packets)| packets.iter().map(move |p| (tick, p)))
+            .filter(|(_, p)| codes.contains(&p[0]) && p.len() >= 3 && p[1..3] == id.to_be_bytes())
+            .map(|(tick, p)| (tick, p.clone()))
+            .collect()
+    }
+    const MOTION: &[u8] = b"eE345d7";
+    const ANCHORS: &[u8] = b"gn=+";
+
+    #[test]
+    fn motion_reports_share_one_gate_per_snake_and_lead_its_anchors() {
+        let mut sim = RawSimulator::new(5, raw_config(3), 3).unwrap();
+        let mut a = Remote::connect(&mut sim, 0, "A");
+        let mut b = Remote::connect(&mut sim, 1, "B");
+        let mut mover = Remote::connect(&mut sim, 2, "Mover");
+        run(
+            &mut sim,
+            &mut [(0, &mut a), (1, &mut b), (2, &mut mover)],
+            60,
+        );
+        let mut seen = [Vec::new(), Vec::new()];
+        let mut steer = |sim: &mut RawSimulator, turn: f64, ticks: usize| {
+            let mut seen = [Vec::new(), Vec::new()];
+            for _ in 0..ticks {
+                sim.backend.slots[2].control.heading += turn;
+                sim.advance_ticks(1).unwrap();
+                seen[0].push(a.pump(sim, 0));
+                seen[1].push(b.pump(sim, 1));
+                mover.pump(sim, 2);
+            }
+            seen
+        };
+        // A settled, straight snake keeps sending anchors but no motion.
+        let straight = steer(&mut sim, 0., 120);
+        assert!(about(&straight[0], 2, MOTION).is_empty());
+        assert!(!about(&straight[0], 2, ANCHORS).is_empty());
+        // Continuous steering: reports at most every MOTION_REPORT_TICKS, in
+        // the same ticks for both recipients.
+        for (all, new) in seen.iter_mut().zip(steer(&mut sim, 0.03, 120)) {
+            *all = new;
+        }
+        let ticks = |seen: &[Vec<Vec<u8>>]| -> Vec<usize> {
+            about(seen, 2, MOTION)
+                .iter()
+                .map(|(tick, _)| *tick)
+                .collect()
+        };
+        let (first, second) = (ticks(&seen[0]), ticks(&seen[1]));
+        assert!(first.len() >= 10, "{first:?}");
+        assert_eq!(first, second);
+        assert!(
+            first
+                .windows(2)
+                .all(|w| w[1] - w[0] >= MOTION_REPORT_TICKS as usize)
+        );
+        // Same-snake motion precedes its anchor within a tick's packets.
+        for packets in &seen[0] {
+            let position = |codes: &[u8]| {
+                packets
+                    .iter()
+                    .position(|p| codes.contains(&p[0]) && p.len() >= 3 && p[1..3] == [0, 2])
+            };
+            if let (Some(motion), Some(anchor)) = (position(MOTION), position(ANCHORS)) {
+                assert!(motion < anchor);
+            }
+        }
+    }
+
+    #[test]
+    fn standalone_mass_reports_wait_for_their_opportunity() {
+        let mut sim = RawSimulator::new(5, raw_config(2), 2).unwrap();
+        let mut a = Remote::connect(&mut sim, 0, "A");
+        let mut mover = Remote::connect(&mut sim, 1, "Mover");
+        run(&mut sim, &mut [(0, &mut a), (1, &mut mover)], 60);
+        let mut seen = Vec::new();
+        for _ in 0..120 {
+            // Mass changes every tick without new segments.
+            let snake = &mut sim.backend.world.snakes[1];
+            snake.fam = (snake.fam + 0.003) % 1.;
+            sim.advance_ticks(1).unwrap();
+            seen.push(a.pump(&mut sim, 0));
+            mover.pump(&mut sim, 1);
+        }
+        let reports: Vec<usize> = about(&seen, 1, b"h")
+            .iter()
+            .map(|(tick, _)| *tick)
+            .collect();
+        assert!(reports.len() >= 6, "{reports:?}");
+        assert!(
+            reports
+                .windows(2)
+                .all(|w| w[1] - w[0] >= FAM_REPORT_TICKS as usize)
+        );
+    }
+
+    #[test]
+    fn ordinary_food_waits_for_maintenance_while_snake_food_is_prompt() {
+        let mut config = raw_config(2);
+        config.world.food_count = 2000;
+        config.world.ambient_replenish_per_second = 2000.;
+        config.world.radius = 6000.;
+        let mut sim = RawSimulator::new(9, config, 2).unwrap();
+        // Start empty so replenishment keeps adding ordinary food.
+        sim.backend.world.food.clear();
+        let mut a = Remote::connect(&mut sim, 0, "A");
+        let mut booster = Remote::connect(&mut sim, 1, "Booster");
+        run(&mut sim, &mut [(0, &mut a), (1, &mut booster)], 20);
+        // The viewer drives beside the booster's tail, inside its food interest.
+        for (slot, head, segments) in [
+            (0, Point { x: -500., y: 300. }, 10),
+            (1, Point { x: 1500., y: 0. }, 60),
+        ] {
+            sim.backend.world.snakes[slot].alive = false;
+            sim.backend.world.respawn(slot, head, 0., segments).unwrap();
+            sim.backend.slots[slot].control.heading = 0.;
+        }
+        sim.backend.slots[1].control = Action {
+            heading: 0.,
+            boost: true,
+        };
+        let (mut ordinary, mut snake_food) = (BTreeSet::new(), BTreeSet::new());
+        for _ in 0..300 {
+            sim.advance_ticks(1).unwrap();
+            let now = sim.time();
+            let epoch = |t: f64| (t / super::super::visibility::CLEANUP_SECONDS).floor();
+            let maintenance = epoch(now) > epoch(now - sim.dt());
+            for packet in a.pump(&mut sim, 0) {
+                match packet[0] {
+                    b'f' => ordinary.insert(maintenance),
+                    b'b' => snake_food.insert(maintenance),
+                    _ => false,
+                };
+            }
+            booster.pump(&mut sim, 1);
+        }
+        assert_eq!(ordinary, BTreeSet::from([true]));
+        assert!(snake_food.contains(&false), "{snake_food:?}");
+    }
+
+    #[test]
+    fn prey_corrections_share_one_clock_across_viewers() {
+        let mut config = raw_config(2);
+        config.world.prey.count = 3;
+        let mut sim = RawSimulator::new(4, config, 2).unwrap();
+        let mut a = Remote::connect(&mut sim, 0, "A");
+        run(&mut sim, &mut [(0, &mut a)], 100);
+        // A later viewer joins the existing clocks rather than starting its own.
+        let mut b = Remote::connect(&mut sim, 1, "B");
+        let mut seen = [Vec::new(), Vec::new()];
+        for _ in 0..400 {
+            sim.advance_ticks(1).unwrap();
+            for (seen, (slot, remote)) in seen.iter_mut().zip([(0, &mut a), (1, &mut b)]) {
+                let packets = remote.pump(&mut sim, slot);
+                seen.extend(
+                    packets
+                        .into_iter()
+                        .filter(|p| p[0] == b'j')
+                        .map(|p| (sim.backend.tick, p[1..3].to_vec())),
+                );
+            }
+        }
+        let late = seen[1].first().expect("second viewer saw a correction").0;
+        let first: Vec<_> = seen[0].iter().filter(|(tick, _)| *tick >= late).collect();
+        assert!(first.len() >= 6, "{first:?}");
+        assert_eq!(first, seen[1].iter().collect::<Vec<_>>());
     }
 
     #[test]
