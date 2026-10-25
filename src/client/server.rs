@@ -66,7 +66,7 @@ const MAX_INPUT_BYTES: usize = 4 << 10;
 const WRITE_BUFFER_BYTES: usize = 16 << 10;
 /// Queued output beyond this closes the connection as too slow.
 const MAX_SEND_BUFFER_BYTES: usize = 1 << 20;
-/// Frames waiting for their delivery time on one connection.
+/// Frames waiting for their delivery time on one connection, socket or bot.
 const MAX_QUEUED_FRAMES: usize = 4096;
 /// Connections that have not joined, including those being closed.
 const MAX_PENDING: usize = 32;
@@ -159,26 +159,26 @@ impl HostConfig {
     }
 }
 
-/// World time `t` is due at `epoch + t + deferred × dt`. Ticks the simulation
-/// could not keep up with shift the whole schedule, so queued frames keep
-/// their spacing.
+/// Threads exchange wall seconds since `epoch`. Only the simulation thread maps
+/// them to world time, which runs `deferred × dt` behind once ticks were
+/// deferred, so a deferral never moves times other threads already hold.
 struct Clock {
     epoch: Instant,
     dt: f64,
+    /// Published copy of the simulation's deferred ticks, for reporting.
     deferred: AtomicU64,
 }
 
 impl Clock {
-    /// World time at `at`.
-    fn world(&self, at: Instant) -> f64 {
-        let offset = self.deferred.load(Ordering::Relaxed) as f64 * self.dt;
-        at.saturating_duration_since(self.epoch).as_secs_f64() - offset
+    /// Wall seconds at `at`.
+    fn wall(&self, at: Instant) -> f64 {
+        at.saturating_duration_since(self.epoch).as_secs_f64()
     }
 
-    /// Sleep until world time `due`, for at most `limit`; an infinite `due`
+    /// Sleep until wall time `due`, for at most `limit`; an infinite `due`
     /// sleeps for `limit`.
     fn sleep_until(&self, due: f64, limit: Duration) {
-        let wait = (due - self.world(Instant::now())).min(limit.as_secs_f64());
+        let wait = (due - self.wall(Instant::now())).min(limit.as_secs_f64());
         if wait > 0. {
             thread::sleep(Duration::from_secs_f64(wait));
         }
@@ -223,7 +223,7 @@ enum Command {
         appearance: PlayerAppearance,
         session_id: bool,
     },
-    /// A game command sent at world time `sent`.
+    /// A game command sent at wall time `sent`.
     Message {
         slot: usize,
         generation: u64,
@@ -244,7 +244,7 @@ enum Command {
 
 /// From the simulation thread to a slot's owner.
 enum Delivery {
-    /// Server payloads with their delivery times in world seconds, in order.
+    /// Server payloads with their delivery times in wall seconds, in order.
     Frames {
         slot: usize,
         generation: u64,
@@ -493,7 +493,7 @@ impl Simulation {
         while !self.shared.stopped() {
             let due = self.due_ticks(Instant::now());
             if due == 0 {
-                let next = (self.ticks + 1) as f64 * dt;
+                let next = (self.ticks + self.deferred + 1) as f64 * dt;
                 self.shared
                     .clock
                     .sleep_until(next, Duration::from_secs_f64(dt));
@@ -530,6 +530,11 @@ impl Simulation {
                 .store(self.deferred, Ordering::Relaxed);
         }
         backlog.min(limit).min(MAX_CATCHUP_TICKS)
+    }
+
+    /// World time of wall time `wall`, behind it by the deferred ticks.
+    fn world_time(&self, wall: f64) -> f64 {
+        wall - self.deferred as f64 * self.shared.clock.dt
     }
 
     fn route(&self, slot: usize) -> usize {
@@ -571,6 +576,7 @@ impl Simulation {
                 bytes,
                 sent,
             } if generation == self.generations[slot] => {
+                let sent = self.world_time(sent);
                 if let Err(reason) = self.world.receive_at(slot, &bytes, sent) {
                     self.close(slot, reason)?;
                 }
@@ -581,6 +587,7 @@ impl Simulation {
                 text,
                 sent,
             } if generation == self.generations[slot] => {
+                let sent = self.world_time(sent);
                 if let Err(reason) = self.world.victory_at(slot, &text, sent) {
                     self.close(slot, reason)?;
                 }
@@ -608,9 +615,13 @@ impl Simulation {
 
     /// Hand every queued frame to its slot's owner, which sends it on time.
     fn hand_over(&mut self) -> Result<(), String> {
+        let offset = self.deferred as f64 * self.shared.clock.dt;
         for slot in 0..self.generations.len() {
-            let frames = self.world.take(slot)?;
+            let mut frames = self.world.take(slot)?;
             if !frames.is_empty() {
+                for (at, _) in &mut frames {
+                    *at += offset;
+                }
                 let route = self.route(slot);
                 self.batches[route].push(Delivery::Frames {
                     slot,
@@ -753,9 +764,9 @@ impl Gateway {
                 self.deliver(delivery, now);
             }
         }
-        let world = self.gate.shared.clock.world(now);
+        let wall = self.gate.shared.clock.wall(now);
         for session in &mut self.sessions {
-            session.service(&mut self.gate, now, world)?;
+            session.service(&mut self.gate, now, wall)?;
         }
         for session in &mut self.sessions {
             let Stage::Open(open) = &mut session.stage else {
@@ -850,7 +861,7 @@ impl Session {
         matches!(&self.stage, Stage::Open(open) if matches!(open.phase, Phase::Playing(_)))
     }
 
-    fn service(&mut self, gate: &mut Gate, now: Instant, world: f64) -> Result<(), String> {
+    fn service(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
@@ -860,7 +871,7 @@ impl Session {
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             },
             Stage::Open(mut open) => {
-                if open.service(gate, now, world, age)? {
+                if open.service(gate, now, wall, age)? {
                     Stage::Open(open)
                 } else {
                     Stage::Closed
@@ -889,7 +900,7 @@ impl Open {
         &mut self,
         gate: &mut Gate,
         now: Instant,
-        world: f64,
+        wall: f64,
         age: Duration,
     ) -> Result<bool, String> {
         if let Phase::Closing(deadline) = self.phase {
@@ -902,7 +913,7 @@ impl Open {
         for _ in 0..MAX_READS_PER_POLL {
             match self.socket.read() {
                 Ok(Message::Binary(bytes)) => {
-                    if let Err(reason) = self.receive(gate, &bytes, world) {
+                    if let Err(reason) = self.receive(gate, &bytes, wall) {
                         self.reject(gate, now, &reason);
                         return Ok(true);
                     }
@@ -935,13 +946,13 @@ impl Open {
                 }
             }
         }
-        self.send_due(gate, now, world)?;
+        self.send_due(gate, now, wall)?;
         Ok(true)
     }
 
-    /// Apply one client message received at world time `world`. An error
+    /// Apply one client message received at wall time `wall`. An error
     /// closes only this connection.
-    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], world: f64) -> Result<(), String> {
+    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), String> {
         match (self.phase, bytes) {
             (Phase::Hello { framed: false }, [1]) => self.request(Framing::Bare),
             (Phase::Hello { framed: false }, [2]) => self.request(Framing::Sequence(1)),
@@ -971,7 +982,7 @@ impl Open {
                     slot,
                     generation: self.generation,
                     text: text.to_vec(),
-                    sent: world,
+                    sent: wall,
                 });
                 Ok(())
             }
@@ -980,7 +991,7 @@ impl Open {
                     slot,
                     generation: self.generation,
                     bytes: bytes.to_vec(),
-                    sent: world,
+                    sent: wall,
                 });
                 Ok(())
             }
@@ -1017,9 +1028,9 @@ impl Open {
         Ok(())
     }
 
-    /// Send queued frames due by world time `world`. Only host faults are errors.
-    fn send_due(&mut self, gate: &mut Gate, now: Instant, world: f64) -> Result<(), String> {
-        while self.queued.front().is_some_and(|(at, _)| *at <= world) {
+    /// Send queued frames due by wall time `wall`. Only host faults are errors.
+    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
+        while self.queued.front().is_some_and(|(at, _)| *at <= wall) {
             let (_, message) = self.queued.pop_front().unwrap();
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
@@ -1148,7 +1159,7 @@ struct Seat {
 
 impl Bots {
     fn run(&mut self) -> Result<(), String> {
-        let start = self.shared.clock.world(Instant::now());
+        let start = self.shared.clock.wall(Instant::now());
         for seat in &mut self.seats {
             seat.decide_at += start;
             seat.join(start, &self.commands, &self.latency, &mut self.random)?;
@@ -1159,7 +1170,7 @@ impl Bots {
                     self.deliver(delivery);
                 }
             }
-            let now = self.shared.clock.world(Instant::now());
+            let now = self.shared.clock.wall(Instant::now());
             let mut next = f64::INFINITY;
             for seat in &mut self.seats {
                 seat.run(
@@ -1194,7 +1205,17 @@ impl Bots {
             return;
         };
         match delivery {
-            Delivery::Frames { frames, .. } => seat.frames.extend(frames),
+            Delivery::Frames { .. } if seat.closed => {}
+            Delivery::Frames { frames, .. } => {
+                if seat.frames.len() + frames.len() > MAX_QUEUED_FRAMES {
+                    // A worker this far behind ends the session and rejoins,
+                    // as a socket client reading too slowly is closed.
+                    let _ = self.commands.send(Command::Disconnect { slot, generation });
+                    seat.close();
+                } else {
+                    seat.frames.extend(frames);
+                }
+            }
             Delivery::Closed { .. } => seat.close(),
         }
     }
@@ -1416,6 +1437,135 @@ mod tests {
         let started = Instant::now();
         clock.sleep_until(f64::INFINITY, Duration::from_millis(20));
         assert!(started.elapsed() >= Duration::from_millis(15));
+    }
+
+    #[test]
+    fn deferred_ticks_keep_wall_times_other_threads_hold() {
+        let config = SimulationConfig {
+            agents: 1,
+            world: crate::Config::sandbox(),
+            ..Default::default()
+        };
+        let world = RawSimulator::new(1, config, 1).unwrap();
+        let dt = world.dt();
+        let (commands, inbox) = mpsc::channel();
+        let (route, deliveries) = mpsc::channel();
+        let mut simulation = Simulation {
+            world,
+            commands: inbox,
+            routes: vec![route],
+            batches: vec![Vec::new()],
+            max_clients: 1,
+            generations: vec![0],
+            shared: Arc::new(Shared {
+                clock: Clock {
+                    epoch: Instant::now(),
+                    dt,
+                    deferred: AtomicU64::new(0),
+                },
+                stop: AtomicBool::new(false),
+                ticks: AtomicU64::new(0),
+                busy: AtomicU64::new(0),
+                players: AtomicUsize::new(0),
+                failure: Mutex::new(None),
+            }),
+            ticks: 0,
+            // World time already runs 100 ticks behind the wall clock.
+            deferred: 100,
+        };
+        let step = |simulation: &mut Simulation| {
+            simulation.apply_commands().unwrap();
+            simulation.world.advance_ticks(1).unwrap();
+            simulation.ticks += 1;
+            simulation.hand_over().unwrap();
+        };
+        commands
+            .send(Command::Connect {
+                slot: 0,
+                generation: 1,
+                appearance: PlayerAppearance::default(),
+                session_id: false,
+            })
+            .unwrap();
+        for _ in 0..20 {
+            step(&mut simulation);
+        }
+        while deliveries.try_recv().is_ok() {}
+        // A ping sent mid-tick by the wall clock is answered in that tick, in
+        // a frame due at the tick's wall time.
+        let wall = (simulation.ticks + 100) as f64 * dt + dt / 2.;
+        commands
+            .send(Command::Message {
+                slot: 0,
+                generation: 1,
+                bytes: vec![251],
+                sent: wall,
+            })
+            .unwrap();
+        step(&mut simulation);
+        let pong = deliveries
+            .try_iter()
+            .flatten()
+            .filter_map(|delivery| match delivery {
+                Delivery::Frames { frames, .. } => Some(frames),
+                Delivery::Closed { .. } => None,
+            })
+            .flatten()
+            .find(|(_, bytes)| protocol::split_frame(bytes).unwrap().contains(&&b"p"[..]));
+        let (at, _) = pong.expect("no pong in the tick the ping arrived");
+        assert!(
+            (at - (simulation.ticks + 100) as f64 * dt).abs() < 1e-9,
+            "{at}"
+        );
+    }
+
+    #[test]
+    fn a_bot_seat_too_far_behind_ends_its_session() {
+        let (commands, received) = mpsc::channel();
+        let (_route, deliveries) = mpsc::channel();
+        let latency = LatencyConfig::default();
+        let mut random = Random::new(1);
+        let mut seat = Seat::new(4, 0.042);
+        seat.join(0.1, &commands, &latency, &mut random).unwrap();
+        let mut bots = Bots {
+            seats: vec![seat],
+            stride: 1,
+            deliveries,
+            commands,
+            shared: Arc::new(Shared {
+                clock: Clock {
+                    epoch: Instant::now(),
+                    dt: 0.007,
+                    deferred: AtomicU64::new(0),
+                },
+                stop: AtomicBool::new(false),
+                ticks: AtomicU64::new(0),
+                busy: AtomicU64::new(0),
+                players: AtomicUsize::new(0),
+                failure: Mutex::new(None),
+            }),
+            latency,
+            random,
+            interval: 0.042,
+        };
+        let frames = |count| Delivery::Frames {
+            slot: 4,
+            generation: 1,
+            frames: vec![(1., vec![0, 0, b'p']); count],
+        };
+        bots.deliver(frames(MAX_QUEUED_FRAMES));
+        assert_eq!(bots.seats[0].frames.len(), MAX_QUEUED_FRAMES);
+        bots.deliver(frames(1));
+        assert!(bots.seats[0].closed && bots.seats[0].frames.is_empty());
+        assert!(received.try_iter().any(|command| matches!(
+            command,
+            Command::Disconnect {
+                slot: 4,
+                generation: 1
+            }
+        )));
+        bots.deliver(frames(1));
+        assert!(bots.seats[0].frames.is_empty());
     }
 
     #[test]
