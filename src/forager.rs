@@ -326,6 +326,31 @@ fn forward(p: Point, heading: f64, distance: f64) -> Point {
         y: p.y + heading.sin() * distance,
     }
 }
+/// Head position after `t` seconds of turning by `delta` radians at `turn`
+/// radians per second, then continuing straight: the continuous form of
+/// repeated `physics::advance` toward a fixed target.
+fn turn_then_straight(
+    head: Point,
+    heading: f64,
+    delta: f64,
+    speed: f64,
+    turn: f64,
+    t: f64,
+) -> Point {
+    if delta == 0.0 || turn <= 0.0 {
+        return forward(head, heading, speed * t);
+    }
+    let side = delta.signum();
+    let arc = (delta.abs() / turn).min(t);
+    let radius = speed / turn;
+    let end = heading + side * turn * arc;
+    let p = Point {
+        x: head.x + side * radius * (end.sin() - heading.sin()),
+        y: head.y - side * radius * (end.cos() - heading.cos()),
+    };
+    forward(p, end, speed * (t - arc))
+}
+
 fn width(s: &Snake) -> f64 {
     BODY_RADIUS * scale(s.segments)
 }
@@ -574,16 +599,10 @@ impl Scene {
             let close = |q: Point| near_within(q, reach2);
             let head = if turning {
                 // Turning toward the reported wanted heading at its turn rate.
-                let target = enemy.heading + p.intent_weight * wrap(intent.wanted - enemy.heading);
+                let delta = p.intent_weight * wrap(intent.wanted - enemy.heading);
                 let turn = turn_rate(enemy.segments);
                 let path = |t: f64| {
-                    let n = (t / 0.06).ceil().clamp(1.0, 24.0);
-                    let dt = t / n;
-                    let (mut q, mut h) = (enemy.head, enemy.heading);
-                    for _ in 0..n as usize {
-                        (q, h) = advance(q, h, target, enemy.speed, turn, dt);
-                    }
-                    q
+                    turn_then_straight(enemy.head, enemy.heading, delta, enemy.speed, turn, t)
                 };
                 let head = if view.lead > 0.0 {
                     path(view.lead)
@@ -772,5 +791,28 @@ fn steer(o: &Observation, me: &Me, p: &Params, near: &[Obstacle], goal: Goal) ->
     Action {
         heading: wrap(best.1),
         boost: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn closed_form_turn_matches_fine_physics_steps() {
+        let head = Point { x: 10.0, y: -20.0 };
+        for (heading, delta) in [(0.3, 1.2), (2.0, -2.5), (-1.0, 0.4), (1.0, 0.0)] {
+            let (speed, turn) = (190.0, 3.7);
+            let (mut q, mut h) = (head, heading);
+            let dt = 1e-5;
+            for step in 1..=100_000 {
+                (q, h) = advance(q, h, heading + delta, speed, turn, dt);
+                if step % 25_000 == 0 {
+                    let t = step as f64 * dt;
+                    let exact = turn_then_straight(head, heading, delta, speed, turn, t);
+                    assert!(exact.distance(q) < 0.05, "{heading} {delta} {t}: {exact:?} {q:?}");
+                }
+            }
+        }
     }
 }
