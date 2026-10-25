@@ -13,8 +13,8 @@
 use crate::{
     Action, Arena, BoundaryMode, Observation, Point, Snake, SpeedModel, SpeedState, boundary,
     physics::{
-        BODY_RADIUS, advance, base_speed, pickup_circle, scale, segment_distance, swept_distance,
-        turn_rate,
+        BODY_RADIUS, BOOST_SPEED, advance, base_speed, pickup_circle, scale, segment_distance,
+        swept_distance, turn_rate,
     },
 };
 
@@ -112,6 +112,12 @@ pub struct Params {
     /// tightens by `coil_shrink`; body contraction then closes it further.
     pub coil_close_angle: f64,
     pub coil_shrink: f64,
+    /// Boost only at or above this score; boosting spends mass.
+    pub boost_min_score: f64,
+    /// Boost to win a cut-off that cruise speed cannot reach in time.
+    pub kill_boost: bool,
+    /// Boost along a clear arc when every cruise-speed arc is dangerous.
+    pub escape_boost: bool,
 }
 
 impl Default for Params {
@@ -156,6 +162,9 @@ impl Default for Params {
             coil_lead_angle: 0.6,
             coil_close_angle: 4.7,
             coil_shrink: 0.7,
+            boost_min_score: 30.0,
+            kill_boost: false,
+            escape_boost: false,
         }
     }
 }
@@ -194,6 +203,7 @@ impl Params {
             self.coil_lead_angle,
             self.coil_close_angle,
             self.coil_shrink,
+            self.boost_min_score,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -330,7 +340,7 @@ impl Default for Scratch {
 /// The observation is first advanced by the timing's lead: the bot's own head
 /// replays the commands in flight, opponents continue straight, and pellets its
 /// pickup circle sweeps meanwhile are treated as eaten. This heuristic does not
-/// guarantee collision avoidance. Boost is always off.
+/// guarantee collision avoidance. Boost stays off unless a boost option is set.
 ///
 /// `intents` holds received knowledge per opponent in observation order; it may
 /// be shorter (missing entries are unknown) or empty.
@@ -554,6 +564,7 @@ impl View<'_> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct Me {
     head: Point,
     heading: f64,
@@ -586,6 +597,8 @@ impl Me {
 struct Goal {
     heading: f64,
     rate: f64,
+    /// Reaching it needs boost speed.
+    boost: bool,
     /// Opponent whose head path this goal deliberately crosses ahead of.
     crosses: Option<usize>,
 }
@@ -784,6 +797,7 @@ impl Scene {
                 best = Some(Goal {
                     heading: toward(me.head, q),
                     rate,
+                    boost: false,
                     crosses: None,
                 });
             }
@@ -798,6 +812,11 @@ impl Scene {
 /// `kill_weight` × its mass per second until it arrives.
 fn cut(view: &View, me: &Me, p: &Params, intents: &[Intent]) -> Option<Goal> {
     let o = view.o;
+    let boosted = Me {
+        speed: BOOST_SPEED,
+        ..*me
+    };
+    let can_boost = p.kill_boost && o.me.score >= p.boost_min_score;
     let samples = p.kill_samples.max(1);
     let mut best: Option<Goal> = None;
     for (k, enemy) in o.opponents.iter().enumerate() {
@@ -825,18 +844,22 @@ fn cut(view: &View, me: &Me, p: &Params, intents: &[Intent]) -> Option<Goal> {
             if q.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
                 continue;
             }
-            let Some(ours) = me.reach(q, p.orbit_factor) else {
+            let fits = |ours: Option<f64>| {
+                ours.is_some_and(|t| (p.kill_gap..=p.kill_window).contains(&(tau - t)))
+            };
+            let boost = if fits(me.reach(q, p.orbit_factor)) {
+                false
+            } else if can_boost && fits(boosted.reach(q, p.orbit_factor)) {
+                true
+            } else {
                 continue;
             };
-            let slack = tau - ours;
-            if slack < p.kill_gap || slack > p.kill_window {
-                continue;
-            }
             let rate = p.kill_weight * mass / (tau + p.settle_seconds);
             if best.as_ref().is_none_or(|b| rate > b.rate) {
                 best = Some(Goal {
                     heading: toward(me.head, q),
                     rate,
+                    boost,
                     crosses: Some(k),
                 });
             }
@@ -924,6 +947,7 @@ fn coil(view: &View, me: &Me, p: &Params) -> Option<Goal> {
         heading: toward(me.head, aim),
         rate: p.coil_weight * (target.segments as f64 + target.fam)
             / (remaining + p.settle_seconds),
+        boost: false,
         crosses: None,
     })
 }
@@ -939,6 +963,7 @@ fn roam(o: &Observation, me: &Me, p: &Params) -> Goal {
     Goal {
         heading,
         rate: 0.0,
+        boost: false,
         crosses: None,
     }
 }
@@ -1007,17 +1032,47 @@ fn clearance(
 }
 
 fn steer(o: &Observation, me: &Me, p: &Params, near: &[Obstacle], goal: Goal) -> Action {
-    let mut best = (f64::INFINITY, goal.heading);
-    for &offset in &p.fan[..p.fan_len.min(MAX_FAN)] {
-        // Offsets grow, so none left can beat a clear arc already found.
-        if best.0 <= offset.abs() {
-            break;
+    let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
+    // (cost, heading, clearance, offset) of the cheapest arc at `me`'s speed.
+    let search = |me: &Me| {
+        let mut best = (f64::INFINITY, goal.heading, f64::NEG_INFINITY, 0.0);
+        for &offset in fan {
+            // Offsets grow, so none left can beat a clear arc already found.
+            if best.0 <= offset.abs() {
+                break;
+            }
+            let heading = goal.heading + offset;
+            let clearance = clearance(o, me, p, near, heading, p.safe, goal.crosses);
+            let cost = offset.abs() + (p.safe - clearance).max(0.0) * p.danger_weight;
+            if cost < best.0 {
+                best = (cost, heading, clearance, offset);
+            }
         }
-        let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, p.safe, goal.crosses);
-        let cost = offset.abs() + (p.safe - clearance).max(0.0) * p.danger_weight;
-        if cost < best.0 {
-            best = (cost, heading);
+        best
+    };
+    let can_boost = o.me.score >= p.boost_min_score;
+    let boosted = Me {
+        speed: BOOST_SPEED,
+        ..*me
+    };
+    if goal.boost && can_boost {
+        // Like the original Hunter: boost only along a clear, nearly straight arc.
+        let best = search(&boosted);
+        if best.2 >= p.safe && best.3.abs() < 0.4 {
+            return Action {
+                heading: wrap(best.1),
+                boost: true,
+            };
+        }
+    }
+    let best = search(me);
+    if p.escape_boost && can_boost && best.2 < p.safe {
+        let fast = search(&boosted);
+        if fast.2 >= p.safe {
+            return Action {
+                heading: wrap(fast.1),
+                boost: true,
+            };
         }
     }
     Action {

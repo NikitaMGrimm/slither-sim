@@ -454,6 +454,9 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
         kill_weight: 0.4,
         coil_weight: 1.0,
         coil_mass_ratio: 2.0,
+        kill_boost: true,
+        escape_boost: true,
+        boost_min_score: 0.0,
         ..Params::default()
     };
     let intents: Vec<_> = (0..observation.opponents.len())
@@ -576,5 +579,42 @@ fn coiling_orbits_a_much_smaller_snake_the_way_we_already_turn_around_it() {
     assert!(on.heading > 0.2 && on.heading < 1.2, "{on:?}");
     // Equal masses are not encircled.
     observation.opponents[0].segments = 200;
-    assert_eq!(decide(&observation, &Timing::default(), &params).heading, 0.0);
+    assert_eq!(
+        decide(&observation, &Timing::default(), &params).heading,
+        0.0
+    );
+}
+
+#[test]
+fn a_cut_off_out_of_cruise_reach_boosts_when_allowed() {
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut opponent = observation.me.clone();
+    opponent.id = "opponent".into();
+    opponent.segments = 60;
+    // It reaches (100, 30) in 0.6 s: too soon at cruise, not at boost speed.
+    opponent.head = Point { x: 100.0, y: 141.0 };
+    opponent.heading = -std::f64::consts::FRAC_PI_2;
+    opponent.speed = 185.0;
+    opponent.body = (1..=8)
+        .map(|i| Point {
+            x: 100.0,
+            y: 141.0 + physics::ANCHOR_SPACING * i as f64,
+        })
+        .collect();
+    observation.opponents.push(opponent);
+    let cruise = Params {
+        kill_weight: 0.4,
+        ..Params::default()
+    };
+    assert!(!decide(&observation, &Timing::default(), &cruise).boost);
+    let boost = Params {
+        kill_boost: true,
+        ..cruise
+    };
+    assert!(decide(&observation, &Timing::default(), &boost).boost);
+    // Too small to spend mass.
+    observation.me.score = 10.0;
+    assert!(!decide(&observation, &Timing::default(), &boost).boost);
 }
