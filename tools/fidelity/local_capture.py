@@ -20,7 +20,7 @@ import time
 import transport_parity as tp
 
 sys.path.insert(0, str(tp.ROOT / "tools"))
-from perf_build import ProcessTree
+from perf_build import ProcessTree, output
 
 
 def loopback_endpoint(bind):
@@ -53,8 +53,7 @@ def run(config, out, seconds, reference, tolerances):
     environment.setdefault("CARGO_TARGET_DIR", str(tp.ROOT / "target" / "transport-parity"))
     command = ["cargo", "run", "--release", "--locked", "-j", "3", "--", "host",
                "--config", str(frozen_config), "--bind", f"{host}:{port}"]
-    manifest = dict(hostCommand=command, gitHead=subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=tp.ROOT, text=True).strip(),
+    manifest = dict(hostCommand=command, gitHead=output(["git", "rev-parse", "HEAD"], tp.ROOT),
         configSha256=tp.pc.sha256(frozen_config), collectorSha256=tp.pc.sha256(
             tp.ROOT / "tools/fidelity/slither-headless.mjs"), seconds=seconds,
         targetDir=environment["CARGO_TARGET_DIR"])
