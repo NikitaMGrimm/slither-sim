@@ -1,5 +1,34 @@
-use super::food::KnownSectors;
-use super::*;
+//! Ordered links, client decisions and wire recording for each slot.
+use super::{NATIVE_PROFILE, SimulatorBackend, food::KnownSectors, snakes::KnownSnakes};
+use crate::{
+    Action,
+    client::{
+        ClientState, Minimap, WireEvent, WireRecord, encode, latency::Link, protocol,
+        visibility::SectorInterest,
+    },
+    physics,
+};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    f64::consts::TAU,
+};
+
+/// Messages in flight per direction of one connection before the run fails.
+/// A local resource budget; the protocol has no such field.
+pub(super) const MAX_IN_FLIGHT: usize = 4096;
+/// Fit the host's 1 MiB send buffer and native client's message limit, leaving
+/// room for the largest unmasked WebSocket header.
+const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
+/// Retained wire bytes per slot before the run fails; drain to continue. Each
+/// record also counts a fixed overhead so empty events stay bounded. A local
+/// resource budget.
+pub(super) const MAX_RECORD_BYTES: usize = 32 << 20;
+pub(super) const RECORD_OVERHEAD: usize = 32;
+#[derive(Clone, Debug)]
+pub(super) struct KnownPrey {
+    pub(super) wire: u16,
+    pub(super) motion: [u32; 3],
+}
 
 #[derive(Clone, Debug)]
 pub(super) enum Uplink {
@@ -182,7 +211,7 @@ impl SimulatorBackend {
         Ok(())
     }
 
-    pub(super) fn transmit(&mut self, slot: usize, at: f64) -> Result<(), String> {
+    fn transmit(&mut self, slot: usize, at: f64) -> Result<(), String> {
         let s = &mut self.slots[slot];
         let Some((_, action, processing)) = s.outbox else {
             return Ok(());

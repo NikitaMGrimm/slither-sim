@@ -1,7 +1,17 @@
+use super::*;
+use crate::{
+    Config,
+    client::{Minimap, WireEvent, encode, latency::LatencyConfig, protocol},
+    model::{Food, Origin, Snake},
+    physics,
+};
+use std::collections::BTreeSet;
+
 use super::{
-    broadcast::{Board, clock_due},
+    broadcast::{Board, LEADERBOARD_ROWS, clock_due},
+    connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},
     food::{KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
-    snakes::{KnownSnake, changes},
+    snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
 };
 
 #[test]
@@ -11,8 +21,6 @@ fn a_clock_past_u64_periods_stays_due() {
     assert_eq!(next, u64::MAX);
     assert!(clock_due(&mut next, 1.007, 1e-20));
 }
-
-use super::*;
 
 #[test]
 fn failed_ring_spawn_restores_the_existing_life() {
@@ -316,10 +324,10 @@ fn hosted_and_native_snakes_use_finite_whole_body_coverage() {
         sim.backend.slots[slot].control.heading = 0.;
     }
     run(&mut sim, &mut [(0, &mut remote)], 12);
-    assert!(sim.backend.slots[0].connection.snakes.contains_key(&1));
-    assert!(!sim.backend.slots[0].connection.snakes.contains_key(&2));
-    assert!(sim.backend.slots[1].connection.snakes.contains_key(&0));
-    assert!(!sim.backend.slots[1].connection.snakes.contains_key(&2));
+    assert!(sim.backend.slots[0].connection.snakes.contains_key(1));
+    assert!(!sim.backend.slots[0].connection.snakes.contains_key(2));
+    assert!(sim.backend.slots[1].connection.snakes.contains_key(0));
+    assert!(!sim.backend.slots[1].connection.snakes.contains_key(2));
 
     // A distant head does not hide a snake whose tail reaches the view.
     sim.backend.world.snakes[2].alive = false;
@@ -329,7 +337,7 @@ fn hosted_and_native_snakes_use_finite_whole_body_coverage() {
         .unwrap();
     sim.backend.broadcast().unwrap();
     remote.pump(&mut sim, 0);
-    assert!(sim.backend.slots[0].connection.snakes.contains_key(&2));
+    assert!(sim.backend.slots[0].connection.snakes.contains_key(2));
     for point in &mut sim.backend.world.snakes[2].body {
         point.x += 3000.;
     }

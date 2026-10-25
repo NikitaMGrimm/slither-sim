@@ -1,4 +1,10 @@
-use super::*;
+//! Raw remote slots sharing the native backend's world and scheduler.
+use super::{
+    EarlyFrames, MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT,
+    SimulationConfig, SimulatorBackend, client_message,
+    connection::{Connection, Uplink},
+};
+use crate::Action;
 
 /// One shared world whose leading slots are external protocol-19 clients.
 ///
@@ -6,9 +12,9 @@ use super::*;
 /// scheduling, coverage and encoders as native slots. This process never
 /// decodes their frames, pings for them or models their processing: a remote
 /// client's compute time has already elapsed in real time. Configured latency
-/// still delays both directions in order. Remaining slots are background food
-/// seekers that reconnect after death; a remote slot stays dead until the host
-/// connects it again.
+/// still delays both directions in order. The host drives remaining slots as
+/// background seekers that reconnect after death; a remote slot stays dead until
+/// the host connects it again.
 pub(crate) struct RawSimulator {
     pub(super) backend: SimulatorBackend,
 }

@@ -1,4 +1,11 @@
-use super::*;
+//! Configuration and protocol bounds for the virtual-time backend.
+use super::{MAX_AGENTS, MAX_PREY, snakes::FRESH_ANCHORS};
+use crate::{
+    Config,
+    client::{encode, latency::LatencyConfig},
+    physics,
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -32,7 +39,7 @@ impl Default for SimulationConfig {
             decision_ticks: 6,
             // Official HUD clocks are shared by all recipients and average
             // 2503.994/3008.062 ms, not their nominal 2.5/3 s; see the
-            // scheduler study linked from `MOTION_REPORT_TICKS`.
+            // scheduler study linked from `super::snakes::MOTION_REPORT_TICKS`.
             minimap_interval_seconds: 2.504,
             // Retained protocol-19 minimap receipts and the earlier browser
             // bridge use 136 cells per side; 32 was a local backend shortcut.

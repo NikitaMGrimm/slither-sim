@@ -1,4 +1,14 @@
-use super::*;
+//! Ordered food lifetimes, shared sector listings and per-connection diffs.
+use super::SimulatorBackend;
+use crate::{
+    client::{encode, fast_hash::FastMap, presentation::FoodPresentation},
+    model::{Food, Origin, Point},
+    physics,
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// The physical identity disambiguates food collapsed onto the same wire grid.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -11,7 +21,7 @@ pub(super) struct KnownFood {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct SectorFood(pub(super) Vec<([u8; 2], KnownFood)>);
 impl SectorFood {
-    pub(super) fn get(&self, offset: &[u8; 2]) -> Option<&KnownFood> {
+    fn get(&self, offset: &[u8; 2]) -> Option<&KnownFood> {
         let index = self.0.binary_search_by_key(offset, |(key, _)| *key).ok()?;
         Some(&self.0[index].1)
     }
@@ -30,7 +40,7 @@ impl std::ops::Index<&[u8; 2]> for SectorFood {
 
 /// Listings a connection holds, in ascending sector order.
 #[derive(Clone, Debug, Default)]
-pub(super) struct KnownSectors(pub(super) Vec<([u8; 2], Arc<SectorFood>)>);
+pub(super) struct KnownSectors(Vec<([u8; 2], Arc<SectorFood>)>);
 #[cfg(test)]
 impl KnownSectors {
     pub(super) fn get(&self, sector: &[u8; 2]) -> Option<&Arc<SectorFood>> {
@@ -55,29 +65,31 @@ impl std::ops::Index<&[u8; 2]> for KnownSectors {
 /// Ordinary (ambient) births stay off the wire until the next shared food
 /// maintenance: official ordinary-food `f` packets come in bursts ~504 ms apart
 /// that align across clients, together with sector clears, while boost and
-/// death food and pickups go out promptly (scheduler study, 2026-10-25).
+/// death food and pickups go out promptly (the [scheduler study], 2026-10-25).
 /// Whether the official server creates ambient food at maintenance or only
 /// announces it then is not identified; physics here is unchanged.
+///
+/// [scheduler study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md
 #[derive(Default)]
 pub(super) struct FoodIndex {
-    pub(super) sectors: FastMap<u16, Vec<IndexedFood>>,
+    sectors: FastMap<u16, Vec<IndexedFood>>,
     pub(super) count: usize,
     /// A pickup did not match the index; rebuild before the next listing.
     pub(super) stale: bool,
     /// Sectors whose shown food changed since the last listing.
-    pub(super) dirty: BTreeSet<u16>,
+    dirty: BTreeSet<u16>,
     /// Sectors holding ambient births not yet shown.
-    pub(super) hidden: BTreeSet<u16>,
+    hidden: BTreeSet<u16>,
 }
 
 /// One pellet lifetime, with the color it was born with: a listing may show
 /// a newer pellet while an older one at its position is still hidden.
 #[derive(Clone)]
-pub(super) struct IndexedFood {
-    pub(super) offset: [u8; 2],
-    pub(super) food: Food,
-    pub(super) shown: bool,
-    pub(super) color: u8,
+struct IndexedFood {
+    offset: [u8; 2],
+    food: Food,
+    shown: bool,
+    color: u8,
 }
 impl FoodIndex {
     pub(super) fn rebuild(&mut self, food: &[Food], presentation: &FoodPresentation) {

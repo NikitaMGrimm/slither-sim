@@ -1,4 +1,30 @@
-use super::*;
+//! Snake report state, coverage candidates and ordered wire diffs.
+use super::PlayerAppearance;
+use crate::{
+    client::encode,
+    model::{Point, Snake},
+    physics,
+};
+use std::{collections::HashMap, f64::consts::TAU};
+
+/// Front anchors searched for a known snake's previous front. Contraction runs
+/// before each insertion from index 3 on, so that front stays unchanged at
+/// indices 1, 2 and 3 through three insertions and moves on the fourth: up to
+/// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
+/// snake in full.
+pub(super) const FRESH_ANCHORS: usize = 4;
+/// Release rules from the [scheduler study] (2026-10-25; 1.93 million
+/// retained frames): body anchors leave in the tick that makes them.
+/// A snake's motion (heading, wanted heading,
+/// speed) is reported when it changed, at most every six ~7 ms ticks: busy
+/// gaps sit near 42 ms, a straight snake stays silent for seconds and one
+/// snake's reports share a phase across recipients. Changed mass follows its
+/// own ~105 ms opportunity. The exact comparators and rearm rules are not
+/// identified; these minimum gaps are inferences.
+///
+/// [scheduler study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md
+pub(super) const MOTION_REPORT_TICKS: u64 = 6;
+pub(super) const FAM_REPORT_TICKS: u64 = 15;
 
 /// What one connection has been told about a snake, in wire terms.
 #[derive(Clone, Debug)]
@@ -87,16 +113,16 @@ impl SnakeReports {
 
 /// What one connection has been told about each snake slot.
 #[derive(Clone, Debug, Default)]
-pub(super) struct KnownSnakes(pub(super) Vec<Option<KnownSnake>>);
+pub(super) struct KnownSnakes(Vec<Option<KnownSnake>>);
 impl KnownSnakes {
-    pub(super) fn contains_key(&self, slot: &usize) -> bool {
-        self.0.get(*slot).is_some_and(Option::is_some)
+    pub(super) fn contains_key(&self, slot: usize) -> bool {
+        self.0.get(slot).is_some_and(Option::is_some)
     }
-    pub(super) fn get_mut(&mut self, slot: &usize) -> Option<&mut KnownSnake> {
-        self.0.get_mut(*slot)?.as_mut()
+    pub(super) fn get_mut(&mut self, slot: usize) -> Option<&mut KnownSnake> {
+        self.0.get_mut(slot)?.as_mut()
     }
-    pub(super) fn remove(&mut self, slot: &usize) -> Option<KnownSnake> {
-        self.0.get_mut(*slot)?.take()
+    pub(super) fn remove(&mut self, slot: usize) -> Option<KnownSnake> {
+        self.0.get_mut(slot)?.take()
     }
     pub(super) fn insert(&mut self, slot: usize, known: KnownSnake) {
         if self.0.len() <= slot {
@@ -117,8 +143,8 @@ impl KnownSnakes {
 /// reach, so the cell holding a head lists every snake that can cover it.
 /// Testing all snakes for each of ~500 connections every tick cost ~2.3 ms.
 pub(super) struct CoverageGrid {
-    pub(super) cell: f64,
-    pub(super) cells: HashMap<(i64, i64), Vec<usize>>,
+    cell: f64,
+    cells: HashMap<(i64, i64), Vec<usize>>,
 }
 impl CoverageGrid {
     pub(super) fn new(snakes: &[Snake], bounds: &[[f64; 4]], vision: f64) -> Self {
@@ -142,7 +168,7 @@ impl CoverageGrid {
         grid
     }
 
-    pub(super) fn key(&self, x: f64, y: f64) -> (i64, i64) {
+    fn key(&self, x: f64, y: f64) -> (i64, i64) {
         (
             (x / self.cell).floor() as i64,
             (y / self.cell).floor() as i64,
@@ -203,9 +229,13 @@ pub(super) fn full(
 /// Incremental body, mass and motion reports for a known snake. Body changes
 /// go out in the tick that makes them; motion and standalone mass wait for the
 /// snake's shared opportunities in `reports`. We adopt the common observed
-/// order: tail/standalone mass, motion, then anchors. The scheduler study above
-/// retains 27 reverse mass/motion pairs; this is not a universal official sort.
-#[allow(clippy::too_many_arguments)]
+/// order: tail/standalone mass, motion, then anchors. The scheduler study linked
+/// from `MOTION_REPORT_TICKS` retains 27 reverse mass/motion pairs; this is not a
+/// universal official sort.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Keep wire inputs explicit without a per-snake context"
+)]
 pub(super) fn changes(
     packets: &mut Vec<Vec<u8>>,
     own: bool,

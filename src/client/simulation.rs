@@ -1,76 +1,29 @@
 //! Virtual-time backend: the authoritative simulator acts as a protocol-19 server
 //! and every slot is a client fed only by the bytes delivered to it.
 //!
-//! Each slot owns one connection. Commands and pings travel its uplink and are
-//! applied in the server tick during which they arrive; frames emitted at a tick
-//! travel its downlink. Both directions keep their order like one TCP stream, so
-//! variation and pauses delay messages but never reorder them. Configured delays stay
-//! private: a client only measures its pings and knows its own reply time.
+//! Commands and pings arrive over each slot's ordered uplink and apply in that
+//! server tick; emitted frames travel its ordered downlink. Variation and pauses
+//! delay messages without reordering them. Configured delays stay private:
+//! clients measure only pings and their own reply time.
 //!
-//! Snake/prey visibility uses approximate circular coverage: a
-//! snake is covered while any part of its centerline is within `world.vision` of
-//! the client's head, and prey within it. Food uses a separate retained
-//! 300-unit-sector interest model. A covered snake appears once per entry or
-//! life; afterwards only changed anchors, tail removals, mass and motion fields
-//! are sent. Native and remote recipients use the same coverage policies.
+//! Snake/prey coverage approximates a circle of `world.vision` around the head;
+//! any centerline part keeps a snake covered. Food has separate retained
+//! 300-unit-sector interest. Snakes appear once per entry or life, then receive
+//! anchor, tail, mass and motion deltas. Native and remote coverage is shared.
 use super::{
-    Backend, ClientFrame, ClientState, ClientStatus, Minimap, WireEvent, WireRecord, encode,
-    fast_hash::FastMap,
-    latency::{LatencyConfig, Link, Random},
+    Backend, ClientFrame, ClientState, ClientStatus, WireEvent, WireRecord, latency::Random,
     presentation::FoodPresentation,
-    protocol,
-    visibility::SectorInterest,
 };
-use crate::{
-    Action, Config, Simulator,
-    model::{Arena, Food, Origin, Point, Snake},
-    physics,
-    simulator::PickupItem,
-    spawn,
-};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
-    f64::consts::TAU,
-    sync::Arc,
-};
+use crate::{Action, Simulator, model::Point, spawn};
+use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
 
-/// Messages in flight per direction of one connection before the run fails.
-/// A local resource budget; the protocol has no such field.
-const MAX_IN_FLIGHT: usize = 4096;
-/// Fit the host's 1 MiB send buffer and native client's message limit, leaving
-/// room for the largest unmasked WebSocket header.
-const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
-/// Retained wire bytes per slot before the run fails; drain to continue. Each
-/// record also counts a fixed overhead so empty events stay bounded. A local
-/// resource budget.
-const MAX_RECORD_BYTES: usize = 32 << 20;
-const RECORD_OVERHEAD: usize = 32;
-/// Front anchors searched for a known snake's previous front. Contraction runs
-/// before each insertion from index 3 on, so that front stays unchanged at
-/// indices 1, 2 and 3 through three insertions and moves on the fourth: up to
-/// `FRESH_ANCHORS - 1` new anchors encode incrementally, and more resend the
-/// snake in full.
-const FRESH_ANCHORS: usize = 4;
-/// Release rules from the [scheduler study] (2026-10-25; 1.93 million
-/// retained frames): body anchors leave in the tick that makes them.
-/// A snake's motion (heading, wanted heading,
-/// speed) is reported when it changed, at most every six ~7 ms ticks: busy
-/// gaps sit near 42 ms, a straight snake stays silent for seconds and one
-/// snake's reports share a phase across recipients. Changed mass follows its
-/// own ~105 ms opportunity. The exact comparators and rearm rules are not
-/// identified; these minimum gaps are inferences.
-///
-/// [scheduler study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md
-const MOTION_REPORT_TICKS: u64 = 6;
-const FAM_REPORT_TICKS: u64 = 15;
 /// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
 /// pose may exist after this many failures.
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
-/// the rest of `MAX_IN_FLIGHT` for broadcasts while the host drains.
-pub(super) const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
+/// the rest of `connection::MAX_IN_FLIGHT` for broadcasts while the host drains.
+pub(super) const REMOTE_IN_FLIGHT: usize = connection::MAX_IN_FLIGHT / 2;
 /// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
 /// leaderboard's u16 rank and living population must also count every snake.
 pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
@@ -79,8 +32,6 @@ const MAX_PREY: usize = u16::MAX as usize + 1;
 /// Stock-client compatibility: its nickname input keeps 24 characters, while
 /// the u8 length field could carry 255 Latin-1 bytes.
 pub(crate) const MAX_NICKNAME: usize = 24;
-/// Rows the stock leaderboard shows.
-const LEADERBOARD_ROWS: usize = 10;
 /// Stock-client compatibility: its victory input keeps 140 ASCII characters;
 /// the record packet carries the remainder without a length field.
 pub(crate) const MAX_VICTORY_TEXT: usize = 140;
@@ -108,33 +59,16 @@ mod snakes;
 pub use config::SimulationConfig;
 pub(crate) use remote::RawSimulator;
 
-use broadcast::Record;
-use connection::{Connection, Slot, Uplink};
+use broadcast::{PreyClock, Record};
+use connection::{Connection, Slot};
 use food::{FoodIndex, SectorFood};
-use snakes::{KnownSnakes, SnakeReports};
-
-#[derive(Clone, Debug)]
-struct KnownPrey {
-    wire: u16,
-    motion: [u32; 3],
-}
-
-/// One prey's correction clock, shared by every recipient: official
-/// corrections for one prey align across clients, and a new viewer does not
-/// restart it.
-#[derive(Clone, Copy, Debug)]
-struct PreyClock {
-    reported_at: f64,
-    speed: u32,
-    due: bool,
-}
+use snakes::SnakeReports;
 
 /// Simulator backend whose clients reconstruct frames from protocol-19 bytes.
 ///
-/// `reconnect` opens a new connection and respawns the slot with the core
-/// `Simulator::respawn_body` at a clear pose drawn from `spawn::spawn_distance`;
-/// a living snake is first removed without death food. In-flight messages of the
-/// old connection are dropped.
+/// `reconnect` drops the old connection's in-flight messages and respawns via
+/// `Simulator::respawn_body` at a clear pose drawn from `spawn::spawn_distance`.
+/// A living snake is first removed without death food.
 pub struct SimulatorBackend {
     config: SimulationConfig,
     world: Simulator,
@@ -155,7 +89,7 @@ pub struct SimulatorBackend {
     food_index: FoodIndex,
     /// Food maintenance periods begun since virtual zero.
     food_epoch: u64,
-    /// Next minimap and leaderboard periods; see `clock_due`.
+    /// Next minimap and leaderboard periods; see `broadcast::clock_due`.
     next_minimap: u64,
     next_leaderboard: u64,
     prey_clocks: BTreeMap<u64, PreyClock>,
@@ -520,8 +454,6 @@ impl Backend for SimulatorBackend {
     }
 }
 
-/// Background policy from the slot's own frame: turn inward near the rim,
-/// otherwise toward the nearest received food.
 /// Game commands a playing client may send: heading bytes 0..=250, ping 251,
 /// keyboard turns `[252, amount]` and boost 253/254.
 pub(crate) fn client_message(bytes: &[u8]) -> bool {
@@ -543,6 +475,7 @@ pub(crate) fn seeker_action(frame: &ClientFrame, sent: &mut Option<u8>) -> Optio
     })
 }
 
+/// Turn inward near the rim, otherwise toward the nearest received food.
 fn seek(frame: &ClientFrame) -> Option<f64> {
     let observation = frame.observation.as_ref()?;
     let head = observation.me.head;

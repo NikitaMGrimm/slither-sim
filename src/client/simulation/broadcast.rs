@@ -1,22 +1,44 @@
-use super::*;
+//! Shared tick scheduling and recipient-ordered broadcasts.
 use super::{
+    EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
+    connection::KnownPrey,
     food::{eaten_sectors, food_identity, food_updates},
     snakes::{CoverageGrid, KnownSnake, changes, covered, full},
 };
+use crate::{
+    Simulator,
+    client::{Minimap, encode},
+    model::{Arena, Point, Snake},
+    physics,
+    simulator::PickupItem,
+};
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Rows the stock leaderboard shows.
+pub(super) const LEADERBOARD_ROWS: usize = 10;
+/// One prey's correction clock, shared by every recipient: official
+/// corrections for one prey align across clients, and a new viewer does not
+/// restart it.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct PreyClock {
+    reported_at: f64,
+    speed: u32,
+    due: bool,
+}
 
 /// Highest-scoring completed life in this world run. It names the slot and
 /// life so a later session in a reused slot cannot change it.
 #[derive(Clone, Debug)]
 pub(super) struct Record {
-    pub(super) slot: usize,
-    pub(super) life: u64,
-    pub(super) segments: usize,
-    pub(super) fam: u32,
-    pub(super) score: f64,
+    slot: usize,
+    life: u64,
+    segments: usize,
+    fam: u32,
+    score: f64,
     pub(super) name: Vec<u8>,
     pub(super) message: Vec<u8>,
     pub(super) message_set: bool,
-    pub(super) version: u64,
+    version: u64,
 }
 
 /// Living snakes ranked once per broadcast that needs a leaderboard: wire
@@ -93,7 +115,7 @@ impl SimulatorBackend {
 
     /// A life that ended by death since the last tick may set the record; a
     /// tie keeps the earlier holder.
-    pub(super) fn settle_lives(&mut self) {
+    fn settle_lives(&mut self) {
         if !self.config.local_records {
             return;
         }
@@ -223,11 +245,7 @@ impl SimulatorBackend {
     }
 
     /// Give `hand_over` every queued frame of slots `..early`.
-    pub(super) fn hand_over_early(
-        &mut self,
-        early: usize,
-        hand_over: &mut EarlyFrames,
-    ) -> Result<(), String> {
+    fn hand_over_early(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
         let early = early.min(self.slots.len());
         let frames: Vec<_> = self.slots[..early]
             .iter_mut()
@@ -248,11 +266,7 @@ impl SimulatorBackend {
         self.broadcast_with(0, &mut |_| Ok(()))
     }
 
-    pub(super) fn broadcast_with(
-        &mut self,
-        early: usize,
-        hand_over: &mut EarlyFrames,
-    ) -> Result<(), String> {
+    fn broadcast_with(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
         let now = self.time();
         // Ambient births reach the wire at the shared food maintenance, with
         // sector cleanup; see `FoodIndex`.
@@ -367,7 +381,7 @@ impl SimulatorBackend {
     /// `updates` in this broadcast, which sends every removal before any
     /// appearance, so a connection still showing a retired ID sees it removed
     /// before its reuse. All 65,536 IDs can therefore be live.
-    pub(super) fn assign_prey_wire(&mut self) -> Result<(), String> {
+    fn assign_prey_wire(&mut self) -> Result<(), String> {
         let live: BTreeSet<u64> = self.world.prey.iter().map(|prey| prey.id).collect();
         self.prey_wire.retain(|id, _| live.contains(id));
         let mut taken: Option<BTreeSet<u16>> = None;
@@ -389,7 +403,7 @@ impl SimulatorBackend {
     }
 
     /// Open each living snake's shared report opportunities for this tick.
-    pub(super) fn update_reports(&mut self) -> Result<(), String> {
+    fn update_reports(&mut self) -> Result<(), String> {
         for (slot, snake) in self.world.snakes.iter().enumerate() {
             let reports = &mut self.reports[slot];
             if !snake.alive {
@@ -412,7 +426,7 @@ impl SimulatorBackend {
     /// Advance every living prey's correction clock. Ordinary corrections
     /// recur near one third second; the 210 ms pulse guard is an engineering
     /// choice, not a universal receipt bound. See docs/server-rules.md.
-    pub(super) fn update_prey_clocks(&mut self) -> Result<(), String> {
+    fn update_prey_clocks(&mut self) -> Result<(), String> {
         let now = self.time();
         let mut clocks = BTreeMap::new();
         for prey in &self.world.prey {
@@ -447,7 +461,7 @@ impl SimulatorBackend {
         map: &mut Option<Minimap>,
     ) -> Result<Option<Vec<u8>>, String> {
         let connection = &self.slots[slot].connection;
-        if !self.world.snakes[slot].alive || !connection.snakes.contains_key(&slot) {
+        if !self.world.snakes[slot].alive || !connection.snakes.contains_key(slot) {
             return Ok(None);
         }
         let map = map.get_or_insert_with(|| {
@@ -478,7 +492,7 @@ impl SimulatorBackend {
     }
 
     /// Changes since this connection's last frame, own snake first.
-    pub(super) fn updates(
+    fn updates(
         &mut self,
         slot: usize,
         eaten: &BTreeSet<[u8; 2]>,
@@ -498,7 +512,7 @@ impl SimulatorBackend {
             // the final mass, then game over, then the death removal.
             connection.over = true;
             let id = slot as u16;
-            let known = connection.snakes.remove(&slot);
+            let known = connection.snakes.remove(slot);
             let fam = encode::fam_u24(me.fam);
             if known.as_ref().is_some_and(|known| known.fam != fam) {
                 packets.push(encode::fam(id, fam));
@@ -540,7 +554,7 @@ impl SimulatorBackend {
             let id = i as u16;
             let profile = self.profiles.get(i).unwrap_or(&NATIVE_PROFILE);
             let connection = &mut self.slots[slot].connection;
-            let known = connection.snakes.get_mut(&i);
+            let known = connection.snakes.get_mut(i);
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
                     let wanted = physics::quantize_heading(control);
@@ -560,7 +574,7 @@ impl SimulatorBackend {
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
                     packets.push(encode::removal(id, died));
-                    connection.snakes.remove(&i);
+                    connection.snakes.remove(i);
                 }
                 (None, false) => {}
                 (known, true) => {
@@ -575,7 +589,7 @@ impl SimulatorBackend {
                 }
             }
             let connection = &mut self.slots[slot].connection;
-            if own && connection.snakes.contains_key(&slot) {
+            if own && connection.snakes.contains_key(slot) {
                 // HUD packets wait for the client's own appearance; a
                 // requested session ID follows it so the client knows itself.
                 connection.appeared = true;
@@ -644,11 +658,7 @@ impl SimulatorBackend {
 
     /// Leaderboard when `board` is given, then an unsent record. Both wait for
     /// the connection's own appearance.
-    pub(super) fn hud(
-        &mut self,
-        slot: usize,
-        board: Option<&Board>,
-    ) -> Result<Vec<Vec<u8>>, String> {
+    fn hud(&mut self, slot: usize, board: Option<&Board>) -> Result<Vec<Vec<u8>>, String> {
         let mut packets = Vec::new();
         let connection = &mut self.slots[slot].connection;
         if !connection.appeared {
