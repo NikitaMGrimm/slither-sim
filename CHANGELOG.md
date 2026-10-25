@@ -105,8 +105,6 @@
 
 ### Fixed
 
-- The performance catalog runner test no longer lets Windows platform probes
-  consume its binary Git diff mock when WMI detection fails.
 - A default `host` no longer refuses every player with `No clear spawn
   position`. Dynamic host arenas start sized for all seats, and a crowded world
   places a join at the most open spot ([hosting](docs/raw-server.md#presets)).
