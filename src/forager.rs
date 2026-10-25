@@ -137,6 +137,9 @@ pub struct Params {
     /// Boost toward a food cell holding at least this much value (after
     /// `occupied_factor`), such as a fresh kill's drop; 0 never does.
     pub food_boost_value: f64,
+    /// Extra clearance per unit of our own width, added to `safe`: a longer
+    /// snake turns wider and loses more by dying.
+    pub safe_width_factor: f64,
 }
 
 impl Default for Params {
@@ -188,6 +191,7 @@ impl Default for Params {
             kill_boost: false,
             escape_boost: false,
             food_boost_value: 0.0,
+            safe_width_factor: 0.0,
         }
     }
 }
@@ -231,6 +235,7 @@ impl Params {
             self.coil_shrink,
             self.boost_min_score,
             self.food_boost_value,
+            self.safe_width_factor,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -252,6 +257,7 @@ impl Params {
             || self.kill_weight < 0.0
             || self.kill_trap_weight < 0.0
             || self.food_boost_value < 0.0
+            || self.safe_width_factor < 0.0
             || self.kill_trap_seconds < 0.0
             || self.coil_weight < 0.0
             || !(0.0..=1.0).contains(&self.coil_shrink)
@@ -388,6 +394,7 @@ pub fn decide(
     let lead = lead_steps as f64 * SUBSTEP;
     scratch.sweep.clear();
     let mut me = Me::new(&o.me);
+    me.safe = p.safe + p.safe_width_factor * me.width;
     if lead_steps > 0 {
         let motion = replay(&o.me, &o.arena, timing, lead_steps, |m| {
             scratch
@@ -643,6 +650,9 @@ struct Me {
     segments: usize,
     /// Speed and boost progress at the forecast moment.
     state: SpeedState,
+    /// Clearance below which an arc is dangerous (`Params::safe`, widened by
+    /// `safe_width_factor`).
+    safe: f64,
 }
 
 impl Me {
@@ -655,6 +665,7 @@ impl Me {
             width: width(me),
             segments: me.segments,
             state: SpeedState::from_observed_speed(me.speed, me.segments),
+            safe: 0.0,
         }
     }
     /// Cumulative distance after each substep of boosting from our speed
@@ -1517,8 +1528,8 @@ fn search(
             break;
         }
         let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, p.safe, goal.crosses, ramp);
-        let cost = offset.abs() + (p.safe - clearance).max(0.0) * p.danger_weight;
+        let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp);
+        let cost = offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight;
         if cost < best.0 {
             best = (cost, heading, clearance, offset);
         }
@@ -1537,7 +1548,7 @@ fn boost_toward(
     ramp: &[f64; RAMP_SUBSTEPS],
 ) -> Option<Action> {
     let best = search(o, me, p, near, goal, Some(ramp));
-    (best.2 >= p.safe && best.3.abs() < 0.4).then(|| Action {
+    (best.2 >= me.safe && best.3.abs() < 0.4).then(|| Action {
         heading: wrap(best.1),
         boost: true,
     })
@@ -1553,16 +1564,16 @@ fn steer(
     escape: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> Action {
     let best = search(o, me, p, near, &goal, None);
-    if let Some(ramp) = escape.filter(|_| best.2 < p.safe) {
+    if let Some(ramp) = escape.filter(|_| best.2 < me.safe) {
         // The cheapest arc may trade clearance for a smaller turn.
         let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
         let any_clear = fan.iter().any(|&offset| {
             let heading = goal.heading + offset;
-            clearance(o, me, p, near, heading, p.safe, goal.crosses, None) >= p.safe
+            clearance(o, me, p, near, heading, me.safe, goal.crosses, None) >= me.safe
         });
         if !any_clear {
             let fast = search(o, me, p, near, &goal, Some(ramp));
-            if fast.2 >= p.safe {
+            if fast.2 >= me.safe {
                 return Action {
                     heading: wrap(fast.1),
                     boost: true,
@@ -1707,6 +1718,7 @@ mod tests {
             width: BODY_RADIUS * scale(segments),
             segments,
             state: SpeedState::from_observed_speed(speed, segments),
+            safe: 30.0,
         };
         let ramp = me.boost_ramp();
         let two = RAMP_SUBSTEPS as f64 * SUBSTEP;

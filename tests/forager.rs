@@ -297,6 +297,43 @@ fn tip_based_danger_lets_the_bot_pass_beside_a_body() {
 }
 
 #[test]
+fn wider_snakes_keep_more_clearance_when_asked() {
+    let mut observation = fixture();
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut opponent = snake(
+        &observation,
+        "opponent",
+        Point { x: 300.0, y: 20.0 },
+        0.0,
+        2,
+    );
+    // The same body beside our path's end as the tip test above.
+    opponent.speed = 0.0;
+    opponent.body.truncate(5);
+    observation.opponents.push(opponent);
+    let base = Params {
+        safe: 5.0,
+        own_width_factor: 0.0,
+        ..Params::default()
+    };
+    assert_eq!(decide(&observation, &Timing::default(), &base).heading, 0.0);
+    let wide = Params {
+        safe_width_factor: 2.0,
+        ..base
+    };
+    assert_ne!(decide(&observation, &Timing::default(), &wide).heading, 0.0);
+    // The extra clearance is ours: it vanishes with zero factor.
+    let zero = Params {
+        safe_width_factor: 0.0,
+        ..wide
+    };
+    assert_eq!(
+        decide(&observation, &Timing::default(), &zero),
+        decide(&observation, &Timing::default(), &base)
+    );
+}
+
+#[test]
 fn processing_delays_only_the_command_decided_now() {
     let mut observation = fixture();
     observation.food = vec![food(300.0, 80.0, 1.0)];
