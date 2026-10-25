@@ -1170,3 +1170,35 @@ fn prey_is_chased_with_a_paid_boost_when_cruise_cannot_catch_it() {
         decide(&observation, &Timing::default(), &plain)
     );
 }
+
+#[test]
+fn racing_boosts_for_a_rich_cell_a_rival_would_reach_first() {
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    observation.food = (0..10).map(|i| food(400.0 + i as f64, 0.0, 0.6)).collect();
+    // A rival heading for the same pile from beyond it.
+    let rival = snake(
+        &observation,
+        "rival",
+        Point { x: 700.0, y: 0.0 },
+        std::f64::consts::PI,
+        2,
+    );
+    observation.opponents.push(rival);
+    let plain = Params::default();
+    assert!(!decide(&observation, &Timing::default(), &plain).boost);
+    let racing = Params {
+        race_sigma: 0.15,
+        ..plain
+    };
+    let raced = decide(&observation, &Timing::default(), &racing);
+    assert!(raced.boost, "{raced:?}");
+    assert!(raced.heading.abs() < 0.1, "{raced:?}");
+    // Free boosting (a score floor) races the same way; without a rival the
+    // pile is ours at cruise share too, so the boost only buys time.
+    let floor = Params {
+        boost_free_score: 100.0,
+        ..racing
+    };
+    assert!(decide(&observation, &Timing::default(), &floor).boost);
+}

@@ -162,6 +162,16 @@ pub struct Params {
     pub prey_range: f64,
     /// ... and catchable within this many seconds.
     pub prey_horizon: f64,
+    /// Race rivals for food cells holding at least `race_min_value`: such a
+    /// cell's value counts the share we expect to beat the nearest visible
+    /// rival head to, a ramp `race_sigma` seconds wide around its arrival
+    /// time, and boosting wins the cell when the extra share and time saved
+    /// outweigh the boost's mass cost. 0 disables racing.
+    pub race_sigma: f64,
+    pub race_min_value: f64,
+    /// Boosting costs nothing at or below this score (Battledome's 400-point
+    /// floor, a public mode rule); 0 for official worlds.
+    pub boost_free_score: f64,
 }
 
 impl Default for Params {
@@ -220,6 +230,9 @@ impl Default for Params {
             prey_weight: 0.0,
             prey_range: 650.0,
             prey_horizon: 2.0,
+            race_sigma: 0.0,
+            race_min_value: 1.0,
+            boost_free_score: 0.0,
         }
     }
 }
@@ -270,6 +283,9 @@ impl Params {
             self.prey_weight,
             self.prey_range,
             self.prey_horizon,
+            self.race_sigma,
+            self.race_min_value,
+            self.boost_free_score,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -299,6 +315,7 @@ impl Params {
             || self.exit_weight < 0.0
             || self.prey_weight < 0.0
             || self.prey_horizon < 0.0
+            || self.race_sigma < 0.0
             || !(0.0..=2.0).contains(&self.exit_seconds)
             || self.kill_samples > 16
         {
@@ -402,6 +419,13 @@ pub struct Scratch {
     exits: Vec<Obstacle>,
     /// Obstacles that can lower a fan arc's capped clearance.
     arcs: Vec<Obstacle>,
+    /// Visible rivals' heads, pickup reach and speed, for racing.
+    rivals: Vec<(Point, f64, f64)>,
+    /// The same three lists at boost reach, gathered only when a boosted
+    /// arc is checked; the cruise ones stay for the fallback.
+    boost_near: Vec<Obstacle>,
+    boost_arcs: Vec<Obstacle>,
+    boost_exits: Vec<Obstacle>,
     sweep: Vec<Point>,
 }
 
@@ -411,6 +435,10 @@ impl Default for Scratch {
             near: Vec::with_capacity(4096),
             exits: Vec::with_capacity(4096),
             arcs: Vec::with_capacity(4096),
+            rivals: Vec::with_capacity(256),
+            boost_near: Vec::with_capacity(4096),
+            boost_arcs: Vec::with_capacity(4096),
+            boost_exits: Vec::with_capacity(4096),
             sweep: Vec::with_capacity(MAX_LEAD_SUBSTEPS + 1),
         }
     }
@@ -473,7 +501,23 @@ pub fn decide(
         false,
         scratch_lists(&mut scratch.near, &mut scratch.arcs, &mut scratch.exits),
     );
-    let mut goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
+    scratch.rivals.clear();
+    if p.race_sigma > 0.0 {
+        scratch
+            .rivals
+            .extend(o.opponents.iter().filter(|s| s.alive).map(|s| {
+                let (c, r) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                (s.head, c.distance(s.head) + r, s.speed.max(1.0))
+            }));
+    }
+    let race = (p.race_sigma > 0.0).then(|| Race {
+        charge: can_boost.then(|| boost_charge(o, p)),
+        sigma: p.race_sigma + view.uncertainty,
+        rivals: &scratch.rivals,
+    });
+    let mut goal = scene
+        .food(&view, &me, p, race)
+        .unwrap_or_else(|| roam(o, &me, p));
     // The best goal reachable at cruise speed, should boosting turn out unsafe.
     let mut cruise = goal;
     let mut consider = |g: Goal| {
@@ -509,24 +553,47 @@ pub fn decide(
                 p,
                 intents,
                 true,
-                scratch_lists(&mut scratch.near, &mut scratch.arcs, &mut scratch.exits),
+                scratch_lists(
+                    &mut scratch.boost_near,
+                    &mut scratch.boost_arcs,
+                    &mut scratch.boost_exits,
+                ),
             );
             boosted = true;
-            if let Some(action) =
-                boost_toward(o, &me, p, &scratch.arcs, &scratch.exits, &goal, &ramp)
-            {
+            if let Some(action) = boost_toward(
+                o,
+                &me,
+                p,
+                &scratch.boost_arcs,
+                &scratch.boost_exits,
+                &goal,
+                &ramp,
+            ) {
                 return action;
             }
         }
         // Only the best cut-off was kept; find the best one at cruise speed.
+        // Without cut-offs (zero weight, zero value) none can win.
         goal = cruise;
-        if let Some(g) = cut(&view, &me, p, intents, &scratch.near, None) {
+        if let Some(g) = (p.kill_weight > 0.0)
+            .then(|| cut(&view, &me, p, intents, &scratch.near, None))
+            .flatten()
+        {
             if g.rate > goal.rate {
                 goal = g;
             }
         }
     }
-    let best = search(o, &me, p, &scratch.arcs, &scratch.exits, &goal, None);
+    let best = search(
+        o,
+        &me,
+        p,
+        &scratch.arcs,
+        &scratch.exits,
+        &goal,
+        None,
+        f64::INFINITY,
+    );
     // With `escape_boost`, boost along a clear arc when no cruise arc is clear.
     if p.escape_boost && can_boost && best.2 < me.safe {
         // The cheapest arc may trade clearance for a smaller turn.
@@ -553,10 +620,23 @@ pub fn decide(
                     p,
                     intents,
                     true,
-                    scratch_lists(&mut scratch.near, &mut scratch.arcs, &mut scratch.exits),
+                    scratch_lists(
+                        &mut scratch.boost_near,
+                        &mut scratch.boost_arcs,
+                        &mut scratch.boost_exits,
+                    ),
                 );
             }
-            let fast = search(o, &me, p, &scratch.arcs, &scratch.exits, &goal, Some(&ramp));
+            let fast = search(
+                o,
+                &me,
+                p,
+                &scratch.boost_arcs,
+                &scratch.boost_exits,
+                &goal,
+                Some(&ramp),
+                f64::INFINITY,
+            );
             if fast.2 >= me.safe {
                 return Action {
                     heading: wrap(fast.1),
@@ -636,6 +716,38 @@ fn gather(
     scene
 }
 
+/// Boost economics for racing food cells.
+#[derive(Clone, Copy)]
+struct Race<'a> {
+    /// One boost charge in food equivalents, if we may boost.
+    charge: Option<f64>,
+    /// Width of the share ramp around a rival's arrival, seconds.
+    sigma: f64,
+    /// Visible rivals' heads, pickup reach and speed.
+    rivals: &'a [(Point, f64, f64)],
+}
+
+/// One boost charge (src/physics.rs boost cost, mean jitter 1.01) in food
+/// equivalents at our mass; free at or below `boost_free_score`.
+fn boost_charge(o: &Observation, p: &Params) -> f64 {
+    if o.me.score <= p.boost_free_score {
+        return 0.0;
+    }
+    let n = o.me.segments as f64;
+    let mass = n + o.me.fam;
+    let nutrition = (1.0 - (mass - 2.0) / 430.0).max(1.0 / 430.0).powf(2.25);
+    1.01 * 0.0812 * (1.0 - n / 430.0).max(0.0).powf(1.66) / nutrition
+}
+
+/// Earliest time a visible rival's pickup circle reaches `q` at its current
+/// speed heading straight there (no turn): a nominal deadline.
+fn rival_arrival(rivals: &[(Point, f64, f64)], q: Point) -> f64 {
+    rivals
+        .iter()
+        .map(|&(head, mouth, speed)| (head.distance(q) - mouth).max(0.0) / speed)
+        .fold(f64::INFINITY, f64::min)
+}
+
 /// Food equivalents of a prey at its size: `PreyConfig::default`'s
 /// nutrition factor (src/prey.rs), the mode setting every official world uses.
 const PREY_NUTRITION: f64 = 30.0;
@@ -663,12 +775,7 @@ fn prey(o: &Observation, me: &Me, p: &Params, can_boost: bool) -> Option<Goal> {
         let (c, r) = pickup_circle(me.head, me.heading, speed, segments);
         c.distance(me.head) + r
     };
-    let n = segments as f64;
-    let mass = n + o.me.fam;
-    let nutrition = (1.0 - (mass - 2.0) / 430.0).max(1.0 / 430.0).powf(2.25);
-    // One boost charge (src/physics.rs boost cost, mean jitter 1.01) in food
-    // equivalents at our mass.
-    let charge = 1.01 * 0.0812 * (1.0 - n / 430.0).max(0.0).powf(1.66) / nutrition;
+    let charge = boost_charge(o, p);
     let f = 1.0 + 0.305 * (scale(segments) - 1.0);
     let accel = (BOOST_SPEED - base_speed(segments)).max(1.0) * 1.875 / f;
     let ramp = (BOOST_SPEED - me.speed).max(0.0) / accel;
@@ -972,6 +1079,27 @@ impl Me {
         let steps = ramp.partition_point(|&d| d < distance);
         (steps < RAMP_SUBSTEPS).then(|| (steps + 1) as f64 * SUBSTEP + angle / self.turn)
     }
+    /// Like [`Me::reach`] when boosting from now: speed ramps continuously
+    /// from ours to boost speed (`SpeedState`'s retained-progress rate at our
+    /// size), turning at the same angular rate.
+    fn reach_boosting(&self, p: Point, orbit_factor: f64) -> Option<f64> {
+        let distance = p.distance(self.head);
+        let angle = wrap(toward(self.head, p) - self.heading).abs();
+        if distance < orbit_factor * BOOST_SPEED / self.turn * angle.sin() {
+            return None;
+        }
+        let v0 = self.speed.min(BOOST_SPEED);
+        let f = 1.0 + 0.305 * (scale(self.segments) - 1.0);
+        let a = (BOOST_SPEED - base_speed(self.segments)).max(1.0) * 1.875 / f;
+        let ramp = (BOOST_SPEED - v0) / a;
+        let ramped = v0 * ramp + 0.5 * a * ramp * ramp;
+        let t = if distance <= ramped {
+            2.0 * distance / (v0 + (v0 * v0 + 2.0 * a * distance).sqrt())
+        } else {
+            ramp + (distance - ramped) / BOOST_SPEED
+        };
+        Some(t + angle / self.turn)
+    }
     /// Seconds to reach `p`, or None inside the tightest turning circle on its
     /// side: chasing such a point makes a snake orbit it.
     fn reach(&self, p: Point, orbit_factor: f64) -> Option<f64> {
@@ -1079,7 +1207,8 @@ impl Scene {
             occupied: [false; MAX_CELLS * MAX_CELLS],
             n,
         };
-        for food in &o.food {
+        // A boost-reach regather keeps the cruise scene's food.
+        for food in o.food.iter().filter(|_| !boosting) {
             if let Some(i) = cell(food.point()) {
                 if view.eaten(food.point()) {
                     continue;
@@ -1203,7 +1332,8 @@ impl Scene {
                 if is_close || was_close {
                     near.push(Obstacle::new(previous, point, width, k, false));
                 }
-                if let Some(i) = cell(point) {
+                // A boost-reach regather keeps the cruise scene's occupancy.
+                if let Some(i) = cell(point).filter(|_| !boosting) {
                     scene.occupied[i] = true;
                 }
                 previous = point;
@@ -1214,7 +1344,7 @@ impl Scene {
     }
 
     /// The food cell with the most value per second of travel.
-    fn food(&self, view: &View, me: &Me, p: &Params) -> Option<Goal> {
+    fn food(&self, view: &View, me: &Me, p: &Params, race: Option<Race<'_>>) -> Option<Goal> {
         let o = view.o;
         let mut best: Option<Goal> = None;
         let cells = self.n * self.n;
@@ -1231,9 +1361,16 @@ impl Scene {
             } else {
                 value
             };
-            // Travel takes at least the straight distance: skip what cannot win.
+            // Travel takes at least the straight distance: skip what cannot
+            // win. A raced cell may arrive faster by boosting.
+            let boostable = race.is_some_and(|r| r.charge.is_some()) && value >= p.race_min_value;
+            let fastest = if boostable {
+                me.speed.max(BOOST_SPEED)
+            } else {
+                me.speed
+            };
             if let Some(b) = &best {
-                let within = (value / b.rate - p.settle_seconds) * me.speed;
+                let within = (value / b.rate - p.settle_seconds) * fastest;
                 if within <= 0.0
                     || within * within <= (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2)
                 {
@@ -1246,13 +1383,30 @@ impl Scene {
             let Some(seconds) = me.reach(q, p.orbit_factor) else {
                 continue;
             };
-            let rate = value / (seconds + p.settle_seconds);
+            let mut rate = value / (seconds + p.settle_seconds);
+            // Rich enough to race for; boosting still has to be safe.
+            let mut boost = p.food_boost_value > 0.0 && value >= p.food_boost_value;
+            if let Some(race) = race.filter(|_| value >= p.race_min_value) {
+                let rival = rival_arrival(race.rivals, q);
+                let share = |t: f64| (0.5 + (rival - t) / (2.0 * race.sigma)).clamp(0.0, 1.0);
+                rate = value * share(seconds) / (seconds + p.settle_seconds);
+                if let Some(charge) = race.charge {
+                    let t = me.reach_boosting(q, p.orbit_factor);
+                    if let Some(t) = t {
+                        let paid = value * share(t) - charge * (1.0 + t / 0.155);
+                        let fast = paid / (t + p.settle_seconds);
+                        if fast > rate {
+                            rate = fast;
+                            boost = true;
+                        }
+                    }
+                }
+            }
             if best.as_ref().is_none_or(|b| rate > b.rate) {
                 best = Some(Goal {
                     heading: toward(me.head, q),
                     rate,
-                    // Rich enough to race for; boosting still has to be safe.
-                    boost: p.food_boost_value > 0.0 && value >= p.food_boost_value,
+                    boost,
                     crosses: None,
                 });
             }
@@ -1823,11 +1977,12 @@ fn search(
     exits: &[Obstacle],
     goal: &Goal,
     ramp: Option<&[f64; RAMP_SUBSTEPS]>,
+    max_offset: f64,
 ) -> (f64, f64, f64, f64) {
     let mut best = (f64::INFINITY, goal.heading, f64::NEG_INFINITY, 0.0);
     for &offset in &p.fan[..p.fan_len.min(MAX_FAN)] {
         // Offsets grow, so none left can beat a clear arc already found.
-        if best.0 <= offset.abs() {
+        if best.0 <= offset.abs() || offset.abs() >= max_offset {
             break;
         }
         let heading = goal.heading + offset;
@@ -1987,8 +2142,11 @@ fn boost_toward(
     goal: &Goal,
     ramp: &[f64; RAMP_SUBSTEPS],
 ) -> Option<Action> {
-    let best = search(o, me, p, near, exits, goal, Some(ramp));
-    (best.2 >= me.safe && best.3.abs() < 0.4).then(|| Action {
+    // Only arcs within 0.4 rad of the goal are taken, and any arc costs at
+    // least its offset, so the cheapest arc overall is one of them exactly
+    // when the cheapest of them costs less than 0.4.
+    let best = search(o, me, p, near, exits, goal, Some(ramp), 0.4);
+    (best.2 >= me.safe && best.0 < 0.4).then(|| Action {
         heading: wrap(best.1),
         boost: true,
     })
