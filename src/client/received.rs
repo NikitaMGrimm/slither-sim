@@ -179,7 +179,13 @@ struct Track {
     snake: Snake,
     target: f64,
     incarnation: u64,
-    fields: [Field; 7],
+    position: Field,
+    heading: Field,
+    wanted_heading: Field,
+    speed: Field,
+    body: Field,
+    mass: Field,
+    appearance: Field,
     wanted: VecDeque<(f64, f64)>,
     speeds: VecDeque<(f64, f64)>,
 }
@@ -253,7 +259,13 @@ impl ReceivedTracker {
             snake: snake.clone(),
             target,
             incarnation: self.generations[slot],
-            fields: std::array::from_fn(|_| Field(Some(now))),
+            position: Field(Some(now)),
+            heading: Field(Some(now)),
+            wanted_heading: Field(Some(now)),
+            speed: Field(Some(now)),
+            body: Field(Some(now)),
+            mass: Field(Some(now)),
+            appearance: Field(Some(now)),
             wanted: VecDeque::new(),
             speeds: VecDeque::from([(now, snake.speed)]),
         });
@@ -281,9 +293,8 @@ impl ReceivedTracker {
     ) -> Result<(), String> {
         self.anchor_with(slot, point, grow, DEFAULT_CONTRACTION, now)
     }
-    /// `anchor` with the body contraction coefficient from the server setup
-    /// packet. Supported values are 0 through 1; larger coefficients can make
-    /// sequential body reconstruction overflow even from finite wire points.
+    /// `anchor` with the server's contraction coefficient, restricted to 0..=1:
+    /// larger values can overflow sequential reconstruction of finite wire points.
     pub fn anchor_with(
         &mut self,
         slot: usize,
@@ -302,7 +313,7 @@ impl ReceivedTracker {
         }
         let track = self.track_mut(slot)?;
         append_anchor(&mut track.snake.body, point, grow, contraction);
-        track.fields[4].receipt(now);
+        track.body.receipt(now);
         Ok(())
     }
     /// Grow to at least `slots`; existing tracks and incarnations are kept.
@@ -316,7 +327,7 @@ impl ReceivedTracker {
         self.clock(now)?;
         let track = self.track_mut(slot)?;
         track.snake.body.truncate(length);
-        track.fields[4].receipt(now);
+        track.body.receipt(now);
         Ok(())
     }
     pub fn position(&mut self, slot: usize, point: Point, now: f64) -> Result<(), String> {
@@ -326,7 +337,7 @@ impl ReceivedTracker {
         }
         let track = self.track_mut(slot)?;
         track.snake.head = point;
-        track.fields[0].receipt(now);
+        track.position.receipt(now);
         Ok(())
     }
     /// Optional fields are independent reports, not a refreshed pose from rendering.
@@ -350,7 +361,7 @@ impl ReceivedTracker {
         let track = self.track_mut(slot)?;
         if let Some(heading) = heading {
             track.snake.heading = heading;
-            track.fields[1].receipt(now);
+            track.heading.receipt(now);
         }
         if let Some(wanted) = wanted {
             if wanted != track.target {
@@ -358,11 +369,11 @@ impl ReceivedTracker {
                 track.wanted.truncate(3);
             }
             track.target = wanted;
-            track.fields[2].receipt(now);
+            track.wanted_heading.receipt(now);
         }
         if let Some(speed) = speed {
             track.snake.speed = speed;
-            track.fields[3].receipt(now);
+            track.speed.receipt(now);
             track.speeds.push_front((now, speed));
             while track.speeds.len() > 1
                 && track.speeds.back().is_some_and(|(at, _)| now - at > 0.5)
@@ -402,13 +413,12 @@ impl ReceivedTracker {
         track.snake.length = length;
         // Opponent private credits/kills are not reconstructed from mass reports.
         track.snake.score = physics::score(segments, fam);
-        track.fields[5].receipt(now);
+        track.mass.receipt(now);
         Ok(())
     }
-    /// A receiver knows its own displayed score; opponents' private credits stay
-    /// unavailable. This report does not refresh the independently received mass.
-    /// Apply it only to the receiver's own slot; a later `mass` report replaces it
-    /// with the mass-derived score until the own score is reported again.
+    /// Set only the receiver's displayed score, without refreshing mass receipts.
+    /// Opponents' private credits remain unknown. A later `mass` report replaces
+    /// this value with the mass-derived score until own score is reported again.
     pub fn own_score(&mut self, slot: usize, score: f64) -> Result<(), String> {
         if !score.is_finite() || score < 0. {
             return Err("Invalid received own score".into());
@@ -475,13 +485,13 @@ impl ReceivedTracker {
             metadata.snakes.push(ReceivedSnake {
                 snake_id: track.snake.id.clone(),
                 incarnation: track.incarnation,
-                position: track.fields[0].metadata(now),
-                appearance: track.fields[6].metadata(now),
-                heading: track.fields[1].metadata(now),
-                wanted_heading: track.fields[2].metadata(now),
-                speed: track.fields[3].metadata(now),
-                body: track.fields[4].metadata(now),
-                mass: track.fields[5].metadata(now),
+                position: track.position.metadata(now),
+                appearance: track.appearance.metadata(now),
+                heading: track.heading.metadata(now),
+                wanted_heading: track.wanted_heading.metadata(now),
+                speed: track.speed.metadata(now),
+                body: track.body.metadata(now),
+                mass: track.mass.metadata(now),
                 wanted_history: track
                     .wanted
                     .iter()

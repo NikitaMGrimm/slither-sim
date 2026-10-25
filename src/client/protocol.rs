@@ -77,14 +77,8 @@ impl FoodBudget<'_> {
                 .filter(|(id, _)| !self.updates.contains_key(id))
                 .count();
         }
-        let updates: Vec<_> = self
-            .updates
-            .range(first..=last)
-            .map(|(&id, &present)| (id, present))
-            .collect();
-        for (id, present) in updates {
+        for (_, present) in self.updates.extract_if(first..=last, |_, _| true) {
             self.count -= usize::from(present);
-            self.updates.remove(&id);
         }
     }
 }
@@ -553,7 +547,7 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
                 .as_chunks::<4>()
                 .0
                 .iter()
-                .map(|c| (c[1], c[2], f64::from(c[3]) / 5.))
+                .map(|&[_, rx, ry, size]| (rx, ry, f64::from(size) / 5.))
                 .collect(),
         ),
         b'b' | b'f' => match n - 1 {
