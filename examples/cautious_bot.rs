@@ -1,5 +1,5 @@
-//! Food seeking with short-horizon wall/head/body avoidance (heuristics, not guarantees).
-//! Run with `cargo run --release --locked --example cautious_bot -- --steps 200`.
+//! Seeks food and steers away from the wall and other snakes it can see.
+//! `cargo run --release --locked --example cautious_bot -- --steps 200`
 use slither_sim::{Action, Food, Observation, Point, physics};
 use std::f64::consts::{PI, TAU};
 

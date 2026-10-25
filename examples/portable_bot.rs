@@ -1,4 +1,4 @@
-//! Food seeker: `cargo run --release --locked --example portable_bot -- --steps 200`.
+//! Seeks the nearest food. `cargo run --release --locked --example portable_bot -- --steps 200`
 use slither_sim::client::{
     Backend, Bot, BotRunner, ClientFrame, ClientStatus, NetworkBackend, NetworkConfig,
     SimulationConfig, SimulatorBackend,

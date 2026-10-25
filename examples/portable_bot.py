@@ -1,4 +1,4 @@
-"""Food seeker using `slither-sim client`; build with cargo build --release --locked."""
+"""Seeks the nearest food through `slither-sim client`. Build first: cargo build --release --locked"""
 import argparse
 import json
 import math

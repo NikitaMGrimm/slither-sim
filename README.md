@@ -46,9 +46,10 @@ python examples/portable_bot.py --steps 200
 ```
 
 Run from the checkout after building. Python 3.11+ is optional; the example uses
-only its standard library. On Windows, use `py -3` if needed. Rust users can
-embed the simulator directly; see [the basic example](examples/basic.rs).
-For food seeking with wall, head and body avoidance, try the [cautious Rust bot](https://github.com/NikitaMGrimm/slither-sim/blob/main/examples/cautious_bot.rs) (`cargo run --release --locked --example cautious_bot -- --steps 200` from a checkout).
+only its standard library. On Windows, use `py -3` if needed.
+
+More examples: [embedding the simulator](examples/basic.rs) and
+[a bot that also avoids walls and snakes](examples/cautious_bot.rs).
 
 ### Download a release
 
