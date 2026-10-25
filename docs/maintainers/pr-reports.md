@@ -222,9 +222,11 @@ branches cannot publish a comment; their raw measurement artifacts remain
 available. Using a separate branch for each PR avoids this ambiguity.
 
 Both workflows pin actions and disable persisted checkout credentials; they
-need no personal token or external benchmarking service. Full measurements,
-input/binary hashes, traces and logs have 14-day artifact retention, including
-partial failures. Publishers download only small comment artifacts. Launcher
+need no personal token or external benchmarking service. Once cleanup is
+verified (below), full measurements, input/binary hashes, traces and logs upload
+with 14-day retention, including partial failures; otherwise only progress
+checkpoints already uploaded remain. Publishers download only small comment
+artifacts. Launcher
 logs/PID and partial diagnostics survive upload failures before collector finish;
 broken report generation fails the job.
 

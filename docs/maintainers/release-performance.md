@@ -55,8 +55,8 @@ The request records it.
 Before preparation, fix `job_cutoff = job_start + 1800 - 90`. Git preparation,
 builds, regressions, fidelity, metadata, catalogs and parity check remaining time
 before starting children and bound them by it. Preparation/build children use the
-shared process-tree owner with strict stop/reap verification. A cutoff leaves
-Unavailable and partial logs, never a fresh preparation timeout. Worktree cleanup
+shared process-tree owner with strict stop/reap verification. A cutoff during
+preparation leaves Unavailable and partial logs, never a fresh preparation timeout. Worktree cleanup
 uses bounded waits within the finalization reserve.
 
 Sampling follows preparation at `min(stage_start + 1500, job_cutoff)`; setup and
