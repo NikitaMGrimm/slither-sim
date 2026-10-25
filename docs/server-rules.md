@@ -101,7 +101,7 @@ following gates are adopted inferences, not an exact recovered implementation:
 | Standalone mass `h` | Changed mass, at least 15 ticks apart (105 ms at default `dt`), shared per snake. Tail removals and growth anchors can carry mass outside this gate. |
 | Body | Prompt anchors and tail changes. Incremental per-snake order is tail/standalone mass, then motion, then anchors; growth anchors carry their own mass. |
 | Food | Ambient births become wire-visible when `floor(t / 0.504)` advances, with sector cleanup on the shared maintenance epoch. Boost/death `b` and pickups are prompt; `F` listings remain an interest-entry path. Physical ambient generation is unchanged. |
-| Prey `j` | One correction clock per prey shared across viewers, nominal one third second. When the current or last reported speed encodes as exactly 11, the interval is 210 ms; ordinary turning alone does not accelerate reporting. Quantized position need not change. Viewer entry does not restart the clock. |
+| Prey `j` | One correction clock per prey shared across viewers, with a nominal one-third-second interval. When the current or last reported speed encodes as exactly 11, the interval is 210 ms; ordinary turning alone does not accelerate reporting. Quantized position need not change. Viewer entry does not restart the clock. |
 
 The corpus includes sub-35 ms motion gaps, sub-100 ms mass gaps, 27 reverse
 mass/motion pairs and a 2,694 ms same-prey correction gap with other traffic
