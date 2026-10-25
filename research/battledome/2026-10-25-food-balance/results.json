@@ -1,0 +1,613 @@
+{
+  "before": {
+    "source_commit": "421e384c3738e7c4d08e1eb12275733266d7a629",
+    "harness_sha256": "d2278f3231c81689482f3492f179174f9f193a88f97d6f74349e6f201eee1dc5",
+    "policy_sha256": "67db3f965d4638d45b61b75465e798feaf863785c6ea55133ae199e4e52b13dd",
+    "seconds": 600,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "agents": [
+      32,
+      64
+    ],
+    "cpu_affinity": "two logical CPUs",
+    "runs": [
+      {
+        "name": "n32-s1",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 84.82537850004155
+      },
+      {
+        "name": "n32-s2",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 113.4249320999952
+      },
+      {
+        "name": "n32-s3",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 98.72372110001743
+      },
+      {
+        "name": "n64-s1",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 456.69059010001365
+      },
+      {
+        "name": "n64-s2",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 468.957525899983
+      },
+      {
+        "name": "n64-s3",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 442.5359008000232
+      }
+    ],
+    "binary_sha256": "8e813d65d502dc602f0a06fe1a2f4348eeedf22a1b5e0cf9aac08a77e417a25f",
+    "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "series_sha256": {
+      "n32-s1.csv": "0030bda657db82bdb2028b50ce7ad61bd7f1e15ac3b539cfac486005d74b5f9c",
+      "n32-s2.csv": "6d9ba1c4f558da45c1102aa7a08f2037820bbbfa0cf3508422d4988cf5b35d79",
+      "n32-s3.csv": "4e3dc46d927549848aec99aaa4eeeecad19a43d6c6925adb1475f48553386fb9",
+      "n64-s1.csv": "8c3b1a343cb33f66a37a8df5ffe7c2658b4a7724a57b0f24a352694598f8d4a6",
+      "n64-s2.csv": "b0a0b27da1d1269eac9ee0fe950009df6598ca2a9adf051bdaf8f036041a174e",
+      "n64-s3.csv": "3a033e31416f87d7717aa5102707d91a4068b34a7e290072d92df29c48bcdada"
+    }
+  },
+  "summary": {
+    "before-32": {
+      "seed": {
+        "mean": 2.0,
+        "min": 1.0,
+        "max": 3.0
+      },
+      "agents": {
+        "mean": 32.0,
+        "min": 32.0,
+        "max": 32.0
+      },
+      "time": {
+        "mean": 600.012,
+        "min": 600.012,
+        "max": 600.012
+      },
+      "living": {
+        "mean": 32.0,
+        "min": 32.0,
+        "max": 32.0
+      },
+      "food": {
+        "mean": 4424.0,
+        "min": 4327.0,
+        "max": 4492.0
+      },
+      "ambient": {
+        "mean": 1606.0,
+        "min": 1560.0,
+        "max": 1695.0
+      },
+      "death": {
+        "mean": 2818.0,
+        "min": 2758.0,
+        "max": 2929.0
+      },
+      "boost": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "food_value": {
+        "mean": 1948.0175256666666,
+        "min": 1899.172922,
+        "max": 2040.340737
+      },
+      "ambient_value": {
+        "mean": 210.469047,
+        "min": 201.881394,
+        "max": 223.689486
+      },
+      "death_value": {
+        "mean": 1737.5484786666666,
+        "min": 1680.849432,
+        "max": 1834.504476
+      },
+      "boost_value": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "snake_mass": {
+        "mean": 1898.4938606666667,
+        "min": 1834.8715,
+        "max": 1975.792348
+      },
+      "mean_score": {
+        "mean": 1101.0623333333333,
+        "min": 1053.531,
+        "max": 1168.906
+      },
+      "median_score": {
+        "mean": 623.3333333333334,
+        "min": 548.0,
+        "max": 694.5
+      },
+      "max_score": {
+        "mean": 7237.333333333333,
+        "min": 5016.0,
+        "max": 10047.0
+      },
+      "deaths": {
+        "mean": 483.6666666666667,
+        "min": 471.0,
+        "max": 494.0
+      },
+      "lives": {
+        "mean": 515.6666666666666,
+        "min": 503.0,
+        "max": 526.0
+      },
+      "grown_lives": {
+        "mean": 484.0,
+        "min": 472.0,
+        "max": 494.0
+      },
+      "late_lives": {
+        "mean": 238.0,
+        "min": 226.0,
+        "max": 245.0
+      },
+      "late_grown_lives": {
+        "mean": 237.66666666666666,
+        "min": 225.0,
+        "max": 245.0
+      },
+      "late_mean_living": 31.978494623655912,
+      "late_min_living": 31.0,
+      "late_max_living": 32.0,
+      "late_food_min": 2614.0,
+      "late_food_max": 5282.0,
+      "peak_sampled_score": 10295.0,
+      "deaths_per_minute": 48.36569935267962,
+      "late_deaths_per_minute": 47.59904801903962,
+      "minute5_mean_score": 1155.1146666666666,
+      "minute5_food": 3621.0,
+      "late_grown_fraction": 0.9985994397759104,
+      "late_grown_lives_total": 713,
+      "late_lives_total": 714
+    },
+    "before-64": {
+      "seed": {
+        "mean": 2.0,
+        "min": 1.0,
+        "max": 3.0
+      },
+      "agents": {
+        "mean": 64.0,
+        "min": 64.0,
+        "max": 64.0
+      },
+      "time": {
+        "mean": 600.012,
+        "min": 600.012,
+        "max": 600.012
+      },
+      "living": {
+        "mean": 60.666666666666664,
+        "min": 60.0,
+        "max": 61.0
+      },
+      "food": {
+        "mean": 3800.6666666666665,
+        "min": 3350.0,
+        "max": 4107.0
+      },
+      "ambient": {
+        "mean": 771.0,
+        "min": 719.0,
+        "max": 803.0
+      },
+      "death": {
+        "mean": 3029.6666666666665,
+        "min": 2631.0,
+        "max": 3316.0
+      },
+      "boost": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "food_value": {
+        "mean": 1988.0645789999999,
+        "min": 1696.62841,
+        "max": 2246.671215
+      },
+      "ambient_value": {
+        "mean": 100.886099,
+        "min": 95.756027,
+        "max": 105.790086
+      },
+      "death_value": {
+        "mean": 1887.1784799999998,
+        "min": 1600.872383,
+        "max": 2145.559031
+      },
+      "boost_value": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "snake_mass": {
+        "mean": 3469.570278,
+        "min": 3387.26335,
+        "max": 3512.866171
+      },
+      "mean_score": {
+        "mean": 1046.5583333333334,
+        "min": 1029.016,
+        "max": 1072.167
+      },
+      "median_score": {
+        "mean": 613.6666666666666,
+        "min": 533.0,
+        "max": 679.0
+      },
+      "max_score": {
+        "mean": 8003.666666666667,
+        "min": 6546.0,
+        "max": 9182.0
+      },
+      "deaths": {
+        "mean": 998.6666666666666,
+        "min": 987.0,
+        "max": 1016.0
+      },
+      "lives": {
+        "mean": 1059.3333333333333,
+        "min": 1048.0,
+        "max": 1077.0
+      },
+      "grown_lives": {
+        "mean": 986.6666666666666,
+        "min": 975.0,
+        "max": 1005.0
+      },
+      "late_lives": {
+        "mean": 511.0,
+        "min": 503.0,
+        "max": 515.0
+      },
+      "late_grown_lives": {
+        "mean": 506.0,
+        "min": 496.0,
+        "max": 513.0
+      },
+      "late_mean_living": 61.204301075268816,
+      "late_min_living": 53.0,
+      "late_max_living": 64.0,
+      "late_food_min": 2509.0,
+      "late_food_max": 5245.0,
+      "peak_sampled_score": 15403.0,
+      "deaths_per_minute": 99.8646693732792,
+      "late_deaths_per_minute": 102.19795604087919,
+      "minute5_mean_score": 1054.254,
+      "minute5_food": 3558.6666666666665,
+      "late_grown_fraction": 0.9902152641878669,
+      "late_grown_lives_total": 1518,
+      "late_lives_total": 1533
+    },
+    "after-32": {
+      "seed": {
+        "mean": 2.0,
+        "min": 1.0,
+        "max": 3.0
+      },
+      "agents": {
+        "mean": 32.0,
+        "min": 32.0,
+        "max": 32.0
+      },
+      "time": {
+        "mean": 600.012,
+        "min": 600.012,
+        "max": 600.012
+      },
+      "living": {
+        "mean": 31.666666666666668,
+        "min": 31.0,
+        "max": 32.0
+      },
+      "food": {
+        "mean": 1747.6666666666667,
+        "min": 1702.0,
+        "max": 1776.0
+      },
+      "ambient": {
+        "mean": 1332.0,
+        "min": 1260.0,
+        "max": 1390.0
+      },
+      "death": {
+        "mean": 415.6666666666667,
+        "min": 312.0,
+        "max": 516.0
+      },
+      "boost": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "food_value": {
+        "mean": 419.3438946666667,
+        "min": 362.329402,
+        "max": 470.67433
+      },
+      "ambient_value": {
+        "mean": 175.59058,
+        "min": 167.851218,
+        "max": 182.457221
+      },
+      "death_value": {
+        "mean": 243.75331433333332,
+        "min": 179.872181,
+        "max": 302.823111
+      },
+      "boost_value": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "snake_mass": {
+        "mean": 1519.69629,
+        "min": 1498.416268,
+        "max": 1561.391126
+      },
+      "mean_score": {
+        "mean": 887.405,
+        "min": 815.531,
+        "max": 983.903
+      },
+      "median_score": {
+        "mean": 503.3333333333333,
+        "min": 468.0,
+        "max": 523.0
+      },
+      "max_score": {
+        "mean": 4622.0,
+        "min": 3590.0,
+        "max": 5294.0
+      },
+      "deaths": {
+        "mean": 345.6666666666667,
+        "min": 344.0,
+        "max": 349.0
+      },
+      "lives": {
+        "mean": 377.3333333333333,
+        "min": 376.0,
+        "max": 380.0
+      },
+      "grown_lives": {
+        "mean": 345.3333333333333,
+        "min": 343.0,
+        "max": 349.0
+      },
+      "late_lives": {
+        "mean": 159.66666666666666,
+        "min": 149.0,
+        "max": 165.0
+      },
+      "late_grown_lives": {
+        "mean": 158.66666666666666,
+        "min": 149.0,
+        "max": 164.0
+      },
+      "late_mean_living": 31.967741935483872,
+      "late_min_living": 31.0,
+      "late_max_living": 32.0,
+      "late_food_min": 1406.0,
+      "late_food_max": 2529.0,
+      "peak_sampled_score": 7496.0,
+      "deaths_per_minute": 34.56597534715972,
+      "late_deaths_per_minute": 31.999360012799745,
+      "minute5_mean_score": 799.6460000000001,
+      "minute5_food": 1771.3333333333333,
+      "late_grown_fraction": 0.9937369519832986,
+      "late_grown_lives_total": 476,
+      "late_lives_total": 479
+    },
+    "after-64": {
+      "seed": {
+        "mean": 2.0,
+        "min": 1.0,
+        "max": 3.0
+      },
+      "agents": {
+        "mean": 64.0,
+        "min": 64.0,
+        "max": 64.0
+      },
+      "time": {
+        "mean": 600.012,
+        "min": 600.012,
+        "max": 600.012
+      },
+      "living": {
+        "mean": 64.0,
+        "min": 64.0,
+        "max": 64.0
+      },
+      "food": {
+        "mean": 942.6666666666666,
+        "min": 730.0,
+        "max": 1143.0
+      },
+      "ambient": {
+        "mean": 513.6666666666666,
+        "min": 482.0,
+        "max": 531.0
+      },
+      "death": {
+        "mean": 429.0,
+        "min": 248.0,
+        "max": 615.0
+      },
+      "boost": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "food_value": {
+        "mean": 322.72897566666666,
+        "min": 206.922772,
+        "max": 444.471259
+      },
+      "ambient_value": {
+        "mean": 68.10937733333333,
+        "min": 62.945626,
+        "max": 71.509271
+      },
+      "death_value": {
+        "mean": 254.61959833333333,
+        "min": 143.977146,
+        "max": 374.598024
+      },
+      "boost_value": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "snake_mass": {
+        "mean": 2363.884907,
+        "min": 2283.974604,
+        "max": 2486.123918
+      },
+      "mean_score": {
+        "mean": 604.9846666666667,
+        "min": 578.469,
+        "max": 621.016
+      },
+      "median_score": {
+        "mean": 453.5,
+        "min": 441.5,
+        "max": 464.5
+      },
+      "max_score": {
+        "mean": 3243.3333333333335,
+        "min": 2220.0,
+        "max": 4705.0
+      },
+      "deaths": {
+        "mean": 715.3333333333334,
+        "min": 696.0,
+        "max": 735.0
+      },
+      "lives": {
+        "mean": 779.3333333333334,
+        "min": 760.0,
+        "max": 799.0
+      },
+      "grown_lives": {
+        "mean": 708.3333333333334,
+        "min": 688.0,
+        "max": 729.0
+      },
+      "late_lives": {
+        "mean": 336.6666666666667,
+        "min": 333.0,
+        "max": 339.0
+      },
+      "late_grown_lives": {
+        "mean": 332.0,
+        "min": 326.0,
+        "max": 336.0
+      },
+      "late_mean_living": 63.82795698924731,
+      "late_min_living": 62.0,
+      "late_max_living": 64.0,
+      "late_food_min": 536.0,
+      "late_food_max": 1270.0,
+      "peak_sampled_score": 5880.0,
+      "deaths_per_minute": 71.53190269527943,
+      "late_deaths_per_minute": 67.33198669359946,
+      "minute5_mean_score": 654.0103333333334,
+      "minute5_food": 742.0,
+      "late_grown_fraction": 0.9861386138613861,
+      "late_grown_lives_total": 996,
+      "late_lives_total": 1010
+    }
+  },
+  "after": {
+    "source_commit": "a1fccfda3905e7a89295a9fbfa97d02cf84cde81",
+    "harness_sha256": "d2278f3231c81689482f3492f179174f9f193a88f97d6f74349e6f201eee1dc5",
+    "policy_sha256": "67db3f965d4638d45b61b75465e798feaf863785c6ea55133ae199e4e52b13dd",
+    "seconds": 600,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "agents": [
+      32,
+      64
+    ],
+    "cpu_affinity": "two logical CPUs",
+    "runs": [
+      {
+        "name": "n32-s1",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 60.61769420001656
+      },
+      {
+        "name": "n32-s2",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 61.005397800006904
+      },
+      {
+        "name": "n32-s3",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 56.427265000063926
+      },
+      {
+        "name": "n64-s1",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 264.2872704999754
+      },
+      {
+        "name": "n64-s2",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 156.71822440007236
+      },
+      {
+        "name": "n64-s3",
+        "status": "complete",
+        "exit_code": 0,
+        "wall_seconds": 112.99285799998324
+      }
+    ],
+    "binary_sha256": "d0313d802344e72ee8a6a9f1e641f9811a8325f15554302f76412ab5bd2871d9",
+    "cargo_lock_sha256": "80638008dab0abc580835c4d704abdc82bda13b08e044f5247825c2d742e0693",
+    "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "series_sha256": {
+      "n32-s1.csv": "21a9e9a14e965c70f685be792c88aee17159532118d6f4830113563d0004b9da",
+      "n32-s2.csv": "9064ab1ac9bffd618700cde3603bcb1e14f50c9551c70964ac960ad0946a27cb",
+      "n32-s3.csv": "9c8ce5e8b8222dfed0677f24394e87af48032733df8183028d800ff4b1032439",
+      "n64-s1.csv": "719a569f74c840e16e1d6873712c98ddc9ad1a22de817dba4bcb2ff5733dcf82",
+      "n64-s2.csv": "04debeaf3651698f667c682d9ed4233ef1358183ac1be70f202bebc2c2e7ed42",
+      "n64-s3.csv": "b108b1ca70110107199c06f9e60d8e48b1fe19bdc0427515d433640e0e1b8969"
+    }
+  }
+}

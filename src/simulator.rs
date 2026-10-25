@@ -121,8 +121,11 @@ pub struct Config {
     /// Enable the population-driven boundary model used by [`Config::official`].
     pub dynamic_radius: bool,
     pub vision: f64,
-    /// Global ambient pellet target; boost and death do not count against it.
+    /// Refill target; counts ambient pellets unless `ambient_refill_counts_all_food`.
     pub food_count: usize,
+    /// Count every pellet toward the refill target. A custom ecology choice,
+    /// enabled by Battledome; independent of a snake's size floor.
+    pub ambient_refill_counts_all_food: bool,
     /// Ambient placement attempts per simulated second while below food_count.
     pub ambient_replenish_per_second: f64,
     /// Physics step. The server loop is ~7 ms; larger steps trade event resolution for speed.
@@ -156,7 +159,7 @@ pub struct Config {
     pub kill_score_seconds: Option<f64>,
     /// Least displayed score: new lives start at the least mass that displays
     /// it, and boosting or the kiosk penalty spend only mass above that floor;
-    /// boosting at the floor is free.
+    /// boosting at the floor is free. Death food excludes the free floor mass.
     /// Requires `spawn_radius`, the ring that new bodies lie along. Read when a
     /// world is created.
     pub min_score: Option<u32>,
@@ -175,6 +178,8 @@ struct ConfigWire {
     dynamic_radius: bool,
     vision: f64,
     food_count: usize,
+    #[serde(skip_serializing_if = "is_false")]
+    ambient_refill_counts_all_food: bool,
     ambient_replenish_per_second: f64,
     dt: f64,
     food_index: bool,
@@ -195,6 +200,10 @@ struct ConfigWire {
     kill_score_seconds: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     min_score: Option<u32>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 impl Default for Config {
@@ -292,6 +301,7 @@ impl Config {
             // Exact server entry/exit geometry and size scaling remain unknown.
             vision: 1500.0,
             food_count,
+            ambient_refill_counts_all_food: false,
             ambient_replenish_per_second,
             dt: LOOP_SECONDS,
             food_index: true,
@@ -332,7 +342,7 @@ impl Config {
         }
     }
 
-    /// Battledome: official physics and ecology in a fixed 3584-unit arena,
+    /// Battledome: official physics in a fixed 3584-unit arena,
     /// with a one-way pit of radius 1784, spawns midway between the two, a
     /// 15-minute kill score, a 400-point size floor and no prey. See docs/configuration.md#battledome.
     pub fn battledome() -> Self {
@@ -343,6 +353,10 @@ impl Config {
             radius: RADIUS,
             dynamic_radius: false,
             food_count,
+            // Design choice: death/boost food already feeds snakes, so it also
+            // fills the ambient target. Independent of minScore for custom worlds.
+            // research/battledome/2026-10-25-food-balance/REPORT.md
+            ambient_refill_counts_all_food: true,
             ambient_replenish_per_second,
             prey: PreyConfig {
                 count: 0,
@@ -1563,14 +1577,18 @@ impl Simulator {
             let interval = 1.0 / replenish;
             self.ambient_clock += dt;
             if self.ambient_clock + 1e-12 >= interval {
-                let mut ambient_food_count = self.food_cache.ambient(&self.food);
+                let mut refill_count = if self.config.ambient_refill_counts_all_food {
+                    self.food.len()
+                } else {
+                    self.food_cache.ambient(&self.food)
+                };
                 // The tolerance spends an attempt a rounding error early, but only
                 // while credit remains: below a 1e-12 s interval it would otherwise
                 // drive the clock negative until subtraction stopped changing it.
                 // Above that interval a qualifying clock is always positive.
                 while self.ambient_clock > 0.0 && self.ambient_clock + 1e-12 >= interval {
                     self.ambient_clock -= interval;
-                    if ambient_food_count < target {
+                    if refill_count < target {
                         let f = self.new_food();
                         // Cell occupancy includes every origin.
                         if admit_ambient_food(
@@ -1587,7 +1605,7 @@ impl Simulator {
                             }
                             self.food_cache.push(&f);
                             self.food.push(f);
-                            ambient_food_count += 1;
+                            refill_count += 1;
                         }
                     }
                 }
@@ -1895,6 +1913,23 @@ impl Simulator {
     }
     fn death_food(&mut self, index: usize) -> usize {
         let s = &self.snakes[index];
+        // Custom floor rule, not an official fit: free spawn mass must not
+        // become food on each death. Map the earned fraction of continuous
+        // mass to the same fraction of the ordinary death-food nutrition.
+        // Keep normal size/scatter, selecting evenly spaced sites when the
+        // cumulative budget crosses an integer in tail-first emission order.
+        // The final site carries any fractional nutrition, sqrt-scaled in size.
+        // Admission still discards rejected shares rather than redistributing.
+        // research/battledome/2026-10-25-food-balance/REPORT.md
+        let site_count = 2 * s.body.len() + 1;
+        let budget = self.min_mass.map(|floor| {
+            let mass = s.segments as f64 + s.fam;
+            let earned = floor.excess(s.segments, s.fam);
+            site_count as f64 * (earned / mass)
+        });
+        if budget == Some(0.0) {
+            return 0;
+        }
         let density = &self.config.death_food;
         // Occupancy counts current food, including earlier deaths this same tick.
         let outside_step = !self.food_cache.is_open();
@@ -1906,7 +1941,31 @@ impl Simulator {
         // square; 15 is an empirical half-width (see death-jitter-audit.md).
         let spread = 15.0 * scale(s.segments);
         let size = death_food_size(s.segments);
-        for site in death_food_sites(&s.body, s.head).rev() {
+        let mut next_whole = 1.0;
+        let sites = death_food_sites(&s.body, s.head)
+            .rev()
+            .enumerate()
+            .filter_map(|(index, site)| {
+                if let Some(budget) = budget {
+                    // Compute cumulative credit from the index to avoid drift;
+                    // the last site reaches the exact budget, even at integers.
+                    let credit = if index + 1 == site_count {
+                        budget
+                    } else {
+                        budget * ((index + 1) as f64 / site_count as f64)
+                    };
+                    if credit < next_whole {
+                        return None;
+                    }
+                    next_whole += 1.0;
+                }
+                Some((site, size))
+            });
+        let remainder = budget.and_then(|budget| {
+            let fraction = budget.fract();
+            (fraction > 0.0).then_some((s.head, size * fraction.sqrt()))
+        });
+        for (site, size) in sites.chain(remainder) {
             let pellet = Self::pellet(
                 Point {
                     x: site.x + (self.random.next() * 2.0 - 1.0) * spread,
@@ -2140,6 +2199,76 @@ mod death_food_density_tests {
         );
         assert_eq!(world.death_food(0), 0);
         assert_eq!(world.food_spawn_events.as_ref().unwrap().len(), count);
+    }
+
+    #[test]
+    fn floor_budget_spans_the_body_and_preserves_nutrition_and_random_draws() {
+        let floor = MassFloor::for_score(400).unwrap();
+        for (min_score, segments, fam, full_sites) in [
+            // Full pellets are 7 or 8 sites apart, from tail toward head.
+            (400, 30, 0.5, vec![7, 14, 21, 28, 35, 42, 49, 56]),
+            // Both the last whole crossing and a remainder fall at the head.
+            (400, 30, 0.12, vec![7, 15, 22, 30, 38, 45, 53, 60]),
+            // Sub-pellet growth still returns its nutrition near the head.
+            (400, floor.segments, floor.fam + 0.01, vec![]),
+            (400, floor.segments, floor.fam, vec![]),
+            // Exactly one pellet: the final crossing must not round away.
+            (10, 2, 0.5, vec![4]),
+        ] {
+            let mut world = Simulator::new(
+                7,
+                Config {
+                    radius: 5000.0,
+                    food_count: 0,
+                    ambient_replenish_per_second: 0.0,
+                    spawn_radius: Some(2684.0),
+                    min_score: Some(min_score),
+                    ..Config::sandbox()
+                },
+            )
+            .unwrap();
+            world.config.death_food.enabled = false;
+            world.add("victim", 0, 1).unwrap();
+            let snake = &mut world.snakes[0];
+            snake.head = Point { x: -75.0, y: 0.0 };
+            snake.body = (0..segments)
+                .map(|i| Point {
+                    x: i as f64 * 75.0,
+                    y: 0.0,
+                })
+                .collect();
+            snake.segments = segments;
+            snake.fam = fam;
+            Simulator::update_mass(snake);
+            let sites: Vec<_> = death_food_sites(&snake.body, snake.head).rev().collect();
+            let budget = sites.len() as f64
+                * (world.min_mass.unwrap().excess(segments, fam) / (segments as f64 + fam));
+            assert_eq!(full_sites.len(), budget.floor() as usize);
+            let size = death_food_size(segments);
+            let spread = 15.0 * scale(segments);
+            let mut random = world.random.clone();
+            let mut expected = Vec::new();
+            for (index, share) in full_sites
+                .into_iter()
+                .map(|index| (index, 1.0))
+                .chain((budget.fract() > 0.0).then_some((sites.len() - 1, budget.fract())))
+            {
+                let site = sites[index];
+                expected.push(Simulator::pellet(
+                    Point {
+                        x: site.x + (random.next() * 2.0 - 1.0) * spread,
+                        y: site.y + (random.next() * 2.0 - 1.0) * spread,
+                    },
+                    size * share.sqrt(),
+                    Origin::Death,
+                ));
+            }
+            assert_eq!(world.death_food(0), budget.ceil() as usize);
+            assert_eq!(world.food, expected);
+            let nutrition: f64 = world.food.iter().map(|food| food.value).sum();
+            assert!((nutrition - budget * crate::physics::nutrition(size, 2.0)).abs() < 1e-12);
+            assert_eq!(world.random.next(), random.next());
+        }
     }
 
     fn existing(x: f64, y: f64, origin: Origin) -> Food {

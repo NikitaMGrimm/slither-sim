@@ -90,6 +90,64 @@ fn refill_counts_all_origins_and_reconciles_public_food_edits() {
 }
 
 #[test]
+fn total_food_target_stops_refill_and_resumes_after_removal() {
+    let mut world = tiny_world(false, 0, 1000.0);
+    world.config.food_count = 5;
+    world.config.ambient_refill_counts_all_food = true;
+    world.food = vec![food(Origin::Boost), food(Origin::Death)];
+    // Ten attempts in one tick must stop exactly at five total pellets.
+    world.step(&[]).unwrap();
+    assert_eq!(world.food.len(), 5);
+    assert_eq!(
+        world
+            .food
+            .iter()
+            .filter(|f| f.origin == Some(Origin::Ambient))
+            .count(),
+        3
+    );
+    for _ in 0..10 {
+        world.step(&[]).unwrap();
+        assert_eq!(world.food.len(), 5);
+    }
+    world.food.pop();
+    world.step(&[]).unwrap();
+    assert_eq!(world.food.len(), 5);
+    // An unspecified origin is still a physical pellet.
+    world.food = vec![food(Origin::Death); 6];
+    world.food[0].origin = None;
+    world.step(&[]).unwrap();
+    assert_eq!(world.food.len(), 6);
+}
+
+#[test]
+fn official_and_sandbox_keep_the_ambient_only_target() {
+    for config in [Config::official(1), Config::sandbox()] {
+        assert!(!config.ambient_refill_counts_all_food);
+        assert!(
+            !serde_json::to_value(&config)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .contains_key("ambientRefillCountsAllFood")
+        );
+        let restored: Config = serde_json::from_str("{}").unwrap();
+        assert!(!restored.ambient_refill_counts_all_food);
+        let mut world = tiny_world(false, 0, 1000.0);
+        world.config.food_count = 5;
+        world.food = vec![food(Origin::Boost), food(Origin::Death)];
+        world.step(&[]).unwrap();
+        assert_eq!(world.food.len(), 7);
+    }
+    let preset: Config = serde_json::from_str(r#"{"preset":"battledome"}"#).unwrap();
+    assert!(preset.ambient_refill_counts_all_food);
+    let override_config: Config =
+        serde_json::from_str(r#"{"preset":"battledome","ambientRefillCountsAllFood":false}"#)
+            .unwrap();
+    assert!(!override_config.ambient_refill_counts_all_food);
+}
+
+#[test]
 fn actual_pickup_frees_capacity_before_the_same_step_refill() {
     // Radius 20 puts every generated ambient candidate at the origin. The
     // inward-facing snake can collect that cell while its head stays inside.

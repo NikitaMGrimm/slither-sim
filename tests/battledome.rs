@@ -488,7 +488,7 @@ fn kill_score_is_zero_without_a_window() {
 }
 
 #[test]
-fn battledome_uses_official_density_and_runs_deterministically() {
+fn battledome_uses_official_ambient_density_and_runs_deterministically() {
     let config = Config::battledome();
     config.validate().unwrap();
     let official = Config::official(1);
@@ -506,6 +506,7 @@ fn battledome_uses_official_density_and_runs_deterministically() {
         "radius",
         "dynamicRadius",
         "foodCount",
+        "ambientRefillCountsAllFood",
         "ambientReplenishPerSecond",
         "pit",
         "spawnRadius",
@@ -1033,7 +1034,7 @@ fn kiosk_shrinking_stops_at_the_floor() {
 }
 
 #[test]
-fn battledome_pit_deaths_drop_food_and_wall_deaths_none() {
+fn battledome_floor_pit_and_wall_deaths_drop_nothing() {
     let mut config = Config::battledome();
     config.food_count = 0;
     config.ambient_replenish_per_second = 0.0;
@@ -1057,12 +1058,12 @@ fn battledome_pit_deaths_drop_food_and_wall_deaths_none() {
     let reasons: Vec<_> = deaths.iter().map(|death| death.reason).collect();
     assert_eq!(reasons, [DeathReason::Boundary, DeathReason::Pit]);
     assert_eq!(deaths[0].food, 0);
-    assert!(deaths[1].food > 0);
-    assert_eq!(world.food.len(), deaths[1].food);
+    assert_eq!(deaths[1].food, 0);
+    assert!(world.food.is_empty());
 }
 
 #[test]
-fn death_food_follows_actual_mass_under_a_floor() {
+fn death_food_excludes_the_floor_and_keeps_the_earned_fraction() {
     let mut open = kill_world(None);
     let mut floored = kill_world(None);
     floored.config.min_score = Some(400);
@@ -1070,6 +1071,12 @@ fn death_food_follows_actual_mass_under_a_floor() {
     let mut floored = Simulator::new(7, floored.config.clone()).unwrap();
     floored.add("victim", 0, 2).unwrap();
     floored.add("killer", 1, 2).unwrap();
+    // Disable admission to test the complete nutrition budget, including its
+    // fractional last pellet; geometry and full pellet sizes stay official.
+    open.config.death_food.enabled = false;
+    floored.config.death_food.enabled = false;
+    open.snakes[0].fam = 0.5;
+    Simulator::update_mass(&mut open.snakes[0]);
     for (from, to) in open.snakes.clone().into_iter().zip(&mut floored.snakes) {
         *to = from;
     }
@@ -1077,8 +1084,47 @@ fn death_food_follows_actual_mass_under_a_floor() {
     floored.step(&straight(&floored)).unwrap();
     assert_eq!(floored.deaths[0].reason, DeathReason::Body);
     assert!(floored.deaths[0].food > 0);
-    assert_eq!(floored.deaths, open.deaths);
-    assert_eq!(floored.food, open.food);
+    let floor = MassFloor::for_score(400).unwrap();
+    let fraction = floor.excess(30, 0.5) / 30.5;
+    let budget = 61.0 * fraction;
+    assert_eq!(floored.deaths[0].food, budget.ceil() as usize);
+    let nominal: f64 = open.food.iter().map(|food| food.value).sum();
+    let actual: f64 = floored.food.iter().map(|food| food.value).sum();
+    assert!((actual - nominal * fraction).abs() < 1e-12);
+    let full = budget.floor() as usize;
+    assert!(
+        floored.food[..full]
+            .iter()
+            .all(|food| food.size == open.food[0].size)
+    );
+    let last = floored.food.last().unwrap();
+    assert_eq!(
+        last.size.unwrap(),
+        open.food[0].size.unwrap() * budget.fract().sqrt()
+    );
+    assert_eq!(last.origin, Some(slither_sim::Origin::Death));
+}
+
+#[test]
+fn a_floor_size_body_collision_drops_nothing() {
+    let mut config = kill_world(None).config;
+    config.min_score = Some(400);
+    config.spawn_radius = Some(500.0);
+    let mut world = Simulator::new(7, config).unwrap();
+    for snake in kill_world(None).snakes {
+        world.add(&snake.id, 0, 2).unwrap();
+    }
+    world.snakes = kill_world(None).snakes;
+    let floor = MassFloor::for_score(400).unwrap();
+    let s = &mut world.snakes[0];
+    s.segments = floor.segments;
+    s.fam = floor.fam;
+    s.body.truncate(floor.segments);
+    Simulator::update_mass(s);
+    world.step(&straight(&world)).unwrap();
+    assert_eq!(world.deaths[0].reason, DeathReason::Body);
+    assert_eq!(world.deaths[0].food, 0);
+    assert!(world.food.is_empty());
 }
 
 #[cfg(feature = "networking")]
