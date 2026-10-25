@@ -112,6 +112,9 @@ wall-clock ticks and shifts delivery, slowing world time without skipping physic
 decides every `decisionTicks × dt` with staggered phases, models processing delay,
 pings and rejoins after death. See [worker limits](configuration.md#hostconfig)
 and [decision timing](configuration.md#timing-and-ping).
+An unadmitted background bot waits one wall second after its connection is
+refused before retrying, a host policy that limits crowded-arena admission work.
+Socket players still choose when to retry their own joins.
 
 ## Embedding and load checks
 

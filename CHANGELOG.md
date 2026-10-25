@@ -148,6 +148,11 @@
 
 ### Performance
 
+- Crowded hosts stop scoring spawn candidates that cannot be admitted or beat
+  the current best, without changing the selected pose. Background bots wait a
+  wall second after refused admission, reducing retry load; socket players keep
+  their own join timing
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-25-battledome-spawn-cost/REPORT.md)).
 - Batch observations (`observe_all_into`, `observe_selected_into`, transport
   frames and `serve`) are 16–19% faster sequentially and 5–12% faster in
   parallel in the 96- and 128-snake benchmark worlds, with identical results.
