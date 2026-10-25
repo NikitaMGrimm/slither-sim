@@ -42,6 +42,10 @@ pub struct AmbientFoodConfig {
     pub enabled: bool,
     pub cell_size: f64,
     pub max_per_cell: usize,
+    /// Scenario option, not an official mechanic: extra ambient placement
+    /// density factor `(1 - r/R)^centreBias` toward the arena centre. 0 keeps
+    /// the official placement and its random draws exactly.
+    pub centre_bias: f64,
 }
 impl Default for AmbientFoodConfig {
     fn default() -> Self {
@@ -49,6 +53,7 @@ impl Default for AmbientFoodConfig {
             enabled: true,
             cell_size: 75.0,
             max_per_cell: 2,
+            centre_bias: 0.0,
         }
     }
 }
@@ -56,6 +61,9 @@ impl AmbientFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
         if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
             return Err("Ambient-food cellSize must be positive and finite".into());
+        }
+        if !self.centre_bias.is_finite() || self.centre_bias < 0.0 {
+            return Err("Ambient-food centreBias must be finite and nonnegative".into());
         }
         Ok(())
     }
@@ -705,6 +713,10 @@ impl Simulator {
         let r = loop {
             let f = self.random.next().sqrt();
             if self.random.next() * 0.217 <= 0.217 - 0.172 * f {
+                let bias = self.config.ambient_food.centre_bias;
+                if bias > 0.0 && self.random.next() >= (1.0 - f).powf(bias) {
+                    continue;
+                }
                 break f * (self.config.radius - 20.0).max(0.0);
             }
         };

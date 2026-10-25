@@ -237,3 +237,68 @@ fn refill_intervals_below_the_tolerance_stop_at_spent_credit() {
         .expect("one refill step must finish");
     assert_eq!(time, 1e-30);
 }
+
+#[test]
+fn centre_bias_concentrates_ambient_food_and_zero_keeps_official_placement() {
+    let world = |bias: f64| {
+        Simulator::new(
+            11,
+            Config {
+                radius: 3000.0,
+                food_count: 4000,
+                ambient_food: AmbientFoodConfig {
+                    enabled: false,
+                    centre_bias: bias,
+                    ..AmbientFoodConfig::default()
+                },
+                ..Config::sandbox()
+            },
+        )
+        .unwrap()
+    };
+    let official = Simulator::new(
+        11,
+        Config {
+            radius: 3000.0,
+            food_count: 4000,
+            ambient_food: AmbientFoodConfig {
+                enabled: false,
+                ..AmbientFoodConfig::default()
+            },
+            ..Config::sandbox()
+        },
+    )
+    .unwrap();
+    assert_eq!(world(0.0).food, official.food);
+    // Placement density f(0.217 - 0.172f)(1 - f)^k over f = r/R has mean
+    // 0.573 at k = 0 and 0.434 at k = 1.
+    let mean = |w: &Simulator| {
+        w.food
+            .iter()
+            .map(|f| f.point().distance(Point::default()))
+            .sum::<f64>()
+            / w.food.len() as f64
+            / 2980.0
+    };
+    assert!(
+        (mean(&official) - 0.573).abs() < 0.02,
+        "{}",
+        mean(&official)
+    );
+    assert!(
+        (mean(&world(1.0)) - 0.434).abs() < 0.02,
+        "{}",
+        mean(&world(1.0))
+    );
+    assert!(
+        Config {
+            ambient_food: AmbientFoodConfig {
+                centre_bias: -1.0,
+                ..AmbientFoodConfig::default()
+            },
+            ..Config::sandbox()
+        }
+        .validate()
+        .is_err()
+    );
+}

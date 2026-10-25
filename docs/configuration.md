@@ -238,6 +238,12 @@ counts toward cell occupancy.
 | `boostFood` | `75` | `9` |
 | `deathFood` | `75` | `22` |
 
+`ambientFood.centreBias` (default `0`, finite and nonnegative) is a scenario
+option, not an official mechanic: it multiplies the official ambient placement
+density by `(1 - r/R)^centreBias`, so a modified world can concentrate play
+toward the centre without changing any policy. `0` keeps official placement
+and its random draws exactly.
+
 ### Kiosk penalty
 
 This is a historical, provisional anti-camping model. Set `kiosk.enabled: false`
