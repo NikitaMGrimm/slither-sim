@@ -1,11 +1,9 @@
 # On-demand direct release comparison
 
-The **Direct release performance** workflow is a second, explicit measurement
-layer: a published release versus an exact candidate commit. It is separate from
-the [automatic PR preview reports](pr-reports.md) and their cheap release
-consolidation. Neither release metadata refreshes nor pushes start this workflow.
-It has no two-hour mode and never changes release-plz files, PR bodies, release
-guards or publication behavior.
+**Direct release performance** explicitly compares a published release with an
+exact candidate commit. Unlike [PR preview reports and release consolidation](pr-reports.md),
+it runs only on demand, with no two-hour mode. It changes no release-plz files,
+PR bodies, release guards or publication behavior.
 
 ## Request and identity
 
@@ -18,70 +16,59 @@ default branch with three required inputs:
 | `baseline_commit` | Full lowercase commit SHA behind that tag. A mismatch fails pinning. |
 | `candidate_commit` | Explicit full commit SHA, normally main or the rolling release PR's exact head. Branch names are rejected. |
 
-Before any build, the read-only pinning job verifies the published release and
-resolves both commits and trees. The dispatch's default-branch revision pins the
-shared harness, collector and workflow. The immutable request artifact records
-all three revisions, the release ID, run/attempt, protocol and declared inputs.
-The measurement job never interprets a candidate as a two-parent PR merge preview.
-Rerun all jobs to obtain a new request for a new attempt; a measurement-only retry
-cannot consume another attempt's request.
+Before building, read-only pinning verifies the published release and resolves
+both commits/trees. The dispatch's default-branch revision pins the shared harness,
+collector and workflow. The immutable request records all three revisions, release
+ID, run/attempt, protocol and inputs. Candidates are exact commits, never
+two-parent merge previews. Rerun all jobs for a new attempt; measurement-only
+retries cannot consume another attempt's request.
 
-Both exact runtime commits are detached worktrees. The pinned trusted harness's
-measurement examples, selected regression sources and fixtures are copied into
-both through `perf_build.overlay`. No runtime code or lockfile is adapted.
-`perf_build` builds and copies executables, records source/tree, overlay hashes,
-lockfiles, toolchain, commands, targets and binary hashes, and verifies copied
-binaries around measurement. The workflow uses fresh, separate baseline/candidate
-targets, two build jobs, explicit `networking,parallel` with default features off,
-and identical release profile settings. The stable compiler installed for that
-job is shared by both sources and its exact version is retained. This is not a
-toolchain pin across different runs.
+Detached runtime worktrees receive the trusted harness's measurement examples,
+selected tests and fixtures through `perf_build.overlay`; runtime code and
+lockfiles are not adapted. `perf_build` copies executables and records source/tree,
+overlay hashes, lockfiles, toolchain, commands, targets and binary hashes, checked
+around measurement. Builds use fresh separate targets, two jobs, explicit
+`networking,parallel` with default features off and identical release settings.
+Both sources share the job's stable compiler; its exact version is retained,
+but is not pinned across runs.
 
-The same catalog names, operation counts, trace windows, seeds, resolved workload
-definitions and operations are required. Incompatible old sources, unavailable
-features, build errors or mismatched catalogs produce **Unavailable**. There is
-no fallback to an older harness, asymmetric feature selection, retry or selected
-successful attempt.
+Catalog names, operation counts, trace windows, seeds, definitions and operations
+must match. Incompatible sources, unavailable features, build errors or mismatched
+catalogs are **Unavailable**: no older harness, asymmetric features, retry or
+selection of successful attempts.
 
 ## Evidence and limits
 
-The collector reuses `perf_compare.parity`, selected `movement_turns`/`physics`
-regressions and fidelity helpers, and `perf_compare.sequential`. It does not own
-a new sampler. Missing trace evidence suppresses that row's timing claim;
-changed parity remains visible as changed behavior. The raw artifact preserves
-all attempted samples, failures, selected test outcomes, residuals, full traces,
-copied binaries and identities. `evidence.json` binds retained files by hash to
-the original request, including both runtime identities. Hashes establish
-consistency, not scientific validity.
+The collector reuses `perf_compare.parity`/`sequential`, selected
+`movement_turns`/`physics` regressions and fidelity helpers. Missing traces suppress
+that row's timing claim; changed parity remains changed behavior. Raw artifacts
+keep every attempted sample, failure, selected test outcome, residual, full trace,
+copied binary and identity. `evidence.json` hashes bind retained files to the
+request and both runtimes: consistency, not scientific validity.
 
-The [v2 contract](performance-statistics-v2.md) applies except for its runner:
-one block per fresh process, at most ten workloads, fourteen covered looks, and
-the fixed error allocation. The measurement job runs on `ubuntu-latest`, like the
-[PR comparisons](pr-reports.md#calibration), by owner decision on 2026-10-25,
-without a separate Windows-versus-Ubuntu confirmation run. The runner is a
-declared input, so the request records it. Builds/regressions/parity precede
-the sampling stage. The shared job cutoff is fixed before preparation at
-`job_start + 1800 - 90`. Git preparation, builds, regressions, fidelity, build metadata, catalogs and parity
-check the remaining allowance before starting children and bound those children
-by it. Preparation/build children use the shared process-tree owner with strict
-stop/reap verification. A cutoff leaves Unavailable and retained partial logs;
-it cannot start a fresh independent preparation timeout. Worktree cleanup uses
-bounded waits within the finalization reserve.
-Sampling uses `min(stage_start + 1500, job_cutoff)`; setup and builds consume the
-job budget. The final covered prefix survives a normal sampling time cap.
-Sampler or binary-validation failure suppresses final claims. There are no
-interim comments or background collector. Cancellation sends SIGINT only to the
-step's entry process, so the step `exec`s the collector rather than leaving bash
-in between. Its cleanup then kills and reaps the session-isolated build and
-regression process groups before the unconditional diagnostic upload. Cleanup
-cut off by the runner's later SIGTERM or forced kill is outside this guarantee.
-Frozen v1 studies keep their original contract and are never relabelled.
+The [v2 contract](performance-statistics-v2.md) owns process blocks, workload/look
+limits, error allocation, sampling caps and failure rules. The declared runner is
+`ubuntu-latest`, matching [PR comparisons](pr-reports.md#calibration), selected by
+the owner on 2026-10-25 without a separate Windows-versus-Ubuntu confirmation run.
+The request records it.
 
-Intervals remain conditional on independent normal constant-variance log errors
-with constant change and order effects. Hosted-runner calibration and power are
-not established. These synthetic operation costs are neither official-server
-evidence nor a production workload distribution. This direct run has its own
-interval family; PR percentages and interval budgets are never combined with it.
+Before preparation, fix `job_cutoff = job_start + 1800 - 90`. Git preparation,
+builds, regressions, fidelity, metadata, catalogs and parity check remaining time
+before starting children and bound them by it. Preparation/build children use the
+shared process-tree owner with strict stop/reap verification. A cutoff leaves
+Unavailable and partial logs, never a fresh preparation timeout. Worktree cleanup
+uses bounded waits within the finalization reserve.
+
+Sampling follows preparation at `min(stage_start + 1500, job_cutoff)`; setup and
+builds consume the job budget. There are no interim comments or background
+collector. The step `exec`s the collector so cancellation's SIGINT reaches it.
+Cleanup kills/reaps session-isolated build/regression groups before unconditional
+diagnostic upload; later runner SIGTERM/forced kill can interrupt this guarantee.
+
+The protocol's intervals remain conditional; hosted-runner calibration and power
+are unestablished. Synthetic operation costs are neither official-server evidence
+nor a production distribution. Direct runs have their own interval family;
+never combine their budgets or percentages with PR results.
 
 ## Redundant requests
 
@@ -97,39 +84,35 @@ GitHub's default `queue: single`, another matching arrival replaces the pending
 duplicate; it does not cancel the active measurement. This is suppression, not
 a guarantee that every duplicate will be measured.
 
-There is deliberately **no completed-result reuse**. A later request runs afresh;
-an existing favorable comment, PR number, expired artifact or failed run cannot
-satisfy it. Suppression makes no evidence claim and identifies the original active
-run. Robust cross-run reuse would need an immutable evidence index, retention and
-revalidation policy; that machinery is outside this focused layer.
+**Completed results are never reused.** Later requests run afresh; comments,
+PR numbers, expired artifacts and failed runs cannot satisfy them. Suppression
+identifies the original active run and makes no evidence claim. Cross-run reuse
+would require an immutable evidence index, retention and revalidation policy.
 
 ## Trusted release evidence publication
 
-Jobs that build or run either source have `contents: read` only, no persisted
-checkout credentials and no write token passed to candidate code. A separate
-completed `workflow_run` job executes only default-branch publisher code. It
-verifies the source workflow, event, default-branch ancestry, run/attempt,
-published baseline, exact commit/trees and canonical request key independently.
-ZIP readers accept only bounded regular report/request files and never extract
-artifact-controlled paths. Candidate Markdown is ignored; the publisher renders
-validated fields with fixed wording and retains Unavailable/Undecided outcomes.
+Build/run jobs have only `contents: read`, no persisted credentials or candidate
+write token. A separate completed `workflow_run` executes default-branch publisher
+code, independently verifying workflow/event, default-branch ancestry,
+run/attempt, published baseline, exact commits/trees and request key. ZIP readers
+accept only bounded regular report/request files without extracting controlled
+paths. Fixed wording renders validated fields, ignoring candidate Markdown and
+preserving Unavailable/Undecided.
 
-When pinning found one open rolling release PR, the publisher adds a distinctly
-owned **Direct release performance** comment per source run there, linking the original run and
-artifact evidence with all exact revisions. It writes only while that pinned PR
-head remains current. Otherwise the result stays in the workflow summary and
-artifacts; it is not attached to a different candidate. A failed/cancelled source
-run with a retained request publishes Unavailable, never partial timing claims.
-Publisher concurrency is scoped to the source run ID, and comment ownership
-includes that ID and the input key. Distinct completed runs therefore cannot
-replace each other's pending publication or overwrite each other's evidence.
-Only attempts of the same source run share the single-pending queue; stale
-attempts are rejected and the latest attempt owns that run's comment. This does
-not depend on dispatch order. See GitHub's [current concurrency policy](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
-The documented `queue: max` option is unnecessary for this policy; the locally
-verified actionlint 1.7.12 does not support that newer field.
-Reports for older rerun attempts cannot overwrite newer evidence. No release
-body, release-plz PR body, guard, tag or release asset is changed.
+If pinning found exactly one open rolling release PR, each source run owns a
+**Direct release performance** comment linking its run/artifacts and exact
+revisions. It writes only while the pinned PR head is current; otherwise results
+stay in summaries/artifacts rather than attaching to another candidate.
+Failed/cancelled runs with retained requests publish Unavailable, never partial
+claims.
+
+Publisher concurrency uses the source run ID; comment ownership includes that
+ID and input key. Distinct runs cannot evict pending publication or overwrite
+each other. Attempts of one run share the single-pending queue; stale attempts
+are rejected and the latest owns its comment, regardless of dispatch order.
+See GitHub's [concurrency policy](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+`queue: max` is unnecessary and unsupported by locally verified actionlint 1.7.12.
+Publication changes no release body, release-plz PR body, guard, tag or asset.
 
 This evidence measures the recorded candidate and overlaid harness. A later merge
 or publication with a different tree is a different candidate; the report never

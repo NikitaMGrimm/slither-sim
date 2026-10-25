@@ -1,11 +1,9 @@
 # Performance workloads
 
-The native benchmark harness, `examples/perf_baseline.rs`, keeps every workload in
-one registration table. That table is the only case list: argument parsing, usage
-and the catalog are derived from it. All workloads are synthetic and offline, use
-seed 7 and the 7 ms physics tick, and do not describe production worlds or bot
-playing strength. Build and comparison procedures are in the
-[performance guide](performance.md).
+`examples/perf_baseline.rs` derives argument parsing, usage and its catalog from
+one workload registration table. All cases are synthetic and offline, with seed 7
+and the 7 ms physics tick; they represent neither production worlds nor bot
+playing strength. See the [performance guide](performance.md) for builds/comparisons.
 
 ## Catalog
 
@@ -48,32 +46,29 @@ cargo run --release --locked --example perf_baseline -- --list
 - **Client:** `SimulatorBackend` lives on an official world, timed through
   `step_all` with wire recording. These rows need the `networking` feature.
 
-Each sandbox, official and dome-proxy registration expands into `<id>-step`, which
-times one `Simulator::step`, and `<id>-bot`, which times `step` followed by a
-batch observation into one reused buffer, as a bot that observes every decision
-would. The batch observation is `observe_all_into`, or `observe_all` when
-`perf_compare --base` builds the harness against a baseline that predates it.
-Before the reused buffer, `-bot` rows were defined as `step+observe_all` and
-dropped their observations.
+Sandbox, official and dome-proxy registrations expand into `<id>-step` (one
+`Simulator::step`) and `<id>-bot` (`step` then batch observation into a reused
+buffer). Observations use `observe_all_into`, falling back to `observe_all` when
+`perf_compare --base` targets an older API. Earlier `step+observe_all` definitions
+dropped observations rather than reusing buffers.
 
 ## Steady-state lifecycle
 
-Unlike the legacy cases, which reset after any death, scenario rows measure a
-running population with deaths, death food, respawns and grown bodies:
+Legacy cases reset after any death. Scenario rows retain deaths, death food,
+respawns and grown bodies:
 
-- **Placement:** every slot is added, marked dead and enters through
-  `Simulator::respawn` at a pose that passes `Simulator::spawn_is_clear`.
-  Distances come from `spawn::sample_spawn_distance`. Each life is a straight body
-  with a segment count drawn from the registered range.
-- **Randomness:** poses and lengths come from a harness-owned generator. It never
-  draws the simulator's RNG, so lifecycle work does not shift world randomness.
+- **Placement:** added slots are marked dead and enter through `Simulator::respawn`
+  at poses passing `Simulator::spawn_is_clear`. Distances use
+  `spawn::sample_spawn_distance`; lives start with straight bodies and segment
+  counts drawn from the registered range.
+- **Randomness:** harness-owned pose/length generation never consumes simulator
+  RNG, preserving world randomness across lifecycle work.
 - **Control:** a stateless wander controller picks a heading per staggered window,
   occasionally chases another head, steers inward near the edge and boosts in a
   staggered window. Controls and lifecycle work are outside the timed interval.
-- **Respawn:** between operations, new deaths are read through a cursor;
-  `world.deaths` is not modified. Dead slots queue in death order and respawn with
-  bounded attempts. A slot without a clear pose is deferred and retried a few
-  ticks later.
+- **Respawn:** between operations, a cursor reads new deaths without modifying
+  `world.deaths`. Slots queue in death order with bounded placement attempts;
+  blocked slots retry a few ticks later.
 - **Warmup and epochs:** an untimed warmup runs first. Long samples restore the
   warmed scene every 4,096 operations, bounding death history and drift.
 - **Client rows:** a slot reconnects through `reconnect_slot` after its client
@@ -88,15 +83,14 @@ definition, lifecycle counts, population statistics and warmup results.
 
 ## Validity checks
 
-Every mode checks a deterministic prefix: warmup plus the default trace window,
-or the whole run if it is shorter. A steady scenario must show at least one body
-death, one respawn and, when death food is enabled, one death-food pellet in that
-prefix. Otherwise the harness exits non-zero with the counts.
+Every mode checks warmup plus the default trace window, or the whole run if
+shorter. This deterministic prefix must include a body death, respawn and, when
+enabled, death-food pellet; otherwise the harness exits non-zero with counts.
 
-Population depletion is reported, not fatal. `population` gives the minimum, mean
-and maximum living snakes and total anchors at operation boundaries; `depleted`
-is true when the mean is below 90% of the requested population. Check it before
-interpreting throughput.
+Population depletion is reported, not fatal. `population` gives minimum, mean
+and maximum living snakes, plus minimum and maximum total anchors at operation
+boundaries; `depleted` is true when the mean is below 90% of the requested
+population. Check it before interpreting throughput.
 
 ## Traces
 
@@ -118,10 +112,9 @@ and `-bot` rows observe on the rayon pool. It needs the default `parallel` featu
 and adds `"parallel": true` to the report; every other trace line must match the
 run without it. Runners and PR comparisons do not pass it.
 
-Snapshots and warmup statistics are taken right after the operation, before dead
-slots respawn: respawning resets a slot's per-life state, which would otherwise
-hide changes to a just-died snake from parity comparison. Scenario respawn records
-carry each new pose and length; client slots reconnect before the next decision.
+Snapshots/warmup statistics precede respawns so per-life resets cannot hide a
+just-died snake's state from parity checks. Respawn records retain new poses and
+lengths; client slots reconnect before the next decision.
 
 ## Adding a workload
 
@@ -139,9 +132,9 @@ No runner, workflow or table edit is needed for a new registration.
 
 ## Observation workloads
 
-The immutable `perf_observation` harness separates observation materialization
-from output destruction. It performs no physics stepping and has no workload
-catalog. It screens geometry/selection costs rather than long-running sessions.
+The immutable `perf_observation` harness isolates geometry/selection costs,
+separating materialization from output destruction. It has no physics stepping
+or catalog and does not measure long-running sessions.
 
 The first six cases use seed 7, 32 living slots, 32 body anchors per slot, eight
 prey, and vision 1,500. Body anchors extend from each ring-start head at 42-unit spacing.
@@ -158,39 +151,35 @@ Food counts below are admitted pellets, not placement attempts.
 | `observe-sparse` | Radius 100,000; slots 0–7 alive with heads at the origin, slots 8–31 dead; a 512×512 food lattice over x, y = ±65,625 replaces the startup food; `observe_all`. | 262,144 | 500 |
 | `observe-clustered` | Radius 20,000; 128 slots with two-anchor bodies and heads on a 12-column grid at 1,600-unit spacing within ±8,800; four 64×64 lattices in 1,200-unit corner patches within ±12,000, plus 512 background pellets, replace the startup food; `observe_all`. | 16,896 | 2,000 |
 
-The strip remap consumes no additional RNG and retains insertion order, values,
-sizes and origins. The sparse lattice gives the food grid many cells for only
-eight observers. The clustered patches lie beyond every observer's vision, so the
-mean food density overstates what the observers can see. `observe-clustered` has
-128 slots with two-anchor bodies, so snake filtering does not hide the grid's cost.
-These overrides are explicit workload construction, with no package default
-changes. The wide/compact/strip/sparse/clustered cases expose different
-filtering, copying and index costs; they are not weighted samples of production
-worlds.
+Strip remapping preserves RNG, insertion order, values, sizes and origins.
+The sparse lattice stresses many grid cells with eight observers; clustered
+patches beyond all vision make mean density overstate visible food. Two-anchor
+clustered bodies keep snake filtering from hiding grid cost. These explicit
+overrides leave package defaults unchanged and expose filtering/copying/index
+costs, not a weighted production distribution.
 
 ### Reproduction and metric scope
 
-Build `cargo build --release --locked --example perf_observation -j 2`, using the
-same toolchain, release profile and source file for each runtime. Copy and hash
-each executable into separate owned output storage. Opt in to these cases explicitly:
+Build `cargo build --release --locked --example perf_observation -j 2` with
+identical toolchain, profile and harness source for both runtimes. Follow
+[copied-executable identity requirements](performance.md#compare-copied-executables)
+and select cases explicitly:
 
 ```sh
 python -B tools/perf_compare.py --baseline BASELINE --candidate CANDIDATE --output outputs/observation-comparison --cases observe-dense observe-compact observe-wide observe-strip observe-one observe-empty observe-sparse observe-clustered
 ```
 
-The comparison uses 10,000 wide batches and 100,000 empty selections per sample
-to reduce Windows process-CPU quantization; other counts match the table. It
-alternates adjacent pairs, with one untallied warmup per executable/case and five
-measured pairs by default. Agree a quiet window before timing; finish builds,
-tests and traces first. Do not time a mutable Cargo-target executable.
+The runner uses 10,000 wide batches and 100,000 empty selections per sample to
+reduce Windows CPU quantization; other counts match the table. It uses the
+[local comparison](performance.md#compare-a-change) warmup, paired ordering,
+five-pair default and quiet-window requirements. Finish traces before timing too.
 
-Materialization includes index construction, filtering, ordering, copying and
-internal temporary destruction. `outputDrop` separately measures destruction of
-the returned observations. Both use `Instant` wall intervals, without internal
-phase attribution. Process CPU/wall include setup, both intervals, clock/sample
-overhead, report serialization and teardown. CPU is Windows kernel+user time,
-quantized; peak working set is resident memory, not total allocation. The runner
-reports CPU/peak unavailable on other platforms. Throughput and operation tail
+Materialization includes indexing, filtering, ordering, copying and internal
+temporary destruction. `outputDrop` separately times returned-observation
+destruction. Both use `Instant` wall intervals without phase attribution.
+Process CPU/wall includes setup, both intervals, clock/sample overhead,
+serialization and teardown. [CPU/peak scope](performance.md#read-the-results)
+applies: CPU is quantized Windows kernel+user time. Throughput and operation tail
 latencies describe batches with the stated selection mask.
 
 Historical measurements, rejected candidates and the pinned phase-diagnostic
@@ -200,12 +189,11 @@ That diagnostic recipe targets a historical implementation, not the current
 
 ## Retained client workload
 
-`examples/perf_client_retained.rs` extends the short portable/protocol fixtures
-in the main catalog. It runs a seed-7 synthetic world for
-up to 384 decisions, six 7 ms ticks per decision: 16.128 virtual seconds. Eight
-slots retain their connections and decoders; slot zero reconnects immediately
-after decision 192. Death does not reset the world. Native background seekers
-may reconnect dead background slots in `next_frame` mode.
+`examples/perf_client_retained.rs` extends the catalog's short portable/protocol
+fixtures: a seed-7 synthetic world, up to 384 decisions of six 7 ms ticks
+(16.128 virtual seconds). Eight slots retain connections/decoders; slot zero
+reconnects after decision 192. Death does not reset the world. In `next_frame`,
+native background seekers may reconnect dead background slots.
 
 The explicit workload overrides are radius 6,000, 12,000 food placement attempts,
 eight prey, vision 3,000, eight agents, zero added link/processing delays, wire
@@ -220,11 +208,10 @@ These are local engineering fixtures, not official-server presets.
 cargo build --release --locked --example perf_client_retained -j 2
 ```
 
-Copy the executable to `outputs/retained-client/bin/` in a new owned output
-directory and record its SHA-256, actual runtime/harness source, toolchain,
-platform and build command before use.
-The embedded source label identifies fixture construction history only. The
-caller must pin the actual binary and runtime separately.
+Copy into a new owned `outputs/retained-client/bin/` and record platform plus
+the [binary/source/build identities](performance.md#compare-copied-executables).
+The embedded source label records fixture construction history, not actual
+binary/runtime identity.
 
 ```sh
 ./outputs/retained-client/bin/perf_client_retained step_all 384
@@ -233,23 +220,20 @@ caller must pin the actual binary and runtime separately.
 
 On Windows, use `./outputs/retained-client/bin/perf_client_retained.exe`.
 
-Each invocation creates a fresh world. `--iterations N` permits one to eight
-worlds with the same seed. `step_all` supplies controls for every playing slot;
-`next_frame` supplies slot-zero controls and uses the actual built-in background
-seekers. The modes produce different worlds and do different work. Compare a
-given mode only against the same mode, configuration, seed and decision count.
-There are no sockets, listeners, `BotRunner` or measured-compute feedback into
-virtual time.
+Each invocation starts fresh; `--iterations N` permits one to eight same-seed
+worlds. `step_all` controls every playing slot; `next_frame` controls slot zero
+and uses built-in background seekers. Modes produce different worlds/work;
+compare only matching mode, configuration, seed and decision count. There are
+no sockets, listeners, `BotRunner` or compute-time feedback into virtual time.
 
-After every decision and lifecycle checkpoint, the harness drains records for
-all eight slots, applies them to persistent independent public decoders,
-materializes their frames, and checks equality with backend frames. Wire and
-coverage counters retain array order and distinguish each connection generation.
-Reports include actual living populations, food and available anchors, packet
-codes, full/delta maps, leaderboards and reconnects. False coverage flags mean a
-case did not occur; they do not establish an error or permission to change policy.
-Sector-clear packets witness exits without revealing their private expiry reason.
-Counts from available observations do not treat dead/waiting frames as empty worlds.
+Every decision/lifecycle checkpoint drains all eight slots' records, replays them
+through persistent independent public decoders, materializes frames and checks
+backend equality. Wire/coverage counters preserve array order and connection
+generations. Reports retain living populations, food, available anchors, packet
+codes, full/delta maps, leaderboards and reconnects. False coverage means a case
+did not occur, not an error or grounds for policy changes. Sector-clear packets
+show exits, not private expiry reasons. Counts use available observations;
+dead/waiting frames are not empty worlds.
 
 Wall intervals separately report backend operations, external action submission,
 additional backend frames, record draining, replay application, replay frames and
