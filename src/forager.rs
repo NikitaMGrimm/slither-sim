@@ -83,6 +83,35 @@ pub struct Params {
     /// probe kills (`physics::strikes`), so below 1 the arc is checked from the
     /// head's tip, shifted forward by the rest of the width. 1 is the original.
     pub own_width_factor: f64,
+    /// Value of a cut-off per unit of victim mass (segments + fam), compared
+    /// with food value; 0 disables kill seeking.
+    pub kill_weight: f64,
+    /// Opponents whose head is this far away are not cut off.
+    pub kill_range: f64,
+    /// Cut points are sampled along a victim's predicted path up to this many
+    /// seconds ahead ...
+    pub kill_horizon: f64,
+    /// ... at this many equal steps.
+    pub kill_samples: usize,
+    /// We must cross a cut point at least this many seconds before the victim.
+    pub kill_gap: f64,
+    /// ... and at most this many, or it has time to turn away.
+    pub kill_window: f64,
+    /// Value of encircling a smaller snake per unit of its mass, compared with
+    /// food value; 0 disables coiling.
+    pub coil_weight: f64,
+    /// Only snakes with at most this share of our mass are encircled ...
+    pub coil_mass_ratio: f64,
+    /// ... whose head is within this distance.
+    pub coil_range: f64,
+    /// Orbit radius: this many summed widths plus the target's turning radius.
+    pub coil_radius_widths: f64,
+    /// The orbit is steered toward a point this many radians ahead of us.
+    pub coil_lead_angle: f64,
+    /// Once our body wraps this many radians around the target, the orbit
+    /// tightens by `coil_shrink`; body contraction then closes it further.
+    pub coil_close_angle: f64,
+    pub coil_shrink: f64,
 }
 
 impl Default for Params {
@@ -114,6 +143,19 @@ impl Default for Params {
             intent_weight: 0.0,
             stale_margin: 0.0,
             own_width_factor: 1.0,
+            kill_weight: 0.0,
+            kill_range: 450.0,
+            kill_horizon: 0.8,
+            kill_samples: 4,
+            kill_gap: 0.15,
+            kill_window: 0.5,
+            coil_weight: 0.0,
+            coil_mass_ratio: 0.5,
+            coil_range: 600.0,
+            coil_radius_widths: 1.5,
+            coil_lead_angle: 0.6,
+            coil_close_angle: 4.7,
+            coil_shrink: 0.7,
         }
     }
 }
@@ -140,6 +182,18 @@ impl Params {
             self.intent_weight,
             self.stale_margin,
             self.own_width_factor,
+            self.kill_weight,
+            self.kill_range,
+            self.kill_horizon,
+            self.kill_gap,
+            self.kill_window,
+            self.coil_weight,
+            self.coil_mass_ratio,
+            self.coil_range,
+            self.coil_radius_widths,
+            self.coil_lead_angle,
+            self.coil_close_angle,
+            self.coil_shrink,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -158,6 +212,10 @@ impl Params {
             || !(0.0..=1.0).contains(&self.intent_weight)
             || self.stale_margin < 0.0
             || !(0.0..=1.0).contains(&self.own_width_factor)
+            || self.kill_weight < 0.0
+            || self.coil_weight < 0.0
+            || !(0.0..=1.0).contains(&self.coil_shrink)
+            || self.kill_samples > 16
         {
             return Err(format!(
                 "Forager needs 1..={MAX_CELLS} cells, 1..={MAX_FAN} fan offsets, a positive cell \
@@ -310,7 +368,21 @@ pub fn decide(
         uncertainty: timing.uncertainty * p.uncertainty_margin,
     };
     let scene = Scene::new(&view, &me, p, intents, &mut scratch.near);
-    let goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
+    let mut goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
+    if p.kill_weight > 0.0 {
+        if let Some(cut) = cut(&view, &me, p, intents) {
+            if cut.rate > goal.rate {
+                goal = cut;
+            }
+        }
+    }
+    if p.coil_weight > 0.0 {
+        if let Some(coil) = coil(&view, &me, p) {
+            if coil.rate > goal.rate {
+                goal = coil;
+            }
+        }
+    }
     steer(o, &me, p, &scratch.near, goal)
 }
 
@@ -514,6 +586,8 @@ impl Me {
 struct Goal {
     heading: f64,
     rate: f64,
+    /// Opponent whose head path this goal deliberately crosses ahead of.
+    crosses: Option<usize>,
 }
 
 /// A visible segment near enough to matter for the next arc, with its midpoint
@@ -525,14 +599,19 @@ struct Obstacle {
     width: f64,
     mid: Point,
     half: f64,
+    /// Opponent index, and whether this is its predicted head path.
+    owner: usize,
+    head: bool,
 }
 
 impl Obstacle {
-    fn new(from: Point, to: Point, width: f64) -> Self {
+    fn new(from: Point, to: Point, width: f64, owner: usize, head: bool) -> Self {
         Self {
             from,
             to,
             width,
+            owner,
+            head,
             mid: Point {
                 x: (from.x + to.x) / 2.0,
                 y: (from.y + to.y) / 2.0,
@@ -619,8 +698,8 @@ impl Scene {
                 let ahead = path(view.lead + p.lookahead_seconds);
                 if close(head) || close(middle) || close(ahead) {
                     let w = width + unsure * enemy.speed;
-                    near.push(Obstacle::new(head, middle, w));
-                    near.push(Obstacle::new(middle, ahead, w));
+                    near.push(Obstacle::new(head, middle, w, k, true));
+                    near.push(Obstacle::new(middle, ahead, w, k, true));
                 }
                 head
             } else {
@@ -638,7 +717,13 @@ impl Scene {
                 }
                 let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
                 if close(head) || close(ahead) {
-                    near.push(Obstacle::new(head, ahead, width + unsure * enemy.speed));
+                    near.push(Obstacle::new(
+                        head,
+                        ahead,
+                        width + unsure * enemy.speed,
+                        k,
+                        true,
+                    ));
                 }
                 head
             };
@@ -649,7 +734,7 @@ impl Scene {
             for point in observed.into_iter().chain(enemy.body.iter().copied()) {
                 let is_close = close(point);
                 if is_close || was_close {
-                    near.push(Obstacle::new(previous, point, width));
+                    near.push(Obstacle::new(previous, point, width, k, false));
                 }
                 if let Some(i) = cell(point) {
                     scene.occupied[i] = true;
@@ -699,11 +784,148 @@ impl Scene {
                 best = Some(Goal {
                     heading: toward(me.head, q),
                     rate,
+                    crosses: None,
                 });
             }
         }
         best
     }
+}
+
+/// The most valuable cut-off: a point on a nearby opponent's predicted path
+/// that our head reaches `kill_gap` to `kill_window` seconds before it does,
+/// so our body lies across its path when it arrives. Valued at
+/// `kill_weight` × its mass per second until it arrives.
+fn cut(view: &View, me: &Me, p: &Params, intents: &[Intent]) -> Option<Goal> {
+    let o = view.o;
+    let samples = p.kill_samples.max(1);
+    let mut best: Option<Goal> = None;
+    for (k, enemy) in o.opponents.iter().enumerate() {
+        if !enemy.alive || enemy.head.distance(me.head) > p.kill_range {
+            continue;
+        }
+        let intent = intents.get(k).copied().unwrap_or_default();
+        let delta = if p.intent_weight > 0.0 && intent.wanted.is_finite() {
+            p.intent_weight * wrap(intent.wanted - enemy.heading)
+        } else {
+            0.0
+        };
+        let turn = turn_rate(enemy.segments);
+        let mass = enemy.segments as f64 + enemy.fam;
+        for step in 1..=samples {
+            let tau = p.kill_horizon * step as f64 / samples as f64;
+            let q = turn_then_straight(
+                enemy.head,
+                enemy.heading,
+                delta,
+                enemy.speed,
+                turn,
+                view.lead + tau,
+            );
+            if q.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
+                continue;
+            }
+            let Some(ours) = me.reach(q, p.orbit_factor) else {
+                continue;
+            };
+            let slack = tau - ours;
+            if slack < p.kill_gap || slack > p.kill_window {
+                continue;
+            }
+            let rate = p.kill_weight * mass / (tau + p.settle_seconds);
+            if best.as_ref().is_none_or(|b| rate > b.rate) {
+                best = Some(Goal {
+                    heading: toward(me.head, q),
+                    rate,
+                    crosses: Some(k),
+                });
+            }
+        }
+    }
+    best
+}
+
+/// Encircle the nearest much smaller snake. Our body is laid on an orbit
+/// around its forecast head, turning the way we already circle it; once the
+/// body wraps `coil_close_angle` around it the orbit tightens, and the body's
+/// natural contraction (`physics::contract_body`) closes the ring. Valued at
+/// `coil_weight` × its mass per second of the estimated time to close.
+fn coil(view: &View, me: &Me, p: &Params) -> Option<Goal> {
+    let o = view.o;
+    let mass = o.me.segments as f64 + o.me.fam;
+    let (_, target) = o
+        .opponents
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| {
+            t.alive
+                && (t.segments as f64 + t.fam) <= p.coil_mass_ratio * mass
+                && t.head.distance(me.head) <= p.coil_range
+        })
+        .min_by(|a, b| {
+            a.1.head
+                .distance(me.head)
+                .total_cmp(&b.1.head.distance(me.head))
+        })?;
+    let centre = view.head(target);
+    let radius = p.coil_radius_widths * (me.width + width(target))
+        + target.speed.max(base_speed(target.segments)) / turn_rate(target.segments);
+    // Our body must be able to go round the orbit (`Snake::length` counts
+    // segments, so measure the received polyline).
+    let mut length = 0.0;
+    let mut previous = o.me.head;
+    for &anchor in &o.me.body {
+        length += previous.distance(anchor);
+        previous = anchor;
+    }
+    if length < std::f64::consts::TAU * radius {
+        return None;
+    }
+    // Wrapped angle: signed small-angle sum along our body near the target,
+    // starting at the head. Anchors 42 units apart on a radius above ~100 keep
+    // the sine approximation within a few percent.
+    let mut wrapped = 0.0;
+    let rel = |q: Point| (q.x - centre.x, q.y - centre.y);
+    let (mut ax, mut ay) = rel(me.head);
+    let mut ra = (ax * ax + ay * ay).sqrt();
+    for &anchor in &o.me.body {
+        let (bx, by) = rel(anchor);
+        let rb = (bx * bx + by * by).sqrt();
+        if rb > 2.5 * radius || ra == 0.0 || rb == 0.0 {
+            break;
+        }
+        wrapped += (ax * by - ay * bx) / (ra * rb);
+        (ax, ay, ra) = (bx, by, rb);
+    }
+    // Head first, the body trails: we circle opposite to the body's sweep.
+    let (hx, hy) = rel(me.head);
+    let side = if wrapped != 0.0 {
+        -wrapped.signum()
+    } else {
+        let cross = hx * me.heading.sin() - hy * me.heading.cos();
+        if cross >= 0.0 { 1.0 } else { -1.0 }
+    };
+    let closing = wrapped.abs() >= p.coil_close_angle;
+    let orbit = if closing {
+        radius * p.coil_shrink
+    } else {
+        radius
+    };
+    let phi = hy.atan2(hx) + side * p.coil_lead_angle;
+    let aim = Point {
+        x: centre.x + orbit * phi.cos(),
+        y: centre.y + orbit * phi.sin(),
+    };
+    if aim.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
+        return None;
+    }
+    let remaining = (std::f64::consts::TAU - wrapped.abs()).max(0.0) * radius / me.speed;
+    Some(Goal {
+        heading: toward(me.head, aim),
+        rate: p.coil_weight * (target.segments as f64 + target.fam)
+            / (remaining + p.settle_seconds),
+        crosses: None,
+    })
 }
 
 /// With nothing to eat in view, cross the middle of the arena rather than
@@ -714,7 +936,11 @@ fn roam(o: &Observation, me: &Me, p: &Params) -> Goal {
     } else {
         me.heading
     };
-    Goal { heading, rate: 0.0 }
+    Goal {
+        heading,
+        rate: 0.0,
+        crosses: None,
+    }
 }
 
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
@@ -728,6 +954,7 @@ fn clearance(
     near: &[Obstacle],
     heading: f64,
     cap: f64,
+    crosses: Option<usize>,
 ) -> f64 {
     let step = p.lookahead_seconds / 2.0;
     let (middle, turned) = advance(me.head, me.heading, heading, me.speed, me.turn, step);
@@ -756,6 +983,11 @@ fn clearance(
         (a, b, mid, a.distance(b) / 2.0)
     });
     for obstacle in near {
+        // A cut-off crosses ahead of its victim's head by design; its body
+        // still counts.
+        if obstacle.head && crosses == Some(obstacle.owner) {
+            continue;
+        }
         for &(a, b, mid, half) in &arcs {
             // Segment distance >= midpoint distance - both half lengths. The
             // slack, relative to coordinate magnitude, keeps rounding from
@@ -782,7 +1014,7 @@ fn steer(o: &Observation, me: &Me, p: &Params, near: &[Obstacle], goal: Goal) ->
             break;
         }
         let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, p.safe);
+        let clearance = clearance(o, me, p, near, heading, p.safe, goal.crosses);
         let cost = offset.abs() + (p.safe - clearance).max(0.0) * p.danger_weight;
         if cost < best.0 {
             best = (cost, heading);
@@ -810,7 +1042,10 @@ mod tests {
                 if step % 25_000 == 0 {
                     let t = step as f64 * dt;
                     let exact = turn_then_straight(head, heading, delta, speed, turn, t);
-                    assert!(exact.distance(q) < 0.05, "{heading} {delta} {t}: {exact:?} {q:?}");
+                    assert!(
+                        exact.distance(q) < 0.05,
+                        "{heading} {delta} {t}: {exact:?} {q:?}"
+                    );
                 }
             }
         }

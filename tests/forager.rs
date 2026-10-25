@@ -451,6 +451,9 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
         intent_weight: 1.0,
         stale_margin: 0.5,
         own_width_factor: 0.5,
+        kill_weight: 0.4,
+        coil_weight: 1.0,
+        coil_mass_ratio: 2.0,
         ..Params::default()
     };
     let intents: Vec<_> = (0..observation.opponents.len())
@@ -511,4 +514,67 @@ fn zz_probe() {
             decide(&observation, &Timing::default(), &p0).heading
         );
     }
+}
+
+#[test]
+fn kill_seeking_crosses_ahead_of_a_nearby_head() {
+    let mut observation = fixture();
+    // Food straight ahead; an opponent to the left heading down across our
+    // path, far enough that we can cross ahead of it.
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut opponent = observation.me.clone();
+    opponent.id = "opponent".into();
+    opponent.segments = 60;
+    // It reaches (100, 30) in 0.8 s; we can be there about 0.16 s earlier.
+    opponent.head = Point { x: 100.0, y: 178.0 };
+    opponent.heading = -std::f64::consts::FRAC_PI_2;
+    opponent.speed = 185.0;
+    opponent.body = (1..=8)
+        .map(|i| Point {
+            x: 100.0,
+            y: 178.0 + physics::ANCHOR_SPACING * i as f64,
+        })
+        .collect();
+    observation.opponents.push(opponent);
+    let off = still(&observation);
+    let params = Params {
+        kill_weight: 0.4,
+        ..Params::default()
+    };
+    let on = decide(&observation, &Timing::default(), &params);
+    assert_ne!(on.heading, off.heading);
+    // Toward the victim's side, to lay our body across its path.
+    assert!(on.heading > off.heading, "{on:?} {off:?}");
+}
+
+#[test]
+fn coiling_orbits_a_much_smaller_snake_the_way_we_already_turn_around_it() {
+    let mut observation = fixture();
+    observation.me.segments = 200;
+    observation.me.speed = physics::base_speed(200);
+    observation.me.body = (1..=100)
+        .map(|i| Point {
+            x: -physics::ANCHOR_SPACING * i as f64,
+            y: 0.0,
+        })
+        .collect();
+    let mut target = observation.me.clone();
+    target.id = "small".into();
+    target.segments = 5;
+    target.speed = physics::base_speed(5);
+    target.head = Point { x: 0.0, y: 150.0 };
+    target.body = vec![Point { x: -42.0, y: 150.0 }];
+    observation.opponents.push(target);
+    let off = still(&observation);
+    assert_eq!(off.heading, 0.0);
+    let params = Params {
+        coil_weight: 1.0,
+        ..Params::default()
+    };
+    let on = decide(&observation, &Timing::default(), &params);
+    // Counterclockwise around the target: aim ahead and to the left.
+    assert!(on.heading > 0.2 && on.heading < 1.2, "{on:?}");
+    // Equal masses are not encircled.
+    observation.opponents[0].segments = 200;
+    assert_eq!(decide(&observation, &Timing::default(), &params).heading, 0.0);
 }
