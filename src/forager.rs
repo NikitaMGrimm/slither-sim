@@ -34,6 +34,8 @@ pub const MAX_LEAD_SUBSTEPS: usize = 250;
 const RAMP_SUBSTEPS: usize = 250;
 /// Chords of a boosted arc; acceleration while turning bends it unevenly.
 const BOOST_CHORDS: usize = 8;
+/// Equal-time samples of an arc against a crossed victim's head.
+const TIMED_SAMPLES: usize = 16;
 
 /// Every tunable number of the policy. Defaults reproduce the original Forager.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -669,12 +671,17 @@ impl Me {
         heading: f64,
         seconds: f64,
     ) -> [(Point, f64); BOOST_CHORDS + 1] {
+        let last = RAMP_SUBSTEPS as f64 * SUBSTEP;
+        let terminal = (ramp[RAMP_SUBSTEPS - 1] - ramp[RAMP_SUBSTEPS - 2]) / SUBSTEP;
         let at = |t: f64| {
-            let x = (t / SUBSTEP).min(RAMP_SUBSTEPS as f64);
+            if t >= last {
+                // Past the ramp, at its final speed.
+                return ramp[RAMP_SUBSTEPS - 1] + (t - last) * terminal;
+            }
+            let x = t / SUBSTEP;
             let i = x.floor() as usize;
             let before = if i == 0 { 0.0 } else { ramp[i - 1] };
-            let after = ramp[i.min(RAMP_SUBSTEPS - 1)];
-            before + (after - before) * (x - i as f64)
+            before + (ramp[i] - before) * (x - i as f64)
         };
         let dt = seconds / BOOST_CHORDS as f64;
         let mut path = [(self.head, self.heading); BOOST_CHORDS + 1];
@@ -738,6 +745,10 @@ struct Obstacle {
     /// Opponent index, and whether this is its predicted head path.
     owner: usize,
     head: bool,
+    /// A head path's head crosses it from `t0` to `t1` seconds after the
+    /// forecast moment.
+    t0: f64,
+    t1: f64,
 }
 
 impl Obstacle {
@@ -748,12 +759,17 @@ impl Obstacle {
             width,
             owner,
             head,
+            t0: 0.0,
+            t1: 0.0,
             mid: Point {
                 x: (from.x + to.x) / 2.0,
                 y: (from.y + to.y) / 2.0,
             },
             half: from.distance(to) / 2.0,
         }
+    }
+    fn during(self, t0: f64, t1: f64) -> Self {
+        Self { t0, t1, ..self }
     }
 }
 
@@ -853,8 +869,9 @@ impl Scene {
                 let ahead = path(view.lead + p.lookahead_seconds);
                 if close(head) || close(middle) || close(ahead) {
                     let w = width + unsure * enemy.speed;
-                    near.push(Obstacle::new(head, middle, w, k, true));
-                    near.push(Obstacle::new(middle, ahead, w, k, true));
+                    let half = p.lookahead_seconds / 2.0;
+                    near.push(Obstacle::new(head, middle, w, k, true).during(0.0, half));
+                    near.push(Obstacle::new(middle, ahead, w, k, true).during(half, 2.0 * half));
                 }
                 head
             } else {
@@ -872,13 +889,10 @@ impl Scene {
                 }
                 let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
                 if close(head) || close(ahead) {
-                    near.push(Obstacle::new(
-                        head,
-                        ahead,
-                        width + unsure * enemy.speed,
-                        k,
-                        true,
-                    ));
+                    near.push(
+                        Obstacle::new(head, ahead, width + unsure * enemy.speed, k, true)
+                            .during(0.0, p.lookahead_seconds),
+                    );
                 }
                 head
             };
@@ -1113,6 +1127,23 @@ fn cut(
             } else {
                 continue;
             };
+            // Our actual, possibly turning, arc toward the cut point must stay
+            // clear of the victim's head and the body it lays meanwhile.
+            let (mut ours, points, _) = arc(me, p, approach, ramp.filter(|_| boost));
+            to_tip(&mut ours[..points], me, p);
+            let w = p.own_width_factor * me.width + radius + view.uncertainty * enemy.speed;
+            let half = p.lookahead_seconds / 2.0;
+            let early = Obstacle::new(path(0.0), path(half), w, k, true).during(0.0, half);
+            let late =
+                Obstacle::new(path(half), path(2.0 * half), w, k, true).during(half, 2.0 * half);
+            if timed_clearance(&ours[..points], p.lookahead_seconds, &early).min(timed_clearance(
+                &ours[..points],
+                p.lookahead_seconds,
+                &late,
+            )) < 0.0
+            {
+                continue;
+            }
             let mut rate = p.kill_weight * mass / (tau + p.settle_seconds);
             if p.kill_trap_weight > 0.0 {
                 let escapes = escapes.get_or_insert_with(|| {
@@ -1236,6 +1267,43 @@ fn roam(o: &Observation, me: &Me, p: &Params) -> Goal {
     }
 }
 
+/// Head positions and headings along the arc toward `heading` at equal
+/// times over `lookahead_seconds`, how many, and the heading the rim check
+/// continues along. Cruise arcs are the original two steps; with `ramp` the
+/// arc accelerates to boost speed.
+fn arc(
+    me: &Me,
+    p: &Params,
+    heading: f64,
+    ramp: Option<&[f64; RAMP_SUBSTEPS]>,
+) -> ([(Point, f64); BOOST_CHORDS + 1], usize, f64) {
+    let mut path = [(me.head, me.heading); BOOST_CHORDS + 1];
+    if let Some(ramp) = ramp {
+        path = me.boost_path(ramp, heading, p.lookahead_seconds);
+        let last = path[BOOST_CHORDS].1;
+        (path, BOOST_CHORDS + 1, last)
+    } else {
+        let step = p.lookahead_seconds / 2.0;
+        let (middle, turned) = advance(me.head, me.heading, heading, me.speed, me.turn, step);
+        let (end, last) = advance(middle, turned, heading, me.speed, me.turn, step);
+        path[1] = (middle, turned);
+        path[2] = (end, last);
+        // The original continues along the middle heading.
+        (path, 3, turned)
+    }
+}
+
+/// Obstacle widths hold `own_width_factor` of our width; the rest moves the
+/// checked path forward to the head's tip.
+fn to_tip(path: &mut [(Point, f64)], me: &Me, p: &Params) {
+    let tip = (1.0 - p.own_width_factor) * me.width;
+    if tip > 0.0 {
+        for (q, h) in path.iter_mut() {
+            *q = forward(*q, *h, tip);
+        }
+    }
+}
+
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
 /// capped at `cap`. Only clearance below `safe` changes a cost, so callers pass
 /// `safe` and obstacles that provably cannot lower the running minimum are
@@ -1252,33 +1320,14 @@ fn clearance(
     crosses: Option<usize>,
     ramp: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> f64 {
-    let mut path = [(me.head, me.heading); BOOST_CHORDS + 1];
-    let (points, rim_heading) = if let Some(ramp) = ramp {
-        path = me.boost_path(ramp, heading, p.lookahead_seconds);
-        (BOOST_CHORDS + 1, path[BOOST_CHORDS].1)
-    } else {
-        let step = p.lookahead_seconds / 2.0;
-        let (middle, turned) = advance(me.head, me.heading, heading, me.speed, me.turn, step);
-        let (end, last) = advance(middle, turned, heading, me.speed, me.turn, step);
-        path[1] = (middle, turned);
-        path[2] = (end, last);
-        // The original continues along the middle heading.
-        (3, turned)
-    };
+    let (mut path, points, rim_heading) = arc(me, p, heading, ramp);
     let path = &mut path[..points];
     let end = path[points - 1].0;
     // Look further toward the rim so a turn starts in time.
     let ahead = forward(end, rim_heading, me.speed * p.rim_ahead_seconds);
     let rim = |q: Point| o.arena.radius - me.width - q.distance(o.arena.center);
     let mut clearance = rim(end).min(rim(ahead) + p.rim_ahead_credit).min(cap);
-    // Obstacle widths hold `own_width_factor` of our width; the rest moves the
-    // checked path forward to the head's tip.
-    let tip = (1.0 - p.own_width_factor) * me.width;
-    if tip > 0.0 {
-        for (q, h) in path.iter_mut() {
-            *q = forward(*q, *h, tip);
-        }
-    }
+    to_tip(path, me, p);
     let mut arcs = [(Point::default(), Point::default(), Point::default(), 0.0); BOOST_CHORDS];
     for (arc, w) in arcs.iter_mut().zip(path.windows(2)) {
         let (a, b) = (w[0].0, w[1].0);
@@ -1290,9 +1339,11 @@ fn clearance(
     }
     let arcs = &arcs[..points - 1];
     for obstacle in near {
-        // A cut-off crosses ahead of its victim's head by design; its body
-        // still counts.
+        // A cut-off crosses ahead of its victim's head by design: check the
+        // arc against where the head has been by each moment, not its whole
+        // path.
         if obstacle.head && crosses == Some(obstacle.owner) {
+            clearance = clearance.min(timed_clearance(path, p.lookahead_seconds, obstacle));
             continue;
         }
         for &(a, b, mid, half) in arcs {
@@ -1309,6 +1360,47 @@ fn clearance(
             clearance =
                 clearance.min(swept_distance(a, b, obstacle.from, obstacle.to) - obstacle.width);
         }
+    }
+    clearance
+}
+
+/// Clearance of our arc `path` (points at equal times over `seconds`) from the
+/// part of a crossed victim's head path occupied at each moment: its head and
+/// the body laid behind it. Between samples either may move half a sample's
+/// travel closer, which the margin covers.
+fn timed_clearance(path: &[(Point, f64)], seconds: f64, ob: &Obstacle) -> f64 {
+    let chords = (path.len() - 1) as f64;
+    let ours = |t: f64| {
+        let x = (t / seconds).clamp(0.0, 1.0) * chords;
+        let i = (x.floor() as usize).min(path.len() - 2);
+        let (a, b) = (path[i].0, path[i + 1].0);
+        let f = x - i as f64;
+        Point {
+            x: a.x + (b.x - a.x) * f,
+            y: a.y + (b.y - a.y) * f,
+        }
+    };
+    let span = (ob.t1 - ob.t0).max(1e-9);
+    let fastest = path
+        .windows(2)
+        .map(|w| w[0].0.distance(w[1].0))
+        .fold(0.0, f64::max)
+        * chords
+        / seconds;
+    let dt = seconds / TIMED_SAMPLES as f64;
+    let margin = (fastest + 2.0 * ob.half / span) * dt / 2.0;
+    let mut clearance = f64::INFINITY;
+    for i in 0..=TIMED_SAMPLES {
+        let t = dt * i as f64;
+        if t < ob.t0 {
+            continue;
+        }
+        let f = ((t - ob.t0) / span).min(1.0);
+        let reached = Point {
+            x: ob.from.x + (ob.to.x - ob.from.x) * f,
+            y: ob.from.y + (ob.to.y - ob.from.y) * f,
+        };
+        clearance = clearance.min(segment_distance(ours(t), ob.from, reached) - ob.width - margin);
     }
     clearance
 }
@@ -1330,19 +1422,13 @@ fn search(
             break;
         }
         let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, p.safe, crosses(goal, offset), ramp);
+        let clearance = clearance(o, me, p, near, heading, p.safe, goal.crosses, ramp);
         let cost = offset.abs() + (p.safe - clearance).max(0.0) * p.danger_weight;
         if cost < best.0 {
             best = (cost, heading, clearance, offset);
         }
     }
     best
-}
-
-/// A cut-off validated only its own heading; steering off it meets the
-/// victim's head path like any other arc.
-fn crosses(goal: &Goal, offset: f64) -> Option<usize> {
-    goal.crosses.filter(|_| offset == 0.0)
 }
 
 /// Boost toward a goal that needs it, like the original Hunter: only along a
@@ -1377,16 +1463,7 @@ fn steer(
         let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
         let any_clear = fan.iter().any(|&offset| {
             let heading = goal.heading + offset;
-            clearance(
-                o,
-                me,
-                p,
-                near,
-                heading,
-                p.safe,
-                crosses(&goal, offset),
-                None,
-            ) >= p.safe
+            clearance(o, me, p, near, heading, p.safe, goal.crosses, None) >= p.safe
         });
         if !any_clear {
             let fast = search(o, me, p, near, &goal, Some(ramp));
@@ -1407,6 +1484,29 @@ fn steer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn boosted_paths_continue_past_the_ramp_at_its_final_speed() {
+        let segments = 2;
+        let speed = base_speed(segments);
+        let me = Me {
+            head: Point::default(),
+            heading: 0.0,
+            speed,
+            turn: turn_rate(segments),
+            width: BODY_RADIUS * scale(segments),
+            segments,
+            state: SpeedState::from_observed_speed(speed, segments),
+        };
+        let ramp = me.boost_ramp();
+        let two = RAMP_SUBSTEPS as f64 * SUBSTEP;
+        let terminal = (ramp[RAMP_SUBSTEPS - 1] - ramp[RAMP_SUBSTEPS - 2]) / SUBSTEP;
+        let path = me.boost_path(&ramp, 0.0, two + 1.0);
+        let end = path[BOOST_CHORDS].0.x;
+        let expected = ramp[RAMP_SUBSTEPS - 1] + terminal;
+        assert!((end - expected).abs() < 1e-6, "{end} {expected}");
+        assert!(end > ramp[RAMP_SUBSTEPS - 1] + 400.0);
+    }
 
     #[test]
     fn closed_form_turn_matches_fine_physics_steps() {

@@ -929,3 +929,69 @@ fn trap_scoring_prefers_the_victim_with_fewer_escapes() {
     let trapping = decide(&observation, &Timing::default(), &trap);
     assert!(trapping.heading < 0.0, "{trapping:?}");
 }
+
+#[test]
+fn a_turning_approach_to_a_cut_off_does_not_meet_the_victim() {
+    // Review repro: the straight approach to the cut point is clear, but our
+    // actual turning arc meets the turning victim within 70 ms. Closed loop
+    // in the simulator, deciding every six ticks.
+    let mut observation = fixture();
+    observation.me.segments = 2;
+    observation.me.speed = physics::base_speed(2);
+    observation.me.heading = 1.014672336529071;
+    let along = |head: Point, heading: f64| {
+        (1..=2)
+            .map(|i| Point {
+                x: head.x - physics::ANCHOR_SPACING * i as f64 * heading.cos(),
+                y: head.y - physics::ANCHOR_SPACING * i as f64 * heading.sin(),
+            })
+            .collect::<Vec<_>>()
+    };
+    observation.me.body = along(observation.me.head, observation.me.heading);
+    let mut victim = observation.me.clone();
+    victim.id = "victim".into();
+    victim.head = Point {
+        x: 31.736722573040737,
+        y: 40.7538232769206,
+    };
+    victim.heading = -2.6434345913760775;
+    victim.body = along(victim.head, victim.heading);
+    let wanted = 19.0 * std::f64::consts::TAU / 251.0;
+    let intents = [Intent {
+        wanted,
+        heading_age: 0.0,
+    }];
+    let params = Params {
+        kill_weight: 1.0,
+        kill_horizon: 1.2,
+        intent_weight: 1.0,
+        ..Params::default()
+    };
+    let mut world = Simulator::new(1, Config::sandbox()).unwrap();
+    world.add("self", 0, 2).unwrap();
+    world.add("victim", 1, 2).unwrap();
+    world.snakes[0] = observation.me.clone();
+    world.snakes[1] = victim;
+    world.food.clear();
+    let mut action = Action::default();
+    let mut scratch = Scratch::default();
+    for tick in 0..64 {
+        if !world.snakes[0].alive || !world.snakes[1].alive {
+            break;
+        }
+        if tick % 6 == 0 {
+            let seen = world.observe(0).unwrap();
+            action = forager::decide(&seen, &Timing::default(), &intents, &params, &mut scratch);
+        }
+        world
+            .step(&[
+                Some(action),
+                Some(Action {
+                    heading: wanted + std::f64::consts::TAU / 502.0,
+                    boost: false,
+                }),
+            ])
+            .unwrap();
+    }
+    assert!(world.snakes[0].alive, "{:?}", world.deaths);
+}
