@@ -17,6 +17,8 @@ const DT: f64 = physics::LOOP_SECONDS;
 
 #[test]
 fn delivery_defaults_and_explicit_overrides_resolve_before_world_presets() {
+    use serde::Deserialize;
+
     for (json, expected) in [
         (r#"{}"#, DeliveryProfile::Official),
         (
@@ -42,6 +44,13 @@ fn delivery_defaults_and_explicit_overrides_resolve_before_world_presets() {
     ] {
         let config: SimulationConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.delivery, expected);
+        let mut deserializer = serde_json::Deserializer::from_str(json);
+        let direct = SimulationConfig::deserialize(&mut deserializer).unwrap();
+        assert_eq!(direct.delivery, expected);
+        assert_eq!(
+            serde_json::to_value(&direct).unwrap(),
+            serde_json::to_value(&config).unwrap()
+        );
         let host: HostConfig =
             serde_json::from_str(&format!(r#"{{"simulation":{json}}}"#)).unwrap();
         assert_eq!(host.simulation.delivery, expected);

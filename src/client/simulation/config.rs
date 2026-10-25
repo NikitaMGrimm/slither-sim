@@ -21,18 +21,10 @@ impl DeliveryProfile {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(
-    remote = "Self",
-    default,
-    deny_unknown_fields,
-    rename_all = "camelCase"
-)]
+#[derive(Clone, Debug)]
 pub struct SimulationConfig {
     pub world: Config,
     /// When visible state is sent; independent of `latency`.
-    // Preserve the official profile's existing config/trace JSON.
-    #[serde(skip_serializing_if = "DeliveryProfile::is_official")]
     pub delivery: DeliveryProfile,
     /// Snakes joined at start on the deterministic test ring of `Simulator::add`.
     pub agents: usize,
@@ -53,6 +45,31 @@ pub struct SimulationConfig {
     /// Retain each slot's connect/send/receive/disconnect records for replay.
     pub record_wire: bool,
 }
+
+// Keep derived serde entry points private so public calls resolve delivery defaults.
+#[derive(Serialize, Deserialize)]
+#[serde(
+    remote = "SimulationConfig",
+    default = "SimulationConfig::default",
+    deny_unknown_fields,
+    rename_all = "camelCase"
+)]
+struct SimulationConfigWire {
+    world: Config,
+    // Preserve the official profile's existing config/trace JSON.
+    #[serde(skip_serializing_if = "DeliveryProfile::is_official")]
+    delivery: DeliveryProfile,
+    agents: usize,
+    controlled_slot: usize,
+    decision_ticks: usize,
+    minimap_interval_seconds: f64,
+    minimap_side: usize,
+    leaderboard_interval_seconds: f64,
+    local_records: bool,
+    latency: LatencyConfig,
+    record_wire: bool,
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -77,7 +94,7 @@ impl Default for SimulationConfig {
 }
 impl Serialize for SimulationConfig {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        Self::serialize(self, serializer)
+        SimulationConfigWire::serialize(self, serializer)
     }
 }
 impl<'de> Deserialize<'de> for SimulationConfig {
@@ -97,7 +114,7 @@ impl<'de> Deserialize<'de> for SimulationConfig {
         {
             fields.insert("delivery".into(), Value::String("responsive".into()));
         }
-        Self::deserialize(Value::Object(fields)).map_err(D::Error::custom)
+        SimulationConfigWire::deserialize(Value::Object(fields)).map_err(D::Error::custom)
     }
 }
 impl SimulationConfig {
