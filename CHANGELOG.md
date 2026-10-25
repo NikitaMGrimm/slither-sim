@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Show pit edges in the stock browser with decorative pellets; bot food and
+  physics stay unchanged.
+
 ### Breaking
 
 - The minimum Rust version is 1.99 (was 1.86).

@@ -53,6 +53,9 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
+/// Automatic bot handshake: preserve physical food even at decorative wire keys.
+/// An HTTP header keeps the stock binary protocol and other servers unchanged.
+pub(crate) const PHYSICAL_FOOD_HEADER: &str = "x-slither-sim-food";
 // The budgets and timeouts below are host resource policies, not protocol or
 // physics limits.
 /// Largest accepted client message or frame. Logins with a custom skin are the
@@ -233,6 +236,7 @@ enum Command {
         generation: u64,
         appearance: PlayerAppearance,
         session_id: bool,
+        physical_food: bool,
     },
     /// A game command sent at wall time `sent`.
     Message {
@@ -607,9 +611,13 @@ impl Simulation {
                 generation,
                 appearance,
                 session_id,
+                physical_food,
             } => {
                 self.generations[slot] = generation;
                 let mut joined = self.world.connect(slot, appearance);
+                if joined.is_ok() && physical_food {
+                    self.world.physical_food(slot);
+                }
                 if joined.is_ok() && session_id {
                     joined = self.world.request_session_id(slot);
                 }
@@ -747,7 +755,20 @@ enum Phase {
     Closing(Instant),
 }
 
-type Upgrade = fn(&Request, Response) -> Result<Response, ErrorResponse>;
+struct Upgrade(Arc<AtomicBool>);
+
+impl tungstenite::handshake::server::Callback for Upgrade {
+    fn on_request(self, request: &Request, response: Response) -> Result<Response, ErrorResponse> {
+        self.0.store(
+            request
+                .headers()
+                .get(PHYSICAL_FOOD_HEADER)
+                .is_some_and(|value| value == "physical"),
+            Ordering::Relaxed,
+        );
+        upgrade(request, response)
+    }
+}
 
 #[expect(
     clippy::result_large_err,
@@ -826,6 +847,7 @@ struct Open {
     phase: Phase,
     framing: Framing,
     want_session_id: bool,
+    physical_food: bool,
     generation: u64,
     /// Frames from the world waiting for their delivery time, in order.
     queued: VecDeque<(f64, Vec<u8>)>,
@@ -839,6 +861,7 @@ enum Stage {
 
 struct Session {
     accepted: Instant,
+    physical_food: Arc<AtomicBool>,
     stage: Stage,
 }
 
@@ -937,17 +960,22 @@ impl Gateway {
             {
                 continue;
             }
+            let physical_food = Arc::new(AtomicBool::new(false));
             let stage = match tungstenite::accept_hdr_with_config(
                 stream,
-                upgrade as Upgrade,
+                Upgrade(physical_food.clone()),
                 Some(socket_config()),
             ) {
-                Ok(socket) => Stage::Open(Box::new(Open::new(socket))),
+                Ok(socket) => Stage::Open(Box::new(Open::new(
+                    socket,
+                    physical_food.load(Ordering::Relaxed),
+                ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             };
             self.sessions.push(Session {
                 accepted: now,
+                physical_food,
                 stage,
             });
         }
@@ -964,7 +992,10 @@ impl Session {
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
             Stage::Http(mid) => match mid.handshake() {
-                Ok(socket) => Stage::Open(Box::new(Open::new(socket))),
+                Ok(socket) => Stage::Open(Box::new(Open::new(
+                    socket,
+                    self.physical_food.load(Ordering::Relaxed),
+                ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             },
@@ -982,12 +1013,13 @@ impl Session {
 }
 
 impl Open {
-    fn new(socket: WebSocket<TcpStream>) -> Self {
+    fn new(socket: WebSocket<TcpStream>, physical_food: bool) -> Self {
         Self {
             socket,
             phase: Phase::Hello { framed: false },
             framing: Framing::Elapsed,
             want_session_id: false,
+            physical_food,
             generation: 0,
             queued: VecDeque::new(),
         }
@@ -1116,6 +1148,7 @@ impl Open {
             generation: self.generation,
             appearance,
             session_id: self.want_session_id,
+            physical_food: self.physical_food,
         });
         Ok(())
     }
@@ -1449,6 +1482,7 @@ impl Seat {
             generation: self.generation,
             appearance: PlayerAppearance::default(),
             session_id: false,
+            physical_food: true,
         });
         Ok(())
     }
@@ -1611,6 +1645,7 @@ mod tests {
             generation: 1,
             appearance: PlayerAppearance::default(),
             session_id: false,
+            physical_food: true,
         });
         for _ in 0..40 {
             step(&mut simulation);
@@ -1748,6 +1783,7 @@ mod tests {
                     generation: 1,
                     appearance: PlayerAppearance::default(),
                     session_id: false,
+                    physical_food: true,
                 })
                 .unwrap();
         }

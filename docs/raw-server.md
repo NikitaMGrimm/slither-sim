@@ -207,6 +207,13 @@ reconnects and sector re-entry. Birth/pickup telemetry supplies colors and eater
 IDs. The wire exposes the first co-located pellet; physics consumes co-located
 pellets newest first, before ambient refill.
 
+Worlds with a pit automatically add its decorative edge to stock food packets.
+Marker keys take priority over real food in browser listings; real pickups do
+not remove markers. Portable bots automatically send the WebSocket upgrade
+header `X-SlitherSim-Food: physical` to receive physical food instead. Other
+socket bots should send the same header. In-process clients and host seekers
+already use physical food. See [pit presentation](configuration.md#battledome).
+
 ## Stock browser client
 
 Official assets are not distributed. Redirect an idle client to the local server;

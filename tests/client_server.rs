@@ -153,6 +153,72 @@ fn native_client_joins_plays_and_measures_ping() {
 }
 
 #[test]
+fn pit_markers_reach_stock_sockets_but_not_portable_bots() {
+    // Spare seats allow reconnect to overlap the old socket's asynchronous close.
+    let mut config = config(4, 0);
+    config.simulation.world = slither_sim::Config::battledome();
+    config.simulation.world.food_count = 0;
+    config.simulation.world.ambient_replenish_per_second = 0.;
+    let host = Running::start(config);
+    // No special header: this follows stock framing and food parsing.
+    let mut stock = Raw::connect(host.address, "/slither");
+    assert!(stock.status().starts_with("HTTP/1.1 101"));
+    stock.send(&[1]);
+    stock.send(&stock_login(b"Stock", 0, &[]));
+    let start = Instant::now();
+    loop {
+        let received = packets(&stock.binary());
+        if received.iter().any(|p| p[0] == b'F' && p.len() > 3) {
+            for packet in received.iter().filter(|p| p[0] == b'F') {
+                for marker in packet[3..].as_chunks::<4>().0 {
+                    assert_eq!((marker[0], marker[3]), (8, 31));
+                }
+            }
+            break;
+        }
+        assert!(start.elapsed() < WAIT, "no marker listing");
+    }
+    // The native network backend requests physical food automatically on both
+    // login paths and every reconnect. With no real food, its view stays empty.
+    for handshake in [Handshake::Challenge, Handshake::Direct] {
+        let mut bot = network(host.url(), "Bot", handshake);
+        for life in 0..2 {
+            if life > 0 {
+                bot.reconnect().unwrap();
+            }
+            let frame = until(&mut bot, &format!("self {handshake:?} life {life}"), |f| {
+                assert_ne!(
+                    f.status,
+                    ClientStatus::Disconnected,
+                    "{handshake:?} life {life}"
+                );
+                assert_ne!(f.status, ClientStatus::Dead, "{handshake:?} life {life}");
+                f.status == ClientStatus::Playing
+            });
+            assert!(frame.observation.unwrap().food.is_empty());
+            for _ in 0..5 {
+                assert!(
+                    bot.next_frame()
+                        .unwrap()
+                        .observation
+                        .unwrap()
+                        .food
+                        .is_empty()
+                );
+            }
+        }
+        bot.disconnect();
+        // A close is handled asynchronously; wait for the remote seat to free.
+        let start = Instant::now();
+        while host.host.players() > 1 {
+            assert!(start.elapsed() < WAIT, "bot connection did not close");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    host.finish();
+}
+
+#[test]
 fn bot_threads_steer_their_snakes() {
     let mut config = config(1, 4);
     config.bot_threads = 2;

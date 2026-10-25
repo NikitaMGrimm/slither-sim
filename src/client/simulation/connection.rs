@@ -56,6 +56,12 @@ pub(super) struct Connection {
     pub(super) header_ms: u64,
     pub(super) snakes: KnownSnakes,
     pub(super) food: KnownSectors,
+    pub(super) decorated_food: KnownSectors,
+    /// Stock sockets get decoration; bot clients retain physical food at every key.
+    pub(super) decorations: bool,
+    /// Last presented delivery, including marker-only frames. The physical
+    /// latency stream must not advance for decorations, but output stays ordered.
+    pub(super) presented_at: f64,
     pub(super) food_interest: SectorInterest,
     /// Keyed by simulator ID; each entry keeps the wire ID it was shown with.
     pub(super) prey: BTreeMap<u64, KnownPrey>,
@@ -252,43 +258,62 @@ impl SimulatorBackend {
         now: f64,
         packets: &[Vec<u8>],
     ) -> Result<(), String> {
-        let mut groups: Vec<&[Vec<u8>]> = Vec::new();
-        let mut start = 0;
-        let mut bytes = 2; // Elapsed-ms header.
-        for (index, packet) in packets.iter().enumerate() {
-            if !encode::frameable(packet) {
-                if start < index {
-                    groups.push(&packets[start..index]);
-                }
-                groups.push(&packets[index..=index]);
-                start = index + 1;
-                bytes = 2;
-            } else {
-                let packet_bytes = packet.len() + 2;
-                if bytes + packet_bytes > MAX_FRAME_BYTES && start < index {
-                    groups.push(&packets[start..index]);
-                    start = index;
-                    bytes = 2;
-                }
-                bytes += packet_bytes;
-            }
-        }
-        if start < packets.len() {
-            groups.push(&packets[start..]);
-        }
+        self.emit_presented(slot, now, packets, None)
+    }
+
+    pub(super) fn emit_presented(
+        &mut self,
+        slot: usize,
+        now: f64,
+        packets: &[Vec<u8>],
+        physical: Option<&[Vec<u8>]>,
+    ) -> Result<(), String> {
+        let groups = frame_groups(packets);
         let connection = &mut self.slots[slot].connection;
         if connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
             return Err("Downlink queue is full".into());
         }
-        for group in groups {
+        // Decorations must not consume extra shared latency RNG draws: that
+        // would change other bots' receipts and eventually physics. Advance
+        // the baseline stream exactly as physical packets would, even when a
+        // browser hides a colliding pellet. Extra presentation frames share
+        // the last physical release; marker-only releases sample clones.
+        let arrivals = physical.map(|packets| {
+            frame_groups(packets)
+                .iter()
+                .map(|_| {
+                    connection
+                        .link
+                        .downlink(&self.config.latency, &mut self.random, now)
+                })
+                .collect::<Vec<_>>()
+        });
+        let extra = if arrivals.as_ref().is_some_and(Vec::is_empty) && !groups.is_empty() {
+            connection
+                .link
+                .clone()
+                .downlink(&self.config.latency, &mut self.random.clone(), now)
+        } else {
+            now
+        };
+        for (index, group) in groups.into_iter().enumerate() {
             let setup = *connection.setup_at.get_or_insert(now);
             let target = ((now - setup) * 1000.).round().max(0.) as u64;
             let elapsed = target.saturating_sub(connection.header_ms).min(65535);
             connection.header_ms += elapsed;
             let bytes = encode::frame(elapsed as u16, group)?;
-            let arrival = connection
-                .link
-                .downlink(&self.config.latency, &mut self.random, now);
+            let arrival = match &arrivals {
+                Some(arrivals) => arrivals
+                    .get(index)
+                    .or_else(|| arrivals.last())
+                    .copied()
+                    .unwrap_or(extra),
+                None => connection
+                    .link
+                    .downlink(&self.config.latency, &mut self.random, now),
+            };
+            let arrival = arrival.max(connection.presented_at);
+            connection.presented_at = arrival;
             connection.downlink.push_back((arrival, bytes));
         }
         Ok(())
@@ -363,4 +388,33 @@ fn session_id(serial: u32, key: u32) -> u32 {
     x ^= x >> 16;
     x = x.wrapping_mul(0x85eb_ca6b);
     x ^ x >> 13
+}
+
+/// Stock transport grouping, shared by physical scheduling and presentation.
+fn frame_groups(packets: &[Vec<u8>]) -> Vec<&[Vec<u8>]> {
+    let mut groups: Vec<&[Vec<u8>]> = Vec::new();
+    let mut start = 0;
+    let mut bytes = 2; // Elapsed-ms header.
+    for (index, packet) in packets.iter().enumerate() {
+        if !encode::frameable(packet) {
+            if start < index {
+                groups.push(&packets[start..index]);
+            }
+            groups.push(&packets[index..=index]);
+            start = index + 1;
+            bytes = 2;
+        } else {
+            let packet_bytes = packet.len() + 2;
+            if bytes + packet_bytes > MAX_FRAME_BYTES && start < index {
+                groups.push(&packets[start..index]);
+                start = index;
+                bytes = 2;
+            }
+            bytes += packet_bytes;
+        }
+    }
+    if start < packets.len() {
+        groups.push(&packets[start..]);
+    }
+    groups
 }

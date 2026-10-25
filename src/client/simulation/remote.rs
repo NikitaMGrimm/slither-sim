@@ -84,7 +84,13 @@ impl RawSimulator {
             heading,
             boost: false,
         };
-        b.connect(slot)
+        b.connect(slot)?;
+        b.slots[slot].connection.decorations = true;
+        Ok(())
+    }
+
+    pub(crate) fn physical_food(&mut self, slot: usize) {
+        self.backend.slots[slot].connection.decorations = false;
     }
 
     /// Queue one client message sent now on the uplink; see `receive_at`.
@@ -202,6 +208,7 @@ impl RawSimulator {
                 *at -= seconds;
             }
             connection.link.shift(seconds);
+            connection.presented_at -= seconds;
         }
     }
 

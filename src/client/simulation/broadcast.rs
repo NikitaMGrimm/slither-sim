@@ -16,6 +16,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Rows the stock leaderboard shows.
 pub(super) const LEADERBOARD_ROWS: usize = 10;
+/// Physical packets, plus a browser view when pit decoration is active.
+type PacketViews = (Vec<Vec<u8>>, Option<Vec<Vec<u8>>>);
 /// One prey's correction clock, shared by every recipient: official
 /// corrections for one prey align across clients, and a new viewer does not
 /// restart it.
@@ -350,18 +352,29 @@ impl SimulatorBackend {
             // and put the map before gameplay updates.
             let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
             let mut packets = vec![encode::pong(); pongs];
-            let updates = self.updates(slot, &eaten, &bounds, &grid)?;
+            let (updates, presented_updates) = self.updates(slot, &eaten, &bounds, &grid)?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 packets.push(packet);
             }
+            let mut presented = presented_updates.map(|updates| {
+                let mut presented = packets.clone();
+                presented.extend(updates);
+                presented
+            });
             packets.extend(updates);
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
             let live_board = board
                 .as_ref()
                 .filter(|_| leaderboard_due && (alive || was_over));
-            packets.extend(self.hud(slot, live_board)?);
-            if !packets.is_empty() {
+            let hud = self.hud(slot, live_board)?;
+            if let Some(presented) = &mut presented {
+                presented.extend(hud.iter().cloned());
+            }
+            packets.extend(hud);
+            if let Some(presented) = presented {
+                self.emit_presented(slot, now, &presented, Some(&packets))?;
+            } else if !packets.is_empty() {
                 self.emit(slot, now, &packets)?;
             }
         }
@@ -498,7 +511,7 @@ impl SimulatorBackend {
         eaten: &BTreeSet<[u8; 2]>,
         bounds: &[[f64; 4]],
         grid: &CoverageGrid,
-    ) -> Result<Vec<Vec<u8>>, String> {
+    ) -> Result<PacketViews, String> {
         let world = &self.world;
         let me = &world.snakes[slot];
         let record = self
@@ -605,6 +618,7 @@ impl SimulatorBackend {
             }
         }
         let connection = &mut self.slots[slot].connection;
+        let food_start = packets.len();
         food_updates(
             &mut packets,
             &mut connection.food,
@@ -613,6 +627,21 @@ impl SimulatorBackend {
             eaten,
             &self.food_eaters,
         );
+        let food_end = packets.len();
+        let mut presented = if connection.decorations && self.pit_markers.is_some() {
+            let mut presented = packets[..food_start].to_vec();
+            food_updates(
+                &mut presented,
+                &mut connection.decorated_food,
+                connection.food_interest.subscribed(),
+                &self.decorated_food_sectors,
+                eaten,
+                &self.food_eaters,
+            );
+            Some(presented)
+        } else {
+            None
+        };
         let mut visible = BTreeMap::new();
         for prey in &world.prey {
             if prey.position.distance(head) <= vision {
@@ -653,7 +682,10 @@ impl SimulatorBackend {
             }
             connection.prey.insert(id, current);
         }
-        Ok(packets)
+        if let Some(presented) = &mut presented {
+            presented.extend_from_slice(&packets[food_end..]);
+        }
+        Ok((packets, presented))
     }
 
     /// Leaderboard when `board` is given, then an unsent record. Both wait for
