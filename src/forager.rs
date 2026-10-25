@@ -169,6 +169,10 @@ pub struct Params {
     /// outweigh the boost's mass cost. 0 disables racing.
     pub race_sigma: f64,
     pub race_min_value: f64,
+    /// Time rivals for at most this many raced cells per decision, the most
+    /// promising first; dense contested scenes otherwise time most cells
+    /// (live official play exceeds 24 in about 1 decision in 600).
+    pub race_cells: usize,
     /// Boosting costs nothing at or below this score (Battledome's 400-point
     /// floor, a public mode rule); 0 for official worlds.
     pub boost_free_score: f64,
@@ -232,6 +236,7 @@ impl Default for Params {
             prey_horizon: 2.0,
             race_sigma: 0.0,
             race_min_value: 1.0,
+            race_cells: 24,
             boost_free_score: 0.0,
         }
     }
@@ -296,6 +301,7 @@ impl Params {
         }
         if !(1..=MAX_CELLS).contains(&self.cells)
             || !(1..=MAX_FAN).contains(&self.fan_len)
+            || self.race_cells == 0
             || self.cell <= 0.0
             || self.lookahead_seconds <= 0.0
             || !(0.0..=1.0).contains(&self.uplink_share)
@@ -545,8 +551,30 @@ pub fn decide(
     }
     let mut boosted = false;
     if goal.boost {
-        if can_boost {
-            let ramp = nominate.unwrap_or_else(|| me.boost_ramp());
+        let ramp = can_boost.then(|| nominate.unwrap_or_else(|| me.boost_ramp()));
+        // The cruise obstacles are a subset of the boost-reach ones, and
+        // clearance is a minimum over obstacles: when no boosted arc that
+        // `boost_toward` may take clears them, none clears the full set, so
+        // decline without gathering at boost reach.
+        let ramp = ramp.filter(|ramp| {
+            p.fan[..p.fan_len.min(MAX_FAN)]
+                .iter()
+                .filter(|offset| offset.abs() < BOOST_MAX_OFFSET)
+                .any(|&offset| {
+                    let heading = goal.heading + offset;
+                    clearance(
+                        o,
+                        &me,
+                        p,
+                        &scratch.arcs,
+                        heading,
+                        me.safe,
+                        goal.crosses,
+                        Some(ramp),
+                    ) >= me.safe
+                })
+        });
+        if let Some(ramp) = ramp {
             gather(
                 &view,
                 &me,
@@ -740,12 +768,20 @@ fn boost_charge(o: &Observation, p: &Params) -> f64 {
 }
 
 /// Earliest time a visible rival's pickup circle reaches `q` at its current
-/// speed heading straight there (no turn): a nominal deadline.
-fn rival_arrival(rivals: &[(Point, f64, f64)], q: Point) -> f64 {
-    rivals
-        .iter()
-        .map(|&(head, mouth, speed)| (head.distance(q) - mouth).max(0.0) / speed)
-        .fold(f64::INFINITY, f64::min)
+/// speed heading straight there (no turn): a nominal deadline. Arrivals
+/// after `by` are not told apart and give `by`.
+fn rival_arrival(rivals: &[(Point, f64, f64)], q: Point, by: f64) -> f64 {
+    let mut best = by;
+    for &(head, mouth, speed) in rivals {
+        // Only a rival within `best` of travel can arrive sooner; the slack
+        // keeps rounding from dropping a tie.
+        let reach = (best * speed + mouth) * (1.0 + 1e-9);
+        let d2 = (head.x - q.x).powi(2) + (head.y - q.y).powi(2);
+        if d2 < reach * reach {
+            best = best.min((d2.sqrt() - mouth).max(0.0) / speed);
+        }
+    }
+    best
 }
 
 /// Food equivalents of a prey at its size: `PreyConfig::default`'s
@@ -1343,75 +1379,143 @@ impl Scene {
         scene
     }
 
-    /// The food cell with the most value per second of travel.
+    /// The food cell with the most value per second of travel, the first in
+    /// grid order on ties.
     fn food(&self, view: &View, me: &Me, p: &Params, race: Option<Race<'_>>) -> Option<Goal> {
         let o = view.o;
-        let mut best: Option<Goal> = None;
         let cells = self.n * self.n;
-        for (&(value, x, y), &occupied) in self.cells[..cells].iter().zip(&self.occupied[..cells]) {
-            if value <= 0.0 {
-                continue;
-            }
-            let q = Point {
-                x: x / value,
-                y: y / value,
-            };
-            let value = if occupied {
-                p.occupied_factor * value
-            } else {
-                value
-            };
-            // Travel takes at least the straight distance: skip what cannot
-            // win. A raced cell may arrive faster by boosting.
-            let boostable = race.is_some_and(|r| r.charge.is_some()) && value >= p.race_min_value;
-            let fastest = if boostable {
-                me.speed.max(BOOST_SPEED)
-            } else {
-                me.speed
-            };
-            if let Some(b) = &best {
-                let within = (value / b.rate - p.settle_seconds) * fastest;
-                if within <= 0.0
-                    || within * within <= (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2)
-                {
-                    continue;
+        let food = |i: usize| {
+            let (value, x, y) = self.cells[i];
+            (value > 0.0).then(|| {
+                let q = Point {
+                    x: x / value,
+                    y: y / value,
+                };
+                let value = if self.occupied[i] {
+                    p.occupied_factor * value
+                } else {
+                    value
+                };
+                (q, value)
+            })
+        };
+        let beats = |rate: f64, i: usize, best: &Option<(Goal, usize)>| {
+            best.as_ref()
+                .is_none_or(|(b, j)| rate > b.rate || (rate == b.rate && i < *j))
+        };
+        // Value per second of cell `i`, and whether boosting earns it; None
+        // when unreachable or, racing, when it cannot beat `best`.
+        let rate = |i: usize, q: Point, value: f64, best: &Option<(Goal, usize)>| {
+            let race = race.filter(|_| value >= p.race_min_value);
+            let mut rival = f64::INFINITY;
+            if let Some(race) = race {
+                // Time rivals first. Ours takes at least the straight
+                // distance at our fastest speed and at most that at our
+                // slowest plus a half turn; a rival a full ramp later leaves
+                // us the whole cell, and our share only falls with time, so
+                // a contested cell is skipped before timing our own path.
+                let d = ((q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2)).sqrt();
+                let slack = 1.0 + 1e-9;
+                let latest =
+                    (d / me.speed.min(BOOST_SPEED) + std::f64::consts::PI / me.turn) * slack;
+                rival = rival_arrival(race.rivals, q, latest + 2.0 * race.sigma);
+                let fastest = if race.charge.is_some() {
+                    me.speed.max(BOOST_SPEED)
+                } else {
+                    me.speed
+                };
+                let t = d / fastest;
+                let share = (0.5 + (rival - t) / (2.0 * race.sigma)).clamp(0.0, 1.0);
+                if !beats(value * share / (t + p.settle_seconds) * slack, i, best) {
+                    return None;
                 }
             }
             if q.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
-                continue;
+                return None;
             }
-            let Some(seconds) = me.reach(q, p.orbit_factor) else {
-                continue;
-            };
+            let seconds = me.reach(q, p.orbit_factor)?;
             let mut rate = value / (seconds + p.settle_seconds);
             // Rich enough to race for; boosting still has to be safe.
             let mut boost = p.food_boost_value > 0.0 && value >= p.food_boost_value;
-            if let Some(race) = race.filter(|_| value >= p.race_min_value) {
-                let rival = rival_arrival(race.rivals, q);
+            if let Some(race) = race {
+                let fast = race
+                    .charge
+                    .and_then(|charge| Some((charge, me.reach_boosting(q, p.orbit_factor)?)));
                 let share = |t: f64| (0.5 + (rival - t) / (2.0 * race.sigma)).clamp(0.0, 1.0);
                 rate = value * share(seconds) / (seconds + p.settle_seconds);
-                if let Some(charge) = race.charge {
-                    let t = me.reach_boosting(q, p.orbit_factor);
-                    if let Some(t) = t {
-                        let paid = value * share(t) - charge * (1.0 + t / 0.155);
-                        let fast = paid / (t + p.settle_seconds);
-                        if fast > rate {
-                            rate = fast;
-                            boost = true;
-                        }
+                if let Some((charge, t)) = fast {
+                    let paid = value * share(t) - charge * (1.0 + t / 0.155);
+                    let fast = paid / (t + p.settle_seconds);
+                    if fast > rate {
+                        rate = fast;
+                        boost = true;
                     }
                 }
             }
-            if best.as_ref().is_none_or(|b| rate > b.rate) {
-                best = Some(Goal {
-                    heading: toward(me.head, q),
-                    rate,
-                    boost,
-                    crosses: None,
-                });
+            Some((rate, boost))
+        };
+        let mut best: Option<(Goal, usize)> = None;
+        let take = |i: usize, q: Point, value: f64, best: &mut Option<(Goal, usize)>| {
+            let Some((cell_rate, boost)) = rate(i, q, value, best) else {
+                return;
+            };
+            if beats(cell_rate, i, best) {
+                *best = Some((
+                    Goal {
+                        heading: toward(me.head, q),
+                        rate: cell_rate,
+                        boost,
+                        crosses: None,
+                    },
+                    i,
+                ));
             }
+        };
+        // Raced cells wait, with a bound on their rate, for a pass from the
+        // most promising down: contested cells keep the best rate low, so in
+        // grid order few could be skipped.
+        let mut raced = [(0.0, 0); MAX_CELLS * MAX_CELLS];
+        let mut queued = 0;
+        let boostable = race.is_some_and(|r| r.charge.is_some());
+        for i in 0..cells {
+            let Some((q, value)) = food(i) else {
+                continue;
+            };
+            let d2 = (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2);
+            if race.is_some() && value >= p.race_min_value {
+                // Travel takes at least the straight distance; a raced cell
+                // may be reached at boost speed.
+                let fastest = if boostable {
+                    me.speed.max(BOOST_SPEED)
+                } else {
+                    me.speed
+                };
+                let bound = value / (d2.sqrt() / fastest + p.settle_seconds) * (1.0 + 1e-9);
+                raced[queued] = (bound, i);
+                queued += 1;
+                continue;
+            }
+            // Travel takes at least the straight distance: skip what cannot
+            // win.
+            if let Some((b, _)) = &best {
+                let within = (value / b.rate - p.settle_seconds) * me.speed;
+                if within <= 0.0 || within * within <= d2 {
+                    continue;
+                }
+            }
+            take(i, q, value, &mut best);
         }
-        best
+        let raced = &mut raced[..queued];
+        raced.sort_unstable_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+        for &(bound, i) in raced.iter().take(p.race_cells) {
+            // Later cells are bounded no higher, and on a tie come later.
+            if !beats(bound, i, &best) {
+                break;
+            }
+            let (q, value) = food(i).expect("queued cells hold food");
+            take(i, q, value, &mut best);
+        }
+        best.map(|(goal, _)| goal)
     }
 }
 
@@ -2133,6 +2237,9 @@ fn blocked_exits(
 
 /// Boost toward a goal that needs it, like the original Hunter: only along a
 /// clear, nearly straight accelerating arc.
+/// Boosting toward a goal takes only arcs this close to it, radians.
+const BOOST_MAX_OFFSET: f64 = 0.4;
+
 fn boost_toward(
     o: &Observation,
     me: &Me,
@@ -2142,11 +2249,11 @@ fn boost_toward(
     goal: &Goal,
     ramp: &[f64; RAMP_SUBSTEPS],
 ) -> Option<Action> {
-    // Only arcs within 0.4 rad of the goal are taken, and any arc costs at
-    // least its offset, so the cheapest arc overall is one of them exactly
-    // when the cheapest of them costs less than 0.4.
-    let best = search(o, me, p, near, exits, goal, Some(ramp), 0.4);
-    (best.2 >= me.safe && best.0 < 0.4).then(|| Action {
+    // Only arcs within `BOOST_MAX_OFFSET` of the goal are taken, and any arc
+    // costs at least its offset, so the cheapest arc overall is one of them
+    // exactly when the cheapest of them costs less than that.
+    let best = search(o, me, p, near, exits, goal, Some(ramp), BOOST_MAX_OFFSET);
+    (best.2 >= me.safe && best.0 < BOOST_MAX_OFFSET).then(|| Action {
         heading: wrap(best.1),
         boost: true,
     })
