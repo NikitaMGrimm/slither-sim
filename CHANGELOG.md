@@ -72,9 +72,11 @@
 - [Battledome](docs/configuration.md#battledome), our own mode:
   `Config::battledome()` or `"preset": "battledome"` gives a fixed 3,584-unit
   arena with a one-way pit, a permanent 400-point size floor (boosting at it is
-  free and drops nothing), a 15-minute rolling kill score and no prey; other
-  rules follow the official preset. It is built from four new world settings:
-  `pit`, `spawnRadius`, `killScoreSeconds` and `minScore`.
+  free and drops nothing, and death food returns only mass above it), a
+  15-minute rolling kill score and no prey; ambient refill counts all food
+  toward its target, and other rules follow the official preset. It is built
+  from five new world settings: `pit`, `spawnRadius`, `killScoreSeconds`,
+  `minScore` and `ambientRefillCountsAllFood`.
 - World configs take `"preset": "official" | "sandbox" | "battledome"` in `serve`
   and Python resets and in `host` and `client` config files; explicit fields
   override the preset ([presets](docs/configuration.md#presets)).

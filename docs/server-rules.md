@@ -12,8 +12,8 @@ See [configuration](configuration.md#official-and-sandbox) for official and
 sandbox defaults and overrides. Neither is an exact official replica.
 
 [`Config::battledome()`](configuration.md#battledome) owns its custom pit,
-size-floor and free-boost rules and synthetic regressions. These are design
-choices, not official-server measurements.
+size-floor, free-boost and food-budget rules and synthetic regressions. These
+are design choices, not official-server measurements.
 
 The radius controller, food admission limits, prey population, kiosk penalty and
 rim sliding are provisional. In particular:

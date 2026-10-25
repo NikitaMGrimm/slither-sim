@@ -83,7 +83,8 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | `radius` | `670` | Positive finite arena radius. |
 | `dynamicRadius` | `true` | Enable the provisional population-driven boundary model. |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
-| `foodCount` | `109` | Ambient food target/startup placement attempts. Admission limits can reduce placement; memory bounds it. |
+| `foodCount` | `109` | Refill target/startup placement attempts. Admission limits can reduce placement; memory bounds it. |
+| `ambientRefillCountsAllFood` | `false` | Count all pellets toward the refill target; otherwise count only ambient food. Does not cap death/boost drops. |
 | `ambientReplenishPerSecond` | `≈1.60456356` | Ambient placement attempts/s below target; finite, nonnegative and small enough that one attempt interval still changes the refill clock. |
 | `dt` | `0.007` | Positive finite physics step. With sliding boundaries it must be below 16 / 437.5 ≈ 0.036571 s; steps outside the measured 6.94–7.07 ms warn. |
 | `foodIndex` | `true` | Accelerate food lookup; disable for differential debugging. |
@@ -173,9 +174,9 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 | Spawn ring | `spawnRadius: 2684` | Midway between pit and wall, giving equal room in both directions |
 | Spawn body | 26 anchors, 42 units apart along the ring, heading along it | Keeps the whole new body clear of pit and wall; host samples angle and direction with 600-unit clearance |
 | Kill score | `killScoreSeconds: 900` | +1 per credited kill for 15 minutes; retained across lives so death does not erase recent kills |
-| Pit death food | Normal death food; wall deaths still drop none | Returns pit victims' mass to play |
+| Death food | Only the fraction of mass above `minScore`; pit and body deaths | Prevents free floor mass becoming food each life; wall deaths still drop none |
 | Prey | `prey.count: 0` | Snakes only |
-| Ambient food | `foodCount: 3138`, about 45.9 attempts/s | Inherits the official model's density at radius 3584 and its admission caps |
+| Ambient food | `foodCount: 3138`, about 45.9 attempts/s; `ambientRefillCountsAllFood: true` | Death/boost pellets also fill the target; inherited admission caps |
 
 The pit tests the head center's swept path each tick: after entering distance
 `< r`, reaching `r` kills with reason `pit` and no credited killer, including
@@ -185,7 +186,10 @@ The floor uses the least mass on the protocol-19 fam grid displaying the chosen
 score (400 gives 26 segments and fam ≈ 0.1589). Boosting and the kiosk penalty
 spend only mass above it. A partial final boost pellet reflects actual mass
 spent; at the floor, boost is free without pellets, preventing cost-free food
-generation. Growth and normal death-food rules remain.
+generation. Death food uses the same above-floor mass fraction of the normal
+nutrition budget, spreading full-size pellets along the body, with one
+smaller final pellet for a fraction. A floor-size death drops nothing.
+These are [offline-tested design choices](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-25-food-balance/REPORT.md).
 
 A kill at time `t` counts while `world.time < t + killScoreSeconds`, separately
 from per-life `kills` and size `score`, without changing the size-based
