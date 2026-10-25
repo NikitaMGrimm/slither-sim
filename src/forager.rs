@@ -134,6 +134,9 @@ pub struct Params {
     pub kill_boost: bool,
     /// Boost along a clear arc when every cruise-speed arc is dangerous.
     pub escape_boost: bool,
+    /// Boost toward a food cell holding at least this much value (after
+    /// `occupied_factor`), such as a fresh kill's drop; 0 never does.
+    pub food_boost_value: f64,
 }
 
 impl Default for Params {
@@ -184,6 +187,7 @@ impl Default for Params {
             boost_min_score: 30.0,
             kill_boost: false,
             escape_boost: false,
+            food_boost_value: 0.0,
         }
     }
 }
@@ -226,6 +230,7 @@ impl Params {
             self.coil_close_angle,
             self.coil_shrink,
             self.boost_min_score,
+            self.food_boost_value,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -246,6 +251,7 @@ impl Params {
             || !(0.0..=1.0).contains(&self.own_width_factor)
             || self.kill_weight < 0.0
             || self.kill_trap_weight < 0.0
+            || self.food_boost_value < 0.0
             || self.kill_trap_seconds < 0.0
             || self.coil_weight < 0.0
             || !(0.0..=1.0).contains(&self.coil_shrink)
@@ -403,7 +409,8 @@ pub fn decide(
         uncertainty: timing.uncertainty * p.uncertainty_margin,
     };
     let can_boost = o.me.score >= p.boost_min_score;
-    let ramp = (can_boost && (p.kill_boost || p.escape_boost)).then(|| me.boost_ramp());
+    let boosts = p.kill_boost || p.escape_boost || p.food_boost_value > 0.0;
+    let ramp = (can_boost && boosts).then(|| me.boost_ramp());
     let scene = Scene::new(&view, &me, p, intents, ramp.is_some(), &mut scratch.near);
     let mut goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
     // The best goal reachable at cruise speed, should boosting turn out unsafe.
@@ -958,7 +965,8 @@ impl Scene {
                 best = Some(Goal {
                     heading: toward(me.head, q),
                     rate,
-                    boost: false,
+                    // Rich enough to race for; boosting still has to be safe.
+                    boost: p.food_boost_value > 0.0 && value >= p.food_boost_value,
                     crosses: None,
                 });
             }

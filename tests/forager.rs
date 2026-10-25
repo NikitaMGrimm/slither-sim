@@ -457,6 +457,8 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
         kill_boost: true,
         escape_boost: true,
         boost_min_score: 0.0,
+        kill_trap_weight: 1.0,
+        food_boost_value: 1.0,
         ..Params::default()
     };
     let intents: Vec<_> = (0..observation.opponents.len())
@@ -994,4 +996,29 @@ fn a_turning_approach_to_a_cut_off_does_not_meet_the_victim() {
             .unwrap();
     }
     assert!(world.snakes[0].alive, "{:?}", world.deaths);
+}
+
+#[test]
+fn rich_food_is_raced_for_when_boosting_is_safe() {
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    observation.food = vec![food(400.0, 0.0, 50.0)];
+    let params = Params {
+        food_boost_value: 20.0,
+        ..Params::default()
+    };
+    let rich = decide(&observation, &Timing::default(), &params);
+    assert!(rich.boost && rich.heading == 0.0, "{rich:?}");
+    // A small pellet is not worth the mass.
+    let mut small = observation.clone();
+    small.food = vec![food(400.0, 0.0, 5.0)];
+    assert!(!decide(&small, &Timing::default(), &params).boost);
+    // Nor is a boost into a body.
+    let mut blocked = observation.clone();
+    blocked
+        .opponents
+        .push(post(&blocked, Point { x: 60.0, y: 0.0 }));
+    assert!(!decide(&blocked, &Timing::default(), &params).boost);
+    // Off by default.
+    assert!(!still(&observation).boost);
 }
