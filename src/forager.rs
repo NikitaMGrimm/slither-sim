@@ -144,6 +144,14 @@ pub struct Params {
     /// Extra clearance per unit of our own width, added to `safe`: a longer
     /// snake turns wider and loses more by dying.
     pub safe_width_factor: f64,
+    /// Cost per share of our escape branches blocked at a fan arc's end: from
+    /// where the arc leaves us, hard left, straight and hard right over
+    /// `exit_seconds` at cruise speed, each blocked by the rim or a gathered
+    /// body or head path. 0 skips the check (the original search). Hindsight
+    /// replays (LEDGER D1) found about half of body deaths avoidable 0.5 s
+    /// before by a fixed action, often by simply holding course.
+    pub exit_weight: f64,
+    pub exit_seconds: f64,
 }
 
 impl Default for Params {
@@ -197,6 +205,8 @@ impl Default for Params {
             escape_boost: false,
             food_boost_value: 0.0,
             safe_width_factor: 0.0,
+            exit_weight: 0.0,
+            exit_seconds: 0.4,
         }
     }
 }
@@ -242,6 +252,8 @@ impl Params {
             self.boost_min_score,
             self.food_boost_value,
             self.safe_width_factor,
+            self.exit_weight,
+            self.exit_seconds,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -268,6 +280,8 @@ impl Params {
             || self.coil_weight < 0.0
             || !(0.0..=1.0).contains(&self.coil_shrink)
             || self.coil_progress_power < 0.0
+            || self.exit_weight < 0.0
+            || !(0.0..=2.0).contains(&self.exit_seconds)
             || self.kill_samples > 16
         {
             return Err(format!(
@@ -863,10 +877,16 @@ impl Scene {
             me.speed
         };
         // A width-scaled safety margin counts obstacles that much further out.
+        let exits = if p.exit_weight > 0.0 {
+            me.speed * p.exit_seconds
+        } else {
+            0.0
+        };
         let reach = speed * p.lookahead_seconds
             + 2.0 * me.width
             + p.reach_extra
-            + p.safe_width_factor * me.width;
+            + p.safe_width_factor * me.width
+            + exits;
         let near_within =
             |q: Point, reach2: f64| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2) < reach2;
         let steps = p.head_path_steps.max(1);
@@ -1588,12 +1608,63 @@ fn search(
         }
         let heading = goal.heading + offset;
         let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp);
-        let cost = offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight;
+        let mut cost = offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight;
+        // The exit cost only adds, so skip it where the arc already loses.
+        if p.exit_weight > 0.0 && cost < best.0 {
+            let (path, points, _) = arc(me, p, heading, ramp);
+            let (end, end_heading) = path[points - 1];
+            cost += p.exit_weight * blocked_exits(o, me, p, near, end, end_heading);
+        }
         if cost < best.0 {
             best = (cost, heading, clearance, offset);
         }
     }
     best
+}
+
+/// Share of our hard-left, straight and hard-right branches from `head`
+/// (heading `heading`) over `exit_seconds` at cruise speed that the rim or a
+/// gathered obstacle blocks. Branch tips follow `to_tip`, as arcs do; a
+/// segment blocks where a tip chord comes within its width. Head paths count
+/// as laid for the whole span (conservative); unseen or ungathered snakes
+/// count as open.
+fn blocked_exits(
+    o: &Observation,
+    me: &Me,
+    p: &Params,
+    near: &[Obstacle],
+    head: Point,
+    heading: f64,
+) -> f64 {
+    let dt = p.exit_seconds / TRAP_CHORDS as f64;
+    let tip = (1.0 - p.own_width_factor) * me.width;
+    let span = me.speed * p.exit_seconds + tip;
+    let mut blocked = 0;
+    for delta in [-std::f64::consts::PI, 0.0, std::f64::consts::PI] {
+        let at = |t: f64| {
+            let q = turn_then_straight(head, heading, delta, me.speed, me.turn, t);
+            (q, heading + delta.signum() * delta.abs().min(me.turn * t))
+        };
+        if branch_hits_rim(&o.arena, o.me.segments, dt, at) {
+            blocked += 1;
+            continue;
+        }
+        let tips: [Point; TRAP_CHORDS + 1] = std::array::from_fn(|j| {
+            let (q, h) = at(dt * j as f64);
+            forward(q, h, tip)
+        });
+        let hit = near.iter().any(|ob| {
+            // Branches stay within `span` of `head`.
+            let bound = span + ob.half + ob.width;
+            let (dx, dy) = (ob.mid.x - head.x, ob.mid.y - head.y);
+            dx * dx + dy * dy <= bound * bound
+                && tips
+                    .windows(2)
+                    .any(|w| swept_distance(w[0], w[1], ob.from, ob.to) < ob.width)
+        });
+        blocked += usize::from(hit);
+    }
+    blocked as f64 / 3.0
 }
 
 /// Boost toward a goal that needs it, like the original Hunter: only along a

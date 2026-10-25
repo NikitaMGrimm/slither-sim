@@ -442,6 +442,14 @@ fn invalid_parameters_are_rejected() {
             own_width_factor: -0.1,
             ..defaults
         },
+        Params {
+            exit_weight: -1.0,
+            ..defaults
+        },
+        Params {
+            exit_seconds: 2.5,
+            ..defaults
+        },
     ] {
         assert!(bad.validate().is_err(), "{bad:?}");
     }
@@ -1078,4 +1086,53 @@ fn rich_food_is_raced_for_when_boosting_is_safe() {
     assert!(!decide(&blocked, &Timing::default(), &params).boost);
     // Off by default.
     assert!(!still(&observation).boost);
+}
+
+#[test]
+fn exit_check_declines_a_pocket_it_could_not_leave() {
+    let mut observation = fixture();
+    // A U of motionless body, open toward us, with food at its back.
+    let mut wall = snake(&observation, "wall", Point { x: 60.0, y: 45.0 }, 0.0, 2);
+    wall.speed = 0.0;
+    let mut polyline = Vec::new();
+    for i in 1..=6 {
+        polyline.push(Point {
+            x: 60.0 + 20.0 * i as f64,
+            y: 45.0,
+        });
+    }
+    for i in 1..=4 {
+        polyline.push(Point {
+            x: 180.0,
+            y: 45.0 - 22.5 * i as f64,
+        });
+    }
+    for i in 1..=6 {
+        polyline.push(Point {
+            x: 180.0 - 20.0 * i as f64,
+            y: -45.0,
+        });
+    }
+    wall.body = polyline;
+    observation.opponents.push(wall);
+    observation.food = vec![food(140.0, 0.0, 5.0)];
+    // Our turning circle (radius 180.9 / 4.125 = 44) cannot fit the 90-wide
+    // pocket once inside, so every exit from its mouth is blocked.
+    let plain = Params::default();
+    assert_eq!(
+        decide(&observation, &Timing::default(), &plain).heading,
+        0.0
+    );
+    let careful = Params {
+        exit_weight: 5.0,
+        ..plain
+    };
+    let declined = decide(&observation, &Timing::default(), &careful);
+    assert!(declined.heading.abs() > 1.0, "{declined:?}");
+    // In open water every exit is clear and the decision is the plain one.
+    observation.opponents.clear();
+    assert_eq!(
+        decide(&observation, &Timing::default(), &careful),
+        decide(&observation, &Timing::default(), &plain)
+    );
 }
