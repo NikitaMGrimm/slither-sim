@@ -557,7 +557,7 @@ fn unsupported_configurations_are_rejected() {
         serde_json::from_str(r#"{"agents":2,"latency":{"roundTripSeconds":[0.1]}}"#).unwrap();
     // Updates go out every tick; the removed batching field is rejected.
     assert!(serde_json::from_str::<SimulationConfig>(r#"{"broadcastTicks":6}"#).is_err());
-    assert_eq!(config.leaderboard_interval_seconds, 3.);
+    assert_eq!(config.leaderboard_interval_seconds, 3.008);
     let config: SimulationConfig =
         serde_json::from_str(r#"{"leaderboardIntervalSeconds":1.5}"#).unwrap();
     assert_eq!(config.leaderboard_interval_seconds, 1.5);
@@ -751,9 +751,9 @@ fn leaderboard(p: &[u8]) -> (u8, usize, usize, Vec<(usize, f64, String)>) {
 }
 
 #[test]
-fn native_leaderboards_follow_own_appearance_with_ranked_rows() {
+fn native_leaderboards_follow_the_server_clock_with_ranked_rows() {
     let mut backend = SimulatorBackend::new(8, config(3, LatencyConfig::default())).unwrap();
-    while backend.time() < 7.5 {
+    while backend.time() < 9.5 {
         backend.next_frame().unwrap();
     }
     let received: Vec<(f64, Vec<u8>)> = backend
@@ -773,11 +773,12 @@ fn native_leaderboards_follow_own_appearance_with_ranked_rows() {
         .filter(|(_, (_, p))| p[0] == b'l')
         .collect();
     assert!(boards[0].0 > own);
-    assert_eq!(boards[0].1.0, received[own].0);
     assert_eq!(boards.len(), 3);
-    for pair in boards.windows(2) {
-        let gap = pair[1].1.0 - pair[0].1.0;
-        assert!((3. - 1e-9..3. + 6. * DT).contains(&gap), "{gap}");
+    // One server-wide clock: each board leaves in the first tick of a period.
+    let interval = SimulationConfig::default().leaderboard_interval_seconds;
+    for (_, (time, _)) in &boards {
+        let phase = (time / interval).fract() * interval;
+        assert!(phase < DT + 1e-9, "{time}");
     }
     for (_, (_, packet)) in boards {
         let (position, rank, count, rows) = leaderboard(packet);

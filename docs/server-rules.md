@@ -58,7 +58,7 @@ A receipt, a reconstructed pose and renderer prediction are different states.
 | Snakes | Complete centerline intersects `world.vision`, default 1,500. | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
 | Prey coverage | Points checked independently at the same configurable distance. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
 | Hosted spawning | Radial-lattice candidates; complete newborn body clears living heads/body edges by 600 units. Crowded admission waits or fails without a cramped fallback. | `spawn.rs` and host tests. Observed own joins include exceptions below 600; this is conservative local admission. Initial geometric test rings are synthetic. |
-| Minimap | Global living centerlines, 136×136 by default, nominal 2.5 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
+| Minimap | Global living centerlines, 136×136 by default, server-wide 2.504 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
 | Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins select boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes and pooled ambient counts. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
 
 The [visibility study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
@@ -107,10 +107,13 @@ rules, event-to-send deadlines and visibility triggers remain unknown.
 An incremental food index and snake coverage grid reduce work while preserving
 wire selection and ordering; they are performance mechanisms, not official rules.
 
-Minimap and leaderboard deadlines remain independent nominal 2.5/3-second clocks,
-serviced at physics ticks. The study found shared global official HUD phases
-and mean periods near 2504/3008 ms; the simulator's connection-relative HUD
-schedules have not adopted those phases or drift.
+Minimaps and leaderboards follow two independent server-wide clocks. Officially
+both are shared by all recipients, reconnects join the running phase, and mean
+periods are 2503.994/3008.062 ms rather than 2500/3000. The simulator services
+absolute periods of 2.504/3.008 s at the first tick in each, so a first map or
+board arrives 0–2.5/3 s after entry, and puts the map first in its frame. Why
+official periods exceed 2.5/3 s is unknown; nominal thresholds rearmed after
+service would fit, but the simulator only reproduces the mean.
 
 Setup advertises the active prey turn rate in reference-frame units (default
 `mamu2=0.029`), as checked by `client-hud-leaderboard.json`. The cadence fixture

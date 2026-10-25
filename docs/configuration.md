@@ -29,8 +29,9 @@ Every world `Config` object also accepts a [`preset`](#presets).
 Motion and standalone mass reports use shared per-snake gates of at least six
 and 15 ticks (42/105 ms at the default `dt`); anchors are prompt. Ordinary food
 births wait for shared 504 ms maintenance. Prey corrections have a shared clock
-per prey. Minimaps and leaderboards retain independent nominal 2.5/3-second
-clocks, serviced at physics ticks. These are partial scheduling models; see
+per prey. Minimaps and leaderboards follow separate server-wide clocks that
+connections join mid-phase, at the official mean periods 2.504/3.008 s. These
+are partial scheduling models; see
 [packet timing and evidence limits](server-rules.md#packet-timing).
 
 Ping is a measured round trip, not a target the server needs you to set. Native
@@ -67,9 +68,9 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `agents` | `1` | Slots, 1–65,535; overridden by the host. |
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, at least 1. |
-| `minimapIntervalSeconds` | `2.5` | Positive finite interval. |
+| `minimapIntervalSeconds` | `2.504` | Positive finite period of the server-wide minimap clock. |
 | `minimapSide` | `136` | Received protocol-19 minimap resolution; 1–512, the stock client's clamp. Rasterization remains approximate. |
-| `leaderboardIntervalSeconds` | `3` | Positive finite interval; a board also arrives on entry. |
+| `leaderboardIntervalSeconds` | `3.008` | Positive finite period of the server-wide leaderboard clock; the first board waits for it. |
 | `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |

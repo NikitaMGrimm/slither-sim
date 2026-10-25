@@ -42,7 +42,7 @@ Save as `arena.json`:
       "dt": 0.007,
       "prey": { "count": 6 }
     },
-    "leaderboardIntervalSeconds": 3.0
+    "leaderboardIntervalSeconds": 3.008
   }
 }
 ```
@@ -170,14 +170,16 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 
 ### Reports and game-over
 
-- `l`: top ten living snakes, recipient rank and population, on entry and every
-  `leaderboardIntervalSeconds` (default 3; positive and finite).
+- `l`: top ten living snakes, recipient rank and population, on a server-wide
+  clock of `leaderboardIntervalSeconds` (default 3.008) after the recipient's
+  own snake appears.
 - `k`: simulator collision-attributed kills.
 - `F`: nonempty sector listings on entry; empty subscriptions stay internal and
   send neither `W` nor an empty `F`. Births/pickups update subscribed food;
   `w` clears on exit. See [food delivery](server-rules.md#food-sector-delivery).
 - `M`/`V`: a global minimap (136×136 by default, configurable via
-  `simulation.minimapSide`) on an independent nominal 2.5-second clock.
+  `simulation.minimapSide`) on its own server-wide clock (default 2.504 s),
+  first in its frame.
   First, reconnected and resized maps use full `M`; later maps use XOR `V` only
   when strictly shorter than `M`, against that connection's last queued bitmap.
   Living heads and body centerlines are rasterized; the stock client draws its

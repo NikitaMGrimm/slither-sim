@@ -130,6 +130,10 @@
   ambient food joins shared 504 ms maintenance, and prey corrections share one
   clock per prey across viewers. These are partial models with retained
   counterexamples; see [packet timing](docs/server-rules.md#packet-timing).
+- Minimaps and leaderboards follow server-wide clocks at the official mean
+  periods, now the defaults: `minimapIntervalSeconds` 2.504 and
+  `leaderboardIntervalSeconds` 3.008. A joining connection meets the running
+  phase, so its first board no longer arrives on entry; the map leads its frame.
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 

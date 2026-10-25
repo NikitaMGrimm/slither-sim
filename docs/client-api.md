@@ -163,7 +163,7 @@ latency and network fields, their defaults and limits.
 
 Defaults: one snake, six 7 ms ticks per decision, gameplay emission every tick
 with [per-family release rules](server-rules.md#packet-timing), 136×136 minimap
-every 2.5 seconds, leaderboard on entry/every 3 seconds and zero added delay.
+and leaderboard on server-wide 2.504/3.008-second clocks and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.
 
 Latency settings include `roundTripSeconds`, `roundTripWeights`, `roundTripSpread`,
