@@ -22,8 +22,9 @@ use crate::{
 pub const MAX_CELLS: usize = 17;
 /// Largest steering fan; [`Params::fan`] may use fewer.
 pub const MAX_FAN: usize = 16;
-/// Remembered sent commands used to replay the bot's own motion.
-pub const MAX_SENT: usize = 16;
+/// Remembered sent commands used to replay the bot's own motion; the
+/// portable decoder keeps the same number.
+pub const MAX_SENT: usize = 64;
 /// Own-motion forecast step, as in the original predictor (one protocol unit).
 pub const SUBSTEP: f64 = 0.008;
 /// Longest forecast lead, in substeps (2 seconds).
@@ -72,6 +73,16 @@ pub struct Params {
     pub lead_scale: f64,
     /// Obstacle widening per second of lead uncertainty and unit of closing speed.
     pub uncertainty_margin: f64,
+    /// Share of each opponent's reported turn toward its wanted heading that
+    /// its predicted path follows; 0 continues straight (the original).
+    pub intent_weight: f64,
+    /// Obstacle widening per second of an opponent's heading-receipt age and
+    /// unit of its speed.
+    pub stale_margin: f64,
+    /// Share of our own width counted beside the arc. Only a head's forward
+    /// probe kills (`physics::strikes`), so below 1 the arc is checked from the
+    /// head's tip, shifted forward by the rest of the width. 1 is the original.
+    pub own_width_factor: f64,
 }
 
 impl Default for Params {
@@ -100,6 +111,9 @@ impl Default for Params {
             uplink_share: 0.5,
             lead_scale: 1.0,
             uncertainty_margin: 1.0,
+            intent_weight: 0.0,
+            stale_margin: 0.0,
+            own_width_factor: 1.0,
         }
     }
 }
@@ -123,6 +137,9 @@ impl Params {
             self.uplink_share,
             self.lead_scale,
             self.uncertainty_margin,
+            self.intent_weight,
+            self.stale_margin,
+            self.own_width_factor,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -138,10 +155,14 @@ impl Params {
             || !(0.0..=1.0).contains(&self.uplink_share)
             || self.lead_scale < 0.0
             || self.uncertainty_margin < 0.0
+            || !(0.0..=1.0).contains(&self.intent_weight)
+            || self.stale_margin < 0.0
+            || !(0.0..=1.0).contains(&self.own_width_factor)
         {
             return Err(format!(
                 "Forager needs 1..={MAX_CELLS} cells, 1..={MAX_FAN} fan offsets, a positive cell \
-                 and lookahead, an uplink share in 0..=1 and nonnegative lead/uncertainty scales"
+                 and lookahead, an uplink share, intent weight and own-width factor in 0..=1 and nonnegative \
+                 lead, uncertainty and stale margins"
             ));
         }
         Ok(())
@@ -155,19 +176,54 @@ pub struct Sent {
     pub action: Action,
 }
 
+/// Received knowledge about one opponent, aligned with `Observation::opponents`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Intent {
+    /// Latest reported wanted heading in radians; NaN when unknown.
+    pub wanted: f64,
+    /// Seconds since its heading was last received.
+    pub heading_age: f64,
+}
+
+impl Default for Intent {
+    fn default() -> Self {
+        Self {
+            wanted: f64::NAN,
+            heading_age: 0.0,
+        }
+    }
+}
+
 /// What the client knows about its connection for one decision.
 ///
-/// The observed state is `observation_age` server seconds old, and a command
-/// sent now acts `command_delay` seconds from now. `uncertainty` is the spread
-/// of that total lead, for example the recent ping range.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+/// The observed state is `observation_age` server seconds old. A command takes
+/// `command_delay` seconds from leaving the client to acting; the command
+/// decided now first waits `processing` seconds before it leaves. Commands
+/// already sent carry their actual departure ages, so replay delays them by
+/// `command_delay` only. `uncertainty` is the spread of the total lead, for
+/// example the recent ping range.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Timing {
     pub observation_age: f64,
     pub command_delay: f64,
+    pub processing: f64,
     pub uncertainty: f64,
     /// Most recent first; only the first `sent_len` entries are used.
     pub sent: [Sent; MAX_SENT],
     pub sent_len: usize,
+}
+
+impl Default for Timing {
+    fn default() -> Self {
+        Self {
+            observation_age: 0.0,
+            command_delay: 0.0,
+            processing: 0.0,
+            uncertainty: 0.0,
+            sent: [Sent::default(); MAX_SENT],
+            sent_len: 0,
+        }
+    }
 }
 
 impl Timing {
@@ -217,8 +273,18 @@ impl Default for Scratch {
 /// replays the commands in flight, opponents continue straight, and pellets its
 /// pickup circle sweeps meanwhile are treated as eaten. This heuristic does not
 /// guarantee collision avoidance. Boost is always off.
-pub fn decide(o: &Observation, timing: &Timing, p: &Params, scratch: &mut Scratch) -> Action {
-    let lead_steps = ((timing.observation_age + timing.command_delay) * p.lead_scale / SUBSTEP)
+///
+/// `intents` holds received knowledge per opponent in observation order; it may
+/// be shorter (missing entries are unknown) or empty.
+pub fn decide(
+    o: &Observation,
+    timing: &Timing,
+    intents: &[Intent],
+    p: &Params,
+    scratch: &mut Scratch,
+) -> Action {
+    let lead = timing.observation_age + timing.command_delay + timing.processing;
+    let lead_steps = (lead * p.lead_scale / SUBSTEP)
         .round()
         .clamp(0.0, MAX_LEAD_SUBSTEPS as f64) as usize;
     let lead = lead_steps as f64 * SUBSTEP;
@@ -243,7 +309,7 @@ pub fn decide(o: &Observation, timing: &Timing, p: &Params, scratch: &mut Scratc
         pickup_radius,
         uncertainty: timing.uncertainty * p.uncertainty_margin,
     };
-    let scene = Scene::new(&view, &me, p, &mut scratch.near);
+    let scene = Scene::new(&view, &me, p, intents, &mut scratch.near);
     let goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
     steer(o, &me, p, &scratch.near, goal)
 }
@@ -460,7 +526,7 @@ struct Scene {
 }
 
 impl Scene {
-    fn new(view: &View, me: &Me, p: &Params, near: &mut Vec<Obstacle>) -> Self {
+    fn new(view: &View, me: &Me, p: &Params, intents: &[Intent], near: &mut Vec<Obstacle>) -> Self {
         let o = view.o;
         let n = p.cells.min(MAX_CELLS);
         let half = n as f64 * p.cell / 2.0;
@@ -489,30 +555,74 @@ impl Scene {
         }
         near.clear();
         let reach = me.speed * p.lookahead_seconds + 2.0 * me.width + p.reach_extra;
-        let reach2 = reach * reach;
-        let close = |q: Point| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2) < reach2;
+        let near_within =
+            |q: Point, reach2: f64| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2) < reach2;
         let steps = p.head_path_steps.max(1);
-        for enemy in &o.opponents {
+        for (k, enemy) in o.opponents.iter().enumerate() {
             if !enemy.alive {
                 continue;
             }
-            let head = view.head(enemy);
+            let intent = intents.get(k).copied().unwrap_or_default();
+            let turning = p.intent_weight > 0.0 && intent.wanted.is_finite();
             let unsure = view.uncertainty;
-            let width = me.width + width(enemy) + unsure * me.speed;
-            for step in 0..=steps {
-                let q = forward(
-                    head,
-                    enemy.heading,
-                    enemy.speed * p.head_path_seconds * step as f64 / steps as f64,
-                );
-                if let Some(i) = cell(q) {
-                    scene.occupied[i] = true;
+            let stale = p.stale_margin * intent.heading_age * enemy.speed;
+            let width = p.own_width_factor * me.width + width(enemy) + unsure * me.speed + stale;
+            // The gathering radius assumes two of our widths; widened envelopes
+            // (uncertainty, stale data) extend it so no reachable segment is dropped.
+            let extra = (width + unsure * enemy.speed - me.width - self::width(enemy)).max(0.0);
+            let reach2 = (reach + extra) * (reach + extra);
+            let close = |q: Point| near_within(q, reach2);
+            let head = if turning {
+                // Turning toward the reported wanted heading at its turn rate.
+                let target = enemy.heading + p.intent_weight * wrap(intent.wanted - enemy.heading);
+                let turn = turn_rate(enemy.segments);
+                let path = |t: f64| {
+                    let n = (t / 0.06).ceil().clamp(1.0, 24.0);
+                    let dt = t / n;
+                    let (mut q, mut h) = (enemy.head, enemy.heading);
+                    for _ in 0..n as usize {
+                        (q, h) = advance(q, h, target, enemy.speed, turn, dt);
+                    }
+                    q
+                };
+                let head = if view.lead > 0.0 {
+                    path(view.lead)
+                } else {
+                    enemy.head
+                };
+                for step in 0..=steps {
+                    let t = p.head_path_seconds * step as f64 / steps as f64;
+                    if let Some(i) = cell(path(view.lead + t)) {
+                        scene.occupied[i] = true;
+                    }
                 }
-            }
-            let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
-            if close(head) || close(ahead) {
-                near.push(Obstacle::new(head, ahead, width + unsure * enemy.speed));
-            }
+                let middle = path(view.lead + p.lookahead_seconds / 2.0);
+                let ahead = path(view.lead + p.lookahead_seconds);
+                if close(head) || close(middle) || close(ahead) {
+                    let w = width + unsure * enemy.speed;
+                    near.push(Obstacle::new(head, middle, w));
+                    near.push(Obstacle::new(middle, ahead, w));
+                }
+                head
+            } else {
+                // The original straight-line forecast.
+                let head = view.head(enemy);
+                for step in 0..=steps {
+                    let q = forward(
+                        head,
+                        enemy.heading,
+                        enemy.speed * p.head_path_seconds * step as f64 / steps as f64,
+                    );
+                    if let Some(i) = cell(q) {
+                        scene.occupied[i] = true;
+                    }
+                }
+                let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
+                if close(head) || close(ahead) {
+                    near.push(Obstacle::new(head, ahead, width + unsure * enemy.speed));
+                }
+                head
+            };
             // During the lead the observed head became body behind the forecast head.
             let mut previous = head;
             let mut was_close = close(previous);
@@ -602,12 +712,24 @@ fn clearance(
 ) -> f64 {
     let step = p.lookahead_seconds / 2.0;
     let (middle, turned) = advance(me.head, me.heading, heading, me.speed, me.turn, step);
-    let (end, _) = advance(middle, turned, heading, me.speed, me.turn, step);
+    let (end, last) = advance(middle, turned, heading, me.speed, me.turn, step);
     // Look further toward the rim so a turn starts in time.
     let ahead = forward(end, turned, me.speed * p.rim_ahead_seconds);
     let rim = |q: Point| o.arena.radius - me.width - q.distance(o.arena.center);
     let mut clearance = rim(end).min(rim(ahead) + p.rim_ahead_credit).min(cap);
-    let arcs = [(me.head, middle), (middle, end)].map(|(a, b)| {
+    // Obstacle widths hold `own_width_factor` of our width; the rest moves the
+    // checked path forward to the head's tip.
+    let tip = (1.0 - p.own_width_factor) * me.width;
+    let (start, middle, end) = if tip > 0.0 {
+        (
+            forward(me.head, me.heading, tip),
+            forward(middle, turned, tip),
+            forward(end, last, tip),
+        )
+    } else {
+        (me.head, middle, end)
+    };
+    let arcs = [(start, middle), (middle, end)].map(|(a, b)| {
         let mid = Point {
             x: (a.x + b.x) / 2.0,
             y: (a.y + b.y) / 2.0,
@@ -617,8 +739,10 @@ fn clearance(
     for obstacle in near {
         for &(a, b, mid, half) in &arcs {
             // Segment distance >= midpoint distance - both half lengths. The
-            // slack keeps rounding from skipping a segment that would lower it.
-            let bound = clearance + obstacle.width + obstacle.half + half + 1e-6;
+            // slack, relative to coordinate magnitude, keeps rounding from
+            // skipping a segment that would lower it.
+            let slack = 1e-6 + 1e-12 * (mid.x.abs() + mid.y.abs() + obstacle.half + half);
+            let bound = clearance + obstacle.width + obstacle.half + half + slack;
             let dx = mid.x - obstacle.mid.x;
             let dy = mid.y - obstacle.mid.y;
             if bound > 0.0 && dx * dx + dy * dy > bound * bound {

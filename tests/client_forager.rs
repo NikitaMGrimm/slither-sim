@@ -40,7 +40,8 @@ fn adapter_checks_lifecycle_and_keeps_no_state_between_decisions() {
                 playing += 1;
                 let timing = bots[0].timing(frame);
                 let mut scratch = Scratch::default();
-                let expected = forager::decide(o, &timing, &Params::default(), &mut scratch);
+                // Default parameters ignore opponent intents.
+                let expected = forager::decide(o, &timing, &[], &Params::default(), &mut scratch);
                 assert_eq!(*action, Some(expected));
             }
         }

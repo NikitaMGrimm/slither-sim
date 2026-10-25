@@ -1,6 +1,6 @@
 use slither_sim::{
     Action, Config, Food, Observation, Point, Simulator,
-    forager::{self, Params, Scratch, Timing},
+    forager::{self, Intent, Params, Scratch, Timing},
     physics,
 };
 use std::{
@@ -64,7 +64,7 @@ fn food(x: f64, y: f64, value: f64) -> Food {
 }
 
 fn decide(observation: &Observation, timing: &Timing, params: &Params) -> Action {
-    forager::decide(observation, timing, params, &mut Scratch::default())
+    forager::decide(observation, timing, &[], params, &mut Scratch::default())
 }
 
 fn still(observation: &Observation) -> Action {
@@ -86,6 +86,7 @@ fn default_zero_lead_decisions_match_the_original_forager() {
         let action = forager::decide(
             &observation,
             &Timing::default(),
+            &[],
             &Params::default(),
             &mut scratch,
         );
@@ -219,6 +220,145 @@ fn ping_uncertainty_widens_margins() {
 }
 
 #[test]
+fn reported_wanted_heading_bends_the_predicted_head_path() {
+    let mut observation = fixture();
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut opponent = observation.me.clone();
+    opponent.id = "opponent".into();
+    // Running parallel below our path, but wanting to turn up across its end.
+    opponent.head = Point { x: 40.0, y: -80.0 };
+    opponent.heading = 0.0;
+    opponent.speed = 185.0;
+    opponent.body = vec![Point { x: -2.0, y: -80.0 }];
+    observation.opponents.push(opponent);
+    let intents = [Intent {
+        wanted: std::f64::consts::FRAC_PI_2,
+        heading_age: 0.0,
+    }];
+    let defaults = Params::default();
+    let mut scratch = Scratch::default();
+    let straight = forager::decide(
+        &observation,
+        &Timing::default(),
+        &intents,
+        &defaults,
+        &mut scratch,
+    );
+    // Defaults ignore intents: the original straight forecast.
+    assert_eq!(straight, still(&observation));
+    let params = Params {
+        intent_weight: 1.0,
+        ..defaults
+    };
+    let turned = forager::decide(
+        &observation,
+        &Timing::default(),
+        &intents,
+        &params,
+        &mut scratch,
+    );
+    assert_ne!(turned.heading, straight.heading);
+}
+
+#[test]
+fn tip_based_danger_lets_the_bot_pass_beside_a_body() {
+    let mut observation = fixture();
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut opponent = observation.me.clone();
+    opponent.id = "opponent".into();
+    // A body ahead, parallel to our path and just beside its end.
+    opponent.head = Point { x: 300.0, y: 20.0 };
+    opponent.heading = 0.0;
+    opponent.speed = 0.0;
+    opponent.body = (1..=5)
+        .map(|i| Point {
+            x: 300.0 - physics::ANCHOR_SPACING * i as f64,
+            y: 20.0,
+        })
+        .collect();
+    observation.opponents.push(opponent);
+    // Same safety threshold; only the own-width treatment differs.
+    let centre = Params {
+        safe: 5.0,
+        ..Params::default()
+    };
+    assert_ne!(
+        decide(&observation, &Timing::default(), &centre).heading,
+        0.0
+    );
+    let params = Params {
+        own_width_factor: 0.0,
+        ..centre
+    };
+    assert_eq!(
+        decide(&observation, &Timing::default(), &params).heading,
+        0.0
+    );
+}
+
+#[test]
+fn processing_delays_only_the_command_decided_now() {
+    let mut observation = fixture();
+    observation.food = vec![food(300.0, 80.0, 1.0)];
+    let turn = Action {
+        heading: 1.2,
+        boost: false,
+    };
+    let mut timing = Timing {
+        observation_age: 0.05,
+        command_delay: 0.05,
+        processing: 0.04,
+        ..Default::default()
+    };
+    timing.push_sent(0.08, turn);
+    // The same arrivals and lead, with processing folded into the ages.
+    let mut folded = Timing {
+        observation_age: 0.09,
+        command_delay: 0.05,
+        ..Default::default()
+    };
+    folded.push_sent(0.12, turn);
+    let params = Params::default();
+    assert_eq!(
+        decide(&observation, &timing, &params),
+        decide(&observation, &folded, &params)
+    );
+}
+
+#[test]
+fn the_whole_decoder_command_history_is_kept() {
+    let mut timing = Timing::default();
+    for i in 0..forager::MAX_SENT + 3 {
+        timing.push_sent(i as f64 * 0.01, Action::default());
+    }
+    assert_eq!(forager::MAX_SENT, 64);
+    assert_eq!(timing.sent_len, forager::MAX_SENT);
+}
+
+#[test]
+fn widened_obstacles_are_gathered_beyond_the_plain_reach() {
+    // Reviewer reproduction: a stationary head outside the plain gathering
+    // radius whose uncertainty-widened envelope reaches the arc.
+    let mut observation = fixture();
+    observation.me.speed = 200.0;
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut opponent = observation.me.clone();
+    opponent.id = "opponent".into();
+    opponent.head = Point { x: 250.0, y: 0.0 };
+    opponent.speed = 0.0;
+    opponent.body.clear();
+    observation.opponents.push(opponent);
+    let timing = Timing {
+        uncertainty: 0.8,
+        ..Default::default()
+    };
+    assert_ne!(
+        decide(&observation, &timing, &Params::default()).heading,
+        0.0
+    );
+}
+
+#[test]
 fn invalid_parameters_are_rejected() {
     let defaults = Params::default();
     assert!(defaults.validate().is_ok());
@@ -245,6 +385,14 @@ fn invalid_parameters_are_rejected() {
         },
         Params {
             safe: f64::NAN,
+            ..defaults
+        },
+        Params {
+            intent_weight: 1.5,
+            ..defaults
+        },
+        Params {
+            own_width_factor: -0.1,
             ..defaults
         },
     ] {
@@ -298,16 +446,29 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
             },
         );
     }
-    let params = Params::default();
+    // Every optional feature on, so its paths are covered too.
+    let params = Params {
+        intent_weight: 1.0,
+        stale_margin: 0.5,
+        own_width_factor: 0.5,
+        ..Params::default()
+    };
+    let intents: Vec<_> = (0..observation.opponents.len())
+        .map(|k| Intent {
+            wanted: k as f64 * 0.3,
+            heading_age: 0.05,
+        })
+        .collect();
     let mut scratch = Scratch::default();
     // Warm once: buffers reserve their working capacity.
-    forager::decide(&observation, &timing, &params, &mut scratch);
+    forager::decide(&observation, &timing, &intents, &params, &mut scratch);
     ALLOCATIONS.with(|count| count.set(0));
     COUNTING.with(|counting| counting.set(true));
     for _ in 0..32 {
         std::hint::black_box(forager::decide(
             std::hint::black_box(&observation),
             &timing,
+            &intents,
             &params,
             &mut scratch,
         ));
@@ -315,4 +476,39 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
     COUNTING.with(|counting| counting.set(false));
     assert_eq!(ALLOCATIONS.with(Cell::get), 0);
     assert_eq!(observation, original);
+}
+
+#[test]
+fn zz_probe() {
+    let o = fixture();
+    eprintln!(
+        "me segments {} speed {} radius {}",
+        o.me.segments, o.me.speed, o.me.radius
+    );
+    for y in [20.0, 30.0, 40.0, 50.0, 60.0] {
+        let mut observation = fixture();
+        observation.food = vec![food(400.0, 0.0, 1.0)];
+        let mut opponent = observation.me.clone();
+        opponent.id = "opponent".into();
+        opponent.head = Point { x: 300.0, y };
+        opponent.heading = 0.0;
+        opponent.speed = 0.0;
+        opponent.body = (1..=8)
+            .map(|i| Point {
+                x: 300.0 - physics::ANCHOR_SPACING * i as f64,
+                y,
+            })
+            .collect();
+        observation.opponents.push(opponent);
+        let p0 = Params {
+            own_width_factor: 0.0,
+            safe: 5.0,
+            ..Params::default()
+        };
+        eprintln!(
+            "y {y}: default {:?} tip {:?}",
+            still(&observation).heading,
+            decide(&observation, &Timing::default(), &p0).heading
+        );
+    }
 }

@@ -169,13 +169,26 @@ impl Bot for ReferenceBot {
 /// any snake position/heading, body or food report) plus the downlink share of
 /// the measured round trip. A command sent now acts after the uplink share plus
 /// the previous decision's processing time. The recent ping range is the
-/// lead's uncertainty. Only received fields are read; positions between
-/// reports are already extrapolated by the decoder. The bot keeps reusable
-/// buffers but no state between decisions, so `reset` has nothing to clear.
-#[derive(Clone, Debug, Default)]
+/// lead's uncertainty. Each opponent's latest reported wanted heading and
+/// heading-receipt age come from its `received.snakes` row. Only received
+/// fields are read; positions between reports are already extrapolated by the
+/// decoder. The bot keeps reusable buffers but no state between decisions, so
+/// `reset` has nothing to clear.
+#[derive(Clone, Debug)]
 pub struct ForagerBot {
     pub params: crate::forager::Params,
     scratch: crate::forager::Scratch,
+    intents: Vec<crate::forager::Intent>,
+}
+
+impl Default for ForagerBot {
+    fn default() -> Self {
+        Self {
+            params: Default::default(),
+            scratch: Default::default(),
+            intents: Vec::with_capacity(4096),
+        }
+    }
 }
 
 impl ForagerBot {
@@ -183,7 +196,7 @@ impl ForagerBot {
         params.validate()?;
         Ok(Self {
             params,
-            scratch: Default::default(),
+            ..Default::default()
         })
     }
     /// The kernel timing this adapter derives from a frame.
@@ -206,7 +219,8 @@ impl ForagerBot {
         let receipt = if receipt.is_finite() { receipt } else { 0.0 };
         let mut result = crate::forager::Timing {
             observation_age: ping * (1.0 - uplink) + receipt,
-            command_delay: ping * uplink + timing.processing_seconds,
+            command_delay: ping * uplink,
+            processing: timing.processing_seconds,
             uncertainty: timing
                 .ping_range_seconds
                 .map_or(0.0, |[low, high]| high - low),
@@ -226,12 +240,44 @@ impl Bot for ForagerBot {
         }
         let observation = frame.observation.as_ref()?;
         let timing = self.timing(frame);
+        fill_intents(&mut self.intents, observation, &frame.received);
         Some(crate::forager::decide(
             observation,
             &timing,
+            &self.intents,
             &self.params,
             &mut self.scratch,
         ))
+    }
+}
+
+/// Per-opponent received knowledge in observation order. Opponents and
+/// receipt rows both follow the decoder's slot order, so the scan resumes after
+/// the previous match and usually finds the next row at once.
+fn fill_intents(
+    intents: &mut Vec<crate::forager::Intent>,
+    observation: &crate::Observation,
+    received: &ReceivedMetadata,
+) {
+    intents.clear();
+    let rows = &received.snakes;
+    let mut next = 0;
+    for opponent in &observation.opponents {
+        let mut intent = crate::forager::Intent::default();
+        let found = (0..rows.len())
+            .map(|i| (next + i) % rows.len())
+            .find(|&i| rows[i].snake_id == opponent.id);
+        if let Some(i) = found {
+            next = i + 1;
+            let row = &rows[i];
+            if let Some(wanted) = row.wanted_history.first() {
+                intent.wanted = wanted.value;
+            }
+            if row.heading.valid {
+                intent.heading_age = row.heading.age_seconds;
+            }
+        }
+        intents.push(intent);
     }
 }
 
