@@ -613,9 +613,12 @@ class ProcessFailures(unittest.TestCase):
                 reader = perf_baseline.Lines(Pipe(), spin_seconds=spin)
                 polls = iter([0, 0, 3])
                 reader.available = lambda: next(polls)
+                # A frozen clock keeps both idle polls inside the spin window even
+                # if the test thread is descheduled between them.
                 with patch.object(perf_baseline.os, "read", return_value=b"ok\n"), patch.object(
-                        perf_baseline.time, "sleep") as sleep:
-                    self.assertEqual(reader.read(time.perf_counter() + 60), b"ok")
+                        perf_baseline.time, "sleep") as sleep, patch.object(
+                        perf_baseline.time, "perf_counter", return_value=0.0):
+                    self.assertEqual(reader.read(60.0), b"ok")
                 self.assertEqual([call.args[0] for call in sleep.call_args_list], expected)
         self.assertEqual(perf_baseline.Lines(Pipe()).spin_seconds, 0)
 
