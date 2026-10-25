@@ -1,30 +1,24 @@
 //! Raw protocol-19 WebSocket host: remote clients and in-process bots share
 //! one real-time world.
 //!
-//! Three kinds of threads share one wall-clock schedule. The simulation thread
-//! owns the world and only runs physics ticks and encodes their messages. The
-//! I/O thread owns the listener and every socket, and sends each frame at the
-//! time the latency model delivers it rather than whenever the tick that made
-//! it finished. Bot threads run the background seekers as ordinary clients of
-//! their own slots: they decode frames, decide, ping and model processing time
-//! off the simulation thread, and reach the world only through timestamped
-//! commands. Running 480 seekers on the host thread delayed remote frames by up
-//! to ~20 ms depending on tick phase ([jitter study], 2026-10-25).
+//! Three thread roles share one wall-clock schedule: simulation owns physics
+//! and encoding; I/O owns the listener and sockets, sending frames at their
+//! latency-model delivery times; bots decode, decide, ping and model processing
+//! for their own slots, reaching the world through timestamped commands.
+//! Running 480 seekers on the simulation thread delayed remote frames by up to
+//! ~20 ms depending on tick phase ([jitter study], 2026-10-25).
 //!
 //! [jitter study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-tail-jitter/REPORT.md
 //!
-//! Sockets stay nonblocking: interrupted HTTP upgrades, partial WebSocket
-//! messages and unflushed output stay inside their tungstenite state, so a slow
-//! or stalled peer never blocks physics or another connection. Each socket is
-//! bounded: upgrade and login deadlines, small client messages, a capped send
-//! buffer and a per-poll read budget. A misbehaving client is closed without
-//! touching other slots.
+//! Nonblocking sockets retain interrupted upgrades, partial messages and pending
+//! output in tungstenite state, so stalled peers cannot block physics or other
+//! connections. Upgrade/login deadlines, message/send-buffer limits and per-poll
+//! read budgets bound each socket; client faults close only that connection.
 //!
-//! Login follows the stock client: optional one-byte framing requests, the
-//! `[99, 0]` request, a `6` challenge generated here from a fixed literal, a
-//! 27-byte reply and the `s` login. The challenge is a compatibility step, not
-//! authentication. A login sent first (the native `direct` handshake) is also
-//! accepted.
+//! Login accepts optional one-byte framing requests, `[99, 0]`, a `6` challenge
+//! generated from a fixed literal, a 27-byte reply and `s` login. The challenge
+//! provides stock-client compatibility, not authentication. A direct `s` login
+//! is also accepted.
 use super::{
     ClientState, ClientStatus, SimulationConfig, challenge,
     latency::{LatencyConfig, Link, Random},
@@ -273,6 +267,19 @@ enum Delivery {
     },
 }
 
+impl Delivery {
+    fn session(&self) -> (usize, u64) {
+        match self {
+            Self::Frames {
+                slot, generation, ..
+            }
+            | Self::Closed {
+                slot, generation, ..
+            } => (*slot, *generation),
+        }
+    }
+}
+
 /// A bound protocol-19 server. `start` serves it on its own threads; `run`
 /// serves it until a failure.
 pub struct Host {
@@ -517,9 +524,8 @@ impl Simulation {
             }
             let started = Instant::now();
             for _ in 0..due {
-                // Commands shape the tick during which they arrive, so a
-                // frame reflects input that reached it by its due time; their
-                // send times, not this loop, set which tick that is.
+                // Command send times determine their arrival tick, so its frame
+                // reflects input that reached the world by that tick's due time.
                 self.apply_commands()?;
                 self.advance_tick()?;
                 self.ticks += 1;
@@ -729,7 +735,7 @@ enum Phase {
 
 type Upgrade = fn(&Request, Response) -> Result<Response, ErrorResponse>;
 
-#[allow(
+#[expect(
     clippy::result_large_err,
     reason = "tungstenite's header callback fixes the error type"
 )]
@@ -782,10 +788,8 @@ impl Gate {
         let _ = self.commands.send(command);
     }
 
-    /// Send a playing client's message unless the simulation has yet to
-    /// consume `REMOTE_IN_FLIGHT` earlier commands from its slot. The world's
-    /// own limit applies only as it consumes them, which a stalled simulation
-    /// does not, so this bounds what the channel holds.
+    /// Bound queued commands by `REMOTE_IN_FLIGHT` per slot, even while the
+    /// simulation stalls: the world's own limit applies only on consumption.
     fn forward(&self, command: Command) -> Result<(), String> {
         if self.shared.pending[command.slot()].load(Ordering::Relaxed) >= REMOTE_IN_FLIGHT {
             return Err("Remote connection has too many undelivered messages".into());
@@ -873,14 +877,7 @@ impl Gateway {
     /// Queue a delivery on its session. Deliveries for a session that already
     /// ended are dropped.
     fn deliver(&mut self, delivery: Delivery, now: Instant) {
-        let (slot, generation) = match &delivery {
-            Delivery::Frames {
-                slot, generation, ..
-            }
-            | Delivery::Closed {
-                slot, generation, ..
-            } => (*slot, *generation),
-        };
+        let (slot, generation) = delivery.session();
         let Some(open) = self
             .sessions
             .iter_mut()
@@ -1215,10 +1212,9 @@ struct Bots {
     interval: f64,
 }
 
-/// A background seeker as a client of its slot. It follows the simulator's
-/// native background client: it decides every decision interval from the
-/// frames delivered by then, sends after its processing time, pings on the
-/// client's cadence and rejoins after it dies.
+/// A background seeker that decides from delivered frames every interval, sends
+/// after processing, pings on the client's cadence and rejoins after death,
+/// matching the simulator's native background client.
 struct Seat {
     slot: usize,
     generation: u64,
@@ -1269,14 +1265,7 @@ impl Bots {
     }
 
     fn deliver(&mut self, delivery: Delivery) {
-        let (slot, generation) = match &delivery {
-            Delivery::Frames {
-                slot, generation, ..
-            }
-            | Delivery::Closed {
-                slot, generation, ..
-            } => (*slot, *generation),
-        };
+        let (slot, generation) = delivery.session();
         let first = self.seats[0].slot;
         let Some(seat) = self
             .seats

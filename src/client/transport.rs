@@ -98,19 +98,14 @@ impl Active {
         }
     }
 
-    /// Poll the current frame. This never advances time or reads a socket.
-    fn frame(&mut self) -> Result<ClientFrame, String> {
-        match self {
+    /// Reply with the current frame without advancing time or reading a socket.
+    fn reply(&mut self) -> Result<Vec<u8>, String> {
+        let backend = self.name();
+        let frame = match self {
             Self::Simulation(backend) => backend.frame(),
             Self::Network(backend) => backend.frame(),
-        }
-    }
-
-    fn reply(&mut self) -> Result<Vec<u8>, String> {
-        Ok(reply(&FrameReply {
-            backend: self.name(),
-            frame: self.frame()?,
-        }))
+        }?;
+        Ok(reply(&FrameReply { backend, frame }))
     }
 }
 

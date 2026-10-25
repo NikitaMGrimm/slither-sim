@@ -204,58 +204,7 @@ impl NetworkBackend {
     }
 
     fn open(&mut self) -> Result<(), String> {
-        let mut request = self
-            .config
-            .url
-            .as_str()
-            .into_client_request()
-            .map_err(|e| e.to_string())?;
-        if let Some(origin) = &self.config.origin {
-            request.headers_mut().insert(
-                "Origin",
-                HeaderValue::from_str(origin).map_err(|e| e.to_string())?,
-            );
-        }
-        let uri = request.uri();
-        let host = uri.host().ok_or("Missing server host")?;
-        let host = host.trim_start_matches('[').trim_end_matches(']');
-        let port = uri
-            .port_u16()
-            .unwrap_or(if uri.scheme_str() == Some("wss") {
-                443
-            } else {
-                80
-            });
-        // DNS uses the system resolver; the socket and HTTP/TLS handshakes are bounded.
-        let addresses = (host, port).to_socket_addrs().map_err(|e| e.to_string())?;
-        let deadline = deadline(Instant::now(), self.config.connect_timeout_seconds)?;
-        let mut last_error = "Server resolved to no addresses".to_string();
-        let mut connected = None;
-        for address in addresses {
-            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-                break;
-            };
-            match TcpStream::connect_timeout(&address, remaining) {
-                Ok(stream) => {
-                    connected = Some(stream);
-                    break;
-                }
-                Err(error) => last_error = error.to_string(),
-            }
-        }
-        let stream = connected.ok_or(last_error)?;
-        stream.set_nodelay(true).map_err(|e| e.to_string())?;
-        let stream = DeadlineStream {
-            socket: stream,
-            read_deadline: deadline,
-            write_deadline: deadline,
-        };
-        let config = WebSocketConfig::default()
-            .max_message_size(Some(MAX_MESSAGE_BYTES))
-            .max_frame_size(Some(MAX_MESSAGE_BYTES));
-        let (socket, _) = tungstenite::client_tls_with_config(request, stream, Some(config), None)
-            .map_err(|e| e.to_string())?;
-        self.socket = Some(socket);
+        self.socket = Some(connect_socket(&self.config)?);
         let now = self.now();
         self.state.new_connection(now)?;
         self.last_received = now;
@@ -468,6 +417,63 @@ impl Drop for NetworkBackend {
     fn drop(&mut self) {
         self.disconnect();
     }
+}
+
+/// Establish the transport before resetting client state or sending game messages.
+fn connect_socket(
+    config: &NetworkConfig,
+) -> Result<WebSocket<MaybeTlsStream<DeadlineStream>>, String> {
+    let mut request = config
+        .url
+        .as_str()
+        .into_client_request()
+        .map_err(|e| e.to_string())?;
+    if let Some(origin) = &config.origin {
+        request.headers_mut().insert(
+            "Origin",
+            HeaderValue::from_str(origin).map_err(|e| e.to_string())?,
+        );
+    }
+    let uri = request.uri();
+    let host = uri.host().ok_or("Missing server host")?;
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    let port = uri
+        .port_u16()
+        .unwrap_or(if uri.scheme_str() == Some("wss") {
+            443
+        } else {
+            80
+        });
+    // DNS uses the system resolver; the socket and HTTP/TLS handshakes are bounded.
+    let addresses = (host, port).to_socket_addrs().map_err(|e| e.to_string())?;
+    let deadline = deadline(Instant::now(), config.connect_timeout_seconds)?;
+    let mut last_error = "Server resolved to no addresses".to_string();
+    let mut connected = None;
+    for address in addresses {
+        let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+            break;
+        };
+        match TcpStream::connect_timeout(&address, remaining) {
+            Ok(stream) => {
+                connected = Some(stream);
+                break;
+            }
+            Err(error) => last_error = error.to_string(),
+        }
+    }
+    let stream = connected.ok_or(last_error)?;
+    stream.set_nodelay(true).map_err(|e| e.to_string())?;
+    let stream = DeadlineStream {
+        socket: stream,
+        read_deadline: deadline,
+        write_deadline: deadline,
+    };
+    let config = WebSocketConfig::default()
+        .max_message_size(Some(MAX_MESSAGE_BYTES))
+        .max_frame_size(Some(MAX_MESSAGE_BYTES));
+    let (socket, _) = tungstenite::client_tls_with_config(request, stream, Some(config), None)
+        .map_err(|e| e.to_string())?;
+    Ok(socket)
 }
 
 fn transport_stream(
