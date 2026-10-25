@@ -148,6 +148,12 @@
 
 ### Performance
 
+- Crowded hosts spend far less time choosing spawn positions: candidates stop
+  being scored once they cannot win, and the chosen pose is unchanged. A
+  64-seat Battledome host drops from about 45 to 3.5 ms per tick. Background
+  bots refused a spawn wait one second before retrying; socket players keep
+  their own join timing
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-25-battledome-spawn-cost/REPORT.md)).
 - Batch observations (`observe_all_into`, `observe_selected_into`, transport
   frames and `serve`) are 16–19% faster sequentially and 5–12% faster in
   parallel in the 96- and 128-snake benchmark worlds, with identical results.

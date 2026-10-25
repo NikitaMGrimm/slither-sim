@@ -14,6 +14,151 @@ use super::{
     snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
 };
 
+/// Original exhaustive admission, kept independent of the bounded scorer.
+fn exhaustive_spawn_pose(
+    world: &Simulator,
+    random: &mut Random,
+) -> Result<(Vec<Point>, f64), String> {
+    let mut open: Option<(f64, Vec<Point>, f64)> = None;
+    for _ in 0..SPAWN_ATTEMPTS {
+        let distance = spawn::spawn_distance(&world.config, random.unit());
+        let angle = random.unit() * TAU;
+        let heading = random.unit() * TAU;
+        let (body, heading) = world.spawn_body(
+            Point {
+                x: angle.cos() * distance,
+                y: angle.sin() * distance,
+            },
+            heading,
+        )?;
+        if world.body_is_clear(&body, 600.) {
+            return Ok((body, heading));
+        }
+        if let Some(margin) = world.spawn_margin(&body)
+            && open.as_ref().is_none_or(|(best, ..)| margin > *best)
+        {
+            open = Some((margin, body, heading));
+        }
+    }
+    match open {
+        Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
+        Some(_) => Err("No spawn position is clear of other snakes".into()),
+        None => Err("No spawn position fits inside the arena".into()),
+    }
+}
+
+#[test]
+fn bounded_admission_matches_exhaustive_poses_errors_and_random_stream() {
+    let mut outcomes = [0; 3]; // clear preference, crowded fallback, refused
+    for seed in [7, 29] {
+        for neighbors in [0, 6, 16] {
+            let mut backend = SimulatorBackend::new(
+                seed,
+                SimulationConfig {
+                    world: Config::battledome(),
+                    agents: neighbors + 1,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            for snake in &mut backend.world.snakes {
+                snake.alive = false;
+            }
+            // Synthetic ring arcs leave ample space, narrow fallback gaps, or
+            // no full-newborn gap. No live server evidence is implied.
+            for slot in 1..=neighbors {
+                let angle = (slot - 1) as f64 * TAU / neighbors as f64;
+                let (body, heading) = backend
+                    .world
+                    .spawn_body(
+                        Point {
+                            x: 2684. * angle.cos(),
+                            y: 2684. * angle.sin(),
+                        },
+                        angle + std::f64::consts::FRAC_PI_2,
+                    )
+                    .unwrap();
+                backend.world.respawn_body(slot, body, heading).unwrap();
+            }
+            for _ in 0..3 {
+                let mut random = backend.spawn_random.clone();
+                let expected = exhaustive_spawn_pose(&backend.world, &mut random);
+                let actual = backend.spawn_pose(0);
+                assert_eq!(actual, expected, "seed {seed}, neighbors {neighbors}");
+                assert_eq!(backend.spawn_random.unit(), random.unit());
+                assert!(!backend.world.snakes[0].alive);
+                let kind = match actual {
+                    Ok((body, _)) if backend.world.body_is_clear(&body, 600.) => 0,
+                    Ok(_) => 1,
+                    Err(_) => 2,
+                };
+                outcomes[kind] += 1;
+            }
+        }
+    }
+    assert!(outcomes.iter().all(|&count| count > 0), "{outcomes:?}");
+
+    let mut backend = SimulatorBackend::new(
+        7,
+        SimulationConfig {
+            world: Config::battledome(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    backend.world.snakes[0].alive = false;
+    // All sampled ring bodies violate the wall margin: preserve the distinct
+    // invalid-geometry error rather than treating a pruned score as invalid.
+    backend.world.config.radius = 2000.;
+    let mut random = backend.spawn_random.clone();
+    assert_eq!(
+        backend.spawn_pose(0),
+        exhaustive_spawn_pose(&backend.world, &mut random)
+    );
+    assert_eq!(backend.spawn_random.unit(), random.unit());
+}
+
+#[test]
+fn bounded_spawn_margins_only_prune_losing_candidates() {
+    let mut world = Simulator::new(7, Config::battledome()).unwrap();
+    world.add_slots(8).unwrap();
+    for angle in [0., 0.1, 1., 3.] {
+        let (body, _) = world
+            .spawn_body(
+                Point {
+                    x: 2684. * f64::cos(angle),
+                    y: 2684. * f64::sin(angle),
+                },
+                angle,
+            )
+            .unwrap();
+        let exact = world.spawn_margin(&body).unwrap();
+        for cutoff in [f64::NEG_INFINITY, -100., 0., 100., exact, f64::INFINITY] {
+            let bound = world.spawn_margin_bounded(&body, cutoff).unwrap();
+            assert!(bound >= exact);
+            assert_eq!(bound > cutoff, exact > cutoff);
+            if bound > cutoff {
+                assert_eq!(bound.to_bits(), exact.to_bits());
+            }
+        }
+    }
+    for body in [
+        vec![],
+        vec![Point::default(); 431],
+        vec![Point { x: f64::NAN, y: 0. }; 2],
+        vec![Point { x: 3584., y: 0. }; 2],
+    ] {
+        assert_eq!(world.spawn_margin_bounded(&body, 0.), None);
+    }
+    for snake in &mut world.snakes {
+        snake.alive = false;
+    }
+    assert_eq!(
+        world.spawn_margin_bounded(&[Point::default(); 2], 0.),
+        Some(f64::INFINITY)
+    );
+}
+
 #[test]
 fn a_clock_past_u64_periods_stays_due() {
     let mut next = 1;

@@ -17,6 +17,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 | Fidelity | [Spawn admission](fidelity/2026-10-25-spawn-admission/REPORT.md) | Retained official join clearances; adopted never-refuse host admission with a most-open fallback and seat-sized dynamic host arenas; the official rejection rule stays unidentified. |
 | Fidelity | [Tail/turn jitter](fidelity/2026-10-25-tail-jitter/REPORT.md) | Exploratory shared Windows desktop; batching/stall diagnosis, reverted staggering and owner-reported 500-bot after evidence (43% simulation load, zero deferrals). |
 | Performance | [Initial cost baseline](performance/2026-10-23-baseline/REPORT.md) | Exploratory synthetic costs; not an isolated host or stable production comparison. |
+| Performance | [Battledome spawn cost](performance/2026-10-25-battledome-spawn-cost/REPORT.md) | Offline host admission profiling; bounded scoring preserves selected poses, refused host bots wait one wall second, and spawn-ring capacity is measured separately from CPU cost. |
 | Performance | [Collision bounds lookup](performance/2026-10-23-collision-bounds/REPORT.md) | Adopted lookup change; gain specific to the separated-body fixture. |
 | Performance | [Observation batches](performance/2026-10-23-observation-batches/REPORT.md) | Early return adopted for empty batches; rejected attempt and mixed nonempty results retained. |
 | Fidelity | [Visibility recheck and follow-ups](fidelity/2026-10-23-visibility-recheck/REPORT.md) | Acquisition successes and failures; no validated replacement subscription rule. |

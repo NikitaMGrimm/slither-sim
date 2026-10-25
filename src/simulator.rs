@@ -941,6 +941,12 @@ impl Simulator {
     /// `None` for a body that check rejects whatever the neighbors: a length
     /// outside 2..=430, a non-finite point, or a point within the wall margin.
     pub fn spawn_margin(&self, body: &[Point]) -> Option<f64> {
+        self.spawn_margin_bounded(body, f64::NEG_INFINITY)
+    }
+
+    /// As `spawn_margin`, but may return an upper bound at most `stop_at` as
+    /// soon as an edge rules out beating it. Larger results remain exact.
+    pub(crate) fn spawn_margin_bounded(&self, body: &[Point], stop_at: f64) -> Option<f64> {
         let limit = self.config.radius - SPAWN_WALL_MARGIN;
         if !(2..=430).contains(&body.len())
             || body
@@ -955,9 +961,15 @@ impl Simulator {
             for edge in body.windows(2) {
                 let (head, tail) = (edge[0], edge[1]);
                 margin = margin.min(segment_distance(s.head, head, tail) - contact);
+                if margin <= stop_at {
+                    return Some(margin);
+                }
                 let mut a = s.head;
                 for &b in &s.body {
                     margin = margin.min(swept_distance(head, tail, a, b) - contact);
+                    if margin <= stop_at {
+                        return Some(margin);
+                    }
                     a = b;
                 }
             }
