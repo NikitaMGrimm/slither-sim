@@ -431,7 +431,13 @@ impl SimulatorBackend {
                 encode::speed_byte(snake.speed)?,
             ];
             let fam = encode::fam_u24(snake.fam);
-            reports.update(self.slots[slot].life, motion, fam, self.tick);
+            reports.update(
+                self.slots[slot].life,
+                motion,
+                fam,
+                self.tick,
+                self.config.delivery,
+            );
         }
         Ok(())
     }

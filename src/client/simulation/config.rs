@@ -7,10 +7,33 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Packet release policy, independent of the link's delivery delay.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DeliveryProfile {
+    #[default]
+    Official,
+    Responsive,
+}
+impl DeliveryProfile {
+    fn is_official(&self) -> bool {
+        *self == Self::Official
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+#[serde(
+    remote = "Self",
+    default,
+    deny_unknown_fields,
+    rename_all = "camelCase"
+)]
 pub struct SimulationConfig {
     pub world: Config,
+    /// When visible state is sent; independent of `latency`.
+    // Preserve the official profile's existing config/trace JSON.
+    #[serde(skip_serializing_if = "DeliveryProfile::is_official")]
+    pub delivery: DeliveryProfile,
     /// Snakes joined at start on the deterministic test ring of `Simulator::add`.
     pub agents: usize,
     pub controlled_slot: usize,
@@ -34,6 +57,7 @@ impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
             world: Config::default(),
+            delivery: DeliveryProfile::Official,
             agents: 1,
             controlled_slot: 0,
             decision_ticks: 6,
@@ -49,6 +73,31 @@ impl Default for SimulationConfig {
             latency: LatencyConfig::default(),
             record_wire: false,
         }
+    }
+}
+impl Serialize for SimulationConfig {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        Self::serialize(self, serializer)
+    }
+}
+impl<'de> Deserialize<'de> for SimulationConfig {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        use serde_json::{Map, Value};
+        let mut fields = Map::deserialize(deserializer)?;
+        // Resolve while the preset name still exists: Config deserialization
+        // expands it into world fields. Explicit delivery always wins, and a
+        // custom pit/floor alone does not silently opt into responsive delivery.
+        if !fields.contains_key("delivery")
+            && fields
+                .get("world")
+                .and_then(|world| world.get("preset"))
+                .and_then(Value::as_str)
+                == Some("battledome")
+        {
+            fields.insert("delivery".into(), Value::String("responsive".into()));
+        }
+        Self::deserialize(Value::Object(fields)).map_err(D::Error::custom)
     }
 }
 impl SimulationConfig {

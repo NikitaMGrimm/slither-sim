@@ -34,7 +34,7 @@ pub use received::{
     ReceivedTracker,
 };
 pub use server::{Host, HostConfig, RunningHost};
-pub use simulation::{SimulationConfig, SimulatorBackend};
+pub use simulation::{DeliveryProfile, SimulationConfig, SimulatorBackend};
 
 pub const CONTRACT: &str = "slither-client-v2";
 

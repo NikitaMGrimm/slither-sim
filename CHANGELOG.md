@@ -62,6 +62,9 @@
 
 ### Added
 
+- `SimulationConfig.delivery` selects official or responsive packet pacing;
+  Battledome JSON presets default to responsive ([configuration](docs/configuration.md#simulationconfig)).
+
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from

@@ -3,8 +3,8 @@
 use slither_sim::{
     Action,
     client::{
-        Backend, ClientFrame, ClientState, ClientStatus, HostConfig, SimulationConfig,
-        SimulatorBackend, WireEvent, WireRecord,
+        Backend, ClientFrame, ClientState, ClientStatus, DeliveryProfile, HostConfig,
+        SimulationConfig, SimulatorBackend, WireEvent, WireRecord,
         latency::{LatencyConfig, Pauses, Variation},
         protocol::split_frame,
         replay_record,
@@ -14,6 +14,54 @@ use slither_sim::{
 use std::f64::consts::TAU;
 
 const DT: f64 = physics::LOOP_SECONDS;
+
+#[test]
+fn delivery_defaults_and_explicit_overrides_resolve_before_world_presets() {
+    for (json, expected) in [
+        (r#"{}"#, DeliveryProfile::Official),
+        (
+            r#"{"world":{"preset":"official"}}"#,
+            DeliveryProfile::Official,
+        ),
+        (
+            r#"{"world":{"preset":"sandbox"}}"#,
+            DeliveryProfile::Official,
+        ),
+        (
+            r#"{"world":{"preset":"battledome"}}"#,
+            DeliveryProfile::Responsive,
+        ),
+        (
+            r#"{"delivery":"official","world":{"preset":"battledome"}}"#,
+            DeliveryProfile::Official,
+        ),
+        (
+            r#"{"delivery":"responsive","world":{"preset":"official"}}"#,
+            DeliveryProfile::Responsive,
+        ),
+    ] {
+        let config: SimulationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.delivery, expected);
+        let host: HostConfig =
+            serde_json::from_str(&format!(r#"{{"simulation":{json}}}"#)).unwrap();
+        assert_eq!(host.simulation.delivery, expected);
+        let resolved = serde_json::to_value(&config).unwrap();
+        assert_eq!(
+            resolved.get("delivery").and_then(serde_json::Value::as_str),
+            (expected == DeliveryProfile::Responsive).then_some("responsive")
+        );
+        let roundtrip: SimulationConfig = serde_json::from_value(resolved).unwrap();
+        assert_eq!(roundtrip.delivery, expected);
+    }
+    for json in [r#"{"delivery":"fast"}"#, r#"{"delivery":null}"#] {
+        assert!(serde_json::from_str::<SimulationConfig>(json).is_err());
+    }
+    // Rust world construction carries no preset name: delivery is explicit.
+    assert_eq!(
+        SimulationConfig::default().delivery,
+        DeliveryProfile::Official
+    );
+}
 
 fn config(agents: usize, latency: LatencyConfig) -> SimulationConfig {
     let mut config = SimulationConfig {

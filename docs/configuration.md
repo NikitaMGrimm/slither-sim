@@ -57,6 +57,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
 | `world` | `Config::official(1)` | World settings below. |
+| `delivery` | `"official"` | Packet release profile: `official` or `responsive`; separate from link latency. Responsive sends changed wanted heading, speed and mass each tick; steady turning keeps the six-tick gate. |
 | `agents` | `1` | Slots, 1–65,535; overridden by the host. |
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, at least 1. |
@@ -66,6 +67,12 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
+
+In host and portable JSON, `world: {"preset": "battledome"}` defaults delivery
+to `responsive`; explicit `delivery` always wins. Other presets default to
+`official`. Resolved JSON omits default `official` and retains `responsive`.
+Rust world constructors carry no preset name: set
+`delivery: DeliveryProfile::Responsive` explicitly.
 
 Incremental updates send at most three new body anchors per snake per tick.
 When `world.dt × 437.5 ≥ 126` world units, boosting snakes can outrun this window;

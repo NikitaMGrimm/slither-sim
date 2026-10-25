@@ -88,7 +88,8 @@ Physics ticks default to 7 ms, encoding gameplay every tick without empty frames
 The
 [scheduler study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md)
 supports separate release paths and shared entity/maintenance phases.
-These gates are adopted inferences, not an exact recovered implementation:
+The default `delivery: "official"` uses these adopted inferences, not an exact
+recovered implementation:
 
 | Family | Simulator release rule |
 | --- | --- |
@@ -97,6 +98,12 @@ These gates are adopted inferences, not an exact recovered implementation:
 | Body | Prompt anchors and tail changes. Incremental per-snake order is tail/standalone mass, then motion, then anchors; growth anchors carry their own mass. |
 | Food | Ambient births become wire-visible when `floor(t / 0.504)` advances, with sector cleanup on the shared maintenance epoch. Boost/death `b` and pickups are prompt; `F` listings remain an interest-entry path. Physical ambient generation is unchanged. |
 | Prey `j` | One correction clock per prey shared across viewers, with a nominal one-third-second interval. When the current or last reported speed encodes as exactly 11, the interval is 210 ms; ordinary turning alone does not accelerate reporting. Quantized position need not change. Viewer entry does not restart the clock. |
+
+`delivery: "responsive"` is our design for players, not official behavior.
+Changed wanted-heading/speed bytes and standalone mass bypass their gates in
+the next tick's frame. Heading-only changes keep six-tick spacing; other
+families keep official pacing. It uses the same packets and stock client.
+See the [comparison](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-delivery-profiles/REPORT.md).
 
 The corpus includes sub-35 ms motion gaps, sub-100 ms mass gaps, 27 reverse
 mass/motion pairs and a 2,694 ms same-prey correction gap with other traffic

@@ -1,0 +1,563 @@
+{
+  "latency": {
+    "official": {
+      "heading": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 2.5,
+          "min": 0,
+          "p50": 3,
+          "p90": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 2.5,
+          "min": 0,
+          "p50": 3,
+          "p90": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "histogramTicks": {
+          "0": 16,
+          "1": 16,
+          "2": 16,
+          "3": 16,
+          "4": 16,
+          "5": 16
+        }
+      },
+      "boostOn": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 2.5,
+          "min": 0,
+          "p50": 3,
+          "p90": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 2.5,
+          "min": 0,
+          "p50": 3,
+          "p90": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "histogramTicks": {
+          "0": 16,
+          "1": 16,
+          "2": 16,
+          "3": 16,
+          "4": 16,
+          "5": 16
+        }
+      },
+      "boostOff": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 1.2916666666666667,
+          "min": 0,
+          "p50": 0,
+          "p90": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 1.2916666666666667,
+          "min": 0,
+          "p50": 0,
+          "p90": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "histogramTicks": {
+          "0": 63,
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 5,
+          "5": 16
+        }
+      },
+      "mass": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 7.1875,
+          "min": 0,
+          "p50": 7,
+          "p90": 13,
+          "p95": 14,
+          "p99": 14,
+          "max": 14
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 7.1875,
+          "min": 0,
+          "p50": 7,
+          "p90": 13,
+          "p95": 14,
+          "p99": 14,
+          "max": 14
+        },
+        "histogramTicks": {
+          "0": 7,
+          "1": 6,
+          "2": 6,
+          "3": 6,
+          "4": 6,
+          "5": 6,
+          "6": 6,
+          "7": 6,
+          "8": 6,
+          "9": 6,
+          "10": 7,
+          "11": 7,
+          "12": 7,
+          "13": 7,
+          "14": 7
+        }
+      }
+    },
+    "naive": {
+      "heading": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      },
+      "boostOn": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      },
+      "boostOff": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      },
+      "mass": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      }
+    },
+    "responsive": {
+      "heading": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      },
+      "boostOn": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      },
+      "boostOff": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      },
+      "mass": {
+        "ownTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "otherTicks": {
+          "n": 96,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "histogramTicks": {
+          "0": 96
+        }
+      }
+    }
+  },
+  "live": [
+    {
+      "scene": "official500",
+      "variant": "official",
+      "ticks": 4947,
+      "deferred": 53,
+      "simulationMsPerTick": 3.9600930665049523,
+      "simulationLoad": 0.5597308685714286,
+      "generatedBytesPerClientSecond": {
+        "n": 500,
+        "mean": 2065.2245142857146,
+        "min": 1157.3428571428572,
+        "p50": 2064.0,
+        "p90": 2423.2,
+        "p95": 2529.5714285714284,
+        "p99": 2706.5142857142855,
+        "max": 2948.457142857143
+      },
+      "watcherReceivedBytesPerSecond": 1883.654285311832,
+      "correction": {
+        "recv": {
+          "n": 612.0,
+          "rms": 3.49,
+          "p50": 0.66,
+          "p95": 5.31,
+          "p99": 14.05
+        },
+        "server": {
+          "n": 612.0,
+          "rms": 0.68,
+          "p50": 0.28,
+          "p95": 1.38,
+          "p99": 1.81
+        }
+      },
+      "excessDelayMs": {
+        "n": 3394.0,
+        "p50": 2.1,
+        "p90": 372.6,
+        "p99": 534.2
+      },
+      "capture": "usable",
+      "bandwidthScope": "all configured seats, including inactive; server-generated payloads",
+      "seatsWithBytes": 500
+    },
+    {
+      "scene": "official500",
+      "variant": "naive",
+      "ticks": 5000,
+      "deferred": 0,
+      "simulationMsPerTick": 4.0040117,
+      "simulationLoad": 0.5720016714285715,
+      "generatedBytesPerClientSecond": {
+        "n": 500,
+        "mean": 5745.885257142857,
+        "min": 2787.114285714286,
+        "p50": 5702.371428571429,
+        "p90": 7087.742857142857,
+        "p95": 7609.0,
+        "p99": 8146.8,
+        "max": 8772.714285714286
+      },
+      "watcherReceivedBytesPerSecond": 6173.372905013726,
+      "correction": {
+        "recv": {
+          "n": 818.0,
+          "rms": 4.78,
+          "p50": 0.66,
+          "p95": 10.23,
+          "p99": 21.02
+        },
+        "server": {
+          "n": 818.0,
+          "rms": 0.64,
+          "p50": 0.28,
+          "p95": 1.37,
+          "p99": 1.52
+        }
+      },
+      "excessDelayMs": {
+        "n": 4951.0,
+        "p50": 1.5,
+        "p90": 13.3,
+        "p99": 126.2
+      },
+      "capture": "usable",
+      "bandwidthScope": "all configured seats, including inactive; server-generated payloads",
+      "seatsWithBytes": 500
+    },
+    {
+      "scene": "official500",
+      "variant": "responsive",
+      "ticks": 5001,
+      "deferred": 0,
+      "simulationMsPerTick": 3.1874089982003597,
+      "simulationLoad": 0.4554352114285714,
+      "generatedBytesPerClientSecond": {
+        "n": 500,
+        "mean": 2156.122685714286,
+        "min": 1067.4,
+        "p50": 2144.9142857142856,
+        "p90": 2528.9142857142856,
+        "p95": 2617.0285714285715,
+        "p99": 2762.9142857142856,
+        "max": 3025.714285714286
+      },
+      "watcherReceivedBytesPerSecond": 1889.5312177007133,
+      "correction": {
+        "recv": {
+          "n": 527.0,
+          "rms": 0.89,
+          "p50": 0.45,
+          "p95": 1.73,
+          "p99": 2.39
+        },
+        "server": {
+          "n": 527.0,
+          "rms": 0.71,
+          "p50": 0.42,
+          "p95": 1.38,
+          "p99": 1.66
+        }
+      },
+      "excessDelayMs": {
+        "n": 2925.0,
+        "p50": 1.3,
+        "p90": 3.4,
+        "p99": 12.7
+      },
+      "capture": "usable",
+      "bandwidthScope": "all configured seats, including inactive; server-generated payloads",
+      "seatsWithBytes": 500
+    },
+    {
+      "scene": "battledome64",
+      "variant": "official",
+      "ticks": 856,
+      "deferred": 4124,
+      "simulationMsPerTick": 40.69252488317757,
+      "simulationLoad": 0.9952228942857143,
+      "generatedBytesPerClientSecond": {
+        "n": 64,
+        "mean": 74.96160714285715,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 197.65714285714284,
+        "p95": 241.94285714285715,
+        "p99": 262.1142857142857,
+        "max": 272.4
+      },
+      "watcherReceivedBytesPerSecond": 29.7161165358032,
+      "correction": {
+        "recv": null,
+        "server": null
+      },
+      "excessDelayMs": null,
+      "capture": "no gameplay; refused join",
+      "bandwidthScope": "all configured seats, including inactive; server-generated payloads",
+      "seatsWithBytes": 29
+    },
+    {
+      "scene": "battledome64",
+      "variant": "naive",
+      "ticks": 868,
+      "deferred": 4141,
+      "simulationMsPerTick": 40.52059216589862,
+      "simulationLoad": 1.0049106857142858,
+      "generatedBytesPerClientSecond": {
+        "n": 64,
+        "mean": 215.30223214285715,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 635.2857142857143,
+        "p95": 672.0571428571428,
+        "p99": 793.4571428571429,
+        "max": 803.2285714285714
+      },
+      "watcherReceivedBytesPerSecond": 29.462083794892852,
+      "correction": {
+        "recv": null,
+        "server": null
+      },
+      "excessDelayMs": null,
+      "capture": "no gameplay; refused join",
+      "bandwidthScope": "all configured seats, including inactive; server-generated payloads",
+      "seatsWithBytes": 28
+    },
+    {
+      "scene": "battledome64",
+      "variant": "responsive",
+      "ticks": 923,
+      "deferred": 4096,
+      "simulationMsPerTick": 38.00726966413868,
+      "simulationLoad": 1.0023059971428572,
+      "generatedBytesPerClientSecond": {
+        "n": 64,
+        "mean": 91.59910714285715,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 249.68571428571428,
+        "p95": 263.6,
+        "p99": 281.9428571428571,
+        "max": 314.37142857142857
+      },
+      "watcherReceivedBytesPerSecond": 30.415942898702795,
+      "correction": {
+        "recv": null,
+        "server": null
+      },
+      "excessDelayMs": null,
+      "capture": "no gameplay; refused join",
+      "bandwidthScope": "all configured seats, including inactive; server-generated payloads",
+      "seatsWithBytes": 29
+    }
+  ],
+  "turnPrediction": {
+    "assumptions": "held target; correct transmitted turn direction; 42 ms; zero transport delay; fixed size; one angle-byte initial/target uncertainty; 2..293 measured segment range",
+    "maximum": {
+      "segments": 293,
+      "rateDriftRadians": 0.0034343170447921913,
+      "headingBoundRadians": 0.02797800965096245,
+      "boostPositionBoundUnits": 0.5140959273364349
+    }
+  }
+}
