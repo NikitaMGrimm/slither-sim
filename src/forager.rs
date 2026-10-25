@@ -753,9 +753,10 @@ struct Obstacle {
     owner: usize,
     head: bool,
     /// A head path's head crosses it from `t0` to `t1` seconds after the
-    /// forecast moment.
+    /// forecast moment, within `bow` of the point moving uniformly along it.
     t0: f64,
     t1: f64,
+    bow: f64,
 }
 
 impl Obstacle {
@@ -768,6 +769,7 @@ impl Obstacle {
             head,
             t0: 0.0,
             t1: 0.0,
+            bow: 0.0,
             mid: Point {
                 x: (from.x + to.x) / 2.0,
                 y: (from.y + to.y) / 2.0,
@@ -778,6 +780,18 @@ impl Obstacle {
     fn during(self, t0: f64, t1: f64) -> Self {
         Self { t0, t1, ..self }
     }
+    fn bowed(self, bow: f64) -> Self {
+        Self { bow, ..self }
+    }
+}
+
+/// How far a point that travels `length` along a path turning one way through
+/// `turned` radians strays from the point moving uniformly along the chord at
+/// the same moment. Velocities differ from the chord's mean by at most
+/// `2 sin(turned / 2) <= min(turned, 2)` of the speed, and both start and end
+/// together, so the gap is at most half of that over the whole span.
+fn bow(length: f64, turned: f64) -> f64 {
+    length * turned.abs().min(2.0) / 2.0
 }
 
 /// Food pooled in cells around the head and cells that bodies or oncoming
@@ -877,8 +891,17 @@ impl Scene {
                 if close(head) || close(middle) || close(ahead) {
                     let w = width + unsure * enemy.speed;
                     let half = p.lookahead_seconds / 2.0;
-                    near.push(Obstacle::new(head, middle, w, k, true).during(0.0, half));
-                    near.push(Obstacle::new(middle, ahead, w, k, true).during(half, 2.0 * half));
+                    let bow = bow(enemy.speed * half, (turn * half).min(delta.abs()));
+                    near.push(
+                        Obstacle::new(head, middle, w, k, true)
+                            .during(0.0, half)
+                            .bowed(bow),
+                    );
+                    near.push(
+                        Obstacle::new(middle, ahead, w, k, true)
+                            .during(half, 2.0 * half)
+                            .bowed(bow),
+                    );
                 }
                 head
             } else {
@@ -975,6 +998,18 @@ impl Scene {
     }
 }
 
+/// Whether the sliding rim (`boundary::constrain`) kills a head here: only a
+/// contact point past the rim pushed outward steeply dies, and a head meeting
+/// it closer to the tangent slides along it. Escape branches are not
+/// constrained, so past the rim this forecasts where sliding would lead.
+fn rim_kills(arena: &Arena, head: Point, heading: f64, segments: usize) -> bool {
+    let tip = forward(head, heading, boundary::CONTACT_LEAD * scale(segments));
+    let (x, y) = (tip.x - arena.center.x, tip.y - arena.center.y);
+    let distance = x.hypot(y);
+    distance >= arena.radius
+        && x * heading.cos() + y * heading.sin() > boundary::LETHAL_OUTWARD * distance
+}
+
 /// A victim's hard-left, straight and hard-right escape branches from its
 /// forecast head, as the path of its tip (`physics::strikes` kills through the
 /// tip), with whether the rim or a gathered body already blocks each.
@@ -982,6 +1017,7 @@ impl Scene {
 struct Escapes {
     tips: [[Point; 3]; 3],
     blocked: [bool; 3],
+    seconds: f64,
 }
 
 impl Escapes {
@@ -1008,13 +1044,13 @@ impl Escapes {
         {
             let at = |t: f64| {
                 let q = turn_then_straight(head, heading, delta, enemy.speed, turn, t);
-                let h = heading + delta.signum() * delta.abs().min(turn * t);
-                forward(q, h, radius)
+                (q, heading + delta.signum() * delta.abs().min(turn * t))
             };
-            tips[b] = [at(0.0), at(half), at(2.0 * half)];
-            blocked[b] = tips[b]
+            let heads = [at(0.0), at(half), at(2.0 * half)];
+            tips[b] = heads.map(|(q, h)| forward(q, h, radius));
+            blocked[b] = heads
                 .iter()
-                .any(|&q| q.distance(o.arena.center) > o.arena.radius - radius);
+                .any(|&(q, h)| rim_kills(&o.arena, q, h, enemy.segments));
         }
         // Other snakes' gathered bodies: a tip crossing their centre line, or
         // within their radius of it, dies.
@@ -1041,18 +1077,35 @@ impl Escapes {
             }
             previous = anchor;
         }
-        Self { tips, blocked }
+        Self {
+            tips,
+            blocked,
+            seconds: p.kill_trap_seconds,
+        }
     }
 
-    /// Share of branches blocked once our head has laid a wall from `from`
-    /// to `to`.
-    fn blocked_with_wall(&self, from: Point, to: Point, width: f64) -> f64 {
+    /// Share of branches blocked by a wall our head lays from `from` to `to`
+    /// at a steady pace, arriving after `arrival` seconds. A branch chord
+    /// meets only the part laid by the time the chord ends.
+    fn blocked_with_wall(&self, from: Point, to: Point, width: f64, arrival: f64) -> f64 {
+        let chord = self.seconds / 2.0;
+        let laid = |t: f64| {
+            let f = if arrival > 0.0 {
+                (t / arrival).min(1.0)
+            } else {
+                1.0
+            };
+            Point {
+                x: from.x + (to.x - from.x) * f,
+                y: from.y + (to.y - from.y) * f,
+            }
+        };
         let mut count = 0;
         for (tip, &blocked) in self.tips.iter().zip(&self.blocked) {
             if blocked
-                || tip
-                    .windows(2)
-                    .any(|w| swept_distance(w[0], w[1], from, to) < width)
+                || tip.windows(2).enumerate().any(|(j, w)| {
+                    swept_distance(w[0], w[1], from, laid(chord * (j + 1) as f64)) < width
+                })
             {
                 count += 1;
             }
@@ -1121,17 +1174,18 @@ fn cut(
             let tip = forward(q, approach, me.width);
             let probe = forward(tip, approach, radius);
             let fits = |ours: Option<f64>| {
-                ours.is_some_and(|t| {
+                ours.filter(|&t| {
                     let head = path(t);
                     (p.kill_gap..=p.kill_window).contains(&(tau - t))
                         && swept_distance(tip, probe, head, forward(head, heading_at(t), radius))
                             > radius
                 })
             };
-            let boost = if fits(me.reach(q, p.orbit_factor)) {
-                false
-            } else if ramp.is_some_and(|r| fits(me.reach_boosted(r, q, p.orbit_factor))) {
-                true
+            let (boost, arrival) = if let Some(t) = fits(me.reach(q, p.orbit_factor)) {
+                (false, t)
+            } else if let Some(t) = ramp.and_then(|r| fits(me.reach_boosted(r, q, p.orbit_factor)))
+            {
+                (true, t)
             } else {
                 continue;
             };
@@ -1141,15 +1195,22 @@ fn cut(
             to_tip(&mut ours[..points], me, p);
             let w = p.own_width_factor * me.width + radius + view.uncertainty * enemy.speed;
             let half = p.lookahead_seconds / 2.0;
-            let early = Obstacle::new(path(0.0), path(half), w, k, true).during(0.0, half);
-            let late =
-                Obstacle::new(path(half), path(2.0 * half), w, k, true).during(half, 2.0 * half);
-            if timed_clearance(&ours[..points], p.lookahead_seconds, &early).min(timed_clearance(
-                &ours[..points],
-                p.lookahead_seconds,
-                &late,
-            )) < 0.0
-            {
+            let bow = bow(enemy.speed * half, (turn * half).min(delta.abs()));
+            let early = Obstacle::new(path(0.0), path(half), w, k, true)
+                .during(0.0, half)
+                .bowed(bow);
+            let late = Obstacle::new(path(half), path(2.0 * half), w, k, true)
+                .during(half, 2.0 * half)
+                .bowed(bow);
+            let ours = &ours[..points];
+            let speed = if boost {
+                me.speed.max(BOOST_SPEED)
+            } else {
+                me.speed
+            };
+            let tip = (1.0 - p.own_width_factor) * me.width;
+            let timed = |ob: &Obstacle| timed_clearance(ours, p.lookahead_seconds, ob, speed, tip);
+            if timed(&early).min(timed(&late)) < 0.0 {
                 continue;
             }
             let mut rate = p.kill_weight * mass / (tau + p.settle_seconds);
@@ -1157,7 +1218,8 @@ fn cut(
                 let escapes = escapes.get_or_insert_with(|| {
                     Escapes::new(view, me, p, near, k, enemy, path(0.0), heading_at(0.0))
                 });
-                rate *= 1.0 + p.kill_trap_weight * escapes.blocked_with_wall(me.head, q, me.width);
+                rate *= 1.0
+                    + p.kill_trap_weight * escapes.blocked_with_wall(me.head, q, me.width, arrival);
             }
             if best.as_ref().is_none_or(|b| rate > b.rate) {
                 best = Some(Goal {
@@ -1336,6 +1398,12 @@ fn clearance(
     let rim = |q: Point| o.arena.radius - me.width - q.distance(o.arena.center);
     let mut clearance = rim(end).min(rim(ahead) + p.rim_ahead_credit).min(cap);
     to_tip(path, me, p);
+    let speed = if ramp.is_some() {
+        me.speed.max(BOOST_SPEED)
+    } else {
+        me.speed
+    };
+    let tip = (1.0 - p.own_width_factor) * me.width;
     let mut arcs = [(Point::default(), Point::default(), Point::default(), 0.0); BOOST_CHORDS];
     for (arc, w) in arcs.iter_mut().zip(path.windows(2)) {
         let (a, b) = (w[0].0, w[1].0);
@@ -1351,7 +1419,13 @@ fn clearance(
         // arc against where the head has been by each moment, not its whole
         // path.
         if obstacle.head && crosses == Some(obstacle.owner) {
-            clearance = clearance.min(timed_clearance(path, p.lookahead_seconds, obstacle));
+            clearance = clearance.min(timed_clearance(
+                path,
+                p.lookahead_seconds,
+                obstacle,
+                speed,
+                tip,
+            ));
             continue;
         }
         for &(a, b, mid, half) in arcs {
@@ -1372,11 +1446,20 @@ fn clearance(
     clearance
 }
 
-/// Clearance of our arc `path` (points at equal times over `seconds`) from the
-/// part of a crossed victim's head path occupied at each moment: its head and
-/// the body laid behind it. Between samples either may move half a sample's
-/// travel closer, which the margin covers.
-fn timed_clearance(path: &[(Point, f64)], seconds: f64, ob: &Obstacle) -> f64 {
+/// Clearance of our arc `path` (tip points and headings at equal times over
+/// `seconds`) from the part of a crossed victim's head path occupied at each
+/// moment: its head and the body laid behind it. Between samples either may
+/// move half a sample's travel closer, which the margin covers. Both paths
+/// are checked as chords travelled uniformly; the actual curves stray from
+/// them by at most their bows (the obstacle's, and ours from our head speed
+/// bound `speed`, tip offset `tip` and each chord's turn).
+fn timed_clearance(
+    path: &[(Point, f64)],
+    seconds: f64,
+    ob: &Obstacle,
+    speed: f64,
+    tip: f64,
+) -> f64 {
     let chords = (path.len() - 1) as f64;
     let ours = |t: f64| {
         let x = (t / seconds).clamp(0.0, 1.0) * chords;
@@ -1395,8 +1478,12 @@ fn timed_clearance(path: &[(Point, f64)], seconds: f64, ob: &Obstacle) -> f64 {
         .fold(0.0, f64::max)
         * chords
         / seconds;
+    let ours_bow = path
+        .windows(2)
+        .map(|w| bow(speed * seconds / chords + 2.0 * tip, wrap(w[1].1 - w[0].1)))
+        .fold(0.0, f64::max);
     let dt = seconds / TIMED_SAMPLES as f64;
-    let margin = (fastest + 2.0 * ob.half / span) * dt / 2.0;
+    let margin = (fastest + 2.0 * ob.half / span) * dt / 2.0 + ob.bow + ours_bow;
     let mut clearance = f64::INFINITY;
     for i in 0..=TIMED_SAMPLES {
         let t = dt * i as f64;
@@ -1492,6 +1579,121 @@ fn steer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn lcg(seed: &mut u64) -> f64 {
+        *seed = seed
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        (*seed >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    #[test]
+    fn timed_clearance_covers_the_curves_between_its_chords() {
+        // Review round 6: both chords of a turning, boosted victim's head path
+        // cleared a straight arc that the actual curves strike. Whenever the
+        // timed check clears, the exact curves must stay a width apart.
+        let (seconds, width) = (0.45, 14.5);
+        let half = seconds / 2.0;
+        let mut seed = 6;
+        let mut checked = 0;
+        for _ in 0..4_000 {
+            let speed = base_speed(2) + lcg(&mut seed) * (BOOST_SPEED - base_speed(2));
+            let turn = turn_rate(2 + (lcg(&mut seed) * 300.0) as usize);
+            let delta = (2.0 * lcg(&mut seed) - 1.0) * std::f64::consts::PI;
+            let victim = |t: f64| turn_then_straight(Point::default(), 0.0, delta, speed, turn, t);
+            let bow = bow(speed * half, (turn * half).min(delta.abs()));
+            let early = Obstacle::new(victim(0.0), victim(half), width, 0, true)
+                .during(0.0, half)
+                .bowed(bow);
+            let late = Obstacle::new(victim(half), victim(seconds), width, 0, true)
+                .during(half, seconds)
+                .bowed(bow);
+            let start = Point {
+                x: (2.0 * lcg(&mut seed) - 1.0) * 120.0 + 60.0,
+                y: (2.0 * lcg(&mut seed) - 1.0) * 120.0,
+            };
+            let heading = lcg(&mut seed) * std::f64::consts::TAU;
+            let target = lcg(&mut seed) * std::f64::consts::TAU;
+            let ours_speed = base_speed(2) + lcg(&mut seed) * 100.0;
+            let ours_turn = turn_rate(2 + (lcg(&mut seed) * 300.0) as usize);
+            let ours = |t: f64| advance(start, heading, target, ours_speed, ours_turn, t);
+            let path = [ours(0.0), ours(half), ours(seconds)];
+            let timed = |ob: &Obstacle| timed_clearance(&path, seconds, ob, ours_speed, 0.0);
+            if timed(&early).min(timed(&late)) < 0.0 {
+                continue;
+            }
+            checked += 1;
+            for i in 0..=450 {
+                let t = i as f64 / 1000.0;
+                let q = ours(t).0;
+                for j in 0..=i {
+                    let distance = q.distance(victim(j as f64 / 1000.0));
+                    assert!(distance >= width, "t={t} gap={distance}");
+                }
+            }
+        }
+        assert!(checked > 200, "{checked}");
+    }
+
+    #[test]
+    fn trap_walls_block_only_once_laid() {
+        // Review round 6: a wall we lay later must not count against an
+        // escape branch that has already passed its place.
+        let (radius, speed) = (BODY_RADIUS * scale(2), base_speed(2));
+        let tip = |t: f64| Point {
+            x: radius + speed * t,
+            y: 0.0,
+        };
+        let open = [[Point { x: 0.0, y: 500.0 }; 3]; 3];
+        let mut tips = open;
+        tips[1] = [tip(0.0), tip(0.2), tip(0.4)];
+        let escapes = Escapes {
+            tips,
+            blocked: [false; 3],
+            seconds: 0.4,
+        };
+        let (from, to) = (Point { x: 50.0, y: -100.0 }, Point { x: 50.0, y: 100.0 });
+        assert_eq!(escapes.blocked_with_wall(from, to, 10.0, 1.0), 0.0);
+        assert_eq!(escapes.blocked_with_wall(from, to, 10.0, 0.1), 1.0 / 3.0);
+    }
+
+    #[test]
+    fn rim_kills_like_the_sliding_rim_and_lets_tangents_slide() {
+        let arena = Arena {
+            center: Point { x: 30.0, y: -20.0 },
+            radius: 1000.0,
+        };
+        // Review round 6: a small snake touching the rim on a tangent slides.
+        let at = Point {
+            x: 1025.0,
+            y: -20.0,
+        };
+        assert!(!rim_kills(&arena, at, std::f64::consts::FRAC_PI_2, 2));
+        assert!(rim_kills(&arena, at, 0.3, 2));
+        let mut seed = 9;
+        for _ in 0..20_000 {
+            let segments = 2 + (lcg(&mut seed) * 400.0) as usize;
+            let angle = lcg(&mut seed) * std::f64::consts::TAU;
+            let r = arena.radius - lcg(&mut seed) * 60.0;
+            let head = Point {
+                x: r * angle.cos(),
+                y: r * angle.sin(),
+            };
+            let heading = lcg(&mut seed) * std::f64::consts::TAU;
+            let (_, dies) = boundary::constrain(
+                head,
+                heading,
+                scale(segments),
+                arena.radius,
+                BoundaryMode::Sliding,
+            );
+            let moved = Point {
+                x: head.x + arena.center.x,
+                y: head.y + arena.center.y,
+            };
+            assert_eq!(rim_kills(&arena, moved, heading, segments), dies);
+        }
+    }
 
     #[test]
     fn boosted_paths_continue_past_the_ramp_at_its_final_speed() {

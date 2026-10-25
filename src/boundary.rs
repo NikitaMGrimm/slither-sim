@@ -14,6 +14,11 @@ pub enum BoundaryMode {
 /// Forward contact lead per unit of snake scale.
 pub const CONTACT_LEAD: f64 = 16.0;
 
+/// sin(0.7): a contact point past the rim dies when its heading's outward
+/// share exceeds this; the observed transition is near 40 degrees outward from
+/// tangent.
+pub const LETHAL_OUTWARD: f64 = 0.644217687237691;
+
 /// Returns the corrected head and whether contact is lethal. Most snakes only
 /// take the squared-distance fast path; no body/food scans or allocations.
 pub fn constrain(
@@ -46,9 +51,8 @@ pub fn constrain(
     if distance < radius {
         return (head, false);
     }
-    // sin(0.7): the observed transition is near 40 degrees outward from tangent.
     // Input quantization and packet timing limit the precision of this estimate.
-    if (tip.x * dx + tip.y * dy) > 0.644217687237691 * distance {
+    if (tip.x * dx + tip.y * dy) > LETHAL_OUTWARD * distance {
         return (head, true);
     }
     let ratio = radius / distance;
