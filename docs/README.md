@@ -14,6 +14,7 @@ owners, focused tests and the evidence each kind of change needs.
 | Run `serve` sessions in-process from C or another language | [C ABI](c-api.md) |
 | Host a shared world or connect the stock browser | [WebSocket server](raw-server.md) |
 | Choose world, timing and network settings | [Configuration](configuration.md) |
+| Run the custom Battledome mode | [Battledome](configuration.md#battledome) |
 | Understand implemented rules and approximations | [Mechanics and delivery limits](server-rules.md) |
 
 ## Contribute and investigate

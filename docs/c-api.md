@@ -76,8 +76,9 @@ one pointer per column. Columns hold the values and fixed types of the
 - Snake row `r`'s anchors are entries `snake_body_start[r]` up to
   `snake_body_start[r + 1]` of `snake_body_x` and `snake_body_y`.
 - `view_self[s]` is slot `s`'s own snakes row, or `SLITHER_NONE` when the slot is
-  dead. Slot `s` sees the snakes rows `view_snakes[view_snakes_start[s]]` up to
-  `view_snakes_start[s + 1]`, and likewise food and prey. Each `*_start` column
+  dead. Slot `s` sees the snake rows in
+  `view_snakes[view_snakes_start[s]:view_snakes_start[s + 1]]` (half-open slice),
+  and likewise food and prey. Each `*_start` column
   has `slots + 1` entries.
 - `food_size` is NaN without a size, `food_origin` is `SLITHER_NO_ORIGIN` without
   an origin, and `death_killer` is `SLITHER_NONE` without a killer; JSON prints

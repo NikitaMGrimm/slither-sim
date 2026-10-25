@@ -112,6 +112,11 @@ one prey. It includes provisional models and is not an exact official replica.
 [official and sandbox](docs/configuration.md#official-and-sandbox) for both and
 [rules and evidence limits](docs/server-rules.md) for what has been measured.
 
+`Config::battledome()` adds our custom arena mode: a one-way pit, a permanent
+400-point size floor and a rolling kill score. Boosting at the floor is free and
+drops no pellets. These are mode design choices, not measured official rules.
+See [Battledome settings and bot visibility](docs/configuration.md#battledome).
+
 ## Development
 
 - [Contributing](CONTRIBUTING.md): changes, tests and packaging.

@@ -2,7 +2,8 @@
 
 Adopted 2026-10-25 for new runs. This is an advisory, conditional procedure,
 not established hosted-runner calibration, a power guarantee or a runner choice.
-Windows, one block per fresh process and the ±5% time band remain unchanged.
+One block per fresh process and the ±5% time band remain unchanged. Runner
+selection is documented separately in [PR comparison calibration](pr-reports.md#calibration).
 The frozen [v1 contract](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-pr-comparison-statistics/STATISTICS-CONTRACT.md)
 still describes historical runs. Never upgrade an in-flight v1 run or reinterpret
 its intervals with these constants. New plans use `slither-perf-sequential-v2`.

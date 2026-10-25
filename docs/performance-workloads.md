@@ -42,8 +42,9 @@ cargo run --release --locked --example perf_baseline -- --list
 - **Sandbox and official:** `Config::sandbox()` and `Config::official(n)` at several
   populations, giving a scaling curve.
 - **Dome proxy:** a dense, fixed arena with sandbox mechanics, no prey and no
-  ambient food. Boost and death pellets are its only food. It stands in for the
-  future Battle Dome; it does not implement Battle Dome rules.
+  ambient food. Boost and death pellets are its only food. It stands in for
+  a dense custom world; it does not use [`Config::battledome()`](configuration.md#battledome)
+  or implement its pit, spawn ring, size floor or rolling kill score.
 - **Client:** `SimulatorBackend` lives on an official world, timed through
   `step_all` with wire recording. These rows need the `networking` feature.
 

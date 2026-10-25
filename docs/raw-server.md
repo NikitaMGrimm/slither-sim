@@ -77,6 +77,15 @@ explicit fields override the preset's values. Omitted settings without a preset
 use the documented defaults. See [presets](configuration.md#presets) and
 [Battledome](configuration.md#battledome).
 
+For Battledome, save this minimal host config and pass it to `host --config`:
+
+```json
+{"simulation":{"world":{"preset":"battledome"}}}
+```
+
+It keeps the default remote slots and background bots. The stock browser receives
+normal gameplay packets; it has no pit overlay or rolling kill-score display.
+
 Native and remote clients share finite snake/prey coverage (`world.vision`, default
 1,500). Snakes remain visible while any centerline segment is covered. Food uses
 a separate 45-sector entry stencil with heading lead and temporal retention.
@@ -89,8 +98,9 @@ waits or fails without near-contact fallback. This conservative model is not an
 identified official exclusion rule.
 
 The host world defaults to `Config::official(1)`; Rust callers can choose
-`Config::official(n)`, `Config::sandbox()` or `Config::battledome()`. Neither is an exact official server
-configuration; see [official and sandbox](configuration.md#official-and-sandbox).
+`Config::official(n)`, `Config::sandbox()` or `Config::battledome()`. The official
+model has [known approximations](configuration.md#official-and-sandbox);
+Battledome is a custom mode.
 
 ## VPS use
 
@@ -182,7 +192,7 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
   `w` clears on exit. See [food delivery](server-rules.md#food-sector-delivery).
 - `M`/`V`: a global minimap (136×136 by default, configurable via
   `simulation.minimapSide`) on its own server-wide clock (default 2.504 s),
-  first in its frame.
+  before gameplay updates, after any pongs.
   First, reconnected and resized maps use full `M`; later maps use XOR `V` only
   when strictly shorter than `M`, against that connection's last queued bitmap.
   Living heads and body centerlines are rasterized; the stock client draws its

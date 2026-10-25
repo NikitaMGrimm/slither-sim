@@ -166,6 +166,18 @@ with [per-family release rules](server-rules.md#packet-timing), 136×136 minimap
 and leaderboard on server-wide 2.504/3.008-second clocks and zero added delay.
 `leaderboardIntervalSeconds` must be positive and finite.
 
+For the custom [Battledome mode](configuration.md#battledome), put the preset
+inside `config.world`:
+
+```json
+{"op":"simulation","seed":7,"config":{"world":{"preset":"battledome"}}}
+```
+
+The frame still contains only decoded protocol reports. Pit geometry, the size
+floor and the rolling kill score are not transmitted; retain the chosen world
+config separately when a bot needs the mode rules. Reported kills count the
+current life, and leaderboard ranks use size scores.
+
 Latency settings include `roundTripSeconds`, `roundTripWeights`, `roundTripSpread`,
 `uplinkShare`, `variation`, `pauses`, `processingSeconds` and
 `processingJitterSeconds`:
