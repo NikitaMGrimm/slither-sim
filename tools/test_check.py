@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import patch
 
 import check
+import perf_build
 
 
 class CheckRunnerTests(unittest.TestCase):
@@ -106,18 +107,45 @@ class CheckRunnerTests(unittest.TestCase):
         self.assertGreaterEqual(results[0][0], 0.3)
 
     def test_a_hung_concurrent_command_is_stopped_and_its_output_shown(self):
-        hung = [sys.executable, "-c", "import time; print('started', flush=True); time.sleep(30)"]
         quick = [sys.executable, "-c", "print('done')"]
         buffer = io.BytesIO()
         stdout = io.TextIOWrapper(buffer, encoding="utf-8")
-        with redirect_stdout(stdout), patch.object(check.sys, "stderr", io.StringIO()):
-            results = check.run_concurrently([hung, quick], os.environ.copy(), timeout=1)
+        process_tree = perf_build.ProcessTree
+        watchdog_started = None
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / "ready"
+            hung = [sys.executable, "-c", ("import threading; from pathlib import Path; "
+                    f"print('started', flush=True); Path({str(ready)!r}).touch(); threading.Event().wait()")]
+
+            def started(*args, **kwargs):
+                nonlocal watchdog_started
+                tree = process_tree(*args, **kwargs)
+                try:
+                    # The watchdog checks stopping/replaying, not interpreter startup speed.
+                    # Both commands must reach their intended state before its clock starts.
+                    if args[0] == quick:
+                        self.assertEqual(tree.wait(timeout=30), 0)
+                        watchdog_started = time.monotonic()
+                    else:
+                        deadline = time.monotonic() + 30
+                        while not ready.exists() and time.monotonic() < deadline:
+                            time.sleep(0.01)
+                        self.assertTrue(ready.exists(), "hung command did not start")
+                except BaseException:
+                    tree.stop()
+                    raise
+                return tree
+
+            with redirect_stdout(stdout), patch.object(check.sys, "stderr", io.StringIO()), \
+                    patch.object(perf_build, "ProcessTree", side_effect=started):
+                results = check.run_concurrently([hung, quick], os.environ.copy(), timeout=1)
+                stopped = time.monotonic()
         stdout.flush()
         # On POSIX, the interrupted child adds its KeyboardInterrupt traceback.
         words = buffer.getvalue().decode().split()
         self.assertEqual((words[0], words[-1]), ("started", "done"))
         self.assertEqual([code for _, code in results], [check.TIMED_OUT, 0])
-        self.assertLess(results[0][0], 10)
+        self.assertLess(stopped - watchdog_started, 10)
 
     @unittest.skipIf(os.name == "nt", "Windows job objects already contain nested jobs")
     def test_a_stopped_suite_cleans_up_processes_in_their_own_sessions(self):
