@@ -689,6 +689,10 @@ impl Scene {
             let extra = (width + unsure * enemy.speed - me.width - self::width(enemy)).max(0.0);
             let reach2 = (reach + extra) * (reach + extra);
             let close = |q: Point| near_within(q, reach2);
+            // Forecast trail points between the forecast and observed heads
+            // when the head turns during the lead, newest first.
+            let mut trail = [Point::default(); 2];
+            let mut trail_len = 0;
             let head = if turning {
                 // Turning toward the reported wanted heading at its turn rate.
                 let delta = p.intent_weight * wrap(intent.wanted - enemy.heading);
@@ -697,6 +701,8 @@ impl Scene {
                     turn_then_straight(enemy.head, enemy.heading, delta, enemy.speed, turn, t)
                 };
                 let head = if view.lead > 0.0 {
+                    trail = [path(view.lead * 2.0 / 3.0), path(view.lead / 3.0)];
+                    trail_len = 2;
                     path(view.lead)
                 } else {
                     enemy.head
@@ -744,7 +750,12 @@ impl Scene {
             let mut previous = head;
             let mut was_close = close(previous);
             let observed = (view.lead > 0.0).then_some(enemy.head);
-            for point in observed.into_iter().chain(enemy.body.iter().copied()) {
+            for point in trail[..trail_len]
+                .iter()
+                .copied()
+                .chain(observed)
+                .chain(enemy.body.iter().copied())
+            {
                 let is_close = close(point);
                 if is_close || was_close {
                     near.push(Obstacle::new(previous, point, width, k, false));

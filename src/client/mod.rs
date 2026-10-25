@@ -271,7 +271,11 @@ fn fill_intents(
             next = i + 1;
             let row = &rows[i];
             if let Some(wanted) = row.wanted_history.first() {
-                intent.wanted = wanted.value;
+                // Motion reports round the target to 256 steps; the server
+                // steers to the client's 251-step command, so take the nearest.
+                let step = std::f64::consts::TAU / 251.0;
+                intent.wanted =
+                    (wanted.value.rem_euclid(std::f64::consts::TAU) / step).round() % 251.0 * step;
             }
             if row.heading.valid {
                 intent.heading_age = row.heading.age_seconds;
