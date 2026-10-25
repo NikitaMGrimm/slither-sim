@@ -1,9 +1,11 @@
 # VPS official-server timing, 2026-10-26
 
-The original attempt stopped after about one minute with an abnormal low-route
-close (1006). An explicitly authorized continuation isolated the endpoints;
-both then failed independently with 1006 after about 185/127 seconds. All four
-partial recordings have valid gzip/integrity receipts but remain quarantined.
+The original attempt and first continuation stopped at the collectors' first
+deaths. Full raw-stream audit confirms that their requested post-death closes
+preceded socket-error/1006 events, which the study wrappers misclassified as
+unexpected failures. The earlier endpoint-unusable conclusion is withdrawn;
+a block is not indicated by these records. All four partial recordings have
+valid gzip/integrity receipts but remain quarantined, without editing raw data.
 **Q1 and Q2 remain inconclusive: zero eligible batches, no held-out data.**
 Across both attempts there were four connections, peak concurrency two, and no
 retries. No simulator model, default or bot policy changed. Spawn admission
@@ -15,9 +17,9 @@ At **2026-10-25 23:30:15 UTC** round 1 opened one socket per endpoint. At
 23:31:14.794 the low endpoint emitted `socket-error` with an empty message,
 followed by close code **1006** and an empty reason. The study controller aborted
 both clients; the coordinator exited 1 at 23:31:15. The second connection was
-stopped by that abort, not independently observed to fail. The datacenter
-blocking/rate-limiting risk remains a possible explanation, **not an identified
-cause**. No login/Origin change, workaround, retry or endpoint substitution
+stopped by that abort, not independently observed to fail. The socket error
+followed the collector's requested post-death close; it was not evidence of an
+independent server drop. No login/Origin change, workaround, retry or endpoint substitution
 followed. Rounds 2–3 were never started.
 
 [Selected results](selected-results.json) retain the terminal receipts,
@@ -57,6 +59,38 @@ study and its counterexamples remain unchanged.
 change or fitted parameter. The independently authorized continuation below
 preserves the original attempt and its quarantine.
 
+### Audit correction: requested closes
+
+The [full-stream audit](death-close-audit.json) preserves compressed source
+hashes, one-based JSONL lines, death-packet bytes and actual recorded timestamps.
+All three stopped clients were in life 1 with one join. Each had exactly one
+death-observation start, close request and end. Both `v` and own death-removal
+packets occurred in the listed death frame. Times below are milliseconds on
+each process's monotonic receipt clock, not invented from event counts.
+
+| Stream | Death packet receipt | Observation start | Close requested | Socket error | Observation end | Close 1006 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Original low | 58529.562 | 58529.835 | 59543.924 | 59771.596 | 59772.450 | 59772.516 |
+| First continuation low | 183365.001 | 183365.300 | 184374.067 | 184459.638 | 184459.925 | 184459.950 |
+| First continuation second | 125643.057 | 125643.357 | 126650.746 | 126780.560 | 126781.349 | 126781.397 |
+
+The base collector sets `deathObservation.closeRequestedAt` before calling
+`ws.close()`. Its close handler records the death-observation end and normally
+schedules a rejoin. The original wrapper aborted both clients on any socket
+error; the first continuation aborted that endpoint and also rejected 1006
+closes even after a requested death close. Thus the wrapper stop rules fired
+on requested life endings. The original second stream has no death packet,
+death-observation, close-request, socket-error or close event; its terminal
+receipt records the sibling abort.
+
+This establishes event order and wrapper classification. It does **not** show
+that requesting the close caused the socket error, nor identify transport or
+server behavior during close. The claimed independent endpoint failures and
+low-endpoint unusability are withdrawn. **A block is not indicated.** Historical
+frozen plans and terminal error strings remain as recorded; their erroneous
+classification is corrected here and in selected results, not applied as a new
+exclusion or silently rewritten into the raw streams.
+
 ## Original attempt: load and cleanup
 
 The 60 load records contain 59 adjacent CPU/steal differences, sampled at about
@@ -86,7 +120,7 @@ Read-only checks at **23:33:53 UTC** verified that the remote scratch directory,
 the study container and the pinned image were all absent. Existing service
 containers, volumes and directories were not modified.
 
-## Continuation
+## First continuation
 
 The owner explicitly authorized one continuation with independent endpoint
 failure handling. The [continuation plan](continuation-plan.json), collector,
@@ -108,9 +142,10 @@ recordings stayed in separate scratch trees and were never combined.
 
 ### Endpoint outcomes
 
-Round 1 started at **23:41:07 UTC**. The second endpoint failed first, at
-23:43:14.620; its failure did **not** cancel the low endpoint. The low endpoint
-continued for another **57.7 seconds**, then failed at 23:44:12.296. Both emitted
+Round 1 started at **23:41:07 UTC**. The wrapper stopped the second client first,
+at 23:43:14.620; this did **not** cancel the low client. The low client continued
+for another **57.7 seconds**, then was stopped at 23:44:12.296. Both sequences
+followed their own first-death close requests, as audited above, and emitted
 `socket-error` with an empty message and close **1006** with an empty reason.
 
 | Endpoint | Round 1 recorded span | Received raw frames | Game pings | Game RTT p50 / p99 ms | Rounds 2 / 3 |
@@ -127,14 +162,11 @@ The coordinator invoked the later rounds only to record skipped outcomes;
 Both archives pass gzip and prefix-integrity verification; their sole audit
 issue is `interrupted_capture`.
 
-The **low endpoint is unusable from this remote Linux ARM64 VM for the planned
-ten-minute captures under the tested setup**. It closed abnormally in both
-authorized attempts, after different durations. A block remains possible but
-unidentified. Successful gameplay before closure neither identifies a block nor
-rules one out. The second endpoint also failed its continuation batch; its
-original healthy prefix had been stopped by the original sibling-abort policy.
-The empty close/error reasons do not establish a network, server or collector
-cause. Neither endpoint was retried after its continuation failure.
+The recorded failed outcomes reflect the wrapper's misclassification, not
+established server-initiated drops. The previous claim that the low endpoint
+was unusable from this VM is withdrawn. A block is not indicated. Neither
+endpoint was retried after the wrapper stopped its first batch; both partial
+archives remain quarantined under their original interrupted receipts.
 
 ### Questions and diagnostic RTT
 
@@ -185,6 +217,25 @@ directory, study container and newly pulled image were absent. No existing
 service container, volume, service directory or host configuration was changed.
 Full logs, original/continuation receipts, source snapshots and both copy-back
 and cleanup verification records remain local-only and hash-pinned.
+
+## Second continuation: corrected life endings
+
+The [second continuation plan](second-continuation-plan.json) restarts the
+original three ten-minute rounds with the same questions, metrics, stall gauge,
+gates, development/held-out split, independent endpoints and two-socket limit.
+The [corrected collector](capture-second-continuation.mjs) treats events after
+the base collector's recorded post-death close request as that life ending,
+including an error/1006 sequence, and allows the base collector's rejoin after
+close. An unrequested error or close stops that endpoint for the remaining run,
+without retry. Intent resets for every new socket. The earlier collectors stay
+frozen as historical acquisition sources; no simulator or base collector changed.
+
+A regression drives the actual base collector's post-death tick, requested
+close, socket error, close handler and rejoin through a fake socket. It also
+checks that an unrequested error in the next life is fatal, and that an error
+or close during death observation before a close request stops the endpoint.
+Results will be recorded after this separately frozen acquisition; prior raw
+streams remain quarantined and are not combined with it.
 
 ## Questions and method
 

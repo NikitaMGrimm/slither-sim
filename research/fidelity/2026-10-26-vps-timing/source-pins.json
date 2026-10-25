@@ -468,5 +468,12 @@
         "bytes": 22341
       }
     ]
+  },
+  "deathCloseAudit": {
+    "access": "local-only full raw streams; selected derived event witnesses in death-close-audit.json",
+    "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\second-continuation\\prior-death-audit.json",
+    "sha256": "82be236922b2b0316d6c6c140d877c4e52d1aae9b861591f396d56f7a8e8b628",
+    "selectedSha256": "34509b9302fb50eb65ddc2f4b26967ab8da8e61eae116c1e54e7416946d1b1ea",
+    "rawArchivesUnchanged": true
   }
 }

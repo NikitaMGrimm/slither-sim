@@ -1,6 +1,6 @@
 {
   "originalAttempt": {
-    "interpretation": "Failed acquisition. Interrupted archives are quarantined by the frozen plan. Q1/Q2 inconclusive, no model proposal. RTT is a diagnostic of the received partial prefixes, not validation.",
+    "interpretation": "Collector wrapper interruption: original low first-death close was requested before socket-error/1006 and misclassified by the wrapper; original second was sibling-aborted. Raw archives remain quarantined. This is not evidence of an independent server drop or a block.",
     "frozenCommit": "86787770df6a82dee43a108e770840d6e9ab2185",
     "connections": 2,
     "peakIncludingConnectingSockets": 2,
@@ -74,6 +74,45 @@
         "completeGzip": true,
         "events": [
           {
+            "line": 8765,
+            "event": "received-death-packet",
+            "life": 1,
+            "t": 58529.562,
+            "serverMs": 58380,
+            "packetIndex": 3,
+            "packetHex": "7600",
+            "ownId": 33
+          },
+          {
+            "line": 8765,
+            "event": "received-death-packet",
+            "life": 1,
+            "t": 58529.562,
+            "serverMs": 58380,
+            "packetIndex": 4,
+            "packetHex": "73002101",
+            "ownId": 33
+          },
+          {
+            "line": 8766,
+            "type": "meta",
+            "t": 58529.835,
+            "wall": 1792971073552,
+            "event": "death-observation-start",
+            "life": 1,
+            "serverClock": 58380,
+            "durationMs": 1000
+          },
+          {
+            "line": 8917,
+            "type": "meta",
+            "t": 59543.924,
+            "wall": 1792971074566,
+            "event": "death-observation-close-requested",
+            "life": 1
+          },
+          {
+            "line": 8918,
             "type": "meta",
             "t": 59771.596,
             "wall": 1792971074794,
@@ -82,6 +121,19 @@
             "message": ""
           },
           {
+            "line": 8919,
+            "type": "meta",
+            "t": 59772.45,
+            "wall": 1792971074795,
+            "event": "death-observation-end",
+            "life": 1,
+            "reason": "deadline",
+            "elapsedMs": 1242.8644829999976,
+            "serverElapsedMs": 1010,
+            "framesAfterDeath": 136
+          },
+          {
+            "line": 8920,
             "type": "meta",
             "t": 59772.516,
             "wall": 1792971074795,
@@ -139,7 +191,8 @@
         "admittedExcessFrames": 0,
         "scheduler": {
           "quarantined": true
-        }
+        },
+        "classificationCorrection": "requested_first_death_close_misclassified"
       },
       {
         "batch": {
@@ -242,7 +295,8 @@
         "admittedExcessFrames": 0,
         "scheduler": {
           "quarantined": true
-        }
+        },
+        "classificationCorrection": "sibling_abort_without_death_close"
       },
       {
         "batch": {
@@ -355,10 +409,17 @@
       "files": 21,
       "allSha256Matched": true
     },
-    "cleanupVerification": "2026-10-25T23:33:53Z\nVERIFIED_SCRATCH_CONTAINER_AND_IMAGE_ABSENT"
+    "cleanupVerification": "2026-10-25T23:33:53Z\nVERIFIED_SCRATCH_CONTAINER_AND_IMAGE_ABSENT",
+    "interpretationCorrection": {
+      "rawAudit": "death-close-audit.json",
+      "rawArchivesUnchanged": true,
+      "quarantineUnchanged": true,
+      "endpointUnusableConclusionWithdrawn": true,
+      "blockIndicated": false
+    }
   },
   "continuation": {
-    "interpretation": "Two independently failed endpoint batches; interrupted archives stay quarantined. The low endpoint is unusable for the planned ten-minute captures from this remote Linux ARM64 VM under the tested setup. A block remains possible but unidentified. Q1/Q2 remain inconclusive; no model change proposed.",
+    "interpretation": "Both clients reached their first death and requested a close before socket-error/1006. The wrapper misclassified these requested life ends as failures. The previous low-endpoint-unusable conclusion is withdrawn; a block is not indicated. Raw archives remain quarantined; no retrospective admission or model change.",
     "frozenCommit": "f0593ae946c52f1566933f177a14b1236247ce12",
     "connections": 2,
     "peakIncludingConnectingSockets": 2,
@@ -435,6 +496,45 @@
         },
         "events": [
           {
+            "line": 21938,
+            "event": "received-death-packet",
+            "life": 1,
+            "t": 183365.001,
+            "serverMs": 183152,
+            "packetIndex": 6,
+            "packetHex": "7600",
+            "ownId": 171
+          },
+          {
+            "line": 21938,
+            "event": "received-death-packet",
+            "life": 1,
+            "t": 183365.001,
+            "serverMs": 183152,
+            "packetIndex": 7,
+            "packetHex": "7300ab01",
+            "ownId": 171
+          },
+          {
+            "line": 21939,
+            "type": "meta",
+            "t": 183365.3,
+            "wall": 1792971850901,
+            "event": "death-observation-start",
+            "life": 1,
+            "serverClock": 183152,
+            "durationMs": 1000
+          },
+          {
+            "line": 22086,
+            "type": "meta",
+            "t": 184374.067,
+            "wall": 1792971851910,
+            "event": "death-observation-close-requested",
+            "life": 1
+          },
+          {
+            "line": 22087,
             "type": "meta",
             "t": 184459.638,
             "wall": 1792971851995,
@@ -443,6 +543,19 @@
             "message": ""
           },
           {
+            "line": 22088,
+            "type": "meta",
+            "t": 184459.925,
+            "wall": 1792971851995,
+            "event": "death-observation-end",
+            "life": 1,
+            "reason": "deadline",
+            "elapsedMs": 1094.9081470000092,
+            "serverElapsedMs": 1006,
+            "framesAfterDeath": 132
+          },
+          {
+            "line": 22089,
             "type": "meta",
             "t": 184459.95,
             "wall": 1792971851996,
@@ -508,7 +621,8 @@
         "admittedExcessFrames": 0,
         "scheduler": {
           "quarantined": true
-        }
+        },
+        "classificationCorrection": "requested_first_death_close_misclassified"
       },
       {
         "batch": {
@@ -569,6 +683,45 @@
         },
         "events": [
           {
+            "line": 13927,
+            "event": "received-death-packet",
+            "life": 1,
+            "t": 125643.057,
+            "serverMs": 125381,
+            "packetIndex": 1,
+            "packetHex": "7600",
+            "ownId": 275
+          },
+          {
+            "line": 13927,
+            "event": "received-death-packet",
+            "life": 1,
+            "t": 125643.057,
+            "serverMs": 125381,
+            "packetIndex": 2,
+            "packetHex": "73011301",
+            "ownId": 275
+          },
+          {
+            "line": 13928,
+            "type": "meta",
+            "t": 125643.357,
+            "wall": 1792971793179,
+            "event": "death-observation-start",
+            "life": 1,
+            "serverClock": 125381,
+            "durationMs": 1000
+          },
+          {
+            "line": 14059,
+            "type": "meta",
+            "t": 126650.746,
+            "wall": 1792971794186,
+            "event": "death-observation-close-requested",
+            "life": 1
+          },
+          {
+            "line": 14060,
             "type": "meta",
             "t": 126780.56,
             "wall": 1792971794316,
@@ -577,6 +730,19 @@
             "message": ""
           },
           {
+            "line": 14061,
+            "type": "meta",
+            "t": 126781.349,
+            "wall": 1792971794317,
+            "event": "death-observation-end",
+            "life": 1,
+            "reason": "deadline",
+            "elapsedMs": 1138.2704209999938,
+            "serverElapsedMs": 1007,
+            "framesAfterDeath": 116
+          },
+          {
+            "line": 14062,
             "type": "meta",
             "t": 126781.397,
             "wall": 1792971794317,
@@ -634,7 +800,8 @@
         "admittedExcessFrames": 0,
         "scheduler": {
           "quarantined": true
-        }
+        },
+        "classificationCorrection": "requested_first_death_close_misclassified"
       },
       {
         "batch": {
@@ -909,6 +1076,13 @@
       "files": 36,
       "allSha256Matched": true
     },
-    "cleanupVerification": "Untagged: node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205\nDeleted: sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205\n2026-10-25T23:45:58Z\nVERIFIED_SCRATCH_CONTAINER_AND_IMAGE_ABSENT"
+    "cleanupVerification": "Untagged: node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205\nDeleted: sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205\n2026-10-25T23:45:58Z\nVERIFIED_SCRATCH_CONTAINER_AND_IMAGE_ABSENT",
+    "interpretationCorrection": {
+      "rawAudit": "death-close-audit.json",
+      "rawArchivesUnchanged": true,
+      "quarantineUnchanged": true,
+      "endpointUnusableConclusionWithdrawn": true,
+      "blockIndicated": false
+    }
   }
 }
