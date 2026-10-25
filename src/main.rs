@@ -6,6 +6,16 @@ const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FIL
     FILE is a HostConfig JSON object; --bind overrides its bind address.\n\
     See docs/raw-server.md for limits and VPS configuration.";
 
+fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn host(args: &[&str]) -> ExitCode {
     use slither_sim::client::{Host, HostConfig};
     let parsed = (|| -> Result<Option<HostConfig>, String> {
@@ -61,13 +71,7 @@ fn host(args: &[&str]) -> ExitCode {
         eprintln!("Listening on ws://{}/slither", host.local_addr()?);
         host.run()
     });
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("{error}");
-            ExitCode::FAILURE
-        }
-    }
+    command_exit(result)
 }
 
 fn serve(args: &[&str]) -> ExitCode {
@@ -92,13 +96,10 @@ fn serve(args: &[&str]) -> ExitCode {
             return ExitCode::from(2);
         }
     }
-    match slither_sim::transport::serve(io::stdin().lock(), io::stdout().lock()) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("{error}");
-            ExitCode::FAILURE
-        }
-    }
+    command_exit(slither_sim::transport::serve(
+        io::stdin().lock(),
+        io::stdout().lock(),
+    ))
 }
 
 fn main() -> ExitCode {
@@ -128,15 +129,10 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["serve", args @ ..] => serve(args),
-        ["client"] => {
-            match slither_sim::client::transport::serve(io::stdin().lock(), io::stdout().lock()) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(error) => {
-                    eprintln!("{error}");
-                    ExitCode::FAILURE
-                }
-            }
-        }
+        ["client"] => command_exit(slither_sim::client::transport::serve(
+            io::stdin().lock(),
+            io::stdout().lock(),
+        )),
         ["host", args @ ..] => host(args),
         _ => {
             eprintln!("Usage: slither-sim serve | client | host | --help | --version");

@@ -73,7 +73,7 @@ enum Order {
 /// exporters may point its `shape` into the view itself.
 struct View<'py> {
     view: Box<ffi::Py_buffer>,
-    _attached: Python<'py>,
+    attached: Python<'py>,
 }
 
 impl<'py> View<'py> {
@@ -87,7 +87,7 @@ impl<'py> View<'py> {
         }
         Ok(Self {
             view,
-            _attached: object.py(),
+            attached: object.py(),
         })
     }
 
@@ -109,8 +109,7 @@ impl<'py> View<'py> {
         (String::from_utf8_lossy(format).into_owned(), item)
     }
 
-    /// The items' bytes in C order. Copying needs no alignment and follows
-    /// any strides.
+    /// Copies items in C order, respecting strides without requiring alignment.
     fn bytes(&self) -> PyResult<Vec<u8>> {
         let length = usize::try_from(self.view.len).expect("buffer lengths are not negative");
         let mut out = vec![0; length];
@@ -125,7 +124,7 @@ impl<'py> View<'py> {
                 )
             };
             if status != 0 {
-                return Err(PyErr::fetch(self._attached));
+                return Err(PyErr::fetch(self.attached));
             }
         }
         Ok(out)
