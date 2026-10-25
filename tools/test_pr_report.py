@@ -119,7 +119,7 @@ class ReportTests(unittest.TestCase):
 
                 with patch.object(pr_report, "ROOT", checkout), patch.object(pr_report, "git", side_effect=["c" * 40, "b" * 40, "a" * 40]), \
                         patch.object(pr_report.perf_build, "output", side_effect=git_or_tool), \
-                        patch.object(pr_report.subprocess, "check_output", return_value="synthetic rustc"), \
+                        patch.object(pr_report.subprocess, "check_output", return_value="synthetic rustc"),                         patch.object(pr_report.platform, "platform", return_value="fixture-platform"), \
                         patch.object(pr_report.perf_build, "command", side_effect=command), \
                         patch.object(pr_report, "load_catalog", return_value=listed), \
                         patch.object(pr_report, "capture_trace", side_effect=trace), \

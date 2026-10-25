@@ -68,7 +68,7 @@ class Calibration(unittest.TestCase):
                             [row(name, iterations=100) for name in names])), \
                         patch.object(perf_calibration, "GROUPS", {"A": names}), \
                         patch.object(perf_calibration, "STAGE_CAP_SECONDS", deadline), \
-                        patch.object(perf_calibration.subprocess, "check_output", return_value="fixture rustc"):
+                        patch.object(perf_calibration.subprocess, "check_output", return_value="fixture rustc"),                         patch.object(perf_calibration.platform, "platform", return_value="fixture-platform"),                         patch.object(perf_calibration.platform, "processor", return_value="fixture-cpu"):
                     self.assertEqual(perf_calibration.main(), 0)
                 data = json.loads((output / "summary.json").read_text())
             else:
