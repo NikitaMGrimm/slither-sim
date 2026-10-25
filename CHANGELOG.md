@@ -7,15 +7,12 @@
 - Rust helpers no longer expose unused arguments or test-only reconstruction:
   `crossed_anchor` takes only head and last anchor, `append_client_anchor` is
   removed, and `Minimap::from_snakes` returns `Result` for invalid sides.
-
 - Network wire drains now return an error when recording is disabled, matching
   simulation. Rust `NetworkBackend::drain_records` returns `Result`; JSON `wire`
   reports the error under `slither-client-json-v2` ([recording](docs/client-api.md#recording-and-network-bounds)).
-
 - Portable JSON requests and reply envelopes now use `slither-client-json-v2`,
   reflecting the removed broadcast and latency fields. The frame contract stays
   `slither-client-v2` ([portable bots](docs/client-api.md#interface-versions)).
-
 - The minimum Rust version is 1.99 (was 1.86).
 - `SimulationConfig.broadcastTicks` is removed: gameplay updates go out every
   tick. Configs that still set it are rejected
@@ -121,15 +118,14 @@
 
 ### Fixed
 
+- Frame and Rust field docs now distinguish segment mass, displayed score and
+  food size from geometry and eater-dependent nutrition ([frames](docs/bot-api.md#frames)).
 - Python resets issue warnings before replacing worlds, so treating a
   `UserWarning` as an error keeps the previous session ([Python](docs/python.md)).
-
 - JSON round trips preserve a world stopped by mass overflow; later steps
   still return the original failure ([limits](docs/configuration.md#limits)).
-
 - Rust `Config::deserialize` now accepts presets just like JSON parsing; it no
   longer bypasses preset handling ([presets](docs/configuration.md#presets)).
-
 - A default `host` no longer refuses every player with `No clear spawn
   position`. Dynamic host arenas start sized for all seats, and a crowded world
   places a join at the most open spot ([hosting](docs/raw-server.md#presets)).

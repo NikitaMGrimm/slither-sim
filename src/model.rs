@@ -65,11 +65,16 @@ pub struct Snake {
     pub body: Vec<Point>,
     pub heading: f64,
     pub speed: f64,
-    /// Display-width estimate. Collision width is configured separately.
+    /// Display radius in world units; collision geometry derives from segment counts.
     pub radius: f64,
+    /// Body length in segments, including fractional growth: `segments + fam`.
+    /// This is mass, not geometric length.
     pub length: f64,
+    /// Whole body segment count.
     pub segments: usize,
+    /// Unconverted growth in segment units; may exceed one before anchors grow.
     pub fam: f64,
+    /// Displayed size points from the segment/fam score table.
     pub score: f64,
     // Received observations use zero until a count is reported; the portable
     // client's HUD distinguishes an unknown count from a reported zero.
@@ -108,7 +113,10 @@ pub enum Origin {
 pub struct Food {
     pub x: f64,
     pub y: f64,
+    /// Nominal nutrition in segment units at minimum mass (2); with `size`,
+    /// actual gain depends on the eater's mass. Without it, gain is `value`.
     pub value: f64,
+    /// Optional protocol pellet size, used for display and mass-dependent nutrition.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]

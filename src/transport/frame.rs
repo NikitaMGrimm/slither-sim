@@ -89,6 +89,8 @@ pub struct FrameRef<'a> {
 
 /// One row per snake that some living slot sees. Positions, headings and speeds
 /// are rounded like the JSON frame.
+/// Snake rows use [`crate::Snake`] units: segment counts and unconverted `fam`
+/// sum to mass `length`, while `score` is displayed size points.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct SnakeColumns<'a> {
@@ -113,6 +115,8 @@ pub struct SnakeColumns<'a> {
 }
 
 /// One row per food item that some living slot sees.
+/// Food rows use [`crate::Food`] units: nominal nutrition `value` at minimum
+/// mass and protocol pellet `size` (NaN when absent in borrowed columns).
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct FoodColumns<'a> {
