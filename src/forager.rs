@@ -32,6 +32,8 @@ pub const MAX_LEAD_SUBSTEPS: usize = 250;
 /// Longest boost forecast, in substeps (2 seconds); later points count as
 /// unreachable by boosting.
 const RAMP_SUBSTEPS: usize = 250;
+/// Chords of a boosted arc; acceleration while turning bends it unevenly.
+const BOOST_CHORDS: usize = 8;
 
 /// Every tunable number of the policy. Defaults reproduce the original Forager.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -645,13 +647,34 @@ impl Me {
         }
         ramp
     }
-    /// Our motion boosting for `seconds`, at its mean speed.
-    fn boosted(&self, ramp: &[f64; RAMP_SUBSTEPS], seconds: f64) -> Self {
-        let steps = ((seconds / SUBSTEP).round() as usize).clamp(1, RAMP_SUBSTEPS);
-        Self {
-            speed: (ramp[steps - 1] / (steps as f64 * SUBSTEP)).max(self.speed),
-            ..*self
+    /// Path points and headings boosting toward `heading` for `seconds`:
+    /// [`BOOST_CHORDS`] intervals, each the exact constant-speed turn at the
+    /// ramp's mean speed over it.
+    fn boost_path(
+        &self,
+        ramp: &[f64; RAMP_SUBSTEPS],
+        heading: f64,
+        seconds: f64,
+    ) -> [(Point, f64); BOOST_CHORDS + 1] {
+        let at = |t: f64| {
+            let x = (t / SUBSTEP).min(RAMP_SUBSTEPS as f64);
+            let i = x.floor() as usize;
+            let before = if i == 0 { 0.0 } else { ramp[i - 1] };
+            let after = ramp[i.min(RAMP_SUBSTEPS - 1)];
+            before + (after - before) * (x - i as f64)
+        };
+        let dt = seconds / BOOST_CHORDS as f64;
+        let mut path = [(self.head, self.heading); BOOST_CHORDS + 1];
+        for i in 1..=BOOST_CHORDS {
+            let (q, h) = path[i - 1];
+            let speed = (at(dt * i as f64) - at(dt * (i - 1) as f64)) / dt;
+            let delta = wrap(heading - h);
+            path[i] = (
+                turn_then_straight(q, h, delta, speed, self.turn, dt),
+                h + delta.signum() * delta.abs().min(self.turn * dt),
+            );
         }
+        path
     }
     /// Like [`Me::reach`] when boosting along `ramp`; None beyond it.
     fn reach_boosted(
@@ -1107,7 +1130,9 @@ fn roam(o: &Observation, me: &Me, p: &Params) -> Goal {
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
 /// capped at `cap`. Only clearance below `safe` changes a cost, so callers pass
 /// `safe` and obstacles that provably cannot lower the running minimum are
-/// skipped; the result equals `min(cap, exact clearance)`.
+/// skipped; the result equals `min(cap, exact clearance)`. With `ramp` the
+/// arc accelerates to boost speed.
+#[allow(clippy::too_many_arguments)]
 fn clearance(
     o: &Observation,
     me: &Me,
@@ -1116,40 +1141,52 @@ fn clearance(
     heading: f64,
     cap: f64,
     crosses: Option<usize>,
+    ramp: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> f64 {
-    let step = p.lookahead_seconds / 2.0;
-    let (middle, turned) = advance(me.head, me.heading, heading, me.speed, me.turn, step);
-    let (end, last) = advance(middle, turned, heading, me.speed, me.turn, step);
+    let mut path = [(me.head, me.heading); BOOST_CHORDS + 1];
+    let (points, rim_heading) = if let Some(ramp) = ramp {
+        path = me.boost_path(ramp, heading, p.lookahead_seconds);
+        (BOOST_CHORDS + 1, path[BOOST_CHORDS].1)
+    } else {
+        let step = p.lookahead_seconds / 2.0;
+        let (middle, turned) = advance(me.head, me.heading, heading, me.speed, me.turn, step);
+        let (end, last) = advance(middle, turned, heading, me.speed, me.turn, step);
+        path[1] = (middle, turned);
+        path[2] = (end, last);
+        // The original continues along the middle heading.
+        (3, turned)
+    };
+    let path = &mut path[..points];
+    let end = path[points - 1].0;
     // Look further toward the rim so a turn starts in time.
-    let ahead = forward(end, turned, me.speed * p.rim_ahead_seconds);
+    let ahead = forward(end, rim_heading, me.speed * p.rim_ahead_seconds);
     let rim = |q: Point| o.arena.radius - me.width - q.distance(o.arena.center);
     let mut clearance = rim(end).min(rim(ahead) + p.rim_ahead_credit).min(cap);
     // Obstacle widths hold `own_width_factor` of our width; the rest moves the
     // checked path forward to the head's tip.
     let tip = (1.0 - p.own_width_factor) * me.width;
-    let (start, middle, end) = if tip > 0.0 {
-        (
-            forward(me.head, me.heading, tip),
-            forward(middle, turned, tip),
-            forward(end, last, tip),
-        )
-    } else {
-        (me.head, middle, end)
-    };
-    let arcs = [(start, middle), (middle, end)].map(|(a, b)| {
+    if tip > 0.0 {
+        for (q, h) in path.iter_mut() {
+            *q = forward(*q, *h, tip);
+        }
+    }
+    let mut arcs = [(Point::default(), Point::default(), Point::default(), 0.0); BOOST_CHORDS];
+    for (arc, w) in arcs.iter_mut().zip(path.windows(2)) {
+        let (a, b) = (w[0].0, w[1].0);
         let mid = Point {
             x: (a.x + b.x) / 2.0,
             y: (a.y + b.y) / 2.0,
         };
-        (a, b, mid, a.distance(b) / 2.0)
-    });
+        *arc = (a, b, mid, a.distance(b) / 2.0);
+    }
+    let arcs = &arcs[..points - 1];
     for obstacle in near {
         // A cut-off crosses ahead of its victim's head by design; its body
         // still counts.
         if obstacle.head && crosses == Some(obstacle.owner) {
             continue;
         }
-        for &(a, b, mid, half) in &arcs {
+        for &(a, b, mid, half) in arcs {
             // Segment distance >= midpoint distance - both half lengths. The
             // slack, relative to coordinate magnitude, keeps rounding from
             // skipping a segment that would lower it.
@@ -1167,14 +1204,15 @@ fn clearance(
     clearance
 }
 
-/// (cost, heading, clearance, offset) of the cheapest fan arc toward `goal`
-/// at `me`'s speed.
+/// (cost, heading, clearance, offset) of the cheapest fan arc toward `goal`,
+/// at cruise speed or, with `ramp`, accelerating.
 fn search(
     o: &Observation,
     me: &Me,
     p: &Params,
     near: &[Obstacle],
     goal: &Goal,
+    ramp: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> (f64, f64, f64, f64) {
     let mut best = (f64::INFINITY, goal.heading, f64::NEG_INFINITY, 0.0);
     for &offset in &p.fan[..p.fan_len.min(MAX_FAN)] {
@@ -1183,7 +1221,7 @@ fn search(
             break;
         }
         let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, p.safe, goal.crosses);
+        let clearance = clearance(o, me, p, near, heading, p.safe, crosses(goal, offset), ramp);
         let cost = offset.abs() + (p.safe - clearance).max(0.0) * p.danger_weight;
         if cost < best.0 {
             best = (cost, heading, clearance, offset);
@@ -1192,8 +1230,14 @@ fn search(
     best
 }
 
+/// A cut-off validated only its own heading; steering off it meets the
+/// victim's head path like any other arc.
+fn crosses(goal: &Goal, offset: f64) -> Option<usize> {
+    goal.crosses.filter(|_| offset == 0.0)
+}
+
 /// Boost toward a goal that needs it, like the original Hunter: only along a
-/// clear, nearly straight arc at the mean speed the ramp reaches.
+/// clear, nearly straight accelerating arc.
 fn boost_toward(
     o: &Observation,
     me: &Me,
@@ -1202,7 +1246,7 @@ fn boost_toward(
     goal: &Goal,
     ramp: &[f64; RAMP_SUBSTEPS],
 ) -> Option<Action> {
-    let best = search(o, &me.boosted(ramp, p.lookahead_seconds), p, near, goal);
+    let best = search(o, me, p, near, goal, Some(ramp));
     (best.2 >= p.safe && best.3.abs() < 0.4).then(|| Action {
         heading: wrap(best.1),
         boost: true,
@@ -1218,15 +1262,25 @@ fn steer(
     goal: Goal,
     escape: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> Action {
-    let best = search(o, me, p, near, &goal);
+    let best = search(o, me, p, near, &goal, None);
     if let Some(ramp) = escape.filter(|_| best.2 < p.safe) {
         // The cheapest arc may trade clearance for a smaller turn.
         let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
         let any_clear = fan.iter().any(|&offset| {
-            clearance(o, me, p, near, goal.heading + offset, p.safe, goal.crosses) >= p.safe
+            let heading = goal.heading + offset;
+            clearance(
+                o,
+                me,
+                p,
+                near,
+                heading,
+                p.safe,
+                crosses(&goal, offset),
+                None,
+            ) >= p.safe
         });
         if !any_clear {
-            let fast = search(o, &me.boosted(ramp, p.lookahead_seconds), p, near, &goal);
+            let fast = search(o, me, p, near, &goal, Some(ramp));
             if fast.2 >= p.safe {
                 return Action {
                     heading: wrap(fast.1),
