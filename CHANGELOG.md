@@ -113,6 +113,9 @@
 
 ### Fixed
 
+- Python resets issue warnings before replacing worlds, so treating a
+  `UserWarning` as an error keeps the previous session ([Python](docs/python.md)).
+
 - JSON round trips preserve a world stopped by mass overflow; later steps
   still return the original failure ([limits](docs/configuration.md#limits)).
 

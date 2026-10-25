@@ -325,6 +325,22 @@ class ErrorTests(unittest.TestCase):
         reply = session.request({"op": "reset", "config": {"dt": 0.01}})
         self.assertEqual(len(reply["result"]["warnings"]), 1)
 
+    def test_warning_as_error_keeps_the_previous_worlds(self):
+        session, control = Session(), Session()
+        reset(session)
+        reset(control)
+        before = fingerprint(session)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            with self.assertRaises(UserWarning):
+                session.reset(config={"dt": 0.01})
+        self.assertEqual((session.worlds, session.agents), (WORLDS, AGENTS))
+        self.assertEqual(fingerprint(session), before)
+        headings, boosts = decide(frames(session), 0)
+        session.step(headings, boosts)
+        control.step(headings, boosts)
+        self.assertEqual(fingerprint(session), fingerprint(control))
+
     def test_rejected_resets_keep_the_previous_worlds(self):
         session = Session()
         reset(session)
