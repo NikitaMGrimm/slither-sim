@@ -377,12 +377,12 @@ impl Raw {
     /// Next server message as `(opcode, payload)`; `None` when the socket ended.
     fn next(&mut self) -> Option<(u8, Vec<u8>)> {
         loop {
-            if let Some((opcode, header, length)) = self.header() {
-                if self.buffer.len() >= header + length {
-                    let payload = self.buffer[header..header + length].to_vec();
-                    self.buffer.drain(..header + length);
-                    return Some((opcode, payload));
-                }
+            if let Some((opcode, header, length)) = self.header()
+                && self.buffer.len() >= header + length
+            {
+                let payload = self.buffer[header..header + length].to_vec();
+                self.buffer.drain(..header + length);
+                return Some((opcode, payload));
             }
             self.fill()?;
         }

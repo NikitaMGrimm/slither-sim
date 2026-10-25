@@ -58,7 +58,7 @@ jobs:
           - os: macos-latest
             toolchain: stable
           - os: ubuntu-latest
-            toolchain: '1.86.0'
+            toolchain: '1.99.0'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:

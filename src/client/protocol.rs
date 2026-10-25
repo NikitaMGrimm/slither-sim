@@ -546,11 +546,13 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
         b'r' if n == 3 => Packet::Tail(u16_at(p, 1)?, None),
         b'r' if n == 6 => Packet::Tail(u16_at(p, 1)?, Some(fraction24(p, 3)?)),
         b'R' if n == 2 => Packet::Credit(p[1]),
-        b'F' if n >= 3 && (n - 3) % 4 == 0 => Packet::Sector(
+        b'F' if n >= 3 && (n - 3).is_multiple_of(4) => Packet::Sector(
             p[1],
             p[2],
             p[3..]
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| (c[1], c[2], f64::from(c[3]) / 5.))
                 .collect(),
         ),
@@ -643,7 +645,7 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
             Packet::Session(u16_at(p, 1)?, u32::from_be_bytes([p[3], p[4], p[5], p[6]]))
         }
         b'o' if n == 9 => Packet::TeamScore([i32_at(p, 1)?, i32_at(p, 5)?]),
-        b'o' if n > 1 && (n - 1) % 8 == 0 => Packet::TeamHistory(
+        b'o' if n > 1 && (n - 1).is_multiple_of(8) => Packet::TeamHistory(
             (1..n)
                 .step_by(8)
                 .map(|i| Ok([i32_at(p, i)?, i32_at(p, i + 4)?]))

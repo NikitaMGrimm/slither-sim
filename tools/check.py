@@ -46,7 +46,7 @@ def commands(group):
             ["cargo", "test", "--doc", "--no-default-features", "--locked"],
             ["cargo", "test", "-p", "slither-sim-ffi", "--all-targets", "--locked"],
             # The Python crate has no Rust tests; this builds it with each
-            # toolchain, including the 1.86 it declares.
+            # toolchain, including the 1.99 it declares.
             ["cargo", "check", "-p", "slither-sim-py", "--all-targets", "--locked"],
             ["cargo", "run", "--locked", "--example", "basic"],
         ]

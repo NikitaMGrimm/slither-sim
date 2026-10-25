@@ -2,7 +2,7 @@
 name = "slither-sim"
 version.workspace = true
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.99"
 description = "Headless Slither.io simulator for bot development, training and custom protocol-19 servers"
 repository = "https://github.com/NikitaMGrimm/slither-sim"
 readme = "README.md"
@@ -16,6 +16,9 @@ include = [
     "/examples/basic.rs",
     "/examples/portable_bot.rs",
     "/examples/portable_bot.py",
+    # Every [[example]] below must ship its source: maturin's sdist keeps the
+    # manifest's target list, and pip fails on a missing target file.
+    "/examples/host_load.rs",
     "/examples/bot.py",
     "/examples/bot.mjs",
     "/examples/ffi_bot.py",

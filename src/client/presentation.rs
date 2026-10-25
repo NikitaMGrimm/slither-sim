@@ -144,7 +144,7 @@ impl FoodPresentation {
     pub(super) fn register(&mut self, slot: usize, skin: u8, custom: &[u8]) {
         let mut palette = Vec::new();
         let mut white = None;
-        for run in custom.get(8..).unwrap_or_default().chunks_exact(2) {
+        for run in custom.get(8..).unwrap_or_default().as_chunks::<2>().0 {
             let color = if run[1] == 9 {
                 *white.get_or_insert_with(|| (self.random.unit() * 3.) as u8)
             } else if let Some(color) = custom_food_color(run[1]) {

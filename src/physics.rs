@@ -432,10 +432,11 @@ pub(crate) fn remove_mass_above_floor(
     }
     *fam = fam.max(0.0);
     // `amount` stops at the floor, so landing below it is only rounding.
-    if let Some(f) = floor {
-        if amount > 0.0 && (*segments, *fam) < (f.segments, f.fam) {
-            (*segments, *fam) = (f.segments, f.fam);
-        }
+    if let Some(f) = floor
+        && amount > 0.0
+        && (*segments, *fam) < (f.segments, f.fam)
+    {
+        (*segments, *fam) = (f.segments, f.fam);
     }
     before.saturating_sub(*segments)
 }

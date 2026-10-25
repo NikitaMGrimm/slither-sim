@@ -166,13 +166,10 @@ fn read_headings(object: &Bound<'_, PyAny>, out: &mut Vec<f64>) -> PyResult<()> 
     out.clear();
     if is_buffer(object) {
         let (bytes, order) = read_buffer(object, "headings", "float64", b"d", 8)?;
-        out.extend(bytes.chunks_exact(8).map(|item| {
-            let item = item.try_into().expect("items have 8 bytes");
-            match order {
-                Order::Native => f64::from_ne_bytes(item),
-                Order::Little => f64::from_le_bytes(item),
-                Order::Big => f64::from_be_bytes(item),
-            }
+        out.extend(bytes.as_chunks::<8>().0.iter().map(|&item| match order {
+            Order::Native => f64::from_ne_bytes(item),
+            Order::Little => f64::from_le_bytes(item),
+            Order::Big => f64::from_be_bytes(item),
         }));
         return Ok(());
     }
