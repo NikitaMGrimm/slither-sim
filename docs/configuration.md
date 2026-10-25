@@ -57,7 +57,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
 | `world` | `Config::official(1)` | World settings below. |
-| `delivery` | `"official"` | Packet release profile: `official` or `responsive`; separate from link latency. Responsive sends changed wanted heading, speed and mass each tick; steady turning keeps the six-tick gate. |
+| `delivery` | `"official"` | When visible state is sent, separate from link latency. `official` keeps the measured per-family pacing; `responsive` sends a changed wanted heading, speed or mass in the next frame, while a snake turning toward an unchanged target still reports every six ticks. See [packet timing](server-rules.md#packet-timing). |
 | `agents` | `1` | Slots, 1–65,535; overridden by the host. |
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, at least 1. |
@@ -68,11 +68,10 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
 
-In host and portable JSON, `world: {"preset": "battledome"}` defaults delivery
-to `responsive`; explicit `delivery` always wins. Other presets default to
-`official`. Resolved JSON omits default `official` and retains `responsive`.
-Rust world constructors carry no preset name: set
-`delivery: DeliveryProfile::Responsive` explicitly.
+In host and portable JSON, `world: {"preset": "battledome"}` makes `responsive`
+the default; an explicit `delivery` wins. Rust world constructors carry no
+preset name, so set `delivery: DeliveryProfile::Responsive` yourself. Resolved
+JSON omits `official`.
 
 Incremental updates send at most three new body anchors per snake per tick.
 When `world.dt × 437.5 ≥ 126` world units, boosting snakes can outrun this window;
@@ -202,6 +201,9 @@ A kill at time `t` counts while `world.time < t + killScoreSeconds`, separately
 from per-life `kills` and size `score`, without changing the size-based
 leaderboard. The preset defines no deadline, winner or automatic episode reset.
 A new world clears the rolling score.
+
+Host and portable configs that name the preset also default to
+[`responsive` delivery](#simulationconfig).
 
 These rules have synthetic offline regressions in
 [`tests/battledome.rs`](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/battledome.rs),
