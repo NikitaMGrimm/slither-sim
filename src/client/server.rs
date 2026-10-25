@@ -2027,7 +2027,21 @@ mod tests {
             client
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
-            let (server, _) = gateway.listener.accept().unwrap();
+            // The gateway listener is nonblocking, and a fresh connection may
+            // not be queued yet (macOS CI returned WouldBlock here).
+            let deadline = Instant::now() + Duration::from_secs(2);
+            let server = loop {
+                match gateway.listener.accept() {
+                    Ok((server, _)) => break server,
+                    Err(error)
+                        if error.kind() == io::ErrorKind::WouldBlock
+                            && Instant::now() < deadline =>
+                    {
+                        thread::yield_now()
+                    }
+                    Err(error) => panic!("accept failed: {error}"),
+                }
+            };
             server.set_nonblocking(true).unwrap();
             let mut client = WebSocket::from_raw_socket(client, Role::Client, None);
             let mut open = Open::new(
