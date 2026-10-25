@@ -485,41 +485,6 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
 }
 
 #[test]
-fn zz_probe() {
-    let o = fixture();
-    eprintln!(
-        "me segments {} speed {} radius {}",
-        o.me.segments, o.me.speed, o.me.radius
-    );
-    for y in [20.0, 30.0, 40.0, 50.0, 60.0] {
-        let mut observation = fixture();
-        observation.food = vec![food(400.0, 0.0, 1.0)];
-        let mut opponent = observation.me.clone();
-        opponent.id = "opponent".into();
-        opponent.head = Point { x: 300.0, y };
-        opponent.heading = 0.0;
-        opponent.speed = 0.0;
-        opponent.body = (1..=8)
-            .map(|i| Point {
-                x: 300.0 - physics::ANCHOR_SPACING * i as f64,
-                y,
-            })
-            .collect();
-        observation.opponents.push(opponent);
-        let p0 = Params {
-            own_width_factor: 0.0,
-            safe: 5.0,
-            ..Params::default()
-        };
-        eprintln!(
-            "y {y}: default {:?} tip {:?}",
-            still(&observation).heading,
-            decide(&observation, &Timing::default(), &p0).heading
-        );
-    }
-}
-
-#[test]
 fn kill_seeking_crosses_ahead_of_a_nearby_head() {
     let mut observation = fixture();
     // Food straight ahead; an opponent to the left heading down across our
@@ -528,14 +493,15 @@ fn kill_seeking_crosses_ahead_of_a_nearby_head() {
     let mut opponent = observation.me.clone();
     opponent.id = "opponent".into();
     opponent.segments = 60;
-    // It reaches (100, 30) in 0.8 s; we can be there about 0.16 s earlier.
-    opponent.head = Point { x: 100.0, y: 178.0 };
+    // We cross x = 60 well before it does, transversely and with its head
+    // clear of our forward probe.
+    opponent.head = Point { x: 60.0, y: 170.0 };
     opponent.heading = -std::f64::consts::FRAC_PI_2;
     opponent.speed = 185.0;
     opponent.body = (1..=8)
         .map(|i| Point {
-            x: 100.0,
-            y: 178.0 + physics::ANCHOR_SPACING * i as f64,
+            x: 60.0,
+            y: 170.0 + physics::ANCHOR_SPACING * i as f64,
         })
         .collect();
     observation.opponents.push(opponent);
@@ -593,14 +559,15 @@ fn a_cut_off_out_of_cruise_reach_boosts_when_allowed() {
     let mut opponent = observation.me.clone();
     opponent.id = "opponent".into();
     opponent.segments = 60;
-    // It reaches (100, 30) in 0.6 s: too soon at cruise, not at boost speed.
-    opponent.head = Point { x: 100.0, y: 141.0 };
+    // Cruise speed cannot cross its path early enough; accelerating to
+    // boost speed can.
+    opponent.head = Point { x: 100.0, y: 180.0 };
     opponent.heading = -std::f64::consts::FRAC_PI_2;
     opponent.speed = 185.0;
     opponent.body = (1..=8)
         .map(|i| Point {
             x: 100.0,
-            y: 141.0 + physics::ANCHOR_SPACING * i as f64,
+            y: 180.0 + physics::ANCHOR_SPACING * i as f64,
         })
         .collect();
     observation.opponents.push(opponent);
@@ -617,4 +584,217 @@ fn a_cut_off_out_of_cruise_reach_boosts_when_allowed() {
     // Too small to spend mass.
     observation.me.score = 10.0;
     assert!(!decide(&observation, &Timing::default(), &boost).boost);
+}
+
+/// A snake at `head` moving along `heading` at cruise speed, its body behind.
+fn snake(
+    observation: &Observation,
+    id: &str,
+    head: Point,
+    heading: f64,
+    segments: usize,
+) -> slither_sim::Snake {
+    let mut s = observation.me.clone();
+    s.id = id.into();
+    s.segments = segments;
+    s.speed = physics::base_speed(segments);
+    s.head = head;
+    s.heading = heading;
+    s.body = (1..=8)
+        .map(|i| Point {
+            x: head.x - heading.cos() * physics::ANCHOR_SPACING * i as f64,
+            y: head.y - heading.sin() * physics::ANCHOR_SPACING * i as f64,
+        })
+        .collect();
+    s
+}
+
+/// A motionless body: a one-anchor wall at `at`.
+fn post(observation: &Observation, at: Point) -> slither_sim::Snake {
+    let mut s = snake(observation, "post", at, 0.0, 2);
+    s.speed = 0.0;
+    s.body = vec![Point {
+        x: at.x + 10.0,
+        y: at.y + 10.0,
+    }];
+    s
+}
+
+fn lcg(state: &mut u64) -> f64 {
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    (*state >> 11) as f64 / (1u64 << 53) as f64
+}
+
+#[test]
+fn kill_seeking_never_aims_at_an_oncoming_head() {
+    // Review repro: head-on, 200 units apart. Arriving first on its path
+    // would meet its head, not cross ahead of it.
+    let mut observation = fixture();
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let victim = snake(
+        &observation,
+        "victim",
+        Point { x: 200.0, y: 0.0 },
+        std::f64::consts::PI,
+        2,
+    );
+    observation.opponents.push(victim);
+    let params = Params {
+        kill_weight: 1.0,
+        ..Params::default()
+    };
+    assert_eq!(
+        decide(&observation, &Timing::default(), &params),
+        still(&observation)
+    );
+}
+
+#[test]
+fn boost_cut_offs_follow_the_acceleration_ramp() {
+    // Review repro: crossing (190, 0) 0.6 s ahead needs instant top speed;
+    // from cruise speed the ramp covers only about 130 units by then.
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    observation.food = vec![food(400.0, 0.0, 1.0)];
+    let mut victim = snake(
+        &observation,
+        "victim",
+        Point { x: 190.0, y: 111.0 },
+        -std::f64::consts::FRAC_PI_2,
+        60,
+    );
+    victim.speed = 185.0;
+    observation.opponents.push(victim);
+    let params = Params {
+        kill_weight: 1.0,
+        kill_boost: true,
+        ..Params::default()
+    };
+    assert!(!decide(&observation, &Timing::default(), &params).boost);
+}
+
+#[test]
+fn boost_decisions_gather_every_obstacle_they_check_and_fall_back_to_cruise() {
+    // Gathering everything must not change a decision, and a refused boost
+    // must leave exactly the cruise-only decision.
+    let mut state = 7;
+    let mut boosted = 0;
+    for case in 0..3000 {
+        let mut observation = fixture();
+        observation.me.score = 100.0;
+        observation.food = vec![food(400.0, 0.0, 1.0)];
+        let mut victim = snake(
+            &observation,
+            "victim",
+            Point {
+                x: 40.0 + lcg(&mut state) * 200.0,
+                y: 60.0 + lcg(&mut state) * 200.0,
+            },
+            -std::f64::consts::FRAC_PI_2 + (lcg(&mut state) - 0.5),
+            60,
+        );
+        victim.speed = 185.0;
+        observation.opponents.push(victim);
+        let angle = (lcg(&mut state) - 0.5) * 1.5;
+        let distance = 120.0 + lcg(&mut state) * 160.0;
+        let at = Point {
+            x: angle.cos() * distance,
+            y: angle.sin() * distance,
+        };
+        observation.opponents.push(post(&observation, at));
+        for escape_boost in [false, true] {
+            let params = Params {
+                kill_weight: 1.0,
+                kill_boost: true,
+                escape_boost,
+                ..Params::default()
+            };
+            let action = decide(&observation, &Timing::default(), &params);
+            let everything = Params {
+                reach_extra: 1e4,
+                ..params
+            };
+            assert_eq!(
+                action,
+                decide(&observation, &Timing::default(), &everything),
+                "case {case}"
+            );
+            boosted += usize::from(action.boost);
+            if !action.boost && !escape_boost {
+                let cruise = Params {
+                    kill_boost: false,
+                    ..params
+                };
+                assert_eq!(
+                    action,
+                    decide(&observation, &Timing::default(), &cruise),
+                    "case {case}"
+                );
+            }
+        }
+    }
+    assert!(boosted > 100, "{boosted}");
+}
+
+#[test]
+fn coil_orbits_are_no_tighter_than_our_turning_circle() {
+    // Review repro: a 430-segment snake turns on a 233-unit radius, wider
+    // than the 176-unit orbit the target's size alone asks for. A body
+    // that cannot wrap the wider orbit does not coil.
+    let mut observation = fixture();
+    observation.me.segments = 430;
+    observation.me.speed = physics::base_speed(430);
+    let ours = observation.me.speed / physics::turn_rate(430);
+    let anchors = |n: usize| {
+        (1..=n)
+            .map(|i| Point {
+                x: -physics::ANCHOR_SPACING * i as f64,
+                y: 0.0,
+            })
+            .collect::<Vec<_>>()
+    };
+    let target = snake(&observation, "small", Point { x: 0.0, y: 150.0 }, 0.0, 5);
+    observation.opponents.push(target);
+    let params = Params {
+        coil_weight: 1.0,
+        ..Params::default()
+    };
+    let wraps = |n: usize| n as f64 * physics::ANCHOR_SPACING;
+    let short = 30;
+    assert!(wraps(short) > std::f64::consts::TAU * 176.3);
+    assert!(wraps(short) < std::f64::consts::TAU * ours);
+    observation.me.body = anchors(short);
+    assert_eq!(
+        decide(&observation, &Timing::default(), &params),
+        still(&observation)
+    );
+    observation.me.body = anchors(40);
+    assert_ne!(
+        decide(&observation, &Timing::default(), &params),
+        still(&observation)
+    );
+}
+
+#[test]
+fn escape_boost_needs_every_cruise_arc_dangerous() {
+    // Review repro: the cheapest arc is dangerous, but other cruise arcs
+    // are clear, so there is nothing to escape.
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    let goal: f64 = 1.68204;
+    observation.food = vec![food(400.0 * goal.cos(), 400.0 * goal.sin(), 1.0)];
+    observation.opponents.push(post(
+        &observation,
+        Point {
+            x: 70.328,
+            y: 74.985,
+        },
+    ));
+    let params = Params {
+        escape_boost: true,
+        ..Params::default()
+    };
+    assert!(!decide(&observation, &Timing::default(), &params).boost);
 }
