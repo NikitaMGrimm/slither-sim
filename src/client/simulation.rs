@@ -1861,17 +1861,20 @@ impl RawSimulator {
         self.uplink_at(slot, sent, Uplink::Victory(text.to_vec()))
     }
 
-    /// Move every remote slot's in-flight uplink `seconds` earlier in world
-    /// time. A host that defers ticks maps the same wall time to an earlier
-    /// world time; messages already in flight keep their wall arrival.
-    pub(crate) fn shift_uplinks(&mut self, seconds: f64) {
+    /// Move every remote slot's link times `seconds` earlier in world time. A
+    /// host that defers ticks maps the same wall time to an earlier world time;
+    /// messages in flight and each stream's clocks keep their wall times.
+    pub(crate) fn shift_links(&mut self, seconds: f64) {
         let remote = self.backend.remote;
         for slot in &mut self.backend.slots[..remote] {
             let connection = &mut slot.connection;
             for (at, _) in &mut connection.uplink {
                 *at -= seconds;
             }
-            connection.link.shift_uplink(seconds);
+            for (at, _) in &mut connection.downlink {
+                *at -= seconds;
+            }
+            connection.link.shift(seconds);
         }
     }
 

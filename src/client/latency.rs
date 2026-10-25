@@ -408,9 +408,10 @@ impl Link {
         let base = self.round_trip * (1. - config.uplink_share);
         self.downlink.deliver(config, random, base, emitted)
     }
-    /// Move the uplink's clock `seconds` earlier; see `RawSimulator::shift_uplinks`.
-    pub(crate) fn shift_uplink(&mut self, seconds: f64) {
+    /// Move both streams' clocks `seconds` earlier; see `RawSimulator::shift_links`.
+    pub(crate) fn shift(&mut self, seconds: f64) {
         self.uplink.shift(seconds);
+        self.downlink.shift(seconds);
     }
     /// Processing time of one reply: the connection's base with per-reply jitter.
     pub(crate) fn processing(&self, config: &LatencyConfig, random: &mut Random) -> f64 {
@@ -492,6 +493,41 @@ mod tests {
                 .iter()
                 .all(|(sent, at)| (at - sent - 0.01).abs() < 1e-12)
         );
+    }
+
+    #[test]
+    fn a_shifted_link_delivers_as_if_its_times_never_moved() {
+        let config = LatencyConfig {
+            round_trip_seconds: vec![0.02],
+            variation: Variation {
+                median_seconds: 0.05,
+                log_sigma: 2.,
+                correlated_share: 0.5,
+                correlation_seconds: 1.,
+            },
+            pauses: Pauses {
+                rate_per_second: 5.,
+                mean_seconds: 0.1,
+            },
+            ..Default::default()
+        };
+        let mut random = Random::new(152);
+        let mut link = Link::connect(&config, &mut random);
+        link.uplink(&config, &mut random, 0.14);
+        link.downlink(&config, &mut random, 0.14);
+        let (mut shifted, mut shifted_random) = (link.clone(), random.clone());
+        shifted.shift(0.7);
+        for at in [0.147, 1.106, 1.113, 1.5] {
+            let up = link.uplink(&config, &mut random, at);
+            let down = link.downlink(&config, &mut random, at);
+            let up_shifted = shifted.uplink(&config, &mut shifted_random, at - 0.7);
+            let down_shifted = shifted.downlink(&config, &mut shifted_random, at - 0.7);
+            assert!((up - 0.7 - up_shifted).abs() < 1e-9, "{up} {up_shifted}");
+            assert!(
+                (down - 0.7 - down_shifted).abs() < 1e-9,
+                "{down} {down_shifted}"
+            );
+        }
     }
 
     #[test]

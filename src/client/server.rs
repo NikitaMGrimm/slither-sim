@@ -195,7 +195,7 @@ struct Shared {
     /// Nanoseconds the simulation thread spent running ticks.
     busy: AtomicU64,
     players: AtomicUsize,
-    /// Messages per socket slot sent to the simulation and not yet consumed.
+    /// Commands per socket slot sent to the simulation and not yet consumed.
     pending: Vec<AtomicUsize>,
     failure: Mutex<Option<String>>,
 }
@@ -244,6 +244,17 @@ enum Command {
         slot: usize,
         generation: u64,
     },
+}
+
+impl Command {
+    fn slot(&self) -> usize {
+        match self {
+            Command::Connect { slot, .. }
+            | Command::Message { slot, .. }
+            | Command::Victory { slot, .. }
+            | Command::Disconnect { slot, .. } => *slot,
+        }
+    }
 }
 
 /// From the simulation thread to a slot's owner.
@@ -541,8 +552,7 @@ impl Simulation {
             .clock
             .deferred
             .store(self.deferred, Ordering::Relaxed);
-        self.world
-            .shift_uplinks(ticks as f64 * self.shared.clock.dt);
+        self.world.shift_links(ticks as f64 * self.shared.clock.dt);
     }
 
     /// World time of wall time `wall`, behind it by the deferred ticks.
@@ -567,13 +577,9 @@ impl Simulation {
 
     /// Client faults close only that session; errors are simulator failures.
     fn apply(&mut self, command: Command) -> Result<(), String> {
-        match command {
-            Command::Message { slot, .. } | Command::Victory { slot, .. }
-                if slot < self.max_clients =>
-            {
-                self.shared.pending[slot].fetch_sub(1, Ordering::Relaxed);
-            }
-            _ => {}
+        let slot = command.slot();
+        if slot < self.max_clients {
+            self.shared.pending[slot].fetch_sub(1, Ordering::Relaxed);
         }
         match command {
             Command::Connect {
@@ -731,23 +737,32 @@ struct Gate {
 }
 
 impl Gate {
+    /// Send a socket slot's command; the slot counts it until consumed. Only
+    /// this thread adds to the count, so a read of it is never too low.
     fn send(&self, command: Command) {
+        self.shared.pending[command.slot()].fetch_add(1, Ordering::Relaxed);
         // A closed channel means the simulation ended and the host is stopping.
         let _ = self.commands.send(command);
     }
 
     /// Send a playing client's message unless the simulation has yet to
-    /// consume `REMOTE_IN_FLIGHT` earlier ones from its slot. The world's own
-    /// limit applies only as it consumes them, which a stalled simulation does
-    /// not, so this bounds what the channel holds.
-    fn forward(&self, slot: usize, command: Command) -> Result<(), String> {
-        let pending = &self.shared.pending[slot];
-        if pending.fetch_add(1, Ordering::Relaxed) >= REMOTE_IN_FLIGHT {
-            pending.fetch_sub(1, Ordering::Relaxed);
+    /// consume `REMOTE_IN_FLIGHT` earlier commands from its slot. The world's
+    /// own limit applies only as it consumes them, which a stalled simulation
+    /// does not, so this bounds what the channel holds.
+    fn forward(&self, command: Command) -> Result<(), String> {
+        if self.shared.pending[command.slot()].load(Ordering::Relaxed) >= REMOTE_IN_FLIGHT {
             return Err("Remote connection has too many undelivered messages".into());
         }
         self.send(command);
         Ok(())
+    }
+
+    /// A free slot whose earlier commands were all consumed, so login churn
+    /// cannot queue commands faster than the simulation takes them.
+    fn free_slot(&self) -> Option<usize> {
+        (0..self.occupied.len()).find(|&slot| {
+            !self.occupied[slot] && self.shared.pending[slot].load(Ordering::Relaxed) == 0
+        })
     }
 }
 
@@ -1013,25 +1028,21 @@ impl Open {
             (Phase::Playing(slot), [255, 118, text @ ..])
                 if text.len() <= MAX_VICTORY_TEXT && text.is_ascii() =>
             {
-                gate.forward(
+                gate.forward(Command::Victory {
                     slot,
-                    Command::Victory {
-                        slot,
-                        generation: self.generation,
-                        text: text.to_vec(),
-                        sent: wall,
-                    },
-                )
+                    generation: self.generation,
+                    text: text.to_vec(),
+                    sent: wall,
+                })
             }
-            (Phase::Playing(slot), _) if super::simulation::client_message(bytes) => gate.forward(
-                slot,
-                Command::Message {
+            (Phase::Playing(slot), _) if super::simulation::client_message(bytes) => {
+                gate.forward(Command::Message {
                     slot,
                     generation: self.generation,
                     bytes: bytes.to_vec(),
                     sent: wall,
-                },
-            ),
+                })
+            }
             (Phase::Playing(_), _) => Err("Unsupported client message".into()),
             (Phase::Closing(_), _) => Ok(()),
         }
@@ -1047,11 +1058,7 @@ impl Open {
     /// with setup, or closes the session if it cannot admit the snake.
     fn join(&mut self, gate: &mut Gate, login: &[u8]) -> Result<(), String> {
         let appearance = parse_login(login)?;
-        let slot = gate
-            .occupied
-            .iter()
-            .position(|used| !used)
-            .ok_or("Server is full")?;
+        let slot = gate.free_slot().ok_or("Server is full")?;
         gate.occupied[slot] = true;
         gate.generations[slot] += 1;
         self.generation = gate.generations[slot];
@@ -1492,11 +1499,12 @@ mod tests {
         })
     }
 
-    /// A one-socket simulation already connected in slot 0, generation 1.
+    /// A one-socket simulation already connected in slot 0, generation 1,
+    /// with the gate that sends its commands.
     fn connected(
         latency: LatencyConfig,
         deferred: u64,
-    ) -> (Simulation, Sender<Command>, Receiver<Vec<Delivery>>) {
+    ) -> (Simulation, Gate, Receiver<Vec<Delivery>>) {
         let config = SimulationConfig {
             agents: 1,
             world: crate::Config::sandbox(),
@@ -1518,19 +1526,25 @@ mod tests {
             ticks: 0,
             deferred,
         };
-        commands
-            .send(Command::Connect {
-                slot: 0,
-                generation: 1,
-                appearance: PlayerAppearance::default(),
-                session_id: false,
-            })
-            .unwrap();
+        let gate = Gate {
+            occupied: vec![true],
+            generations: vec![1],
+            challenge: Vec::new(),
+            replies: [Vec::new(), Vec::new()],
+            commands,
+            shared: simulation.shared.clone(),
+        };
+        gate.send(Command::Connect {
+            slot: 0,
+            generation: 1,
+            appearance: PlayerAppearance::default(),
+            session_id: false,
+        });
         for _ in 0..40 {
             step(&mut simulation);
         }
         while deliveries.try_recv().is_ok() {}
-        (simulation, commands, deliveries)
+        (simulation, gate, deliveries)
     }
 
     fn step(simulation: &mut Simulation) {
@@ -1577,12 +1591,12 @@ mod tests {
     #[test]
     fn deferred_ticks_keep_wall_times_other_threads_hold() {
         // World time already runs 100 ticks behind the wall clock.
-        let (mut simulation, commands, deliveries) = connected(LatencyConfig::default(), 100);
+        let (mut simulation, gate, deliveries) = connected(LatencyConfig::default(), 100);
         let dt = simulation.shared.clock.dt;
         // A ping sent mid-tick by the wall clock is answered in that tick, in
         // a frame due at the tick's wall time.
         let wall = (simulation.ticks + 100) as f64 * dt + dt / 2.;
-        commands.send(ping(wall)).unwrap();
+        gate.send(ping(wall));
         let at = pong_after(&mut simulation, &deliveries, 1).expect("no pong in the arrival tick");
         assert!(
             (at - (simulation.ticks + 100) as f64 * dt).abs() < 1e-9,
@@ -1592,11 +1606,11 @@ mod tests {
 
     #[test]
     fn deferring_keeps_in_flight_uplinks_on_their_wall_arrival() {
-        let (mut simulation, commands, deliveries) = connected(LatencyConfig::one_way(0.07, 0.), 0);
+        let (mut simulation, gate, deliveries) = connected(LatencyConfig::one_way(0.07, 0.), 0);
         let dt = simulation.shared.clock.dt;
         let sent = simulation.ticks;
         // Arrives 10.5 ticks after it is sent, by the wall clock.
-        commands.send(ping((sent as f64 + 0.5) * dt)).unwrap();
+        gate.send(ping((sent as f64 + 0.5) * dt));
         step(&mut simulation);
         simulation.defer(5);
         let at = pong_after(&mut simulation, &deliveries, 20).expect("no pong");
@@ -1607,23 +1621,29 @@ mod tests {
 
     #[test]
     fn a_socket_slot_waiting_on_too_many_messages_is_refused() {
-        let (mut simulation, commands, _deliveries) = connected(LatencyConfig::default(), 0);
-        let gate = Gate {
-            occupied: vec![true],
-            generations: vec![1],
-            challenge: Vec::new(),
-            replies: [Vec::new(), Vec::new()],
-            commands,
-            shared: simulation.shared.clone(),
-        };
+        let (mut simulation, gate, _deliveries) = connected(LatencyConfig::default(), 0);
         // A stalled simulation consumes nothing.
         for _ in 0..REMOTE_IN_FLIGHT {
-            gate.forward(0, ping(0.)).unwrap();
+            gate.forward(ping(0.)).unwrap();
         }
-        assert!(gate.forward(0, ping(0.)).is_err());
+        assert!(gate.forward(ping(0.)).is_err());
         simulation.apply_commands().unwrap();
         assert_eq!(simulation.shared.pending[0].load(Ordering::Relaxed), 0);
-        gate.forward(0, ping(0.)).unwrap();
+        gate.forward(ping(0.)).unwrap();
+    }
+
+    #[test]
+    fn a_released_socket_slot_waits_for_the_simulation_to_take_its_commands() {
+        let (mut simulation, mut gate, _deliveries) = connected(LatencyConfig::default(), 0);
+        // A login and close, as `release` sends them, while simulation stalls.
+        gate.send(Command::Disconnect {
+            slot: 0,
+            generation: 1,
+        });
+        gate.occupied[0] = false;
+        assert_eq!(gate.free_slot(), None);
+        simulation.apply_commands().unwrap();
+        assert_eq!(gate.free_slot(), Some(0));
     }
 
     #[test]
