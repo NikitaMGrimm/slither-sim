@@ -204,12 +204,11 @@ Rust `Observation` omits the rolling score. Geometric frames and portable
 `ClientFrame` omit pit geometry and the floor setting; retain world config
 separately. Portable clients receive per-life kills and the size-based
 leaderboard, without rolling kill score or distinct pit death reason.
-The stock browser shows the pit edge as decorative pellets, with no growth or
-physics effect. Local design choices: centers 3 units outside the pit, spaced
-about 15 units apart, palette 8 and size byte 31 (6.2). Battledome has 749
-markers. Sector exit and reconnect follow normal food delivery. Bots receive
-physical food only, including pellets hidden by markers in the browser.
-The stock browser has no rolling kill-score display.
+The stock browser shows the pit edge as a ring of 749 decorative pellets:
+centers 3 units outside the pit, about 15 units apart, palette 8, size byte 31
+(6.2). These are design choices. Markers cannot be eaten and follow normal
+sector delivery. Bots get only real food, including any pellet a marker hides in
+the browser. The stock browser has no rolling kill-score display.
 
 ### Prey
 

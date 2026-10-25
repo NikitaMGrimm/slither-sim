@@ -2,9 +2,6 @@
 
 ## Unreleased
 
-- Show pit edges in the stock browser with decorative pellets; bot food and
-  physics stay unchanged.
-
 ### Breaking
 
 - The minimum Rust version is 1.99 (was 1.86).
@@ -88,6 +85,10 @@
 - A localhost-only host/capture/compare command records transport baselines and
   checks them against official-reference gates
   ([transport parity](docs/research-workflow.md#transport-parity)).
+- The stock browser shows a pit's edge as a ring of decorative pellets. Physics
+  and bot food are unchanged; socket bots get real food only by sending the
+  `X-SlitherSim-Food: physical` upgrade header
+  ([Battledome](docs/configuration.md#battledome)).
 - A [cautious bot example](examples/cautious_bot.rs) that seeks food while
   avoiding walls and other snakes; the `portable_bot` examples are shorter.
 
