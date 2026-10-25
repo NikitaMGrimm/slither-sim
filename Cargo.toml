@@ -16,6 +16,9 @@ include = [
     "/examples/basic.rs",
     "/examples/portable_bot.rs",
     "/examples/portable_bot.py",
+    # Every [[example]] below must ship its source: maturin's sdist keeps the
+    # manifest's target list, and pip fails on a missing target file.
+    "/examples/host_load.rs",
     "/examples/bot.py",
     "/examples/bot.mjs",
     "/examples/ffi_bot.py",
