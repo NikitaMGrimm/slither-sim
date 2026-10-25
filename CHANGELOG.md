@@ -4,6 +4,9 @@
 
 ### Added
 
+- Offline transport parity measurements and official-reference gates, with a
+  localhost-only host/capture/compare command for recording transport baselines.
+
 - Advisory PR performance comparisons publish up to three covered progress
   updates and a terminal report, retain verified original-preview results after
   merge, and consolidate evidence on the rolling release PR. A pre-budgeted v2

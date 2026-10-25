@@ -260,6 +260,55 @@ active/post-death counts and prey reporting rates per known-prey second. Entry,
 removal, reconnect and censored lifetimes remain distinct. It does not repeat the
 audit's integrity/RTT analysis or infer world populations from recipient counts.
 
+### Transport parity
+
+Measure complete elapsed-header protocol-19 captures on receipt and server clocks:
+
+```sh
+uv run --locked --only-group tools python tools/fidelity/transport_parity.py measure CAPTURE.jsonl.gz --output outputs/transport.json
+uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-reference.json outputs/transport.json
+uv run --locked --only-group tools python tools/fidelity/local_capture.py --config arena.json --seconds 60 --out outputs/local-transport
+```
+
+`measure` accepts multiple captures and records SHA-256s for inputs, decoder,
+census and measurement tool. It reports each capture/setup epoch and pooled
+statistics. `compare` prints four initial gates and exits 1 on failure (including
+insufficient samples), 2 on invalid input. Optional `--tolerances FILE` supplies
+JSON with explanatory `comment` fields. Limits use the observed per-capture
+official envelope, with 100 samples required per gated statistic. The
+[reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-transport-parity/REPORT.md)
+include the full retained headless input manifest and exclusions in the fixture;
+community recordings are excluded. Raw reference captures require local access.
+
+Frame cadence and the header-delta histogram expose batching. Anchor correction
+is `v_local * gap - 42` world units: local speed is nine anchor spacings divided
+by their duration, centered on the measured interval (four neighboring intervals
+on either side), separately on each clock. Windows with over 15% reported speed
+variation are skipped. The stock client resets `chl` on each anchor and smooths
+`dchl` over 53 frames; larger absolute corrections indicate more interpolation
+reset work. The report includes RMS and absolute p50/p95/p99, also for snakes
+with at least 100 body anchors. It does not simulate the rendered correction.
+Own/other per-snake rotation/speed-report gaps use server time and separate
+appearance epochs. Packet-family counts/rates reuse the census. Excess delivery
+delay is receipt minus cumulative server time, minus a centered rolling minimum
+over +/-600 frames, separately after each setup and excluding its frame.
+
+Samples overlap and are correlated. Receipt timing includes network jitter and
+collector stalls. `collector-timing` metadata and final collector counters are
+reported (missing older metadata remains unknown); repeated cumulative counters
+are not summed. No clock here identifies absolute one-way latency or guarantees
+stock-client playing equivalence. Collector stalls remain in measurements and
+can widen the official envelope.
+
+`local_capture.py` starts `cargo run --release --locked -j 3 -- host --config FILE`,
+runs the headless collector, stops both process trees, then measures and compares.
+It saves the capture path, frozen config, Git head, logs and comparison table in
+a new output directory and uses an isolated Cargo target by default. Its config
+must bind a numeric IPv4 loopback address; it refuses other addresses before
+starting anything and supplies the validated bind override to the host. It never
+discovers or connects to outside game servers. Choose a representative local
+world/load in `arena.json`; a small world cannot establish full-load parity.
+
 Before export, audit the complete study and inspect its attempt ledger, source
 pins and quarantine status. Preserve that audit result and the selected window
 identity with the analysis. The standalone exporter reads the supplied capture;

@@ -33,6 +33,12 @@ wire evidence. This inventory does not duplicate source hashes.
 `client-food-interest.json` contains selected decoded receipt/pose witnesses,
 with source identity and selection limits, rather than full raw frames.
 
+[`transport-official-reference.json`](transport-official-reference.json) is a
+separate wire-19 measurement summary (`schemaVersion: 1`), outside the packet
+fixture inventory. It contains input paths/hashes, parse exclusions and
+decoder-derived transport quantiles, without raw gameplay bytes. See its
+[selection and limits](../../research/fidelity/2026-10-25-transport-parity/REPORT.md).
+
 ## Changing a protocol or contract
 
 The runtime default may advance independently. Do not derive historical tags

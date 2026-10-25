@@ -70,7 +70,7 @@ def commands(group):
             ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
             suite("tools", "test_*.py"),
             # Complementary halves, so the long end-to-end comparison test runs
-            # beside the rest of the fidelity suite.
+            # beside the rest of the fidelity suite, including transport parity.
             *(suite("tools/fidelity", pattern) for pattern in FIDELITY_HALVES),
             ["node", "--test", *sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools/fidelity").glob("*.test.mjs"))],
             [sys.executable, "-B", "tools/perf_transport.py", "--binary", binary,

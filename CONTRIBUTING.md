@@ -48,6 +48,13 @@ and `tools` on Linux, Windows and macOS. The weekly
 [extended checks](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/workflows/extended.yml) add release-profile tests,
 Linux ARM tests and a RustSec audit; they block nothing and can be dispatched.
 
+Transport measurement regressions (`tools/fidelity/test_transport_parity.py`)
+are discovered by the tools group's fidelity suite. Run them alone with
+`uv run --locked --only-group tools python -B -m unittest discover -s tools/fidelity -p test_transport_parity.py`.
+The [local transport check](docs/research-workflow.md#transport-parity) is an
+explicit measurement, separate from unit tests; a current-host gate failure is
+a recorded baseline rather than a reason to loosen official tolerances.
+
 ## Evidence proportional to the change
 
 - Explain the problem and resulting behavior. Include a reproducer and relevant

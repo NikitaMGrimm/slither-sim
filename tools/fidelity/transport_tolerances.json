@@ -1,0 +1,26 @@
+{
+  "minimumSamples": 100,
+  "comment": "One-sided exploratory gates. Each limit is the maximum eligible official per-capture quantile plus spreadAllowance times the observed max-minus-min spread. Zero allowance uses the complete observed envelope without tuning against a local host. At least 100 samples per metric avoids calibrating on smoke captures. Lower correction, delay and frame gaps are permitted. This is not a confidence interval or a claim of renderer equivalence.",
+  "metrics": {
+    "anchor_receipt_p50": {
+      "path": "anchors.receipt.all.abs.p50",
+      "spreadAllowance": 0,
+      "comment": "Typical stock-client interpolation reset correction, in world units. Includes network and collector timing. Use all eligible official captures, including slower sessions."
+    },
+    "anchor_receipt_p95": {
+      "path": "anchors.receipt.all.abs.p95",
+      "spreadAllowance": 0,
+      "comment": "Tail correction magnitude; the observed official envelope is the initial tolerance. Correlated anchor windows are not independent trials."
+    },
+    "frame_server_p50": {
+      "path": "frameGapsMs.server.p50",
+      "spreadAllowance": 0,
+      "comment": "Median elapsed-ms header interval. Detects delayed server batching independently of receipt jitter; sparse official captures widen this envelope."
+    },
+    "delay_p90": {
+      "path": "excessDelayMs.p90",
+      "spreadAllowance": 0,
+      "comment": "Receipt-minus-server excess over a centered +/-600-frame minimum. The full official envelope includes collector stalls; no absolute latency inference."
+    }
+  }
+}
