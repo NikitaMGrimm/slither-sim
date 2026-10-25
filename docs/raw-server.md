@@ -203,7 +203,7 @@ and the [presentation fixture](../tests/fixtures/client-presentation.json).
 Colors are outside physics and bot observations, persisting across source death,
 reconnects and sector re-entry. Birth/pickup telemetry supplies colors and eater
 IDs. The wire exposes the first co-located pellet; physics consumes co-located
-pellets in insertion order before ambient refill.
+pellets newest first, before ambient refill.
 
 ## Stock browser client
 
