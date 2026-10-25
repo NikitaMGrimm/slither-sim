@@ -322,6 +322,16 @@ fn wider_snakes_keep_more_clearance_when_asked() {
         ..base
     };
     assert_ne!(decide(&observation, &Timing::default(), &wide).heading, 0.0);
+    // Review round 8: the wider margin also gathers obstacles further out.
+    let mut long = fixture();
+    long.food = vec![food(800.0, 0.0, 1.0)];
+    long.me.segments = 430;
+    long.me.speed = physics::base_speed(430);
+    let mut opponent = snake(&long, "opponent", Point { x: 414.0, y: 0.0 }, 0.0, 2);
+    opponent.speed = 0.0;
+    opponent.body = vec![Point { x: 372.0, y: 0.0 }, Point { x: 330.0, y: 0.0 }];
+    long.opponents.push(opponent);
+    assert_ne!(decide(&long, &Timing::default(), &wide).heading, 0.0);
     // The extra clearance is ours: it vanishes with zero factor.
     let zero = Params {
         safe_width_factor: 0.0,

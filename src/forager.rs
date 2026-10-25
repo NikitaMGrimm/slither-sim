@@ -855,7 +855,11 @@ impl Scene {
         } else {
             me.speed
         };
-        let reach = speed * p.lookahead_seconds + 2.0 * me.width + p.reach_extra;
+        // A width-scaled safety margin counts obstacles that much further out.
+        let reach = speed * p.lookahead_seconds
+            + 2.0 * me.width
+            + p.reach_extra
+            + p.safe_width_factor * me.width;
         let near_within =
             |q: Point, reach2: f64| (q.x - me.head.x).powi(2) + (q.y - me.head.y).powi(2) < reach2;
         let steps = p.head_path_steps.max(1);
@@ -1025,7 +1029,7 @@ fn rim_kills(arena: &Arena, head: Point, heading: f64, segments: usize) -> bool 
 /// `TRAP_CHORDS` samples `dt` apart. Its first contact, located between
 /// samples by bisection, is lethal or starts a slide; while sliding, the head
 /// stays on the rim, so later samples die once their heading points outward
-/// steeply at the sample's bearing.
+/// steeply at the bearing of their contact point.
 fn branch_hits_rim(
     arena: &Arena,
     segments: usize,
@@ -1055,7 +1059,8 @@ fn branch_hits_rim(
     rim_kills(arena, q, h, segments)
         || (j + 1..=TRAP_CHORDS).any(|i| {
             let (q, h) = at(dt * i as f64);
-            let (x, y) = (q.x - arena.center.x, q.y - arena.center.y);
+            let tip = forward(q, h, lead);
+            let (x, y) = (tip.x - arena.center.x, tip.y - arena.center.y);
             x * h.cos() + y * h.sin() > boundary::LETHAL_OUTWARD * x.hypot(y)
         })
 }
@@ -1751,6 +1756,16 @@ mod tests {
         // sliding dies.
         let tangent = branches(Point { x: 990.0, y: 0.0 }, std::f64::consts::FRAC_PI_2);
         assert_eq!(tangent, [true, false, false]);
+        // Review round 8: a long snake's slide dies by its contact point's
+        // bearing (simulator death at 392 ms).
+        let (speed, turn) = (base_speed(326), turn_rate(326));
+        let (head, heading) = (Point { x: 980.0, y: 0.0 }, -1.58);
+        assert!(branch_hits_rim(&arena, 326, 0.05, |t| {
+            (
+                turn_then_straight(head, heading, std::f64::consts::PI, speed, turn, t),
+                heading + std::f64::consts::PI.min(turn * t),
+            )
+        }));
     }
 
     #[test]
