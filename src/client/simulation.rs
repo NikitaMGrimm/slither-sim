@@ -265,6 +265,11 @@ struct SnakeReports {
     /// Reported in the current tick.
     motion_due: bool,
     fam_due: bool,
+    /// Some recipient holds a value other than the last report, from an
+    /// appearance or a growth/tail mass; the next opportunity reports even
+    /// if the snake returned to that value.
+    motion_stale: bool,
+    fam_stale: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -1517,6 +1522,7 @@ impl SimulatorBackend {
                         profile,
                         reports,
                     )?;
+                    self.reports[i].observe(known);
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
@@ -1530,9 +1536,9 @@ impl SimulatorBackend {
                         packets.push(encode::removal(id, true));
                     }
                     full(&mut packets, own, id, snake, wanted, profile)?;
-                    connection
-                        .snakes
-                        .insert(i, KnownSnake::new(life, snake, wanted)?);
+                    let known = KnownSnake::new(life, snake, wanted)?;
+                    self.reports[i].observe(&known);
+                    connection.snakes.insert(i, known);
                 }
             }
             let connection = &mut self.slots[slot].connection;
@@ -1919,16 +1925,24 @@ impl SnakeReports {
             };
             return;
         }
-        self.motion_due = motion != self.motion && tick >= self.motion_at;
+        self.motion_due = (motion != self.motion || self.motion_stale) && tick >= self.motion_at;
         if self.motion_due {
             self.motion = motion;
             self.motion_at = tick + MOTION_REPORT_TICKS;
+            self.motion_stale = false;
         }
-        self.fam_due = fam != self.fam && tick >= self.fam_at;
+        self.fam_due = (fam != self.fam || self.fam_stale) && tick >= self.fam_at;
         if self.fam_due {
             self.fam = fam;
             self.fam_at = tick + FAM_REPORT_TICKS;
+            self.fam_stale = false;
         }
+    }
+
+    /// Note a recipient's view of this snake after its packets this tick.
+    fn observe(&mut self, known: &KnownSnake) {
+        self.motion_stale |= [known.heading, known.wanted, known.speed] != self.motion;
+        self.fam_stale |= known.fam != self.fam;
     }
 }
 
@@ -3582,6 +3596,41 @@ mod tests {
         let heading = sim.backend.slots[0].control.heading;
         assert!(angle_close(heading, start - 127. * step, 1e-12));
         assert!((0. ..TAU).contains(&heading));
+    }
+
+    #[test]
+    fn a_viewer_holding_a_newer_value_is_corrected_when_the_snake_returns() {
+        let known = |motion: [u8; 3], fam| KnownSnake {
+            life: 1,
+            front: Point::default(),
+            len: 2,
+            heading: motion[0],
+            wanted: motion[1],
+            speed: motion[2],
+            fam,
+            kills: 0,
+        };
+        let (a, b) = ([10, 20, 30], [10, 21, 30]);
+        let mut reports = SnakeReports::default();
+        reports.update(1, [0; 3], 100, 0);
+        reports.update(1, a, 150, 10);
+        assert!(reports.motion_due && reports.fam_due);
+        // A viewer appearing at tick 11 holds B; a growth anchor told every
+        // viewer mass 200 while the mass gate was closed.
+        reports.update(1, b, 200, 11);
+        reports.observe(&known(b, 200));
+        // The snake returns to the reported A and mass 150 before the gates
+        // open: six ticks for motion, 15 for mass.
+        for tick in 12..25 {
+            reports.update(1, a, 150, tick);
+            assert_eq!(reports.motion_due, tick == 16, "{tick}");
+            assert!(!reports.fam_due, "{tick}");
+        }
+        assert_eq!(reports.motion, a);
+        reports.update(1, a, 150, 25);
+        assert!(reports.fam_due && reports.fam == 150);
+        reports.update(1, a, 150, 40);
+        assert!(!reports.motion_due && !reports.fam_due);
     }
 
     #[test]
