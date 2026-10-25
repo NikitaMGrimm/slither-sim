@@ -102,6 +102,7 @@ class Progress(unittest.TestCase):
     def test_strict_windows_job_query_termination_and_timeout_errors_fail_closed(self):
         job = object.__new__(perf_build.Job)
         job.handle = 123
+        job.process_handles = Mock(return_value=[])
         job.accounting = lambda: SimpleNamespace(ActiveProcesses=1)
         job.ctypes = SimpleNamespace(byref=lambda x: x, sizeof=lambda x: 1,
                                     get_last_error=lambda: 5, WinError=lambda n: OSError(n, "synthetic Windows job API failure"))
@@ -116,6 +117,16 @@ class Progress(unittest.TestCase):
         job.kernel.QueryInformationJobObject.return_value = 1
         with patch.object(perf_build.time, "perf_counter", side_effect=[0, 1]), self.assertRaises(TimeoutError):
             job.terminate(wait_seconds=0.5, verify=True)
+        job.process_handles.return_value = [456]
+        job.kernel.WaitForSingleObject = Mock(return_value=258)
+        job.kernel.CloseHandle = Mock()
+        with self.assertRaises(TimeoutError):
+            job.terminate(verify=True)
+        job.kernel.CloseHandle.assert_called_once_with(456)
+        job.kernel.WaitForSingleObject.return_value = 0xFFFFFFFF
+        with self.assertRaises(OSError):
+            job.terminate(verify=True)
+        self.assertEqual(job.kernel.CloseHandle.call_count, 2)
         job.close = Mock()
         job.terminate = Mock(side_effect=OSError("strict termination failed"))
         tree = object.__new__(perf_build.ProcessTree)
@@ -233,28 +244,54 @@ class Supervision(unittest.TestCase):
             beat = output / "heartbeat"
             writer = (f"import time\nfrom pathlib import Path\np=Path({str(beat)!r})\n"
                       "while True:\n    with p.open('a') as stream: stream.write('.')\n    time.sleep(.02)\n")
-            script = (f"import sys,time\nfrom pathlib import Path\nsys.path.insert(0,{str(Path(pr_report_progress.__file__).parent)!r})\n"
+            script = ("import sys,time\n"
+                      f"if sys.stdin.buffer.read(1) != {perf_build.RELEASE!r}: sys.exit(1)\n"
+                      f"from pathlib import Path\nsys.path.insert(0,{str(Path(pr_report_progress.__file__).parent)!r})\n"
                       "from pr_report_progress import supervise\n"
-                      f"sys.exit(supervise(Path({str(output)!r}),[sys.executable,'-c',{writer!r}],time.monotonic()+15))\n")
-            supervisor = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.DEVNULL,
-                                          stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+                      f"sys.exit(supervise(Path({str(output)!r}),[{sys.executable!r},'-c',{writer!r}],float('inf')))\n")
+            # Kill the actual supervisor, not a venv redirector. A fixture-owned job
+            # contains failure paths, but must not stop members before the assertions.
+            job = perf_build.Job()
+            members = []
+            supervisor = None
             try:
-                deadline = time.monotonic() + 5
-                while not beat.exists() and time.monotonic() < deadline:
+                supervisor = subprocess.Popen([sys._base_executable, "-c", script], stdin=subprocess.PIPE,
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                              creationflags=subprocess.CREATE_NO_WINDOW)
+                job.assign(supervisor)
+                supervisor.stdin.write(perf_build.RELEASE)
+                supervisor.stdin.close()
+                # Startup is separate from the killed-supervisor/cleanup checks.
+                deadline = time.monotonic() + 30
+                while (not beat.exists() or not beat.stat().st_size) and time.monotonic() < deadline:
                     time.sleep(.01)
-                self.assertTrue(beat.exists())
+                self.assertTrue(beat.exists() and beat.stat().st_size, "synthetic writer never started")
+                members = job.process_handles()
                 supervisor.kill()
-                supervisor.wait(timeout=5)
-                time.sleep(.1)
+                supervisor.wait(timeout=30)
+                deadline = time.monotonic() + 30
+                for handle in members:
+                    status = job.kernel.WaitForSingleObject(handle, max(0, int((deadline - time.monotonic()) * 1000)))
+                    self.assertEqual(status, 0, "job member survived the killed supervisor")
                 size = beat.stat().st_size
                 time.sleep(.2)
                 self.assertEqual(beat.stat().st_size, size)
+                log = output.with_suffix(".collector.log")
+                log.rename(log.with_suffix(".closed"))
                 self.assertFalse((control / "quiesced").exists())
                 self.assertFalse(pr_report_progress.cleanup(output, timeout=.05))
             finally:
-                if supervisor.poll() is None:
-                    supervisor.kill()
-                    supervisor.wait(timeout=5)
+                try:
+                    if supervisor is not None and supervisor.poll() is None:
+                        supervisor.kill()
+                    job.terminate(verify=True)
+                finally:
+                    job.close()
+                    for handle in members:
+                        job.kernel.CloseHandle(handle)
+                    if supervisor is not None:
+                        supervisor.stdin.close()
+                        supervisor.wait(timeout=30)
 
 
 if __name__ == "__main__":

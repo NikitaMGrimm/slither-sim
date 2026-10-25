@@ -10,13 +10,23 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 import perf_build
 
 
 def git(root, *args, **kwargs):
     return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True, **kwargs).stdout
+
+
+def wait_for_file(path):
+    """Bound fixture startup separately from the timeout exercised by a test."""
+    deadline = time.perf_counter() + 30
+    while time.perf_counter() < deadline:
+        if path.exists() and (text := path.read_text()):
+            return text
+        time.sleep(0.01)
+    raise AssertionError(f"child did not write {path.name}")
 
 
 class Repository(unittest.TestCase):
@@ -199,10 +209,19 @@ class Output(unittest.TestCase):
                               ["partial output", "failure"])
 
     def test_timed_out_deadline_command_preserves_both_streams(self):
-        child = ("import sys, time; print('partial output', flush=True); "
-                 "print('warning', file=sys.stderr, flush=True); time.sleep(60)")
         with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaises(TimeoutError) as raised:
+            ready = Path(temporary) / "ready"
+            child = ("import sys, threading; from pathlib import Path; print('partial output', flush=True); "
+                     "print('warning', file=sys.stderr, flush=True); "
+                     f"Path({str(ready)!r}).write_text('ready'); threading.Event().wait()")
+            wait = perf_build.ProcessTree.wait
+
+            def wait_after_output(tree, timeout):
+                wait_for_file(ready)
+                return wait(tree, timeout)
+
+            with patch.object(perf_build.ProcessTree, "wait", wait_after_output), \
+                    self.assertRaises(TimeoutError) as raised:
                 perf_build.output([sys.executable, "-c", child], temporary, timeout=1.5,
                                   deadline=time.perf_counter() + 30)
         self.assertEqual(str(raised.exception).rsplit(": ", 1)[1].splitlines(), ["partial output", "warning"])
@@ -227,16 +246,21 @@ class Commands(unittest.TestCase):
                      "    time.sleep(0.01)\n" + after_spawn)
             log = root / "command.log"
             original = perf_build.ProcessTree.stop
+            wait = perf_build.ProcessTree.wait
+
+            def wait_after_spawn(tree, timeout):
+                wait_for_file(pid)
+                wait_for_file(beat)
+                return wait(tree, timeout)
 
             def delayed(tree):
                 stop(tree, pid, release)
                 original(tree)
 
             try:
-                with patch.object(perf_build.ProcessTree, "stop", delayed) if stop else contextlib.nullcontext():
+                with patch.object(perf_build.ProcessTree, "wait", wait_after_spawn), \
+                        patch.object(perf_build.ProcessTree, "stop", delayed) if stop else contextlib.nullcontext():
                     code = perf_build.command([sys.executable, "-c", child], root, log, timeout=timeout)
-                if not pid.exists():
-                    self.skipTest("grandchild did not start")
                 size = beat.stat().st_size
                 time.sleep(0.3)
                 self.assertEqual(beat.stat().st_size, size, "grandchild outlived command()")
@@ -281,6 +305,54 @@ class Commands(unittest.TestCase):
                     released = data == perf_build.RELEASE
                     self.assertEqual(result.returncode == 0, released, result.stderr)
                     self.assertEqual(marker.exists(), released)
+
+    @unittest.skipUnless(os.name == "nt", "Windows job assignment")
+    def test_job_owns_the_shim_interpreter_even_when_assignment_is_delayed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ready, log = root / "shim.pid", root / "command.log"
+            shim = ("import os\n"
+                    f"with open({str(ready)!r}, 'w') as marker: marker.write(str(os.getpid()))\n"
+                    + perf_build.SHIM)
+            assign = perf_build.Job.assign
+
+            def assign_after_start(job, process):
+                # Force any venv redirector to spawn its interpreter before assignment.
+                shim_pid = int(wait_for_file(ready))
+                assign(job, process)
+                self.assertEqual(shim_pid, process.pid,
+                                 "job must own the interpreter waiting for the release byte")
+
+            with patch.object(perf_build, "SHIM", shim), \
+                    patch.object(perf_build.Job, "assign", assign_after_start):
+                code = perf_build.command([sys.executable, "-c", "print('contained')"], root, log, timeout=30)
+            self.assertEqual(code, 0)
+            self.assertEqual(log.read_text().strip(), "contained")
+
+    def test_job_waits_for_members_even_when_accounting_is_already_zero(self):
+        job = object.__new__(perf_build.Job)
+        job.handle = 123
+        job.process_handles = Mock(return_value=[456, 789])
+        job.active = Mock(return_value=0)
+        job.kernel = Mock()
+        job.kernel.TerminateJobObject.return_value = 1
+        job.kernel.WaitForSingleObject.return_value = 0
+        job.terminate(verify=True)
+        self.assertEqual(job.kernel.WaitForSingleObject.call_args_list[0].args[0], 456)
+        self.assertEqual(job.kernel.WaitForSingleObject.call_args_list[1].args[0], 789)
+        self.assertEqual(job.kernel.CloseHandle.call_args_list, [call(456), call(789)])
+        job.active.assert_called_once_with(verify=True)
+
+    def test_best_effort_termination_survives_member_enumeration_failure(self):
+        job = object.__new__(perf_build.Job)
+        job.handle = 123
+        job.process_handles = Mock(side_effect=OSError("enumeration failed"))
+        job.active = Mock(return_value=0)
+        job.kernel = Mock()
+        job.terminate()
+        job.kernel.TerminateJobObject.assert_called_once_with(123, 1)
+        with self.assertRaises(OSError):
+            job.terminate(verify=True)
 
     @unittest.skipIf(os.name == "nt", "POSIX process-group cleanup")
     def test_posix_timeout_returns_promptly(self):

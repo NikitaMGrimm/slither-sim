@@ -115,6 +115,10 @@ class Job:
                 [ctypes.c_void_p] if name.startswith("Query") else [])
         kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
         kernel.TerminateJobObject.argtypes = [wintypes.HANDLE, ctypes.c_uint]
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
         kernel.CloseHandle.argtypes = [wintypes.HANDLE]
         self.handle = kernel.CreateJobObjectW(None, None)
         if not self.handle:
@@ -140,17 +144,67 @@ class Job:
             raise self.ctypes.WinError(self.ctypes.get_last_error())
         return info.ActiveProcesses if ok else 0
 
+    def process_handles(self):
+        """Hold termination witnesses before terminating members removes them from accounting."""
+        ctypes = self.ctypes
+        handles, capacity = [], 16
+        try:
+            while True:
+                class ProcessIds(ctypes.Structure):
+                    _fields_ = [("assigned", ctypes.c_uint32), ("count", ctypes.c_uint32),
+                                ("pids", ctypes.c_size_t * capacity)]
+
+                info = ProcessIds()
+                if self.kernel.QueryInformationJobObject(self.handle, 3, ctypes.byref(info),
+                                                         ctypes.sizeof(info), None):
+                    break
+                error = ctypes.get_last_error()
+                if error != 234:  # ERROR_MORE_DATA: members were added during the query.
+                    raise ctypes.WinError(error)
+                capacity = max(capacity * 2, info.assigned)
+            for pid in info.pids[:info.count]:
+                handle = self.kernel.OpenProcess(0x100000, False, pid)  # SYNCHRONIZE
+                if handle:
+                    handles.append(handle)
+                elif (error := ctypes.get_last_error()) != 87:  # ERROR_INVALID_PARAMETER: already gone.
+                    raise ctypes.WinError(error)
+            return handles
+        except BaseException:
+            for handle in handles:
+                self.kernel.CloseHandle(handle)
+            raise
+
     def terminate(self, wait_seconds=30, *, verify=False):
-        ok = self.kernel.TerminateJobObject(self.handle, 1)
-        if not ok and verify:
-            raise self.ctypes.WinError(self.ctypes.get_last_error())
         deadline = time.perf_counter() + wait_seconds
-        while self.active(verify=verify):
-            if time.perf_counter() >= deadline:
-                if verify:
-                    raise TimeoutError("Windows process job still has active descendants")
-                break
-            time.sleep(0.01)
+        try:
+            handles = self.process_handles()
+        except OSError:
+            # Best-effort stops must still terminate; the active() loop below
+            # covers members whose handles could not be held.
+            if verify:
+                raise
+            handles = []
+        try:
+            ok = self.kernel.TerminateJobObject(self.handle, 1)
+            if not ok and verify:
+                raise self.ctypes.WinError(self.ctypes.get_last_error())
+            # ActiveProcesses can reach zero before members finish releasing file/cwd
+            # handles. Wait for actual termination, including nested venv launchers.
+            for handle in handles:
+                status = self.kernel.WaitForSingleObject(handle, max(0, int((deadline - time.perf_counter()) * 1000)))
+                if status == 0xFFFFFFFF and verify:  # WAIT_FAILED
+                    raise self.ctypes.WinError(self.ctypes.get_last_error())
+                if status != 0 and verify:
+                    raise TimeoutError("Windows job member did not terminate")
+            while self.active(verify=verify):
+                if time.perf_counter() >= deadline:
+                    if verify:
+                        raise TimeoutError("Windows process job still has active descendants")
+                    break
+                time.sleep(0.01)
+        finally:
+            for handle in handles:
+                self.kernel.CloseHandle(handle)
 
     def close(self):
         if self.handle:
@@ -174,7 +228,9 @@ class ProcessTree:
                 raise FileNotFoundError(f"{args[0]} not found")
             self.job = Job()
             try:
-                self.process = subprocess.Popen([sys.executable, "-I", "-c", SHIM, executable, *args[1:]],
+                # A venv redirector can spawn its interpreter before assignment;
+                # that existing child would escape this job and retain log/cwd handles.
+                self.process = subprocess.Popen([sys._base_executable, "-I", "-c", SHIM, executable, *args[1:]],
                                                 cwd=cwd, env=environment, stdin=subprocess.PIPE,
                                                 stdout=stream, stderr=stderr)
             except BaseException:
