@@ -512,8 +512,10 @@ pub fn decide(
         scratch
             .rivals
             .extend(o.opponents.iter().filter(|s| s.alive).map(|s| {
-                let (c, r) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                (s.head, c.distance(s.head) + r, s.speed.max(1.0))
+                // Where its head is at the moment we decide for, as ours.
+                let head = view.head(s);
+                let (c, r) = pickup_circle(head, s.heading, s.speed, s.segments);
+                (head, c.distance(head) + r, s.speed.max(1.0))
             }));
     }
     let race = (p.race_sigma > 0.0).then(|| Race {
@@ -524,14 +526,17 @@ pub fn decide(
     let mut goal = scene
         .food(&view, &me, p, race)
         .unwrap_or_else(|| roam(o, &me, p));
+    // A raced food goal may be valued at boost speed: should boosting turn
+    // out unsafe, food is valued again at cruise speed.
+    let revalue = goal.boost && race.is_some_and(|r| r.charge.is_some());
     // The best goal reachable at cruise speed, should boosting turn out unsafe.
-    let mut cruise = goal;
+    let mut cruise = (!revalue).then_some(goal);
     let mut consider = |g: Goal| {
         if g.rate > goal.rate {
             goal = g;
         }
-        if !g.boost && g.rate > cruise.rate {
-            cruise = g;
+        if !g.boost && cruise.is_none_or(|c| g.rate > c.rate) {
+            cruise = Some(g);
         }
     };
     if p.prey_weight > 0.0 {
@@ -600,9 +605,18 @@ pub fn decide(
                 return action;
             }
         }
+        if revalue {
+            let food = scene
+                .food(&view, &me, p, race.map(|r| Race { charge: None, ..r }))
+                .unwrap_or_else(|| roam(o, &me, p));
+            // Food came first, so it keeps ties.
+            if cruise.is_none_or(|c| food.rate >= c.rate) {
+                cruise = Some(food);
+            }
+        }
+        goal = cruise.expect("food, roaming or another cruise goal");
         // Only the best cut-off was kept; find the best one at cruise speed.
         // Without cut-offs (zero weight, zero value) none can win.
-        goal = cruise;
         if let Some(g) = (p.kill_weight > 0.0)
             .then(|| cut(&view, &me, p, intents, &scratch.near, None))
             .flatten()
@@ -1288,7 +1302,21 @@ impl Scene {
             // The gathering radius assumes two of our widths; widened envelopes
             // (uncertainty, stale data) extend it so no reachable segment is dropped.
             let extra = (width + unsure * enemy.speed - me.width - self::width(enemy)).max(0.0);
-            let reach2 = (reach + extra) * (reach + extra);
+            let mut reach = reach + extra;
+            if p.exit_weight > 0.0 {
+                // Exit branch tips run up to cruise travel past an arc's end,
+                // itself our tip offset ahead, and meet this obstacle's
+                // whole width, however wide the snake.
+                let tip = (1.0 - p.own_width_factor) * me.width;
+                reach = reach.max(
+                    speed * p.lookahead_seconds
+                        + me.speed * p.exit_seconds
+                        + tip
+                        + width
+                        + unsure * enemy.speed,
+                );
+            }
+            let reach2 = reach * reach;
             let close = |q: Point| near_within(q, reach2);
             // Forecast trail points between the forecast and observed heads
             // when the head turns during the lead, newest first.
@@ -2154,6 +2182,10 @@ fn exit_branches(me: &Me, head: Point, heading: f64, dt: f64, tip: f64) -> (Bran
 /// Chords per exit branch: at the default 0.4 s a cruising snake moves
 /// about 18 units per chord, less than two minimum widths.
 const EXIT_CHORDS: usize = 4;
+/// Rim samples along an exit branch are at most this far apart, seconds:
+/// sparser samples could miss a turning branch that crosses the rim and
+/// returns between them.
+const EXIT_RIM_SECONDS: f64 = 0.025;
 
 /// Share of our hard-left, straight and hard-right branches from `head`
 /// (heading `heading`) over `exit_seconds` at cruise speed that the rim or a
@@ -2195,7 +2227,16 @@ fn blocked_exits(
             let q = turn_then_straight(head, heading, delta, me.speed, me.turn, t);
             (q, heading + delta.signum() * delta.abs().min(me.turn * t))
         };
-        if near_rim && branch_hits_rim(&o.arena, o.me.segments, dt, EXIT_CHORDS, at) {
+        if near_rim && {
+            let chords = (p.exit_seconds / EXIT_RIM_SECONDS).ceil().max(1.0) as usize;
+            branch_hits_rim(
+                &o.arena,
+                o.me.segments,
+                p.exit_seconds / chords as f64,
+                chords,
+                at,
+            )
+        } {
             blocked += 1;
             continue;
         }
@@ -2235,11 +2276,11 @@ fn blocked_exits(
     cost + p.exit_weight * blocked as f64 / 3.0
 }
 
-/// Boost toward a goal that needs it, like the original Hunter: only along a
-/// clear, nearly straight accelerating arc.
 /// Boosting toward a goal takes only arcs this close to it, radians.
 const BOOST_MAX_OFFSET: f64 = 0.4;
 
+/// Boost toward a goal that needs it, like the original Hunter: only along a
+/// clear, nearly straight accelerating arc.
 fn boost_toward(
     o: &Observation,
     me: &Me,
@@ -2262,6 +2303,149 @@ fn boost_toward(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A two-segment snake at the origin heading east, alone in a sandbox
+    /// arena of radius 3000.
+    fn lone() -> Observation {
+        let mut world = crate::Simulator::new(1, crate::Config::sandbox()).unwrap();
+        world.add("self", 0, 1).unwrap();
+        let mut o = world.observe(0).unwrap();
+        o.me.head = Point::default();
+        o.me.heading = 0.0;
+        o.me.segments = 2;
+        o.me.speed = base_speed(2);
+        o.me.fam = 0.8;
+        o.me.score = crate::physics::score(2, 0.8);
+        o.me.body = vec![Point { x: -42.0, y: 0.0 }];
+        o.food.clear();
+        o.prey.clear();
+        o.opponents.clear();
+        o.arena.radius = 3000.0;
+        o
+    }
+
+    fn pellet(x: f64, y: f64, value: f64) -> crate::Food {
+        crate::Food {
+            x,
+            y,
+            value,
+            size: None,
+            origin: None,
+        }
+    }
+
+    fn still_view(o: &Observation) -> View<'_> {
+        View {
+            o,
+            lead: 0.0,
+            sweep: &[],
+            sweep_bounds: (Point::default(), Point::default()),
+            pickup_radius: 0.0,
+            uncertainty: 0.0,
+        }
+    }
+
+    #[test]
+    fn exit_rim_check_sees_a_crossing_between_body_samples() {
+        // Review of 745115e: over a 2 s exit both turning branches from an
+        // outward heading cross the rim lethally near 200 ms and are back
+        // inside by the 500 ms body sample.
+        let mut o = lone();
+        o.arena.radius = 1000.0;
+        let p = Params {
+            exit_weight: 3.0,
+            exit_seconds: 2.0,
+            ..Params::default()
+        };
+        let me = Me::new(&o.me);
+        let head = Point { x: 960.0, y: 0.0 };
+        assert_eq!(
+            blocked_exits(&o, &me, &p, &[], head, 0.0, 0.0, f64::INFINITY),
+            3.0
+        );
+    }
+
+    #[test]
+    fn exit_gathering_reaches_the_whole_width_of_a_large_body() {
+        // Review of 745115e: the gathering radius assumed opponents no wider
+        // than us, so a 430-segment body across our exits went unseen.
+        let mut o = lone();
+        let mut enemy = o.me.clone();
+        enemy.segments = 430;
+        enemy.head = Point { x: 210.0, y: 210.0 };
+        enemy.speed = base_speed(430);
+        enemy.body = (1..=10)
+            .map(|i| Point {
+                x: 210.0,
+                y: 210.0 - i as f64 * 42.0,
+            })
+            .collect();
+        o.opponents.push(enemy);
+        let p = Params {
+            exit_weight: 3.0,
+            ..Params::default()
+        };
+        let mut me = Me::new(&o.me);
+        me.safe = p.safe;
+        let mut s = Scratch::default();
+        let lists = scratch_lists(&mut s.near, &mut s.arcs, &mut s.exits);
+        gather(&still_view(&o), &me, &p, &[], false, lists);
+        let (path, points, _) = arc(&me, &p, 0.0, None);
+        let (end, heading) = path[points - 1];
+        assert!(blocked_exits(&o, &me, &p, &s.exits, end, heading, 0.0, f64::INFINITY) > 0.0);
+    }
+
+    #[test]
+    fn a_declined_racing_boost_values_food_again_at_cruise_speed() {
+        // Review of b350be3: a rich cell is ours only by boosting, a post
+        // blocks the boost, and cruising there loses it to the rival.
+        let mut o = lone();
+        o.food = vec![pellet(400.0, 0.0, 20.0), pellet(180.0, 300.0, 1.0)];
+        let mut rival = o.me.clone();
+        rival.head = Point { x: 700.0, y: 0.0 };
+        rival.heading = std::f64::consts::PI;
+        rival.body.clear();
+        o.opponents.push(rival);
+        let mut post = o.me.clone();
+        post.head = Point { x: 150.0, y: 0.0 };
+        post.speed = 0.0;
+        post.body.clear();
+        o.opponents.push(post);
+        let p = Params {
+            race_sigma: 0.15,
+            boost_min_score: 0.0,
+            ..Params::default()
+        };
+        let action = decide(&o, &Timing::default(), &[], &p, &mut Scratch::default());
+        assert!(!action.boost);
+        assert!(action.heading > 0.5, "{action:?}");
+    }
+
+    #[test]
+    fn racing_times_rivals_from_where_they_will_be() {
+        // Review of b350be3: our head is forecast through the latency, so a
+        // rival's must be too; from its stale head it seemed slower to the
+        // rich cell and we boosted straight at a cell it reaches first.
+        let mut o = lone();
+        o.food = vec![pellet(400.0, 0.0, 32.0), pellet(180.0, 300.0, 1.0)];
+        let mut rival = o.me.clone();
+        rival.head = Point { x: 650.0, y: 0.0 };
+        rival.heading = std::f64::consts::PI;
+        rival.body.clear();
+        o.opponents.push(rival);
+        let p = Params {
+            race_sigma: 0.15,
+            boost_min_score: 0.0,
+            ..Params::default()
+        };
+        let timing = Timing {
+            observation_age: 0.08,
+            ..Timing::default()
+        };
+        let action = decide(&o, &timing, &[], &p, &mut Scratch::default());
+        assert!(!action.boost, "{action:?}");
+        assert!(action.heading > 0.5, "{action:?}");
+    }
 
     fn lcg(seed: &mut u64) -> f64 {
         *seed = seed
