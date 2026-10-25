@@ -57,7 +57,7 @@ fn host(args: &[&str]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let result = Host::bind(config).and_then(|mut host| {
+    let result = Host::bind(config).and_then(|host| {
         eprintln!("Listening on ws://{}/slither", host.local_addr()?);
         host.run()
     });

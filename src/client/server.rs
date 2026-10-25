@@ -1,11 +1,22 @@
-//! Raw protocol-19 WebSocket host: remote clients share one real-time world.
+//! Raw protocol-19 WebSocket host: remote clients and in-process bots share
+//! one real-time world.
 //!
-//! One nonblocking event loop owns the simulator and every socket. Interrupted
-//! HTTP upgrades, partial WebSocket messages and unflushed output stay inside
-//! their tungstenite state between polls, so a slow or stalled peer never
-//! blocks physics or another connection. Each socket is bounded: upgrade and
-//! login deadlines, small client messages, a capped send buffer and a per-poll
-//! read budget. A misbehaving client is closed without touching other slots.
+//! Three kinds of threads share one wall-clock schedule. The simulation thread
+//! owns the world and only runs physics ticks and encodes their messages. The
+//! I/O thread owns the listener and every socket, and sends each frame at the
+//! time the latency model delivers it rather than whenever the tick that made
+//! it finished. Bot threads run the background seekers as ordinary clients of
+//! their own slots: they decode frames, decide, ping and model processing time
+//! off the simulation thread, and reach the world only through timestamped
+//! commands. Running 480 seekers on the host thread delayed remote frames by up
+//! to ~20 ms depending on tick phase (jitter study, 2026-10-25).
+//!
+//! Sockets stay nonblocking: interrupted HTTP upgrades, partial WebSocket
+//! messages and unflushed output stay inside their tungstenite state, so a slow
+//! or stalled peer never blocks physics or another connection. Each socket is
+//! bounded: upgrade and login deadlines, small client messages, a capped send
+//! buffer and a per-poll read budget. A misbehaving client is closed without
+//! touching other slots.
 //!
 //! Login follows the stock client: optional one-byte framing requests, the
 //! `[99, 0]` request, a `6` challenge generated here from a fixed literal, a
@@ -13,14 +24,23 @@
 //! authentication. A login sent first (the native `direct` handshake) is also
 //! accepted.
 use super::{
-    SimulationConfig, challenge,
+    ClientState, ClientStatus, SimulationConfig, challenge,
+    latency::{LatencyConfig, Link, Random},
+    protocol,
     simulation::{MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, RawSimulator},
 };
+use crate::Action;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::VecDeque,
     io,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
-    thread,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        mpsc::{self, Receiver, Sender},
+    },
+    thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 use tungstenite::{
@@ -44,23 +64,26 @@ const MAX_INPUT_BYTES: usize = 4 << 10;
 const WRITE_BUFFER_BYTES: usize = 16 << 10;
 /// Queued output beyond this closes the connection as too slow.
 const MAX_SEND_BUFFER_BYTES: usize = 1 << 20;
+/// Frames waiting for their delivery time on one connection.
+const MAX_QUEUED_FRAMES: usize = 4096;
 /// Connections that have not joined, including those being closed.
 const MAX_PENDING: usize = 32;
 /// Fairness budgets per poll, so one busy listener or socket cannot starve
-/// physics or the other connections.
+/// the other connections.
 const MAX_ACCEPTS_PER_POLL: usize = 16;
 const MAX_READS_PER_POLL: usize = 32;
 /// Lifecycle deadlines from acceptance: upgrade, login and close handshakes.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(10);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(1);
-/// Physics ticks run per poll while catching up with the wall clock.
+/// Physics ticks run per wake while catching up with the wall clock.
 const MAX_CATCHUP_TICKS: u64 = 8;
 /// Backlog beyond this is deferred: world time falls behind the wall clock
 /// rather than skipping physics or running an unbounded burst.
 const MAX_BACKLOG_SECONDS: f64 = 0.25;
-/// Longest sleep in `run`, so socket service never waits a long tick.
-const MAX_IDLE: Duration = Duration::from_millis(5);
+/// Longest sleep of the socket and bot threads, which also bounds how late a
+/// frame handed over during a sleep is noticed.
+const MAX_IDLE: Duration = Duration::from_millis(1);
 /// Appearances carry the custom skin after a u8 length.
 const MAX_CUSTOM_SKIN: usize = u8::MAX as usize;
 /// WebSocket control frames carry at most 125 payload bytes (RFC 6455 5.5),
@@ -72,7 +95,7 @@ const CHALLENGE_LITERAL: (&[u8; 5], &[u8; 22]) = (b"Slith", b"erSimLocalHostChal
 /// Real-time host configuration.
 ///
 /// `simulation.agents` and `simulation.controlledSlot` are derived: the world
-/// has `maxClients` remote slots followed by `bots` background seekers, and no
+/// has `maxClients` socket slots followed by `bots` background seekers, and no
 /// in-process controlled slot. Values given for those two fields are replaced.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -81,6 +104,9 @@ pub struct HostConfig {
     pub seed: u32,
     pub max_clients: usize,
     pub bots: usize,
+    /// Threads that run the background seekers, apart from the simulation and
+    /// socket threads.
+    pub bot_threads: usize,
     pub simulation: SimulationConfig,
 }
 
@@ -91,6 +117,7 @@ impl Default for HostConfig {
             seed: 1,
             max_clients: 4,
             bots: 4,
+            bot_threads: 2,
             simulation: SimulationConfig::default(),
         }
     }
@@ -114,6 +141,9 @@ impl HostConfig {
         if self.max_clients == 0 {
             return Err("Host needs 1 or more maxClients".into());
         }
+        if self.bots > 0 && self.bot_threads == 0 {
+            return Err("Bots need 1 or more botThreads".into());
+        }
         if self.simulation.record_wire {
             return Err("The host does not retain wire records; set recordWire to false".into());
         }
@@ -124,6 +154,475 @@ impl HostConfig {
         };
         config.validate()?;
         Ok(config)
+    }
+}
+
+/// World time `t` is due at `epoch + t + deferred × dt`. Ticks the simulation
+/// could not keep up with shift the whole schedule, so queued frames keep
+/// their spacing.
+struct Clock {
+    epoch: Instant,
+    dt: f64,
+    deferred: AtomicU64,
+}
+
+impl Clock {
+    /// World time at `at`.
+    fn world(&self, at: Instant) -> f64 {
+        let offset = self.deferred.load(Ordering::Relaxed) as f64 * self.dt;
+        at.saturating_duration_since(self.epoch).as_secs_f64() - offset
+    }
+
+    /// Sleep until world time `due`, for at most `limit`.
+    fn sleep_until(&self, due: f64, limit: Duration) {
+        let wait = Duration::try_from_secs_f64(due - self.world(Instant::now()))
+            .map_or(Duration::ZERO, |wait| wait.min(limit));
+        if !wait.is_zero() {
+            thread::sleep(wait);
+        }
+    }
+}
+
+/// State every host thread can see.
+struct Shared {
+    clock: Clock,
+    stop: AtomicBool,
+    ticks: AtomicU64,
+    /// Nanoseconds the simulation thread spent running ticks.
+    busy: AtomicU64,
+    players: AtomicUsize,
+    failure: Mutex<Option<String>>,
+}
+
+impl Shared {
+    fn stopped(&self) -> bool {
+        self.stop.load(Ordering::Relaxed)
+    }
+}
+
+/// Sets the stop flag when its thread ends, including by panic, so the other
+/// threads finish too. Senders to a thread that has ended therefore always see
+/// the flag: they ignore send errors and exit at their next check.
+struct StopOnExit(Arc<Shared>);
+
+impl Drop for StopOnExit {
+    fn drop(&mut self) {
+        self.0.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+/// From a slot's owner to the simulation thread, in send order. A generation
+/// numbers one owner's sessions in a slot; commands for an older one are
+/// ignored.
+enum Command {
+    Connect {
+        slot: usize,
+        generation: u64,
+        appearance: PlayerAppearance,
+        session_id: bool,
+    },
+    /// A game command sent at world time `sent`.
+    Message {
+        slot: usize,
+        generation: u64,
+        bytes: Vec<u8>,
+        sent: f64,
+    },
+    Victory {
+        slot: usize,
+        generation: u64,
+        text: Vec<u8>,
+        sent: f64,
+    },
+    Disconnect {
+        slot: usize,
+        generation: u64,
+    },
+}
+
+/// From the simulation thread to a slot's owner.
+enum Delivery {
+    /// Server payloads with their delivery times in world seconds, in order.
+    Frames {
+        slot: usize,
+        generation: u64,
+        frames: Vec<(f64, Vec<u8>)>,
+    },
+    /// The world refused or ended this session.
+    Closed {
+        slot: usize,
+        generation: u64,
+        reason: String,
+    },
+}
+
+/// A bound protocol-19 server. `start` serves it on its own threads; `run`
+/// serves it until a failure.
+pub struct Host {
+    listener: TcpListener,
+    world: RawSimulator,
+    max_clients: usize,
+    bots: usize,
+    bot_threads: usize,
+    seed: u32,
+    latency: LatencyConfig,
+    decision_seconds: f64,
+}
+
+impl Host {
+    pub fn bind(config: HostConfig) -> Result<Self, String> {
+        let simulation = config.world_config()?;
+        let latency = simulation.latency.clone();
+        let decision_seconds = simulation.decision_ticks as f64 * simulation.world.dt;
+        // Bots are clients of their own slots, like sockets.
+        let world = RawSimulator::new(config.seed, simulation, config.max_clients + config.bots)?;
+        let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
+        listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+        Ok(Self {
+            listener,
+            world,
+            max_clients: config.max_clients,
+            bots: config.bots,
+            bot_threads: config.bot_threads.min(config.bots),
+            seed: config.seed,
+            latency,
+            decision_seconds,
+        })
+    }
+
+    pub fn local_addr(&self) -> Result<SocketAddr, String> {
+        self.listener.local_addr().map_err(|e| e.to_string())
+    }
+
+    /// Serve on new threads; the world clock starts now.
+    pub fn start(self) -> Result<RunningHost, String> {
+        let address = self.local_addr()?;
+        let (encoded, replies) = challenge_parts()?;
+        let mut challenge = vec![0, 0, b'6'];
+        challenge.extend(encoded);
+        let shared = Arc::new(Shared {
+            clock: Clock {
+                epoch: Instant::now(),
+                dt: self.world.dt(),
+                deferred: AtomicU64::new(0),
+            },
+            stop: AtomicBool::new(false),
+            ticks: AtomicU64::new(0),
+            busy: AtomicU64::new(0),
+            players: AtomicUsize::new(0),
+            failure: Mutex::new(None),
+        });
+        let mut running = RunningHost {
+            address,
+            shared: shared.clone(),
+            threads: Vec::new(),
+        };
+        let (commands, inbox) = mpsc::channel();
+        let (to_sockets, socket_inbox) = mpsc::channel();
+        let mut routes = vec![to_sockets];
+        for worker in 0..self.bot_threads {
+            let (sender, receiver) = mpsc::channel();
+            routes.push(sender);
+            let seats = (self.max_clients + worker..self.max_clients + self.bots)
+                .step_by(self.bot_threads)
+                .map(|slot| Seat::new(slot, self.decision_seconds))
+                .collect();
+            let bots = Bots {
+                seats,
+                stride: self.bot_threads,
+                deliveries: receiver,
+                commands: commands.clone(),
+                shared: shared.clone(),
+                latency: self.latency.clone(),
+                random: Random::new(u64::from(self.seed) ^ 0x626f_7473_0000 ^ worker as u64),
+                interval: self.decision_seconds,
+            };
+            running.spawn(&format!("slither-bots-{worker}"), bots, Bots::run)?;
+        }
+        let gateway = Gateway {
+            listener: self.listener,
+            sessions: Vec::new(),
+            gate: Gate {
+                occupied: vec![false; self.max_clients],
+                generations: vec![0; self.max_clients],
+                challenge,
+                replies,
+                commands,
+                shared: shared.clone(),
+            },
+            deliveries: socket_inbox,
+        };
+        let agents = self.max_clients + self.bots;
+        let simulation = Simulation {
+            world: self.world,
+            commands: inbox,
+            batches: routes.iter().map(|_| Vec::new()).collect(),
+            routes,
+            max_clients: self.max_clients,
+            generations: vec![0; agents],
+            shared,
+            ticks: 0,
+            deferred: 0,
+        };
+        running.spawn("slither-simulation", simulation, Simulation::run)?;
+        running.spawn("slither-sockets", gateway, Gateway::run)?;
+        Ok(running)
+    }
+
+    /// Serve until a thread fails, and return its error.
+    pub fn run(self) -> Result<(), String> {
+        self.start()?.wait()
+    }
+}
+
+/// A serving host. Dropping it stops and joins its threads.
+pub struct RunningHost {
+    address: SocketAddr,
+    shared: Arc<Shared>,
+    threads: Vec<JoinHandle<Result<(), String>>>,
+}
+
+impl RunningHost {
+    pub fn local_addr(&self) -> SocketAddr {
+        self.address
+    }
+
+    /// Physics ticks run since starting.
+    pub fn ticks(&self) -> u64 {
+        self.shared.ticks.load(Ordering::Relaxed)
+    }
+
+    /// Wall-clock ticks postponed because the simulation could not keep up.
+    pub fn deferred_ticks(&self) -> u64 {
+        self.shared.clock.deferred.load(Ordering::Relaxed)
+    }
+
+    /// Wall seconds the simulation thread has spent running ticks; its load is
+    /// the increase over elapsed time.
+    pub fn simulation_seconds(&self) -> f64 {
+        self.shared.busy.load(Ordering::Relaxed) as f64 * 1e-9
+    }
+
+    /// Connected socket players in the shared world.
+    pub fn players(&self) -> usize {
+        self.shared.players.load(Ordering::Relaxed)
+    }
+
+    /// Block until a thread fails, and return its error.
+    pub fn wait(mut self) -> Result<(), String> {
+        self.join()
+    }
+
+    /// Stop every thread; an error reports a failure that happened first.
+    pub fn stop(mut self) -> Result<(), String> {
+        self.shared.stop.store(true, Ordering::Relaxed);
+        self.join()
+    }
+
+    fn spawn<T: Send + 'static>(
+        &mut self,
+        name: &str,
+        task: T,
+        run: fn(&mut T) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let shared = self.shared.clone();
+        let thread = thread::Builder::new()
+            .name(name.into())
+            .spawn(move || {
+                let mut task = task;
+                // Declared after the task, so the flag is set before its
+                // channels close, on return and on unwind.
+                let exit = StopOnExit(shared);
+                let result = run(&mut task);
+                if let Err(error) = &result {
+                    let mut failure = exit.0.failure.lock().unwrap_or_else(|e| e.into_inner());
+                    failure.get_or_insert_with(|| error.clone());
+                }
+                result
+            })
+            .map_err(|e| e.to_string())?;
+        self.threads.push(thread);
+        Ok(())
+    }
+
+    fn join(&mut self) -> Result<(), String> {
+        let mut panicked = false;
+        for thread in self.threads.drain(..) {
+            panicked |= thread.join().is_err();
+        }
+        let failure = self
+            .shared
+            .failure
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        match (failure.clone(), panicked) {
+            (Some(error), _) => Err(error),
+            (None, true) => Err("A host thread panicked".into()),
+            (None, false) => Ok(()),
+        }
+    }
+}
+
+impl Drop for RunningHost {
+    fn drop(&mut self) {
+        self.shared.stop.store(true, Ordering::Relaxed);
+        let _ = self.join();
+    }
+}
+
+/// The simulation thread: the world, its tick schedule and command intake.
+struct Simulation {
+    world: RawSimulator,
+    commands: Receiver<Command>,
+    /// Owner threads: sockets first, then bot workers.
+    routes: Vec<Sender<Vec<Delivery>>>,
+    batches: Vec<Vec<Delivery>>,
+    max_clients: usize,
+    /// Current session per slot; zero while closed.
+    generations: Vec<u64>,
+    shared: Arc<Shared>,
+    ticks: u64,
+    deferred: u64,
+}
+
+impl Simulation {
+    fn run(&mut self) -> Result<(), String> {
+        let dt = self.shared.clock.dt;
+        while !self.shared.stopped() {
+            let due = self.due_ticks(Instant::now());
+            if due == 0 {
+                let next = (self.ticks + 1) as f64 * dt;
+                self.shared
+                    .clock
+                    .sleep_until(next, Duration::from_secs_f64(dt));
+                continue;
+            }
+            let started = Instant::now();
+            for _ in 0..due {
+                // Commands take effect at the first tick after they arrive;
+                // their send times, not this loop, set when that is.
+                self.apply_commands()?;
+                self.world.advance_ticks(1)?;
+                self.ticks += 1;
+                self.shared.ticks.store(self.ticks, Ordering::Relaxed);
+                self.hand_over()?;
+            }
+            let busy = started.elapsed().as_nanos().try_into().unwrap_or(u64::MAX);
+            self.shared.busy.fetch_add(busy, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+
+    fn due_ticks(&mut self, now: Instant) -> u64 {
+        let dt = self.shared.clock.dt;
+        // Casts saturate, and ticks + deferred never exceeds an earlier schedule.
+        let scheduled = (now.duration_since(self.shared.clock.epoch).as_secs_f64() / dt) as u64;
+        let backlog = scheduled.saturating_sub(self.deferred + self.ticks);
+        let limit = (MAX_BACKLOG_SECONDS / dt).ceil() as u64;
+        if backlog > limit {
+            self.deferred += backlog - limit;
+            self.shared
+                .clock
+                .deferred
+                .store(self.deferred, Ordering::Relaxed);
+        }
+        backlog.min(limit).min(MAX_CATCHUP_TICKS)
+    }
+
+    fn route(&self, slot: usize) -> usize {
+        if slot < self.max_clients {
+            0
+        } else {
+            1 + (slot - self.max_clients) % (self.routes.len() - 1)
+        }
+    }
+
+    fn apply_commands(&mut self) -> Result<(), String> {
+        while let Ok(command) = self.commands.try_recv() {
+            self.apply(command)?;
+        }
+        Ok(())
+    }
+
+    /// Client faults close only that session; errors are simulator failures.
+    fn apply(&mut self, command: Command) -> Result<(), String> {
+        match command {
+            Command::Connect {
+                slot,
+                generation,
+                appearance,
+                session_id,
+            } => {
+                self.generations[slot] = generation;
+                let mut joined = self.world.connect(slot, appearance);
+                if joined.is_ok() && session_id {
+                    joined = self.world.request_session_id(slot);
+                }
+                if let Err(reason) = joined {
+                    self.close(slot, reason)?;
+                }
+            }
+            Command::Message {
+                slot,
+                generation,
+                bytes,
+                sent,
+            } if generation == self.generations[slot] => {
+                if let Err(reason) = self.world.receive_at(slot, &bytes, sent) {
+                    self.close(slot, reason)?;
+                }
+            }
+            Command::Victory {
+                slot,
+                generation,
+                text,
+                sent,
+            } if generation == self.generations[slot] => {
+                if let Err(reason) = self.world.victory_at(slot, &text, sent) {
+                    self.close(slot, reason)?;
+                }
+            }
+            Command::Disconnect { slot, generation } if generation == self.generations[slot] => {
+                self.generations[slot] = 0;
+                self.world.disconnect(slot)?;
+            }
+            Command::Message { .. } | Command::Victory { .. } | Command::Disconnect { .. } => {}
+        }
+        Ok(())
+    }
+
+    fn close(&mut self, slot: usize, reason: String) -> Result<(), String> {
+        self.world.disconnect(slot)?;
+        let generation = std::mem::take(&mut self.generations[slot]);
+        let route = self.route(slot);
+        self.batches[route].push(Delivery::Closed {
+            slot,
+            generation,
+            reason,
+        });
+        Ok(())
+    }
+
+    /// Hand every queued frame to its slot's owner, which sends it on time.
+    fn hand_over(&mut self) -> Result<(), String> {
+        for slot in 0..self.generations.len() {
+            let frames = self.world.take(slot)?;
+            if !frames.is_empty() {
+                let route = self.route(slot);
+                self.batches[route].push(Delivery::Frames {
+                    slot,
+                    generation: self.generations[slot],
+                    frames,
+                });
+            }
+        }
+        for (route, batch) in self.routes.iter().zip(&mut self.batches) {
+            if !batch.is_empty() {
+                // A closed route means its thread ended and the host is stopping.
+                let _ = route.send(std::mem::take(batch));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -174,15 +673,33 @@ fn socket_config() -> WebSocketConfig {
         .max_frame_size(Some(MAX_INPUT_BYTES))
 }
 
-/// World and admission state shared by all connections.
-struct Game {
-    world: RawSimulator,
+/// The socket thread: listener, sessions and socket-slot admission.
+struct Gateway {
+    listener: TcpListener,
+    sessions: Vec<Session>,
+    gate: Gate,
+    deliveries: Receiver<Vec<Delivery>>,
+}
+
+/// Admission state shared by all sessions.
+struct Gate {
     occupied: Vec<bool>,
+    /// Last session generation per socket slot.
+    generations: Vec<u64>,
     /// The `6` message with an elapsed header, transformed per connection.
     challenge: Vec<u8>,
     /// Exact accepted replies: the literal-copy compatibility profile and the
     /// rotated reply observed from the native and tested stock clients.
     replies: [Vec<u8>; 2],
+    commands: Sender<Command>,
+    shared: Arc<Shared>,
+}
+
+impl Gate {
+    fn send(&self, command: Command) {
+        // A closed channel means the simulation ended and the host is stopping.
+        let _ = self.commands.send(command);
+    }
 }
 
 struct Open {
@@ -190,6 +707,9 @@ struct Open {
     phase: Phase,
     framing: Framing,
     want_session_id: bool,
+    generation: u64,
+    /// Frames from the world waiting for their delivery time, in order.
+    queued: VecDeque<(f64, Vec<u8>)>,
 }
 
 enum Stage {
@@ -203,117 +723,87 @@ struct Session {
     stage: Stage,
 }
 
-/// A bound protocol-19 server. Call `poll` from your own loop or `run` forever.
-pub struct Host {
-    listener: TcpListener,
-    game: Game,
-    sessions: Vec<Session>,
-    dt: f64,
-    epoch: Instant,
-    ticks: u64,
-    deferred: u64,
-}
-
-impl Host {
-    pub fn bind(config: HostConfig) -> Result<Self, String> {
-        let simulation = config.world_config()?;
-        let world = RawSimulator::new(config.seed, simulation, config.max_clients)?;
-        let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
-        listener.set_nonblocking(true).map_err(|e| e.to_string())?;
-        let (encoded, replies) = challenge_parts()?;
-        let mut challenge = vec![0, 0, b'6'];
-        challenge.extend(encoded);
-        Ok(Self {
-            listener,
-            dt: world.dt(),
-            game: Game {
-                world,
-                occupied: vec![false; config.max_clients],
-                challenge,
-                replies,
-            },
-            sessions: Vec::new(),
-            epoch: Instant::now(),
-            ticks: 0,
-            deferred: 0,
-        })
+impl Gateway {
+    fn run(&mut self) -> Result<(), String> {
+        while !self.gate.shared.stopped() {
+            self.poll()?;
+            let next = self
+                .sessions
+                .iter()
+                .filter_map(|session| match &session.stage {
+                    Stage::Open(open) => open.queued.front().map(|(at, _)| *at),
+                    _ => None,
+                })
+                .fold(f64::INFINITY, f64::min);
+            self.gate.shared.clock.sleep_until(next, MAX_IDLE);
+        }
+        Ok(())
     }
 
-    pub fn local_addr(&self) -> Result<SocketAddr, String> {
-        self.listener.local_addr().map_err(|e| e.to_string())
-    }
-
-    /// Physics ticks run since binding.
-    pub fn ticks(&self) -> u64 {
-        self.ticks
-    }
-
-    /// Wall-clock ticks postponed because the host could not keep up.
-    pub fn deferred_ticks(&self) -> u64 {
-        self.deferred
-    }
-
-    /// Connected players in the shared world.
-    pub fn players(&self) -> usize {
-        self.game.occupied.iter().filter(|&&used| used).count()
-    }
-
-    /// Accept and service sockets, then run due physics ticks without blocking.
-    /// An error is a simulator failure; client faults only close that client.
-    pub fn poll(&mut self) -> Result<(), String> {
+    /// Accept and service sockets, take the world's frames and send those due.
+    /// An error is a host failure; client faults only close that client.
+    fn poll(&mut self) -> Result<(), String> {
         let now = Instant::now();
         self.accept(now);
-        for session in &mut self.sessions {
-            session.service(&mut self.game, now)?;
-        }
-        for _ in 0..self.due_ticks(now) {
-            self.game.world.advance_ticks(1)?;
-            self.ticks += 1;
-            for session in &mut self.sessions {
-                if let Stage::Open(open) = &mut session.stage {
-                    open.deliver(&mut self.game, now)?;
-                }
+        while let Ok(batch) = self.deliveries.try_recv() {
+            for delivery in batch {
+                self.deliver(delivery, now);
             }
+        }
+        let world = self.gate.shared.clock.world(now);
+        for session in &mut self.sessions {
+            session.service(&mut self.gate, now, world)?;
         }
         for session in &mut self.sessions {
             let Stage::Open(open) = &mut session.stage else {
                 continue;
             };
-            if !open.flush(&mut self.game)? {
+            if !open.flush(&mut self.gate) {
                 session.stage = Stage::Closed;
             }
         }
         self.sessions
             .retain(|session| !matches!(session.stage, Stage::Closed));
+        let players = self.gate.occupied.iter().filter(|&&used| used).count();
+        self.gate.shared.players.store(players, Ordering::Relaxed);
         Ok(())
     }
 
-    /// Serve until a simulator error, sleeping until the next tick between polls.
-    pub fn run(&mut self) -> Result<(), String> {
-        loop {
-            self.poll()?;
-            // Tiny steps can saturate the tick counts; then only poll.
-            let next = (self.ticks.checked_add(self.deferred))
-                .and_then(|ticks| ticks.checked_add(1))
-                .and_then(|ticks| Duration::try_from_secs_f64(ticks as f64 * self.dt).ok());
-            let wait = next.map_or(Duration::ZERO, |next| {
-                next.saturating_sub(self.epoch.elapsed()).min(MAX_IDLE)
-            });
-            if !wait.is_zero() {
-                thread::sleep(wait);
+    /// Queue a delivery on its session. Deliveries for a session that already
+    /// ended are dropped.
+    fn deliver(&mut self, delivery: Delivery, now: Instant) {
+        let (slot, generation) = match &delivery {
+            Delivery::Frames {
+                slot, generation, ..
             }
+            | Delivery::Closed {
+                slot, generation, ..
+            } => (*slot, *generation),
+        };
+        let Some(open) = self
+            .sessions
+            .iter_mut()
+            .find_map(|session| match &mut session.stage {
+                Stage::Open(open)
+                    if open.phase == Phase::Playing(slot) && open.generation == generation =>
+                {
+                    Some(open)
+                }
+                _ => None,
+            })
+        else {
+            return;
+        };
+        match delivery {
+            Delivery::Frames { frames, .. } => {
+                if open.queued.len() + frames.len() > MAX_QUEUED_FRAMES {
+                    open.reject(&mut self.gate, now, "Client is reading too slowly");
+                } else {
+                    open.queued.extend(frames);
+                }
+            }
+            Delivery::Closed { reason, .. } => open.reject(&mut self.gate, now, &reason),
         }
-    }
-
-    fn due_ticks(&mut self, now: Instant) -> u64 {
-        // Casts saturate, and ticks + deferred never exceeds an earlier schedule.
-        let scheduled = (now.duration_since(self.epoch).as_secs_f64() / self.dt) as u64;
-        let backlog = scheduled.saturating_sub(self.deferred + self.ticks);
-        let limit = (MAX_BACKLOG_SECONDS / self.dt).ceil() as u64;
-        if backlog > limit {
-            self.deferred += backlog - limit;
-        }
-        backlog.min(limit).min(MAX_CATCHUP_TICKS)
     }
 
     fn accept(&mut self, now: Instant) {
@@ -357,7 +847,7 @@ impl Session {
         matches!(&self.stage, Stage::Open(open) if matches!(open.phase, Phase::Playing(_)))
     }
 
-    fn service(&mut self, game: &mut Game, now: Instant) -> Result<(), String> {
+    fn service(&mut self, gate: &mut Gate, now: Instant, world: f64) -> Result<(), String> {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
@@ -367,7 +857,7 @@ impl Session {
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             },
             Stage::Open(mut open) => {
-                if open.service(game, now, age)? {
+                if open.service(gate, now, world, age)? {
                     Stage::Open(open)
                 } else {
                     Stage::Closed
@@ -386,33 +876,41 @@ impl Open {
             phase: Phase::Hello { framed: false },
             framing: Framing::Elapsed,
             want_session_id: false,
+            generation: 0,
+            queued: VecDeque::new(),
         }
     }
 
-    /// Read within budget and deliver output. Returns false once closed.
-    fn service(&mut self, game: &mut Game, now: Instant, age: Duration) -> Result<bool, String> {
+    /// Read within budget and send due frames. Returns false once closed.
+    fn service(
+        &mut self,
+        gate: &mut Gate,
+        now: Instant,
+        world: f64,
+        age: Duration,
+    ) -> Result<bool, String> {
         if let Phase::Closing(deadline) = self.phase {
             return Ok(now < deadline && self.drain_close());
         }
         if !matches!(self.phase, Phase::Playing(_)) && age >= LOGIN_TIMEOUT {
-            self.reject(game, now, "Login timeout")?;
+            self.reject(gate, now, "Login timeout");
             return Ok(true);
         }
         for _ in 0..MAX_READS_PER_POLL {
             match self.socket.read() {
                 Ok(Message::Binary(bytes)) => {
-                    if let Err(reason) = self.receive(game, &bytes) {
-                        self.reject(game, now, &reason)?;
+                    if let Err(reason) = self.receive(gate, &bytes, world) {
+                        self.reject(gate, now, &reason);
                         return Ok(true);
                     }
                 }
                 Ok(Message::Text(_)) => {
-                    self.reject(game, now, "Expected binary messages")?;
+                    self.reject(gate, now, "Expected binary messages");
                     return Ok(true);
                 }
                 Ok(Message::Close(_)) => {
                     // tungstenite queued the close reply; flush it while closing.
-                    self.release(game)?;
+                    self.release(gate);
                     self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
                     return Ok(true);
                 }
@@ -424,22 +922,23 @@ impl Open {
                     // tungstenite keeps the oversized frame header after this
                     // error; reading again trips its buffer invariant. Send
                     // the close once and drop the socket without another read.
-                    self.reject(game, now, "Message too large")?;
+                    self.reject(gate, now, "Message too large");
                     let _ = self.socket.flush();
                     return Ok(false);
                 }
                 Err(_) => {
-                    self.release(game)?;
+                    self.release(gate);
                     return Ok(false);
                 }
             }
         }
-        self.deliver(game, now)?;
+        self.send_due(gate, now, world)?;
         Ok(true)
     }
 
-    /// Apply one client message. An error closes only this connection.
-    fn receive(&mut self, game: &mut Game, bytes: &[u8]) -> Result<(), String> {
+    /// Apply one client message received at world time `world`. An error
+    /// closes only this connection.
+    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], world: f64) -> Result<(), String> {
         match (self.phase, bytes) {
             (Phase::Hello { framed: false }, [1]) => self.request(Framing::Bare),
             (Phase::Hello { framed: false }, [2]) => self.request(Framing::Sequence(1)),
@@ -451,12 +950,12 @@ impl Open {
             (Phase::Hello { .. }, [4]) => Err("Repeated session-ID request".into()),
             (Phase::Hello { .. }, [99, 0]) => {
                 self.phase = Phase::Reply;
-                let challenge = game.challenge.clone();
+                let challenge = gate.challenge.clone();
                 self.send(&challenge)
             }
-            (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(game, bytes),
+            (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(gate, bytes),
             (Phase::Hello { .. }, _) => Err("Expected a login request".into()),
-            (Phase::Reply, _) if game.replies.iter().any(|reply| reply == bytes) => {
+            (Phase::Reply, _) if gate.replies.iter().any(|reply| reply == bytes) => {
                 self.phase = Phase::Login;
                 Ok(())
             }
@@ -465,9 +964,24 @@ impl Open {
             (Phase::Playing(slot), [255, 118, text @ ..])
                 if text.len() <= MAX_VICTORY_TEXT && text.is_ascii() =>
             {
-                game.world.victory(slot, text)
+                gate.send(Command::Victory {
+                    slot,
+                    generation: self.generation,
+                    text: text.to_vec(),
+                    sent: world,
+                });
+                Ok(())
             }
-            (Phase::Playing(slot), _) => game.world.receive(slot, bytes),
+            (Phase::Playing(slot), _) if super::simulation::client_message(bytes) => {
+                gate.send(Command::Message {
+                    slot,
+                    generation: self.generation,
+                    bytes: bytes.to_vec(),
+                    sent: world,
+                });
+                Ok(())
+            }
+            (Phase::Playing(_), _) => Err("Unsupported client message".into()),
             (Phase::Closing(_), _) => Ok(()),
         }
     }
@@ -478,36 +992,38 @@ impl Open {
         Ok(())
     }
 
-    fn join(&mut self, game: &mut Game, login: &[u8]) -> Result<(), String> {
+    /// Claim a free slot and ask the world to connect it. The world answers
+    /// with setup, or closes the session if it cannot admit the snake.
+    fn join(&mut self, gate: &mut Gate, login: &[u8]) -> Result<(), String> {
         let appearance = parse_login(login)?;
-        let slot = game
+        let slot = gate
             .occupied
             .iter()
             .position(|used| !used)
             .ok_or("Server is full")?;
-        game.world.connect(slot, appearance)?;
-        if self.want_session_id {
-            if let Err(error) = game.world.request_session_id(slot) {
-                game.world.disconnect(slot)?;
-                return Err(error);
-            }
-        }
-        game.occupied[slot] = true;
+        gate.occupied[slot] = true;
+        gate.generations[slot] += 1;
+        self.generation = gate.generations[slot];
         self.phase = Phase::Playing(slot);
+        gate.send(Command::Connect {
+            slot,
+            generation: self.generation,
+            appearance,
+            session_id: self.want_session_id,
+        });
         Ok(())
     }
 
-    /// Forward simulator messages for this slot. Only simulator faults are errors.
-    fn deliver(&mut self, game: &mut Game, now: Instant) -> Result<(), String> {
-        let Phase::Playing(slot) = self.phase else {
-            return Ok(());
-        };
-        for message in game.world.drain(slot)? {
+    /// Send queued frames due by world time `world`. Only host faults are errors.
+    fn send_due(&mut self, gate: &mut Gate, now: Instant, world: f64) -> Result<(), String> {
+        while self.queued.front().is_some_and(|(at, _)| *at <= world) {
+            let (_, message) = self.queued.pop_front().unwrap();
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
             }
             if let Err(reason) = self.send(&message) {
-                return self.reject(game, now, &reason);
+                self.reject(gate, now, &reason);
+                break;
             }
         }
         Ok(())
@@ -540,15 +1056,13 @@ impl Open {
     }
 
     /// Write buffered output. Returns false once the connection ended.
-    fn flush(&mut self, game: &mut Game) -> Result<bool, String> {
+    fn flush(&mut self, gate: &mut Gate) -> bool {
         match self.socket.flush() {
-            Ok(()) => Ok(true),
-            Err(tungstenite::Error::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => {
-                Ok(true)
-            }
+            Ok(()) => true,
+            Err(tungstenite::Error::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => true,
             Err(_) => {
-                self.release(game)?;
-                Ok(false)
+                self.release(gate);
+                false
             }
         }
     }
@@ -567,16 +1081,19 @@ impl Open {
         true
     }
 
-    fn release(&mut self, game: &mut Game) -> Result<(), String> {
+    fn release(&mut self, gate: &mut Gate) {
         if let Phase::Playing(slot) = self.phase {
-            game.world.disconnect(slot)?;
-            game.occupied[slot] = false;
+            gate.send(Command::Disconnect {
+                slot,
+                generation: self.generation,
+            });
+            gate.occupied[slot] = false;
+            self.queued.clear();
         }
-        Ok(())
     }
 
-    fn reject(&mut self, game: &mut Game, now: Instant, reason: &str) -> Result<(), String> {
-        self.release(game)?;
+    fn reject(&mut self, gate: &mut Gate, now: Instant, reason: &str) {
+        self.release(gate);
         self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
         let mut end = reason.len().min(MAX_CLOSE_REASON);
         while !reason.is_char_boundary(end) {
@@ -586,7 +1103,247 @@ impl Open {
             code: CloseCode::Policy,
             reason: reason[..end].to_owned().into(),
         }));
+    }
+}
+
+/// One bot thread: background seekers in their own slots.
+struct Bots {
+    /// Every `stride`th slot from the first seat's.
+    seats: Vec<Seat>,
+    stride: usize,
+    deliveries: Receiver<Vec<Delivery>>,
+    commands: Sender<Command>,
+    shared: Arc<Shared>,
+    latency: LatencyConfig,
+    random: Random,
+    /// Seconds between one bot's decisions.
+    interval: f64,
+}
+
+/// A background seeker as a client of its slot. It follows the simulator's
+/// native background client: it decides every decision interval from the
+/// frames delivered by then, sends after its processing time, pings on the
+/// client's cadence and rejoins after it dies.
+struct Seat {
+    slot: usize,
+    generation: u64,
+    state: ClientState,
+    /// Last heading byte sent; see `seeker_action`.
+    sent: Option<u8>,
+    /// Processing draws for this connection.
+    link: Link,
+    frames: VecDeque<(f64, Vec<u8>)>,
+    /// Latest local time used; the client clock never runs backwards.
+    clock: f64,
+    decide_at: f64,
+    /// Decision time, action and processing time of the pending command.
+    outbox: Option<(f64, Action, f64)>,
+    previous_boost: Option<bool>,
+    /// The world closed the session; rejoin at the next decision.
+    closed: bool,
+}
+
+impl Bots {
+    fn run(&mut self) -> Result<(), String> {
+        let start = self.shared.clock.world(Instant::now());
+        for seat in &mut self.seats {
+            seat.decide_at += start;
+            seat.join(start, &self.commands, &self.latency, &mut self.random)?;
+        }
+        while !self.shared.stopped() {
+            while let Ok(batch) = self.deliveries.try_recv() {
+                for delivery in batch {
+                    self.deliver(delivery);
+                }
+            }
+            let now = self.shared.clock.world(Instant::now());
+            let mut next = f64::INFINITY;
+            for seat in &mut self.seats {
+                seat.run(
+                    now,
+                    &self.commands,
+                    &self.latency,
+                    &mut self.random,
+                    self.interval,
+                )?;
+                next = next.min(seat.next_event());
+            }
+            self.shared.clock.sleep_until(next, MAX_IDLE);
+        }
         Ok(())
+    }
+
+    fn deliver(&mut self, delivery: Delivery) {
+        let (slot, generation) = match &delivery {
+            Delivery::Frames {
+                slot, generation, ..
+            }
+            | Delivery::Closed {
+                slot, generation, ..
+            } => (*slot, *generation),
+        };
+        let first = self.seats[0].slot;
+        let Some(seat) = self
+            .seats
+            .get_mut((slot - first) / self.stride)
+            .filter(|seat| seat.generation == generation)
+        else {
+            return;
+        };
+        match delivery {
+            Delivery::Frames { frames, .. } => seat.frames.extend(frames),
+            Delivery::Closed { .. } => {
+                seat.closed = true;
+                seat.frames.clear();
+                seat.state.disconnect();
+            }
+        }
+    }
+}
+
+impl Seat {
+    /// `decide_at` is relative to the start until the thread runs.
+    fn new(slot: usize, interval: f64) -> Self {
+        Self {
+            slot,
+            generation: 0,
+            state: ClientState::new(),
+            sent: None,
+            link: Link::default(),
+            frames: VecDeque::new(),
+            clock: 0.,
+            // Spread decisions over the interval, as independent clients do.
+            decide_at: interval * (slot % 16) as f64 / 16.,
+            outbox: None,
+            previous_boost: None,
+            closed: false,
+        }
+    }
+
+    fn next_event(&self) -> f64 {
+        let frame = self.frames.front().map_or(f64::INFINITY, |(at, _)| *at);
+        let leave = self
+            .outbox
+            .map_or(f64::INFINITY, |(at, _, processing)| at + processing);
+        frame.min(leave).min(self.decide_at)
+    }
+
+    /// Advance to the local time `at`, never backwards.
+    fn tick(&mut self, at: f64) -> f64 {
+        self.clock = self.clock.max(at);
+        self.clock
+    }
+
+    /// Client events up to world time `now`, in time order: deliveries, then
+    /// departures, then decisions; then a ping if its cadence asks for one.
+    fn run(
+        &mut self,
+        now: f64,
+        commands: &Sender<Command>,
+        latency: &LatencyConfig,
+        random: &mut Random,
+        interval: f64,
+    ) -> Result<(), String> {
+        loop {
+            let frame = self.frames.front().map_or(f64::INFINITY, |(at, _)| *at);
+            let leave = self
+                .outbox
+                .map_or(f64::INFINITY, |(at, _, processing)| at + processing);
+            let decide = self.decide_at;
+            let first = frame.min(leave).min(decide);
+            if first > now {
+                break;
+            }
+            let at = self.tick(first);
+            if frame == first {
+                let (_, bytes) = self.frames.pop_front().unwrap();
+                self.state.receive_frame(&bytes, at)?;
+            } else if leave == first {
+                self.transmit(at, commands)?;
+            } else {
+                // A late thread makes at most one catch-up decision.
+                self.decide_at = (decide + interval).max(now);
+                self.decide(at, commands, latency, random)?;
+            }
+        }
+        let at = self.tick(now);
+        if !self.closed && self.state.ping_due(at)? {
+            self.state.record_sent(&[251], at)?;
+            self.command(commands, vec![251], at);
+        }
+        Ok(())
+    }
+
+    fn decide(
+        &mut self,
+        at: f64,
+        commands: &Sender<Command>,
+        latency: &LatencyConfig,
+        random: &mut Random,
+    ) -> Result<(), String> {
+        if self.closed || self.state.status() == ClientStatus::Dead {
+            return self.join(at, commands, latency, random);
+        }
+        if self.state.status() != ClientStatus::Playing || self.outbox.is_some() {
+            return Ok(());
+        }
+        let frame = self.state.frame(at)?;
+        if let Some(action) = super::simulation::seeker_action(&frame, &mut self.sent) {
+            let processing = self.link.processing(latency, random);
+            self.outbox = Some((at, action, processing));
+        }
+        Ok(())
+    }
+
+    fn transmit(&mut self, at: f64, commands: &Sender<Command>) -> Result<(), String> {
+        let Some((_, action, processing)) = self.outbox.take() else {
+            return Ok(());
+        };
+        let packets = protocol::action_packets(action, self.previous_boost)?;
+        self.previous_boost = Some(action.boost);
+        self.state.set_processing_seconds(processing)?;
+        for packet in packets {
+            self.state.record_sent(&packet, at)?;
+            self.command(commands, packet, at);
+        }
+        Ok(())
+    }
+
+    /// Start a new session and life. A crowded world may refuse it; the bot
+    /// then retries at its next decision.
+    fn join(
+        &mut self,
+        at: f64,
+        commands: &Sender<Command>,
+        latency: &LatencyConfig,
+        random: &mut Random,
+    ) -> Result<(), String> {
+        self.state.disconnect();
+        self.state.new_connection(at)?;
+        self.generation += 1;
+        self.link = Link::connect(latency, random);
+        self.sent = None;
+        self.frames.clear();
+        self.outbox = None;
+        self.previous_boost = None;
+        self.closed = false;
+        // A closed channel means the simulation ended and the host is stopping.
+        let _ = commands.send(Command::Connect {
+            slot: self.slot,
+            generation: self.generation,
+            appearance: PlayerAppearance::default(),
+            session_id: false,
+        });
+        Ok(())
+    }
+
+    fn command(&self, commands: &Sender<Command>, bytes: Vec<u8>, sent: f64) {
+        let _ = commands.send(Command::Message {
+            slot: self.slot,
+            generation: self.generation,
+            bytes,
+            sent,
+        });
     }
 }
 

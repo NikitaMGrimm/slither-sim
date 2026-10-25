@@ -492,7 +492,10 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
     let mut long = config(1, LatencyConfig::default());
     long.world.dt = 0.29;
     let warnings = long.warnings();
-    assert!(warnings.iter().any(|w| w.contains("resent in full")), "{warnings:?}");
+    assert!(
+        warnings.iter().any(|w| w.contains("resent in full")),
+        "{warnings:?}"
+    );
     long.world.dt = 0.28;
     assert!(!long.warnings().iter().any(|w| w.contains("resent in full")));
     reject(|c| c.decision_ticks = 0, "at least 1");

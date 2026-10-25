@@ -33,7 +33,7 @@ pub use received::{
     CategoryKnowledge, ReceivedField, ReceivedHistory, ReceivedMetadata, ReceivedSnake,
     ReceivedTracker,
 };
-pub use server::{Host, HostConfig};
+pub use server::{Host, HostConfig, RunningHost};
 pub use simulation::{SimulationConfig, SimulatorBackend};
 
 pub const CONTRACT: &str = "slither-client-v2";

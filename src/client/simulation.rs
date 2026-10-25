@@ -1575,18 +1575,8 @@ impl SimulatorBackend {
                 }
                 ClientStatus::Playing if !self.pending(slot) => {
                     let frame = self.frame_for(slot)?;
-                    if let Some(heading) = seek(&frame) {
-                        let byte = (heading.rem_euclid(TAU) * 251. / TAU).floor() as u8;
-                        if self.slots[slot].seeker != Some(byte) {
-                            self.slots[slot].seeker = Some(byte);
-                            self.send_to(
-                                slot,
-                                Action {
-                                    heading,
-                                    boost: false,
-                                },
-                            )?;
-                        }
+                    if let Some(action) = seeker_action(&frame, &mut self.slots[slot].seeker) {
+                        self.send_to(slot, action)?;
                     }
                 }
                 _ => {}
@@ -1626,7 +1616,8 @@ impl RawSimulator {
         })
     }
 
-    pub(crate) fn time(&self) -> f64 {
+    #[cfg(test)]
+    fn time(&self) -> f64 {
         self.backend.time()
     }
     pub(crate) fn dt(&self) -> f64 {
@@ -1676,25 +1667,55 @@ impl RawSimulator {
         b.connect(slot)
     }
 
-    /// Queue one client message on the uplink. Accepts heading bytes 0..=250,
-    /// ping 251, keyboard turns `[252, amount]` and boost 253/254; a rejected
-    /// message changes nothing.
-    pub(crate) fn receive(&mut self, slot: usize, bytes: &[u8]) -> Result<(), String> {
+    /// Queue one client message sent now on the uplink; see `receive_at`.
+    #[cfg(test)]
+    fn receive(&mut self, slot: usize, bytes: &[u8]) -> Result<(), String> {
+        self.receive_at(slot, bytes, self.time())
+    }
+
+    /// Queue one client message the client sent at world time `sent`, which may
+    /// fall between or after ticks. It arrives after the uplink delay and takes
+    /// effect at the first tick from then. A rejected message changes nothing.
+    pub(crate) fn receive_at(
+        &mut self,
+        slot: usize,
+        bytes: &[u8],
+        sent: f64,
+    ) -> Result<(), String> {
         self.open(slot)?;
-        if !matches!(bytes, [0..=251 | 253 | 254] | [252, _]) {
+        if !client_message(bytes) {
             return Err("Unsupported client message".into());
+        }
+        self.uplink_at(slot, sent, Uplink::Message(bytes.to_vec()))
+    }
+
+    fn uplink_at(&mut self, slot: usize, sent: f64, message: Uplink) -> Result<(), String> {
+        if !sent.is_finite() {
+            return Err("Send time must be finite".into());
         }
         let connection = &self.backend.slots[slot].connection;
         if connection.uplink.len() + connection.downlink.len() >= REMOTE_IN_FLIGHT {
             return Err("Remote connection has too many undelivered messages".into());
         }
-        let now = self.time();
-        self.backend
-            .uplink(slot, now, Uplink::Message(bytes.to_vec()))
+        self.backend.uplink(slot, sent, message)
+    }
+
+    /// Every queued server payload with its delivery time in world seconds, in
+    /// order, including deliveries still in flight. A real-time host sends each
+    /// at its own time instead of waiting for the tick that follows it. A closed
+    /// slot has none.
+    pub(crate) fn take(&mut self, slot: usize) -> Result<Vec<(f64, Vec<u8>)>, String> {
+        self.remote(slot)?;
+        Ok(self.backend.slots[slot]
+            .connection
+            .downlink
+            .drain(..)
+            .collect())
     }
 
     /// Server payloads delivered by now, in order. Each is one WebSocket message.
-    pub(crate) fn drain(&mut self, slot: usize) -> Result<Vec<Vec<u8>>, String> {
+    #[cfg(test)]
+    fn drain(&mut self, slot: usize) -> Result<Vec<Vec<u8>>, String> {
         self.open(slot)?;
         let now = self.time();
         let downlink = &mut self.backend.slots[slot].connection.downlink;
@@ -1733,18 +1754,18 @@ impl RawSimulator {
     /// Queue a playing client's `[255, 118, text]` victory text. Only the
     /// connection whose dead life holds the session record can set it, once;
     /// other text is ignored when it arrives.
-    pub(crate) fn victory(&mut self, slot: usize, text: &[u8]) -> Result<(), String> {
+    #[cfg(test)]
+    fn victory(&mut self, slot: usize, text: &[u8]) -> Result<(), String> {
+        self.victory_at(slot, text, self.time())
+    }
+
+    /// `victory` for text the client sent at world time `sent`.
+    pub(crate) fn victory_at(&mut self, slot: usize, text: &[u8], sent: f64) -> Result<(), String> {
         self.open(slot)?;
         if text.len() > MAX_VICTORY_TEXT || !text.is_ascii() {
             return Err("Victory text must be at most 140 ASCII bytes".into());
         }
-        let connection = &self.backend.slots[slot].connection;
-        if connection.uplink.len() + connection.downlink.len() >= REMOTE_IN_FLIGHT {
-            return Err("Remote connection has too many undelivered messages".into());
-        }
-        let now = self.time();
-        self.backend
-            .uplink(slot, now, Uplink::Victory(text.to_vec()))
+        self.uplink_at(slot, sent, Uplink::Victory(text.to_vec()))
     }
 
     /// Shared server ticks; background slots decide at the decision cadence.
@@ -2049,6 +2070,27 @@ fn food_identity(point: Point) -> (u64, u64) {
 
 /// Background policy from the slot's own frame: turn inward near the rim,
 /// otherwise toward the nearest received food.
+/// Game commands a playing client may send: heading bytes 0..=250, ping 251,
+/// keyboard turns `[252, amount]` and boost 253/254.
+pub(crate) fn client_message(bytes: &[u8]) -> bool {
+    matches!(bytes, [0..=251 | 253 | 254] | [252, _])
+}
+
+/// The background seeker's decision. It sends only when its heading byte
+/// changes; `sent` holds the last byte sent on this connection.
+pub(crate) fn seeker_action(frame: &ClientFrame, sent: &mut Option<u8>) -> Option<Action> {
+    let heading = seek(frame)?;
+    let byte = (heading.rem_euclid(TAU) * 251. / TAU).floor() as u8;
+    if *sent == Some(byte) {
+        return None;
+    }
+    *sent = Some(byte);
+    Some(Action {
+        heading,
+        boost: false,
+    })
+}
+
 fn seek(frame: &ClientFrame) -> Option<f64> {
     let observation = frame.observation.as_ref()?;
     let head = observation.me.head;
