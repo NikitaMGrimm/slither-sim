@@ -29,7 +29,7 @@ JOB_TIMEOUT_SECONDS, RESERVE_SECONDS, STAGE_CAP_SECONDS = 900, 60, 620
 
 
 PLAN = "slither-perf-calibration-pilot-v2"
-GROUPS = {"A": ("step-default", "portable", "official-100-bot", "battledome-8-step"),
+GROUPS = {"A": ("step-default", "portable", "official-100-bot", "battledome-32-step"),
           "B": ("step-food", "step-body", "observe", "protocol", "official-100-step", "client-battledome-64")}
 BLOCKS = (1, 2, 4)
 # Every permutation of m once, balancing m's position within a workload's round.

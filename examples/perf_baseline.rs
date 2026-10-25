@@ -25,8 +25,10 @@ const MAX_BLOCKS: usize = 16;
 const PLACEMENT_ATTEMPTS: usize = 4096;
 const RESPAWN_ATTEMPTS: usize = 64;
 const RESPAWN_RETRY_TICKS: usize = 4;
+const RING_RESPAWN_RETRY_TICKS: usize = 144;
 /// Long samples restore the warmed scene so death history and drift stay bounded.
 const EPOCH_OPERATIONS: usize = 4096;
+const CLIENT_WINDOW_DECISIONS: usize = 100;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Suite {
@@ -127,7 +129,7 @@ impl World {
                 "wander controller; straight drawn-length spawns and respawns"
             }
             World::Battledome => {
-                "wander controller; floor-size Simulator::spawn_body ring lives; harness contact clearance, not host admission; blocked lives retry"
+                "wander controller; floor-size Simulator::spawn_body ring lives; harness contact clearance, not host admission; blocked initial lives and deaths queue for retries"
             }
         }
     }
@@ -170,6 +172,8 @@ struct ClientScenario {
     world: World,
     agents: usize,
     warmup_decisions: usize,
+    /// Deterministic client backoff after a refused admission, in decision intervals.
+    refusal_retry_decisions: usize,
     operation: Operation,
 }
 
@@ -248,16 +252,16 @@ static REGISTRATIONS: &[Registration] = &[
         bot: Some(op(20, 1, Full)),
     }),
     Registration::Scenario(Scenario {
-        id: "battledome-8",
+        id: "battledome-32",
         world: World::Battledome,
-        population: 8,
+        population: 32,
         segments: (26, 26),
         clearance: 0.0,
         controller: Controller::Wander,
         warmup_ticks: 8000,
         epoch: EPOCH_OPERATIONS,
-        step: op(100_000, 32, Ci),
-        bot: Some(op(9000, 8, Full)),
+        step: op(70_000, 16, Ci),
+        bot: Some(op(8000, 4, Full)),
     }),
     Registration::Scenario(Scenario {
         id: "official-128",
@@ -275,14 +279,16 @@ static REGISTRATIONS: &[Registration] = &[
         id: "client-battledome-64",
         world: World::Battledome,
         agents: 64,
-        warmup_decisions: 1,
-        operation: op(1, 1, Ci),
+        warmup_decisions: 600,
+        refusal_retry_decisions: 24,
+        operation: op(40, 4, Ci),
     }),
     Registration::Client(ClientScenario {
         id: "client-official-500",
         world: World::Official(500),
         agents: 500,
         warmup_decisions: 8,
+        refusal_retry_decisions: 1,
         operation: op(25, 1, Full),
     }),
 ];
@@ -335,7 +341,7 @@ impl Driver {
             Driver::Legacy(_) => None,
             Driver::Scenario { scenario, .. } => Some(scenario.world.synthetic()),
             Driver::Client(_) => Some(
-                "wander controller; synthetic backend ring initialization, then timed native reconnect_slot admission after deaths",
+                "wander controller; synthetic backend ring initialization; warmup then timed native reconnect_slot admission after deaths; deterministic refused-admission backoff",
             ),
         }
     }
@@ -356,13 +362,17 @@ impl Driver {
                 "clearance": scenario.clearance, "controller": scenario.controller.definition(),
                 "lifecycle": {
                     "placement": if scenario.world.config().spawn_radius.is_some() {
-                        "add, mark dead, then Simulator::spawn_body and respawn_body on the configured ring; floor-size lives"
+                        "add, mark dead, then Simulator::spawn_body and respawn_body on the configured ring; floor-size lives; blocked initial slots queue for retries"
                     } else {
                         "add, mark dead, then Simulator::respawn at a clear sampled pose"
                     },
                     "respawn": "dead slots queue in death order and respawn at the next operation boundary",
-                    "placementAttempts": PLACEMENT_ATTEMPTS, "respawnAttempts": RESPAWN_ATTEMPTS,
-                    "respawnRetryTicks": RESPAWN_RETRY_TICKS,
+                    "placementAttempts": if scenario.world.config().spawn_radius.is_some() {
+                        RESPAWN_ATTEMPTS
+                    } else { PLACEMENT_ATTEMPTS }, "respawnAttempts": RESPAWN_ATTEMPTS,
+                    "respawnRetryTicks": if scenario.world.config().spawn_radius.is_some() {
+                        RING_RESPAWN_RETRY_TICKS
+                    } else { RESPAWN_RETRY_TICKS },
                     "epochOperations": scenario.epoch,
                 },
                 "warmupTicks": scenario.warmup_ticks,
@@ -372,9 +382,11 @@ impl Driver {
                 "world": client.world.definition(), "config": client.world.config(),
                 "agents": client.agents, "simulation": simulation_definition(self)?,
                 "controller": Controller::Wander.definition(),
-                "lifecycle": {"reconnect": "timed reconnect_slot after the client reports death; failed spawns retry next decision",
+                "lifecycle": {"reconnect": "timed reconnect_slot after the client reports death; refused admissions wait refusalRetryDecisions",
                     "operation": "reconnect admission plus step_all; controller and record drain excluded"},
                 "warmupDecisions": client.warmup_decisions,
+                "refusalRetryDecisions": client.refusal_retry_decisions,
+                "reportWindowDecisions": CLIENT_WINDOW_DECISIONS,
             }),
         })
     }
@@ -1164,26 +1176,32 @@ mod portable {
 
     #[test]
     fn crowded_client_operation_includes_admission() {
-        let workload = catalog()
-            .into_iter()
-            .find(|w| w.name == "client-battledome-64")
-            .unwrap();
-        let Driver::Client(client) = workload.driver else {
-            panic!("client workload")
+        static CLIENT: ClientScenario = ClientScenario {
+            id: "test-crowded-client",
+            world: World::Battledome,
+            agents: 64,
+            warmup_decisions: 1,
+            refusal_retry_decisions: 24,
+            operation: op(3, 3, Full),
         };
+        let client = &CLIENT;
         let report = run_client(
-            &super::tests::args(&workload.name, workload.driver, workload.operation, 1),
+            &super::tests::args(client.id, Driver::Client(client), client.operation, 3),
             client,
             &mut io::sink(),
         )
         .unwrap();
         let details = &report["details"];
-        assert_eq!(report["timing"]["operations"], 1);
+        assert_eq!(report["timing"]["operations"], 3);
         assert_eq!(details["reconnectTimed"], true);
         let admission = details["admissionSeconds"].as_f64().unwrap();
         assert!(admission > 0.0);
         assert!(report["timing"]["wallSeconds"].as_f64().unwrap() >= admission);
         let calls = details["admissionCalls"].as_u64().unwrap();
+        assert_eq!(
+            calls, 63,
+            "refused lives wait through the next two decisions"
+        );
         let lives = &details["lifecycle"];
         assert_eq!(
             calls,
@@ -1201,6 +1219,13 @@ mod portable {
             client_simulation(client).delivery,
             DeliveryProfile::Responsive
         );
+    }
+
+    fn lifecycle_rates(counts: Lifecycle, decisions: usize) -> Value {
+        let mut value = counts.json();
+        value["refusalsPerDecision"] = json!(counts.deferred as f64 / decisions as f64);
+        value["respawnsPerDecision"] = json!(counts.respawns as f64 / decisions as f64);
+        value
     }
 
     fn wire_summary(wire: &[Vec<WireRecord>]) -> Value {
@@ -1239,6 +1264,11 @@ mod portable {
         let mut validity = Value::Null;
         let mut meter = Meter::default();
         let mut admission_seconds = 0.0;
+        let mut retry_at = vec![0; client.agents];
+        let mut window_population = PopulationStats::new(client.agents);
+        let mut window_lifecycle = Lifecycle::default();
+        let mut windows = Vec::new();
+        let mut window_start = 0;
         for decision in 0..client.warmup_decisions + args.iterations {
             let measured = decision >= client.warmup_decisions;
             if decision == client.warmup_decisions {
@@ -1254,10 +1284,12 @@ mod portable {
             let admission_start = (measured && !args.trace).then(Instant::now);
             let (mut reconnects, mut deferred) = (Vec::new(), Vec::new());
             for (slot, frame) in current_frames.iter().enumerate() {
-                if matches!(
-                    frame.status,
-                    ClientStatus::Dead | ClientStatus::Disconnected
-                ) {
+                if decision >= retry_at[slot]
+                    && matches!(
+                        frame.status,
+                        ClientStatus::Dead | ClientStatus::Disconnected
+                    )
+                {
                     match backend.reconnect_slot(slot) {
                         Ok(()) => reconnects.push(slot),
                         Err(error)
@@ -1268,7 +1300,8 @@ mod portable {
                                     | "No spawn position fits inside the arena"
                             ) =>
                         {
-                            deferred.push(slot)
+                            deferred.push(slot);
+                            retry_at[slot] = decision + client.refusal_retry_decisions;
                         }
                         Err(error) => return Err(error),
                     }
@@ -1311,6 +1344,24 @@ mod portable {
                 &mut warm_population
             };
             stats.record(world);
+            window_population.record(world);
+            window_lifecycle.deaths(&deaths);
+            window_lifecycle.respawns += reconnects.len();
+            window_lifecycle.deferred += deferred.len();
+            if (decision + 1).is_multiple_of(CLIENT_WINDOW_DECISIONS)
+                || decision + 1 == client.warmup_decisions
+                || decision + 1 == client.warmup_decisions + args.iterations
+            {
+                windows.push(json!({
+                    "phase": if measured { "measured" } else { "warmup" },
+                    "startDecision": window_start, "decisions": decision + 1 - window_start,
+                    "population": window_population.json(),
+                    "lifecycle": lifecycle_rates(window_lifecycle, decision + 1 - window_start),
+                }));
+                window_start = decision + 1;
+                window_population = PopulationStats::new(client.agents);
+                window_lifecycle = Lifecycle::default();
+            }
             if args.trace {
                 let mut record = json!({"tick": tick, "actions": actions, "deaths": deaths, "reconnects": reconnects, "deferred": deferred});
                 if measured {
@@ -1349,12 +1400,14 @@ mod portable {
             "reconnect admission + step_all (six physics ticks and all client frames)",
             json!({
                 "definition": args.driver.definition()?, "initial": initial,
-                "warmup": {"decisions": client.warmup_decisions, "stats": warmed, "lifecycle": warm.json(), "population": warm_population.json()},
-                "final": WorldStats::from_world(backend.world()), "lifecycle": lifecycle.json(),
+                "warmup": {"decisions": client.warmup_decisions, "stats": warmed, "lifecycle": lifecycle_rates(warm, client.warmup_decisions), "population": warm_population.json()},
+                "final": WorldStats::from_world(backend.world()), "lifecycle": lifecycle_rates(lifecycle, args.iterations),
                 "population": population.json(), "validity": validity, "physicsTicks": tick,
+                "windows": windows,
                 "wireRecording": true, "recordDrainTimed": false,
                 "reconnectTimed": true, "admissionCalls": lifecycle.respawns + lifecycle.deferred,
                 "admissionSeconds": if args.trace { None } else { Some(admission_seconds) },
+                "admissionSecondsPerDecision": if args.trace { None } else { Some(admission_seconds / args.iterations as f64) },
                 "epochs": "none; samples are short",
             }),
         ))
@@ -1583,6 +1636,7 @@ struct Scene {
     queue: VecDeque<(usize, usize, usize)>,
     segments: (usize, usize),
     clearance: f64,
+    retry_ticks: usize,
 }
 
 struct Boundary {
@@ -1616,6 +1670,11 @@ impl Scene {
         for snake in &mut world.snakes {
             snake.alive = false;
         }
+        let retry_ticks = if world.config.spawn_radius.is_some() {
+            RING_RESPAWN_RETRY_TICKS
+        } else {
+            RESPAWN_RETRY_TICKS
+        };
         let mut scene = Self {
             world,
             random: HarnessRandom::new(),
@@ -1623,13 +1682,28 @@ impl Scene {
             queue: VecDeque::new(),
             segments: scenario.segments,
             clearance: scenario.clearance,
+            retry_ticks,
         };
         for slot in 0..scenario.population {
             let segments = scene.draw_segments();
-            let (head, heading) = scene
-                .pose(segments, PLACEMENT_ATTEMPTS)
-                .ok_or_else(|| format!("{}: no clear initial pose for slot {slot}", scenario.id))?;
-            scene.respawn(slot, head, heading, segments)?;
+            let attempts = if scene.world.config.spawn_radius.is_some() {
+                RESPAWN_ATTEMPTS
+            } else {
+                PLACEMENT_ATTEMPTS
+            };
+            match scene.pose(segments, attempts) {
+                Some((head, heading)) => scene.respawn(slot, head, heading, segments)?,
+                None if scene.world.config.spawn_radius.is_some() => {
+                    // Newborn ring capacity is smaller than the eventual living population.
+                    scene.queue.push_back((slot, segments, scene.retry_ticks));
+                }
+                None => {
+                    return Err(format!(
+                        "{}: no clear initial pose for slot {slot}",
+                        scenario.id
+                    ));
+                }
+            }
         }
         scene.cursor = scene.world.deaths.len();
         Ok(scene)
@@ -1718,7 +1792,7 @@ impl Scene {
                 None => {
                     deferred.push(slot);
                     self.queue
-                        .push_back((slot, segments, tick + RESPAWN_RETRY_TICKS));
+                        .push_back((slot, segments, tick + self.retry_ticks));
                 }
             }
         }
@@ -1757,6 +1831,7 @@ fn run_scenario(
     let death_food =
         scene.world.config.death_food.enabled && scene.world.config.min_score.is_none();
     let initial = WorldStats::from_world(&scene.world);
+    let initial_queued = scene.queue.len();
     if args.trace {
         line(
             out,
@@ -1875,7 +1950,7 @@ fn run_scenario(
             "warmup": {"ticks": scenario.warmup_ticks, "stats": warmed, "lifecycle": warm.json(), "population": warm_population.json()},
             "final": WorldStats::from_world(&scene.world), "lifecycle": lifecycle.json(),
             "population": population.json(), "validity": validity, "physicsTicks": tick,
-            "eventBuffersEnabled": true, "boundaryTimed": false,
+            "eventBuffersEnabled": true, "boundaryTimed": false, "initialQueued": initial_queued,
             "profile": if args.profile { Some(profile) } else { None },
             "observeSeconds": (args.profile && bot).then_some(observe_seconds),
         }),
@@ -2041,6 +2116,7 @@ mod tests {
                 Registration::Client(client) => {
                     client.world.config().validate().unwrap();
                     assert!((1..=500).contains(&client.agents));
+                    assert!(client.warmup_decisions > 0 && client.refusal_retry_decisions > 0);
                 }
             }
         }
@@ -2083,12 +2159,24 @@ mod tests {
     }
 
     #[test]
-    fn registered_scenes_place_every_slot() {
+    fn registered_scenes_place_or_queue_every_slot() {
         for registration in REGISTRATIONS {
             if let Registration::Scenario(scenario) = registration {
                 let scene = Scene::place(scenario).unwrap();
-                assert_eq!(scene.world.living(), scenario.population, "{}", scenario.id);
+                assert_eq!(
+                    scene.world.living() + scene.queue.len(),
+                    scenario.population,
+                    "{}",
+                    scenario.id
+                );
+                if scene.world.config.spawn_radius.is_none() {
+                    assert!(scene.queue.is_empty());
+                }
                 assert!(scene.world.deaths.is_empty());
+                if matches!(scenario.world, World::Battledome) {
+                    assert!(scene.world.living() < scenario.population);
+                    assert!(!scene.queue.is_empty());
+                }
             }
         }
     }
@@ -2131,6 +2219,15 @@ mod tests {
         let (head, heading) = scene.pose(26, PLACEMENT_ATTEMPTS).unwrap();
         scene.respawn(0, head, heading, 26).unwrap();
         check(&scene.world, 0);
+        let queued = scene.queue.front().unwrap().0;
+        for snake in &mut scene.world.snakes {
+            snake.alive = false;
+        }
+        let boundary = scene
+            .boundary(scene.retry_ticks, &mut Lifecycle::default())
+            .unwrap();
+        assert!(boundary.respawns.iter().any(|r| r.0 == queued));
+        check(&scene.world, queued);
     }
 
     #[test]

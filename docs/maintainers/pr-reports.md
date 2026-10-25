@@ -45,7 +45,7 @@ failed cleanup makes that revision unavailable.
 
 Performance and traces cover the PR harness's `ci`
 [workload catalog](../performance.md#workload-selection): six legacy workloads,
-`official-100-step`/`official-100-bot`, `battledome-8-step` and
+`official-100-step`/`official-100-bot`, `battledome-32-step` and
 `client-battledome-64`. The client row includes reconnect admission as well as
 stepping and delivery; its controller and wire draining remain outside timing.
 Both builds must list the same plan.
@@ -155,7 +155,7 @@ For each workload and 1, 2 or 4 reset-identical process blocks, it discards one
 warmup pair then times six balanced pairs without early stopping.
 
 The current pilot uses plan ID `slither-perf-calibration-pilot-v2`: group A
-replaces `dome-proxy-32-step` with `battledome-8-step`, and group B replaces
+replaces `dome-proxy-32-step` with `battledome-32-step`, and group B replaces
 `dome-proxy-32-bot` with `client-battledome-64`. It retains v1's sampling schedule
 and 620-second stage/15-minute job budget. Historical v1 records keep their
 original workload definitions. Artifacts keep every attempt and block time, the executable/catalog/toolchain/runner/CPU

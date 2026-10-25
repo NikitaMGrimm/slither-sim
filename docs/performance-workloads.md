@@ -41,7 +41,7 @@ cargo run --release --locked --example perf_baseline -- --list
   `protocol` come first. Read their resolved definitions from the catalog.
 - **Sandbox and official:** `Config::sandbox()` and `Config::official(n)` at several
   populations, giving a scaling curve.
-- **Battledome:** `battledome-8-step` and `battledome-8-bot` use the unmodified
+- **Battledome:** `battledome-32-step` and `battledome-32-bot` use the unmodified
   [`Config::battledome()`](configuration.md#battledome): pit, permanent size floor,
   spawn ring, ambient food and rolling kill score. They replace the obsolete
   sandbox-mechanics `dome-proxy-*` stand-ins.
@@ -50,15 +50,19 @@ cargo run --release --locked --example perf_baseline -- --list
   `reconnect_slot` admission for dead clients plus `step_all`. These rows need
   the `networking` feature. The 500-agent row exercises the target host population;
   the old harness-only 128-agent assertion was not a backend limit. Battledome uses
-  responsive delivery, matching preset-based host configuration. Its one-decision
-  warmup lets the overlapping synthetic 64-slot start die; the measured decision
-  includes successful admissions and crowded refusals. This is 64 seats, not a
-  claim of 64 living snakes: inspect `population.depleted` and refused attempts.
-  Official uses eight warmup decisions, retaining the initial death/respawn burst
-  in its measured window instead of timing a later quiet interval.
+  responsive delivery, matching preset-based host configuration. It warms for
+  600 decisions (25.2 virtual seconds), past the synthetic ring crash and into
+  ongoing churn, then times 40 decisions, sized on the bounded-admission runtime.
+  Refused clients wait 24 decisions (1.008 virtual seconds); successful lives
+  reconnect after their next reported death. This deterministic harness policy
+  mirrors the host's one-second refusal backoff in virtual time; it does not
+  measure the host's wall-clock scheduling. Both runtimes use the same policy.
+  This is 64 seats: inspect `population.depleted` and refusals for living counts.
+  Official uses eight warmup decisions, retaining its initial death/respawn burst
+  in the measured window.
 
 CI keeps ten rows: the six legacy cases, `official-100-step`, `official-100-bot`,
-`battledome-8-step` and `client-battledome-64`. The two proxy CI slots become a real
+`battledome-32-step` and `client-battledome-64`. The two proxy CI slots become a real
 Battledome physics row and a crowded admission/client row. Battledome batch
 observation remains in the full suite; `official-100-bot` retains CI batch
 observation coverage. The full-suite `client-official-500` replaces
@@ -81,10 +85,14 @@ respawns and grown bodies:
   counts drawn from the registered range. Battledome instead samples the configured
   ring and uses `Simulator::spawn_body`, `body_is_clear` and `respawn_body` for
   floor-size, curved newborns. Its `synthetic` label discloses harness contact
-  clearance rather than host admission. Eight lives fit without overlap; a
-  26-anchor newborn spans about 1,050 units of a 16,864-unit ring, so the former
-  32/96-life straight-body scenes cannot simply move onto that ring. Blocked
-  respawns retry; the 64-agent client row separately stresses crowded admission.
+  clearance rather than host admission. Ring capacity limits simultaneous
+  newborns, not the eventual living population. Initial placement uses 64 attempts
+  per slot and queues blocked lives instead of failing construction. Refused ring
+  placements retry after 144 ticks (1.008 virtual seconds), allowing existing
+  lives to leave the ring before another bounded search. The 32-slot row warms
+  for 8,000 ticks before measurement; reports retain `initialQueued`, initial
+  living count and warmup/measurement population. Non-ring placement is unchanged.
+  The 64-agent client row separately stresses backend admission.
 - **Randomness:** harness-owned pose/length generation never consumes simulator
   RNG, preserving world randomness across lifecycle work.
 - **Control:** a stateless wander controller picks a heading per staggered window,
@@ -92,7 +100,7 @@ respawns and grown bodies:
   staggered window. Controls and lifecycle work are outside the timed interval.
 - **Respawn:** between operations, a cursor reads new deaths without modifying
   `world.deaths`. Slots queue in death order with bounded placement attempts;
-  blocked slots retry a few ticks later.
+  blocked non-ring slots retry a few ticks later; ring slots use the interval above.
 - **Warmup and epochs:** an untimed warmup runs first. Long samples restore the
   warmed scene every 4,096 operations, bounding death history and drift.
 - **Client rows:** a slot reconnects through `reconnect_slot` after its client
@@ -102,9 +110,15 @@ respawns and grown bodies:
   Admission and stepping use disjoint timed intervals summed into one operation;
   controller calculation and wire draining remain untimed. `admissionCalls` counts
   all measured reconnect attempts, including refused poses, and `admissionSeconds`
-  is their included interval (null in traces). `reconnectTimed` is true.
-  Warmup is excluded. The default trace window must itself include an admission
-  attempt, so warmup-only reconnects cannot satisfy this guard.
+  is their included interval (null in traces). `admissionSecondsPerDecision`
+  divides it by the measured decision count; `reconnectTimed` is true. Warmup is
+  excluded from operation timing. `windows` reports consecutive 100-decision
+  populations and lifecycles, split at warmup and sample boundaries. Lifecycles
+  include `refusalsPerDecision` and `respawnsPerDecision`, so the initial crash,
+  warmup tail and measured churn remain distinguishable. The default trace window
+  must itself include admission work. The four-decision Battledome parity window
+  includes refused admissions; the full 40-decision sample also includes deaths
+  and successful respawns.
 
 `--profile` replaces `step` with `step_profiled`. Profiled `-bot` rows also report
 `observeSeconds`, the time spent in the batch observation.
