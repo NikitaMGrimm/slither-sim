@@ -1,9 +1,8 @@
 //! `slither-sim-abi-v2`: a C ABI over [`slither_sim::transport::Session`].
 //!
-//! `include/slither_sim.h` declares these functions and [`SlitherFrame`];
-//! `tests/abi.rs` checks that the two agree. No panic unwinds across the
-//! boundary: a panicking call returns [`SLITHER_PANICKED`] and leaves its
-//! session usable only for [`slither_last_error`] and [`slither_session_free`].
+//! `include/slither_sim.h` declares the API; `tests/abi.rs` checks agreement.
+//! Panics return [`SLITHER_PANICKED`] without unwinding across the boundary;
+//! only [`slither_last_error`] and [`slither_session_free`] remain valid.
 //!
 //! A session must not be used by two threads at once; separate sessions may
 //! run on separate threads.
@@ -193,8 +192,7 @@ unsafe fn with_session(
             (SLITHER_PANICKED, "Internal panic; free this session".into())
         }
     };
-    // Successful calls usually follow successful calls; reuse the empty error
-    // instead of allocating a new one on the hot path.
+    // Reuse an empty error after consecutive successes to avoid hot-path allocation.
     if !(message.is_empty() && s.error.is_empty()) {
         s.error = CString::new(message.replace('\0', " ")).expect("NULs were replaced");
     }

@@ -1,17 +1,14 @@
 //! JSON replies byte-identical to `serde_json::to_vec(&serde_json::to_value(x)?)`.
 //!
-//! The JSON-lines protocols have always built replies through `serde_json::Value`,
-//! whose objects sort their keys. Building that tree allocates every key and node,
-//! which costs several times the simulation step for large observations. This
-//! writer emits the same bytes directly: leaves go through serde_json itself, and
-//! an object whose keys arrive out of order is reordered once, when it ends.
-//! Builds where crate features change `Value` itself take the `Value` path.
+//! Avoids the `Value` tree's per-key/node allocations, which cost several times
+//! the simulation step for large observations. Leaves use serde_json; objects
+//! sort their keys at completion. Builds whose features change `Value` use it directly.
 use serde::ser::{self, Serialize, SerializeMap, Serializer};
 use serde_json::{Error, Value};
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 pub(crate) fn to_vec<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
-    if !default_value_model() {
+    if !*DEFAULT_VALUE_MODEL {
         return serde_json::to_vec(&serde_json::to_value(value)?);
     }
     let mut writer = Writer::default();
@@ -23,15 +20,12 @@ pub(crate) fn to_vec<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error>
 /// JSON, as by default. The `preserve_order`, `arbitrary_precision` and
 /// `raw_value` features of serde_json change `Value` for every crate in a
 /// build, which this writer does not reproduce.
-fn default_value_model() -> bool {
-    static DEFAULT: OnceLock<bool> = OnceLock::new();
-    *DEFAULT.get_or_init(|| {
-        let plain = serde_json::from_str::<Value>(r#"{"b":0,"a":1.00}"#)
-            .and_then(|value| serde_json::to_string(&value))
-            .is_ok_and(|text| text == r#"{"a":1.0,"b":0}"#);
-        plain && serde_json::to_value(RawToken).is_ok_and(|value| value.is_object())
-    })
-}
+static DEFAULT_VALUE_MODEL: LazyLock<bool> = LazyLock::new(|| {
+    let plain = serde_json::from_str::<Value>(r#"{"b":0,"a":1.00}"#)
+        .and_then(|value| serde_json::to_string(&value))
+        .is_ok_and(|text| text == r#"{"a":1.0,"b":0}"#);
+    plain && serde_json::to_value(RawToken).is_ok_and(|value| value.is_object())
+});
 
 /// Shaped like serde_json's `RawValue`: `Value` parses its text under
 /// `raw_value` and otherwise keeps it as an ordinary one-member object.
@@ -616,7 +610,7 @@ mod tests {
         same(&RecoveringVariant);
         // Without `raw_value`, serde_json's token struct is an ordinary struct.
         same(&super::RawToken);
-        assert!(super::default_value_model());
+        assert!(*super::DEFAULT_VALUE_MODEL);
     }
 
     struct RecoveringVariant;

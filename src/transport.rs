@@ -156,6 +156,15 @@ struct WorldState {
 }
 
 impl WorldState {
+    fn set_actions(
+        &mut self,
+        actions: impl IntoIterator<Item = Option<Action>>,
+    ) -> Result<(), String> {
+        self.actions.clear();
+        self.actions.extend(actions);
+        self.world.validate_actions(&self.actions)
+    }
+
     /// Holds the validated actions for up to `decision_ticks` ticks, stopping
     /// once every snake has died, then collects the new frame.
     fn advance(&mut self, decision_ticks: usize) -> Result<(), String> {
@@ -266,15 +275,10 @@ impl Session {
             .zip(headings.chunks(run.agents).zip(boosts.chunks(run.agents)))
             .enumerate()
         {
-            state.actions.clear();
             state
-                .actions
-                .extend(headings.iter().zip(boosts).map(|(&heading, &boost)| {
+                .set_actions(headings.iter().zip(boosts).map(|(&heading, &boost)| {
                     (!heading.is_nan()).then_some(Action { heading, boost })
-                }));
-            state
-                .world
-                .validate_actions(&state.actions)
+                }))
                 .map_err(|error| format!("World {index}: {error}"))?;
         }
         let decision_ticks = run.decision_ticks;
@@ -410,15 +414,10 @@ impl Session {
                         )
                         .into());
                     }
-                    state.actions.clear();
-                    state.actions.extend(
-                        world_actions.heading.iter().zip(&world_actions.boost).map(
-                            |(&heading, &boost)| heading.map(|heading| Action { heading, boost }),
-                        ),
-                    );
                     state
-                        .world
-                        .validate_actions(&state.actions)
+                        .set_actions(world_actions.heading.iter().zip(&world_actions.boost).map(
+                            |(&heading, &boost)| heading.map(|heading| Action { heading, boost }),
+                        ))
                         .map_err(|error| format!("World {index}: {error}"))?;
                 }
                 let decision_ticks = run.decision_ticks;
