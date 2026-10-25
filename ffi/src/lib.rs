@@ -1,8 +1,9 @@
 //! `slither-sim-abi-v2`: a C ABI over [`slither_sim::transport::Session`].
 //!
-//! `include/slither_sim.h` declares the API; `tests/abi.rs` checks agreement.
-//! Panics return [`SLITHER_PANICKED`] without unwinding across the boundary;
-//! only [`slither_last_error`] and [`slither_session_free`] remain valid.
+//! `include/slither_sim.h` declares the API, and `tests/abi.rs` checks it
+//! against this crate. A panicking call returns [`SLITHER_PANICKED`] instead of unwinding;
+//! its session then accepts only [`slither_last_error`] and
+//! [`slither_session_free`].
 //!
 //! A session must not be used by two threads at once; separate sessions may
 //! run on separate threads.

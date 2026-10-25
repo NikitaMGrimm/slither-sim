@@ -10,7 +10,7 @@ Typed-array steps and frame columns avoid JSON in the decision loop.
 pip install slither-sim
 ```
 
-Or use `uv add slither-sim`. Stable-ABI wheels serve CPython 3.11+ on Linux
+Or use `uv add slither-sim`. Stable-ABI wheels cover CPython 3.11+ on Linux
 (x86-64 and ARM64, glibc 2.17+), macOS (Apple silicon and Intel) and Windows
 (x86-64), without runtime dependencies. Elsewhere, pip builds the source
 distribution with Rust 1.99+. Each crate release publishes the same version to PyPI.
