@@ -162,6 +162,79 @@ impl Bot for ReferenceBot {
     }
 }
 
+/// Portable adapter for [`crate::forager::decide`].
+///
+/// It derives the forecast lead from the frame's own timing. The observation
+/// is as old as the latest received message (the smallest valid receipt age of
+/// any snake position/heading, body or food report) plus the downlink share of
+/// the measured round trip. A command sent now acts after the uplink share plus
+/// the previous decision's processing time. The recent ping range is the
+/// lead's uncertainty. Only received fields are read; positions between
+/// reports are already extrapolated by the decoder. The bot keeps reusable
+/// buffers but no state between decisions, so `reset` has nothing to clear.
+#[derive(Clone, Debug, Default)]
+pub struct ForagerBot {
+    pub params: crate::forager::Params,
+    scratch: crate::forager::Scratch,
+}
+
+impl ForagerBot {
+    pub fn new(params: crate::forager::Params) -> Result<Self, String> {
+        params.validate()?;
+        Ok(Self {
+            params,
+            scratch: Default::default(),
+        })
+    }
+    /// The kernel timing this adapter derives from a frame.
+    pub fn timing(&self, frame: &ClientFrame) -> crate::forager::Timing {
+        let timing = &frame.timing;
+        let ping = timing.ping_seconds.unwrap_or(0.0);
+        let uplink = self.params.uplink_share;
+        let received = &frame.received;
+        let age = |field: ReceivedField| field.valid.then_some(field.age_seconds);
+        let receipt = received
+            .snakes
+            .iter()
+            .flat_map(|row| [age(row.position), age(row.heading)])
+            .chain([
+                received.bodies.valid.then_some(received.bodies.age_seconds),
+                received.food.valid.then_some(received.food.age_seconds),
+            ])
+            .flatten()
+            .fold(f64::INFINITY, f64::min);
+        let receipt = if receipt.is_finite() { receipt } else { 0.0 };
+        let mut result = crate::forager::Timing {
+            observation_age: ping * (1.0 - uplink) + receipt,
+            command_delay: ping * uplink + timing.processing_seconds,
+            uncertainty: timing
+                .ping_range_seconds
+                .map_or(0.0, |[low, high]| high - low),
+            ..Default::default()
+        };
+        for command in &timing.sent_commands {
+            result.push_sent(command.seconds_ago, command.action);
+        }
+        result
+    }
+}
+
+impl Bot for ForagerBot {
+    fn decide(&mut self, frame: &ClientFrame) -> Option<Action> {
+        if frame.contract != CONTRACT || frame.status != ClientStatus::Playing {
+            return None;
+        }
+        let observation = frame.observation.as_ref()?;
+        let timing = self.timing(frame);
+        Some(crate::forager::decide(
+            observation,
+            &timing,
+            &self.params,
+            &mut self.scratch,
+        ))
+    }
+}
+
 pub struct BotRunner<B> {
     backend: B,
     identity: Option<(u64, u64)>,

@@ -7,6 +7,7 @@ mod bounds_index;
 #[cfg(feature = "networking")]
 pub mod client;
 mod food_grid;
+pub mod forager;
 mod json;
 pub mod kiosk;
 pub mod model;
