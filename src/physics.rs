@@ -7,7 +7,7 @@ use crate::model::Point;
 use serde::{Deserialize, Serialize};
 use std::{
     f64::consts::{PI, TAU},
-    sync::OnceLock,
+    sync::LazyLock,
 };
 
 /// Average server loop period: frame gaps are multiples of ~7 ms (6.94-7.07 ms per server).
@@ -331,8 +331,7 @@ pub fn crossed_anchor(_previous: Point, head: Point, last: Point) -> Option<Poin
 }
 /// The stock client's `(fmlts, fpsls)` score tables over `0..=MAX_SEGMENTS`.
 fn score_tables() -> &'static ([f64; 431], [f64; 431]) {
-    static TABLE: OnceLock<([f64; 431], [f64; 431])> = OnceLock::new();
-    TABLE.get_or_init(|| {
+    static TABLE: LazyLock<([f64; 431], [f64; 431])> = LazyLock::new(|| {
         let mut weights = [0.0; 431];
         let mut sums = [0.0; 431];
         for i in 0..=430 {
@@ -342,7 +341,8 @@ fn score_tables() -> &'static ([f64; 431], [f64; 431]) {
             }
         }
         (weights, sums)
-    })
+    });
+    &TABLE
 }
 /// Continuous score used by the provisional kiosk penalty. The public score
 /// still rounds down exactly as the official score display does.
