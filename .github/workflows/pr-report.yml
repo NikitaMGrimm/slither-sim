@@ -51,9 +51,9 @@ jobs:
     name: Measurements
     if: github.event_name == 'pull_request'
     # The comparison's runner, set only here; the cache job reuses it because the
-    # cache key includes the OS. Changing it needs a calibration of the new runner
-    # (docs/maintainers/pr-reports.md#calibration).
-    runs-on: &runner windows-latest
+    # cache key includes the OS. Ubuntu was the quieter, faster runner in the
+    # calibration pilot (docs/maintainers/pr-reports.md#calibration).
+    runs-on: &runner ubuntu-latest
     # Provisional operational cap; includes checkpoint pauses. Keep 90 seconds
     # for report finalization and uploads (tools/pr_report.py).
     timeout-minutes: 30
