@@ -590,7 +590,7 @@ pub struct Simulator {
     radius_update_index: usize,
     /// Why the world stopped: a pickup whose gain would overflow the eater's
     /// mass. Validation rejects every later step with it.
-    #[serde(skip)]
+    #[serde(default)]
     failure: Option<String>,
     #[serde(skip)]
     food_cache: FoodCache,

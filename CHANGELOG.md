@@ -113,6 +113,9 @@
 
 ### Fixed
 
+- JSON round trips preserve a world stopped by mass overflow; later steps
+  still return the original failure ([limits](docs/configuration.md#limits)).
+
 - Rust `Config::deserialize` now accepts presets just like JSON parsing; it no
   longer bypasses preset handling ([presets](docs/configuration.md#presets)).
 
