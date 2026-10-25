@@ -107,7 +107,7 @@ fn dense_initial_sector_listings_fit_bounded_socket_transports() {
     loop {
         let frame = bot.next_frame().unwrap();
         assert_ne!(frame.status, ClientStatus::Disconnected);
-        for record in bot.drain_records() {
+        for record in bot.drain_records().unwrap() {
             if record.event == slither_sim::client::WireEvent::Receive {
                 assert!(record.bytes.len() + 10 <= 1 << 20);
                 received_bytes += record.bytes.len();
@@ -267,7 +267,7 @@ fn portable_client_requests_session_id_and_sends_custom_profile() {
     let deadline = Instant::now() + WAIT;
     loop {
         let frame = bot.next_frame().unwrap();
-        for record in bot.drain_records() {
+        for record in bot.drain_records().unwrap() {
             if record.event != slither_sim::client::WireEvent::Receive {
                 continue;
             }

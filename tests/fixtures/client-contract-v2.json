@@ -1,6 +1,12 @@
 {
   "dataOrigin": "synthetic",
   "description": "Private-preview JSON serialization example, written independently of the Rust structs. Values exercise field names, types, optional reports and nesting; they are not a wire capture or physics evidence. Update deliberately with intentional contract changes.",
+  "protocol": "slither-client-json-v2",
+  "rejectedRequests": [
+    {"op": "simulation", "config": {"broadcastTicks": 6}},
+    {"op": "simulation", "config": {"latency": {"jitterSeconds": 0.01}}},
+    {"op": "simulation", "config": {"latency": {"congestion": {}}}}
+  ],
   "frame": {
     "contract": "slither-client-v2",
     "time": 1.5,

@@ -1105,3 +1105,18 @@ fn the_floor_survives_protocol_quantization() {
     let me = backend.frame().unwrap().observation.unwrap().me;
     assert_eq!((me.segments, me.fam, me.score), (26, floor.fam, 400.0));
 }
+
+#[test]
+fn direct_deserialize_uses_the_preset_aware_trait() {
+    use serde::Deserialize;
+    let input = r#"{"preset":"battledome","radius":4000}"#;
+    let mut deserializer = serde_json::Deserializer::from_str(input);
+    let direct = Config::deserialize(&mut deserializer).unwrap();
+    let json: Config = serde_json::from_str(input).unwrap();
+    assert_eq!(
+        serde_json::to_value(&direct).unwrap(),
+        serde_json::to_value(json).unwrap()
+    );
+    assert_eq!(direct.radius, 4000.);
+    assert_eq!(direct.pit, Config::battledome().pit);
+}

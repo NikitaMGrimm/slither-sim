@@ -274,8 +274,9 @@ impl Session {
             }
         }
         let line = dumps(py, &request)?;
-        let inner = &mut self.inner;
-        let reply = py.detach(|| inner.request(&line));
+        // Warnings can raise: prepare a replacement before touching the session.
+        let mut replacement = transport::Session::new();
+        let reply = py.detach(|| replacement.request(&line));
         let reply: Reply = serde_json::from_slice(&reply).expect("replies are JSON objects");
         if let Some(error) = reply.error {
             return Err(PyValueError::new_err(error));
@@ -289,6 +290,7 @@ impl Session {
             let message = CString::new(warning).expect("warnings have no NUL");
             PyErr::warn(py, &category, &message, 1)?;
         }
+        self.inner = replacement;
         Ok(())
     }
 

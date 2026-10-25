@@ -168,6 +168,12 @@ fn accumulated_prey_mass_that_overflows_stops_the_world() {
     let time = world.time;
     assert_eq!(catch(&mut world, 2).unwrap_err(), error);
     assert_eq!(world.time, time);
+
+    let encoded = serde_json::to_string(&world).unwrap();
+    let mut restored: Simulator = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(restored.step(&[None]).unwrap_err(), error);
+    assert_eq!(restored.time, time);
+    assert_eq!(restored.snakes[0].fam, fam);
 }
 
 #[test]

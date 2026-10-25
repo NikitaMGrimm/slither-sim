@@ -2,6 +2,19 @@ use serde::Deserialize;
 use slither_sim::{physics::*, *};
 use std::f64::consts::{FRAC_PI_2, PI};
 
+/// Stock-client reconstruction, retained separately from authoritative geometry.
+fn append_client_anchor(body: &mut Vec<Point>, anchor: Point, grow: bool) {
+    body.insert(0, anchor);
+    if !grow {
+        body.pop();
+    }
+    for i in 3..body.len() {
+        let weight = 0.43 * ((i - 2) as f64 / 4.0).min(1.0);
+        body[i].x += (body[i - 1].x - body[i].x) * weight;
+        body[i].y += (body[i - 1].y - body[i].y) * weight;
+    }
+}
+
 #[derive(Deserialize)]
 struct BodyCase {
     before: Vec<Point>,
@@ -55,19 +68,11 @@ fn scale_score_mass_and_chords() {
     remove_mass(&mut n, &mut f, 10.0);
     assert_eq!((n, f), (2, 0.0));
     assert_eq!(
-        crossed_anchor(
-            Point { x: 30.0, y: 0.0 },
-            Point { x: 41.0, y: 0.0 },
-            Point::default()
-        ),
+        crossed_anchor(Point { x: 41.0, y: 0.0 }, Point::default()),
         None
     );
     assert_eq!(
-        crossed_anchor(
-            Point { x: 41.0, y: 0.0 },
-            Point { x: 43.0, y: 0.0 },
-            Point::default()
-        ),
+        crossed_anchor(Point { x: 43.0, y: 0.0 }, Point::default()),
         Some(Point { x: 42.0, y: 0.0 })
     );
     assert_eq!(
@@ -84,9 +89,8 @@ fn scale_score_mass_and_chords() {
 #[test]
 fn anchor_projects_current_head_ray_after_curved_crossing() {
     let last = Point::default();
-    let previous = Point { x: 41.0, y: 0.0 };
     let head = Point { x: 43.0, y: 3.0 };
-    let anchor = crossed_anchor(previous, head, last).unwrap();
+    let anchor = crossed_anchor(head, last).unwrap();
     let angle = head.y.atan2(head.x);
     let quantized =
         (angle / std::f64::consts::TAU * 65536.0).floor() / 65536.0 * std::f64::consts::TAU;

@@ -477,16 +477,17 @@ impl SimulatorBackend {
         if !self.world.snakes[slot].alive || !connection.snakes.contains_key(slot) {
             return Ok(None);
         }
-        let map = map.get_or_insert_with(|| {
-            Minimap::from_snakes(
+        if map.is_none() {
+            *map = Some(Minimap::from_snakes(
                 &self.world.snakes,
                 &Arena {
                     center: Point::default(),
                     radius: self.world.config.radius,
                 },
                 self.config.minimap_side,
-            )
-        });
+            )?);
+        }
+        let map = map.as_ref().expect("minimap was just constructed");
         let mut packet = encode::minimap(map);
         if let Some(previous) = connection
             .minimap_sent

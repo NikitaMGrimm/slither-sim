@@ -47,7 +47,7 @@ print(session.frame(1).time)
 | Call | Purpose |
 | --- | --- |
 | `Session()` | An empty session; reset it before stepping. |
-| `reset(seed=1, worlds=1, agents=4, decision_ticks=6, config=None)` | Replaces the worlds like a JSON `reset`; `config` is a dict of camelCase [world settings](configuration.md#world-config), optionally with a [`preset`](configuration.md#presets). Each reply warning about valid but unmeasured settings is issued as a `UserWarning`. |
+| `reset(seed=1, worlds=1, agents=4, decision_ticks=6, config=None)` | Replaces the worlds like a JSON `reset`; `config` is a dict of camelCase [world settings](configuration.md#world-config), optionally with a [`preset`](configuration.md#presets). Each reply warning about valid but unmeasured settings is issued as a `UserWarning` before replacement; a warning raised as an error keeps the previous worlds. |
 | `step(headings, boosts)` | Steps every world like a JSON `step`. |
 | `frame(world)` | A copy of world `world`'s current frame. |
 | `request(message)` | Answers one JSON request, given as a dict, `str` or `bytes`, and returns the parsed reply dict with `protocol` and `result` or `error`. Use it for `info` and `snapshot`. |

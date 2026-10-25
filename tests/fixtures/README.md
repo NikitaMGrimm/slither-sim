@@ -11,8 +11,9 @@ login challenges are inline in `tests/client_challenge.rs`, not `login-challenge
 `schemaVersion` versions the inventory. Each entry pins
 `wireProtocol` (the actual binary wire version, currently literal `19`) and
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
-The frame ID differs from the `slither-client-json-v1` request/reply
-envelope and the geometric `slither-sim-json-v3` controller; see
+The frame ID differs from the `slither-client-json-v2` request/reply
+envelope (also pinned with removed-field requests in `client-contract-v2.json`)
+and the geometric `slither-sim-json-v3` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
 [`serve-errors-v3.json`](serve-errors-v3.json) pins the geometric controller's

@@ -299,15 +299,6 @@ pub fn append_anchor(body: &mut Vec<Point>, anchor: Point, grow: bool) {
     }
 }
 
-/// Stock-client reconstruction, retained separately from authoritative geometry.
-pub fn append_client_anchor(body: &mut Vec<Point>, anchor: Point, grow: bool) {
-    body.insert(0, anchor);
-    if !grow {
-        body.pop();
-    }
-    contract_body(body);
-}
-
 fn contract_body(body: &mut [Point]) {
     for i in 3..body.len() {
         let weight = 0.43 * ((i - 2) as f64 / 4.0).min(1.0);
@@ -315,7 +306,7 @@ fn contract_body(body: &mut [Point]) {
         body[i].y += (body[i - 1].y - body[i].y) * weight;
     }
 }
-pub fn crossed_anchor(_previous: Point, head: Point, last: Point) -> Option<Point> {
+pub fn crossed_anchor(head: Point, last: Point) -> Option<Point> {
     if head.distance_lt(last, 42.0) {
         return None;
     }

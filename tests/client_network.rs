@@ -133,7 +133,7 @@ fn loopback_uses_binary_actions_measured_ping_and_replayable_receipts() {
     let later = poll.received.snake("1").unwrap();
     assert!(later.body.age_seconds >= original.body.age_seconds);
     assert_eq!(later.incarnation, original.incarnation);
-    let records = backend.drain_records();
+    let records = backend.drain_records().unwrap();
     assert!(
         records
             .iter()

@@ -413,8 +413,11 @@ impl Minimap {
 
     /// Simulator approximation: rasterize live body centerlines to a binary grid.
     /// The original server's aggregation rule is unavailable; this is not a food map.
-    pub fn from_snakes(snakes: &[Snake], arena: &Arena, side: usize) -> Self {
-        assert!((1..=MAX_SIDE).contains(&side));
+    /// Returns an error unless `side` is in 1..=512.
+    pub fn from_snakes(snakes: &[Snake], arena: &Arena, side: usize) -> Result<Self, String> {
+        if !(1..=MAX_SIDE).contains(&side) {
+            return Err("Invalid minimap size".into());
+        }
         let mut cells = vec![0; side * side];
         let grid = |p: Point| Point {
             x: ((p.x - arena.center.x) / arena.radius + 1.) * side as f64 / 2.,
@@ -448,10 +451,10 @@ impl Minimap {
                 }
             }
         }
-        Self {
+        Ok(Self {
             side,
             cells,
             age_seconds: 0.,
-        }
+        })
     }
 }

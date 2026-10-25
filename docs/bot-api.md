@@ -121,6 +121,15 @@ Columns are arrays of equal length; row `r` is element `r` of each.
 | `food` | `x`, `y`, `value`, `size`, `origin` (index into `info.origins`: ambient, boost, death) |
 | `prey` | `id`, `x`, `y`, `heading`, `targetHeading`, `speed`, `size` |
 
+- `segments`: whole body segments.
+- `fam`: growth not yet turned into a segment, in segment units; it can briefly
+  exceed 1.
+- `length`: `segments + fam`, the body length in segments, not a distance.
+- `score`: the size points the game displays, from `segments` and `fam`.
+- Food `value`: the gain for a minimum-size eater (`length` 2); larger eaters
+  gain less. Food `size`, when present, is the protocol pellet size, which sets
+  the display and the size-dependent gain; without it the eater gains `value`.
+
 `kills` counts the current life's kills. `killScore` counts the slot's kills
 within the last `config.killScoreSeconds`, across lives, and is 0 without that
 window. Death `reason` is `body`, `boundary` or `pit` (only with `config.pit`).
