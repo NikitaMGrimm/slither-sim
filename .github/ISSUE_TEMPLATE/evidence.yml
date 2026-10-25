@@ -13,18 +13,18 @@ body:
     id: method
     attributes:
       label: Method and competing explanations
-      description: Include the sampling unit, timing/visibility limits and independent validation.
+      description: Sampling unit, timing/visibility limits and independent validation.
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
       label: Evidence and reproduction
-      description: Bundle URL and SHA-256, study/capture windows, frozen plan and exact commands; for cohort comparison, include the pinned comparison submission URL/digest. Or say that collection is proposed.
+      description: Bundle URL/SHA-256, study/capture windows, frozen plan and exact commands; for cohort comparison, pinned submission URL/digest. Or state that collection is proposed.
     validations:
       required: true
   - type: textarea
     id: limits
     attributes:
       label: Results and uncertainty
-      description: Include failures, inconclusive results, exclusions and plan deviations.
+      description: Failures, inconclusive results, exclusions and plan deviations.

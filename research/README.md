@@ -1,10 +1,9 @@
 # Research records
 
 Use the [contributor task map](../CONTRIBUTING.md#find-the-change) for code changes
-and the maintained guides in `docs/` for current commands and behavior. This tree
-holds dated studies and selected results, including rejected and inconclusive
-attempts. A completed collection or passing archive check does not establish a
-scientific rule or product adoption.
+and `docs/` for current commands/behavior. This archive holds dated studies and
+selected results, including rejected and inconclusive attempts. Collection or
+archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
@@ -25,29 +24,29 @@ scientific rule or product adoption.
 
 ## Adding or updating material
 
-- Update an existing `docs/` guide when its commands, API or current explanation
-  change. A routine fix usually needs no research report.
+- Update the existing `docs/` guide for command, API or explanation changes;
+  routine fixes usually need no research report.
 - For a distinct study, use `research/<topic>/YYYY-MM-DD-<question>/REPORT.md` and
-  link it here. Start with one report: question, methods and source/build pins,
-  outcomes (including failure), limitations, decision and reproduction/evidence
-  pointers. Amendments to the same study can stay together; a PR or agent turn is
-  not a new study. Preserve frozen plans and historical conclusions.
+  link it here. One report should contain question, methods, source/build pins,
+  outcomes (including failure), limits, decision and reproduction/evidence links.
+  Study amendments can stay together; a PR or agent turn is not a new study.
+  Preserve frozen plans and historical conclusions.
 - Put only useful, bounded result data beside the report. Reuse the existing
   [evidence bundle format](../docs/evidence-format.md); do not add a parallel
-  claims/status registry. Keep small regressions in `tests/fixtures/` and reusable
-  tools in their existing `tools/` paths. The source-snapshot tools do not
-  automatically archive this research tree.
+  claims/status registry. Keep small regressions in `tests/fixtures/`, reusable
+  tools in existing `tools/` paths. Source-snapshot tools do not automatically
+  archive this tree.
 - Keep raw recordings, full traces, checkpoints, binaries and changing handoffs
-  outside Git. Give a retrievable URL and digest when sharing is permitted;
-  otherwise label access as local-only, restricted or unavailable. A path and
-  hash identify material without making it downloadable. Historical paths inside
-  selected JSON are original provenance, not new relative file links.
+  outside Git. When sharing is permitted, give a retrievable URL and digest;
+  otherwise label access local-only, restricted or unavailable. Paths/hashes
+  identify material without making it downloadable. Historical paths in selected
+  JSON are original provenance, not relative file links.
 
 SlitherSim owns simulator/protocol fidelity and simulator/client performance.
-Arena owns policy, reward, planner and training/evaluation research and consumes
-SlitherSim as a dependency. Do not copy private Arena data into this archive.
-The existing import manifests stay at their historical paths under `docs/`.
+Arena owns policy, reward, planner and training/evaluation research, consuming
+SlitherSim as a dependency. Do not copy private Arena data here.
+Import manifests stay at their historical `docs/` paths.
 
-`research/` is repository material, excluded from the published Rust crate.
-Packaged guides link to it using repository URLs; they remain usable without an
-archive checkout. No research framework or additional dependency is required.
+`research/` is excluded from the Rust crate; packaged guides use repository URLs
+to remain usable without the archive. No research framework or extra dependency
+is required.

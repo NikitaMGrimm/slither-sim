@@ -1,11 +1,7 @@
 # Evidence workflow
 
-Choose the [evidence tier](../CONTRIBUTING.md#evidence-proportional-to-the-change)
-before starting. Existing evidence can support mechanics corrections; routine
-tool/API fixes need a reproducer and regression, not a new study. New empirical
-or fitted claims need the complete relevant study and its limitations.
-
-Go directly to the task you need:
+Start with the [evidence tier](../CONTRIBUTING.md#evidence-proportional-to-the-change)
+for your change and [development setup/checks](../CONTRIBUTING.md#setup-and-checks).
 
 - [Try the offline demonstration](#try-the-complete-offline-workflow).
 - [Plan a measurement](#plan-a-real-measurement), including [controlled routes](#controlled-snake-and-food-routes).
@@ -13,17 +9,15 @@ Go directly to the task you need:
 - [Package and submit](#package-and-submit) or [compare contributed bundles](#compare-contributed-evidence).
 - [Add or update a fixture](#add-or-update-a-fixture).
 
-For development setup and test commands, use [contributing](../CONTRIBUTING.md#setup-and-checks).
-
-For the evidence workflow below, use Python 3.12, uv, Rust 1.99+ and Node.js 22+
+Evidence tools require Python 3.12, uv, Rust 1.99+ and Node.js 22+
 (24 recommended). Rust-only and documentation work can skip this setup:
 
 ```sh
 uv sync --locked --only-group tools
 ```
 
-Run commands from the checkout. Use a fresh output directory per study; existing
-plans, captures and bundles are never overwritten.
+Run from the checkout with a fresh output directory per study; never overwrite
+plans, captures or bundles.
 
 ## Try the complete offline workflow
 
@@ -34,39 +28,38 @@ uv run --locked --only-group tools python tools/fidelity/evidence.py pack output
 uv run --locked --only-group tools python tools/fidelity/evidence.py verify outputs/evidence-demo.tar.gz
 ```
 
-The first command builds the simulator/replay example, generates six seconds of
-steering traffic, audits it and replays a three-second window. It uses no network
-or browser. Inspect `REPORT.md`, `analysis/results.json`, `analysis/replay/` and
-`fixtures/`.
+The first command builds the simulator/replay example, generates and audits six
+seconds of steering traffic, then replays a three-second window, without network
+or browser access. Inspect `REPORT.md`, `analysis/results.json`, `analysis/replay/`
+and `fixtures/`.
 
-All data is labelled **synthetic, local-simulator**. The study compares causal
-heading reconstruction with a known-state control and timing/heading perturbations;
-corruption and truncation have separate tests. Initialization errors are retained.
-Passing checks establish pipeline agreement, not server mechanics or playing
-strength. Repeated runs reuse data identities, and thresholds were chosen during
-development, not blinded validation.
+Data is **synthetic, local-simulator**: causal heading reconstruction is compared
+with a known-state control and timing/heading perturbations. Corruption and
+truncation have separate tests; initialization errors are retained. Passing checks
+establish pipeline agreement, not server mechanics or playing strength.
+Repeated runs reuse data identities; thresholds were chosen during development,
+not blinded validation.
 
 ## Plan a real measurement
 
-Collection tools target protocol-19 WebSocket servers at an explicit IPv4
-address/port and `/slither` path. They do not discover servers. The template
-targets the local host at `127.0.0.1:8766`; use `dataOrigin: local-simulator` for
-that source, or `community-server` for another compatible server. Set an HTTP(S)
-`capture.origin` only when required by the endpoint. Recordings contain raw
-received packets and sent controls; they do not include server-only state.
+Collection requires an explicit protocol-19 WebSocket IPv4 address/port and
+`/slither` path; tools do not discover servers. Recordings contain raw received
+packets and sent controls, without server-only state.
 
 Copy [the movement plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/movement-plan.json). Specify:
 
 - Study ID, question, competing explanations and method.
 - Sampling unit, attempt budget, exclusions and held-out validation.
-- Operator-supplied protocol-19 IP/port, optional HTTP(S) `capture.origin` and
-  actual `dataOrigin`. The template uses loopback `127.0.0.1:8766` and `/slither`.
+- Operator-supplied protocol-19 IP/port and actual `dataOrigin`: `local-simulator`
+  for the template's loopback `127.0.0.1:8766` at `/slither`, or `community-server`
+  for another compatible server. Set HTTP(S) `capture.origin` only if required
+  by the endpoint.
 
-For confirmatory work, freeze predictions and selection rules before collection.
-Keep exploratory results labelled exploratory; a plan hash cannot prove when or
-why a plan was written. Fit and validate on separate data.
+Freeze confirmatory predictions and selection rules before collection; label
+exploratory results. A plan hash cannot prove when or why it was written.
+Fit and validate on separate data.
 
-Initialize and inspect the command without connecting:
+Initialize and inspect without connecting:
 
 ```sh
 uv run --locked --only-group tools python tools/fidelity/evidence.py init --plan path/to/your-plan.json --output outputs/your-study
@@ -79,44 +72,43 @@ To collect on that server:
 uv run --locked --only-group tools python tools/fidelity/collect.py outputs/your-study
 ```
 
-Each invocation durably reserves one attempt; there are no automatic retries or
-replacement captures. Limits are 1–3 clients and 3,600 seconds per attempt; the
-template uses one client for 60 seconds. Scenario-specific client counts are
-validated. The wrapper passes the endpoint/Origin, saves stdout/stderr in `logs/`,
-and stops the child after the duration plus 30 seconds for draining. It saves
-the process exit status in `attempts.jsonl` before auditing the recordings; an
-audit exception does not erase that outcome or make the attempt available again.
+Each invocation durably reserves one attempt, without automatic retries or
+replacements. Limits are 1–3 clients and 3,600 seconds per attempt, with
+scenario-specific client counts validated; the template uses one client for
+60 seconds. The wrapper passes the endpoint/Origin, logs stdout/stderr in `logs/`,
+and stops the child after the duration plus 30 seconds for draining. It records
+exit status in `attempts.jsonl` before auditing; audit exceptions cannot erase
+the outcome or release the reservation.
 
-Failures, cancellation and timeout remain in the ledger, including incomplete gzip
-files. Exit zero alone is not successful acquisition. Other advertised protocols
-are quarantined with their raw bytes retained; `setupSignatures[].protocolVersion`
-records the observed version. Unsupported login challenges fail without executing
-JavaScript and require a reviewed parser update.
+Failures, cancellation, timeout and incomplete gzip files remain recorded; exit
+zero alone is not successful acquisition. Other advertised protocols are
+quarantined with raw bytes retained and the observed version in
+`setupSignatures[].protocolVersion`. Unsupported login challenges fail without
+executing JavaScript and require a reviewed parser update.
 
-For paired-prey acquisition, set these fields in the plan's `capture` object
-alongside its server and optional Origin, then use the same `init`, `collect`,
-`audit` and `pack` commands:
+For paired-prey acquisition, add these fields to `capture` alongside the server
+and optional Origin; use the same `init`, `collect`, `audit` and `pack` commands:
 
 ```json
 {"scenario": "paired-prey", "bots": 2, "seconds": 480,
  "mode": "crossing", "direction": "diagonal-positive"}
 ```
 
-Paired plans require exactly two clients, 1–3,600 seconds and an explicit `mode`
-of `overlap` or `crossing`. A fixed `direction` is optional for crossing and
-invalid for overlap. Audits compare the recorded mode/direction against the frozen
-plan as well as checking both members and source hashes. A completed capture
-does not certify a valid crossing or statistical coverage.
+Paired plans require exactly two clients, 1–3,600 seconds and explicit `mode`
+`overlap` or `crossing`. Fixed `direction` is optional for crossing, invalid for
+overlap. Audits check both members, source hashes and mode/direction against the
+frozen plan. Capture completion certifies neither valid crossings nor
+statistical coverage.
 
-The duration ceiling is an operational capture budget, not a server constant.
-Managed plans require an explicit duration.
+Managed plans require explicit duration; its ceiling is an operational budget,
+not a server constant.
 
-Low-level paired-death and feeding-shape collectors still need their own matching
+Low-level paired-death and feeding-shape collectors need their own matching
 coordinator and attempt accounting.
 
 ### Controlled snake and food routes
 
-The managed workflow also accepts these separate acquisition scenarios:
+The managed workflow also accepts these acquisition scenarios:
 
 #### Direct-snake routes
 
@@ -125,30 +117,28 @@ The managed workflow also accepts these separate acquisition scenarios:
  "mode": "crossing", "direction": "x"}
 ```
 
-The direct-snake route uses A's own received pose as a reference while B moves
-between fixed near/far waypoints. It keeps running when the peer disappears from
-an opponent cache; that disappearance is an observable outcome. Plans require
-exactly two clients, an explicit crossing direction and 1–3,600 seconds.
-Directions are normalized: the 800/2,300-unit rail offsets are Euclidean,
-including diagonals. A nominally orbits an 80-unit reference circle; B holds each
-achieved endpoint for two seconds. These settings and safety margins are
-acquisition controls, not recovered server visibility rules.
+The direct-snake route references A's own received pose while B moves between
+fixed near/far waypoints. It continues through peer disappearance from an
+opponent cache, an observable outcome. Plans require exactly two clients, explicit
+crossing direction and 1–3,600 seconds. Normalized directions give Euclidean
+800/2,300-unit rail offsets, including diagonals. A nominally orbits an 80-unit
+circle; B holds each achieved endpoint for two seconds. These settings and safety
+margins are acquisition controls, not recovered server visibility rules.
 
-Only B records canonical `paired-snake-endpoint` witnesses. Initial approach is
-excluded from completed legs. A shared trial binds identities, center and axis;
-`paired-snake-trial-end` records abandonment or capture-end censoring before
-reset. Avoidance interruptions, actual anchors, cache membership, intended and
-sent headings remain available for analysis. Counters and intended waypoints
-alone do not certify an uninterrupted traversal or fresh causal query.
-Both own anchors must be at most 150 ms old for endpoint recognition and new
-heading commands. A brief stale interval pauses control while retaining the
-trial's center, targets and hold deadline; it counts as an interruption. Both
-anchors must refresh after pause entry before control resumes. Ages over 500 ms
-or failure to reacquire within 1,000 ms abandon the trial. Pausing suppresses new
-headings and boost; the last delivered heading continues physically. Holds and
-leg deadlines keep running, and interrupted legs cannot establish an
-uninterrupted round trip. These are engineering bounds, separate from the frozen
-analysis freshness screens and opponent-cache absence.
+Only B records canonical `paired-snake-endpoint` witnesses; completed legs exclude
+initial approach. Shared trials bind identities, center and axis;
+`paired-snake-trial-end` records abandonment or capture-end censoring before reset.
+Logs retain avoidance interruptions, actual anchors, cache membership, intended
+and sent headings. Counters and intended waypoints alone certify neither
+uninterrupted traversal nor fresh causal queries.
+Endpoint recognition and new headings require both own anchors at most 150 ms
+old. Staleness pauses control and counts as an interruption, retaining the trial's
+center, targets and hold deadline. Both anchors must refresh after pause entry
+before resuming. Ages over 500 ms or no reacquisition within 1,000 ms abandon the
+trial. Pausing suppresses new headings and boost; the last delivered heading
+continues physically. Holds and leg deadlines keep running; interrupted legs
+cannot establish uninterrupted round trips. These engineering bounds are separate
+from frozen analysis freshness screens and opponent-cache absence.
 
 #### Food lanes
 
@@ -156,86 +146,80 @@ analysis freshness screens and opponent-cache absence.
 {"scenario": "food-lanes", "bots": 1, "seconds": 480}
 ```
 
-The food route uses one client for 1–480 seconds, with no paired mode/direction.
-It selects one interior site, then schedules eight reciprocal passes in A/B/B/A
-lane blocks, 75 units apart within one 300-unit sector row. The first four slots
-are preassigned calibration and the last four holdout; approach and transfers
-are excluded. Route failure retains missing slots and stops without reconnecting
-or selecting a replacement site. `food-lane-phase-end` records achieved endpoints
-and interruptions; `food-lane-route-end` preserves the terminal outcome.
-Initial site screening requires received opponent body polylines, including
-their extrapolated tips, to clear both lanes, the west transfer and the approach
-by more than 800 units. This conservative acquisition margin cannot guarantee
-future or unreceived safety; the route's danger veto remains active.
+The food route uses one client for 1–480 seconds, without paired mode/direction.
+At one interior site it schedules eight reciprocal passes in A/B/B/A lane blocks,
+75 units apart within one 300-unit sector row. The first four slots are
+preassigned calibration, the last four holdout; approach/transfers are excluded.
+Failure retains missing slots and stops without reconnecting or replacing the
+site. `food-lane-phase-end` records achieved endpoints and interruptions;
+`food-lane-route-end` retains the terminal outcome. Initial screening requires
+received opponent body polylines, including extrapolated tips, more than 800 units
+from both lanes, west transfer and approach. This conservative acquisition margin
+cannot guarantee future or unreceived safety; the danger veto remains active.
 
-Both scenarios use the standard recorder, source/plan pins, managed attempt
-ledger and audit/package commands. The driver can complete an intact recording
-of an aborted route. Inspect the route outcome and packet-derived denominators
-separately from integrity status before scaling a study. Fit/validation splits,
-freshness screens and required coverage belong in the frozen analysis plan.
+Both scenarios use the standard recorder, source/plan pins, attempt ledger and
+audit/package commands. An aborted route can produce an intact recording. Before
+scaling a study, inspect route outcomes and packet-derived denominators separately
+from integrity. Freeze fit/validation splits, freshness screens and required
+coverage in the analysis plan.
 Food announcements and explicit clears describe delivery episodes; unannounced
 empty sectors never establish a known subscription or global food absence.
 
 #### Paired-prey routes
 
-For two-client visibility crossings, the paired-prey collector supports fixed
+For two-client visibility crossings, paired-prey supports fixed
 `x`, `y`, `diagonal-positive` and `diagonal-negative` directions:
 
 ```sh
 node tools/fidelity/slither-paired-prey.mjs --out outputs/paired-diagonal --server 127.0.0.1:8766 --seconds 480 --mode crossing --direction diagonal-positive --plan path/to/paired-plan.json
 ```
 
-Offsets are max-axis distances. The current near offset is 650 (about 919 units
-on a diagonal), the far offset is 1,850, and the reference offset is 450. After
-recording an endpoint, B keeps that relative waypoint for two seconds before the
-next traversal. `crossingHeldOffset` and `crossingHoldUntil` describe the hold;
-`intendedOffset` records the commanded offset even when `crossingLeg` already
-names the upcoming leg. These are acquisition controls, not measured server
-ranges or timers.
+Offsets are max-axis distances: near 650 (about 919 units diagonally), far 1,850,
+reference 450. After recording an endpoint, B holds that relative waypoint for
+two seconds before traversing again. `crossingHeldOffset` and `crossingHoldUntil`
+describe the hold; `intendedOffset` records the commanded offset even when
+`crossingLeg` names the upcoming leg. These are acquisition controls, not measured
+server ranges or timers.
 
-The logs retain projected along-route/cross-track distances, visibility, freshness,
-interruptions and completed legs. An intended route or phase name is not proof of
-an achieved crossing. Freeze candidate geometry/retention, calibration/held-out
-legs, attempt budget and required coverage before connecting. Preserve failed
-joins and empty cohorts; they cannot validate a new visibility rule.
+Logs retain projected along-route/cross-track distances, visibility, freshness,
+interruptions and completed legs; intended routes or phase names cannot prove
+achieved crossings. Before connecting, freeze candidate geometry/retention,
+calibration/held-out legs, attempt budget and required coverage. Preserve failed
+joins and empty cohorts; neither validates a new visibility rule.
 
-When an active crossing trial is abandoned, both archives retain a
-`paired-prey-trial-end` event before clearing its state, including on the same
-update as reacquisition or when a client cannot run movement. `endedAt` is the
-coordinator's monotonic update time; the enclosing `t` is the recorder time.
-The event preserves the old pair/target/trial identities, leg, hold and endpoint
-counts. Its `reason` describes the collector branch: `pair_unavailable` does not
-distinguish death from disconnection, and `primary_visibility_lost` means the
-primary cache is absent or too old. Neither proves a server subscription change.
-Match the event across recipients by trial and `endedAt`; it is one shared
-control event, not two independent observations. A trial still active at capture
-end is right-censored.
+Abandoning an active crossing trial records `paired-prey-trial-end` in both
+archives before clearing state, even on the reacquisition update or when a client
+cannot run movement. `endedAt` is coordinator monotonic update time; enclosing
+`t` is recorder time. The event retains old pair/target/trial identities, leg,
+hold and endpoint counts. `reason` names the collector branch: `pair_unavailable`
+does not distinguish death from disconnection; `primary_visibility_lost` means
+the primary cache is absent or too old. Neither proves a server subscription
+change. Match recipients by trial and `endedAt`: one shared control event, not
+independent observations. Trials active at capture end are right-censored.
 
-Crossing endpoint advancement requires the reference near its assigned offset,
-both snake anchors at most 150 ms old and the reference prey report at most
-350 ms old. These are collector/study quality gates, not server constants.
-`endpointVisits` includes the initial approach; `completedLegs` counts subsequent
-legs between achieved endpoints. Observer B records each exact start/end witness
-once in `crossingEndpoint`.
-These endpoint checks do not establish continuous geometry, avoidance-free travel,
-clock alignment, peer continuity or held-out coverage; analysis must still check them.
+Endpoint advancement requires the reference near its assigned offset, both snake
+anchors at most 150 ms old and the reference prey report at most 350 ms old:
+collector/study quality gates, not server constants. `endpointVisits` includes
+initial approach; `completedLegs` counts subsequent legs between achieved
+endpoints. B records each exact start/end witness once in `crossingEndpoint`.
+Analysis must still check continuous geometry, avoidance-free travel, clock
+alignment, peer continuity and held-out coverage.
 
-The paired collector tests also rehearse complete near/far round trips using the
-actual quantized, rate-limited sent commands. Their point robots have explicit
-synthetic speed/turn settings, exact fresh anchors and no obstacles; stationary
-and moving targets cover both signs of each route. This protects control wiring
-without tying it to measured physics defaults or claiming live acquisition success.
+Paired collector tests rehearse complete near/far round trips with actual
+quantized, rate-limited sent commands. Point robots use explicit synthetic
+speed/turn settings, exact fresh anchors and no obstacles; stationary/moving
+targets cover both signs of each route. Tests protect control wiring without
+depending on measured physics defaults or claiming live acquisition success.
 
 ### Capture records
 
-Raw frames retain direction, bytes and monotonic send/receipt timestamps. Metadata
-pins the plan/collector sources, wall-clock origin, connection/life boundaries,
-ping sends/replies/RTT and censored requests, including post-death observation.
-Server elapsed headers give a separate received clock. The audit derives RTT and
-arrival-gap summaries from those same frames; no second timing log is needed.
-These clocks cannot identify one-way latency or hidden processing ticks.
-JSONL metadata records are objects; frame records are three-element arrays.
-Use the shared audit/decoder rather than treating every record as an object.
+Raw frames retain direction, bytes and monotonic send/receipt times. Metadata
+pins plan/collector sources, wall-clock origin, connection/life boundaries, ping
+sends/replies/RTT and censored requests, including post-death observation. Server
+elapsed headers supply a separate received clock. Audits derive RTT/arrival-gap
+summaries from these frames without a second timing log. Neither clock identifies
+one-way latency or hidden processing ticks. Use the shared audit/decoder: JSONL
+metadata records are objects, frames are three-element arrays.
 
 ## Inspect, analyze and reproduce
 
@@ -244,21 +228,21 @@ uv run --locked --only-group tools python tools/fidelity/evidence.py audit outpu
 ```
 
 Audits check plan/attempt accounting, file membership, sources, receipts, gzip
-completeness, duplicates and batch consistency. Missing attempts are incomplete;
-corrupt, interrupted or mismatched captures are quarantined. Before removing a
-leftover `.study.lock`, check its owner/process and ledger.
+completion, duplicates and batch consistency. Missing attempts are incomplete;
+corrupt, interrupted or mismatched captures are quarantined. Check owner/process
+and ledger before removing a leftover `.study.lock`.
 
-For packet families, byte counts and cadence, analyze an audited complete capture:
+Analyze packet families, byte counts and cadence from an audited complete capture:
 
 ```sh
 uv run --locked --only-group tools python tools/fidelity/packet_census.py outputs/your-study/raw/ATTEMPT/bot0.jsonl.gz --output outputs/your-study/analysis/packets.json
 ```
 
-Create `analysis/` first. The census refuses existing output, incomplete captures
-and non-19 setups. It includes archive/tool hashes, separate server/receipt gaps,
-active/post-death counts and prey reporting rates per known-prey second. Entry,
-removal, reconnect and censored lifetimes remain distinct. It does not repeat the
-audit's integrity/RTT analysis or infer world populations from recipient counts.
+Create `analysis/` first. The census rejects existing output, incomplete captures
+and non-19 setups. It reports archive/tool hashes, separate server/receipt gaps,
+active/post-death counts and prey updates per known-prey second, distinguishing
+entry, removal, reconnect and censored lifetimes. It neither repeats audit
+integrity/RTT analysis nor infers world populations from recipient counts.
 
 ### Transport parity
 
@@ -270,15 +254,15 @@ uv run --locked --only-group tools python tools/fidelity/transport_parity.py com
 uv run --locked --only-group tools python tools/fidelity/local_capture.py --config arena.json --seconds 60 --out outputs/local-transport
 ```
 
-`measure` accepts multiple captures and records SHA-256s for inputs, decoder,
-census and measurement tool. It reports each capture/setup epoch and pooled
-statistics. `compare` prints four initial gates and exits 1 on failure (including
-insufficient samples), 2 on invalid input. Optional `--tolerances FILE` supplies
-JSON with explanatory `comment` fields. Limits use the observed per-capture
-official envelope, with 100 samples required per gated statistic. The
+`measure` accepts multiple captures, records input/decoder/census/tool SHA-256s
+and reports per-capture/setup-epoch and pooled statistics. `compare` prints four
+initial gates; exit 1 means failure (including insufficient samples), 2 invalid
+input. Optional `--tolerances FILE` supplies JSON with explanatory `comment`
+fields. Limits use the observed per-capture official envelope, requiring
+100 samples per gated statistic. The
 [reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-transport-parity/REPORT.md)
-include the full retained headless input manifest and exclusions in the fixture;
-community recordings are excluded. Raw reference captures require local access.
+include the fixture's full retained headless manifest and exclusions. Community
+recordings are excluded; raw reference captures require local access.
 
 Frame cadence and the header-delta histogram expose batching. Anchor correction
 is `v_local * gap - 42` world units: local speed is nine anchor spacings divided
@@ -293,28 +277,27 @@ appearance epochs. Packet-family counts/rates reuse the census. Excess delivery
 delay is receipt minus cumulative server time, minus a centered rolling minimum
 over +/-600 frames, separately after each setup and excluding its frame.
 
-Samples overlap and are correlated. Receipt timing includes network jitter and
-collector stalls. `collector-timing` metadata and final collector counters are
-reported (missing older metadata remains unknown); repeated cumulative counters
-are not summed. No clock here identifies absolute one-way latency or guarantees
-stock-client playing equivalence. Collector stalls remain in measurements and
-can widen the official envelope.
+Samples overlap and correlate; receipt timing includes network jitter and
+collector stalls. Reports retain `collector-timing` metadata and final counters
+(missing older metadata stays unknown), without summing repeated cumulative
+counters. No clock here identifies absolute one-way latency or guarantees
+stock-client playing equivalence. Retained collector stalls can widen the
+official envelope.
 
 `local_capture.py` starts `cargo run --release --locked -j 3 -- host --config FILE`,
-runs the headless collector, stops both process trees, then measures and compares.
-It saves the capture path, frozen config, Git head, logs and comparison table in
-a new output directory and uses an isolated Cargo target by default. Its config
-must bind a numeric IPv4 loopback address; it refuses other addresses before
-starting anything and supplies the validated bind override to the host. It never
-discovers or connects to outside game servers. Choose a representative local
-world/load in `arena.json`; a small world cannot establish full-load parity.
+runs the headless collector, stops both process trees, then measures/compares.
+A new output directory retains capture path, frozen config, Git head, logs and
+comparison table; the Cargo target is isolated by default. Config must bind a
+numeric IPv4 loopback address: other addresses fail before startup, and the host
+receives the validated bind override. It never discovers or contacts outside game
+servers. Choose representative local world/load in `arena.json`; a small world
+cannot establish full-load parity.
 
-Before export, audit the complete study and inspect its attempt ledger, source
-pins and quarantine status. Preserve that audit result and the selected window
-identity with the analysis. The standalone exporter reads the supplied capture;
-it does not perform a study audit or freeze a source snapshot. Packaging below
-creates the source snapshot. Do not replace collection-time source pins to make
-a later audit pass.
+Before export, audit the complete study; inspect attempt ledger, source pins and
+quarantine status. Retain the audit and selected window identity with analysis.
+The standalone exporter reads the supplied capture without auditing the study or
+freezing sources; packaging creates the snapshot. Never replace collection-time
+source pins to pass a later audit.
 
 Export a preselected complete window:
 
@@ -329,21 +312,21 @@ is a separately labelled mass-control sensitivity. Record commands, parameters,
 tool versions, initialization, missing exposure and uncertainty. Do not tune
 window, clock offset or heading estimator to favorable results.
 
-Concurrent clients share a batch. Frames, lives, reconnects, filenames and new
-UUIDs are not automatically independent trials. Justify replication across
-sessions/times/servers and preserve every planned stratum, failed attempt and
-inconclusive result. Distinguish server generation from broadcast filtering and
-received state from reconstructed state.
+Concurrent clients share a batch; frames, lives, reconnects, filenames and new
+UUIDs do not automatically create independent trials. Justify replication across
+sessions/times/servers; preserve every planned stratum, failure and inconclusive
+result. Distinguish server generation from broadcast filtering, and received
+from reconstructed state.
 
-For clients recorded in the same process, verify shared batch, `timeOrigin` and
-collector source before comparing their caches on the common monotonic receipt
-clock. At time T, consume only each stream's packet prefix received by T, keeping
-packet order and separate field ages. Never subtract independent connection
-elapsed clocks or let later packets refresh an earlier pose. Local cache absence
-is meaningful only against a positively retained peer reference; it is not world
-absence. Any later continuity checks select the sample retrospectively and must
-stay separate from causal state reconstruction. Shared receipt time does not
-establish simultaneous server geometry or one-way latency. The
+For same-process clients, verify shared batch, `timeOrigin` and collector source
+before comparing caches on common monotonic receipt time. At T, consume only
+each stream's prefix received by T, preserving packet order and separate field
+ages. Never subtract independent connection elapsed clocks or refresh earlier
+poses with later packets. Local cache absence needs a positively retained peer
+reference and cannot establish world absence. Later continuity checks select
+samples retrospectively; keep them separate from causal reconstruction. Shared
+receipt time establishes neither simultaneous server geometry nor one-way latency.
+The
 [exploratory receipt-time recheck](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md#exploratory-common-receipt-time-replay)
 records a bounded example and its missing validation coverage.
 
@@ -364,26 +347,26 @@ bundled code. See [bundle format](evidence-format.md).
 | 2 | Incomplete or quarantined evidence, retained for review. |
 | 1 | Structural failure: paths, schema, hashes or I/O. |
 
-Scientific status stays `unreviewed`. Submit the bundle URL/SHA-256, report,
-reproduction commands and a distilled regression fixture. Keep full recordings
-outside Git. For external data, note its source and sharing restrictions in `REPORT.md`.
-Review must trace claims to exact windows, alternatives and held-out checks;
-byte integrity alone cannot establish a scientific conclusion.
+Scientific status stays `unreviewed`. Submit bundle URL/SHA-256, report,
+reproduction commands and a distilled regression fixture, following
+[contribution requirements](../CONTRIBUTING.md#evidence-proportional-to-the-change)
+for recording storage and external-data restrictions. Review must trace claims
+to exact windows, alternatives and held-out checks; byte integrity cannot
+establish a scientific conclusion.
 
 ## Compare contributed evidence
 
-Copy [comparison.json](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/comparison.json). Replace its dummy
-digests and acquisition rationale, and name every planned baseline/candidate
-bundle. Each bundle must contain exactly one complete acquisition batch under
-the existing audited bundle format. Concurrent bots, reconnects and packets do
-not add independent samples. The template lists only one placeholder per cohort;
-it needs six eligible batches per cohort before testing. Its effect/exposure
-thresholds are illustrative choices, not measured server tolerances.
+Copy [comparison.json](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/comparison.json).
+Replace dummy digests/rationale and name every planned baseline/candidate bundle,
+each containing exactly one complete acquisition batch in the audited bundle
+format. [Replication limits](#inspect-analyze-and-reproduce) apply. The template
+has one placeholder per cohort; testing needs six eligible batches per cohort.
+Effect/exposure thresholds are illustrative choices, not measured server tolerances.
 
 Freeze metrics, effect thresholds, sampling/size/boost strata and exclusions
-before confirmatory acquisition; preserve the declaration with that study.
-Retrospective comparisons remain exploratory. A digest does not prove when a
-plan was written or that acquisition batches are independent/exchangeable.
+before confirmatory acquisition; retain the declaration with the study.
+Retrospective comparisons are exploratory. Digests prove neither plan timing
+nor batch independence/exchangeability.
 
 Place local bundle paths relative to the submission file, then run offline:
 
@@ -391,13 +374,13 @@ Place local bundle paths relative to the submission file, then run offline:
 uv run --locked --only-group tools python tools/fidelity/compare_evidence.py path/to/comparison.json --output outputs/comparison
 ```
 
-The tool verifies every bundle, recomputes capture audits and packet summaries
-with this checkout's tools, and records their hashes. Bundled scripts/analysis
-are never executed. Duplicate archives, payloads or capture/batch IDs, overlapping
-same-server acquisitions, and changed collector/setup/scenario/origin/framing
-make cohorts incomparable. Recorded size/control options are compared too
-(endpoint and nickname excluded). Match other conditions in the declared design;
-metadata cannot remove hidden population, behavior or network confounding.
+The tool verifies every bundle, recomputes audits/packet summaries with this
+checkout's tools and records tool hashes, without executing bundled scripts or
+analysis. Duplicate archives, payloads or capture/batch IDs, overlapping
+same-server acquisitions, or changed collector/setup/scenario/origin/framing make
+cohorts incomparable. It also compares recorded size/control options, excluding
+endpoint/nickname. Match other conditions in the declared design; metadata cannot
+remove hidden population, behavior or network confounding.
 
 Available scalar summaries are combined `M`/`V` server-gap medians, leaderboard
 server-gap medians, known-prey update server-gap medians, updates per known-prey
@@ -416,16 +399,16 @@ follow standard [permutation-test conventions](https://docs.scipy.org/doc/scipy/
 they do not establish exchangeability or sensitivity to every distribution change.
 
 `report.json` retains every bundle identity, declaration, batch value, missing
-exposure, effect and p-value; `REPORT.md` summarizes the outcome. Results are
+exposure, effect and p-value; `REPORT.md` summarizes results:
 `drift_detected`, `no_drift_detected`, `inconclusive` or `incomparable`, always
-scientifically unreviewed. No detected drift is not equivalence; drift can come
-from reporting or acquisition changes. This is a screening tool, not proof of
-new physics, and does not automatically replace a baseline, fixture or rule.
+scientifically unreviewed. No detected drift does not establish equivalence;
+reporting/acquisition changes can cause drift. Screening cannot prove new physics
+or automatically replace baselines, fixtures or rules.
 Unsupported protocols require a separately reviewed decoder update.
 
-For CI, publish a submission JSON and its pinned bundles on public GitHub release
-or attachment hosts; a raw GitHub JSON URL also works for the submission. Replace
-local `source` paths with immutable HTTPS asset URLs and compute each SHA-256.
+For CI, publish submission JSON and pinned bundles on public GitHub release or
+attachment hosts (raw GitHub JSON also works for submissions). Replace local
+`source` paths with immutable HTTPS asset URLs and compute each SHA-256.
 Submit those identities through the [evidence issue](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/ISSUE_TEMPLATE/evidence.yml).
 A maintainer runs **Evidence comparison** from the default branch with the
 submission URL and digest. The manual workflow uses read-only permissions,
@@ -437,6 +420,5 @@ Ordinary PR CI tests this pipeline offline without downloading contributed data.
 ## Add or update a fixture
 
 Use the [fixture guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/README.md) for selection, independent
-expectations, protocol labels and replay-export provenance. Routine tool/API fixes
-need a focused regression; a new capture is required only when the existing
-evidence cannot support the claim.
+expectations, protocol labels and replay-export provenance; apply the
+[evidence tier](../CONTRIBUTING.md#evidence-proportional-to-the-change) for your change.
