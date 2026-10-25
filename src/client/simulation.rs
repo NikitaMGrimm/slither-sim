@@ -1108,6 +1108,12 @@ impl SimulatorBackend {
     /// One server tick. Client sides are then brought up to the new time, so
     /// frames polled between ticks are already complete.
     fn advance(&mut self) -> Result<(), String> {
+        self.advance_with(0, &mut |_| Ok(()))
+    }
+
+    /// `advance`, handing the frames of slots `..early` to `hand_over` as soon
+    /// as the broadcast has encoded them, before it encodes later slots.
+    fn advance_with(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
         // A server loop pass reads what arrived by the time it sends: input
         // arriving during this tick shapes this tick's frame. Official input
         // reflection takes about one ping round trip (13.2 vs 13.4 ms median)
@@ -1176,14 +1182,36 @@ impl SimulatorBackend {
                 slot.processing_override = None;
             }
         }
-        self.broadcast()?;
+        self.broadcast_with(early, hand_over)?;
         for slot in 0..self.slots.len() {
             self.client_until(slot, now)?;
         }
         Ok(())
     }
 
+    /// Give `hand_over` every queued frame of slots `..early`.
+    fn hand_over_early(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
+        let early = early.min(self.slots.len());
+        let frames: Vec<_> = self.slots[..early]
+            .iter_mut()
+            .enumerate()
+            .filter(|(_, s)| !s.connection.downlink.is_empty())
+            .map(|(slot, s)| (slot, s.connection.downlink.drain(..).collect()))
+            .collect();
+        if frames.is_empty() {
+            Ok(())
+        } else {
+            hand_over(frames)
+        }
+    }
+
+    /// A broadcast between physics ticks, as diagnostic tests issue.
+    #[cfg(test)]
     fn broadcast(&mut self) -> Result<(), String> {
+        self.broadcast_with(0, &mut |_| Ok(()))
+    }
+
+    fn broadcast_with(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
         let now = self.time();
         // Ambient births reach the wire at the shared food maintenance, with
         // sector cleanup; see `FoodIndex`.
@@ -1244,6 +1272,9 @@ impl SimulatorBackend {
         let mut board = None;
         let mut map = None;
         for slot in 0..self.slots.len() {
+            if slot == early {
+                self.hand_over_early(early, hand_over)?;
+            }
             let connection = &self.slots[slot].connection;
             if !connection.setup {
                 continue;
@@ -1280,6 +1311,9 @@ impl SimulatorBackend {
             if !packets.is_empty() {
                 self.emit(slot, now, &packets)?;
             }
+        }
+        if early >= self.slots.len() {
+            self.hand_over_early(early, hand_over)?;
         }
         self.food_eaters.clear();
         self.prey_eaters.clear();
@@ -1679,6 +1713,11 @@ impl SimulatorBackend {
     }
 }
 
+/// Receives `(slot, frames)` for early slots during a tick; see
+/// `RawSimulator::advance_tick_with`.
+pub(crate) type EarlyFrames<'a> =
+    dyn FnMut(Vec<(usize, Vec<(f64, Vec<u8>)>)>) -> Result<(), String> + 'a;
+
 /// One shared world whose leading slots are external protocol-19 clients.
 ///
 /// Remote slots exchange exact WebSocket payloads through the same server-side
@@ -1878,14 +1917,30 @@ impl RawSimulator {
         }
     }
 
-    /// Shared server ticks; background slots decide at the decision cadence.
-    pub(crate) fn advance_ticks(&mut self, ticks: usize) -> Result<(), String> {
+    /// One shared tick, like `advance_ticks(1)`, except that the frames of
+    /// remote slots `..early` go to `hand_over` as soon as they are encoded,
+    /// so those connections do not wait for the rest of the broadcast. Frames
+    /// queued outside the broadcast stay for `take`.
+    pub(crate) fn advance_tick_with(
+        &mut self,
+        early: usize,
+        hand_over: &mut EarlyFrames,
+    ) -> Result<(), String> {
+        if early > self.backend.remote {
+            return Err("Early slots must be remote".into());
+        }
         let b = &mut self.backend;
+        if b.tick % b.config.decision_ticks as u64 == 0 {
+            b.drive_background()?;
+        }
+        b.advance_with(early, hand_over)
+    }
+
+    /// Shared server ticks; background slots decide at the decision cadence.
+    #[cfg(test)]
+    fn advance_ticks(&mut self, ticks: usize) -> Result<(), String> {
         for _ in 0..ticks {
-            if b.tick % b.config.decision_ticks as u64 == 0 {
-                b.drive_background()?;
-            }
-            b.advance()?;
+            self.advance_tick_with(0, &mut |_| Ok(()))?;
         }
         Ok(())
     }

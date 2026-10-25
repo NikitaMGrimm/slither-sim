@@ -521,7 +521,7 @@ impl Simulation {
                 // frame reflects input that reached it by its due time; their
                 // send times, not this loop, set which tick that is.
                 self.apply_commands()?;
-                self.world.advance_ticks(1)?;
+                self.advance_tick()?;
                 self.ticks += 1;
                 self.shared.ticks.store(self.ticks, Ordering::Relaxed);
                 self.hand_over()?;
@@ -640,21 +640,41 @@ impl Simulation {
         Ok(())
     }
 
+    /// One tick. Socket slots come first in the broadcast, and their frames
+    /// reach the socket thread as soon as they are encoded: waiting for every
+    /// bot's frame would add that encoding time to each player's delay.
+    fn advance_tick(&mut self) -> Result<(), String> {
+        let Self {
+            world,
+            routes,
+            batches,
+            generations,
+            shared,
+            deferred,
+            max_clients,
+            ..
+        } = self;
+        let offset = *deferred as f64 * shared.clock.dt;
+        world.advance_tick_with(*max_clients, &mut |early| {
+            for (slot, frames) in early {
+                // Socket slots share route 0.
+                batches[0].push(delivery(slot, generations[slot], frames, offset));
+            }
+            // A closed route means its thread ended and the host is stopping.
+            let _ = routes[0].send(std::mem::take(&mut batches[0]));
+            Ok(())
+        })
+    }
+
     /// Hand every queued frame to its slot's owner, which sends it on time.
     fn hand_over(&mut self) -> Result<(), String> {
         let offset = self.deferred as f64 * self.shared.clock.dt;
         for slot in 0..self.generations.len() {
-            let mut frames = self.world.take(slot)?;
+            let frames = self.world.take(slot)?;
             if !frames.is_empty() {
-                for (at, _) in &mut frames {
-                    *at += offset;
-                }
                 let route = self.route(slot);
-                self.batches[route].push(Delivery::Frames {
-                    slot,
-                    generation: self.generations[slot],
-                    frames,
-                });
+                let generation = self.generations[slot];
+                self.batches[route].push(delivery(slot, generation, frames, offset));
             }
         }
         for (route, batch) in self.routes.iter().zip(&mut self.batches) {
@@ -664,6 +684,23 @@ impl Simulation {
             }
         }
         Ok(())
+    }
+}
+
+/// Frames for a slot's owner, moved from world to wall time by `offset`.
+fn delivery(
+    slot: usize,
+    generation: u64,
+    mut frames: Vec<(f64, Vec<u8>)>,
+    offset: f64,
+) -> Delivery {
+    for (at, _) in &mut frames {
+        *at += offset;
+    }
+    Delivery::Frames {
+        slot,
+        generation,
+        frames,
     }
 }
 
@@ -1549,7 +1586,7 @@ mod tests {
 
     fn step(simulation: &mut Simulation) {
         simulation.apply_commands().unwrap();
-        simulation.world.advance_ticks(1).unwrap();
+        simulation.advance_tick().unwrap();
         simulation.ticks += 1;
         simulation.hand_over().unwrap();
     }
@@ -1644,6 +1681,62 @@ mod tests {
         assert_eq!(gate.free_slot(), None);
         simulation.apply_commands().unwrap();
         assert_eq!(gate.free_slot(), Some(0));
+    }
+
+    #[test]
+    fn socket_frames_leave_before_the_bots_frames_are_handed_over() {
+        let config = SimulationConfig {
+            agents: 2,
+            world: crate::Config::sandbox(),
+            ..Default::default()
+        };
+        let world = RawSimulator::new(1, config, 2).unwrap();
+        let dt = world.dt();
+        let (commands, inbox) = mpsc::channel();
+        let (socket_route, socket_deliveries) = mpsc::channel();
+        let (bot_route, bot_deliveries) = mpsc::channel();
+        let mut simulation = Simulation {
+            world,
+            commands: inbox,
+            routes: vec![socket_route, bot_route],
+            batches: vec![Vec::new(), Vec::new()],
+            max_clients: 1,
+            generations: vec![0, 0],
+            shared: shared(dt, 1),
+            ticks: 0,
+            deferred: 0,
+        };
+        for slot in 0..2 {
+            commands
+                .send(Command::Connect {
+                    slot,
+                    generation: 1,
+                    appearance: PlayerAppearance::default(),
+                    session_id: false,
+                })
+                .unwrap();
+        }
+        // Only the socket slot's command is counted, as `Gate::send` would.
+        simulation.shared.pending[0].store(1, Ordering::Relaxed);
+        for _ in 0..40 {
+            step(&mut simulation);
+        }
+        while socket_deliveries.try_recv().is_ok() {}
+        while bot_deliveries.try_recv().is_ok() {}
+        for _ in 0..20 {
+            simulation.apply_commands().unwrap();
+            simulation.advance_tick().unwrap();
+        }
+        let socket_frames = socket_deliveries
+            .try_iter()
+            .flatten()
+            .filter(|delivery| matches!(delivery, Delivery::Frames { slot: 0, .. }))
+            .count();
+        assert!(socket_frames > 0);
+        assert!(simulation.world.take(0).unwrap().is_empty());
+        // The bot's frames wait for `hand_over`.
+        assert!(bot_deliveries.try_recv().is_err());
+        assert!(!simulation.world.take(1).unwrap().is_empty());
     }
 
     #[test]

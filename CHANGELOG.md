@@ -124,6 +124,9 @@
   `observe-clustered`). The synthetic `observe-wide` (sparse food) and
   `observe-strip` (narrow food) fixtures are about 2.5–4% slower. See the
   [observation food index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md).
+- The host hands socket players' frames to the socket thread as soon as they
+  are encoded, before it encodes the bots' frames. With 480 bots on localhost,
+  mean ping fell from about 8.3 to 7.1 ms and p99 from 17–19 to 11–13 ms.
 
 ### Changed
 
