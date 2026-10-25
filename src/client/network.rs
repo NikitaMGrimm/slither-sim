@@ -304,9 +304,13 @@ impl NetworkBackend {
         Ok(())
     }
 
-    pub fn drain_records(&mut self) -> Vec<WireRecord> {
+    /// Drain recorded messages; errors when wire recording is disabled.
+    pub fn drain_records(&mut self) -> Result<Vec<WireRecord>, String> {
+        if !self.config.record_wire {
+            return Err("Wire recording is disabled".into());
+        }
         self.record_bytes = 0;
-        std::mem::take(&mut self.records)
+        Ok(std::mem::take(&mut self.records))
     }
 
     pub fn set_processing_seconds(&mut self, seconds: f64) -> Result<(), String> {

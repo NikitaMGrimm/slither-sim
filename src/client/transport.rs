@@ -193,7 +193,7 @@ impl Session {
                     Active::Simulation(backend) => {
                         backend.drain_records(backend.config().controlled_slot)?
                     }
-                    Active::Network(backend) => backend.drain_records(),
+                    Active::Network(backend) => backend.drain_records()?,
                 };
                 #[derive(Serialize)]
                 struct Records<T> {

@@ -434,3 +434,25 @@ fn network_reads_only_on_step_and_reconnects_only_on_request() {
     assert_eq!(accepted.load(Ordering::SeqCst), 2);
     assert!(reconnected.received.connection_generation > first.received.connection_generation);
 }
+
+#[test]
+fn wire_distinguishes_disabled_recording_from_an_empty_drain_on_both_backends() {
+    for record in [false, true] {
+        let (url, _) = closing_server(1);
+        for request in [
+            json!({"op":"simulation","config":{"recordWire":record}}),
+            json!({"op":"network","config":{"url":url,"handshake":"direct","recordWire":record}}),
+        ] {
+            let replies = exchange(&[request, json!({"op":"wire"}), json!({"op":"wire"})]);
+            assert!(replies[0].get("error").is_none(), "{}", replies[0]);
+            if record {
+                assert!(replies[1]["result"]["records"].is_array());
+                assert_eq!(replies[2]["result"]["records"], json!([]));
+            } else {
+                for reply in &replies[1..] {
+                    assert_eq!(reply["error"], "Wire recording is disabled");
+                }
+            }
+        }
+    }
+}

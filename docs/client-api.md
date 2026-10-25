@@ -71,7 +71,7 @@ For a WebSocket connection:
 | `observe` | Returns the current frame without processing messages. |
 | `reconnect` | Starts a new connection/session. |
 | `info` | Reports capabilities and defaults. |
-| `wire` | Drains opt-in wire records. |
+| `wire` | Drains opt-in wire records; errors when recording is disabled. |
 
 Wait for `result.frame.status == "playing"` before acting; latency may require
 several empty steps. Omit actions to hold the last command. Poll networks

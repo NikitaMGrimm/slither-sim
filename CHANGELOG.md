@@ -4,6 +4,10 @@
 
 ### Breaking
 
+- Network wire drains now return an error when recording is disabled, matching
+  simulation. Rust `NetworkBackend::drain_records` returns `Result`; JSON `wire`
+  reports the error under `slither-client-json-v2` ([recording](docs/client-api.md#recording-and-network-bounds)).
+
 - Portable JSON requests and reply envelopes now use `slither-client-json-v2`,
   reflecting the removed broadcast and latency fields. The frame contract stays
   `slither-client-v2` ([portable bots](docs/client-api.md#interface-versions)).
