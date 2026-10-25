@@ -623,6 +623,15 @@ impl SimulatorBackend {
         Ok(self.pending(slot))
     }
 
+    /// The action the server applied to this slot's snake on the last tick:
+    /// its latest delivered request, after latency (requests arriving with
+    /// the next tick replace it then). Replaying these through
+    /// `Simulator::step` reproduces the world without the network.
+    pub fn applied_action(&self, slot: usize) -> Result<Action, String> {
+        self.slot(slot)?;
+        Ok(self.slots[slot].control)
+    }
+
     /// Queue a decision. It leaves after the slot's processing time, then travels
     /// the uplink. Rejected unless the slot's client is playing and finished
     /// processing its previous decision.
