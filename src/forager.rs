@@ -152,6 +152,16 @@ pub struct Params {
     /// before by a fixed action, often by simply holding course.
     pub exit_weight: f64,
     pub exit_seconds: f64,
+    /// Value of a visible prey per unit of its food-equivalent nutrition
+    /// (`PREY_NUTRITION` times ordinary food at its size), compared with food
+    /// value; 0 ignores prey. Prey flee from the nearest head at a speed that
+    /// grows with that snake's speed, so a small cruising snake cannot catch
+    /// one: a prey goal boosts when that wins after the boost's mass cost.
+    pub prey_weight: f64,
+    /// ... within this distance of our head ...
+    pub prey_range: f64,
+    /// ... and catchable within this many seconds.
+    pub prey_horizon: f64,
 }
 
 impl Default for Params {
@@ -207,6 +217,9 @@ impl Default for Params {
             safe_width_factor: 0.0,
             exit_weight: 0.0,
             exit_seconds: 0.4,
+            prey_weight: 0.0,
+            prey_range: 650.0,
+            prey_horizon: 2.0,
         }
     }
 }
@@ -254,6 +267,9 @@ impl Params {
             self.safe_width_factor,
             self.exit_weight,
             self.exit_seconds,
+            self.prey_weight,
+            self.prey_range,
+            self.prey_horizon,
         ];
         if finite.iter().any(|v| !v.is_finite())
             || self.fan[..self.fan_len.min(MAX_FAN)]
@@ -281,6 +297,8 @@ impl Params {
             || !(0.0..=1.0).contains(&self.coil_shrink)
             || self.coil_progress_power < 0.0
             || self.exit_weight < 0.0
+            || self.prey_weight < 0.0
+            || self.prey_horizon < 0.0
             || !(0.0..=2.0).contains(&self.exit_seconds)
             || self.kill_samples > 16
         {
@@ -443,15 +461,147 @@ pub fn decide(
         uncertainty: timing.uncertainty * p.uncertainty_margin,
     };
     let can_boost = o.me.score >= p.boost_min_score;
-    let boosts = p.kill_boost || p.escape_boost || p.food_boost_value > 0.0;
-    let ramp = (can_boost && boosts).then(|| me.boost_ramp());
-    let scene = Scene::new(&view, &me, p, intents, ramp.is_some(), &mut scratch.near);
-    // Arc points (and their tips) lie within the fastest arc's travel plus
-    // the tip offset of the head, and exit branch tips within cruise travel
-    // plus the tip offset of an arc end. An obstacle further than that plus
-    // its half length, width and the clearance cap cannot lower a capped
-    // clearance, so fan searches scan only the obstacles that can.
-    let fastest = if ramp.is_some() {
+    // Boost-reach obstacles are gathered only once a boosted arc is checked
+    // (DESIGN-PREY-BOOST.md section 5); cut-off nomination still needs the
+    // ramp up front when it may boost.
+    let nominate = (can_boost && p.kill_boost).then(|| me.boost_ramp());
+    let scene = gather(
+        &view,
+        &me,
+        p,
+        intents,
+        false,
+        scratch_lists(&mut scratch.near, &mut scratch.arcs, &mut scratch.exits),
+    );
+    let mut goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
+    // The best goal reachable at cruise speed, should boosting turn out unsafe.
+    let mut cruise = goal;
+    let mut consider = |g: Goal| {
+        if g.rate > goal.rate {
+            goal = g;
+        }
+        if !g.boost && g.rate > cruise.rate {
+            cruise = g;
+        }
+    };
+    if p.prey_weight > 0.0 {
+        if let Some(g) = prey(o, &me, p, can_boost) {
+            consider(g);
+        }
+    }
+    if p.kill_weight > 0.0 {
+        if let Some(g) = cut(&view, &me, p, intents, &scratch.near, nominate.as_ref()) {
+            consider(g);
+        }
+    }
+    if p.coil_weight > 0.0 {
+        if let Some(g) = coil(&view, &me, p) {
+            consider(g);
+        }
+    }
+    let mut boosted = false;
+    if goal.boost {
+        if can_boost {
+            let ramp = nominate.unwrap_or_else(|| me.boost_ramp());
+            gather(
+                &view,
+                &me,
+                p,
+                intents,
+                true,
+                scratch_lists(&mut scratch.near, &mut scratch.arcs, &mut scratch.exits),
+            );
+            boosted = true;
+            if let Some(action) =
+                boost_toward(o, &me, p, &scratch.arcs, &scratch.exits, &goal, &ramp)
+            {
+                return action;
+            }
+        }
+        // Only the best cut-off was kept; find the best one at cruise speed.
+        goal = cruise;
+        if let Some(g) = cut(&view, &me, p, intents, &scratch.near, None) {
+            if g.rate > goal.rate {
+                goal = g;
+            }
+        }
+    }
+    let best = search(o, &me, p, &scratch.arcs, &scratch.exits, &goal, None);
+    // With `escape_boost`, boost along a clear arc when no cruise arc is clear.
+    if p.escape_boost && can_boost && best.2 < me.safe {
+        // The cheapest arc may trade clearance for a smaller turn.
+        let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
+        let any_clear = fan.iter().any(|&offset| {
+            let heading = goal.heading + offset;
+            clearance(
+                o,
+                &me,
+                p,
+                &scratch.arcs,
+                heading,
+                me.safe,
+                goal.crosses,
+                None,
+            ) >= me.safe
+        });
+        if !any_clear {
+            let ramp = nominate.unwrap_or_else(|| me.boost_ramp());
+            if !boosted {
+                gather(
+                    &view,
+                    &me,
+                    p,
+                    intents,
+                    true,
+                    scratch_lists(&mut scratch.near, &mut scratch.arcs, &mut scratch.exits),
+                );
+            }
+            let fast = search(o, &me, p, &scratch.arcs, &scratch.exits, &goal, Some(&ramp));
+            if fast.2 >= me.safe {
+                return Action {
+                    heading: wrap(fast.1),
+                    boost: true,
+                };
+            }
+        }
+    }
+    Action {
+        heading: wrap(best.1),
+        boost: false,
+    }
+}
+
+/// The three obstacle lists [`gather`] fills.
+struct Lists<'a> {
+    near: &'a mut Vec<Obstacle>,
+    arcs: &'a mut Vec<Obstacle>,
+    exits: &'a mut Vec<Obstacle>,
+}
+fn scratch_lists<'a>(
+    near: &'a mut Vec<Obstacle>,
+    arcs: &'a mut Vec<Obstacle>,
+    exits: &'a mut Vec<Obstacle>,
+) -> Lists<'a> {
+    Lists { near, arcs, exits }
+}
+
+/// The scene at cruise or boost reach, with the obstacles fan searches scan.
+///
+/// Arc points (and their tips) lie within the fastest arc's travel plus the
+/// tip offset of the head, and exit branch tips within cruise travel plus
+/// the tip offset of an arc end. An obstacle further than that plus its half
+/// length, width and the clearance cap cannot lower a capped clearance, so
+/// fan searches scan only the obstacles that can.
+fn gather(
+    view: &View,
+    me: &Me,
+    p: &Params,
+    intents: &[Intent],
+    boosting: bool,
+    lists: Lists,
+) -> Scene {
+    let scene = Scene::new(view, me, p, intents, boosting, lists.near);
+    let fastest = if boosting {
         me.speed.max(BOOST_SPEED)
     } else {
         me.speed
@@ -464,77 +614,104 @@ pub fn decide(
         dx * dx + dy * dy <= b * b * (1.0 + 1e-9) + 1e-6
     };
     let arc_reach = fastest * p.lookahead_seconds + tip + me.safe.max(0.0);
-    scratch.arcs.clear();
-    scratch.arcs.extend(
-        scratch
+    lists.arcs.clear();
+    lists.arcs.extend(
+        lists
             .near
             .iter()
             .copied()
             .filter(|ob| ob.head || within(ob, arc_reach)),
     );
-    scratch.exits.clear();
+    lists.exits.clear();
     if p.exit_weight > 0.0 {
         let exit_reach = fastest * p.lookahead_seconds + me.speed * p.exit_seconds + tip;
-        scratch.exits.extend(
-            scratch
+        lists.exits.extend(
+            lists
                 .near
                 .iter()
                 .copied()
                 .filter(|ob| within(ob, exit_reach)),
         );
     }
-    let mut goal = scene.food(&view, &me, p).unwrap_or_else(|| roam(o, &me, p));
-    // The best goal reachable at cruise speed, should boosting turn out unsafe.
-    let mut cruise = goal;
-    let mut consider = |g: Goal| {
-        if g.rate > goal.rate {
-            goal = g;
-        }
-        if !g.boost && g.rate > cruise.rate {
-            cruise = g;
-        }
+    scene
+}
+
+/// Food equivalents of a prey at its size: `PreyConfig::default`'s
+/// nutrition factor (src/prey.rs), the mode setting every official world uses.
+const PREY_NUTRITION: f64 = 30.0;
+
+/// Flight target speed of a prey fleeing a snake moving at `speed`
+/// (`PreyConfig::default` escape and sprint speeds, src/prey.rs).
+fn prey_flight_speed(speed: f64) -> f64 {
+    let x = ((speed * 0.032 - 5.79) / (14.0 - 5.79)).clamp(0.0, 1.0);
+    192.28125 + (343.65625 - 192.28125) * x
+}
+
+/// The best prey to chase, if any can be caught within `prey_horizon`
+/// (DESIGN-PREY-BOOST.md section 4, simplified). A chased prey flees
+/// straight away from our head at the flight speed our speed sets, so we
+/// close at our speed minus that until it is within our pickup circle's
+/// reach. Boosting closes at boost speed minus the sprint speed, after a
+/// ramp, and spends mass: a fresh start drops one charge at once and one per
+/// 0.155 s, valued in food equivalents at our mass. Value per second counts
+/// the turn toward it and `settle_seconds`, as food does. Coordinate
+/// quantization, flight jitter and rival heads are ignored: a heuristic
+/// nomination that steering still checks for safety.
+fn prey(o: &Observation, me: &Me, p: &Params, can_boost: bool) -> Option<Goal> {
+    let segments = o.me.segments;
+    let mouth = |speed: f64| {
+        let (c, r) = pickup_circle(me.head, me.heading, speed, segments);
+        c.distance(me.head) + r
     };
-    if p.kill_weight > 0.0 {
-        if let Some(g) = cut(
-            &view,
-            &me,
-            p,
-            intents,
-            &scratch.near,
-            ramp.as_ref().filter(|_| p.kill_boost),
-        ) {
-            consider(g);
+    let n = segments as f64;
+    let mass = n + o.me.fam;
+    let nutrition = (1.0 - (mass - 2.0) / 430.0).max(1.0 / 430.0).powf(2.25);
+    // One boost charge (src/physics.rs boost cost, mean jitter 1.01) in food
+    // equivalents at our mass.
+    let charge = 1.01 * 0.0812 * (1.0 - n / 430.0).max(0.0).powf(1.66) / nutrition;
+    let f = 1.0 + 0.305 * (scale(segments) - 1.0);
+    let accel = (BOOST_SPEED - base_speed(segments)).max(1.0) * 1.875 / f;
+    let ramp = (BOOST_SPEED - me.speed).max(0.0) / accel;
+    let mut best: Option<Goal> = None;
+    for prey in &o.prey {
+        let d = prey.position.distance(me.head);
+        if d > p.prey_range {
+            continue;
         }
-    }
-    if p.coil_weight > 0.0 {
-        if let Some(g) = coil(&view, &me, p) {
-            consider(g);
+        let value = p.prey_weight * PREY_NUTRITION * 0.0031535 * prey.size * prey.size;
+        let turn = wrap(toward(me.head, prey.position) - me.heading).abs() / me.turn;
+        let chase = |speed: f64| {
+            let close = speed - prey_flight_speed(speed);
+            (close > 1.0).then(|| (d - mouth(speed)).max(0.0) / close)
+        };
+        let mut pick = |t: f64, cost: f64, boost: bool| {
+            if t > p.prey_horizon {
+                return;
+            }
+            let rate = (value - cost) / (t + turn + p.settle_seconds);
+            if rate > 0.0 && best.is_none_or(|g| rate > g.rate) {
+                // Lead it along its current motion for part of the chase.
+                let lead = t.min(0.5);
+                let aim = forward(prey.position, prey.heading, prey.speed * lead);
+                best = Some(Goal {
+                    heading: toward(me.head, aim),
+                    rate,
+                    boost,
+                    crosses: None,
+                });
+            }
+        };
+        if let Some(t) = chase(me.speed) {
+            pick(t, 0.0, false);
         }
-    }
-    if goal.boost {
-        if let Some(action) = ramp
-            .as_ref()
-            .and_then(|r| boost_toward(o, &me, p, &scratch.arcs, &scratch.exits, &goal, r))
-        {
-            return action;
-        }
-        // Only the best cut-off was kept; find the best one at cruise speed.
-        goal = cruise;
-        if let Some(g) = cut(&view, &me, p, intents, &scratch.near, None) {
-            if g.rate > goal.rate {
-                goal = g;
+        if can_boost {
+            if let Some(t) = chase(BOOST_SPEED) {
+                let t = t + ramp / 2.0;
+                pick(t, charge * (1.0 + t / 0.155), true);
             }
         }
     }
-    steer(
-        o,
-        &me,
-        p,
-        &scratch.arcs,
-        &scratch.exits,
-        goal,
-        ramp.as_ref().filter(|_| p.escape_boost),
-    )
+    best
 }
 
 fn wrap(a: f64) -> f64 {
@@ -1815,40 +1992,6 @@ fn boost_toward(
         heading: wrap(best.1),
         boost: true,
     })
-}
-
-/// With `escape`, boost along a clear arc when no cruise arc is clear.
-fn steer(
-    o: &Observation,
-    me: &Me,
-    p: &Params,
-    near: &[Obstacle],
-    exits: &[Obstacle],
-    goal: Goal,
-    escape: Option<&[f64; RAMP_SUBSTEPS]>,
-) -> Action {
-    let best = search(o, me, p, near, exits, &goal, None);
-    if let Some(ramp) = escape.filter(|_| best.2 < me.safe) {
-        // The cheapest arc may trade clearance for a smaller turn.
-        let fan = &p.fan[..p.fan_len.min(MAX_FAN)];
-        let any_clear = fan.iter().any(|&offset| {
-            let heading = goal.heading + offset;
-            clearance(o, me, p, near, heading, me.safe, goal.crosses, None) >= me.safe
-        });
-        if !any_clear {
-            let fast = search(o, me, p, near, exits, &goal, Some(ramp));
-            if fast.2 >= me.safe {
-                return Action {
-                    heading: wrap(fast.1),
-                    boost: true,
-                };
-            }
-        }
-    }
-    Action {
-        heading: wrap(best.1),
-        boost: false,
-    }
 }
 
 #[cfg(test)]

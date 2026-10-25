@@ -1136,3 +1136,37 @@ fn exit_check_declines_a_pocket_it_could_not_leave() {
         decide(&observation, &Timing::default(), &plain)
     );
 }
+
+#[test]
+fn prey_is_chased_with_a_paid_boost_when_cruise_cannot_catch_it() {
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    observation.prey = vec![slither_sim::prey::Prey {
+        id: 1,
+        position: Point { x: 250.0, y: 120.0 },
+        heading: 0.0,
+        target_heading: 0.0,
+        speed: 118.75,
+        size: 8.0,
+    }];
+    let plain = Params::default();
+    assert_eq!(
+        decide(&observation, &Timing::default(), &plain).heading,
+        0.0
+    );
+    let hungry = Params {
+        prey_weight: 1.0,
+        ..plain
+    };
+    let chase = decide(&observation, &Timing::default(), &hungry);
+    // A two-segment snake cruises at 181 units/s, slower than the 192 a prey
+    // flees it at, so only boosting catches it.
+    assert!(chase.boost, "{chase:?}");
+    assert!(chase.heading > 0.2 && chase.heading < 0.8, "{chase:?}");
+    // Below the boost threshold it cannot pay, and cruising never catches up.
+    observation.me.score = 10.0;
+    assert_eq!(
+        decide(&observation, &Timing::default(), &hungry),
+        decide(&observation, &Timing::default(), &plain)
+    );
+}
