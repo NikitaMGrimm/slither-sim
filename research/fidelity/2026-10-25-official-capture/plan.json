@@ -1,0 +1,169 @@
+{
+  "studyId": "official-capture-20261025",
+  "frozenUtc": "2026-10-25T21:38:22.592451+00:00",
+  "dataOrigin": "official-server",
+  "baseCommit": "421e384c3738e7c4d08e1eb12275733266d7a629",
+  "officialList": {
+    "url": "https://slither.io/i80124.txt",
+    "fetchedUtc": "2026-10-25T21:35:37Z",
+    "access": "local-only",
+    "entries": 141,
+    "selection": "Active port-444 listings, using historical low-RTT and 25-35 ms routes. No endpoint probes before this plan. No substitution."
+  },
+  "endpoints": [
+    "57.129.37.42:444",
+    "198.244.231.35:444"
+  ],
+  "connectionLimit": 2,
+  "allocation": "One existing forage collector plus one existing spawn collector in one process. Exactly two possible concurrent WebSockets. No extra monitors, TCP probes or browser connections.",
+  "cpu": {
+    "affinityMask": 48,
+    "logicalCpus": [
+      4,
+      5
+    ],
+    "maxApproxCpus": 2,
+    "uvThreadpoolSize": 1,
+    "loadGate": "Before every batch poll host_load and slither-sim every 30 s until absent. Log load and processes before/during. Any observed overlap flags batch as confounded; never silently remove."
+  },
+  "batches": [
+    {
+      "id": "low-1",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "low-2",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "low-3",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "heldout"
+    },
+    {
+      "id": "second-1",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "second-2",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "second-3",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "heldout"
+    }
+  ],
+  "betweenBatchSeconds": 30,
+  "attemptBudget": "Six planned batches; no automatic replacement or endpoint substitution. Internal reconnects are retained within batch and not independent trials. Three quick connection failures stop that client. Preserve all raw output, failure, interruption and censored ping metadata.",
+  "telemetry": {
+    "callback": "performance.now receive/send timestamps before decode, 0.001 ms saved resolution; separate connection/setup server clock",
+    "ping": "Existing 250 ms minimum game pings, send/receive/censored metadata. Fixed phase is a limitation.",
+    "eventLoop": "One-ms timer gaps and expected-vs-actual lateness histogram every second; floor-ms bins 0..75 plus >=76, monitorEventLoopDelay resolution1 p50/p95/p99/min/max/count.",
+    "runtime": "GC start/duration/kind, CPU and memory each second, receive handler cost histogram, socket bufferedAmount, gzip/output queue lengths, backpressure counts.",
+    "browser": "No stock browser instrumentation is prepared. The second connection uses the stock-protocol-compatible headless spawn collector; RAF is unavailable and is not imputed.",
+    "controls": "Unmodified existing forage/spawn controls, raw sends preserved. No isolated input intervention; direction and input-phase results observational only."
+  },
+  "network": {
+    "question": "Does the retained ordered lognormal/OU/Poisson-pause model transfer to fresh batches, particularly p99, bursts and ACF?",
+    "baseline": "Frozen retained fit with exact six parameters in pinned model-fit.json; source implementation fit.py, not a new Rust-runtime calibration. Compare frame delivery excess on actual server schedules. Base RTT4.974ms, 50/50 split and mirror/independence remain assumptions.",
+    "metric": "Within each setup: burn in1s; >=1000 frames and >=30s. Correct T-S slope by Theil-Sen of p1 floors in5s bins, centered +/-10s rolling minimum. Pool eligible epochs within batch for excess quantiles and weight ACF/burst by epoch frame counts. Retain per-epoch slopes/raw span/linear residual. RTT raw and RTT minus interpolated excess with correlation.",
+    "cleanMask": "Telemetry seconds with max loop delay>5ms OR any GC>5ms OR per-second increase in backpressureWrites OR timer gap bin>=6ms OR receive handler bin>=6ms: exclude [since-100ms,until+100ms]. Report full and clean; compare same clean frame masks on model/observation. No claim of network-only attribution.",
+    "successCriteria": "Per endpoint untouched third batch: p50/p90 within max(0.5ms,15%) observed; p99 within20%; burst<1ms fraction absolute error<=0.005; ACF at10/50/100/500/1000ms absolute error<=0.10. Report every gate separately. No model adoption if either heldout batch ineligible/confounded or any gate fails. One heldout batch per endpoint cannot establish population confidence.",
+    "modelSeeds": [
+      20261025,
+      20261026,
+      20261027
+    ],
+    "fitting": "No parameter search planned: test frozen baseline first. Any post-hoc alternative is exploratory and cannot change defaults on these heldout data.",
+    "heldout": "Do not inspect timing/spawn analysis from third batch at each endpoint until development analysis choices and scripts are fixed and hashed. Runtime status, source/integrity and aggregate traffic checks are allowed. All collectors/bots/lives within batch stay together.",
+    "exclusions": "Quarantine bad gzip, absent terminal integrity receipt, changed pins, schema/framing/protocol other than19. Keep failed batches and all invalid epochs. No low-jitter selection. Endpoint class is observed, not forced; out-of-class RTT is retained as deviation."
+  },
+  "spawn": {
+    "method": "Use existing deliberate15s join/leave scenario throughout six batches, plus incidental forage joins; all fresh own joins count, opponent introductions never count. Existing ecology -> placement -> neighbor audit. Full raw packets before any reduction.",
+    "target": "At least150 verified own joins with visible neighbors; no extra batches if short. Crowding measured from in-game leaderboard when available; listingWeight is not population.",
+    "criteria": "Compare accepted joins against550-unit whole-newborn-corridor and600-unit head-only hypotheses. A robust counterexample requires >=20-unit margin (corridor<530 or head<580), contributor anchor age<=50ms, complete integrity and own identity/radius, and raw packet witness. Lesser threshold violations reported borderline. Accepted joins alone cannot prove rejection predicates or distinguish them without counterexamples.",
+    "radial": "Report max fraction, grid residual vs0.009+0.011n (tolerance0.0002), count>0.8452 and>0.85. A value>0.8452 with valid radius rejects literal0.845 cap; absence only constrains accepted sample. One-way delay, hidden neighbors and authoritative geometry remain unidentified."
+  },
+  "scheduler": "No extra acquisition unless six network batches finish; current session has no frozen independent motion/input intervention. Do not modify bot policy.",
+  "sourcePins": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\capture.mjs",
+      "sha256": "491744c585c2e5c0fcbe1f7c6a2997f102d37575aada24f94a969866eca6e6db"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\research\\fidelity\\2026-10-25-official-capture\\run.py",
+      "sha256": "8605d266d955247fee684fc1545a8700fe4a3b819b5700520d65a2957766bd51"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\tools\\fidelity\\capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\worktrees\\slither-sim\\t3-90a369ab\\src\\client\\latency.rs",
+      "sha256": "06176d47cf6b295d8e69c29b80dd8574d79222dba4f129fbb4c7e49490b8c709"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list.txt",
+      "sha256": "f1b7c1c3475d64bf3c8b260936f1b9fc246320c57dcfcbcde14b6d73c5cb7bbe"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list.headers.txt",
+      "sha256": "dceb7cd73b82e94a8b448db411f887a5f10e97bf35d537cbee6b39187b00d740"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025\\official-list-decoded.json",
+      "sha256": "73841a5b57a292bb0cc2e5ba13dfcd36238dbd7e8ace8c48a68f22aef3d446ed"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither-headless.mjs",
+      "sha256": "86f9a7ff486e362875212cd644f4a14f9b6989cd60f97dfeb8f441c167422fa3"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\slither_protocol.py",
+      "sha256": "1e82c660defd85867eafc453a6fe08b4dadd77314f0d8766f86f80c0f1939dad"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-headless-ecology.py",
+      "sha256": "382de546579aaa8cb0f4701f9f6d1008fe8127e0d50961c1390bd9af4623c023"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-spawn-placement.py",
+      "sha256": "0102c76d6a218c2a469adfa6f01a3813f5e808c70c49c11bd687849a562c85af"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\Source\\slither-arena-rs\\tools\\fidelity\\analyze-spawn-neighbors.py",
+      "sha256": "99a2ed1f77231fa6e1c8edbf698e42b4c10c2493b9bbd434c7afa1edc0a82a29"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\analyze.py",
+      "sha256": "d61f3192a1bf0e9e3aede9fb22d0c97b7c38bc2991cbf406b763c9e1746f781f"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit.py",
+      "sha256": "0a854f34b635e729f3d80b3294f2e1f8056d5e5830c9d998607c84098d846b71"
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit.json",
+      "sha256": "9620fde64c4097f3929b6ccfeab4832cadacc121ce8342f3e6c6125be99c1e80"
+    }
+  ]
+}

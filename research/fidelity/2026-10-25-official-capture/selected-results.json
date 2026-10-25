@@ -1,0 +1,3461 @@
+{
+  "access": "local-only raw and full analysis under C:\\Users\\Nikita\\.t3\\scratch\\official-capture-20261025",
+  "interpretation": "Effective callback delivery on a shared Windows machine; all contaminated batches are descriptive. No model/default change.",
+  "peakIncludingConnectingSockets": 2,
+  "connectionAttempts": 250,
+  "ownJoinsIncludingDiagnostic": 244,
+  "batches": [
+    {
+      "id": "low-2",
+      "endpoint": "57.129.37.42:444",
+      "split": "development",
+      "quality": "verified",
+      "eligibleEpochs": 7,
+      "excludedEpochs": [
+        {
+          "epoch": 0,
+          "framesAfterBurnIn": 1604,
+          "reason": "short_epoch"
+        },
+        {
+          "epoch": 1,
+          "framesAfterBurnIn": 1203,
+          "reason": "short_epoch"
+        },
+        {
+          "epoch": 2,
+          "framesAfterBurnIn": 1917,
+          "reason": "short_epoch"
+        },
+        {
+          "epoch": 6,
+          "framesAfterBurnIn": 1896,
+          "reason": "short_epoch"
+        }
+      ],
+      "eligibleWallSeconds": 496.40054599999985,
+      "eligibleServerSeconds": 496.397,
+      "epochClockSlopesPpm": [
+        21.41266841634474,
+        25.52105947486724,
+        14.939721062905772,
+        16.10039887335002,
+        24.10351615703035,
+        22.48009606759519,
+        20.22966781988601
+      ],
+      "rttMinusDownlinkExcessMedianByEpochMs": [
+        12.347274019530547,
+        12.148964540823535,
+        12.534011059093638,
+        11.993566267737815,
+        12.436513507405284,
+        12.621994471998772,
+        12.393807991679367
+      ],
+      "rttDownlinkCorrelationByEpoch": [
+        0.48325547233794547,
+        0.21294600274502096,
+        0.40388538167005755,
+        0.3143150974495241,
+        0.37610956549781444,
+        0.2721582308247512,
+        0.3873447843980656
+      ],
+      "full": {
+        "n": 51704,
+        "p50": 1.9917872832156718,
+        "p90": 5.579628712470006,
+        "p99": 57.481137293127915,
+        "p99.9": 187.07967944803963,
+        "maximum": 293.80411180091323
+      },
+      "clean": {
+        "n": null,
+        "p50": null,
+        "p90": null,
+        "p99": null,
+        "p99.9": null,
+        "maximum": null
+      },
+      "cleanFrames": 0,
+      "rttMs": {
+        "n": 2156,
+        "mean": 19.030699025973377,
+        "sd": 24.300114516490385,
+        "minimum": 7.683499999984633,
+        "maximum": 362.15339999999924,
+        "p1": 8.76660999999076,
+        "p10": 11.55654999995022,
+        "p50": 14.392950000008568,
+        "p90": 21.778099999974074,
+        "p95": 33.12622500000725,
+        "p99": 128.58818999998087,
+        "p99.9": 299.95816050003
+      },
+      "population": {
+        "n": 187,
+        "mean": 465.9251336898396,
+        "sd": 12.664099722189922,
+        "minimum": 435.0,
+        "maximum": 496.0,
+        "p1": 435.86,
+        "p10": 452.2,
+        "p50": 465.0,
+        "p90": 483.0,
+        "p95": 488.4,
+        "p99": 492.0,
+        "p99.9": 495.256
+      },
+      "parentFrameFloorMs": {
+        "n": 51829,
+        "mean": 4.040425437498182,
+        "sd": 12.544860410006219,
+        "minimum": 0.0,
+        "maximum": 293.84600000001956,
+        "p1": 0.22800000000279397,
+        "p10": 0.8159999999916181,
+        "p50": 1.9679999999934807,
+        "p90": 5.538000000000466,
+        "p95": 9.507600000005912,
+        "p99": 57.44287999999244,
+        "p99.9": 186.99315600005556
+      },
+      "acf": {
+        "10": 0.5801525922883727,
+        "50": 0.23857052264285106,
+        "100": 0.17031710626150134,
+        "500": 0.08739566438746943,
+        "1000": 0.021442456148364313
+      },
+      "burstLt1": 0.04327136971197555,
+      "above10": {
+        "episodes": 891,
+        "observedSeconds": 496.40054599999985,
+        "ratePerSecond": 1.794921474562601,
+        "maximumPeakMs": 293.80411180091323,
+        "maximumObservedDurationMs": 249.5119999999879
+      },
+      "above20": {
+        "episodes": 261,
+        "observedSeconds": 496.40054599999985,
+        "ratePerSecond": 0.5257850784072265,
+        "maximumPeakMs": 293.80411180091323,
+        "maximumObservedDurationMs": 249.48499999998603
+      },
+      "variants": {
+        "fullModel": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.498723902461279,
+            "p90": 3.2990048782324726,
+            "p99": 13.523479333935542,
+            "p99.9": 44.96118984702064
+          },
+          "p99PerSeedMs": [
+            10.797034547620955,
+            14.488511134121131,
+            13.523479333935542
+          ],
+          "above10": [
+            {
+              "episodes": 272,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.5479587965211664,
+              "maximumPeakMs": 121.16163381298884,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 315,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.634574306174147,
+              "maximumPeakMs": 131.08672945469152,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 331,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.6668033206921308,
+              "maximumPeakMs": 83.13681724569688,
+              "maximumObservedDurationMs": 1.94393340051829
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 128,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.2578629630687842,
+              "maximumPeakMs": 121.16163381298884,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 147,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.29613467621460193,
+              "maximumPeakMs": 131.08672945469152,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 151,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.30419124297435574,
+              "maximumPeakMs": 83.13681724569688,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "noPauses": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4782539524603635,
+            "p90": 3.1288243630078796,
+            "p99": 5.52331407979111,
+            "p99.9": 8.249592524078777
+          },
+          "p99PerSeedMs": [
+            5.52331407979111,
+            5.547777474406613,
+            5.4967379231577445
+          ],
+          "above10": [
+            {
+              "episodes": 10,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.020145543989748767,
+              "maximumPeakMs": 16.505781814295915,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 13,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.026188780889726704,
+              "maximumPeakMs": 17.989768945335527,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 13,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.026188650057394864,
+              "maximumPeakMs": 15.836773229202663,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 0,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            }
+          ]
+        },
+        "halfPauseRate": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4876143995370512,
+            "p90": 3.2186681016337393,
+            "p99": 7.138743910681978,
+            "p99.9": 40.717300038683845
+          },
+          "p99PerSeedMs": [
+            6.728180837374095,
+            7.138743910681978,
+            7.233457743083565
+          ],
+          "above10": [
+            {
+              "episodes": 138,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.27800850705853297,
+              "maximumPeakMs": 130.8513354993247,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 144,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.29009111139389576,
+              "maximumPeakMs": 129.5390584929337,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 146,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.2941186852599731,
+              "maximumPeakMs": 87.66822726909595,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 62,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.12490237273644235,
+              "maximumPeakMs": 130.8513354993247,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 74,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.149074598910752,
+              "maximumPeakMs": 129.5390584929337,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 71,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.14303031954423348,
+              "maximumPeakMs": 87.66822726909595,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "halfPauseLength": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.487400755060662,
+            "p90": 3.2112168209561354,
+            "p99": 6.564345075753523,
+            "p99.9": 18.211292478311755
+          },
+          "p99PerSeedMs": [
+            6.349708777345265,
+            6.564345075753523,
+            6.575292682729178
+          ],
+          "above10": [
+            {
+              "episodes": 117,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.23570286468006058,
+              "maximumPeakMs": 50.25199077068737,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 153,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.3082218058560143,
+              "maximumPeakMs": 63.79090658228597,
+              "maximumObservedDurationMs": 12.343860756969661
+            },
+            {
+              "episodes": 140,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.2820316160027139,
+              "maximumPeakMs": 40.76814594332609,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 26,
+              "observedSeconds": 496.38768777296787,
+              "ratePerSecond": 0.052378414373346796,
+              "maximumPeakMs": 50.25199077068737,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 30,
+              "observedSeconds": 496.39576789538995,
+              "ratePerSecond": 0.06043564820706162,
+              "maximumPeakMs": 63.79090658228597,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 26,
+              "observedSeconds": 496.398247771813,
+              "ratePerSecond": 0.05237730011478973,
+              "maximumPeakMs": 40.76814594332609,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        }
+      },
+      "gatesPerSeed": [
+        {
+          "seed": 20261025,
+          "full": {
+            "p50": true,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261026,
+          "full": {
+            "p50": true,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261027,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        }
+      ],
+      "conditionalRttSensitivity": {
+        "interpretation": "Chosen marginal sensitivity, not a fit, direction identification or RTT-time model; base4.974ms and waitUniform0to7ms.",
+        "bothIndependentDirections": {
+          "n": 100000,
+          "mean": 13.432626476247034,
+          "sd": 5.054234894153276,
+          "minimum": 6.076912997345905,
+          "maximum": 120.25785848019746,
+          "p1": 7.764695906513081,
+          "p10": 9.435720918052636,
+          "p50": 12.861472159217652,
+          "p90": 16.68049210828199,
+          "p95": 18.44866903571352,
+          "p99": 34.73918581895859,
+          "p99.9": 69.61049319112873
+        },
+        "downlinkPausesOnly": {
+          "n": 100000,
+          "mean": 13.09063206516723,
+          "sd": 3.9955299876226773,
+          "minimum": 6.076912997345905,
+          "maximum": 114.46690239005478,
+          "p1": 7.75477392577439,
+          "p10": 9.413298423802653,
+          "p50": 12.778542707868887,
+          "p90": 16.347969998728637,
+          "p95": 17.608723513756253,
+          "p99": 25.247519548861185,
+          "p99.9": 57.277796151640786
+        },
+        "identicalDirectionalDelaySensitivity": {
+          "n": 100000,
+          "mean": 13.472558459575554,
+          "sd": 6.784891939569512,
+          "minimum": 5.512863433507428,
+          "maximum": 212.7045130865896,
+          "p1": 7.259573015643582,
+          "p10": 9.06681334755724,
+          "p50": 12.727279841913273,
+          "p90": 17.056437283004794,
+          "p95": 19.050096069674808,
+          "p99": 36.366953058837666,
+          "p99.9": 101.66147907618651
+        }
+      },
+      "cpuTenSecondMeanMin": 47.7,
+      "cpuTenSecondMeanMax": 82.4,
+      "contaminated": true,
+      "hostOverlapSamples": 0,
+      "telemetrySeconds": 598,
+      "collectorCpuSeconds": 30.781,
+      "collectorAffinityMask": 48,
+      "timerGapAtLeast6msSeconds": 598,
+      "medianLoopMaximumMs": 16.433151,
+      "maximumLoopDelayMs": 23.543807,
+      "receiveCostAtLeast6msSeconds": 0,
+      "gcAbove5msSeconds": 1,
+      "maxQueueBytes": 12042
+    },
+    {
+      "id": "low-3",
+      "endpoint": "57.129.37.42:444",
+      "split": "development",
+      "quality": "verified",
+      "eligibleEpochs": 6,
+      "excludedEpochs": [
+        {
+          "epoch": 6,
+          "framesAfterBurnIn": 3557,
+          "reason": "short_epoch"
+        }
+      ],
+      "eligibleWallSeconds": 546.4907739999999,
+      "eligibleServerSeconds": 546.47,
+      "epochClockSlopesPpm": [
+        22.13731864962952,
+        19.424174937280696,
+        24.075620289855603,
+        21.510697368759867,
+        22.5063740676813,
+        18.956907228026772
+      ],
+      "rttMinusDownlinkExcessMedianByEpochMs": [
+        12.534062477448135,
+        12.680131331769743,
+        12.48156363013798,
+        12.312480764942993,
+        11.993807403707343,
+        11.989008919850908
+      ],
+      "rttDownlinkCorrelationByEpoch": [
+        0.6074354639755338,
+        0.36879827364231643,
+        0.7913820037087763,
+        0.3459135861688165,
+        0.7927281816082844,
+        0.5040359066669651
+      ],
+      "full": {
+        "n": 58583,
+        "p50": 2.048372409393778,
+        "p90": 5.741374036169149,
+        "p99": 66.52075779019975,
+        "p99.9": 276.12642995739276,
+        "maximum": 753.7019618748018
+      },
+      "clean": {
+        "n": null,
+        "p50": null,
+        "p90": null,
+        "p99": null,
+        "p99.9": null,
+        "maximum": null
+      },
+      "cleanFrames": 0,
+      "rttMs": {
+        "n": 2202,
+        "mean": 20.23297211625792,
+        "sd": 38.195289407571245,
+        "minimum": 6.116900000022724,
+        "maximum": 1282.5010000000038,
+        "p1": 8.733759000035352,
+        "p10": 11.53709000000963,
+        "p50": 14.318499999999403,
+        "p90": 22.59196000009543,
+        "p95": 39.42989499999675,
+        "p99": 139.29789299999814,
+        "p99.9": 425.36941380000206
+      },
+      "population": {
+        "n": 192,
+        "mean": 474.7083333333333,
+        "sd": 12.998731241505414,
+        "minimum": 444.0,
+        "maximum": 508.0,
+        "p1": 448.55,
+        "p10": 458.0,
+        "p50": 474.0,
+        "p90": 490.0,
+        "p95": 499.9,
+        "p99": 507.09000000000003,
+        "p99.9": 508.0
+      },
+      "parentFrameFloorMs": {
+        "n": 58717,
+        "mean": 4.707145119810256,
+        "sd": 20.356410800750545,
+        "minimum": 0.0,
+        "maximum": 753.7050000000017,
+        "p1": 0.2599999999802094,
+        "p10": 0.8890000000188593,
+        "p50": 2.0169999999925494,
+        "p90": 5.6969999999855645,
+        "p95": 10.267200000054418,
+        "p99": 66.29919999998992,
+        "p99.9": 274.58392000000356
+      },
+      "acf": {
+        "10": 0.5938566439408011,
+        "50": 0.1531183158541603,
+        "100": 0.13357025987412846,
+        "500": 0.1071157592063064,
+        "1000": 0.04887702526923273
+      },
+      "burstLt1": 0.05179507315157827,
+      "above10": {
+        "episodes": 1155,
+        "observedSeconds": 546.4907739999999,
+        "ratePerSecond": 2.1134849021257223,
+        "maximumPeakMs": 753.7019618748018,
+        "maximumObservedDurationMs": 939.2640000000101
+      },
+      "above20": {
+        "episodes": 388,
+        "observedSeconds": 546.4907739999999,
+        "ratePerSecond": 0.7099845385495933,
+        "maximumPeakMs": 753.7019618748018,
+        "maximumObservedDurationMs": 623.5660000000062
+      },
+      "variants": {
+        "fullModel": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4884588840741344,
+            "p90": 3.2982701024418937,
+            "p99": 13.182519152150757,
+            "p99.9": 45.418273971745606
+          },
+          "p99PerSeedMs": [
+            13.182519152150757,
+            14.016080228220002,
+            12.951990742822238
+          ],
+          "above10": [
+            {
+              "episodes": 344,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.6294937949713638,
+              "maximumPeakMs": 84.6346194065045,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 351,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.6423030594156766,
+              "maximumPeakMs": 86.34894904277462,
+              "maximumObservedDurationMs": 38.70122736081248
+            },
+            {
+              "episodes": 365,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.6679233875115644,
+              "maximumPeakMs": 90.27052602563163,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 160,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.29278781161458783,
+              "maximumPeakMs": 84.6346194065045,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 177,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.323896414577136,
+              "maximumPeakMs": 86.34894904277462,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 170,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.3110876051423725,
+              "maximumPeakMs": 90.27052602563163,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "noPauses": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4623347963643027,
+            "p90": 3.094801076198928,
+            "p99": 5.5018138048806575,
+            "p99.9": 8.194493584319178
+          },
+          "p99PerSeedMs": [
+            5.5699484263376515,
+            5.5018138048806575,
+            5.4302963244724385
+          ],
+          "above10": [
+            {
+              "episodes": 18,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.032938628806641126,
+              "maximumPeakMs": 14.05655084438331,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 15,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.027448848692977628,
+              "maximumPeakMs": 13.732672887505032,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 14,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.02561897924701891,
+              "maximumPeakMs": 16.18381519387367,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 0,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            }
+          ]
+        },
+        "halfPauseRate": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4756192663189722,
+            "p90": 3.1909197245695395,
+            "p99": 7.16369871132105,
+            "p99.9": 35.03649105971047
+          },
+          "p99PerSeedMs": [
+            7.16369871132105,
+            7.123293853247307,
+            7.225774938901018
+          ],
+          "above10": [
+            {
+              "episodes": 183,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.3348760595341848,
+              "maximumPeakMs": 65.69763113264344,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 173,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.316576721592342,
+              "maximumPeakMs": 81.90003140196495,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 199,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.3641554907254831,
+              "maximumPeakMs": 89.91874510980051,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 88,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.1610332963880233,
+              "maximumPeakMs": 65.69763113264344,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 76,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.13907416671108666,
+              "maximumPeakMs": 81.90003140196495,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 100,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.18299270890727792,
+              "maximumPeakMs": 89.91874510980051,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "halfPauseLength": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4744311210561136,
+            "p90": 3.179077844820132,
+            "p99": 6.550860752964801,
+            "p99.9": 18.6063051564016
+          },
+          "p99PerSeedMs": [
+            6.550860752964801,
+            6.566836342317039,
+            6.282284162594734
+          ],
+          "above10": [
+            {
+              "episodes": 158,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.2891279639694055,
+              "maximumPeakMs": 41.636705467506545,
+              "maximumObservedDurationMs": 27.09692265621561
+            },
+            {
+              "episodes": 168,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.30742710536134943,
+              "maximumPeakMs": 42.867402603260416,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 149,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.2726591362718441,
+              "maximumPeakMs": 44.517595656361664,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 29,
+              "observedSeconds": 546.4708353728075,
+              "ratePerSecond": 0.05306779085514404,
+              "maximumPeakMs": 41.636705467506545,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 40,
+              "observedSeconds": 546.4710075012189,
+              "ratePerSecond": 0.07319692984794035,
+              "maximumPeakMs": 42.867402603260416,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 34,
+              "observedSeconds": 546.4698599039256,
+              "ratePerSecond": 0.06221752102847449,
+              "maximumPeakMs": 44.517595656361664,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        }
+      },
+      "gatesPerSeed": [
+        {
+          "seed": 20261025,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261026,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261027,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        }
+      ],
+      "conditionalRttSensitivity": {
+        "interpretation": "Chosen marginal sensitivity, not a fit, direction identification or RTT-time model; base4.974ms and waitUniform0to7ms.",
+        "bothIndependentDirections": {
+          "n": 100000,
+          "mean": 13.432626476247034,
+          "sd": 5.054234894153276,
+          "minimum": 6.076912997345905,
+          "maximum": 120.25785848019746,
+          "p1": 7.764695906513081,
+          "p10": 9.435720918052636,
+          "p50": 12.861472159217652,
+          "p90": 16.68049210828199,
+          "p95": 18.44866903571352,
+          "p99": 34.73918581895859,
+          "p99.9": 69.61049319112873
+        },
+        "downlinkPausesOnly": {
+          "n": 100000,
+          "mean": 13.09063206516723,
+          "sd": 3.9955299876226773,
+          "minimum": 6.076912997345905,
+          "maximum": 114.46690239005478,
+          "p1": 7.75477392577439,
+          "p10": 9.413298423802653,
+          "p50": 12.778542707868887,
+          "p90": 16.347969998728637,
+          "p95": 17.608723513756253,
+          "p99": 25.247519548861185,
+          "p99.9": 57.277796151640786
+        },
+        "identicalDirectionalDelaySensitivity": {
+          "n": 100000,
+          "mean": 13.472558459575554,
+          "sd": 6.784891939569512,
+          "minimum": 5.512863433507428,
+          "maximum": 212.7045130865896,
+          "p1": 7.259573015643582,
+          "p10": 9.06681334755724,
+          "p50": 12.727279841913273,
+          "p90": 17.056437283004794,
+          "p95": 19.050096069674808,
+          "p99": 36.366953058837666,
+          "p99.9": 101.66147907618651
+        }
+      },
+      "cpuTenSecondMeanMin": 48,
+      "cpuTenSecondMeanMax": 82.2,
+      "contaminated": true,
+      "hostOverlapSamples": 0,
+      "telemetrySeconds": 598,
+      "collectorCpuSeconds": 34.391,
+      "collectorAffinityMask": 48,
+      "timerGapAtLeast6msSeconds": 598,
+      "medianLoopMaximumMs": 16.453631,
+      "maximumLoopDelayMs": 32.767999,
+      "receiveCostAtLeast6msSeconds": 0,
+      "gcAbove5msSeconds": 1,
+      "maxQueueBytes": 4682
+    },
+    {
+      "id": "low-4",
+      "endpoint": "57.129.37.42:444",
+      "split": "heldout",
+      "quality": "verified",
+      "eligibleEpochs": 6,
+      "excludedEpochs": [],
+      "eligibleWallSeconds": 577.661011,
+      "eligibleServerSeconds": 577.683,
+      "epochClockSlopesPpm": [
+        18.610256788771068,
+        20.06422395141432,
+        19.415237957998144,
+        19.831222363075476,
+        16.843081446843318,
+        12.317958028112626
+      ],
+      "rttMinusDownlinkExcessMedianByEpochMs": [
+        12.504852098627312,
+        12.434965199858656,
+        12.434969134260522,
+        12.400472436609967,
+        12.704843383841453,
+        12.371109163442085
+      ],
+      "rttDownlinkCorrelationByEpoch": [
+        0.40667191848096707,
+        0.31895099558352574,
+        0.4840706513559631,
+        0.4907469124741568,
+        0.39531822205688216,
+        0.2989698890351877
+      ],
+      "full": {
+        "n": 60837,
+        "p50": 2.1413698153337464,
+        "p90": 6.150502116279677,
+        "p99": 29.883051722302323,
+        "p99.9": 176.11004940067764,
+        "maximum": 463.83296886942117
+      },
+      "clean": {
+        "n": null,
+        "p50": null,
+        "p90": null,
+        "p99": null,
+        "p99.9": null,
+        "maximum": null
+      },
+      "cleanFrames": 0,
+      "rttMs": {
+        "n": 2212,
+        "mean": 21.054575180832266,
+        "sd": 31.899495264434083,
+        "minimum": 7.080199999996694,
+        "maximum": 604.1719000000157,
+        "p1": 9.324905999999828,
+        "p10": 11.845220000011613,
+        "p50": 14.725999999993292,
+        "p90": 25.762859999970548,
+        "p95": 42.00799500001425,
+        "p99": 177.4006860000159,
+        "p99.9": 363.5363261000065
+      },
+      "population": {
+        "n": 195,
+        "mean": 479.10769230769233,
+        "sd": 11.954344443958966,
+        "minimum": 440.0,
+        "maximum": 517.0,
+        "p1": 450.88,
+        "p10": 463.0,
+        "p50": 480.0,
+        "p90": 492.0,
+        "p95": 496.59999999999997,
+        "p99": 510.24,
+        "p99.9": 516.418
+      },
+      "parentFrameFloorMs": {
+        "n": 60874,
+        "mean": 3.839342412197419,
+        "sd": 11.723499001412222,
+        "minimum": 0.0,
+        "maximum": 463.86000000004424,
+        "p1": 0.2930000000051223,
+        "p10": 0.9583000000042377,
+        "p50": 2.1199999999953434,
+        "p90": 6.13300000000163,
+        "p95": 9.725399999954965,
+        "p99": 29.906640000038504,
+        "p99.9": 176.10388900000805
+      },
+      "acf": {
+        "10": 0.5125347551179634,
+        "50": 0.17147323068834766,
+        "100": 0.1697366433862249,
+        "500": 0.07975369161604717,
+        "1000": 0.044362252270384116
+      },
+      "burstLt1": 0.050303299304630865,
+      "above10": {
+        "episodes": 1501,
+        "observedSeconds": 577.661011,
+        "ratePerSecond": 2.598409744499789,
+        "maximumPeakMs": 463.83296886942117,
+        "maximumObservedDurationMs": 389.98499999998603
+      },
+      "above20": {
+        "episodes": 388,
+        "observedSeconds": 577.661011,
+        "ratePerSecond": 0.6716742044409848,
+        "maximumPeakMs": 463.83296886942117,
+        "maximumObservedDurationMs": 229.44599999999627
+      },
+      "variants": {
+        "fullModel": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4908351648846292,
+            "p90": 3.2819424027518838,
+            "p99": 13.451221602241851,
+            "p99.9": 43.84811029310512
+          },
+          "p99PerSeedMs": [
+            14.940082884143338,
+            13.451221602241851,
+            12.094209733851882
+          ],
+          "above10": [
+            {
+              "episodes": 357,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.617986842303161,
+              "maximumPeakMs": 116.38926096358045,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 368,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.6370260222258206,
+              "maximumPeakMs": 73.41750591697564,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 346,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.5989460329829299,
+              "maximumPeakMs": 93.96641694419486,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 184,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.31851422684532665,
+              "maximumPeakMs": 116.38926096358045,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 182,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.31505091316603084,
+              "maximumPeakMs": 73.41750591697564,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 162,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.2804313796047244,
+              "maximumPeakMs": 93.96641694419486,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "noPauses": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4654225874546682,
+            "p90": 3.0745114761206422,
+            "p99": 5.421474686251565,
+            "p99.9": 8.030296215399435
+          },
+          "p99PerSeedMs": [
+            5.359393277777999,
+            5.421474686251565,
+            5.444493250302619
+          ],
+          "above10": [
+            {
+              "episodes": 15,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.025965833710216848,
+              "maximumPeakMs": 13.686993634903047,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 16,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.02769678357503568,
+              "maximumPeakMs": 15.668378217305872,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 16,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.027696926380713523,
+              "maximumPeakMs": 15.043090371240396,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 0,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            }
+          ]
+        },
+        "halfPauseRate": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.47891314879962,
+            "p90": 3.169322393255425,
+            "p99": 7.255859695914548,
+            "p99.9": 37.383796321973364
+          },
+          "p99PerSeedMs": [
+            7.255859695914548,
+            7.4185563472475025,
+            7.0202174039758365
+          ],
+          "above10": [
+            {
+              "episodes": 185,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.3202452824260078,
+              "maximumPeakMs": 89.63084937277017,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 206,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.3565960885285844,
+              "maximumPeakMs": 74.07894636740457,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 184,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.3185146533782055,
+              "maximumPeakMs": 95.61793467019379,
+              "maximumObservedDurationMs": 46.000503393538565
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 96,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.16618133574538782,
+              "maximumPeakMs": 89.63084937277017,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 101,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.17483594631741273,
+              "maximumPeakMs": 74.07894636740457,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 76,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.13156040030838922,
+              "maximumPeakMs": 95.61793467019379,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "halfPauseLength": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4777403094485635,
+            "p90": 3.1601334796512677,
+            "p99": 6.4294537437293915,
+            "p99.9": 18.3722290058724
+          },
+          "p99PerSeedMs": [
+            6.555002053693605,
+            6.4294537437293915,
+            6.318977966898274
+          ],
+          "above10": [
+            {
+              "episodes": 179,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.30985894894192106,
+              "maximumPeakMs": 55.7371838306135,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 168,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.29081622753787467,
+              "maximumPeakMs": 35.7354772190447,
+              "maximumObservedDurationMs": 14.11844326465507
+            },
+            {
+              "episodes": 161,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.27870032170592984,
+              "maximumPeakMs": 46.99297582334657,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 38,
+              "observedSeconds": 577.6822022124369,
+              "ratePerSecond": 0.06578011206588269,
+              "maximumPeakMs": 55.7371838306135,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 39,
+              "observedSeconds": 577.6844071678236,
+              "ratePerSecond": 0.06751090996414948,
+              "maximumPeakMs": 35.7354772190447,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 34,
+              "observedSeconds": 577.6814286202327,
+              "ratePerSecond": 0.05885596855901624,
+              "maximumPeakMs": 46.99297582334657,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        }
+      },
+      "gatesPerSeed": [
+        {
+          "seed": 20261025,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261026,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261027,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        }
+      ],
+      "conditionalRttSensitivity": {
+        "interpretation": "Chosen marginal sensitivity, not a fit, direction identification or RTT-time model; base4.974ms and waitUniform0to7ms.",
+        "bothIndependentDirections": {
+          "n": 100000,
+          "mean": 13.432626476247034,
+          "sd": 5.054234894153276,
+          "minimum": 6.076912997345905,
+          "maximum": 120.25785848019746,
+          "p1": 7.764695906513081,
+          "p10": 9.435720918052636,
+          "p50": 12.861472159217652,
+          "p90": 16.68049210828199,
+          "p95": 18.44866903571352,
+          "p99": 34.73918581895859,
+          "p99.9": 69.61049319112873
+        },
+        "downlinkPausesOnly": {
+          "n": 100000,
+          "mean": 13.09063206516723,
+          "sd": 3.9955299876226773,
+          "minimum": 6.076912997345905,
+          "maximum": 114.46690239005478,
+          "p1": 7.75477392577439,
+          "p10": 9.413298423802653,
+          "p50": 12.778542707868887,
+          "p90": 16.347969998728637,
+          "p95": 17.608723513756253,
+          "p99": 25.247519548861185,
+          "p99.9": 57.277796151640786
+        },
+        "identicalDirectionalDelaySensitivity": {
+          "n": 100000,
+          "mean": 13.472558459575554,
+          "sd": 6.784891939569512,
+          "minimum": 5.512863433507428,
+          "maximum": 212.7045130865896,
+          "p1": 7.259573015643582,
+          "p10": 9.06681334755724,
+          "p50": 12.727279841913273,
+          "p90": 17.056437283004794,
+          "p95": 19.050096069674808,
+          "p99": 36.366953058837666,
+          "p99.9": 101.66147907618651
+        }
+      },
+      "cpuTenSecondMeanMin": 57.3,
+      "cpuTenSecondMeanMax": 96.4,
+      "contaminated": true,
+      "hostOverlapSamples": 0,
+      "telemetrySeconds": 598,
+      "collectorCpuSeconds": 34.172,
+      "collectorAffinityMask": 48,
+      "timerGapAtLeast6msSeconds": 598,
+      "medianLoopMaximumMs": 16.392191,
+      "maximumLoopDelayMs": 193.986559,
+      "receiveCostAtLeast6msSeconds": 4,
+      "gcAbove5msSeconds": 5,
+      "maxQueueBytes": 13023
+    },
+    {
+      "id": "second-1",
+      "endpoint": "198.244.231.35:444",
+      "split": "development",
+      "quality": "verified",
+      "eligibleEpochs": 3,
+      "excludedEpochs": [
+        {
+          "epoch": 1,
+          "framesAfterBurnIn": 2419,
+          "reason": "short_epoch"
+        },
+        {
+          "epoch": 4,
+          "framesAfterBurnIn": 3030,
+          "reason": "short_epoch"
+        },
+        {
+          "epoch": 5,
+          "framesAfterBurnIn": 461,
+          "reason": "short_epoch"
+        }
+      ],
+      "eligibleWallSeconds": 525.2400909999999,
+      "eligibleServerSeconds": 525.23,
+      "epochClockSlopesPpm": [
+        19.310915410074404,
+        18.888288335714915,
+        21.025691029657594
+      ],
+      "rttMinusDownlinkExcessMedianByEpochMs": [
+        27.192927289943423,
+        27.237475788006435,
+        27.335794664791933
+      ],
+      "rttDownlinkCorrelationByEpoch": [
+        0.4493429254684363,
+        0.9432140578350806,
+        0.26647863478467204
+      ],
+      "full": {
+        "n": 57141,
+        "p50": 2.157757843437139,
+        "p90": 5.447109541184091,
+        "p99": 22.697164253287475,
+        "p99.9": 204.43831918572064,
+        "maximum": 505.117657124938
+      },
+      "clean": {
+        "n": null,
+        "p50": null,
+        "p90": null,
+        "p99": null,
+        "p99.9": null,
+        "maximum": null
+      },
+      "cleanFrames": 0,
+      "rttMs": {
+        "n": 2213,
+        "mean": 35.02804360596458,
+        "sd": 27.60092255993386,
+        "minimum": 24.227900000027148,
+        "maximum": 461.51580000000104,
+        "p1": 25.191199999999952,
+        "p10": 27.055299999949057,
+        "p50": 29.996999999973923,
+        "p90": 38.1035400000168,
+        "p95": 48.6739400000166,
+        "p99": 166.65305999997304,
+        "p99.9": 414.42862959999593
+      },
+      "population": {
+        "n": 193,
+        "mean": 479.01554404145077,
+        "sd": 15.636902242792562,
+        "minimum": 442.0,
+        "maximum": 512.0,
+        "p1": 444.92,
+        "p10": 458.4,
+        "p50": 478.0,
+        "p90": 500.6,
+        "p95": 507.0,
+        "p99": 512.0,
+        "p99.9": 512.0
+      },
+      "parentFrameFloorMs": {
+        "n": 57150,
+        "mean": 3.5823657042843218,
+        "sd": 12.602690572966438,
+        "minimum": 0.0,
+        "maximum": 505.0579999999609,
+        "p1": 0.28899999998975545,
+        "p10": 0.9949999999953434,
+        "p50": 2.145999999999731,
+        "p90": 5.439099999985773,
+        "p95": 7.927550000006154,
+        "p99": 22.680999999982305,
+        "p99.9": 204.36601500001748
+      },
+      "acf": {
+        "10": 0.477270078095072,
+        "50": 0.13191974686798846,
+        "100": 0.09262341047530753,
+        "500": 0.0471126763817474,
+        "1000": 0.030309488237112093
+      },
+      "burstLt1": 0.040375931954216106,
+      "above10": {
+        "episodes": 1057,
+        "observedSeconds": 525.2400909999999,
+        "ratePerSecond": 2.0124130242754075,
+        "maximumPeakMs": 505.117657124938,
+        "maximumObservedDurationMs": 104.49199999999837
+      },
+      "above20": {
+        "episodes": 247,
+        "observedSeconds": 525.2400909999999,
+        "ratePerSecond": 0.4702611324465711,
+        "maximumPeakMs": 505.117657124938,
+        "maximumObservedDurationMs": 58.56300000002375
+      },
+      "variants": {
+        "fullModel": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.5288355327793397,
+            "p90": 3.3626852884190157,
+            "p99": 13.669847185219934,
+            "p99.9": 46.71509002915988
+          },
+          "p99PerSeedMs": [
+            13.476273140069665,
+            13.669847185219934,
+            13.91998558187328
+          ],
+          "above10": [
+            {
+              "episodes": 361,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.6873188769195786,
+              "maximumPeakMs": 96.81774794409284,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 339,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.645434278355836,
+              "maximumPeakMs": 111.16486300474207,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 358,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.681606748262021,
+              "maximumPeakMs": 99.81812528282171,
+              "maximumObservedDurationMs": 58.79266626339813
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 171,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.32557209959348465,
+              "maximumPeakMs": 96.81774794409284,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 158,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.30082187604785277,
+              "maximumPeakMs": 111.16486300474207,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 159,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.3027247848426294,
+              "maximumPeakMs": 99.81812528282171,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "noPauses": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.502044998720521,
+            "p90": 3.1630224391119555,
+            "p99": 5.5766979119303866,
+            "p99.9": 8.57517594057718
+          },
+          "p99PerSeedMs": [
+            5.641823962621851,
+            5.5389824893331,
+            5.5766979119303866
+          ],
+          "above10": [
+            {
+              "episodes": 21,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.03998253854656829,
+              "maximumPeakMs": 15.20384694230961,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 13,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.024751167016595483,
+              "maximumPeakMs": 14.279841703537386,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 20,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.03807858928838106,
+              "maximumPeakMs": 18.970927401212975,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 0,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            }
+          ]
+        },
+        "halfPauseRate": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.5145801028702408,
+            "p90": 3.258378290105611,
+            "p99": 7.348081818968056,
+            "p99.9": 36.07304569715342
+          },
+          "p99PerSeedMs": [
+            7.480714313086351,
+            7.348081818968056,
+            7.289141507050949
+          ],
+          "above10": [
+            {
+              "episodes": 195,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.37126642936099125,
+              "maximumPeakMs": 72.45149099561968,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 175,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.33318878676186225,
+              "maximumPeakMs": 107.51473455270752,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 178,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.3388994446665914,
+              "maximumPeakMs": 83.44777705815795,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 85,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.1618340845932526,
+              "maximumPeakMs": 72.45149099561968,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 84,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.15993061764569388,
+              "maximumPeakMs": 107.51473455270752,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 88,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.16754579286887666,
+              "maximumPeakMs": 83.44777705815795,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "halfPauseLength": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.5154979795916006,
+            "p90": 3.2463024294993374,
+            "p99": 6.6436280300287756,
+            "p99.9": 19.28860431631884
+          },
+          "p99PerSeedMs": [
+            6.663733640196724,
+            6.573171520898713,
+            6.6436280300287756
+          ],
+          "above10": [
+            {
+              "episodes": 170,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.3236681691865052,
+              "maximumPeakMs": 46.856663430226035,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 149,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.2836864527286713,
+              "maximumPeakMs": 54.06059815696062,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 170,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.323668008951239,
+              "maximumPeakMs": 47.88921059231507,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 33,
+              "observedSeconds": 525.2292816660696,
+              "ratePerSecond": 0.0628297034303216,
+              "maximumPeakMs": 46.856663430226035,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 26,
+              "observedSeconds": 525.2277596156816,
+              "ratePerSecond": 0.049502334033190966,
+              "maximumPeakMs": 54.06059815696062,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 36,
+              "observedSeconds": 525.2295416863726,
+              "ratePerSecond": 0.0685414607190859,
+              "maximumPeakMs": 47.88921059231507,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        }
+      },
+      "gatesPerSeed": [
+        {
+          "seed": 20261025,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261026,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        },
+        {
+          "seed": 20261027,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "eligible": false
+          }
+        }
+      ],
+      "conditionalRttSensitivity": {
+        "interpretation": "Chosen marginal sensitivity, not a fit, direction identification or RTT-time model; base4.974ms and waitUniform0to7ms.",
+        "bothIndependentDirections": {
+          "n": 100000,
+          "mean": 13.432626476247034,
+          "sd": 5.054234894153276,
+          "minimum": 6.076912997345905,
+          "maximum": 120.25785848019746,
+          "p1": 7.764695906513081,
+          "p10": 9.435720918052636,
+          "p50": 12.861472159217652,
+          "p90": 16.68049210828199,
+          "p95": 18.44866903571352,
+          "p99": 34.73918581895859,
+          "p99.9": 69.61049319112873
+        },
+        "downlinkPausesOnly": {
+          "n": 100000,
+          "mean": 13.09063206516723,
+          "sd": 3.9955299876226773,
+          "minimum": 6.076912997345905,
+          "maximum": 114.46690239005478,
+          "p1": 7.75477392577439,
+          "p10": 9.413298423802653,
+          "p50": 12.778542707868887,
+          "p90": 16.347969998728637,
+          "p95": 17.608723513756253,
+          "p99": 25.247519548861185,
+          "p99.9": 57.277796151640786
+        },
+        "identicalDirectionalDelaySensitivity": {
+          "n": 100000,
+          "mean": 13.472558459575554,
+          "sd": 6.784891939569512,
+          "minimum": 5.512863433507428,
+          "maximum": 212.7045130865896,
+          "p1": 7.259573015643582,
+          "p10": 9.06681334755724,
+          "p50": 12.727279841913273,
+          "p90": 17.056437283004794,
+          "p95": 19.050096069674808,
+          "p99": 36.366953058837666,
+          "p99.9": 101.66147907618651
+        }
+      },
+      "cpuTenSecondMeanMin": 51.3,
+      "cpuTenSecondMeanMax": 80.7,
+      "contaminated": true,
+      "hostOverlapSamples": 1,
+      "telemetrySeconds": 598,
+      "collectorCpuSeconds": 36.813,
+      "collectorAffinityMask": 48,
+      "timerGapAtLeast6msSeconds": 598,
+      "medianLoopMaximumMs": 16.441343,
+      "maximumLoopDelayMs": 73.269247,
+      "receiveCostAtLeast6msSeconds": 0,
+      "gcAbove5msSeconds": 2,
+      "maxQueueBytes": 14955
+    },
+    {
+      "id": "second-2",
+      "endpoint": "198.244.231.35:444",
+      "split": "development",
+      "quality": "verified",
+      "eligibleEpochs": 5,
+      "excludedEpochs": [],
+      "eligibleWallSeconds": 581.435376,
+      "eligibleServerSeconds": 581.429,
+      "epochClockSlopesPpm": [
+        16.804203310596293,
+        18.544502337885763,
+        17.77764425230731,
+        19.4606104776197,
+        20.287595870639592
+      ],
+      "rttMinusDownlinkExcessMedianByEpochMs": [
+        26.90752022911118,
+        26.8574705894519,
+        27.094973509812828,
+        27.02271595980776,
+        27.18891258373999
+      ],
+      "rttDownlinkCorrelationByEpoch": [
+        0.155940792214137,
+        0.27367127483700304,
+        0.33501940732429425,
+        0.7079887452818442,
+        0.3908732422062019
+      ],
+      "full": {
+        "n": 58644,
+        "p50": 2.036887386610033,
+        "p90": 4.95715677161352,
+        "p99": 21.213764684602772,
+        "p99.9": 142.6231657586165,
+        "maximum": 272.82707277848385
+      },
+      "clean": {
+        "n": 2,
+        "p50": 0.2714941903250292,
+        "p90": 0.2832075655227527,
+        "p99": 0.2858430749422405,
+        "p99.9": 0.2861066258841893,
+        "maximum": 0.2861359093221836
+      },
+      "cleanFrames": 2,
+      "rttMs": {
+        "n": 2230,
+        "mean": 33.68571426008919,
+        "sd": 24.698661049197923,
+        "minimum": 23.886699999973644,
+        "maximum": 417.9932999999728,
+        "p1": 24.734177999995445,
+        "p10": 26.974940000008793,
+        "p50": 29.431250000001455,
+        "p90": 36.35768999997895,
+        "p95": 42.799399999992595,
+        "p99": 137.7321600000112,
+        "p99.9": 344.21253149999035
+      },
+      "population": {
+        "n": 194,
+        "mean": 477.03092783505156,
+        "sd": 15.70997031125009,
+        "minimum": 436.0,
+        "maximum": 517.0,
+        "p1": 441.72,
+        "p10": 456.6,
+        "p50": 476.0,
+        "p90": 497.40000000000003,
+        "p95": 501.7,
+        "p99": 510.14,
+        "p99.9": 516.035
+      },
+      "parentFrameFloorMs": {
+        "n": 58634,
+        "mean": 3.1821282873456354,
+        "sd": 8.193286545760175,
+        "minimum": 0.0,
+        "maximum": 272.67399999999907,
+        "p1": 0.28800000000046566,
+        "p10": 0.9510000000009313,
+        "p50": 2.0339999999996508,
+        "p90": 4.947999999995227,
+        "p95": 7.326000000000931,
+        "p99": 21.22675999999769,
+        "p99.9": 142.47633200000786
+      },
+      "acf": {
+        "10": 0.4713561978604869,
+        "50": 0.1643023006268562,
+        "100": 0.14675678635892822,
+        "500": 0.08644713397878671,
+        "1000": 0.07611100045108433
+      },
+      "burstLt1": 0.03304967683623527,
+      "above10": {
+        "episodes": 856,
+        "observedSeconds": 581.435376,
+        "ratePerSecond": 1.4722186425753359,
+        "maximumPeakMs": 272.82707277848385,
+        "maximumObservedDurationMs": 272.8730000000214
+      },
+      "above20": {
+        "episodes": 209,
+        "observedSeconds": 581.435376,
+        "ratePerSecond": 0.3594552526848659,
+        "maximumPeakMs": 272.82707277848385,
+        "maximumObservedDurationMs": 272.86699999996927
+      },
+      "variants": {
+        "fullModel": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.5204146278592816,
+            "p90": 3.3259606939216626,
+            "p99": 13.597789777783326,
+            "p99.9": 46.546340417606324
+          },
+          "p99PerSeedMs": [
+            12.935588928772992,
+            13.597789777783326,
+            13.867107924143292
+          ],
+          "above10": [
+            {
+              "episodes": 345,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.5933626580194384,
+              "maximumPeakMs": 82.92193154687993,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 361,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.6208789311546813,
+              "maximumPeakMs": 111.44796468742425,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 372,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.6398051144992744,
+              "maximumPeakMs": 111.70900305110263,
+              "maximumObservedDurationMs": 27.835108466864767
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 162,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.2786224655047798,
+              "maximumPeakMs": 82.92193154687993,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 170,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.2923806601005424,
+              "maximumPeakMs": 111.44796468742425,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 165,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.2837845265924201,
+              "maximumPeakMs": 111.70900305110263,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "noPauses": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4940577087691054,
+            "p90": 3.1347530185979853,
+            "p99": 5.483636348085274,
+            "p99.9": 8.188726066423994
+          },
+          "p99PerSeedMs": [
+            5.474255960934242,
+            5.483636348085274,
+            5.627655148999711
+          ],
+          "above10": [
+            {
+              "episodes": 15,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.02579837643562776,
+              "maximumPeakMs": 12.886402805786929,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 16,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.027518179774168698,
+              "maximumPeakMs": 13.230065867694066,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 21,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.0361180306572171,
+              "maximumPeakMs": 19.455112867464777,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 0,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            }
+          ]
+        },
+        "halfPauseRate": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.508078061069682,
+            "p90": 3.235906894140499,
+            "p99": 7.214973459167007,
+            "p99.9": 36.94368045001141
+          },
+          "p99PerSeedMs": [
+            7.214973459167007,
+            7.098912641644083,
+            7.855857100047578
+          ],
+          "above10": [
+            {
+              "episodes": 199,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.34225846071266164,
+              "maximumPeakMs": 88.11772585904691,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 194,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.3336579297617955,
+              "maximumPeakMs": 103.07584020172726,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 214,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.36805993145925997,
+              "maximumPeakMs": 78.57721033952839,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 88,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.1513504750890162,
+              "maximumPeakMs": 88.11772585904691,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 81,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.13931078510672903,
+              "maximumPeakMs": 103.07584020172726,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 104,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.17887024706431326,
+              "maximumPeakMs": 78.57721033952839,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "halfPauseLength": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.507729019926046,
+            "p90": 3.217517522377603,
+            "p99": 6.505645640230305,
+            "p99.9": 19.36441908732469
+          },
+          "p99PerSeedMs": [
+            6.492034079245841,
+            6.505645640230305,
+            6.63230844624526
+          ],
+          "above10": [
+            {
+              "episodes": 157,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.2700230066929039,
+              "maximumPeakMs": 42.228142508130986,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 159,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.27346191150580146,
+              "maximumPeakMs": 55.643407769850455,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 161,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.2769049017053311,
+              "maximumPeakMs": 54.6369436220848,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 37,
+              "observedSeconds": 581.4319376813528,
+              "ratePerSecond": 0.06363599520788181,
+              "maximumPeakMs": 42.228142508130986,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 37,
+              "observedSeconds": 581.4338059895659,
+              "ratePerSecond": 0.06363579072776511,
+              "maximumPeakMs": 55.643407769850455,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 40,
+              "observedSeconds": 581.427049533881,
+              "ratePerSecond": 0.06879624887088971,
+              "maximumPeakMs": 54.6369436220848,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        }
+      },
+      "gatesPerSeed": [
+        {
+          "seed": 20261025,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": true,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": false,
+              "500": false,
+              "1000": false
+            }
+          }
+        },
+        {
+          "seed": 20261026,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": true,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": false,
+              "500": false,
+              "1000": false
+            }
+          }
+        },
+        {
+          "seed": 20261027,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": true,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": false,
+              "500": false,
+              "1000": false
+            }
+          }
+        }
+      ],
+      "conditionalRttSensitivity": {
+        "interpretation": "Chosen marginal sensitivity, not a fit, direction identification or RTT-time model; base4.974ms and waitUniform0to7ms.",
+        "bothIndependentDirections": {
+          "n": 100000,
+          "mean": 13.432626476247034,
+          "sd": 5.054234894153276,
+          "minimum": 6.076912997345905,
+          "maximum": 120.25785848019746,
+          "p1": 7.764695906513081,
+          "p10": 9.435720918052636,
+          "p50": 12.861472159217652,
+          "p90": 16.68049210828199,
+          "p95": 18.44866903571352,
+          "p99": 34.73918581895859,
+          "p99.9": 69.61049319112873
+        },
+        "downlinkPausesOnly": {
+          "n": 100000,
+          "mean": 13.09063206516723,
+          "sd": 3.9955299876226773,
+          "minimum": 6.076912997345905,
+          "maximum": 114.46690239005478,
+          "p1": 7.75477392577439,
+          "p10": 9.413298423802653,
+          "p50": 12.778542707868887,
+          "p90": 16.347969998728637,
+          "p95": 17.608723513756253,
+          "p99": 25.247519548861185,
+          "p99.9": 57.277796151640786
+        },
+        "identicalDirectionalDelaySensitivity": {
+          "n": 100000,
+          "mean": 13.472558459575554,
+          "sd": 6.784891939569512,
+          "minimum": 5.512863433507428,
+          "maximum": 212.7045130865896,
+          "p1": 7.259573015643582,
+          "p10": 9.06681334755724,
+          "p50": 12.727279841913273,
+          "p90": 17.056437283004794,
+          "p95": 19.050096069674808,
+          "p99": 36.366953058837666,
+          "p99.9": 101.66147907618651
+        }
+      },
+      "cpuTenSecondMeanMin": 37.8,
+      "cpuTenSecondMeanMax": 86.7,
+      "contaminated": true,
+      "hostOverlapSamples": 0,
+      "telemetrySeconds": 598,
+      "collectorCpuSeconds": 36.078,
+      "collectorAffinityMask": 48,
+      "timerGapAtLeast6msSeconds": 598,
+      "medianLoopMaximumMs": 16.400383,
+      "maximumLoopDelayMs": 74.711039,
+      "receiveCostAtLeast6msSeconds": 0,
+      "gcAbove5msSeconds": 4,
+      "maxQueueBytes": 12336
+    },
+    {
+      "id": "second-3",
+      "endpoint": "198.244.231.35:444",
+      "split": "heldout",
+      "quality": "verified",
+      "eligibleEpochs": 5,
+      "excludedEpochs": [],
+      "eligibleWallSeconds": 581.466495,
+      "eligibleServerSeconds": 581.518,
+      "epochClockSlopesPpm": [
+        19.480392495433183,
+        20.61751129037954,
+        16.87645438582706,
+        24.703790784411073,
+        -2.694384164167858
+      ],
+      "rttMinusDownlinkExcessMedianByEpochMs": [
+        27.28301499540257,
+        26.906342434989764,
+        26.77072080505174,
+        40.040465497146826,
+        35.38906725593556
+      ],
+      "rttDownlinkCorrelationByEpoch": [
+        0.25835808108297204,
+        0.6722265981967739,
+        0.4551358522590124,
+        0.5657293414434061,
+        0.5860460307891131
+      ],
+      "full": {
+        "n": 58795,
+        "p50": 2.687843987561962,
+        "p90": 49.03469286928884,
+        "p99": 110.22546561826562,
+        "p99.9": 188.62577656907402,
+        "maximum": 276.31911532301456
+      },
+      "clean": {
+        "n": 8,
+        "p50": 2.0526298405020498,
+        "p90": 2.52843793570064,
+        "p99": 2.5884425659966657,
+        "p99.9": 2.594443029026268,
+        "maximum": 2.5951097471406683
+      },
+      "cleanFrames": 8,
+      "rttMs": {
+        "n": 2208,
+        "mean": 49.97039347826053,
+        "sd": 45.279191162294765,
+        "minimum": 23.229099999996834,
+        "maximum": 564.2685999999521,
+        "p1": 25.31184500004558,
+        "p10": 27.292649999996684,
+        "p50": 31.703649999995832,
+        "p90": 100.43983999998305,
+        "p95": 130.60891000000413,
+        "p99": 233.31309500000097,
+        "p99.9": 467.8339125000123
+      },
+      "population": {
+        "n": 196,
+        "mean": 469.0816326530612,
+        "sd": 17.991025806755484,
+        "minimum": 426.0,
+        "maximum": 510.0,
+        "p1": 430.9,
+        "p10": 446.0,
+        "p50": 469.0,
+        "p90": 494.0,
+        "p95": 498.0,
+        "p99": 503.3500000000001,
+        "p99.9": 510.0
+      },
+      "parentFrameFloorMs": {
+        "n": 58901,
+        "mean": 14.163693061240505,
+        "sd": 25.150459467022408,
+        "minimum": 0.0,
+        "maximum": 276.25900000002,
+        "p1": 0.3209999999962747,
+        "p10": 1.0819999999948777,
+        "p50": 2.676000000035856,
+        "p90": 48.85800000000745,
+        "p95": 70.85699999995995,
+        "p99": 110.02899999998044,
+        "p99.9": 188.46089999997582
+      },
+      "acf": {
+        "10": 0.5737858798212482,
+        "50": 0.17900614926217867,
+        "100": 0.1587972579562548,
+        "500": 0.07504034845147757,
+        "1000": 0.039837799999844326
+      },
+      "burstLt1": 0.26601462833815276,
+      "above10": {
+        "episodes": 2809,
+        "observedSeconds": 581.466495,
+        "ratePerSecond": 4.830888837369726,
+        "maximumPeakMs": 276.31911532301456,
+        "maximumObservedDurationMs": 1033.5389999999898
+      },
+      "above20": {
+        "episodes": 2165,
+        "observedSeconds": 581.466495,
+        "ratePerSecond": 3.7233443691368664,
+        "maximumPeakMs": 276.31911532301456,
+        "maximumObservedDurationMs": 581.1659999999683
+      },
+      "variants": {
+        "fullModel": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.5129052755037264,
+            "p90": 3.2987428230684586,
+            "p99": 13.060480872905595,
+            "p99.9": 48.533601430370034
+          },
+          "p99PerSeedMs": [
+            14.559437705490181,
+            13.060480872905595,
+            12.074236438176229
+          ],
+          "above10": [
+            {
+              "episodes": 383,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.6586140848715337,
+              "maximumPeakMs": 92.81617088229541,
+              "maximumObservedDurationMs": 33.38997501018457
+            },
+            {
+              "episodes": 332,
+              "observedSeconds": 581.5312662845184,
+              "ratePerSecond": 0.5709065346068023,
+              "maximumPeakMs": 111.34082979535015,
+              "maximumObservedDurationMs": 28.03342127101496
+            },
+            {
+              "episodes": 326,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.5606027566379226,
+              "maximumPeakMs": 95.6185403200434,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 184,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.31640989978162454,
+              "maximumPeakMs": 92.81617088229541,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 167,
+              "observedSeconds": 581.5312662845184,
+              "ratePerSecond": 0.28717286529920477,
+              "maximumPeakMs": 111.34082979535015,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 164,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.28202101867674634,
+              "maximumPeakMs": 95.6185403200434,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "noPauses": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4883103212632705,
+            "p90": 3.1114862018992424,
+            "p99": 5.470464734380509,
+            "p99.9": 7.820436745450308
+          },
+          "p99PerSeedMs": [
+            5.5046137757365035,
+            5.449805030750456,
+            5.470464734380509
+          ],
+          "above10": [
+            {
+              "episodes": 15,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.02579428530828461,
+              "maximumPeakMs": 13.69504564365343,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 16,
+              "observedSeconds": 581.520870938556,
+              "ratePerSecond": 0.027514059769130066,
+              "maximumPeakMs": 13.520608098102457,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 12,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.020635684293420463,
+              "maximumPeakMs": 18.25580350797827,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 0,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 581.520870938556,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            },
+            {
+              "episodes": 0,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.0,
+              "maximumPeakMs": 0,
+              "maximumObservedDurationMs": 0
+            }
+          ]
+        },
+        "halfPauseRate": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.4990751428413205,
+            "p90": 3.202181937036221,
+            "p99": 6.977227413878994,
+            "p99.9": 35.98235833454504
+          },
+          "p99PerSeedMs": [
+            7.103853224046462,
+            6.977227413878994,
+            6.753458816275502
+          ],
+          "above10": [
+            {
+              "episodes": 190,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.32672761390493843,
+              "maximumPeakMs": 75.85432097993908,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 183,
+              "observedSeconds": 581.520870938556,
+              "ratePerSecond": 0.3146920586094251,
+              "maximumPeakMs": 117.00084324454656,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 170,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.29233886082345656,
+              "maximumPeakMs": 94.50478208489949,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 87,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.14960685478805075,
+              "maximumPeakMs": 75.85432097993908,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 79,
+              "observedSeconds": 581.520870938556,
+              "ratePerSecond": 0.1358506701100797,
+              "maximumPeakMs": 117.00084324454656,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 72,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.12381410576052278,
+              "maximumPeakMs": 94.50478208489949,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        },
+        "halfPauseLength": {
+          "medianSeedQuantilesMs": {
+            "p50": 1.5004888128059974,
+            "p90": 3.1904701612107598,
+            "p99": 6.389760642131722,
+            "p99.9": 20.0412501928112
+          },
+          "p99PerSeedMs": [
+            6.60688855458185,
+            6.389760642131722,
+            6.339752317113525
+          ],
+          "above10": [
+            {
+              "episodes": 182,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.31297066174051996,
+              "maximumPeakMs": 45.80341806059732,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 157,
+              "observedSeconds": 581.523419535183,
+              "ratePerSecond": 0.26998052825712765,
+              "maximumPeakMs": 51.75964145317266,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 149,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.25622641330997076,
+              "maximumPeakMs": 46.673655718423106,
+              "maximumObservedDurationMs": 0.0
+            }
+          ],
+          "above20": [
+            {
+              "episodes": 39,
+              "observedSeconds": 581.5241562510863,
+              "ratePerSecond": 0.06706514180153998,
+              "maximumPeakMs": 45.80341806059732,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 37,
+              "observedSeconds": 581.523419535183,
+              "ratePerSecond": 0.06362598436632945,
+              "maximumPeakMs": 51.75964145317266,
+              "maximumObservedDurationMs": 0.0
+            },
+            {
+              "episodes": 31,
+              "observedSeconds": 581.5169407212783,
+              "ratePerSecond": 0.05330885109133619,
+              "maximumPeakMs": 46.673655718423106,
+              "maximumObservedDurationMs": 0.0
+            }
+          ]
+        }
+      },
+      "gatesPerSeed": [
+        {
+          "seed": 20261025,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "p50": false,
+            "p90": false,
+            "p99": true,
+            "burst": true,
+            "acf": {
+              "10": true,
+              "50": true,
+              "100": false,
+              "500": false,
+              "1000": false
+            }
+          }
+        },
+        {
+          "seed": 20261026,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "p50": true,
+            "p90": true,
+            "p99": true,
+            "burst": true,
+            "acf": {
+              "10": true,
+              "50": false,
+              "100": false,
+              "500": false,
+              "1000": false
+            }
+          }
+        },
+        {
+          "seed": 20261027,
+          "full": {
+            "p50": false,
+            "p90": false,
+            "p99": false,
+            "burst": false,
+            "acf": {
+              "10": false,
+              "50": true,
+              "100": true,
+              "500": true,
+              "1000": true
+            }
+          },
+          "clean": {
+            "p50": false,
+            "p90": false,
+            "p99": true,
+            "burst": true,
+            "acf": {
+              "10": false,
+              "50": false,
+              "100": false,
+              "500": false,
+              "1000": false
+            }
+          }
+        }
+      ],
+      "conditionalRttSensitivity": {
+        "interpretation": "Chosen marginal sensitivity, not a fit, direction identification or RTT-time model; base4.974ms and waitUniform0to7ms.",
+        "bothIndependentDirections": {
+          "n": 100000,
+          "mean": 13.432626476247034,
+          "sd": 5.054234894153276,
+          "minimum": 6.076912997345905,
+          "maximum": 120.25785848019746,
+          "p1": 7.764695906513081,
+          "p10": 9.435720918052636,
+          "p50": 12.861472159217652,
+          "p90": 16.68049210828199,
+          "p95": 18.44866903571352,
+          "p99": 34.73918581895859,
+          "p99.9": 69.61049319112873
+        },
+        "downlinkPausesOnly": {
+          "n": 100000,
+          "mean": 13.09063206516723,
+          "sd": 3.9955299876226773,
+          "minimum": 6.076912997345905,
+          "maximum": 114.46690239005478,
+          "p1": 7.75477392577439,
+          "p10": 9.413298423802653,
+          "p50": 12.778542707868887,
+          "p90": 16.347969998728637,
+          "p95": 17.608723513756253,
+          "p99": 25.247519548861185,
+          "p99.9": 57.277796151640786
+        },
+        "identicalDirectionalDelaySensitivity": {
+          "n": 100000,
+          "mean": 13.472558459575554,
+          "sd": 6.784891939569512,
+          "minimum": 5.512863433507428,
+          "maximum": 212.7045130865896,
+          "p1": 7.259573015643582,
+          "p10": 9.06681334755724,
+          "p50": 12.727279841913273,
+          "p90": 17.056437283004794,
+          "p95": 19.050096069674808,
+          "p99": 36.366953058837666,
+          "p99.9": 101.66147907618651
+        }
+      },
+      "cpuTenSecondMeanMin": 53,
+      "cpuTenSecondMeanMax": 100,
+      "contaminated": true,
+      "hostOverlapSamples": 0,
+      "telemetrySeconds": 597,
+      "collectorCpuSeconds": 40.0,
+      "collectorAffinityMask": 48,
+      "timerGapAtLeast6msSeconds": 597,
+      "medianLoopMaximumMs": 16.941055,
+      "maximumLoopDelayMs": 70.778879,
+      "receiveCostAtLeast6msSeconds": 1,
+      "gcAbove5msSeconds": 3,
+      "maxQueueBytes": 11507
+    }
+  ],
+  "spawn": {
+    "summaries": {
+      "all": {
+        "own_joins": 243,
+        "with_known_others": 209,
+        "radial_fraction": {
+          "n": 243,
+          "min": 0.086,
+          "p10": 0.229,
+          "median": 0.493,
+          "p90": 0.636,
+          "max": 0.724
+        },
+        "absolute_distance": {
+          "n": 243,
+          "min": 1146.418,
+          "p10": 3257.119,
+          "median": 6845.386,
+          "p90": 8851.036,
+          "max": 10024.017
+        },
+        "arena_radius": {
+          "n": 243,
+          "min": 12650,
+          "p10": 13259,
+          "median": 13948,
+          "p90": 14252,
+          "max": 14579
+        },
+        "known_body_clearance": {
+          "n": 209,
+          "min": 613.625,
+          "p10": 731.194,
+          "median": 891.048,
+          "p90": 1110.035,
+          "max": 1296.459
+        },
+        "known_head_clearance": {
+          "n": 209,
+          "min": 634.882,
+          "p10": 783.177,
+          "median": 962.425,
+          "p90": 1257.398,
+          "max": 2894.244
+        },
+        "known_body_below_600": 0,
+        "known_body_below_650": 2,
+        "fraction_above_080": 0,
+        "fraction_above_085": 0,
+        "fraction_above_090": 0,
+        "candidate_009_plus_011n_grid": {
+          "within_0002": 243,
+          "median_residual": 1.25e-05,
+          "max_residual": 5.13e-05,
+          "observed_index_min": 7,
+          "observed_index_max": 65
+        },
+        "radial_candidate_cdf_discrepancy": {
+          "area_0.000_to_0.85": 0.3465,
+          "area_0.000_to_0.90": 0.4091,
+          "area_0.000_to_1.00": 0.5094,
+          "area_0.075_to_0.85": 0.3498,
+          "area_0.075_to_0.90": 0.4124,
+          "area_0.075_to_1.00": 0.5126,
+          "radius_0.000_to_0.85": 0.1795,
+          "radius_0.000_to_0.90": 0.2114,
+          "radius_0.000_to_1.00": 0.2857,
+          "radius_0.075_to_0.85": 0.1901,
+          "radius_0.075_to_0.90": 0.2357,
+          "radius_0.075_to_1.00": 0.3125,
+          "triangular_0.075_to_0.90": 0.1144
+        },
+        "joint_radial_visible_clearance": [
+          {
+            "radial_band": [
+              0,
+              0.2
+            ],
+            "joins": 18,
+            "known_body_clearance": {
+              "n": 18,
+              "min": 688.698,
+              "p10": 747.696,
+              "median": 860.795,
+              "p90": 1019.381,
+              "max": 1151.708
+            },
+            "known_others_median": 3
+          },
+          {
+            "radial_band": [
+              0.2,
+              0.4
+            ],
+            "joins": 65,
+            "known_body_clearance": {
+              "n": 65,
+              "min": 660.991,
+              "p10": 723.07,
+              "median": 849.22,
+              "p90": 1095.929,
+              "max": 1296.459
+            },
+            "known_others_median": 3
+          },
+          {
+            "radial_band": [
+              0.4,
+              0.6
+            ],
+            "joins": 111,
+            "known_body_clearance": {
+              "n": 99,
+              "min": 613.625,
+              "p10": 744.6,
+              "median": 910.05,
+              "p90": 1093.684,
+              "max": 1242.86
+            },
+            "known_others_median": 2
+          },
+          {
+            "radial_band": [
+              0.6,
+              0.8
+            ],
+            "joins": 49,
+            "known_body_clearance": {
+              "n": 27,
+              "min": 687.957,
+              "p10": 753.716,
+              "median": 976.521,
+              "p90": 1136.494,
+              "max": 1289.617
+            },
+            "known_others_median": 1
+          },
+          {
+            "radial_band": [
+              0.8,
+              1.0
+            ],
+            "joins": 0,
+            "known_body_clearance": {
+              "n": 0,
+              "min": null,
+              "p10": null,
+              "median": null,
+              "p90": null,
+              "max": null
+            },
+            "known_others_median": null
+          }
+        ]
+      },
+      "development": {
+        "own_joins": 164,
+        "with_known_others": 139,
+        "radial_fraction": {
+          "n": 164,
+          "min": 0.086,
+          "p10": 0.207,
+          "median": 0.504,
+          "p90": 0.636,
+          "max": 0.724
+        },
+        "absolute_distance": {
+          "n": 164,
+          "min": 1146.418,
+          "p10": 2968.305,
+          "median": 6913.594,
+          "p90": 8760.575,
+          "max": 10024.017
+        },
+        "arena_radius": {
+          "n": 164,
+          "min": 12650,
+          "p10": 13202,
+          "median": 13854,
+          "p90": 14246,
+          "max": 14579
+        },
+        "known_body_clearance": {
+          "n": 139,
+          "min": 634.882,
+          "p10": 745.08,
+          "median": 902.507,
+          "p90": 1126.61,
+          "max": 1296.459
+        },
+        "known_head_clearance": {
+          "n": 139,
+          "min": 634.882,
+          "p10": 810.502,
+          "median": 968.171,
+          "p90": 1343.968,
+          "max": 2894.244
+        },
+        "known_body_below_600": 0,
+        "known_body_below_650": 1,
+        "fraction_above_080": 0,
+        "fraction_above_085": 0,
+        "fraction_above_090": 0,
+        "candidate_009_plus_011n_grid": {
+          "within_0002": 164,
+          "median_residual": 1.31e-05,
+          "max_residual": 4.72e-05,
+          "observed_index_min": 7,
+          "observed_index_max": 65
+        },
+        "radial_candidate_cdf_discrepancy": {
+          "area_0.000_to_0.85": 0.3547,
+          "area_0.000_to_0.90": 0.4161,
+          "area_0.000_to_1.00": 0.5143,
+          "area_0.075_to_0.85": 0.3582,
+          "area_0.075_to_0.90": 0.4195,
+          "area_0.075_to_1.00": 0.5176,
+          "radius_0.000_to_0.85": 0.1717,
+          "radius_0.000_to_0.90": 0.214,
+          "radius_0.000_to_1.00": 0.2883,
+          "radius_0.075_to_0.85": 0.1948,
+          "radius_0.075_to_0.90": 0.2396,
+          "radius_0.075_to_1.00": 0.3151,
+          "triangular_0.075_to_0.90": 0.121
+        },
+        "joint_radial_visible_clearance": [
+          {
+            "radial_band": [
+              0,
+              0.2
+            ],
+            "joins": 14,
+            "known_body_clearance": {
+              "n": 14,
+              "min": 688.698,
+              "p10": 729.1,
+              "median": 860.733,
+              "p90": 1019.381,
+              "max": 1110.035
+            },
+            "known_others_median": 3
+          },
+          {
+            "radial_band": [
+              0.2,
+              0.4
+            ],
+            "joins": 43,
+            "known_body_clearance": {
+              "n": 43,
+              "min": 674.34,
+              "p10": 724.297,
+              "median": 870.678,
+              "p90": 1135.363,
+              "max": 1296.459
+            },
+            "known_others_median": 3
+          },
+          {
+            "radial_band": [
+              0.4,
+              0.6
+            ],
+            "joins": 73,
+            "known_body_clearance": {
+              "n": 64,
+              "min": 634.882,
+              "p10": 745.08,
+              "median": 910.05,
+              "p90": 1113.741,
+              "max": 1242.86
+            },
+            "known_others_median": 2
+          },
+          {
+            "radial_band": [
+              0.6,
+              0.8
+            ],
+            "joins": 34,
+            "known_body_clearance": {
+              "n": 18,
+              "min": 745.085,
+              "p10": 823.201,
+              "median": 959.648,
+              "p90": 1255.159,
+              "max": 1289.617
+            },
+            "known_others_median": 1
+          },
+          {
+            "radial_band": [
+              0.8,
+              1.0
+            ],
+            "joins": 0,
+            "known_body_clearance": {
+              "n": 0,
+              "min": null,
+              "p10": null,
+              "median": null,
+              "p90": null,
+              "max": null
+            },
+            "known_others_median": null
+          }
+        ]
+      },
+      "heldout": {
+        "own_joins": 79,
+        "with_known_others": 70,
+        "radial_fraction": {
+          "n": 79,
+          "min": 0.13,
+          "p10": 0.273,
+          "median": 0.482,
+          "p90": 0.647,
+          "max": 0.713
+        },
+        "absolute_distance": {
+          "n": 79,
+          "min": 1834.286,
+          "p10": 3845.269,
+          "median": 6845.386,
+          "p90": 8942.674,
+          "max": 9956.046
+        },
+        "arena_radius": {
+          "n": 79,
+          "min": 13671,
+          "p10": 13789,
+          "median": 14047,
+          "p90": 14252,
+          "max": 14437
+        },
+        "known_body_clearance": {
+          "n": 70,
+          "min": 613.625,
+          "p10": 729.928,
+          "median": 883.348,
+          "p90": 1090.149,
+          "max": 1151.708
+        },
+        "known_head_clearance": {
+          "n": 70,
+          "min": 687.957,
+          "p10": 774.963,
+          "median": 940.735,
+          "p90": 1202.494,
+          "max": 1466.763
+        },
+        "known_body_below_600": 0,
+        "known_body_below_650": 1,
+        "fraction_above_080": 0,
+        "fraction_above_085": 0,
+        "fraction_above_090": 0,
+        "candidate_009_plus_011n_grid": {
+          "within_0002": 79,
+          "median_residual": 1.17e-05,
+          "max_residual": 5.13e-05,
+          "observed_index_min": 11,
+          "observed_index_max": 64
+        },
+        "radial_candidate_cdf_discrepancy": {
+          "area_0.000_to_0.85": 0.3523,
+          "area_0.000_to_0.90": 0.4038,
+          "area_0.000_to_1.00": 0.5037,
+          "area_0.075_to_0.85": 0.3567,
+          "area_0.075_to_0.90": 0.4074,
+          "area_0.075_to_1.00": 0.5069,
+          "radius_0.000_to_0.85": 0.2326,
+          "radius_0.000_to_0.90": 0.2152,
+          "radius_0.000_to_1.00": 0.287,
+          "radius_0.075_to_0.85": 0.1844,
+          "radius_0.075_to_0.90": 0.23,
+          "radius_0.075_to_1.00": 0.3102,
+          "triangular_0.075_to_0.90": 0.1264
+        },
+        "joint_radial_visible_clearance": [
+          {
+            "radial_band": [
+              0,
+              0.2
+            ],
+            "joins": 4,
+            "known_body_clearance": {
+              "n": 4,
+              "min": 791.899,
+              "p10": 791.899,
+              "median": 919.626,
+              "p90": 1151.708,
+              "max": 1151.708
+            },
+            "known_others_median": 3
+          },
+          {
+            "radial_band": [
+              0.2,
+              0.4
+            ],
+            "joins": 22,
+            "known_body_clearance": {
+              "n": 22,
+              "min": 660.991,
+              "p10": 718.141,
+              "median": 813.483,
+              "p90": 1077.485,
+              "max": 1099.248
+            },
+            "known_others_median": 3
+          },
+          {
+            "radial_band": [
+              0.4,
+              0.6
+            ],
+            "joins": 38,
+            "known_body_clearance": {
+              "n": 35,
+              "min": 613.625,
+              "p10": 732.76,
+              "median": 916.813,
+              "p90": 1059.726,
+              "max": 1151.432
+            },
+            "known_others_median": 2
+          },
+          {
+            "radial_band": [
+              0.6,
+              0.8
+            ],
+            "joins": 15,
+            "known_body_clearance": {
+              "n": 9,
+              "min": 687.957,
+              "p10": 729.928,
+              "median": 988.916,
+              "p90": 1096.758,
+              "max": 1119.886
+            },
+            "known_others_median": 1
+          },
+          {
+            "radial_band": [
+              0.8,
+              1.0
+            ],
+            "joins": 0,
+            "known_body_clearance": {
+              "n": 0,
+              "min": null,
+              "p10": null,
+              "median": null,
+              "p90": null,
+              "max": null
+            },
+            "known_others_median": null
+          }
+        ]
+      }
+    },
+    "minimumCorridor": 604.5992092682022,
+    "below550Corridor": 0,
+    "below600Head": 0,
+    "robustBelow530CorridorFresh": 0,
+    "robustBelow580HeadFresh": 0,
+    "above08452": 0,
+    "selectedWitnesses": [
+      {
+        "sha256": "329a4cf5071c249b76db403c16430ae9d38717ac1a60e2250c8afd021eedd9c2",
+        "server": "57.129.37.42:444",
+        "conn": 1,
+        "S": 0,
+        "arena_radius": 14216,
+        "distance_from_center": 5914.017331729761,
+        "radial_fraction": 0.41601134860226235,
+        "known_others": 2,
+        "known_body_clearance": 634.8823513061288,
+        "known_head_clearance": 634.8823513061288,
+        "decoded_server_ms": 0,
+        "nearest_visible_body": {
+          "distance": 634.8823513061288,
+          "snake_id": 354,
+          "segment_index": 2,
+          "body_segment_count": 3,
+          "anchor_age_ms": 0,
+          "head_distance": 634.8823513061288,
+          "corridor_distance": 604.5992092682022,
+          "corridor_nearest": {
+            "distance": 604.5992092682022,
+            "snake_id": 354,
+            "segment_index": 2,
+            "body_segment_count": 3,
+            "anchor_age_ms": 0,
+            "head_distance": 634.8823513061288
+          }
+        },
+        "head_nearest": {
+          "snake_id": 354,
+          "anchor_age_ms": 0,
+          "distance": 634.8823513061288
+        }
+      },
+      {
+        "sha256": "aa9288406f843b7b1ee88a4d14a95b872f9178d8d316aea9d58fe540b48c2d5a",
+        "server": "198.244.231.35:444",
+        "conn": 4,
+        "S": 0,
+        "arena_radius": 13826,
+        "distance_from_center": 10010.42488808542,
+        "radial_fraction": 0.7240289952325633,
+        "known_others": 2,
+        "known_body_clearance": 941.1949213632616,
+        "known_head_clearance": 2140.526626790706,
+        "decoded_server_ms": 0,
+        "nearest_visible_body": {
+          "distance": 941.1949213632616,
+          "snake_id": 436,
+          "segment_index": 0,
+          "body_segment_count": 68,
+          "anchor_age_ms": 0,
+          "head_distance": 2548.520457049538,
+          "corridor_distance": 941.1949213632616,
+          "corridor_nearest": {
+            "distance": 941.1949213632616,
+            "snake_id": 436,
+            "segment_index": 0,
+            "body_segment_count": 68,
+            "anchor_age_ms": 0,
+            "head_distance": 2548.520457049538
+          }
+        },
+        "head_nearest": {
+          "snake_id": 142,
+          "anchor_age_ms": 0,
+          "distance": 2140.526626790706
+        }
+      }
+    ]
+  }
+}
