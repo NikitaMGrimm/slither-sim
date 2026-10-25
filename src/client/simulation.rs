@@ -1132,7 +1132,8 @@ impl SimulatorBackend {
         // co-located lifetimes, including a refill at a just-eaten point.
         for event in births.iter().filter(|event| event.source.is_some()) {
             self.food_presentation.births(std::slice::from_ref(event))?;
-            self.food_index.add(&event.food, true);
+            let color = self.food_presentation.newest(&event.food);
+            self.food_index.add(&event.food, true, color);
         }
         for event in self.world.pickup_events.as_deref().unwrap_or(&[]) {
             if let PickupItem::Prey(prey) = &event.item {
@@ -1153,7 +1154,8 @@ impl SimulatorBackend {
         }
         for event in births.iter().filter(|event| event.source.is_none()) {
             self.food_presentation.births(std::slice::from_ref(event))?;
-            self.food_index.add(&event.food, false);
+            let color = self.food_presentation.newest(&event.food);
+            self.food_index.add(&event.food, false, color);
         }
         self.settle_lives();
         self.tick += 1;
@@ -1193,7 +1195,8 @@ impl SimulatorBackend {
         // Food edited outside physics (fixtures) leaves the index behind.
         if self.food_index.stale || self.food_index.count != self.world.food.len() {
             self.food_presentation.sync(&self.world.food)?;
-            self.food_index.rebuild(&self.world.food);
+            self.food_index
+                .rebuild(&self.world.food, &self.food_presentation);
         }
         self.update_reports()?;
         // HUD clocks run even without recipients, so a join meets their phase.
@@ -1390,7 +1393,7 @@ impl SimulatorBackend {
         for &index in &sectors {
             let listing = &mut table[usize::from(index)];
             if listing.is_none() || self.food_index.dirty.contains(&index) {
-                let run = self.food_index.listing(index, &self.food_presentation);
+                let run = self.food_index.listing(index);
                 if listing.as_ref().is_none_or(|old| old.0 != run) {
                     *listing = Some(Arc::new(SectorFood(run)));
                 }
@@ -1994,22 +1997,28 @@ struct FoodIndex {
     hidden: BTreeSet<u16>,
 }
 
+/// One pellet lifetime, with the color it was born with: a listing may show
+/// a newer pellet while an older one at its position is still hidden.
 #[derive(Clone)]
 struct IndexedFood {
     offset: [u8; 2],
     food: Food,
     shown: bool,
+    color: u8,
 }
 
 impl FoodIndex {
-    fn rebuild(&mut self, food: &[Food]) {
+    fn rebuild(&mut self, food: &[Food], presentation: &FoodPresentation) {
         self.dirty.extend(self.sectors.keys());
         self.sectors.clear();
         self.hidden.clear();
         self.count = 0;
         self.stale = false;
+        let mut lifetimes = FastMap::default();
         for item in food {
-            self.add(item, true);
+            let lifetime = lifetimes.entry(food_identity(item.point())).or_insert(0);
+            self.add(item, true, presentation.color(item, *lifetime));
+            *lifetime += 1;
         }
     }
 
@@ -2018,7 +2027,7 @@ impl FoodIndex {
         Some((u16::from_be_bytes([key[0], key[1]]), [key[2], key[3]]))
     }
 
-    fn add(&mut self, food: &Food, shown: bool) {
+    fn add(&mut self, food: &Food, shown: bool, color: u8) {
         self.count += 1;
         let Some((sector, offset)) = Self::sector(food) else {
             // Off the wire grid; listings never include it.
@@ -2028,6 +2037,7 @@ impl FoodIndex {
             offset,
             food: food.clone(),
             shown,
+            color,
         });
         if shown {
             self.dirty.insert(sector);
@@ -2078,7 +2088,7 @@ impl FoodIndex {
     }
 
     /// The first shown pellet of each wire cell, in offset order.
-    fn listing(&self, sector: u16, presentation: &FoodPresentation) -> Vec<([u8; 2], KnownFood)> {
+    fn listing(&self, sector: u16) -> Vec<([u8; 2], KnownFood)> {
         let mut run: Vec<_> = self
             .sectors
             .get(&sector)
@@ -2095,7 +2105,7 @@ impl FoodIndex {
                     KnownFood {
                         point: food.point(),
                         style: encode::FoodStyle {
-                            color: presentation.color(food),
+                            color: entry.color,
                             size: encode::food_size(size),
                             snake_food: matches!(food.origin, Some(Origin::Boost | Origin::Death)),
                         },
@@ -2640,7 +2650,7 @@ mod tests {
             for event in sim.backend.world.food_spawn_events.as_ref().unwrap() {
                 if event.source == Some(0) {
                     births += 1;
-                    assert_eq!(sim.backend.food_presentation.color(&event.food), 3);
+                    assert_eq!(sim.backend.food_presentation.newest(&event.food), 3);
                 }
             }
         }
@@ -3599,6 +3609,50 @@ mod tests {
     }
 
     #[test]
+    fn a_listing_shows_its_own_pellets_color_beside_a_hidden_older_one() {
+        let ambient = Food {
+            x: 1000.,
+            y: 1000.,
+            value: 1.,
+            size: Some(2.),
+            origin: None,
+        };
+        let death = Food {
+            origin: Some(Origin::Death),
+            ..ambient.clone()
+        };
+        // Find a seed whose ambient color differs from the death palette's.
+        let (presentation, ambient_color, death_color) = (1..100)
+            .find_map(|seed| {
+                let mut presentation = FoodPresentation::new(seed, 1);
+                presentation.register(0, 3, &[]);
+                let births = [(&ambient, None), (&death, Some(0))].map(|(food, source)| {
+                    presentation
+                        .births(&[crate::FoodSpawnEvent {
+                            source,
+                            food: food.clone(),
+                        }])
+                        .unwrap();
+                    presentation.newest(food)
+                });
+                (births[0] != births[1]).then_some((presentation, births[0], births[1]))
+            })
+            .unwrap();
+        // The ambient pellet waits for maintenance; the death pellet is prompt.
+        let mut index = FoodIndex::default();
+        index.add(&ambient, false, ambient_color);
+        index.add(&death, true, death_color);
+        let (sector, _) = FoodIndex::sector(&death).unwrap();
+        let run = index.listing(sector);
+        assert_eq!(run.len(), 1);
+        assert_eq!(run[0].1.style.color, death_color);
+        assert!(run[0].1.style.snake_food);
+        // A rebuild assigns each lifetime its own color too.
+        index.rebuild(&[ambient, death], &presentation);
+        assert_eq!(index.listing(sector)[0].1.style.color, ambient_color);
+    }
+
+    #[test]
     fn a_viewer_holding_a_newer_value_is_corrected_when_the_snake_returns() {
         let known = |motion: [u8; 3], fam| KnownSnake {
             life: 1,
@@ -4035,7 +4089,7 @@ mod tests {
                     color: sim
                         .backend
                         .food_presentation
-                        .color(sim.backend.world.food.last().unwrap()),
+                        .color(sim.backend.world.food.last().unwrap(), 0),
                     size: encode::food_size(2.),
                     snake_food: false,
                 }
