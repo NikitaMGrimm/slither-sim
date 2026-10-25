@@ -1,8 +1,7 @@
 # Documentation
 
-Start with the [quick start](../README.md#quick-start) to run a local bot.
-For a code change, start with [contributing](../CONTRIBUTING.md): setup, source
-owners, focused tests and the evidence each kind of change needs.
+Run a local bot with the [quick start](../README.md#quick-start). For code changes,
+see [contributing](../CONTRIBUTING.md): setup, owners, focused tests and evidence.
 
 ## Use the simulator
 
@@ -34,9 +33,8 @@ Maintainer references:
 [releasing](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md),
 [provenance](provenance.md) and [changelog](../CHANGELOG.md).
 
-Update the guide that owns the behavior. Put distinct dated studies under
-`research/<topic>/YYYY-MM-DD-<question>/REPORT.md`; a routine fix needs no new
-report. Keep selected regressions in `tests/fixtures/` and full recordings,
-binaries and generated outputs outside Git. Current guides and the release
-guide ship in the Rust crate; use repository URLs for research, tools,
-integration tests and other maintainer files excluded from that package.
+Update the guide that owns the behavior; follow the
+[evidence placement rules](../CONTRIBUTING.md#rationale-and-evidence) for studies
+and fixtures. Current guides and the release guide ship in the Rust crate; link
+to excluded research, tools, integration tests and other maintainer files with
+repository URLs.

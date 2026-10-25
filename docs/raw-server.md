@@ -1,8 +1,8 @@
 # Protocol-19 WebSocket server
 
-`slither-sim host` serves one shared world at `ws://127.0.0.1:8766/slither`.
-Use it for custom servers and socket-based bots. For virtual-time runs without
-socket overhead, use `SimulatorBackend` through the [portable API](client-api.md).
+`slither-sim host` serves a shared world at `ws://127.0.0.1:8766/slither` for
+custom servers and socket-based bots. For virtual time without sockets, use
+`SimulatorBackend` through the [portable API](client-api.md).
 
 From the checkout:
 
@@ -21,8 +21,8 @@ No game UI is served.
 
 ## Configuration
 
-The [configuration reference](configuration.md) lists every host/world setting,
-default and limit, including [timing and ping](configuration.md#timing-and-ping).
+The [configuration reference](configuration.md) owns host/world defaults,
+limits and [timing and ping](configuration.md#timing-and-ping).
 
 Save as `arena.json`:
 
@@ -47,35 +47,30 @@ Save as `arena.json`:
 }
 ```
 
-The 1,500-unit arena and eight slots keep this example small. Food settings scale
-the existing provisional ecology estimate: about 7 pellets and 0.1024 placement
-attempts/s per 300×300 sector. `dt` is the measured 7 ms tick. This is not an
-official server preset; six prey is an explicit local choice to exercise prey
-gameplay, not a measured global population. See [rules and limits](server-rules.md).
+This small 1,500-unit, eight-slot example scales the
+[provisional food model](configuration.md#official-and-sandbox) and uses the
+measured 7 ms tick. Six prey is a local gameplay choice, not a measured global
+population or an official preset.
 
 ```sh
 cargo run --release --locked -- host --config arena.json
 ```
 
-`maxClients` reserves remote slots; `bots` adds food-seeking bots. Together they
-may number 65,535, which the `u16` snake IDs, leaderboard rank and population
-fields can count. The host derives `simulation.agents`
-and `controlledSlot` from these counts. `slither-sim host` prints warnings about
-valid but unmeasured settings to stderr; see [limits](configuration.md#limits). Host `recordWire` must be false; enable recording on a client instead.
+[`HostConfig`](configuration.md#hostconfig) defines reserved remote slots,
+background bots and derived simulation fields. Valid but unmeasured settings
+warn on stderr; see [limits](configuration.md#limits). Record on a client;
+host `recordWire` must be false.
 
-`--bind IP:PORT` overrides the file. Real sockets already include network and
-compute delay; configured latency adds another ordered link. Keep added latency
-at zero for normal remote use; on loopback, the
-[measured route](configuration.md#variation-and-pauses) gives every connection,
-bots included, an official-like path. Client processing delay is not simulated
-twice.
+`--bind IP:PORT` overrides the file. Leave added latency at zero for normal
+remote use. On loopback, the [measured route](configuration.md#variation-and-pauses)
+models an official-like path for every connection, including bots. See
+[`LatencyConfig`](configuration.md#latencyconfig) for ordered delays and
+processing, which is not simulated twice for remote clients.
 
 ### Presets
 
-`simulation.world` accepts `"preset": "official"`, `"sandbox"` or `"battledome"`;
-explicit fields override the preset's values. Omitted settings without a preset
-use the documented defaults. See [presets](configuration.md#presets) and
-[Battledome](configuration.md#battledome).
+Select a world with `simulation.world.preset`; see
+[preset names, overrides and defaults](configuration.md#presets).
 
 For Battledome, save this minimal host config and pass it to `host --config`:
 
@@ -83,24 +78,15 @@ For Battledome, save this minimal host config and pass it to `host --config`:
 {"simulation":{"world":{"preset":"battledome"}}}
 ```
 
-It keeps the default remote slots and background bots. The stock browser receives
-normal gameplay packets; it has no pit overlay or rolling kill-score display.
+This keeps default remote slots and bots. See
+[Battledome rules and bot visibility](configuration.md#battledome) for its custom
+mechanics and stock-browser limits.
 
-Native and remote clients share finite snake/prey coverage (`world.vision`, default
-1,500). Snakes remain visible while any centerline segment is covered. Food uses
-a separate 45-sector entry stencil with heading lead and temporal retention.
-These are approximations with [measured constraints and known gaps](server-rules.md);
-the browser does not send its viewport or zoom to this host.
-
-Human joins and hosted bot lives, including startup, request 600-unit clearance
-between the complete newborn body and living heads/bodies. Crowded admission
-waits or fails without near-contact fallback. This conservative model is not an
-identified official exclusion rule.
-
-The host world defaults to `Config::official(1)`; Rust callers can choose
-`Config::official(n)`, `Config::sandbox()` or `Config::battledome()`. The official
-model has [known approximations](configuration.md#official-and-sandbox);
-Battledome is a custom mode.
+Native and remote clients share the
+[coverage and spawning models](server-rules.md#client-delivery-and-spawning),
+including hosted bot startup. The browser sends no viewport or zoom to the host.
+For Rust constructors and the default `Config::official(1)`, see
+[world settings](configuration.md#official-and-sandbox).
 
 ## VPS use
 
@@ -114,24 +100,21 @@ The host serves plain `ws`. For `wss`, use a TLS reverse proxy forwarding
 WebSocket upgrades on `/slither`; HTTPS browser pages require `wss`.
 Game assets are not included.
 
-The simulation thread owns the world, runs physics and encodes updates every
-tick. A separate socket thread owns the listener and nonblocking connections;
-it sends each frame at its latency-model delivery time, without waiting for the
-next physics tick. Actual delivery also depends on OS scheduling and host load.
-Slow clients are disconnected before exhausting output buffers. An overloaded
-host defers wall-clock ticks and shifts the shared delivery schedule; it slows
-world time without skipping physics.
+The simulation thread owns the world, physics and per-tick encoding. A separate
+socket thread owns the listener and nonblocking connections, releasing frames
+at latency-model due times between ticks. OS scheduling and load affect delivery.
+Slow clients disconnect before exhausting output buffers. Overload defers
+wall-clock ticks and shifts delivery, slowing world time without skipping physics.
 
-`botThreads` (default 2) runs background seekers off the simulation thread.
-Each bot decodes its own slot's frames, decides every `decisionTicks × dt` with
-staggered phases, models processing delay, pings and rejoins after death.
-At least one worker is required when `bots > 0`; the host starts no more workers
-than bots. Socket clients choose their own decision intervals.
+`botThreads` runs background seekers separately. Each decodes its slot's frames,
+decides every `decisionTicks × dt` with staggered phases, models processing delay,
+pings and rejoins after death. See [worker limits](configuration.md#hostconfig)
+and [decision timing](configuration.md#timing-and-ping).
 
 ## Embedding and load checks
 
 `Host::bind(config)?.start()?` consumes the bound host and returns `RunningHost`.
-Keep that handle alive while serving. `Host::poll()` has been removed.
+Keep the handle alive while serving.
 
 | `RunningHost` method | Meaning |
 | --- | --- |
@@ -161,11 +144,9 @@ records exploratory results from one shared Windows desktop.
 
 ## Packet compatibility
 
-[Presentation](#presentation) describes pellet colors and their evidence limits.
-
-The host uses the native simulator's encoder. Packet layouts follow protocol 19;
-world values, compression choices and update schedules can differ from official
-sessions. See [mechanics and delivery limits](server-rules.md) and
+The native simulator's encoder uses protocol-19 layouts; world values,
+compression and schedules can differ from official sessions. See
+[mechanics and delivery limits](server-rules.md), [presentation](#presentation) and
 [protocol sources](provenance.md#protocol-references).
 
 | Direction | Supported messages |
@@ -183,44 +164,32 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 
 ### Reports and game-over
 
-- `l`: top ten living snakes, recipient rank and population, on a server-wide
-  clock of `leaderboardIntervalSeconds` (default 3.008) after the recipient's
-  own snake appears.
+- `l`: top ten living snakes, recipient rank and population, after the recipient's
+  own snake appears; see [report clocks](server-rules.md#packet-timing).
 - `k`: simulator collision-attributed kills.
-- `F`: nonempty sector listings on entry; empty subscriptions stay internal and
-  send neither `W` nor an empty `F`. Births/pickups update subscribed food;
-  `w` clears on exit. See [food delivery](server-rules.md#food-sector-delivery).
-- `M`/`V`: a global minimap (136×136 by default, configurable via
-  `simulation.minimapSide`) on its own server-wide clock (default 2.504 s),
-  before gameplay updates, after any pongs.
-  First, reconnected and resized maps use full `M`; later maps use XOR `V` only
-  when strictly shorter than `M`, against that connection's last queued bitmap.
-  Living heads and body centerlines are rasterized; the stock client draws its
-  own player marker. This compression choice is local; exact official pixel
-  filtering and full/delta selection remain unknown. See
-  [minimap encoding](server-rules.md#minimap-encoding).
+- `F`/`w` and birth/pickup deltas: [sector food delivery](server-rules.md#food-sector-delivery).
+- `M`/`V`: [global minimap](server-rules.md#client-delivery-and-spawning), with
+  [per-connection encoding](server-rules.md#minimap-encoding). The stock client
+  draws its own player marker; set resolution with `simulation.minimapSide`.
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.
-- With `simulation.localRecords: true`, `m` shows the highest-scoring completed
-  life in this world run; resets with the world. This feature is off by default:
-  official qualification, persistence and reset rules have not been established.
+- With `simulation.localRecords: true` (default false), `m` shows the highest-scoring
+  completed life in this world run, resetting with the world. Official
+  qualification, persistence and reset rules remain unknown.
   A qualifying death sends `v1` for victory-message entry, other deaths `v0`.
   The owning dead connection/life may submit once (including empty text); `v2`
   acknowledges. Slot reuse cannot edit that record.
-- An open dead session still answers pings, including during victory entry.
-  The stock browser keeps pinging through its death fade; withholding replies
-  triggers its lag detector and slows the return to Play Again. Gameplay
-  controls remain ignored after game over. This is a local compatibility policy.
+- Dead sessions answer pings, including during victory entry, but ignore gameplay
+  controls. The stock browser pings through its fade; withholding replies triggers
+  its lag detector, slowing Play Again. This is a local compatibility policy.
 - Opponent and food updates continue around the dead player's final position;
   prey retain their periodic reporting clock. Game-over and own removal are sent
   once; minimap updates stop. Otherwise the browser extrapolates stale opponents
   through the fade. The native bot frame stays dead with no playable observation.
 
-The stock browser owns its death fade and return-to-play timing. The host keeps
-streaming and answering pings until the client closes, including during victory
-entry. It sets no fixed menu timer. Delivery remains subject to configured tick
-cadence, link delays and host load.
+The stock browser owns death-fade and return-to-play timing; the host has no menu
+timer and streams until closure. Tick cadence, link delays and load affect delivery.
 
 These ranking and record rules are local policies; packet cadences use a
 [partial model with measured constraints](server-rules.md#packet-timing).
@@ -229,15 +198,12 @@ this remains an approximation. Ignored unknown packets are not decoded features.
 
 ## Presentation
 
-Pellet colors are assigned by a separate seeded presentation RNG, outside physics
-and bot observations. Colors persist across source death, reconnects and sector
-re-entry. The [presentation fixture](../tests/fixtures/client-presentation.json)
-retains pooled ambient weights and stock/custom recipes; the current model limits
-are in [mechanics and delivery](server-rules.md#client-delivery-and-spawning).
-Primary skins 0–8 select matching boost/death colors; unknown skins use an
-approximate modulo-9 fallback. Birth/pickup telemetry supplies colors and eater
-IDs without guessing from proximity. The wire exposes the first co-located pellet;
-physics consumes co-located pellets in insertion order before ambient refill.
+See [pellet presentation and evidence limits](server-rules.md#client-delivery-and-spawning)
+and the [presentation fixture](../tests/fixtures/client-presentation.json).
+Colors are outside physics and bot observations, persisting across source death,
+reconnects and sector re-entry. Birth/pickup telemetry supplies colors and eater
+IDs. The wire exposes the first co-located pellet; physics consumes co-located
+pellets in insertion order before ambient refill.
 
 ## Stock browser client
 

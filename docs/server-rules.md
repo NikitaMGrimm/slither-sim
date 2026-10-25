@@ -1,40 +1,37 @@
 # Mechanics and delivery limits
 
-SlitherSim combines protocol-19 measurements, client constants and explicit
-models. The official server is closed source; packet agreement does not identify
-its full algorithms. This page owns the current behavior and its evidence limits;
+SlitherSim combines protocol-19 measurements, client constants and models.
+The official server is closed source; packet agreement cannot identify its full
+algorithms. This guide owns current behavior and evidence limits;
 [research records](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md)
 retain dated measurements, failed fits and counterexamples.
 
 ## Defaults
 
-`Config::default()` is `Config::official(1)`. `Config::sandbox()` uses the same
-mechanics in a compact fixed arena. Neither is an exact official replica. See
-[configuration](configuration.md#official-and-sandbox) for all defaults and overrides.
+See [configuration](configuration.md#official-and-sandbox) for official and
+sandbox defaults and overrides. Neither is an exact official replica.
 
-[`Config::battledome()`](configuration.md#battledome) is a custom mode. Its pit,
-size floor and free boost at the floor are design choices, not official-server
-measurements; the linked reference owns those rules and their regression tests.
+[`Config::battledome()`](configuration.md#battledome) owns its custom pit,
+size-floor and free-boost rules and synthetic regressions. These are design
+choices, not official-server measurements.
 
 The radius controller, food admission limits, prey population, kiosk penalty and
 rim sliding are provisional. In particular:
 
-- Dynamic radius is enabled; use recorded `radiusUpdates` with
-  `dynamicRadius: false` for measured replay.
-- A 75-unit cell admits a new ambient, boost or death pellet only while it holds
-  fewer than 2, 9 or 22 pellets of any kind, respectively. Rejected boost
-  emission still spends mass.
-- The prey target is a working density assumption, not a measured global census.
-- Kiosk is enabled. Set `kiosk.enabled: false` for motion replays where it should
-  not affect trajectories. The historical [WORM Labs study](https://www.reddit.com/r/Slitherio/comments/1dagyjq/worm_labs_inc_study_on_new_kiosk_penalty/)
-  motivates the model; current official onset and recovery remain unverified.
+- For measured radius replay, use [recorded samples](configuration.md#world-config).
+- [Food admission limits](configuration.md#food-admission-limits) count all origins
+  toward occupancy, with origin-specific caps.
+- The [prey target](configuration.md#official-and-sandbox) is a density assumption,
+  not a measured global census.
+- The historical [WORM Labs study](https://www.reddit.com/r/Slitherio/comments/1dagyjq/worm_labs_inc_study_on_new_kiosk_penalty/)
+  motivates [kiosk](configuration.md#kiosk-penalty); current official onset and
+  recovery remain unverified.
 
 ## Packaged regression evidence
 
-Tests are under `tests/`, fixtures under `tests/fixtures/`; the published crate
-omits both, apart from fixtures its unit tests read. Fixtures identify their
-sources, methods and hashes. Tests run without the full recordings, but repeating
-measurements may require those local-only archives.
+`tests/` and `tests/fixtures/` are excluded from the crate except unit-test
+fixtures. Fixtures name sources, methods and hashes. Tests need no full recordings;
+repeating measurements may require those local-only archives.
 
 | Rule | Tests and fixtures | Evidence limit |
 | --- | --- | --- |
@@ -52,9 +49,9 @@ measurements may require those local-only archives.
 ## Client delivery and spawning
 
 The [`serve` controller](bot-api.md#frames) exposes immediate simulation state,
-including the entire stored record of a visible opponent. The [portable client
-API](client-api.md) reconstructs delivered messages with timing and receipt ages.
-A receipt, a reconstructed pose and renderer prediction are different states.
+including visible opponents' entire stored records. The [portable API](client-api.md)
+reconstructs delivered messages with timing and receipt ages. Receipts,
+reconstructed poses and renderer predictions are distinct states.
 
 | Area | Implemented behavior | Evidence and regression |
 | --- | --- | --- |
@@ -62,38 +59,36 @@ A receipt, a reconstructed pose and renderer prediction are different states.
 | Snakes | Complete centerline intersects `world.vision`, default 1,500. | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
 | Prey coverage | Points checked independently at the same configurable distance. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
 | Hosted spawning | Radial-lattice candidates, or the configured `spawnRadius` ring; complete newborn body clears living heads/body edges by 600 units. Crowded admission waits or fails without a cramped fallback. | `spawn.rs` and host tests. Observed own joins include exceptions below 600; this is conservative local admission. Initial geometric test rings are synthetic. |
-| Minimap | Global living centerlines, 136×136 by default, server-wide 2.504 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
-| Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins select boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes and pooled ambient counts. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
+| Minimap | Global living heads and body centerlines, 136×136 by default, server-wide 2.504 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
+| Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins 0–8 select matching boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes, pooled ambient counts and weights. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
 
 The [visibility study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
-preserves food counterexamples and unsuccessful crossing acquisitions. No follow-up
-validated a replacement snake/prey subscription rule. The current collector's
-bounded-staleness pause has offline coverage; live route completion remains to be
-shown before fitting a rule.
+retains food counterexamples and unsuccessful crossings; no follow-up validated
+a replacement snake/prey subscription rule. The collector's bounded-staleness
+pause has offline coverage; live route completion is still required before fitting.
 
 ### Food sector delivery
 
-The host keeps empty subscriptions internal. Nonempty entry listings use `F`,
-subsequent births/pickups use deltas, and `w` clears recipient food on exit without
-deleting physical food. The first birth in an already empty subscription uses a
-birth delta; this is a local choice. The food fixture retains the full-archive
-announcement census as well as selected entry witnesses. Decoder support for
-other packet forms does not require the host to emit them.
+Empty subscriptions send neither `W` nor empty `F`. Nonempty entries use `F`,
+births/pickups use deltas, and `w` clears recipient food on exit without deleting
+physical food. The first birth in an empty subscription uses a birth delta, a
+local choice. The food fixture retains the full-archive announcement census and
+selected entry witnesses. Decoding other packet forms does not require emitting them.
 
 ### Minimap encoding
 
 Each connection retains its last queued bitmap. First/reconnected/resized maps
-use full `M`; later maps use XOR `V` only when strictly shorter. The base advances
-after queuing that recipient's packet. Both forms reconstruct the bitmap; this
-shortest-encoding policy is local and differs from some retained official choices.
+use full `M`; later maps use XOR `V` only when strictly shorter. Queuing advances
+that recipient's base. Both reconstruct the bitmap; this local shortest-encoding
+policy differs from some retained official choices.
 
 ### Packet timing
 
-Physics ticks default to 7 ms. Gameplay updates are encoded every tick, omitting
-empty frames. The
+Physics ticks default to 7 ms, encoding gameplay every tick without empty frames.
+The
 [scheduler study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md)
-supports separate release paths and shared entity/maintenance phases. The
-following gates are adopted inferences, not an exact recovered implementation:
+supports separate release paths and shared entity/maintenance phases.
+These gates are adopted inferences, not an exact recovered implementation:
 
 | Family | Simulator release rule |
 | --- | --- |
@@ -105,46 +100,44 @@ following gates are adopted inferences, not an exact recovered implementation:
 
 The corpus includes sub-35 ms motion gaps, sub-100 ms mass gaps, 27 reverse
 mass/motion pairs and a 2,694 ms same-prey correction gap with other traffic
-continuing. The simulator's strict gates, common ordering and bounded prey
-corrections do not reproduce every exception. Exact dirty comparators, rearm
-rules, event-to-send deadlines and visibility triggers remain unknown.
-An incremental food index and snake coverage grid reduce work while preserving
-wire selection and ordering; they are performance mechanisms, not official rules.
+continuing. Strict gates, common ordering and bounded prey corrections miss
+these exceptions. Exact dirty comparators, rearm rules, event-to-send deadlines
+and visibility triggers remain unknown. Incremental food indexing and a snake
+coverage grid preserve wire selection/order as performance mechanisms, not rules.
 
-Each tick reads every input and ping that arrived during it, and the frame it
-sends leads with any pongs. Officially, input reflection takes about one ping
-round trip (median 13.2 vs 13.4 ms on one route) and pings return in as little
-as 4.9 ms, so neither waits an extra tick; the exact receive-to-send deadline
-is unknown. Pongs lead 81,830 of 81,843 official pong frames.
+Each tick reads all inputs and pings received during it; pongs lead its frame.
+Official input reflection takes about one ping round trip (median 13.2 vs
+13.4 ms on one route); pings return in as little as 4.9 ms. Neither waits an extra
+tick, but the receive-to-send deadline is unknown. Pongs lead 81,830 of 81,843
+official pong frames.
 
-Minimaps and leaderboards follow two independent server-wide clocks. Officially
-both are shared by all recipients, reconnects join the running phase, and mean
-periods are 2503.994/3008.062 ms rather than 2500/3000. The simulator services
-absolute periods of 2.504/3.008 s at the first tick in each, so a first map or
-board waits for the next clock opportunity after entry, plus tick and link delay.
-Maps precede gameplay updates, after any pongs. Why
-official periods exceed 2.5/3 s is unknown; nominal thresholds rearmed after
-service would fit, but the simulator only reproduces the mean.
+Minimaps and leaderboards have independent server-wide clocks. Official periods
+average 2503.994/3008.062 ms rather than 2500/3000; all recipients share each
+clock, and reconnects join its running phase. The simulator services absolute
+2.504/3.008 s periods at their first tick. First maps/boards wait for the next
+opportunity after entry, plus tick and link delay. Maps follow pongs and precede
+gameplay. The excess over 2.5/3 s is unexplained; rearming nominal thresholds
+after service would fit, but the simulator reproduces only the mean.
 
-Setup advertises the active prey turn rate in reference-frame units (default
-`mamu2=0.029`), as checked by `client-hud-leaderboard.json`. The cadence fixture
-pins a selected epoch with source/tool hashes; it is not a universal timing bound.
-Use the [packet census](research-workflow.md#inspect-analyze-and-reproduce) for new
-captures and [configuration](configuration.md#timing-and-ping) for local settings.
+Setup advertises prey turn rate in reference-frame units (default `mamu2=0.029`);
+`client-hud-leaderboard.json` checks it. The cadence fixture pins one epoch with
+source/tool hashes, not a universal timing bound. See the
+[packet census](research-workflow.md#inspect-analyze-and-reproduce) for new captures
+and [configuration](configuration.md#timing-and-ping) for local settings.
 
 ## Ecology models
 
 Population-scaled radius, food target/refill, radial food profile and prey density
-are models. Recipient arrivals and occupancy cannot identify rejected generation,
-global counts or startup seeding. A later matched-sector check rejected the earlier
-ambient-replacement association, so it supplies no refill retuning.
+are models. Recipient arrivals/occupancy cannot identify rejected generation,
+global counts or startup seeding. A matched-sector check rejected the earlier
+ambient-replacement association; it supplies no refill retuning.
 
-The radius controller is known to differ from retained observations. In
+The radius controller contradicts retained observations. In
 `run4-radius-long-20260927/bot0.jsonl.gz` (SHA-256
 `3180b8201f51d5f4fe9732b6c69e85bab8ce49448742a2a72cfd228ef60613ef`),
 connection 4, server time 292,116→292,243 ms, radius grows 13,940→13,947 faster than
-the model's expansion cap. Its replacement remains unidentified; replay recorded
-`radiusUpdates` rather than installing the fastest observed slope as a new cap.
+the model's expansion cap. The replacement is unidentified; replay recorded
+`radiusUpdates` rather than adopting the fastest observed slope as a cap.
 
 ## Movement and geometry
 
@@ -152,14 +145,13 @@ Historical source: `slither-arena-rs` commit
 `c2fb7285febb4273034e30699dc880715a334423`. Its `movement-fidelity.md`,
 `speed-equations.md`, `circle-eating-investigation.md`,
 `official-collisions-20261003.md` and `body-geometry.md` retain the fitted turning,
-speed, pickup, collision and contraction choices. The corresponding selected
-fixtures are packaged here; the full original studies are not.
+speed, pickup, collision and contraction choices. Selected fixtures are packaged
+here; full original studies are not.
 
-The retained 1,567 fixed-size speed ramps support those slopes, not growth during
-a ramp. The simulator moves all snakes before resolving collisions, whereas the
-Android offline client moves and tests each in sequence. Online phasing remains
-unverified. Selected near-rim prey removals constrain received motion but do not
-establish global deletion or its activation rule.
+The 1,567 fixed-size speed ramps support their slopes, not growth during a ramp.
+The simulator moves all snakes before resolving collisions; the Android offline
+client moves/tests each in sequence. Online phasing is unverified. Selected
+near-rim prey removals constrain received motion, not global deletion or its trigger.
 
 ## Open contributions
 

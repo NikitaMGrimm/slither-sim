@@ -1,12 +1,10 @@
 # Configuration reference
 
-These are the world, host and portable-client settings. JSON uses camelCase;
-Rust fields use snake_case. Omitted fields use defaults; unknown fields are
-rejected. Durations are seconds unless named `Ticks`; distances are world units.
-Defaults below are constructor defaults, not the customized server example.
-World `Config` is available in core-only builds; the host and portable-client
-configs require the default-enabled `networking` feature. [Limits](#limits)
-explains why each remaining bound exists.
+World, host and portable-client settings use camelCase in JSON and snake_case
+in Rust. Omitted fields use constructor defaults; unknown fields are rejected.
+Durations are seconds unless named `Ticks`; distances are world units.
+World `Config` supports core-only builds; host and portable-client configs need
+the default-enabled `networking` feature. [Limits](#limits) explains the bounds.
 
 | Entry point | Configuration object |
 | --- | --- |
@@ -20,31 +18,24 @@ Every world `Config` object also accepts a [`preset`](#presets).
 ## Timing and ping
 
 - `world.dt: 0.007`: physics advances every 7 ms, about 143 ticks/s.
-- Gameplay updates are encoded every physics tick; empty frames are omitted.
-  Packet families have separate release rules, not a recipient-wide batch.
 - `decisionTicks: 6`: virtual-time bot decisions and host background bots use
   a nominal 42 ms cadence; processing can delay a decision. Remote clients choose
   their own decision interval.
 
-Motion, mass, food and prey have
-[per-family release rules](server-rules.md#packet-timing). Minimaps and
-leaderboards use independent server-wide clocks; joins and reconnects meet their
-running phase. The default periods below reproduce measured official means,
-not an exact recovered scheduler.
+See [packet timing](server-rules.md#packet-timing) for per-family release rules
+and shared minimap/leaderboard phases. Their default periods reproduce measured
+official means, not an exact recovered scheduler.
 
-Ping is a measured round trip, not a target the server needs you to set. Native
-clients send game pings automatically after setup, with at most one outstanding.
-For a real host, leave artificial latency at zero: sockets and server processing
-already take time. The [server example](raw-server.md#configuration) adds none.
-Zero added delay does not imply a measured ping of zero: input and pings that
-arrive during a tick are answered in that tick's frame, pongs first, so the
-host normally adds up to one physics tick (7 ms by default) before the reply.
-OS scheduling and host load can add more.
+Ping measures round-trip time. Native clients ping automatically after setup,
+with at most one outstanding. Leave artificial latency at zero on real hosts,
+as in the [server example](raw-server.md#configuration): sockets and processing
+already take time. [Same-tick replies](server-rules.md#packet-timing) normally
+add up to one physics tick (7 ms by default); OS scheduling and load can add more.
 
 For virtual-time training, `latency.roundTripSeconds: [0.06]` models a 60 ms base
-round trip; it is split evenly unless `uplinkShare` changes. Tick scheduling,
-variation and pauses can affect the measured result. Do not add the same delay
-at both ends of a real connection unless that extra delay is intentional.
+round trip, split evenly unless `uplinkShare` changes. Scheduling, variation and
+pauses affect measured RTT. Adding delay at both ends of a real connection adds
+both delays.
 
 ## HostConfig
 
@@ -76,16 +67,14 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `latency` | Zero added delay | Link and processing settings below. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
 
-Each tick sends at most three new body anchors per snake incrementally. When
-`world.dt × 437.5 ≥ 126` world units, a boosting snake can outrun that window in
-one tick and is resent in full, which costs bandwidth but stays correct; such
-configs load with a warning. All possible arena radii must be at
-most 32,000 (an encoding-margin [policy](#limits)), and configured prey speeds
-must satisfy `round(speed × 32) ≤ 65535` and the turn rate
-`round(turnRate × 8) ≤ 65535`. The largest attainable prey
-size on the 0.2-unit spawn grid must not exceed 51, the maximum encodable in an
-appearance packet. Range endpoints may exceed 51 if they still only produce
-representable sizes (for example, `size: 51, maxSize: 51.01`).
+Incremental updates send at most three new body anchors per snake per tick.
+When `world.dt × 437.5 ≥ 126` world units, boosting snakes can outrun this window;
+full resends preserve correctness at extra bandwidth cost and configs warn.
+All possible arena radii must be at most 32,000 (an encoding-margin
+[policy](#limits)). Prey require `round(speed × 32) ≤ 65535`,
+`round(turnRate × 8) ≤ 65535` and a largest attainable 0.2-grid size ≤ 51, the
+appearance packet's maximum. Endpoints may exceed 51 if all attainable sizes
+fit (for example, `size: 51, maxSize: 51.01`).
 
 ## World Config
 
@@ -108,19 +97,17 @@ representable sizes (for example, `size: 51, maxSize: 51.01`).
 | `ambientFood` | Defaults below | Ambient-food admission limit. |
 | `boostFood` | Defaults below | Boost-food admission limit. |
 | `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary; entry allowed, exit lethal. Uses the head center's swept path; see [Battledome](#battledome). |
-| `spawnRadius` | `null` | Ring of new lives: their anchors lie 42 apart along this circle, and they head along it. `add` keeps its ring angles and turns counterclockwise; the host draws a uniform angle and direction. The body chords must clear `pit.radius` (`spawnRadius > hypot(pit.radius, 21)`), the ring must stay more than 60 (the spawn wall margin) inside `radius`, and the head-tail gap must exceed the new life's body diameter. Validation includes a floating-point rounding margin for every spawn angle. `null` keeps the official radial grid and straight 2-segment newborns. |
+| `spawnRadius` | `null` | New lives follow this ring with anchors 42 apart. `add` keeps its ring angles, turning counterclockwise; the host samples uniform angle and direction. Body chords must clear the pit (`spawnRadius > hypot(pit.radius, 21)`); the ring must stay more than 60 (spawn wall margin) inside `radius`; head-tail gap must exceed newborn body diameter. Validation allows for floating-point rounding at every angle. `null` keeps the official radial grid and straight 2-segment newborns. |
 | `killScoreSeconds` | `null` | Positive finite rolling kill-score window, per slot across lives; `null` reads as 0. See [score semantics](#battledome). |
-| `minScore` | `null` | Permanent size floor as an integer displayed score, 10–18,436,960; requires `spawnRadius`. The upper bound is the score at 430 segments, where the score table ends; larger snakes display less, so a higher floor could be broken by growth. Converted to mass when the world is created. See [floor behavior](#battledome). |
+| `minScore` | `null` | Permanent integer displayed-score floor, 10–18,436,960; requires `spawnRadius`. Converted to mass at world creation. The maximum is the score at the table's end, 430 segments; larger snakes display less, so growth could break a higher floor. See [floor behavior](#battledome). |
 
-`radiusUpdates` sets radius at each supplied sample, overriding the model at that
-tick. For recorded replay, set `dynamicRadius` false to avoid model changes
-between samples. See [rules and evidence limits](server-rules.md).
-
-The world and prey defaults are `Config::official(1)`.
+`radiusUpdates` overrides the model at each sample's tick. For recorded replay,
+set `dynamicRadius` false to prevent model changes between samples. See
+[rules and evidence limits](server-rules.md).
 
 ### Official and sandbox
 
-Both Rust constructors return the same `Config` type:
+Both constructors return `Config`:
 
 | Constructor | Result |
 | --- | --- |
@@ -128,25 +115,23 @@ Both Rust constructors return the same `Config` type:
 | `Config::sandbox()` | `Config::official(1)` with radius 1000, fixed boundary, food target 350, 5 ambient attempts/s and no prey. |
 
 `Config::default()`, omitted JSON fields, `SimulationConfig` and `host` use
-`Config::official(1)`. It is the best current approximation, not an exact
-official replica. It keeps the provisional kiosk penalty, food cell limits, rim
-sliding, retained boost speed and radius model; the sandbox shares them.
+`Config::official(1)`. Both share provisional kiosk, food admission, rim sliding,
+retained boost speed and radius models rather than exact official rules;
+see [evidence limits](server-rules.md#defaults).
 
-`n` initializes radius, food and prey targets; it does not spawn snakes. With
-dynamic radius, the living population then drives the radius (unoccupied remote
-slots do not count); food and prey targets are not rescaled. One snake is a
-deliberately small start, not a typical official lobby; request
-`Config::official(n)` or set world fields explicitly for larger scenes.
+`n` initializes radius, food and prey targets without spawning snakes. Dynamic
+radius then follows living population, excluding unoccupied remote slots;
+food and prey targets stay fixed. One snake is a deliberately small start,
+not a typical official lobby; use `Config::official(n)` or explicit world fields
+for larger scenes.
 
-The prey density of one per 10 million square units is a working assumption,
-not a calibrated global population. Received density near recorded recipients,
-about 0.04–0.18 per million square units, is a lead rather than a census; the
-official prey population remains unresolved. The
+Prey density is a working assumption, not a calibrated global population.
+Received density of about 0.04–0.18 per million square units near recorded
+recipients is a lead, not a census. The
 [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
-records the sources and caveats of these choices.
+records these choices' sources and caveats; official prey population is unresolved.
 
-Both constructors use the default 7 ms physics step. Link and decision settings
-belong to `SimulationConfig`, which wraps either world:
+Link and decision settings belong to `SimulationConfig`, which wraps either world:
 
 ```rust
 use slither_sim::{Config, client::{HostConfig, SimulationConfig}};
@@ -160,13 +145,13 @@ let host = HostConfig { simulation, ..Default::default() };
 
 ### Presets
 
-In JSON, `"preset"` selects a constructor's world as the base: `"official"`
+JSON `"preset"` selects a constructor's world: `"official"`
 (`Config::official(1)`), `"sandbox"` or `"battledome"`. Fields given beside it
-replace the preset's values; nested objects such as `kiosk` merge field by
-field, and `null` clears an optional setting. Changing `radius` does not rescale
-the preset's food. Without `preset`, omitted fields use `Config::official(1)`.
-A config passes through a JSON value, so a repeated key keeps its last value.
-Replies and snapshots print the resolved fields, not the preset name.
+override it; nested objects such as `kiosk` merge field by field, and `null`
+clears optional settings. Changing `radius` does not rescale food. Without
+`preset`, omitted fields use `Config::official(1)`. Repeated keys keep their last
+value because configs pass through a JSON value. Replies and snapshots print
+resolved fields, not the preset name.
 
 ```json
 {"preset": "battledome", "killScoreSeconds": 300}
@@ -174,10 +159,10 @@ Replies and snapshots print the resolved fields, not the preset name.
 
 ### Battledome
 
-`Config::battledome()` (`"preset": "battledome"`) is our own custom mode, not
-an official slither.io mode or a model of a community server. The arena, pit,
-permanent 400-point floor and free boost at the floor are mode design choices.
-Other mechanics inherit `Config::official(1)`, including its
+`Config::battledome()` (`"preset": "battledome"`) is our custom mode, not an
+official mode or community-server model. Its arena, pit, permanent 400-point
+floor and free boost at the floor are design choices. Other mechanics inherit
+`Config::official(1)`, including its
 [provisional models](server-rules.md#defaults).
 
 | Setting | Value | Mode rule and rationale |
@@ -192,23 +177,20 @@ Other mechanics inherit `Config::official(1)`, including its
 | Prey | `prey.count: 0` | Snakes only |
 | Ambient food | `foodCount: 3138`, about 45.9 attempts/s | Inherits the official model's density at radius 3584 and its admission caps |
 
-The pit tests the head center, not body overlap: after it enters distance `< r`,
-reaching `r` again kills with reason `pit` and no credited killer. The swept
-path is tested each tick, so entering and exiting within one tick also kills.
-Pit-entry state resets each life.
+The pit tests the head center's swept path each tick: after entering distance
+`< r`, reaching `r` kills with reason `pit` and no credited killer, including
+entry and exit within one tick. Pit-entry state resets each life.
 
 The floor uses the least mass on the protocol-19 fam grid displaying the chosen
 score (400 gives 26 segments and fam ≈ 0.1589). Boosting and the kiosk penalty
-spend only mass above it. A partial final boost spend sizes its pellet from the
-mass actually spent; at the floor, boost continues for free with no pellets,
-avoiding food generation without a mass cost. Growth and normal death-food
-rules remain.
+spend only mass above it. A partial final boost pellet reflects actual mass
+spent; at the floor, boost is free without pellets, preventing cost-free food
+generation. Growth and normal death-food rules remain.
 
-A kill at world time `t` counts while `world.time < t + killScoreSeconds`.
-This is separate from the current life's `kills` and size `score`; the rolling
-score does not change the size-based leaderboard. The preset defines no match
-deadline, winner or automatic episode reset. Creating a new world clears the
-rolling score.
+A kill at time `t` counts while `world.time < t + killScoreSeconds`, separately
+from per-life `kills` and size `score`, without changing the size-based
+leaderboard. The preset defines no deadline, winner or automatic episode reset.
+A new world clears the rolling score.
 
 These rules have synthetic offline regressions in
 [`tests/battledome.rs`](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/battledome.rs),
@@ -218,11 +200,11 @@ requests, see [hosting](raw-server.md#presets) and
 
 Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
-Rust `Observation` contains ordinary snake state, not the rolling score.
-Neither geometric frames nor portable `ClientFrame` carry pit geometry or the
-floor setting; retain the world config separately. Portable clients receive
-per-life kills and the size-based leaderboard, without a rolling kill score or
-distinct pit death reason. The stock browser has no pit overlay.
+Rust `Observation` omits the rolling score. Geometric frames and portable
+`ClientFrame` omit pit geometry and the floor setting; retain world config
+separately. Portable clients receive per-life kills and the size-based
+leaderboard, without rolling kill score or distinct pit death reason.
+The stock browser has no pit overlay or rolling kill-score display.
 
 ### Prey
 
@@ -254,7 +236,7 @@ use an 8 ms reference. These conversion scales are separate from `world.dt`.
 
 Each object has `enabled` (default `true`), positive finite `cellSize`, and
 integer `maxPerCell`; zero admits no pellet of that origin. All existing food
-counts toward cell occupancy.
+counts toward cell occupancy. Rejected boost emission still spends mass.
 
 | Object | `cellSize` | `maxPerCell` |
 | --- | --- | --- |
@@ -264,10 +246,11 @@ counts toward cell occupancy.
 
 ### Kiosk penalty
 
-This is a historical, provisional anti-camping model. Set `kiosk.enabled: false`
-when it should not affect a replay. Numeric fields must be finite. `floorScore`
-and `stationaryRadius` must be positive; `graceSeconds` and the three rates may
-be zero, and a zero rate freezes its phase.
+This historical, provisional anti-camping model has
+[unverified official onset and recovery](server-rules.md#defaults).
+Set `kiosk.enabled: false` to exclude it from replay. All numbers must be finite;
+`floorScore` and `stationaryRadius` positive. `graceSeconds` and the three rates
+may be zero; a zero rate freezes its phase.
 Defaults fit a 62,000-to-8,500 change over six minutes for physical score and
 120 minutes for displayed score. Recovery reuses the physical decay rate as an
 approximation.
@@ -284,13 +267,11 @@ approximation.
 
 ## LatencyConfig
 
-Under `SimulationConfig.latency`. No delay is added by default. These are
-artificial delays, additional to any real socket delay. Messages remain ordered.
-Virtual-time delivery and server input application use physics ticks; the
-threaded host's socket thread releases outbound frames at their due times
-between ticks.
-Host remote clients use their own real compute time; processing settings below
-apply to in-process bots, not remote clients.
+`SimulationConfig.latency` adds artificial delay to any real socket delay;
+default zero. Messages stay ordered. Virtual-time delivery and server input
+application use physics ticks; the host's socket thread releases outbound frames
+at due times between ticks. Processing settings apply to in-process bots;
+remote clients use real compute time.
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
@@ -303,21 +284,21 @@ apply to in-process bots, not remote clients.
 | `processingSeconds` | `[0, 0]` | Ordered finite nonnegative range; connection draws a base bot processing time. |
 | `processingJitterSeconds` | `0` | Uniform ± spread per decision, finite and nonnegative. |
 
-The largest possible delay must be finite. The generator's normal draw is at
-most about 8.57 and its exponential draws at most about 36.7 times their mean,
-so `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + medianSeconds ×
+The generator's normal draw is at most about 8.57, exponential draws at most
+about 36.7 times their mean. Thus
+`max(roundTripSeconds) × exp(8.57 × roundTripSpread) + medianSeconds ×
 exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` must
-be finite. Measured `processingSeconds` supplied with a bot decision replaces its
+be finite. Measured `processingSeconds` supplied with a decision replaces its
 modeled duration. Rust also provides `LatencyConfig::fixed(rtt)`,
 `LatencyConfig::one_way(uplink, downlink)` and `LatencyConfig::measured_route()`.
 
 ### Variation and pauses
 
-Each direction is one ordered stream. A message's delay is its base share plus
+Each direction is ordered. Message delay is its base share plus
 `medianSeconds × exp(logSigma × (√c·X + √(1−c)·Z))`, with `c` the
 `correlatedShare`, `Z` a fresh normal draw and `X` a slow unit-variance
-Ornstein–Uhlenbeck state per direction. Delivery pauses then hold every message
-due inside them until they end, so held frames arrive together.
+Ornstein–Uhlenbeck state per direction. Pauses hold all messages due within them
+until their end; held frames arrive together.
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
@@ -339,16 +320,14 @@ on training sessions and checked on held-out ones by the
  "pauses": {"ratePerSecond": 1.646, "meanSeconds": 0.01393}}
 ```
 
-It matches the route's delay quantiles far better than uniform jitter (held-out
-KS distance 0.04 instead of 0.30) but overpredicts the p99 by about 30% and
-misses some correlation. Its base round trip assumes replies within a tick, as
-the host gives; its even split and mirrored uplink are assumptions. Add it only
-where no real path exists, such as in-process bots or a loopback player.
+Against uniform jitter, held-out KS distance improves from 0.30 to 0.04, but
+p99 is overpredicted by about 30% and some correlation is missed. Base RTT assumes
+within-tick replies, as the host gives; even splitting and mirrored uplink are
+assumptions. Use only without a real path, for in-process bots or loopback players.
 
 ## NetworkConfig
 
-For a bot connecting to a real WebSocket server; this object does not simulate
-latency. Only `url` must be supplied; other fields use these defaults.
+Real WebSocket connections, without simulated latency. Only `url` is required.
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
@@ -364,15 +343,14 @@ latency. Only `url` must be supplied; other fields use these defaults.
 | `handshake` | `"challenge"` | Supported challenge exchange, or `"direct"` login. |
 | `recordWire` | `false` | Retain application payloads and local send/receipt times. |
 
-All three durations must be positive, at least 1 ns and representable as a
-platform `Duration`; a deadline the platform clock cannot represent fails at
-run time. See the [portable API](client-api.md) for polling, processing
+All three durations must be ≥ 1 ns and representable as a platform `Duration`;
+unrepresentable clock deadlines fail at run time. See the
+[portable API](client-api.md) for polling, processing
 measurements, recording bounds and reconnection behavior.
 
 ## Limits
 
-Every bound is one of three kinds. The checks themselves keep their rationale
-beside the owning code.
+Bounds have three kinds, with rationale beside the owning checks.
 
 **Real limits** are errors because something breaks beyond them:
 
@@ -394,14 +372,14 @@ beside the owning code.
 | `customSkin` ≤ 255 bytes | Appearances give its length in one byte. |
 | `minimapSide ≥ 1`, positive intervals, `decisionTicks ≥ 1` | Empty maps and zero periods have no meaning. |
 
-Domains such as finite values, nonnegative delays, probabilities in 0–1 and
-ordered ranges follow from each field's meaning.
+Finite values, nonnegative delays, probabilities in 0–1 and ordered ranges follow
+from field meanings.
 
-Work per step grows with what a config asks for and always finishes: each prey
-advances `dt / 0.007` fixed substeps, and ambient refill makes about
+Work per step scales with config and always finishes: each prey advances
+`dt / 0.007` fixed substeps; ambient refill makes about
 `ambientReplenishPerSecond × dt` attempts, even when the target is full, since
-its clock must advance bit for bit. Neither is capped: configs come from the
-operator or the local controller, never from remote players.
+its clock must advance bit for bit. Neither is capped; only the operator or local
+controller supplies configs, never remote players.
 
 **Valid but unmeasured** settings load with a warning (stderr for the command
 line, `warnings` in `serve` reset replies, `UserWarning` in Python):
