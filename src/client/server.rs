@@ -175,12 +175,12 @@ impl Clock {
         at.saturating_duration_since(self.epoch).as_secs_f64() - offset
     }
 
-    /// Sleep until world time `due`, for at most `limit`.
+    /// Sleep until world time `due`, for at most `limit`; an infinite `due`
+    /// sleeps for `limit`.
     fn sleep_until(&self, due: f64, limit: Duration) {
-        let wait = Duration::try_from_secs_f64(due - self.world(Instant::now()))
-            .map_or(Duration::ZERO, |wait| wait.min(limit));
-        if !wait.is_zero() {
-            thread::sleep(wait);
+        let wait = (due - self.world(Instant::now())).min(limit.as_secs_f64());
+        if wait > 0. {
+            thread::sleep(Duration::from_secs_f64(wait));
         }
     }
 }
@@ -1195,11 +1195,7 @@ impl Bots {
         };
         match delivery {
             Delivery::Frames { frames, .. } => seat.frames.extend(frames),
-            Delivery::Closed { .. } => {
-                seat.closed = true;
-                seat.frames.clear();
-                seat.state.disconnect();
-            }
+            Delivery::Closed { .. } => seat.close(),
         }
     }
 }
@@ -1221,6 +1217,15 @@ impl Seat {
             previous_boost: None,
             closed: false,
         }
+    }
+
+    /// The world closed the session: drop what is in flight, including a
+    /// command still processing, and rejoin at the next decision.
+    fn close(&mut self) {
+        self.closed = true;
+        self.frames.clear();
+        self.outbox = None;
+        self.state.disconnect();
     }
 
     fn next_event(&self) -> f64 {
@@ -1321,6 +1326,9 @@ impl Seat {
         latency: &LatencyConfig,
         random: &mut Random,
     ) -> Result<(), String> {
+        // The world may stamp this session's first frames earlier than `at`
+        // while it catches up on ticks; the client clock never goes back.
+        let at = self.tick(at);
         self.state.disconnect();
         self.state.new_connection(at)?;
         self.generation += 1;
@@ -1397,6 +1405,50 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_infinite_deadline_sleeps_for_the_limit() {
+        let clock = Clock {
+            epoch: Instant::now(),
+            dt: 0.007,
+            deferred: AtomicU64::new(0),
+        };
+        let started = Instant::now();
+        clock.sleep_until(f64::INFINITY, Duration::from_millis(20));
+        assert!(started.elapsed() >= Duration::from_millis(15));
+    }
+
+    #[test]
+    fn seats_survive_early_frames_and_closes_while_processing() {
+        let (commands, _received) = mpsc::channel();
+        let latency = LatencyConfig {
+            processing_seconds: [0.05, 0.05],
+            ..Default::default()
+        };
+        let mut random = Random::new(1);
+        let mut seat = Seat::new(0, 0.042);
+        seat.join(0.5, &commands, &latency, &mut random).unwrap();
+        // A world catching up on ticks stamps the setup before the join.
+        let mut frame = vec![0, 0];
+        frame.extend(super::super::encode::setup(1000., 0.029).unwrap());
+        seat.frames.push_back((0.1, frame));
+        seat.run(0.6, &commands, &latency, &mut random, 0.042)
+            .unwrap();
+        // A close while a command is processing cancels its departure, due
+        // here before the next decision would rejoin.
+        assert!(seat.decide_at > 0.61);
+        seat.outbox = Some((
+            0.6,
+            Action {
+                heading: 0.,
+                boost: false,
+            },
+            0.01,
+        ));
+        seat.close();
+        seat.run(0.7, &commands, &latency, &mut random, 0.042)
+            .unwrap();
+    }
 
     #[test]
     fn challenge_round_trips_through_the_restricted_solver() {
