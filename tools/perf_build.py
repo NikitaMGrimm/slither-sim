@@ -45,8 +45,8 @@ def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS, *, deadline
         remaining(timeout, deadline)
         # Preparation (notably worktree checkout) can itself spawn descendants.
         # The shared cutoff must stop/reap those before finalization too.
-        with tempfile.TemporaryFile() as stream:
-            tree = ProcessTree(args, cwd, environment, stream)
+        with tempfile.TemporaryFile() as stream, tempfile.TemporaryFile() as errors:
+            tree = ProcessTree(args, cwd, environment, stream, stderr=errors)
             try:
                 try:
                     code = tree.wait(remaining(timeout, deadline))
@@ -54,12 +54,16 @@ def output(args, cwd, environment=None, timeout=GIT_TIMEOUT_SECONDS, *, deadline
                     tree.stop(verify=True)
             except (subprocess.TimeoutExpired, TimeoutError) as error:
                 stream.seek(0)
+                errors.seek(0)
                 raise TimeoutError(f"preparation command timed out: {error}: "
-                                   f"{stream.read().decode('utf-8', errors='replace')}") from error
+                                   f"{stream.read().decode('utf-8', errors='replace').strip()}\n"
+                                   f"{errors.read().decode('utf-8', errors='replace').strip()}") from error
             stream.seek(0)
             text = stream.read().decode("utf-8", errors="replace").strip()
+            errors.seek(0)
+            detail = errors.read().decode("utf-8", errors="replace").strip()
         if code:
-            raise RuntimeError(f"{' '.join(map(str, args))} exited {code}: {text}")
+            raise RuntimeError(f"{' '.join(map(str, args))} exited {code}: {text}\n{detail}")
         return text
     result = subprocess.run([str(arg) for arg in args], cwd=cwd, env=environment, capture_output=True,
                             encoding="utf-8", errors="replace", timeout=remaining(timeout, deadline), check=False)
@@ -162,7 +166,7 @@ class ProcessTree:
     target whose lock is about to be released.
     """
 
-    def __init__(self, args, cwd, environment, stream):
+    def __init__(self, args, cwd, environment, stream, *, stderr=subprocess.STDOUT):
         args = [str(arg) for arg in args]
         if os.name == "nt":
             executable = shutil.which(args[0], path=(environment or os.environ).get("PATH"))
@@ -172,7 +176,7 @@ class ProcessTree:
             try:
                 self.process = subprocess.Popen([sys.executable, "-I", "-c", SHIM, executable, *args[1:]],
                                                 cwd=cwd, env=environment, stdin=subprocess.PIPE,
-                                                stdout=stream, stderr=subprocess.STDOUT)
+                                                stdout=stream, stderr=stderr)
             except BaseException:
                 self.job.close()
                 raise
@@ -188,7 +192,7 @@ class ProcessTree:
         else:
             self.job = None
             self.process = subprocess.Popen(args, cwd=cwd, env=environment, stdout=stream,
-                                            stderr=subprocess.STDOUT, start_new_session=True)
+                                            stderr=stderr, start_new_session=True)
             self.group = self.process.pid
 
     def wait(self, timeout):

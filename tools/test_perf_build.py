@@ -181,6 +181,33 @@ class Targets(unittest.TestCase):
                 build.verify()
 
 
+class Output(unittest.TestCase):
+    def test_success_returns_only_stdout_with_or_without_a_deadline(self):
+        child = "import sys; print('identity'); print('warning', file=sys.stderr)"
+        with tempfile.TemporaryDirectory() as temporary:
+            for deadline in (None, time.perf_counter() + 30):
+                with self.subTest(deadline=deadline):
+                    self.assertEqual(perf_build.output([sys.executable, "-c", child], temporary,
+                                                       deadline=deadline), "identity")
+
+    def test_failed_deadline_command_preserves_both_streams(self):
+        child = "import sys; print('partial output'); print('failure', file=sys.stderr); sys.exit(7)"
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(RuntimeError) as raised:
+                perf_build.output([sys.executable, "-c", child], temporary, deadline=time.perf_counter() + 30)
+        self.assertCountEqual(str(raised.exception).split("exited 7: ", 1)[1].splitlines(),
+                              ["partial output", "failure"])
+
+    def test_timed_out_deadline_command_preserves_both_streams(self):
+        child = ("import sys, time; print('partial output', flush=True); "
+                 "print('warning', file=sys.stderr, flush=True); time.sleep(60)")
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(TimeoutError) as raised:
+                perf_build.output([sys.executable, "-c", child], temporary, timeout=1.5,
+                                  deadline=time.perf_counter() + 30)
+        self.assertEqual(str(raised.exception).rsplit(": ", 1)[1].splitlines(), ["partial output", "warning"])
+
+
 class Commands(unittest.TestCase):
     GRANDCHILD = ("import os, sys, time\n"
                   "open(sys.argv[2], 'w').write(str(os.getpid()))\n"
