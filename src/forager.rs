@@ -1057,7 +1057,8 @@ fn branch_hits_rim(
     }
     let (q, h) = at(hi);
     rim_kills(arena, q, h, segments)
-        || (j + 1..=TRAP_CHORDS).any(|i| {
+        // Sample j itself follows the bisected contact.
+        || (j..=TRAP_CHORDS).any(|i| {
             let (q, h) = at(dt * i as f64);
             let tip = forward(q, h, lead);
             let (x, y) = (tip.x - arena.center.x, tip.y - arena.center.y);
@@ -1758,14 +1759,28 @@ mod tests {
         assert_eq!(tangent, [true, false, false]);
         // Review round 8: a long snake's slide dies by its contact point's
         // bearing (simulator death at 392 ms).
-        let (speed, turn) = (base_speed(326), turn_rate(326));
-        let (head, heading) = (Point { x: 980.0, y: 0.0 }, -1.58);
-        assert!(branch_hits_rim(&arena, 326, 0.05, |t| {
-            (
-                turn_then_straight(head, heading, std::f64::consts::PI, speed, turn, t),
-                heading + std::f64::consts::PI.min(turn * t),
-            )
-        }));
+        let hard_turn = |arena: &Arena, segments: usize, head: Point, heading: f64| {
+            let (speed, turn) = (base_speed(segments), turn_rate(segments));
+            branch_hits_rim(arena, segments, 0.05, |t| {
+                (
+                    turn_then_straight(head, heading, std::f64::consts::PI, speed, turn, t),
+                    heading + std::f64::consts::PI.min(turn * t),
+                )
+            })
+        };
+        assert!(hard_turn(&arena, 326, Point { x: 980.0, y: 0.0 }, -1.58));
+        // Review round 9: contact in the last interval still checks its end
+        // (simulator death at 399 ms).
+        let official = Arena {
+            center: Point::default(),
+            radius: 21600.0,
+        };
+        assert!(hard_turn(
+            &official,
+            314,
+            Point { x: 21534.0, y: 0.0 },
+            -1.488
+        ));
     }
 
     #[test]
