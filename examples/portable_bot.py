@@ -49,7 +49,7 @@ def main():
         process.stdin.write(json.dumps(message, allow_nan=False) + "\n")
         process.stdin.flush()
         reply = json.loads(process.stdout.readline())
-        if reply.get("protocol") != "slither-client-json-v1":
+        if reply.get("protocol") != "slither-client-json-v2":
             raise RuntimeError("incompatible client protocol")
         if "error" in reply:
             raise RuntimeError(reply["error"])

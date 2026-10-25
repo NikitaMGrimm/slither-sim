@@ -4,6 +4,10 @@
 
 ### Breaking
 
+- Portable JSON requests and reply envelopes now use `slither-client-json-v2`,
+  reflecting the removed broadcast and latency fields. The frame contract stays
+  `slither-client-v2` ([portable bots](docs/client-api.md#interface-versions)).
+
 - The minimum Rust version is 1.99 (was 1.86).
 - `SimulationConfig.broadcastTicks` is removed: gameplay updates go out every
   tick. Configs that still set it are rejected

@@ -64,6 +64,22 @@ fn info_works_without_a_backend() {
 }
 
 #[test]
+fn current_json_contract_rejects_removed_request_fields() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/client-contract-v2.json")).unwrap();
+    assert_eq!(fixture["protocol"], transport::PROTOCOL);
+    assert_eq!(fixture["frame"]["contract"], CONTRACT);
+    let requests = fixture["rejectedRequests"].as_array().unwrap();
+    for (request, reply) in requests.iter().zip(exchange(requests)) {
+        assert_eq!(reply["protocol"], "slither-client-json-v2");
+        assert!(
+            reply["error"].as_str().unwrap().contains("unknown field"),
+            "{request}: {reply}"
+        );
+    }
+}
+
+#[test]
 fn every_line_gets_one_reply_and_errors_do_not_stop_the_stream() {
     let input = b"not json\n\
         {\"op\":\"bogus\"}\n\

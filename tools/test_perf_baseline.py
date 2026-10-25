@@ -339,8 +339,8 @@ class ProcessFailures(unittest.TestCase):
                 client = Mock(stdin=Mock(), stdout=io.BytesIO(), stderr=None, returncode=0)
                 host = Mock(stdin=None, stdout=None, stderr=io.BytesIO())
                 host.poll.return_value = None
-                replies = [json.dumps({"protocol": "slither-client-json-v1", "result": {}}).encode(),
-                           json.dumps({"protocol": "slither-client-json-v1",
+                replies = [json.dumps({"protocol": "slither-client-json-v2", "result": {}}).encode(),
+                           json.dumps({"protocol": "slither-client-json-v2",
                                        "result": {"frame": {"status": "waiting"}}}).encode()]
                 if hosted:
                     replies.insert(0, b"Listening on ws://127.0.0.1:1/slither")

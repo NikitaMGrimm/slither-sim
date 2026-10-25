@@ -513,7 +513,7 @@ def e2e(executable, steps, hosted, directory):
             value = json.loads(response)
             if "error" in value:
                 raise RuntimeError(value["error"])
-            if value["protocol"] != "slither-client-json-v1":
+            if value["protocol"] != "slither-client-json-v2":
                 raise RuntimeError("unexpected CLI protocol")
             return value["result"]
 

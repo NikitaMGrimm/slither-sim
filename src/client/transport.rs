@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::{self, BufRead, Write};
 
-pub const PROTOCOL: &str = "slither-client-json-v1";
+pub const PROTOCOL: &str = "slither-client-json-v2";
 
 fn default_seed() -> u32 {
     1

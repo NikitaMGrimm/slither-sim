@@ -8,14 +8,14 @@ walls and snakes.
 
 ## Interface versions
 
-Interfaces are experimental; only the current frame contract is supported,
-without translation. Check the envelope and frame contract before acting.
+Interfaces are experimental; only the current version of each interface is
+supported, without translation. Check the envelope and frame contract before acting.
 
 | Identifier | Boundary |
 | --- | --- |
 | Protocol `19` | Binary WebSocket packets and commands. |
 | `slither-client-v2` | Bot frame fields, units and lifecycle. |
-| `slither-client-json-v1` | The `client` JSON requests and reply envelope. |
+| `slither-client-json-v2` | The `client` JSON requests and reply envelope. |
 | `slither-sim-json-v3` | The separate geometric [`serve` controller](bot-api.md). |
 | `slither-sim-abi-v2` | The in-process [C ABI](c-api.md) over `serve` sessions. |
 | Package version | Rust API and simulator implementation; also pin the commit for reproducibility. |
@@ -46,8 +46,8 @@ to bytes 0–250, with separate boost-on/off commands.
 Run `slither-sim client` and exchange one JSON object per stdin/stdout line:
 
 ```json
-{"protocol":"slither-client-json-v1","result":{}}
-{"protocol":"slither-client-json-v1","error":"Reset first"}
+{"protocol":"slither-client-json-v2","result":{}}
+{"protocol":"slither-client-json-v2","error":"Reset first"}
 ```
 
 Start and step a virtual-time world:
