@@ -1,11 +1,10 @@
 //! Simulated network conditions between each client and the server.
 //!
-//! Each connection draws a base round trip. Each direction is one ordered
-//! stream: every message adds a right-skewed variation, partly correlated over
-//! seconds, and waits out short delivery pauses, so frames held behind a pause
-//! arrive together. Replies incur processing time. Delays use continuous
-//! seconds; arrivals apply on physics ticks. Clients only measure pings and
-//! their own reply time.
+//! Each connection draws a base round trip. Each direction is an ordered stream:
+//! messages add right-skewed variation, partly correlated over seconds, and wait
+//! out short pauses, releasing held frames together. Replies incur processing
+//! time. Delays use continuous seconds; arrivals apply on physics ticks. Clients
+//! measure only pings and their own reply time.
 //!
 //! The model and `LatencyConfig::measured_route` come from the [network path
 //! study] of retained official captures. It fits effective application
@@ -28,8 +27,8 @@ fn max_normal() -> f64 {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 pub struct LatencyConfig {
-    /// Base round trips a connection starts from, one picked per connection by
-    /// `round_trip_weights` (empty: equally). None configured means zero.
+    /// Base round trips, picked by `round_trip_weights` (empty: equally) once
+    /// per connection. An empty list gives a zero base round trip.
     pub round_trip_seconds: Vec<f64>,
     pub round_trip_weights: Vec<f64>,
     /// Standard deviation of the log base round trip around the picked value.
@@ -265,8 +264,7 @@ impl Random {
     }
 }
 
-/// One direction of a connection: a TCP stream, so a message never arrives
-/// before one sent earlier.
+/// One ordered TCP direction: messages cannot overtake earlier messages.
 #[derive(Clone, Debug, Default)]
 struct Stream {
     last: f64,
