@@ -301,7 +301,7 @@ due inside them until they end, so held frames arrive together.
 | `variation.logSigma` | `0` | Log standard deviation, finite and nonnegative. |
 | `variation.correlatedShare` | `0` | Share of log variance from the slow state, 0–1. |
 | `variation.correlationSeconds` | `0` | Decorrelation time of the slow state; positive when the share is. |
-| `pauses.ratePerSecond` | `0` | Poisson pause starts per second and direction; zero disables pauses. |
+| `pauses.ratePerSecond` | `0` | Poisson pause starts per second and direction, at most 1000 (a processing bound; delivery cannot resolve finer pauses); zero disables pauses. |
 | `pauses.meanSeconds` | `0` | Mean exponential pause length. `ratePerSecond × meanSeconds` must be at most 1: merged pauses last `(e^(rate × mean) − 1) / rate` on average, so more covers nearly all time. |
 
 `LatencyConfig::measured_route()` is the retained low-RTT official route fitted

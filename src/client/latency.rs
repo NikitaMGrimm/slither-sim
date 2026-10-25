@@ -219,6 +219,13 @@ impl Pauses {
                     .into(),
             );
         }
+        // Each start costs a step, and starts closer than the host's 1 ms
+        // delivery resolution cannot be observed.
+        if self.rate_per_second > MAX_PAUSE_RATE {
+            return Err(format!(
+                "Pauses need ratePerSecond ≤ {MAX_PAUSE_RATE}; delivery cannot resolve finer pauses"
+            ));
+        }
         // Merged pauses last (e^(rate × mean) − 1) / rate on average: past one
         // they quickly cover nearly all time, and the stream no longer models
         // delivery delays but an outage.
@@ -232,6 +239,10 @@ impl Pauses {
         Ok(())
     }
 }
+
+/// Pause starts per second and direction. A processing bound, not a measured
+/// limit: the fitted official route has 1.646.
+const MAX_PAUSE_RATE: f64 = 1000.;
 
 /// Seeded xorshift stream; one per backend so runs are reproducible.
 #[derive(Clone, Debug)]
@@ -327,6 +338,14 @@ impl Stream {
         let (start, end) = self.pause;
         if start <= due && due < end { end } else { due }
     }
+
+    /// Move every stored time `seconds` earlier.
+    fn shift(&mut self, seconds: f64) {
+        self.last -= seconds;
+        self.state_at = self.state_at.map(|at| at - seconds);
+        self.pause = (self.pause.0 - seconds, self.pause.1 - seconds);
+        self.next_pause = self.next_pause.map(|at| at - seconds);
+    }
 }
 
 /// One connection's private draws and streams.
@@ -388,6 +407,10 @@ impl Link {
     ) -> f64 {
         let base = self.round_trip * (1. - config.uplink_share);
         self.downlink.deliver(config, random, base, emitted)
+    }
+    /// Move the uplink's clock `seconds` earlier; see `RawSimulator::shift_uplinks`.
+    pub(crate) fn shift_uplink(&mut self, seconds: f64) {
+        self.uplink.shift(seconds);
     }
     /// Processing time of one reply: the connection's base with per-reply jitter.
     pub(crate) fn processing(&self, config: &LatencyConfig, random: &mut Random) -> f64 {
@@ -469,6 +492,17 @@ mod tests {
                 .iter()
                 .all(|(sent, at)| (at - sent - 0.01).abs() < 1e-12)
         );
+    }
+
+    #[test]
+    fn pause_rates_delivery_cannot_resolve_are_rejected() {
+        let pauses = |rate_per_second| Pauses {
+            rate_per_second,
+            mean_seconds: 1e-21,
+        };
+        assert!(pauses(MAX_PAUSE_RATE).validate().is_ok());
+        // Such starts would round onto one instant and never advance.
+        assert!(pauses(1e20).validate().is_err());
     }
 
     #[test]

@@ -29,7 +29,9 @@ use super::{
     ClientState, ClientStatus, SimulationConfig, challenge,
     latency::{LatencyConfig, Link, Random},
     protocol,
-    simulation::{MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, RawSimulator},
+    simulation::{
+        MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT, RawSimulator,
+    },
 };
 use crate::Action;
 use serde::{Deserialize, Serialize};
@@ -193,6 +195,8 @@ struct Shared {
     /// Nanoseconds the simulation thread spent running ticks.
     busy: AtomicU64,
     players: AtomicUsize,
+    /// Messages per socket slot sent to the simulation and not yet consumed.
+    pending: Vec<AtomicUsize>,
     failure: Mutex<Option<String>>,
 }
 
@@ -312,6 +316,7 @@ impl Host {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            pending: (0..self.max_clients).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         });
         let mut running = RunningHost {
@@ -523,13 +528,21 @@ impl Simulation {
         let backlog = scheduled.saturating_sub(self.deferred + self.ticks);
         let limit = (MAX_BACKLOG_SECONDS / dt).ceil() as u64;
         if backlog > limit {
-            self.deferred += backlog - limit;
-            self.shared
-                .clock
-                .deferred
-                .store(self.deferred, Ordering::Relaxed);
+            self.defer(backlog - limit);
         }
         backlog.min(limit).min(MAX_CATCHUP_TICKS)
+    }
+
+    /// Run world time `ticks` further behind the wall clock. Messages already
+    /// in flight keep their wall arrival times.
+    fn defer(&mut self, ticks: u64) {
+        self.deferred += ticks;
+        self.shared
+            .clock
+            .deferred
+            .store(self.deferred, Ordering::Relaxed);
+        self.world
+            .shift_uplinks(ticks as f64 * self.shared.clock.dt);
     }
 
     /// World time of wall time `wall`, behind it by the deferred ticks.
@@ -554,6 +567,14 @@ impl Simulation {
 
     /// Client faults close only that session; errors are simulator failures.
     fn apply(&mut self, command: Command) -> Result<(), String> {
+        match command {
+            Command::Message { slot, .. } | Command::Victory { slot, .. }
+                if slot < self.max_clients =>
+            {
+                self.shared.pending[slot].fetch_sub(1, Ordering::Relaxed);
+            }
+            _ => {}
+        }
         match command {
             Command::Connect {
                 slot,
@@ -713,6 +734,20 @@ impl Gate {
     fn send(&self, command: Command) {
         // A closed channel means the simulation ended and the host is stopping.
         let _ = self.commands.send(command);
+    }
+
+    /// Send a playing client's message unless the simulation has yet to
+    /// consume `REMOTE_IN_FLIGHT` earlier ones from its slot. The world's own
+    /// limit applies only as it consumes them, which a stalled simulation does
+    /// not, so this bounds what the channel holds.
+    fn forward(&self, slot: usize, command: Command) -> Result<(), String> {
+        let pending = &self.shared.pending[slot];
+        if pending.fetch_add(1, Ordering::Relaxed) >= REMOTE_IN_FLIGHT {
+            pending.fetch_sub(1, Ordering::Relaxed);
+            return Err("Remote connection has too many undelivered messages".into());
+        }
+        self.send(command);
+        Ok(())
     }
 }
 
@@ -978,23 +1013,25 @@ impl Open {
             (Phase::Playing(slot), [255, 118, text @ ..])
                 if text.len() <= MAX_VICTORY_TEXT && text.is_ascii() =>
             {
-                gate.send(Command::Victory {
+                gate.forward(
                     slot,
-                    generation: self.generation,
-                    text: text.to_vec(),
-                    sent: wall,
-                });
-                Ok(())
+                    Command::Victory {
+                        slot,
+                        generation: self.generation,
+                        text: text.to_vec(),
+                        sent: wall,
+                    },
+                )
             }
-            (Phase::Playing(slot), _) if super::simulation::client_message(bytes) => {
-                gate.send(Command::Message {
+            (Phase::Playing(slot), _) if super::simulation::client_message(bytes) => gate.forward(
+                slot,
+                Command::Message {
                     slot,
                     generation: self.generation,
                     bytes: bytes.to_vec(),
                     sent: wall,
-                });
-                Ok(())
-            }
+                },
+            ),
             (Phase::Playing(_), _) => Err("Unsupported client message".into()),
             (Phase::Closing(_), _) => Ok(()),
         }
@@ -1439,11 +1476,31 @@ mod tests {
         assert!(started.elapsed() >= Duration::from_millis(15));
     }
 
-    #[test]
-    fn deferred_ticks_keep_wall_times_other_threads_hold() {
+    fn shared(dt: f64, sockets: usize) -> Arc<Shared> {
+        Arc::new(Shared {
+            clock: Clock {
+                epoch: Instant::now(),
+                dt,
+                deferred: AtomicU64::new(0),
+            },
+            stop: AtomicBool::new(false),
+            ticks: AtomicU64::new(0),
+            busy: AtomicU64::new(0),
+            players: AtomicUsize::new(0),
+            pending: (0..sockets).map(|_| AtomicUsize::new(0)).collect(),
+            failure: Mutex::new(None),
+        })
+    }
+
+    /// A one-socket simulation already connected in slot 0, generation 1.
+    fn connected(
+        latency: LatencyConfig,
+        deferred: u64,
+    ) -> (Simulation, Sender<Command>, Receiver<Vec<Delivery>>) {
         let config = SimulationConfig {
             agents: 1,
             world: crate::Config::sandbox(),
+            latency,
             ..Default::default()
         };
         let world = RawSimulator::new(1, config, 1).unwrap();
@@ -1457,27 +1514,9 @@ mod tests {
             batches: vec![Vec::new()],
             max_clients: 1,
             generations: vec![0],
-            shared: Arc::new(Shared {
-                clock: Clock {
-                    epoch: Instant::now(),
-                    dt,
-                    deferred: AtomicU64::new(0),
-                },
-                stop: AtomicBool::new(false),
-                ticks: AtomicU64::new(0),
-                busy: AtomicU64::new(0),
-                players: AtomicUsize::new(0),
-                failure: Mutex::new(None),
-            }),
+            shared: shared(dt, 1),
             ticks: 0,
-            // World time already runs 100 ticks behind the wall clock.
-            deferred: 100,
-        };
-        let step = |simulation: &mut Simulation| {
-            simulation.apply_commands().unwrap();
-            simulation.world.advance_ticks(1).unwrap();
-            simulation.ticks += 1;
-            simulation.hand_over().unwrap();
+            deferred,
         };
         commands
             .send(Command::Connect {
@@ -1487,36 +1526,104 @@ mod tests {
                 session_id: false,
             })
             .unwrap();
-        for _ in 0..20 {
+        for _ in 0..40 {
             step(&mut simulation);
         }
         while deliveries.try_recv().is_ok() {}
+        (simulation, commands, deliveries)
+    }
+
+    fn step(simulation: &mut Simulation) {
+        simulation.apply_commands().unwrap();
+        simulation.world.advance_ticks(1).unwrap();
+        simulation.ticks += 1;
+        simulation.hand_over().unwrap();
+    }
+
+    /// Wall delivery time of the first pong handed over, stepping at most
+    /// `ticks` ticks.
+    fn pong_after(
+        simulation: &mut Simulation,
+        deliveries: &Receiver<Vec<Delivery>>,
+        ticks: usize,
+    ) -> Option<f64> {
+        for _ in 0..ticks {
+            step(simulation);
+            let pong = deliveries
+                .try_iter()
+                .flatten()
+                .filter_map(|delivery| match delivery {
+                    Delivery::Frames { frames, .. } => Some(frames),
+                    Delivery::Closed { .. } => None,
+                })
+                .flatten()
+                .find(|(_, bytes)| protocol::split_frame(bytes).unwrap().contains(&&b"p"[..]));
+            if let Some((at, _)) = pong {
+                return Some(at);
+            }
+        }
+        None
+    }
+
+    fn ping(sent: f64) -> Command {
+        Command::Message {
+            slot: 0,
+            generation: 1,
+            bytes: vec![251],
+            sent,
+        }
+    }
+
+    #[test]
+    fn deferred_ticks_keep_wall_times_other_threads_hold() {
+        // World time already runs 100 ticks behind the wall clock.
+        let (mut simulation, commands, deliveries) = connected(LatencyConfig::default(), 100);
+        let dt = simulation.shared.clock.dt;
         // A ping sent mid-tick by the wall clock is answered in that tick, in
         // a frame due at the tick's wall time.
         let wall = (simulation.ticks + 100) as f64 * dt + dt / 2.;
-        commands
-            .send(Command::Message {
-                slot: 0,
-                generation: 1,
-                bytes: vec![251],
-                sent: wall,
-            })
-            .unwrap();
-        step(&mut simulation);
-        let pong = deliveries
-            .try_iter()
-            .flatten()
-            .filter_map(|delivery| match delivery {
-                Delivery::Frames { frames, .. } => Some(frames),
-                Delivery::Closed { .. } => None,
-            })
-            .flatten()
-            .find(|(_, bytes)| protocol::split_frame(bytes).unwrap().contains(&&b"p"[..]));
-        let (at, _) = pong.expect("no pong in the tick the ping arrived");
+        commands.send(ping(wall)).unwrap();
+        let at = pong_after(&mut simulation, &deliveries, 1).expect("no pong in the arrival tick");
         assert!(
             (at - (simulation.ticks + 100) as f64 * dt).abs() < 1e-9,
             "{at}"
         );
+    }
+
+    #[test]
+    fn deferring_keeps_in_flight_uplinks_on_their_wall_arrival() {
+        let (mut simulation, commands, deliveries) = connected(LatencyConfig::one_way(0.07, 0.), 0);
+        let dt = simulation.shared.clock.dt;
+        let sent = simulation.ticks;
+        // Arrives 10.5 ticks after it is sent, by the wall clock.
+        commands.send(ping((sent as f64 + 0.5) * dt)).unwrap();
+        step(&mut simulation);
+        simulation.defer(5);
+        let at = pong_after(&mut simulation, &deliveries, 20).expect("no pong");
+        // Answered in the tick that ends after its wall arrival.
+        assert!((at - (sent + 11) as f64 * dt).abs() < 1e-9, "{at}");
+        assert_eq!(simulation.ticks, sent + 6);
+    }
+
+    #[test]
+    fn a_socket_slot_waiting_on_too_many_messages_is_refused() {
+        let (mut simulation, commands, _deliveries) = connected(LatencyConfig::default(), 0);
+        let gate = Gate {
+            occupied: vec![true],
+            generations: vec![1],
+            challenge: Vec::new(),
+            replies: [Vec::new(), Vec::new()],
+            commands,
+            shared: simulation.shared.clone(),
+        };
+        // A stalled simulation consumes nothing.
+        for _ in 0..REMOTE_IN_FLIGHT {
+            gate.forward(0, ping(0.)).unwrap();
+        }
+        assert!(gate.forward(0, ping(0.)).is_err());
+        simulation.apply_commands().unwrap();
+        assert_eq!(simulation.shared.pending[0].load(Ordering::Relaxed), 0);
+        gate.forward(0, ping(0.)).unwrap();
     }
 
     #[test]
@@ -1532,18 +1639,7 @@ mod tests {
             stride: 1,
             deliveries,
             commands,
-            shared: Arc::new(Shared {
-                clock: Clock {
-                    epoch: Instant::now(),
-                    dt: 0.007,
-                    deferred: AtomicU64::new(0),
-                },
-                stop: AtomicBool::new(false),
-                ticks: AtomicU64::new(0),
-                busy: AtomicU64::new(0),
-                players: AtomicUsize::new(0),
-                failure: Mutex::new(None),
-            }),
+            shared: shared(0.007, 0),
             latency,
             random,
             interval: 0.042,

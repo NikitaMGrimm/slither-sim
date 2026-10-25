@@ -70,7 +70,7 @@ const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
 /// the rest of `MAX_IN_FLIGHT` for broadcasts while the host drains.
-const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
+pub(super) const REMOTE_IN_FLIGHT: usize = MAX_IN_FLIGHT / 2;
 /// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
 /// leaderboard's u16 rank and living population must also count every snake.
 pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
@@ -1861,6 +1861,20 @@ impl RawSimulator {
         self.uplink_at(slot, sent, Uplink::Victory(text.to_vec()))
     }
 
+    /// Move every remote slot's in-flight uplink `seconds` earlier in world
+    /// time. A host that defers ticks maps the same wall time to an earlier
+    /// world time; messages already in flight keep their wall arrival.
+    pub(crate) fn shift_uplinks(&mut self, seconds: f64) {
+        let remote = self.backend.remote;
+        for slot in &mut self.backend.slots[..remote] {
+            let connection = &mut slot.connection;
+            for (at, _) in &mut connection.uplink {
+                *at -= seconds;
+            }
+            connection.link.shift_uplink(seconds);
+        }
+    }
+
     /// Shared server ticks; background slots decide at the decision cadence.
     pub(crate) fn advance_ticks(&mut self, ticks: usize) -> Result<(), String> {
         let b = &mut self.backend;
@@ -2369,18 +2383,19 @@ fn food_updates(
     }
 }
 
-/// Sectors that may hold a pellet at an eaten position.
 /// Service a server-wide clock of absolute periods `floor(t / interval)`, so
 /// phase never accumulates tick rounding: true once period `next` has begun.
+/// A period count past `u64` saturates, leaving the clock due every tick.
 fn clock_due(next: &mut u64, now: f64, interval: f64) -> bool {
     let current = ((now + 1e-9) / interval).floor() as u64;
     let due = current >= *next;
     if due {
-        *next = current + 1;
+        *next = current.saturating_add(1);
     }
     due
 }
 
+/// Sectors that may hold a pellet at an eaten position.
 fn eaten_sectors(eaters: &BTreeMap<(u64, u64), u16>) -> BTreeSet<[u8; 2]> {
     eaters
         .keys()
@@ -2443,6 +2458,14 @@ fn seek(frame: &ClientFrame) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_clock_past_u64_periods_stays_due() {
+        let mut next = 1;
+        assert!(super::clock_due(&mut next, 1., 1e-20));
+        assert_eq!(next, u64::MAX);
+        assert!(super::clock_due(&mut next, 1.007, 1e-20));
+    }
+
     use super::*;
 
     #[test]
