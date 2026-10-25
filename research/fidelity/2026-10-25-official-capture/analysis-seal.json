@@ -1,0 +1,7 @@
+{
+  "sha256": "89e1c197e71bbf7a83c3acfad9f568bce8658d97fda1e506ad1e2b58f5caf4ae",
+  "sealedUtc": "2026-10-25T21:56:36.657286+00:00",
+  "beforeHeldoutInspection": true,
+  "scope": "Frozen baseline gates and predeclared descriptive ablations; no fitting or default changes.",
+  "tests": "4 study analysis tests, 4 retained analysis tests, 9 historical spawn tests, 104 collector tests, 7 documentation tests pass offline."
+}
