@@ -146,9 +146,13 @@ class Catalogs(unittest.TestCase):
                         measured.append((case, iterations, profile))
                         return {"case": case, "process_wall_seconds": 0}
 
+                    # Windows platform probes can call check_output(text=True),
+                    # which must not consume the binary Git diff fixture below.
                     with patch.object(sys, "argv", argv), patch.object(
                             perf_baseline, "load_catalog", return_value=catalog()), patch.object(
                             perf_baseline, "command_output", return_value="fixture"), patch.object(
+                            perf_baseline.platform, "platform", return_value="fixture-platform"), patch.object(
+                            perf_baseline.platform, "processor", return_value="fixture-cpu"), patch.object(
                             perf_baseline, "capture_trace", side_effect=trace), patch.object(
                             perf_baseline, "native", side_effect=run_native), patch.object(
                             perf_baseline, "e2e", return_value={"wall_seconds": 0}) as e2e, patch.object(
@@ -163,6 +167,7 @@ class Catalogs(unittest.TestCase):
                         perf_baseline.main()
                     manifest = json.loads((output / "manifest.json").read_text())
                     self.assertEqual(manifest["catalog"]["sha256"], catalog().sha256)
+                    self.assertEqual((manifest["platform"], manifest["cpu"]), ("fixture-platform", "fixture-cpu"))
                     if cases is None:
                         self.assertEqual(traced, [("step-default", 32, False), ("observe", 32, False),
                                                   ("official-100-step", 8, True), ("sandbox-16-bot", 16, True)])
