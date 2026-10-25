@@ -1,0 +1,200 @@
+{
+  "access": "local-only",
+  "rawRoot": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026",
+  "frozenCommit": "86787770df6a82dee43a108e770840d6e9ab2185",
+  "planSha256": "a7410f6315b7b471b01186e208ce55eb66ee2f9e1c3205d3fa4fa7b874f8f8b7",
+  "artifacts": [
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\copy-verification.json",
+      "sha256": "1e161e7a710864fbd9353151a56903a1b789361b0a787b03f04e9c48f30c0442",
+      "bytes": 3729
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\operational-summary.json",
+      "sha256": "b82403902dd68d9f5931fedd9994b961b0723129d2ce9148fa25fe21d2574fae",
+      "bytes": 17385
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\analysis-seal.json",
+      "sha256": "71c85a63e401b84fab7b76464064221e8456890c2c3eadc17df2919c1264b306",
+      "bytes": 353
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\cleanup-verification.txt",
+      "sha256": "f4e92fb99fa7d258ba51408b8f2b879f3d6751a1c3cc3c78c5bd283b5339233c",
+      "bytes": 65
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\SHA256SUMS",
+      "sha256": "e4e0f0bd47619450ea8239c2ff8b5c659a9801ddce33d7757403909775d76ec7",
+      "bytes": 2183
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\attempts.log",
+      "sha256": "6dc6c65f53213f8bd44bf3a7d2e759c0611258171bbab611e60b25000203a315",
+      "bytes": 80
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\round-1.log",
+      "sha256": "f59dcb29d475deb215604159c13c338ba1e9e3aa480985969598cf38107e3fd2",
+      "bytes": 563
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\round-1\\load.jsonl",
+      "sha256": "2b33f3de26024fe0d66a7d275f94355b0dda1577ce3855128b48b72e39b82280",
+      "bytes": 107686
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\development.json",
+      "sha256": "dc20485bc1338cce1439eae7e3c03491e8157ac5ded396dda5380d4ad5bf8e49",
+      "bytes": 27419
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\validation.json",
+      "sha256": "b863d66458c1fd183dd6e3fb5605395a597c6f42eb8b56a89780457262aae103",
+      "bytes": 562
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\official-list.txt",
+      "sha256": "ffd504b9bcc7fb596c851c56fab188607db255f5d7cd2fcd11f8a3ccdd5935a0",
+      "bytes": 7897
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\official-list.headers.txt",
+      "sha256": "ba69b8456125225b87cf03bef3a7acd8280290f239f55114dcce09de2c99f771",
+      "bytes": 392
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\official-list-decoded.json",
+      "sha256": "5f853fd831c7c687582f49bba4652bca5c0e88ca9cddbba1d578a11dc115c60b",
+      "bytes": 20145
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\frozen-source.tar",
+      "sha256": "abd29d7fbebf3b158562ced2e651c6fc7e4f49296f4fc87d7da5662a98f5a356",
+      "bytes": 174080
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\analyze.py",
+      "sha256": "d61f3192a1bf0e9e3aede9fb22d0c97b7c38bc2991cbf406b763c9e1746f781f",
+      "bytes": 7259
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\fit.py",
+      "sha256": "0a854f34b635e729f3d80b3294f2e1f8056d5e5830c9d998607c84098d846b71",
+      "bytes": 8205
+    },
+    {
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\network-model-study-20261025\\model-fit.json",
+      "sha256": "9620fde64c4097f3929b6ccfeab4832cadacc121ce8342f3e6c6125be99c1e80",
+      "bytes": 65270
+    }
+  ],
+  "vpsFiles": [
+    {
+      "path": "attempts.log",
+      "sha256": "6dc6c65f53213f8bd44bf3a7d2e759c0611258171bbab611e60b25000203a315",
+      "bytes": 80
+    },
+    {
+      "path": "frozen-source.tar",
+      "sha256": "abd29d7fbebf3b158562ced2e651c6fc7e4f49296f4fc87d7da5662a98f5a356",
+      "bytes": 174080
+    },
+    {
+      "path": "gauge-plan.json",
+      "sha256": "214b217936291e9fe31b0b19a0e03e72e235a8958729e4bab8ffeb15731dc5fa",
+      "bytes": 286
+    },
+    {
+      "path": "gauge-source.tar",
+      "sha256": "360aaea3af5c3304c44fedb7da64be1aed9b7721a4a624e99bcf6be54c89185b",
+      "bytes": 93696
+    },
+    {
+      "path": "gauge/load.jsonl",
+      "sha256": "f03e0da9611dffd968443bbde5fbbfb95d577cde4ef9de4d18914d074e75c21b",
+      "bytes": 23939
+    },
+    {
+      "path": "image-pull.log",
+      "sha256": "7a7099e0527a39e51380def6ba15acc262fd8bc9cd8daa109b828543a1ff7ef5",
+      "bytes": 713
+    },
+    {
+      "path": "images-before.txt",
+      "sha256": "b366df93c046011a1bf1643552ea01debe7b786ed2614997fd996f5d68ba46b1",
+      "bytes": 1944
+    },
+    {
+      "path": "round-1.log",
+      "sha256": "f59dcb29d475deb215604159c13c338ba1e9e3aa480985969598cf38107e3fd2",
+      "bytes": 563
+    },
+    {
+      "path": "round-1/load.jsonl",
+      "sha256": "2b33f3de26024fe0d66a7d275f94355b0dda1577ce3855128b48b72e39b82280",
+      "bytes": 107686
+    },
+    {
+      "path": "round-1/low-1/network0.jsonl.gz",
+      "sha256": "6c1fba570dd61d0ee305142c75edb4b53cfd947c2cea1882a5b922559de6280b",
+      "bytes": 261144
+    },
+    {
+      "path": "round-1/second-1/network0.jsonl.gz",
+      "sha256": "82dad20cde89169666f000373c9077eb354c9afeb2bb546ab8b000bb057df21a",
+      "bytes": 197298
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/analyze.py",
+      "sha256": "f167a1aa423fac3b8639c7e13eaf21971f486ec253f80e23e338b67aa152f79b",
+      "bytes": 13298
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/capture.mjs",
+      "sha256": "fcf3b44a71216d3b2d47eaef2f6c1fb361321f81b538ab5d5c7e5d86f18d6149",
+      "bytes": 6393
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/collect.sh",
+      "sha256": "e134678290a2e42f39d1a345e1a2658bbe57438f8ee371891bd1518e4d55dced",
+      "bytes": 667
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/plan.json",
+      "sha256": "a7410f6315b7b471b01186e208ce55eb66ee2f9e1c3205d3fa4fa7b874f8f8b7",
+      "bytes": 10079
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/test_analysis.py",
+      "sha256": "87efeca8890750a944dd30d7f6e13a0fa1ab65dfd87970d8a1a77c8a00ccc9ae",
+      "bytes": 3286
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/test_capture.mjs",
+      "sha256": "7eb5f3913acf90080ee362ea525dacf38d20324ff9d647c1928ca9e84961a896",
+      "bytes": 460
+    },
+    {
+      "path": "source/research/fidelity/2026-10-26-vps-timing/timing.py",
+      "sha256": "da6f159e8caa4408fc4dabfcd6ba21268c75e59064917f4af6b8a4d06e70deca",
+      "bytes": 3558
+    },
+    {
+      "path": "source/tools/fidelity/capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff",
+      "bytes": 20788
+    },
+    {
+      "path": "source/tools/fidelity/slither-headless.mjs",
+      "sha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "bytes": 84931
+    },
+    {
+      "path": "source/tools/fidelity/slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+      "bytes": 22341
+    }
+  ]
+}

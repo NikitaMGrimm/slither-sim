@@ -1,0 +1,358 @@
+{
+  "interpretation": "Failed acquisition. Interrupted archives are quarantined by the frozen plan. Q1/Q2 inconclusive, no model proposal. RTT is a diagnostic of the received partial prefixes, not validation.",
+  "frozenCommit": "86787770df6a82dee43a108e770840d6e9ab2185",
+  "connections": 2,
+  "peakIncludingConnectingSockets": 2,
+  "roundsAttempted": 1,
+  "endpointBatchesAttempted": 2,
+  "completedBatches": 0,
+  "interruptedBatches": 2,
+  "notAttemptedBatches": 4,
+  "retries": 0,
+  "attemptLog": [
+    "2026-10-25T23:30:15Z starting round-1",
+    "2026-10-25T23:31:15Z ended round-1 exit=1"
+  ],
+  "batches": [
+    {
+      "batch": {
+        "id": "low-1",
+        "round": "round-1",
+        "endpoint": "57.129.37.42:444",
+        "seconds": 600,
+        "split": "development"
+      },
+      "sha256": "6c1fba570dd61d0ee305142c75edb4b53cfd947c2cea1882a5b922559de6280b",
+      "compressedBytes": 261144,
+      "receivedFrames": 7652,
+      "terminal": {
+        "type": "meta",
+        "t": 60073.078,
+        "wall": 1792971075096,
+        "collectorTiming": {
+          "targetTickMs": 25,
+          "ticks": 2370,
+          "lateTicks": 0,
+          "maxTickGapMs": 38.5340389999983
+        },
+        "requestedSeconds": 600,
+        "event": "capture-interrupted",
+        "reason": "Error: socket error 57.129.37.42:444; no retry",
+        "frames": 7652,
+        "joins": 1,
+        "maxSegments": 33,
+        "failures": 0,
+        "collectorEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+        "headlessEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+        "collectorSourcesUnchanged": true,
+        "integrity": {
+          "format": "sha256-jsonl-prefix-v1",
+          "sha256": "766f79c6ed45e0f2d831e5a574c5c3d609b5bcb348420158de52bcc5cdf8e518",
+          "lines": 8920,
+          "payloadBytes": 626178,
+          "counts": {
+            "i": {
+              "frames": 7652,
+              "bytes": 202252
+            },
+            "o": {
+              "frames": 676,
+              "bytes": 751
+            }
+          },
+          "backpressureWrites": 0,
+          "maxQueuedBytes": 3517,
+          "queueLimitBytes": 33554432
+        }
+      },
+      "status": "quarantine",
+      "issues": [
+        "interrupted_capture"
+      ],
+      "integrityVerified": true,
+      "completeGzip": true,
+      "events": [
+        {
+          "type": "meta",
+          "t": 59771.596,
+          "wall": 1792971074794,
+          "event": "socket-error",
+          "life": 1,
+          "message": ""
+        },
+        {
+          "type": "meta",
+          "t": 59772.516,
+          "wall": 1792971074795,
+          "event": "close",
+          "code": 1006,
+          "reason": "",
+          "life": 1
+        }
+      ],
+      "metadata": {
+        "header": 1,
+        "connect": 1,
+        "open": 1,
+        "ping-sent": 233,
+        "ping-rtt": 233,
+        "study-timing": 59,
+        "collector-timing": 59,
+        "death-observation-start": 1,
+        "death-observation-close-requested": 1,
+        "socket-error": 1,
+        "death-observation-end": 1,
+        "close": 1,
+        "capture-interrupted": 1
+      },
+      "rtt": {
+        "n": 233,
+        "mean": 7.121982922746499,
+        "sd": 2.433443486919267,
+        "minimum": 3.4103849999992235,
+        "maximum": 26.81807399999525,
+        "p1": 3.587438799997035,
+        "p10": 4.459975999999915,
+        "p50": 7.006210999999894,
+        "p90": 9.865551000000414,
+        "p95": 10.254210399997646,
+        "p99": 12.73251103999764,
+        "p99.9": 23.846086023996417
+      },
+      "stallWindows": [
+        [
+          -23.895848,
+          1175.544835
+        ],
+        [
+          14976.772866,
+          16177.070755
+        ],
+        [
+          45984.018422,
+          47183.463062
+        ]
+      ],
+      "eligibility": false,
+      "tailClass": "ineligible",
+      "admittedExcessFrames": 0,
+      "scheduler": {
+        "quarantined": true
+      }
+    },
+    {
+      "batch": {
+        "id": "second-1",
+        "round": "round-1",
+        "endpoint": "198.244.231.35:444",
+        "seconds": 600,
+        "split": "development"
+      },
+      "sha256": "82dad20cde89169666f000373c9077eb354c9afeb2bb546ab8b000bb057df21a",
+      "compressedBytes": 197298,
+      "receivedFrames": 6079,
+      "terminal": {
+        "type": "meta",
+        "t": 60073.818,
+        "wall": 1792971075096,
+        "collectorTiming": {
+          "targetTickMs": 25,
+          "ticks": 2370,
+          "lateTicks": 0,
+          "maxTickGapMs": 39.59672700000374
+        },
+        "requestedSeconds": 600,
+        "event": "capture-interrupted",
+        "reason": "Error: socket error 57.129.37.42:444; no retry",
+        "frames": 6079,
+        "joins": 1,
+        "maxSegments": 28,
+        "failures": 0,
+        "collectorEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+        "headlessEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+        "collectorSourcesUnchanged": true,
+        "integrity": {
+          "format": "sha256-jsonl-prefix-v1",
+          "sha256": "60493ffad5ce88d7c23241a263cbc5dc895f8b9c24dc22c8910c6c455e2c700e",
+          "lines": 7403,
+          "payloadBytes": 499747,
+          "counts": {
+            "i": {
+              "frames": 6079,
+              "bytes": 129978
+            },
+            "o": {
+              "frames": 735,
+              "bytes": 810
+            }
+          },
+          "backpressureWrites": 0,
+          "maxQueuedBytes": 2865,
+          "queueLimitBytes": 33554432
+        }
+      },
+      "status": "quarantine",
+      "issues": [
+        "interrupted_capture"
+      ],
+      "integrityVerified": true,
+      "completeGzip": true,
+      "events": [],
+      "metadata": {
+        "header": 1,
+        "connect": 1,
+        "open": 1,
+        "ping-sent": 234,
+        "ping-rtt": 234,
+        "study-timing": 59,
+        "collector-timing": 59,
+        "capture-interrupted": 1
+      },
+      "rtt": {
+        "n": 234,
+        "mean": 24.294509871794805,
+        "sd": 3.3385992983268973,
+        "minimum": 20.194226999999955,
+        "maximum": 63.193938000000344,
+        "p1": 20.311822600000152,
+        "p10": 21.408595300000524,
+        "p50": 23.976633999997944,
+        "p90": 26.897214999997438,
+        "p95": 27.238809349994334,
+        "p99": 29.949059809999124,
+        "p99.9": 56.1399424530005
+      },
+      "stallWindows": [
+        [
+          -23.895848,
+          1175.544835
+        ],
+        [
+          14976.772866,
+          16177.070755
+        ],
+        [
+          45984.018422,
+          47183.463062
+        ]
+      ],
+      "eligibility": false,
+      "tailClass": "ineligible",
+      "admittedExcessFrames": 0,
+      "scheduler": {
+        "quarantined": true
+      }
+    },
+    {
+      "batch": {
+        "id": "low-2",
+        "round": "round-2",
+        "endpoint": "57.129.37.42:444",
+        "seconds": 600,
+        "split": "development"
+      },
+      "missing": true
+    },
+    {
+      "batch": {
+        "id": "second-2",
+        "round": "round-2",
+        "endpoint": "198.244.231.35:444",
+        "seconds": 600,
+        "split": "development"
+      },
+      "missing": true
+    }
+  ],
+  "validation": [
+    {
+      "batch": {
+        "id": "low-3",
+        "round": "round-3",
+        "endpoint": "57.129.37.42:444",
+        "seconds": 600,
+        "split": "heldout"
+      },
+      "missing": true
+    },
+    {
+      "batch": {
+        "id": "second-3",
+        "round": "round-3",
+        "endpoint": "198.244.231.35:444",
+        "seconds": 600,
+        "split": "heldout"
+      },
+      "missing": true
+    }
+  ],
+  "load": {
+    "loadSamples": 60,
+    "hostLoadavg1": {
+      "n": 60,
+      "mean": 0.6995000000000002,
+      "sd": 0.2780133390085207,
+      "minimum": 0.49,
+      "maximum": 1.29,
+      "p1": 0.49,
+      "p10": 0.5,
+      "p50": 0.5549999999999999,
+      "p90": 1.18,
+      "p95": 1.29,
+      "p99": 1.29,
+      "p99.9": 1.29
+    },
+    "hostBusyPercent": {
+      "n": 59,
+      "mean": 12.015988941280824,
+      "sd": 9.530084143639776,
+      "minimum": 5.527638190954774,
+      "maximum": 77.72151898734177,
+      "p1": 5.827905269420149,
+      "p10": 7.319543037427168,
+      "p50": 10.126582278481013,
+      "p90": 16.818941292625507,
+      "p95": 19.688725630871065,
+      "p99": 49.80630328080608,
+      "p99.9": 74.9299974166882
+    },
+    "hostStealPercent": {
+      "n": 59,
+      "mean": 0.517399701949329,
+      "sd": 0.4362673622933257,
+      "minimum": 0.0,
+      "maximum": 3.2911392405063293,
+      "p1": 0.0,
+      "p10": 0.25125628140703515,
+      "p50": 0.5025125628140703,
+      "p90": 0.758344870019997,
+      "p95": 1.0294821022020684,
+      "p99": 2.1220743993800086,
+      "p99.9": 3.1742327563936974
+    },
+    "containerCpuPercentOfOneCore": {
+      "n": 59,
+      "mean": 18.04297975001713,
+      "sd": 2.1023078675322155,
+      "minimum": 11.310032507599908,
+      "maximum": 25.09966103455989,
+      "p1": 13.828107813523648,
+      "p10": 16.034754492759905,
+      "p50": 17.588769606775582,
+      "p90": 20.614967323513316,
+      "p95": 21.568355387850463,
+      "p99": 24.248749883741745,
+      "p99.9": 25.014569919478078
+    },
+    "throttledMicrosecondsTotal": 0,
+    "timerLateMaxMs": 43.351521000000005,
+    "loopMaxMs": 27.557887,
+    "receiveMaxMs": 1.8731339999999932,
+    "rssMaxBytes": 110579712
+  },
+  "copyVerification": {
+    "files": 21,
+    "allSha256Matched": true
+  },
+  "cleanupVerification": "2026-10-25T23:33:53Z\nVERIFIED_SCRATCH_CONTAINER_AND_IMAGE_ABSENT"
+}
