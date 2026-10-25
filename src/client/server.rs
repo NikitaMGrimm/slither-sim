@@ -27,7 +27,7 @@ use super::{
         MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT, RawSimulator,
     },
 };
-use crate::Action;
+use crate::{Action, simulator::population_radius};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -145,11 +145,24 @@ impl HostConfig {
         if self.simulation.record_wire {
             return Err("The host does not retain wire records; set recordWire to false".into());
         }
-        let config = SimulationConfig {
+        let mut config = SimulationConfig {
             agents,
             controlled_slot: 0,
             ..self.simulation.clone()
         };
+        // A dynamic arena follows its living population, but presets and
+        // omitted fields start at `Config::official(1)`'s 670 units: too small
+        // to admit a host's first lives clear of each other. Start no smaller
+        // than the population radius of every seat, scaling the food target and
+        // ambient rate with the area to keep their density.
+        let world = &mut config.world;
+        let seats = population_radius(agents);
+        if world.dynamic_radius && world.radius > 0. && world.radius < seats {
+            let area = (seats / world.radius).powi(2);
+            world.radius = seats;
+            world.food_count = (world.food_count as f64 * area) as usize;
+            world.ambient_replenish_per_second *= area;
+        }
         config.validate()?;
         Ok(config)
     }
@@ -1408,7 +1421,7 @@ impl Seat {
         Ok(())
     }
 
-    /// Start a new session and life. A crowded world may refuse it; the bot
+    /// Start a new session and life. A full world may refuse it; the bot
     /// then retries at its next decision.
     fn join(
         &mut self,
@@ -1507,6 +1520,38 @@ mod tests {
         let started = Instant::now();
         clock.sleep_until(f64::INFINITY, Duration::from_millis(20));
         assert!(started.elapsed() >= Duration::from_millis(15));
+    }
+
+    #[test]
+    fn a_default_host_admits_every_seat() {
+        let host = HostConfig::default();
+        let config = host.world_config().unwrap();
+        let seats = host.max_clients + host.bots;
+        let official = crate::Config::official(seats);
+        assert_eq!(config.world.radius, official.radius);
+        // The area scale floors 109 pellets × 8 rather than the 877.4 target.
+        assert!(official.food_count - config.world.food_count < seats);
+        assert!(
+            (config.world.ambient_replenish_per_second - official.ambient_replenish_per_second)
+                .abs()
+                < 1e-9
+        );
+        // Before, `Config::official(1)`'s 670-unit start refused these joins.
+        let mut world = RawSimulator::new(host.seed, config, seats).unwrap();
+        for slot in 0..seats {
+            world.connect(slot, PlayerAppearance::default()).unwrap();
+        }
+    }
+
+    #[test]
+    fn explicit_and_fixed_host_arenas_keep_their_radius() {
+        let mut host = HostConfig::default();
+        host.simulation.world.radius = 5000.;
+        assert_eq!(host.world_config().unwrap().world.radius, 5000.);
+        host.simulation.world = crate::Config::sandbox();
+        let config = host.world_config().unwrap();
+        assert_eq!(config.world.radius, 1000.);
+        assert_eq!(config.world.food_count, crate::Config::sandbox().food_count);
     }
 
     fn shared(dt: f64, sockets: usize) -> Arc<Shared> {

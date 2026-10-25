@@ -85,6 +85,8 @@ mechanics and stock-browser limits.
 Native and remote clients share the
 [coverage and spawning models](server-rules.md#client-delivery-and-spawning),
 including hosted bot startup. The browser sends no viewport or zoom to the host.
+A dynamic host arena starts sized for all seats (`maxClients` plus `bots`), with
+its food target and ambient rate scaled to the same density.
 For Rust constructors and the default `Config::official(1)`, see
 [world settings](configuration.md#official-and-sandbox).
 
