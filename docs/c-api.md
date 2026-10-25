@@ -1,10 +1,8 @@
 # C ABI: slither-sim-abi-v2
 
-The `slither-sim-ffi` library runs [`serve` sessions](bot-api.md) inside the
-caller's process for any language that can call C. It has the same worlds,
-requests and frame values as `serve`. Steps take typed arrays and frames are read
-as column pointers, so the decision loop never encodes or parses JSON. It wraps
-the Rust [`transport::Session`](bot-api.md#in-process-sessions).
+`slither-sim-ffi` wraps Rust [`transport::Session`](bot-api.md#in-process-sessions)
+for C callers, with the worlds, requests and frame values of [`serve`](bot-api.md).
+Typed-array steps and column pointers avoid JSON in the decision loop.
 
 ## Build and run
 
@@ -13,21 +11,18 @@ cargo build --release --locked -p slither-sim-ffi
 python examples/ffi_bot.py --steps 200
 ```
 
-The `ffi/` workspace member builds `slither_sim_ffi.dll` on Windows,
-`libslither_sim_ffi.so` on Linux or `libslither_sim_ffi.dylib` on macOS in
-`target/release`, plus a static library. It is not on crates.io. The
-hand-written header is
+The `ffi/` workspace member (not on crates.io) builds a static library plus
+`slither_sim_ffi.dll` (Windows), `libslither_sim_ffi.so` (Linux) or
+`libslither_sim_ffi.dylib` (macOS) in `target/release`. The hand-written header is
 [`ffi/include/slither_sim.h`](https://github.com/NikitaMGrimm/slither-sim/blob/main/ffi/include/slither_sim.h).
 
 [Release archives](../README.md#download-a-release) include the shared library,
 the header and, on Windows, the `slither_sim_ffi.dll.lib` import library, for
-Linux (glibc 2.17+), macOS and Windows. They are unsigned. Pass the extracted
-library to the example with `--library`.
+Linux (glibc 2.17+), macOS and Windows. They are unsigned.
 
-The [Python example](../examples/ffi_bot.py) uses only `ctypes` from the standard
-library. It makes the same decisions as the [JSON controller](../examples/bot.py)
-and prints the same summary. Pass `--library PATH` or set `SLITHER_SIM_FFI` to
-load another build.
+The [example](../examples/ffi_bot.py) uses standard-library `ctypes`, makes the
+[JSON controller](../examples/bot.py)'s decisions and prints its summary. Load
+an extracted library or another build with `--library PATH` or `SLITHER_SIM_FFI`.
 
 ## Calls
 
@@ -42,18 +37,16 @@ load another build.
 | `slither_last_error(s)` | Why the latest request, step or frame read failed, or an empty string. |
 
 Use `slither_request` for `info`, `reset` and `snapshot`. JSON errors, including
-terminal failures, return `SLITHER_OK`; inspect `error` and `sessionEnded` in
-the reply. The reply has no newline;
-a NUL that `reply_len` excludes follows it.
+terminal failures, return `SLITHER_OK`; inspect `error` and `sessionEnded`.
+Replies have no newline; a trailing NUL is excluded from `reply_len`.
 
 `slither_step` takes `worlds × agents` entries per array, world-major: slot `s`
 of world `w` is entry `w × agents + s`. Headings are `double` radians, with NaN
 for no action, which only dead slots may give. Boosts are `uint8_t`; any nonzero
-value boosts. Validation and error text match the JSON step, and a rejected step
-changes nothing. JSON and typed steps act on the same worlds.
-If advancement or frame collection fails, `SLITHER_ENDED` clears every world;
-`slither_worlds` and `slither_agents` return 0, and frame reads require a reset.
-The handle remains usable: reset it to continue.
+value boosts. JSON and typed steps share worlds, validation and error text.
+Rejection changes nothing. Advancement or frame-collection failure returns
+`SLITHER_ENDED` and clears every world: `slither_worlds` and `slither_agents`
+return 0; reset the usable handle before reading frames or stepping again.
 
 | Code | Meaning |
 | --- | --- |
@@ -71,8 +64,7 @@ one pointer per column. Columns hold the values and fixed types of the
 [Rust frame columns](bot-api.md#in-process-sessions): `double` measures,
 `uint32_t` slots, counts and row indices, `uint64_t` prey IDs and `uint8_t` codes.
 
-- `snake_kill_score` is the slot's kills within the config's `killScoreSeconds`,
-  across lives, or 0 without that window.
+- `snake_kill_score` maps to JSON [`killScore`](bot-api.md#frames).
 - Snake row `r`'s anchors are entries `snake_body_start[r]` up to
   `snake_body_start[r + 1]` of `snake_body_x` and `snake_body_y`.
 - `view_self[s]` is slot `s`'s own snakes row, or `SLITHER_NONE` when the slot is
@@ -97,12 +89,8 @@ separate threads. Steps advance several worlds in parallel on the library's
 
 ## Compatibility
 
-`slither-sim-abi-v2` covers the function signatures, the `slither_frame` layout,
-the codes and the column meanings. An incompatible change needs a new identifier
-and `SLITHER_ABI_VERSION`. Version 2 inserted `snake_kill_score` after
-`snake_kills` and added `SLITHER_DEATH_PIT`; v1 callers must be rebuilt.
-Requests and replies follow `slither-sim-json-v3`;
-check `protocol` in replies. As with `serve`, record the commit for reproducible
-results.
-Version 2 adds `SLITHER_ENDED`, distinguishing terminal failure from
-`SLITHER_REJECTED`.
+`slither-sim-abi-v2` covers function signatures, `slither_frame` layout, codes
+and column meanings. Incompatible changes need a new identifier and
+`SLITHER_ABI_VERSION`. Rebuild v1 callers; see [migration notes](../CHANGELOG.md#unreleased).
+Requests and replies follow `slither-sim-json-v3`; check `protocol` and record
+the commit for reproducibility.

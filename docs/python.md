@@ -1,10 +1,8 @@
 # Python package: slither_sim
 
-The `slither-sim` Python package runs [`serve` sessions](bot-api.md) inside the
-Python process. Steps take typed arrays and frames arrive as typed columns, so
-the decision loop never encodes or parses JSON. It wraps the Rust
-[`transport::Session`](bot-api.md#in-process-sessions) with the same worlds,
-requests and frame values as `serve`.
+`slither-sim` wraps Rust [`transport::Session`](bot-api.md#in-process-sessions)
+in Python, with the worlds, requests and frame values of [`serve`](bot-api.md).
+Typed-array steps and frame columns avoid JSON in the decision loop.
 
 ## Install
 
@@ -12,23 +10,21 @@ requests and frame values as `serve`.
 pip install slither-sim
 ```
 
-`uv add slither-sim` works the same way. Wheels use the stable ABI, so one wheel
-per platform serves CPython 3.11 and later. They cover Linux (x86-64 and ARM64,
-glibc 2.17+), macOS (Apple silicon and Intel) and Windows (x86-64), and have no
-runtime dependencies. Elsewhere, pip builds the source distribution, which needs
-Rust 1.99+. Each crate release publishes the same version to PyPI.
+Or use `uv add slither-sim`. Stable-ABI wheels serve CPython 3.11+ on Linux
+(x86-64 and ARM64, glibc 2.17+), macOS (Apple silicon and Intel) and Windows
+(x86-64), without runtime dependencies. Elsewhere, pip builds the source
+distribution with Rust 1.99+. Each crate release publishes the same version to PyPI.
 
 ## Install from a checkout
 
-Into a uv project or virtual environment, which builds a release wheel with maturin:
+Build a release wheel with maturin into a uv project or virtual environment:
 
 ```sh
 uv pip install ./python
 python python/examples/bot.py --steps 200
 ```
 
-`pip install ./python` works the same way. To keep the wheel, build it with the
-repository's locked maturin; it lands in `target/wheels`:
+Or use `pip install ./python`. To keep the wheel in `target/wheels`, use locked maturin:
 
 ```sh
 uv run --locked --only-group tools python -m maturin build --release --locked -m python/Cargo.toml
@@ -58,12 +54,11 @@ print(session.frame(1).time)
 | `worlds`, `agents` | Session shape; 0 before the first reset. |
 
 `step` takes `worlds × agents` entries per argument, world-major: slot `s` of
-world `w` is entry `w × agents + s`. Headings are radians; NaN means no action,
-which only dead slots may give. Pass any buffer of float64 headings and of bool
-or uint8 boosts, such as `array.array('d')`, `bytes`, `bytearray` or numpy
-arrays, in any byte order and alignment; multidimensional buffers are read in C
-order. Lists and other iterables
-also work, with `None` for no action and any truthy value to boost.
+world `w` is entry `w × agents + s`. Headings are radians; only dead slots may
+use NaN for no action. Pass float64 heading and bool/uint8 boost buffers
+(`array.array('d')`, `bytes`, `bytearray`, numpy), any byte order/alignment;
+multidimensional buffers use C order. Other iterables, including lists, accept
+`None` for no action and truthy values to boost.
 
 Rejected resets and steps raise `ValueError` with the protocol's error text and
 change nothing. Buffers of other item types raise `TypeError`. `frame` raises
@@ -72,11 +67,10 @@ session; negative indices do not count from the end. `request` returns error
 replies instead of raising. Requests and `config` must be plain dicts; other
 mappings raise `TypeError`.
 
-If advancement or frame collection fails, `step` raises `SessionEndedError`,
-a subclass of `RuntimeError`. Every world is cleared: `worlds` and `agents`
-become 0, and `frame` raises `ValueError` ("Reset first"). Reset to continue.
-`request` reports the same failure with `sessionEnded: true` in its error reply;
-unchanged-state error replies have `sessionEnded: false`.
+Advancement or frame-collection failure makes `step` raise `SessionEndedError`
+(a `RuntimeError` subclass) and clear every world: `worlds` and `agents` become 0;
+`frame` raises `ValueError` ("Reset first"). Reset to continue. `request` instead
+returns an error reply with `sessionEnded: true` (false for unchanged-state errors).
 
 The module also exports `PROTOCOL` (`slither-sim-json-v3`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
@@ -109,22 +103,19 @@ typecodes.
 
 ## Threads
 
-`step`, `reset` and `request` release the GIL while the simulator runs, so
-separate sessions in separate Python threads run concurrently. A session with
-several worlds also steps them in parallel on the [rayon](https://docs.rs/rayon)
-pool; `RAYON_NUM_THREADS` sizes it. Use one session from one thread at a time:
-a call that overlaps another call on the same session raises `RuntimeError`.
+`step`, `reset` and `request` release the GIL, allowing separate sessions in
+separate Python threads to run concurrently. Worlds within a session step on
+the [rayon](https://docs.rs/rayon) pool, sized by `RAYON_NUM_THREADS`.
+Overlapping calls on one session raise `RuntimeError`.
 
 ## Example and timing
 
 [`python/examples/bot.py`](https://github.com/NikitaMGrimm/slither-sim/blob/main/python/examples/bot.py)
-makes the same decisions as the [JSON controller](../examples/bot.py) and prints
-the same summary.
+makes the [JSON controller](../examples/bot.py)'s decisions and prints its summary.
 [`python/examples/timing.py`](https://github.com/NikitaMGrimm/slither-sim/blob/main/python/examples/timing.py)
-times a 128-agent loop through typed steps against JSON requests. With a release
-build on CPython 3.13, Windows 11 and a Ryzen 7 9800X3D, one world of 128 agents
-in a 20,000-unit arena took these medians of 7 runs of 300 steps, in
-milliseconds per step:
+compares typed steps with JSON requests. Medians in ms/step over 7 runs of 300
+steps: release build, CPython 3.13, Windows 11, Ryzen 7 9800X3D, one world of
+128 agents in a 20,000-unit arena.
 
 | Loop | Step | Frame | JSON encode | Decide | Total |
 | --- | --- | --- | --- | --- | --- |
@@ -138,7 +129,6 @@ the same wall time as one.
 
 ## Compatibility
 
-The package version is the `slither-sim` crate's, inherited from the workspace. Requests and replies follow
-`slither-sim-json-v3`; check `PROTOCOL`. The Python API is experimental and may
-change between `0.x` versions. As with `serve`, record the commit for
-reproducible results.
+The package inherits the workspace's `slither-sim` crate version. Check
+`PROTOCOL` (`slither-sim-json-v3`) and record the commit for reproducibility.
+The Python API is experimental and may change between `0.x` versions.

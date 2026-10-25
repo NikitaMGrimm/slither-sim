@@ -1,14 +1,13 @@
 # Portable bots: slither-client-v2
 
-The simulator and WebSocket backends feed the same Rust decoder and return
-`ClientFrame`. A bot can switch backends while keeping its inputs, action mapping
-and state handling. See the [Rust](../examples/portable_bot.rs) and
-[Python](../examples/portable_bot.py) examples.
+Simulator and WebSocket backends share a Rust decoder and `ClientFrame`, so bots
+can keep their inputs, action mapping and state handling across backends. See the
+[Rust](../examples/portable_bot.rs) and [Python](../examples/portable_bot.py) examples.
 
 ## Interface versions
 
-Interfaces are experimental, with one supported frame contract and no translation
-of older versions. Check the envelope and frame contract before acting.
+Interfaces are experimental; only the current frame contract is supported,
+without translation. Check the envelope and frame contract before acting.
 
 | Identifier | Boundary |
 | --- | --- |
@@ -26,16 +25,16 @@ fields; requests, actions and configs reject unknown fields.
 Changes to types, units, coordinates, nullability, status values, action mapping,
 receipt meanings or resets require a new affected contract ID and updated
 examples. Physics can change trajectories without changing that contract.
-The [JSON fixture](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/client-contract-v2.json) checks the current
-shape independently of Rust structs; it does not freeze this preview permanently.
+The [JSON fixture](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/client-contract-v2.json)
+checks the current shape independently of Rust structs.
 
 ## Rust
 
 Implement `client::Bot::decide(&ClientFrame) -> Option<Action>` and `reset()` for
 stateful bots. Run with `BotRunner` and `SimulatorBackend` or `NetworkBackend`.
-The runner checks the contract, decides only while playing, measures compute time
-and sends actions. It resets bot state on connection/life changes and when play
-ends. Reconnection is explicit.
+The runner checks the contract, decides and sends actions only while playing,
+measures compute time, and resets bot state on connection/life changes or play
+ending. Reconnection is explicit.
 
 Headings are absolute radians: zero is +x, pi/2 is +y. Both backends quantize them
 to bytes 0–250, with separate boost-on/off commands.
@@ -49,7 +48,7 @@ Run `slither-sim client` and exchange one JSON object per stdin/stdout line:
 {"protocol":"slither-client-json-v1","error":"Reset first"}
 ```
 
-The Rust process handles packet decoding. Start a virtual-time world and step it:
+Start and step a virtual-time world:
 
 ```json
 {"op":"simulation","seed":7}
@@ -72,28 +71,25 @@ For a WebSocket connection:
 | `info` | Reports capabilities and defaults. |
 | `wire` | Drains opt-in wire records. |
 
-Wait for `result.frame.status == "playing"` before sending an action; latency
-may require several empty steps. Omitting an action holds the last command.
-A replacement backend is installed only after successful construction.
-Poll network backends regularly to avoid accumulating stale input.
+Wait for `result.frame.status == "playing"` before acting; latency may require
+several empty steps. Omit actions to hold the last command. Poll networks
+regularly to avoid stale input. Backend replacement requires successful construction.
 
 The decoder retains at most 4,096 snake slots, 4,096 body anchors per snake,
 65,536 body anchors in total (including removed records), and 131,072 food IDs.
 Updates exceeding these limits fail before changing the frame's received state;
 network backends disconnect on that error. Reconnect clears retained entities.
 
-Minimap decoding also admits at most 1,310,720 logical grid cells per frame,
-enough for the largest supported team snapshot (four 512×512 layers plus their
-union). M, V and U each charge `side²`; legacy u charges `80²`; L charges
-`(teamCount + 1) × side²`, including its union. This local resource limit bounds
-repeated full-grid work even for empty snapshots or deltas. Exceeding it rejects
-the whole frame before committing received state; each new frame has a fresh
-budget. The separate L limit remains 1,048,576 cells across its team layers.
+Minimap decoding has a fresh budget of 1,310,720 logical cells per frame, bounding
+full-grid work even for empty snapshots or deltas. It admits four 512×512 team
+layers plus their union; exceeding it rejects the whole frame before committing
+received state. M, V and U each charge `side²`; legacy u charges `80²`; L charges
+`(teamCount + 1) × side²`, with a separate 1,048,576-cell limit across team layers.
 
-`processingSeconds` is measured bot compute time, finite and nonnegative. It replaces the configured sample for that decision, including when
-no action is sent. Network computation has already elapsed, so the value is
-recorded as metadata. Invalid actions are rejected before recording the duration;
-later I/O or record-buffer errors do not roll back sent bytes or advanced time.
+`processingSeconds` is finite, nonnegative measured bot compute time, replacing
+the configured sample even without an action. For networks it is metadata:
+computation has already elapsed. Invalid actions reject it before recording;
+later I/O or record-buffer errors cannot roll back sent bytes or advanced time.
 
 ## What the bot knows
 
@@ -102,13 +98,13 @@ server elapsed time; header-free connections use local receipt time since setup.
 Coordinates are centered at the arena origin, with body anchors head to tail.
 Observations appear after self's full appearance and are absent after death.
 
-Self is the first full snake appearance on a fresh connection, not the setup's
-server number. A mid-life capture cannot establish self by that rule.
+Self is the first full snake appearance on a fresh connection; neither the
+setup's server number nor a mid-life capture establishes self.
 
-Entities come only from received messages. `received` gives independent age,
-validity and prediction flags for appearance, position, heading, wanted heading,
-speed, body and mass, plus category completeness and control histories. An empty
-list does not imply complete coverage. Polling never refreshes a receipt.
+Entities come only from messages. `received` tracks independent ages, validity
+and prediction flags for appearance, position, heading, wanted heading, speed,
+body and mass, plus category completeness and control histories. Empty lists do
+not imply complete coverage; polling never refreshes receipts.
 Food origins and unreported opponent score credits are unavailable.
 
 `timing` holds game-ping round trips, their recent range, pending ping age,
@@ -139,15 +135,14 @@ are tracked separately.
 
 `settings` retains server number, optional `gameMode`/`teamVal` and wire constants
 `sectorCountAlongEdge`, `spangdv`, `nsp1`, `nsp2`, `nsp3`, `mamu` and `mamu2`.
-These reports do not alter simulator physics. Team maps exceeding 1,048,576 total
-cells are rejected before replacing received state.
+These reports do not alter simulator physics.
 
 ## Compatibility and limits
 
 Network config accepts an explicit `ws://` or `wss://` URL, optional `origin`,
 Latin-1 nickname (24 characters), skin byte, `customSkin` (255 bytes), timeouts,
 decision interval and `recordWire`. `requestSessionId: true` sends `[4]` before
-login; it is off by default. IDs are not authentication or life resumption.
+login; it defaults off. IDs are not authentication or life resumption.
 The default `handshake: "challenge"` uses the supported login exchange;
 `"direct"` sends login immediately.
 
@@ -158,13 +153,9 @@ selects header-free framing, including bundled packets. Body contraction outside
 
 ### Simulation
 
-See the [configuration reference](configuration.md) for all world, simulation,
-latency and network fields, their defaults and limits.
-
-Defaults: one snake, six 7 ms ticks per decision, gameplay emission every tick
-with [per-family release rules](server-rules.md#packet-timing), 136×136 minimap
-and leaderboard on server-wide 2.504/3.008-second clocks and zero added delay.
-`leaderboardIntervalSeconds` must be positive and finite.
+See [configuration](configuration.md) for world, simulation, latency and network
+fields, defaults and limits, and [packet timing](server-rules.md#packet-timing)
+for per-family release rules.
 
 For the custom [Battledome mode](configuration.md#battledome), put the preset
 inside `config.world`:
@@ -178,9 +169,7 @@ floor and the rolling kill score are not transmitted; retain the chosen world
 config separately when a bot needs the mode rules. Reported kills count the
 current life, and leaderboard ranks use size scores.
 
-Latency settings include `roundTripSeconds`, `roundTripWeights`, `roundTripSpread`,
-`uplinkShare`, `variation`, `pauses`, `processingSeconds` and
-`processingJitterSeconds`:
+Example [latency settings](configuration.md#latencyconfig):
 
 ```json
 {"op":"simulation","seed":7,"config":{"agents":4,"latency":{"roundTripSeconds":[0.04,0.12],"roundTripWeights":[3,1],"variation":{"medianSeconds":0.002,"logSigma":0.5},"processingSeconds":[0.005,0.02]}}}
@@ -192,11 +181,10 @@ finishes processing before the next decision frame. Multi-agent callers use
 `step_all`, `send_to`, `decision_pending` and `frame_for`; busy slots reject new
 actions. Reconnect starts a new life at a clear spawn while other snakes continue.
 
-Visibility, minimap rasterization and body presentation remain approximations;
-reconstruction differs from the stock renderer's smoothing. See
-[mechanics and delivery limits](server-rules.md).
-Use the [host](raw-server.md) to exercise
-real sockets; the native backend delivers protocol bytes inside the process.
+Visibility, minimap rasterization and body presentation are approximations;
+reconstruction differs from stock renderer smoothing. See [mechanics and delivery
+limits](server-rules.md). The native backend delivers protocol bytes in-process;
+use the [host](raw-server.md) for real sockets.
 
 ### Recording and network bounds
 

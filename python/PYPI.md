@@ -1,10 +1,8 @@
 # slither-sim
 
-In-process [SlitherSim](https://github.com/NikitaMGrimm/slither-sim) sessions for
-Python bots. SlitherSim is a headless Slither.io simulator written in Rust. This
-package runs its `serve` sessions inside the Python process: steps take typed
-arrays, frames arrive as typed columns, and no JSON is encoded or parsed in the
-decision loop.
+[SlitherSim](https://github.com/NikitaMGrimm/slither-sim) is a headless Slither.io
+simulator in Rust. Run its `serve` sessions in-process for Python bots, with
+typed-array steps and frame columns instead of JSON in the decision loop.
 
 ```sh
 pip install slither-sim
@@ -22,9 +20,9 @@ session.step(headings, bytes(len(headings)))
 print(session.frame(1).time)
 ```
 
-Wheels use the stable ABI for CPython 3.11 and later. They cover Linux
-(x86-64 and ARM64, glibc 2.17+), macOS (Apple silicon and Intel) and Windows
-(x86-64). Elsewhere, pip builds the source distribution, which needs Rust 1.99+.
+Stable-ABI wheels serve CPython 3.11+ on Linux (x86-64 and ARM64, glibc 2.17+),
+macOS (Apple silicon and Intel) and Windows (x86-64). Elsewhere, pip builds from
+source with Rust 1.99+.
 
 - [Python package guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/python.md):
   API, frame columns, threads and timing
