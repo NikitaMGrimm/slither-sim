@@ -290,15 +290,18 @@ fn centre_bias_concentrates_ambient_food_and_zero_keeps_official_placement() {
         "{}",
         mean(&world(1.0))
     );
-    assert!(
+    // Placement rejects draws, so an unbounded bias could stall it.
+    let valid = |bias: f64| {
         Config {
             ambient_food: AmbientFoodConfig {
-                centre_bias: -1.0,
+                centre_bias: bias,
                 ..AmbientFoodConfig::default()
             },
             ..Config::sandbox()
         }
         .validate()
-        .is_err()
-    );
+        .is_ok()
+    };
+    assert!(valid(8.0));
+    assert!(!valid(-1.0) && !valid(8.5) && !valid(f64::INFINITY));
 }

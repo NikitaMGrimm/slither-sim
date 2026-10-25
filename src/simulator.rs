@@ -44,7 +44,9 @@ pub struct AmbientFoodConfig {
     pub max_per_cell: usize,
     /// Scenario option, not an official mechanic: extra ambient placement
     /// density factor `(1 - r/R)^centreBias` toward the arena centre. 0 keeps
-    /// the official placement and its random draws exactly.
+    /// the official placement and its random draws exactly. Placement rejects
+    /// draws, accepting about `2 / ((k + 1)(k + 2))` of them, so the bias is
+    /// capped at `MAX_CENTRE_BIAS`.
     pub centre_bias: f64,
 }
 impl Default for AmbientFoodConfig {
@@ -57,13 +59,19 @@ impl Default for AmbientFoodConfig {
         }
     }
 }
+/// Largest `AmbientFoodConfig::centre_bias`: about 45 placement draws per
+/// pellet.
+pub const MAX_CENTRE_BIAS: f64 = 8.0;
+
 impl AmbientFoodConfig {
     pub fn validate(&self) -> Result<(), String> {
         if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
             return Err("Ambient-food cellSize must be positive and finite".into());
         }
-        if !self.centre_bias.is_finite() || self.centre_bias < 0.0 {
-            return Err("Ambient-food centreBias must be finite and nonnegative".into());
+        if !(0.0..=MAX_CENTRE_BIAS).contains(&self.centre_bias) {
+            return Err(format!(
+                "Ambient-food centreBias must be within 0..={MAX_CENTRE_BIAS}"
+            ));
         }
         Ok(())
     }
