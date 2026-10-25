@@ -1,0 +1,167 @@
+{
+  "studyId": "vps-timing-20261026",
+  "frozenUtc": "2026-10-25T23:29:40.001477+00:00",
+  "baseCommit": "f11c830df1af541805c73e6f1f64ee6e0ac2452d",
+  "dataOrigin": "official-server",
+  "questions": {
+    "Q1": "On the low-RTT VPS route, does callback frame excess retain historical p99 and >10/20ms episode tails, or approach zero? Compare the frozen effective-route fit; attribution remains conditional on clean collector and near-constant path.",
+    "Q2": "Retest adopted motion/mass gates, reverse same-snake mass/motion ordering and repeat prey-correction gaps on server and receipt clocks. Which historical exceptions persist? Spawn admission is out of scope."
+  },
+  "officialList": {
+    "url": "https://slither.io/i80124.txt",
+    "fetchedUtc": "2026-10-25T22:25Z",
+    "sourceAccess": "local-only",
+    "files": [
+      {
+        "path": "official-list.txt",
+        "sha256": "ffd504b9bcc7fb596c851c56fab188607db255f5d7cd2fcd11f8a3ccdd5935a0"
+      },
+      {
+        "path": "official-list.headers.txt",
+        "sha256": "ba69b8456125225b87cf03bef3a7acd8280290f239f55114dcce09de2c99f771"
+      },
+      {
+        "path": "official-list-decoded.json",
+        "sha256": "5f853fd831c7c687582f49bba4652bca5c0e88ca9cddbba1d578a11dc115c60b"
+      }
+    ],
+    "selection": "The two owner-named IPs must be active port-444 entries in the fresh official list. No substitution."
+  },
+  "origin": "http://slither.io",
+  "connectionLimit": 2,
+  "allocation": "One unchanged forage client at each endpoint, two sockets total including CONNECTING. Three rounds, two endpoint batches per round. Normal post-death rejoin only after old socket close; no extra probes.",
+  "batches": [
+    {
+      "id": "low-1",
+      "round": "round-1",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "second-1",
+      "round": "round-1",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "low-2",
+      "round": "round-2",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "second-2",
+      "round": "round-2",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "development"
+    },
+    {
+      "id": "low-3",
+      "round": "round-3",
+      "endpoint": "57.129.37.42:444",
+      "seconds": 600,
+      "split": "heldout"
+    },
+    {
+      "id": "second-3",
+      "round": "round-3",
+      "endpoint": "198.244.231.35:444",
+      "seconds": 600,
+      "split": "heldout"
+    }
+  ],
+  "betweenRoundSeconds": 30,
+  "attemptBudget": "Three rounds, no replacements. First socket error, unexpected close, receive timeout, parser failure or 640-second round watchdog stops all collection. No handshake retries or escalation. Normal deaths/rejoins are retained; game traffic from a datacenter IP might be rate-limited or blocked.",
+  "resources": {
+    "image": "node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205",
+    "container": "docker run --rm --cpus=1 --memory=1g --network host; UV_THREADPOOL_SIZE=1",
+    "network": "host avoids Docker bridge/NAT for timing fidelity. Gauge uses --network none.",
+    "hostChanges": "No packages, services, system config or existing containers/volumes/directories. Only ~/slither-capture-20261026/. Remove scratch and newly pulled image after verified copy.",
+    "localCpu": "At most two logical CPUs; Windows analysis affinity4,5, numerical library threads1. No Rust build."
+  },
+  "telemetry": {
+    "clock": "performance.now() raw receive/send callbacks, before decode, per-setup cumulative elapsed headers. Callback time is not kernel arrival.",
+    "stallGauge": "1ms high-resolution timer: actual gap and gap minus1 lateness maxima; monitorEventLoopDelay resolution1; GC/receive maxima. Every second, no integer-ms histogram decisions.",
+    "preflight": {
+      "seconds": 30,
+      "gameConnections": 0,
+      "gaugeSha256": "f03e0da9611dffd968443bbde5fbbfb95d577cde4ef9de4d18914d074e75c21b",
+      "timerGapMaxMs": 6.803570000000036,
+      "timerLateMaxMs": 5.803570000000036,
+      "loopMaxMs": 6.328319
+    },
+    "cleanMask": "Exclude telemetry interval [since-100ms,until+100ms] if timer lateness>5ms, loop max>6ms, any GC>5ms, receive cost>5ms or backpressureWrites increases. No gauge coverage means unknown/excluded. Pair intervals crossing any mask are excluded. Threshold fixed, never relaxed for load.",
+    "justification": "Linux 1ms hrtimer ordinary sleep is about1ms, unlike Windows coarse timer dispatch. A >5ms extra delay can contaminate the >10ms target; the conservative gauge did flag occasional 6.8ms preflight gaps. Those are excluded rather than moving the threshold.",
+    "load": "Every second: host /proc/loadavg and aggregate /proc/stat (steal delta field8/total delta), own cgroup cpu.stat usage and throttle deltas, process CPU/memory, GC, gzip/output queues and socket bufferedAmount. Other services load is a covariate, never permission to loosen gates."
+  },
+  "split": "Whole round3 at both endpoints held out. No game timing/scheduler analysis of it until development.json is saved, its hash sealed in local analysis-seal.json and committed analysis-source pins match. Only runtime/status/integrity checks before that. No fitting or question changes.",
+  "network": {
+    "metric": "Reuse historical Theil-Sen of p1 offsets in5s bins, centered +/-10s minimum, per-setup after1s burn-in, >=1000frames and>=30s. Retain slopes, raw spans, line-only residuals, full and clean excess p50/p90/p99/p99.9; raw game RTT. Future-dependent floor is offline only.",
+    "episodes": "Contiguous excess>10/20ms runs per eligible setup; counts, clean exposure seconds, runs/s, peak/duration/surrounding bracket distributions and censored edges. Single-frame duration0 is a lower bound, not a physical pause duration. Bursts: adjacent receipt gaps<1ms.",
+    "eligibility": "Each heldout endpoint >=300 clean eligible seconds and>=80% clean/full eligible exposure, complete gzip/terminal/protocol19/source integrity. Otherwise attribution is inconclusive; report all unfiltered results.",
+    "classification": "Per eligible heldout endpoint: near-zero if clean p99<=3ms AND >10ms runs<=0.05/s; persistent if clean p99>=8ms OR >10ms runs>=0.25/s; intermediate otherwise. Both endpoints reported, primary inference on low endpoint. Descriptive thresholds, not population confidence or proof of shared server scheduling.",
+    "comparison": "Compare to #108 full batch p99 (low57.5/66.5/29.9ms; second22.7/21.2/110.2ms) and network-path heldout pooled p99=9.21ms, >10ms runs0.351/s. Exact six frozen fit parameters below, same schedules and three seeds; no refit.",
+    "parameters": [
+      1.901395726025303,
+      0.506615071647472,
+      0.17706847130783426,
+      1.8374055509510452,
+      1.6462607728944314,
+      13.9335646104394
+    ],
+    "modelSeeds": [
+      20261025,
+      20261026,
+      20261027
+    ],
+    "fitGates": "Report p50/p90 within max(0.5ms,15% observed), p99 within20%, burst fraction error<=0.005, ACF at10/50/100/500/1000ms error<=0.10 for each seed. Failure rejects transfer, not the historical data. No adoption in this PR."
+  },
+  "scheduler": {
+    "unit": "Consecutive same-entity reports within same setup/connection/uninterrupted appearance, reset on s or y appearance/removal; repeat j only, entry-to-first excluded. All full and fully clean intervals retained.",
+    "metrics": "Server/receipt gap summaries, motion<35ms and<42ms, standalone h<100ms and<105ms, same-frame same-snake mass(h/r)-before-motion and reverse counts. Repeat j<300/<333/<210 and>500ms, split whether previous/current speed exactly11, max and raw witnesses. Frame index0-based over post-setup frames retained in order; pin compressed archive SHA256. No intervals across known reincarnations.",
+    "gates": "At least one clean server-clock motion<35ms rejects literal wire42ms minimum; h<100ms rejects literal wire105ms minimum; reverse pair rejects absolute mass-before-motion order; j>500ms with intervening traffic rejects bounded333/210ms correction, short gaps split by speed11 constrain guard. Absence is sample-limited, not confirmation of hidden ticks. Receipt-only short gaps with server gaps above gates are burst-compression cases.",
+    "limits": "No official physics tick ID, hidden dirty events or kernel arrival clock. A changing send-header clock can violate wire minima without violating an internal tick gate. Independent endpoints cannot establish cross-client shared-delay coupling."
+  },
+  "sourcePins": [
+    {
+      "path": "research/fidelity/2026-10-26-vps-timing/analyze.py",
+      "sha256": "f167a1aa423fac3b8639c7e13eaf21971f486ec253f80e23e338b67aa152f79b"
+    },
+    {
+      "path": "research/fidelity/2026-10-26-vps-timing/test_analysis.py",
+      "sha256": "87efeca8890750a944dd30d7f6e13a0fa1ab65dfd87970d8a1a77c8a00ccc9ae"
+    },
+    {
+      "path": "research/fidelity/2026-10-26-vps-timing/timing.py",
+      "sha256": "da6f159e8caa4408fc4dabfcd6ba21268c75e59064917f4af6b8a4d06e70deca"
+    },
+    {
+      "path": "research/fidelity/2026-10-26-vps-timing/capture.mjs",
+      "sha256": "fcf3b44a71216d3b2d47eaef2f6c1fb361321f81b538ab5d5c7e5d86f18d6149"
+    },
+    {
+      "path": "research/fidelity/2026-10-26-vps-timing/test_capture.mjs",
+      "sha256": "7eb5f3913acf90080ee362ea525dacf38d20324ff9d647c1928ca9e84961a896"
+    },
+    {
+      "path": "research/fidelity/2026-10-26-vps-timing/collect.sh",
+      "sha256": "e134678290a2e42f39d1a345e1a2658bbe57438f8ee371891bd1518e4d55dced"
+    },
+    {
+      "path": "tools/fidelity/slither-headless.mjs",
+      "sha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3"
+    },
+    {
+      "path": "tools/fidelity/slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "path": "tools/fidelity/capture_quality.py",
+      "sha256": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff"
+    }
+  ]
+}
