@@ -33,7 +33,7 @@ Drafts are measured on every push, so marking one ready does not repeat the run.
 
 Each PR update measures the merge commit against its first parent (the exact
 target revision used for that merge). The report records that pair and the PR
-head. A Windows runner builds release executables for both revisions with the
+head. An Ubuntu runner builds release executables for both revisions with the
 same toolchain, after copying the PR's benchmark and fidelity examples, selected
 test sources and fixtures into a fresh, detached baseline worktree. Both runtimes
 therefore see identical measurement code and evidence. Cargo lockfiles can differ
@@ -80,7 +80,7 @@ the frozen v1 contract and its evidence retain their historical allocation.
 monotonic operation intervals, excluding setup, placement, warmup, resets,
 output destruction and serialization. It is instrumented operation cost, not
 process or end-to-end latency. Process CPU stays in the raw results as a
-diagnostic only; Windows reports it in 15.625 ms steps.
+diagnostic only.
 
 **Sampling.** One observation is an adjacent pair of fresh baseline and PR
 processes for one workload. Both sides follow one plan frozen before sampling
@@ -124,7 +124,7 @@ constant variance, and constant change and order effects over the run. Heavy
 tails, drift, serial dependence or changing effects can break it. It covers
 these two executables on this runner, not other machines, builds or later
 commits. Hosted model calibration is not established; labels remain conditional
-and advisory. This extension selects no new OS, block count or power claim.
+and advisory. This extension selects no block count and makes no power claim.
 
 **Stopping and budget.** A Faster, Slower or Within row stops at once and keeps
 that look. An Undecided row continues until the cap or the explicit 53,248-pair
@@ -184,10 +184,13 @@ failed and receives no further attempts. Its completed pairs and failed attempt
 remain diagnostic evidence; variance, `Q` and the cost fit use only successfully
 warmed, complete cells. Other cells continue within the deadline.
 
-The comparison's runner is set once, as the `&runner` anchor in `pr-report.yml`.
-Change it only after a calibration supports the new runner. The cache key
-includes the OS, so the first runs on a new runner miss the cache until a
-`main` push saves one.
+The comparison's runner is set once, as the `&runner` anchor in `pr-report.yml`:
+`ubuntu-latest`. In the pilot's analysis, Ubuntu had lower pooled same-binary noise
+on nine of ten workloads and needed about 210 instead of 370 sampling seconds, and
+its forecast resolved the least-resolved workload far more often than Windows.
+That analysis selected no calibrated winner, so labels stay advisory. The
+cache key includes the OS, so the first runs on a new runner miss the cache
+until a `main` push saves one.
 
 ## Publishing and permissions
 
@@ -253,12 +256,14 @@ including partial output on failure. The publisher downloads only the small
 comment artifacts. Launcher logs/PID and partial diagnostics are included even
 when an upload step fails before the collector's finish step. Broken report generation remains visible as a failed job.
 
-The Windows measurement job keeps a supervisor owning the collector and all its
-descendants through a kill-on-close process Job. Before terminal/full uploads,
-an `always()` cleanup step requests stop and waits for explicit quiescence. The
-supervisor terminates and reaps descendants even after a normal collector exit,
-closes its evidence output, then acknowledges. Strict Job query, termination or
-timeout failure withholds that acknowledgment; upload is skipped if cleanup is
+The measurement job keeps a supervisor owning the collector and all its
+descendants: a process group on Linux, a kill-on-close process Job on Windows.
+Before terminal/full uploads, an `always()` cleanup step requests stop and waits
+for explicit quiescence. The supervisor kills and reaps the descendants even after
+a normal collector exit, closes its evidence output, then acknowledges. A failed
+termination, or members still present at the timeout, withholds that
+acknowledgment; a descendant that starts its own session leaves the Linux group
+and is outside this guarantee; upload is skipped if cleanup is
 unverified or the supervisor was killed. Successful cleanup does not turn a failed
 or interrupted comparison into success. This precedes the runner's later orphan
 cleanup: [cancellation signals target the active step](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation),
