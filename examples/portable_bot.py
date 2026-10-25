@@ -77,7 +77,7 @@ def main():
                 frame = request({"op": "reconnect"})["frame"]
                 continue
             message = {"op": "step"}
-            if frame["status"] == "playing":
+            if frame["status"] == "playing" and frame["observation"] is not None:
                 started = time.perf_counter()
                 message["action"] = bot.decide(frame)
                 message["processingSeconds"] = time.perf_counter() - started
