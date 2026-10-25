@@ -537,7 +537,7 @@ mod retained {
             "physicsTicksPerDecision": TICKS, "maxVirtualSecondsPerWorld": 16.128,
             "execution": if args.trace { "untimedTrace" } else { "timing" },
             "release": !cfg!(debug_assertions), "config": config(),
-            "overrides": "synthetic radius=6000, food placement attempts=12000, prey count=8, vision=3000, agents=8, controlledSlot=0, recordWire=true; explicitly fixed dt=.007, decision/broadcastTicks=6, minimapSide=136, minimap interval=2.5s, leaderboard interval=3s, uplink/downlink/processing/jitter/congestion delays=zero; all other package defaults retained",
+            "overrides": "synthetic radius=6000, food placement attempts=12000, prey count=8, vision=3000, agents=8, controlledSlot=0, recordWire=true; explicitly fixed dt=.007, decision/broadcastTicks=6, minimapSide=136, minimap interval=2.5s, leaderboard interval=3s, uplink/downlink/processing/variation/pause delays=zero; all other package defaults retained",
             "bodyStaging": "normal SimulatorBackend spawn bodies; no public mutable world/staging seam; actual available anchor counts reported",
             "control": "step_all: all playing slots receive deterministic radial/tangent controls; next_frame: slot0 receives those controls, slots1..7 use ACTUAL built-in seekers; requested boost true for decisions 0..15 of each 128 (zero-based)",
             "lifecycle": "manual slot0 reconnect immediately AFTER decision192, even at the run endpoint; no whole-world resets; others keep their connections unless next_frame's built-in seekers reconnect a dead background slot",
