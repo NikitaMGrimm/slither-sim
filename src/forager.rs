@@ -128,6 +128,10 @@ pub struct Params {
     /// tightens by `coil_shrink`; body contraction then closes it further.
     pub coil_close_angle: f64,
     pub coil_shrink: f64,
+    /// A coil's value scales by its wrapped share of a full turn raised to
+    /// this power: small snakes often slip out of a barely started orbit.
+    /// 0 values every orbit as if it will close.
+    pub coil_progress_power: f64,
     /// Boost only at or above this score; boosting spends mass.
     pub boost_min_score: f64,
     /// Boost to win a cut-off that cruise speed cannot reach in time.
@@ -187,6 +191,7 @@ impl Default for Params {
             coil_lead_angle: 0.6,
             coil_close_angle: 4.7,
             coil_shrink: 0.7,
+            coil_progress_power: 0.0,
             boost_min_score: 30.0,
             kill_boost: false,
             escape_boost: false,
@@ -233,6 +238,7 @@ impl Params {
             self.coil_lead_angle,
             self.coil_close_angle,
             self.coil_shrink,
+            self.coil_progress_power,
             self.boost_min_score,
             self.food_boost_value,
             self.safe_width_factor,
@@ -261,6 +267,7 @@ impl Params {
             || self.kill_trap_seconds < 0.0
             || self.coil_weight < 0.0
             || !(0.0..=1.0).contains(&self.coil_shrink)
+            || self.coil_progress_power < 0.0
             || self.kill_samples > 16
         {
             return Err(format!(
@@ -1372,9 +1379,12 @@ fn coil(view: &View, me: &Me, p: &Params) -> Option<Goal> {
         return None;
     }
     let remaining = (std::f64::consts::TAU - wrapped.abs()).max(0.0) * radius / me.speed;
+    let progress = (wrapped.abs() / std::f64::consts::TAU)
+        .min(1.0)
+        .powf(p.coil_progress_power);
     Some(Goal {
         heading: toward(me.head, aim),
-        rate: p.coil_weight * (target.segments as f64 + target.fam)
+        rate: p.coil_weight * progress * (target.segments as f64 + target.fam)
             / (remaining + p.settle_seconds),
         boost: false,
         crosses: None,

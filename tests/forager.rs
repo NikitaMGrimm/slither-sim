@@ -592,6 +592,16 @@ fn coiling_orbits_a_much_smaller_snake_the_way_we_already_turn_around_it() {
     let on = decide(&observation, &Timing::default(), &params);
     // Counterclockwise around the target: aim ahead and to the left.
     assert!(on.heading > 0.2 && on.heading < 1.2, "{on:?}");
+    // A barely started orbit is worth little once progress counts, so food
+    // straight ahead wins.
+    let mut fed = observation.clone();
+    fed.food = vec![food(300.0, 0.0, 1.0)];
+    assert!(decide(&fed, &Timing::default(), &params).heading > 0.2);
+    let progress = Params {
+        coil_progress_power: 1.0,
+        ..params
+    };
+    assert_eq!(decide(&fed, &Timing::default(), &progress).heading, 0.0);
     // Equal masses are not encircled.
     observation.opponents[0].segments = 200;
     assert_eq!(
