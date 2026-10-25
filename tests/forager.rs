@@ -798,3 +798,84 @@ fn escape_boost_needs_every_cruise_arc_dangerous() {
     };
     assert!(!decide(&observation, &Timing::default(), &params).boost);
 }
+
+#[test]
+fn steering_off_a_cut_off_heading_respects_the_victim_head_path() {
+    // Review repro: the cut heading 0.3558 passes the crossing checks, but a
+    // post makes steering pick 0.9558, which approaches the victim's head
+    // path at 2.53 rad. Only the validated arc may ignore that path.
+    let mut observation = fixture();
+    let mut victim = snake(
+        &observation,
+        "victim",
+        Point {
+            x: 67.2909,
+            y: 173.0063,
+        },
+        -std::f64::consts::FRAC_PI_2,
+        60,
+    );
+    victim.speed = 185.0;
+    observation.opponents.push(victim);
+    observation.opponents.push(post(
+        &observation,
+        Point {
+            x: 46.5779,
+            y: -21.0958,
+        },
+    ));
+    let params = Params {
+        kill_weight: 1.0,
+        ..Params::default()
+    };
+    let action = decide(&observation, &Timing::default(), &params);
+    assert!((action.heading - 0.9558).abs() > 1e-3, "{action:?}");
+}
+
+#[test]
+fn boosted_arcs_bend_with_the_acceleration() {
+    // Review repro: boosting toward 1.904 from cruise speed passes a post
+    // that one mean speed misses; the accelerating turn hits it.
+    let mut observation = fixture();
+    observation.me.score = 100.0;
+    let h: f64 = 1.904;
+    let q = Point {
+        x: 300.0 * h.cos(),
+        y: 300.0 * h.sin(),
+    };
+    let vh = h - 1.0;
+    let mut victim = snake(
+        &observation,
+        "victim",
+        Point {
+            x: q.x - 185.0 * 1.8 * vh.cos(),
+            y: q.y - 185.0 * 1.8 * vh.sin(),
+        },
+        vh,
+        60,
+    );
+    victim.speed = 185.0;
+    observation.opponents.push(victim);
+    let at = Point {
+        x: 47.0438,
+        y: 20.1563,
+    };
+    let mut wall = post(&observation, at);
+    wall.body = vec![at];
+    observation.opponents.push(wall);
+    let params = Params {
+        kill_weight: 1.0,
+        kill_boost: true,
+        kill_samples: 1,
+        kill_horizon: 1.8,
+        own_width_factor: 0.0,
+        safe: 5.0,
+        boost_min_score: 0.0,
+        ..Params::default()
+    };
+    let action = decide(&observation, &Timing::default(), &params);
+    assert!(
+        !(action.boost && (action.heading - h).abs() < 1e-3),
+        "{action:?}"
+    );
+}
