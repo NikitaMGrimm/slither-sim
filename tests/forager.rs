@@ -879,3 +879,53 @@ fn boosted_arcs_bend_with_the_acceleration() {
         "{action:?}"
     );
 }
+
+#[test]
+fn trap_scoring_prefers_the_victim_with_fewer_escapes() {
+    // Mirror-image victims are worth the same; bodies beside the second
+    // one's turning escapes leave our cut wall closing its last way out.
+    let mut observation = fixture();
+    let mut open = snake(
+        &observation,
+        "open",
+        Point { x: 60.0, y: 170.0 },
+        -std::f64::consts::FRAC_PI_2,
+        60,
+    );
+    open.speed = 185.0;
+    let mut trapped = open.clone();
+    trapped.id = "trapped".into();
+    trapped.head = Point { x: 60.0, y: -170.0 };
+    trapped.heading = std::f64::consts::FRAC_PI_2;
+    trapped.body = (1..=8)
+        .map(|i| Point {
+            x: 60.0,
+            y: -170.0 - physics::ANCHOR_SPACING * i as f64,
+        })
+        .collect();
+    observation.opponents.push(open);
+    observation.opponents.push(trapped);
+    for x in [25.0, 95.0] {
+        let mut wall = post(&observation, Point { x, y: -100.0 });
+        wall.segments = 20;
+        wall.body = (1..=5)
+            .map(|i| Point {
+                x,
+                y: -100.0 - physics::ANCHOR_SPACING * i as f64,
+            })
+            .collect();
+        observation.opponents.push(wall);
+    }
+    let params = Params {
+        kill_weight: 1.0,
+        ..Params::default()
+    };
+    let plain = decide(&observation, &Timing::default(), &params);
+    assert!(plain.heading > 0.0, "{plain:?}");
+    let trap = Params {
+        kill_trap_weight: 1.0,
+        ..params
+    };
+    let trapping = decide(&observation, &Timing::default(), &trap);
+    assert!(trapping.heading < 0.0, "{trapping:?}");
+}

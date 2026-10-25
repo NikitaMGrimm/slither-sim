@@ -105,6 +105,12 @@ pub struct Params {
     /// Largest angle between our approach and the victim's heading at a cut
     /// point, radians; larger angles are head-on and kill us instead.
     pub kill_cross_angle: f64,
+    /// Extra cut-off value per escape the victim lacks: of its hard-left,
+    /// straight and hard-right branches over `kill_trap_seconds`, the share
+    /// blocked by the rim, nearby bodies or the wall our cut lays. 0 ignores
+    /// escapes.
+    pub kill_trap_weight: f64,
+    pub kill_trap_seconds: f64,
     /// Value of encircling a smaller snake per unit of its mass, compared with
     /// food value; 0 disables coiling.
     pub coil_weight: f64,
@@ -164,6 +170,8 @@ impl Default for Params {
             kill_gap: 0.15,
             kill_window: 0.5,
             kill_cross_angle: 2.0,
+            kill_trap_weight: 0.0,
+            kill_trap_seconds: 0.4,
             coil_weight: 0.0,
             coil_mass_ratio: 0.5,
             coil_range: 600.0,
@@ -206,6 +214,8 @@ impl Params {
             self.kill_gap,
             self.kill_window,
             self.kill_cross_angle,
+            self.kill_trap_weight,
+            self.kill_trap_seconds,
             self.coil_weight,
             self.coil_mass_ratio,
             self.coil_range,
@@ -233,6 +243,8 @@ impl Params {
             || self.stale_margin < 0.0
             || !(0.0..=1.0).contains(&self.own_width_factor)
             || self.kill_weight < 0.0
+            || self.kill_trap_weight < 0.0
+            || self.kill_trap_seconds < 0.0
             || self.coil_weight < 0.0
             || !(0.0..=1.0).contains(&self.coil_shrink)
             || self.kill_samples > 16
@@ -408,6 +420,7 @@ pub fn decide(
             &me,
             p,
             intents,
+            &scratch.near,
             ramp.as_ref().filter(|_| p.kill_boost),
         ) {
             consider(g);
@@ -427,7 +440,7 @@ pub fn decide(
         }
         // Only the best cut-off was kept; find the best one at cruise speed.
         goal = cruise;
-        if let Some(g) = cut(&view, &me, p, intents, None) {
+        if let Some(g) = cut(&view, &me, p, intents, &scratch.near, None) {
             if g.rate > goal.rate {
                 goal = g;
             }
@@ -940,15 +953,103 @@ impl Scene {
     }
 }
 
+/// A victim's hard-left, straight and hard-right escape branches from its
+/// forecast head, as the path of its tip (`physics::strikes` kills through the
+/// tip), with whether the rim or a gathered body already blocks each.
+/// Bodies beyond our gathering radius are unknown and count as open.
+struct Escapes {
+    tips: [[Point; 3]; 3],
+    blocked: [bool; 3],
+}
+
+impl Escapes {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        view: &View,
+        me: &Me,
+        p: &Params,
+        near: &[Obstacle],
+        k: usize,
+        enemy: &Snake,
+        head: Point,
+        heading: f64,
+    ) -> Self {
+        let o = view.o;
+        let radius = width(enemy);
+        let turn = turn_rate(enemy.segments);
+        let half = p.kill_trap_seconds / 2.0;
+        let mut tips = [[head; 3]; 3];
+        let mut blocked = [false; 3];
+        for (b, delta) in [-std::f64::consts::PI, 0.0, std::f64::consts::PI]
+            .into_iter()
+            .enumerate()
+        {
+            let at = |t: f64| {
+                let q = turn_then_straight(head, heading, delta, enemy.speed, turn, t);
+                let h = heading + delta.signum() * delta.abs().min(turn * t);
+                forward(q, h, radius)
+            };
+            tips[b] = [at(0.0), at(half), at(2.0 * half)];
+            blocked[b] = tips[b]
+                .iter()
+                .any(|&q| q.distance(o.arena.center) > o.arena.radius - radius);
+        }
+        // Other snakes' gathered bodies: a tip crossing their centre line, or
+        // within their radius of it, dies.
+        for obstacle in near.iter().filter(|ob| !ob.head && ob.owner != k) {
+            let reach = width(&o.opponents[obstacle.owner]);
+            for (b, tip) in tips.iter().enumerate() {
+                blocked[b] = blocked[b]
+                    || tip
+                        .windows(2)
+                        .any(|w| swept_distance(w[0], w[1], obstacle.from, obstacle.to) < reach);
+            }
+        }
+        // Our own body near it.
+        let span = enemy.speed * p.kill_trap_seconds + 2.0 * radius + me.width;
+        let mut previous = o.me.head;
+        for &anchor in &o.me.body {
+            if anchor.distance(head) < span || previous.distance(head) < span {
+                for (b, tip) in tips.iter().enumerate() {
+                    blocked[b] = blocked[b]
+                        || tip
+                            .windows(2)
+                            .any(|w| swept_distance(w[0], w[1], previous, anchor) < me.width);
+                }
+            }
+            previous = anchor;
+        }
+        Self { tips, blocked }
+    }
+
+    /// Share of branches blocked once our head has laid a wall from `from`
+    /// to `to`.
+    fn blocked_with_wall(&self, from: Point, to: Point, width: f64) -> f64 {
+        let mut count = 0;
+        for (tip, &blocked) in self.tips.iter().zip(&self.blocked) {
+            if blocked
+                || tip
+                    .windows(2)
+                    .any(|w| swept_distance(w[0], w[1], from, to) < width)
+            {
+                count += 1;
+            }
+        }
+        count as f64 / 3.0
+    }
+}
+
 /// The most valuable cut-off: a point on a nearby opponent's predicted path
 /// that our head reaches `kill_gap` to `kill_window` seconds before it does,
 /// so our body lies across its path when it arrives. Valued at
-/// `kill_weight` × its mass per second until it arrives.
+/// `kill_weight` × its mass per second until it arrives, raised by
+/// `kill_trap_weight` for each escape it lacks.
 fn cut(
     view: &View,
     me: &Me,
     p: &Params,
     intents: &[Intent],
+    near: &[Obstacle],
     ramp: Option<&[f64; RAMP_SUBSTEPS]>,
 ) -> Option<Goal> {
     let o = view.o;
@@ -979,6 +1080,8 @@ fn cut(
         let heading_at =
             |t: f64| enemy.heading + delta.signum() * delta.abs().min(turn * (view.lead + t));
         let radius = width(enemy);
+        // Computed at the victim's first feasible cut point, if any.
+        let mut escapes: Option<Escapes> = None;
         for step in 1..=samples {
             let tau = p.kill_horizon * step as f64 / samples as f64;
             let q = path(tau);
@@ -1010,7 +1113,13 @@ fn cut(
             } else {
                 continue;
             };
-            let rate = p.kill_weight * mass / (tau + p.settle_seconds);
+            let mut rate = p.kill_weight * mass / (tau + p.settle_seconds);
+            if p.kill_trap_weight > 0.0 {
+                let escapes = escapes.get_or_insert_with(|| {
+                    Escapes::new(view, me, p, near, k, enemy, path(0.0), heading_at(0.0))
+                });
+                rate *= 1.0 + p.kill_trap_weight * escapes.blocked_with_wall(me.head, q, me.width);
+            }
             if best.as_ref().is_none_or(|b| rate > b.rate) {
                 best = Some(Goal {
                     heading: toward(me.head, q),
