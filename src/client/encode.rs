@@ -247,16 +247,16 @@ pub(crate) fn motion(
             decreasing
         }
     };
-    let (code, values): (u8, Vec<u8>) = match (heading, wanted, speed) {
+    let (code, values): (u8, &[u8]) = match (heading, wanted, speed) {
         (None, None, None) => return None,
-        (Some(a), Some(w), Some(s)) if own => (pick(b'd', b'7'), vec![a, w, s]),
-        (Some(a), Some(w), Some(s)) => (pick(b'e', b'E'), vec![a, w, s]),
-        (Some(a), None, Some(s)) => (b'e', vec![a, s]),
-        (None, Some(w), Some(s)) => (pick(b'E', b'4'), vec![w, s]),
-        (Some(a), Some(w), None) => (pick(b'3', b'5'), vec![a, w]),
-        (Some(a), None, None) => (b'e', vec![a]),
-        (None, Some(w), None) => (pick(b'E', b'4'), vec![w]),
-        (None, None, Some(s)) => (b'3', vec![s]),
+        (Some(a), Some(w), Some(s)) if own => (pick(b'd', b'7'), &[a, w, s]),
+        (Some(a), Some(w), Some(s)) => (pick(b'e', b'E'), &[a, w, s]),
+        (Some(a), None, Some(s)) => (b'e', &[a, s]),
+        (None, Some(w), Some(s)) => (pick(b'E', b'4'), &[w, s]),
+        (Some(a), Some(w), None) => (pick(b'3', b'5'), &[a, w]),
+        (Some(a), None, None) => (b'e', &[a]),
+        (None, Some(w), None) => (pick(b'E', b'4'), &[w]),
+        (None, None, Some(s)) => (b'3', &[s]),
     };
     let mut p = with_id(code, own, id);
     p.extend(values);
@@ -332,13 +332,11 @@ pub(crate) struct FoodStyle {
 }
 /// Sector listing on subscription, split into frameable packets.
 pub(crate) fn food_sector(sector: [u8; 2], foods: &[([u8; 2], FoodStyle)]) -> Vec<Vec<u8>> {
-    let chunks: Vec<_> = if foods.is_empty() {
-        vec![foods]
-    } else {
-        foods.chunks((MAX_PACKET - 3) / 4).collect()
-    };
-    chunks
-        .into_iter()
+    if foods.is_empty() {
+        return vec![vec![b'F', sector[0], sector[1]]];
+    }
+    foods
+        .chunks((MAX_PACKET - 3) / 4)
         .map(|chunk| {
             let mut p = vec![b'F', sector[0], sector[1]];
             for &([rx, ry], style) in chunk {
