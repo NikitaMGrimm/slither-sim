@@ -88,6 +88,15 @@ Raise `LimitNOFILE` above 4096 for more than about 500 clients.
 An overloaded server [slows world time](raw-server.md#vps-use) rather than
 skipping physics. Watch CPU; memory stays small.
 
+Add `--stats 5` to the `host` command to print one line to stderr every five
+seconds (also visible in the service journal). `ticks/s` is executed physics
+ticks per elapsed wall second, targeting about 142.857/s at the default 7 ms tick;
+`deferred_ticks` counts ticks postponed in that interval. `simulation_load` is
+simulation-thread busy wall time as a percentage of elapsed time (one core),
+excluding socket and bot workers. `players` counts connected socket players,
+including those waiting to spawn or dead; `bot_slots` is the configured number
+of background bot slots, including bots awaiting admission or respawn.
+
 ## Connect
 
 Clients connect to `ws://HOST:444/slither`. The stock browser client can be
