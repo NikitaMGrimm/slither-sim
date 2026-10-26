@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## [0.6.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.5.0...v0.6.0) - 2026-10-26
+
+### Added
+
+- *(sim)* [**breaking**] follow occupied seats with arena size and ecology ([#164](https://github.com/NikitaMGrimm/slither-sim/pull/164))
+- *(api)* [**breaking**] expose world rules and coded geometric errors ([#160](https://github.com/NikitaMGrimm/slither-sim/pull/160))
+- *(bot)* [**breaking**] remove superseded A1 Forager policy ([#161](https://github.com/NikitaMGrimm/slither-sim/pull/161))
+- *(fidelity)* add view-matched transport parity gate ([#159](https://github.com/NikitaMGrimm/slither-sim/pull/159))
+- *(api)* [**breaking**] separate initial and runtime arena radius ([#154](https://github.com/NikitaMGrimm/slither-sim/pull/154))
+- *(fidelity)* add paired collision capture tooling ([#143](https://github.com/NikitaMGrimm/slither-sim/pull/143))
+
+### Fixed
+
+- *(checkpoint)* reject noncanonical config JSON types ([#165](https://github.com/NikitaMGrimm/slither-sim/pull/165))
+- *(fidelity)* bind the official Origin for collision pilots ([#149](https://github.com/NikitaMGrimm/slither-sim/pull/149))
+- *(config)* validate the sized world and require object configs ([#147](https://github.com/NikitaMGrimm/slither-sim/pull/147))
+
+### Other
+
+- describe SlitherSim as for custom servers and bot development ([#163](https://github.com/NikitaMGrimm/slither-sim/pull/163))
+- *(examples)* [**breaking**] replace cautious_bot with a core-only forager example ([#162](https://github.com/NikitaMGrimm/slither-sim/pull/162))
+- *(research)* plan controlled routes for busy official servers ([#158](https://github.com/NikitaMGrimm/slither-sim/pull/158))
+- *(research)* retain failed food-interest pilot ([#157](https://github.com/NikitaMGrimm/slither-sim/pull/157))
+- fix stale admission, qualification and ABI links ([#155](https://github.com/NikitaMGrimm/slither-sim/pull/155))
+- *(research)* record failed collision pilot execution ([#153](https://github.com/NikitaMGrimm/slither-sim/pull/153))
+- *(research)* support the existing own motion gate ([#151](https://github.com/NikitaMGrimm/slither-sim/pull/151))
+- *(research)* explain sparse-view cadence residual ([#150](https://github.com/NikitaMGrimm/slither-sim/pull/150))
+- *(research)* record official visibility and scheduler pilots ([#148](https://github.com/NikitaMGrimm/slither-sim/pull/148))
+- *(research)* record sparse-view frame cadence ([#146](https://github.com/NikitaMGrimm/slither-sim/pull/146))
+
 ### Breaking
 
 - Geometric JSON is `slither-sim-json-v5` and the C ABI is `slither-sim-abi-v3`
