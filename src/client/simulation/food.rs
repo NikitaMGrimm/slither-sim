@@ -277,6 +277,23 @@ pub(super) fn food_updates(
     eaten: &BTreeSet<[u8; 2]>,
     eaters: &BTreeMap<(u64, u64), u16>,
 ) {
+    // Most ticks retain exactly these subscriptions. Keep their Arc handles
+    // and allocation in place; only changed listings need a new handle.
+    if known.0.len() == subscribed.len() && known.0.iter().map(|(sector, _)| sector).eq(subscribed)
+    {
+        for (sector, previous) in &mut known.0 {
+            let current = sectors[usize::from(u16::from_be_bytes(*sector))]
+                .as_ref()
+                .expect("subscribed sectors are listed");
+            if !Arc::ptr_eq(previous, current) || eaten.contains(sector) {
+                sector_changes(packets, *sector, previous, current, eaters);
+                if !Arc::ptr_eq(previous, current) {
+                    previous.clone_from(current);
+                }
+            }
+        }
+        return;
+    }
     let held = std::mem::take(&mut known.0);
     let mut subscriptions = subscribed.iter().peekable();
     for (sector, _) in &held {
@@ -295,7 +312,6 @@ pub(super) fn food_updates(
         let current = sectors[usize::from(u16::from_be_bytes(sector))]
             .as_ref()
             .expect("subscribed sectors are listed");
-        let key = |offset: [u8; 2]| [sector[0], sector[1], offset[0], offset[1]];
         match previous {
             None => {
                 let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
@@ -306,26 +322,37 @@ pub(super) fn food_updates(
             // The same listing without a pickup at its points sends nothing.
             Some(previous) if Arc::ptr_eq(&previous, current) && !eaten.contains(&sector) => {}
             Some(previous) => {
-                for (offset, food) in &previous.0 {
-                    let eater = (!food.decorative)
-                        .then(|| eaters.get(&food_identity(food.point)).copied())
-                        .flatten();
-                    if current.get(offset) != Some(food) || eater.is_some() {
-                        packets.push(encode::food_remove(key(*offset), eater));
-                    }
-                }
-                for (offset, food) in &current.0 {
-                    if previous.get(offset) != Some(food)
-                        || previous.get(offset).is_some_and(|old| {
-                            !old.decorative && eaters.contains_key(&food_identity(old.point))
-                        })
-                    {
-                        packets.push(encode::food_add(key(*offset), food.style));
-                    }
-                }
+                sector_changes(packets, sector, &previous, current, eaters);
             }
         }
         known.0.push((sector, current.clone()));
+    }
+}
+
+fn sector_changes(
+    packets: &mut Vec<Vec<u8>>,
+    sector: [u8; 2],
+    previous: &SectorFood,
+    current: &SectorFood,
+    eaters: &BTreeMap<(u64, u64), u16>,
+) {
+    let key = |offset: [u8; 2]| [sector[0], sector[1], offset[0], offset[1]];
+    for (offset, food) in &previous.0 {
+        let eater = (!food.decorative)
+            .then(|| eaters.get(&food_identity(food.point)).copied())
+            .flatten();
+        if current.get(offset) != Some(food) || eater.is_some() {
+            packets.push(encode::food_remove(key(*offset), eater));
+        }
+    }
+    for (offset, food) in &current.0 {
+        if previous.get(offset) != Some(food)
+            || previous.get(offset).is_some_and(|old| {
+                !old.decorative && eaters.contains_key(&food_identity(old.point))
+            })
+        {
+            packets.push(encode::food_add(key(*offset), food.style));
+        }
     }
 }
 
@@ -346,4 +373,74 @@ pub(super) fn eaten_sectors(eaters: &BTreeMap<(u64, u64), u16>) -> BTreeSet<[u8;
 pub(super) fn food_identity(point: Point) -> (u64, u64) {
     let bits = |v: f64| if v == 0. { 0 } else { v.to_bits() };
     (bits(point.x), bits(point.y))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_subscriptions_keep_storage_and_update_only_changed_handles() {
+        let food = KnownFood {
+            point: Point::default(),
+            decorative: false,
+            style: encode::FoodStyle {
+                color: 3,
+                size: 20,
+                snake_food: false,
+            },
+        };
+        let mut sectors = vec![None; 1 << 16];
+        sectors[1] = Some(Arc::new(SectorFood(vec![([2, 3], food)])));
+        sectors[2] = Some(Arc::new(SectorFood::default()));
+        sectors[3] = Some(Arc::new(SectorFood::default()));
+        let subscribed = BTreeSet::from([[0, 1], [0, 2]]);
+        let mut known = KnownSectors::default();
+        let mut packets = Vec::new();
+        let eaters = BTreeMap::new();
+        food_updates(
+            &mut packets,
+            &mut known,
+            &subscribed,
+            &sectors,
+            &BTreeSet::new(),
+            &eaters,
+        );
+        let storage = known.0.as_ptr();
+        packets.clear();
+        sectors[1] = Some(Arc::new(SectorFood::default()));
+        food_updates(
+            &mut packets,
+            &mut known,
+            &subscribed,
+            &sectors,
+            &BTreeSet::new(),
+            &eaters,
+        );
+        assert_eq!(known.0.as_ptr(), storage);
+        assert_eq!(packets, [encode::food_remove([0, 1, 2, 3], None)]);
+        for (key, listing) in &known.0 {
+            assert!(Arc::ptr_eq(
+                listing,
+                sectors[usize::from(u16::from_be_bytes(*key))]
+                    .as_ref()
+                    .unwrap()
+            ));
+        }
+        // Equal counts do not imply equal subscriptions: the old sector clears.
+        packets.clear();
+        food_updates(
+            &mut packets,
+            &mut known,
+            &BTreeSet::from([[0, 2], [0, 3]]),
+            &sectors,
+            &BTreeSet::new(),
+            &eaters,
+        );
+        assert_eq!(packets, [encode::sector_clear([0, 1])]);
+        assert_eq!(
+            known.0.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+            [[0, 2], [0, 3]]
+        );
+    }
 }

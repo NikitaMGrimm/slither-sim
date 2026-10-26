@@ -25,9 +25,10 @@
   ([simulation settings](docs/configuration.md#simulationconfig)).
 - `LatencyConfig.jitterSeconds` and `congestion` are replaced by `variation`
   (lognormal per-message delay with a slow correlated part) and `pauses` (short
-  delivery holds per direction), fitted to official captures;
-  `LatencyConfig::measured_route()` returns the fitted route. Configs that set the
-  old fields are rejected
+  delivery holds per direction). `LatencyConfig::measured_route()` returns the
+  fit to one home connection to an official server; near-server captures show
+  its pauses come from that connection and its collector, not the server.
+  Configs that set the old fields are rejected
   ([variation and pauses](docs/configuration.md#variation-and-pauses)).
 - `Host::poll()` is removed. `Host::bind(config)?.start()?` returns a
   `RunningHost` with load counters, `wait()` and `stop()`; dropping it stops the
@@ -127,7 +128,6 @@
   apart, mass 84 ms apart, motion before mass in one frame, a 3 s prey gap);
   simulator cadence rules and defaults are unchanged
   ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
-
 - Gameplay updates go out every physics tick (7 ms by default) with measured
   per-family pacing: motion and standalone mass changes at least 6 and 15 ticks
   apart per snake, anchors at once, ambient food on the shared 504 ms maintenance cycle and
@@ -143,6 +143,10 @@
 
 ### Fixed
 
+- A host no longer drops a healthy client when a message near the 1 MiB limit
+  follows a small one that is still waiting for its batch to fill.
+- Native recording failures leave pending decisions and client clocks intact,
+  and rejected sends no longer suppress a later boost change.
 - A new world starts at its configured radius instead of one population step
   smaller, so resetting with the returned config reproduces the first frame.
   `add` rejects an initial ring body that would extend outside a small arena, and
@@ -185,10 +189,12 @@
 
 ### Performance
 
-- A [native Linux capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md)
-  finds that one core keeps official-like delivery for 100 socket clients and
-  real time for 500 background bots, and profiles where the host's CPU goes.
-
+- The host uses about 5% less CPU per tick at 250 and 500 socket clients, with
+  byte-identical output. Unchanged food subscriptions stay in place, recipients
+  with the same history of a snake share one encoded delta, and delivered frames
+  reach the socket without an extra copy. 250 clients now narrowly meet the
+  10 ms delivery grade on one core; 500 still fall behind
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-efficiency/REPORT.md)).
 - Crowded hosts spend far less time choosing spawn positions: candidates stop
   being scored once they cannot win, and the chosen pose is unchanged. A
   64-seat Battledome host drops from about 45 to 3.5 ms per tick. Background
@@ -205,6 +211,9 @@
   frames. With 480 localhost bots, mean ping fell from about 8.3 to 7.1 ms and
   p99 from 17–19 to 11–13 ms
   ([host load checks](docs/raw-server.md#embedding-and-load-checks)).
+- A [native Linux capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md)
+  finds that one core keeps official-like delivery for 100 socket clients and
+  real time for 500 background bots, and profiles where the host's CPU goes.
 
 ## [0.4.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.3.1...v0.4.0) - 2026-10-24
 

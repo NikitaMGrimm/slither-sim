@@ -30,7 +30,7 @@ pub(super) const MOTION_REPORT_TICKS: u64 = 6;
 pub(super) const FAM_REPORT_TICKS: u64 = 15;
 
 /// What one connection has been told about a snake, in wire terms.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) struct KnownSnake {
     pub(super) life: u64,
     pub(super) front: Point,
@@ -40,6 +40,53 @@ pub(super) struct KnownSnake {
     pub(super) speed: u8,
     pub(super) fam: u32,
     pub(super) kills: usize,
+}
+
+/// Reuse a delta only within one broadcast, for the same snake and identical
+/// recipient history. Own-snake packets are never shared. Keeping just the
+/// last history bounds storage even with divergent viewers.
+#[derive(Clone, Default)]
+pub(super) struct SnakeDeltaCache(Option<SnakeDelta>);
+
+#[derive(Clone)]
+struct SnakeDelta {
+    before: KnownSnake,
+    after: KnownSnake,
+    packets: Vec<Vec<u8>>,
+}
+
+impl SnakeDeltaCache {
+    #[expect(clippy::too_many_arguments, reason = "Same explicit inputs as changes")]
+    pub(super) fn changes(
+        &mut self,
+        packets: &mut Vec<Vec<u8>>,
+        own: bool,
+        id: u16,
+        known: &mut KnownSnake,
+        snake: &Snake,
+        wanted: f64,
+        profile: &PlayerAppearance,
+        reports: &SnakeReports,
+    ) -> Result<(), String> {
+        if own {
+            return changes(packets, own, id, known, snake, wanted, profile, reports);
+        }
+        let entry = &mut self.0;
+        if let Some(delta) = entry.as_ref().filter(|delta| delta.before == *known) {
+            packets.extend_from_slice(&delta.packets);
+            known.clone_from(&delta.after);
+        } else {
+            let before = known.clone();
+            let start = packets.len();
+            changes(packets, own, id, known, snake, wanted, profile, reports)?;
+            *entry = Some(SnakeDelta {
+                before,
+                after: known.clone(),
+                packets: packets[start..].to_vec(),
+            });
+        }
+        Ok(())
+    }
 }
 
 /// One snake's report opportunities, shared by every recipient. Recipients
@@ -336,4 +383,73 @@ pub(super) fn changes(
         packets.push(encode::kills(id, snake.kills));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Config, Simulator};
+
+    #[test]
+    fn shared_deltas_preserve_distinct_histories_and_own_packet_types() {
+        let mut world = Simulator::new(7, Config::sandbox()).unwrap();
+        world.add("snake", 0, 1).unwrap();
+        let snake = &mut world.snakes[0];
+        let before = KnownSnake::new(2, snake, 0.).unwrap();
+        let next = Point {
+            x: snake.body[0].x + 42.,
+            y: snake.body[0].y,
+        };
+        physics::append_anchor(&mut snake.body, next, false);
+        snake.head = next;
+        snake.fam = 0.5;
+        snake.kills = 3;
+        let reports = SnakeReports {
+            motion: [7, 9, 13],
+            motion_due: true,
+            fam_due: true,
+            ..Default::default()
+        };
+        let mut cache = SnakeDeltaCache::default();
+        let mut histories = vec![before.clone()];
+        let mut stale = before.clone();
+        stale.heading = 7;
+        stale.fam = encode::fam_u24(0.5);
+        histories.push(stale);
+        let mut missing_front = before;
+        missing_front.front = Point { x: 1e6, y: 1e6 };
+        histories.push(missing_front);
+        for history in histories {
+            // Repeat peer encodings to exercise hits, with an own update between.
+            for own in [false, false, true, false] {
+                let (mut expected, mut actual) = (vec![vec![99]], vec![vec![99]]);
+                let (mut reference, mut shared) = (history.clone(), history.clone());
+                changes(
+                    &mut expected,
+                    own,
+                    4,
+                    &mut reference,
+                    snake,
+                    0.7,
+                    &PlayerAppearance::default(),
+                    &reports,
+                )
+                .unwrap();
+                cache
+                    .changes(
+                        &mut actual,
+                        own,
+                        4,
+                        &mut shared,
+                        snake,
+                        0.7,
+                        &PlayerAppearance::default(),
+                        &reports,
+                    )
+                    .unwrap();
+                assert_eq!(actual, expected);
+                assert_eq!(shared, reference);
+            }
+        }
+    }
 }
