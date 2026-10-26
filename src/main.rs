@@ -164,8 +164,8 @@ fn host(args: &[&str]) -> ExitCode {
         eprintln!("Listening on ws://{}/slither", host.local_addr()?);
         if let Some(interval) = options.stats_interval {
             let running = host.start()?;
-            report_host_stats(&running, interval, bot_slots, &mut io::stderr())
-                .map_err(|error| error.to_string())?;
+            // Stats are diagnostics: if stderr breaks, stop reporting but keep serving.
+            let _ = report_host_stats(&running, interval, bot_slots, &mut io::stderr());
             running.wait()
         } else {
             host.run()
