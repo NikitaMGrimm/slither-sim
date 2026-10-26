@@ -2,7 +2,10 @@
 use super::*;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use serde_json::Value;
-use std::{collections::HashSet, mem::size_of};
+use std::{
+    collections::{HashMap, HashSet},
+    mem::size_of,
+};
 
 pub const FORMAT: &str = "slither-sim-checkpoint-v1";
 pub const RULES_REVISION: &str = "slither-sim-rules-v1";
@@ -847,14 +850,15 @@ impl State {
                 )?;
             }
         }
+        // The death log is never trimmed: index each victim's latest death once.
+        let mut last_death = HashMap::new();
+        for death in &self.deaths {
+            last_death.insert(death.victim.as_str(), death.time);
+        }
         for (i, slot) in self.slots.iter().enumerate() {
             if let Some(time) = slot.death_time {
                 require(
-                    self.deaths
-                        .iter()
-                        .rev()
-                        .find(|d| d.victim == slot.snake.id)
-                        .is_some_and(|d| d.time == time),
+                    last_death.get(slot.snake.id.as_str()) == Some(&time),
                     Constraint::InconsistentState,
                     &format!("state.slots[{i}].deathTime"),
                 )?;
