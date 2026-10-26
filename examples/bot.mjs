@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-const protocol = 'slither-sim-json-v4';
+const protocol = 'slither-sim-json-v5';
 const filename = process.platform === 'win32' ? 'slither-sim.exe' : 'slither-sim';
 const [binary = fileURLToPath(new URL(`../target/release/${filename}`, import.meta.url)), count = '200'] = process.argv.slice(2);
 const steps = Number(count);
@@ -50,7 +50,7 @@ async function request(message) {
   if (done) throw new Error('Simulator closed its output');
   const reply = JSON.parse(value);
   if (reply.protocol !== protocol) throw new Error('Incompatible simulator protocol');
-  if ('error' in reply) throw new Error(reply.error);
+  if ('error' in reply) throw new Error(reply.error.message);
   return reply.result;
 }
 

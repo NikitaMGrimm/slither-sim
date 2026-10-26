@@ -13,7 +13,7 @@ login challenges are inline in `tests/client_challenge.rs`, not `login-challenge
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
 The frame ID differs from the `slither-client-json-v2` request/reply
 envelope (also pinned with removed-field requests in `client-contract-v2.json`)
-and the geometric `slither-sim-json-v4` controller; see
+and the geometric `slither-sim-json-v5` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
 [`serve-errors-v4.json`](serve-errors-v4.json) pins the geometric controller's
@@ -177,3 +177,8 @@ separately before treating derivatives as evidence.
 `serve-errors-v3.json` is retained for the released historical contract.
 `serve-radius-v4.json` is a synthetic initial/live radius split fixture shared
 by Rust transport, C and Python tests; it includes time-zero and next-tick samples.
+
+`serve-errors-v5.json` pins structured cause codes/locations and lifecycle.
+`serve-radius-v5.json` retains the initial/live radius regression under v5;
+`serve-rules-v5.json` is a synthetic customized rules fixture shared across Rust,
+C and Python. The v3/v4 fixtures remain unchanged as historical contracts.

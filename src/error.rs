@@ -52,20 +52,26 @@ impl ErrorCode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+#[repr(u32)]
 pub enum Constraint {
-    Missing,
-    NonFinite,
-    Negative,
-    NonPositive,
-    OutOfRange,
-    LengthMismatch,
-    Duplicate,
-    Ordering,
-    OutsideArena,
-    InconsistentState,
+    Missing = 1,
+    NonFinite = 2,
+    Negative = 3,
+    NonPositive = 4,
+    OutOfRange = 5,
+    LengthMismatch = 6,
+    Duplicate = 7,
+    Ordering = 8,
+    OutsideArena = 9,
+    InconsistentState = 10,
 }
 
 impl Constraint {
+    /// Stable wire/FFI constraint code; zero is reserved for no constraint.
+    pub const fn code(self) -> u32 {
+        self as u32
+    }
+
     pub(crate) fn positive(value: f64) -> Option<Self> {
         if !value.is_finite() {
             Some(Self::NonFinite)
@@ -228,4 +234,38 @@ impl Error for CoreStepError {
 pub enum WorldStatus<'a> {
     Running,
     Stopped(&'a SimError),
+}
+
+/// Stable geometric error representation shared by JSON and language bindings.
+/// `code` identifies ErrorKind; `rule` identifies an optional Constraint.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorDetails {
+    pub code: u32,
+    pub rule: Option<u32>,
+    pub world: Option<usize>,
+    pub slot: Option<usize>,
+    pub field: Option<String>,
+    pub message: String,
+}
+impl SimError {
+    pub const fn rule(&self) -> Option<Constraint> {
+        match self.kind {
+            ErrorKind::InvalidConfig { rule }
+            | ErrorKind::InvalidAction { rule }
+            | ErrorKind::InvalidState { rule }
+            | ErrorKind::InvalidCheckpoint { rule } => Some(rule),
+            _ => None,
+        }
+    }
+    pub fn details(&self) -> ErrorDetails {
+        ErrorDetails {
+            code: self.code() as u32,
+            rule: self.rule().map(Constraint::code),
+            world: self.world,
+            slot: self.slot,
+            field: self.field.clone(),
+            message: self.to_string(),
+        }
+    }
 }

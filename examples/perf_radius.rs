@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let row = json!({"kind":"state", "case":name, "tick":tick, "initialConfig":initial_config,
                 "checkpoint":checkpoint, "observations":world.observe_all(),
                 "pickupEvents":format!("{:?}", world.pickup_events()), "foodSpawnEvents":format!("{:?}", world.food_spawn_events()),
-                "snapshot":snapshot, "frame":format!("{:?}", session.frame(0).unwrap()),
+                "snapshot":snapshot, "frame":runtime::frame_debug(session.frame(0).unwrap(), &runtime::rules(&config)),
                 "spawnDistance":runtime::spawn_distance(&world, 0.375)});
             serde_json::to_writer(&mut out, &row)?;
             writeln!(out)?;

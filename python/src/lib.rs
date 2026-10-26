@@ -7,7 +7,7 @@ use pyo3::ffi;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBytes, PyDict, PyString, PyTuple};
-use slither_sim::transport;
+use slither_sim::{ErrorKind, SimError, transport};
 use std::ffi::{CStr, CString};
 
 pyo3::create_exception!(
@@ -16,6 +16,67 @@ pyo3::create_exception!(
     PyRuntimeError,
     "Advancement failed and cleared all worlds; reset the session to continue."
 );
+
+pyo3::create_exception!(
+    slither_sim,
+    SimulationError,
+    PyValueError,
+    "A simulator rejection with stable cause and location attributes."
+);
+
+fn annotate(py: Python<'_>, error: PyErr, cause: &SimError) -> PyErr {
+    let value = error.value(py);
+    let result = (|| -> PyResult<()> {
+        value.setattr("code", cause.code() as u32)?;
+        value.setattr("rule", cause.rule().map(slither_sim::Constraint::code))?;
+        value.setattr("world", cause.world)?;
+        value.setattr("slot", cause.slot)?;
+        value.setattr("field", cause.field.as_deref())?;
+        Ok(())
+    })();
+    result.err().unwrap_or(error)
+}
+fn rejected(py: Python<'_>, cause: SimError) -> PyErr {
+    annotate(py, SimulationError::new_err(cause.to_string()), &cause)
+}
+fn invalid_request(py: Python<'_>, message: impl ToString) -> PyErr {
+    rejected(
+        py,
+        SimError::new(ErrorKind::InvalidRequest, message.to_string()),
+    )
+}
+
+/// One immutable scalar rules copy per owned frame.
+#[pyclass(name = "WorldRules", module = "slither_sim", frozen)]
+struct Rules {
+    value: slither_sim::WorldRules,
+}
+#[pymethods]
+impl Rules {
+    #[getter]
+    fn boundary_mode(&self) -> &'static str {
+        match self.value.boundary_mode {
+            slither_sim::BoundaryMode::Sliding => "sliding",
+            slither_sim::BoundaryMode::Hard => "hard",
+        }
+    }
+    #[getter]
+    fn pit_radius(&self) -> Option<f64> {
+        self.value.pit_radius
+    }
+    #[getter]
+    fn min_score(&self) -> Option<u32> {
+        self.value.min_score
+    }
+    #[getter]
+    fn kill_score_seconds(&self) -> Option<f64> {
+        self.value.kill_score_seconds
+    }
+    #[getter]
+    fn free_boost_at_floor(&self) -> bool {
+        self.value.free_boost_at_floor
+    }
+}
 
 static ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 static DUMPS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
@@ -222,9 +283,10 @@ where
     {
         return Ok(value);
     }
-    let value: serde_json::Value = serde_json::from_slice(&dumps(value.py(), &value)?)
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    serde_json::from_value(value).map_err(|e| PyValueError::new_err(e.to_string()))
+    let py = value.py();
+    let value: serde_json::Value =
+        serde_json::from_slice(&dumps(py, &value)?).map_err(|e| invalid_request(py, e))?;
+    serde_json::from_value(value).map_err(|e| invalid_request(py, e))
 }
 
 fn reset_object<T: serde::de::DeserializeOwned + Default>(
@@ -233,12 +295,15 @@ fn reset_object<T: serde::de::DeserializeOwned + Default>(
 ) -> PyResult<T> {
     match value.filter(|v| !v.is_none()) {
         None => Ok(T::default()),
-        Some(value) => serde_json::from_slice(&dumps(py, &value)?)
-            .map_err(|e| PyValueError::new_err(e.to_string())),
+        Some(value) => {
+            let value: serde_json::Value =
+                serde_json::from_slice(&dumps(py, &value)?).map_err(|e| invalid_request(py, e))?;
+            serde_json::from_value(value).map_err(|e| invalid_request(py, e))
+        }
     }
 }
 
-/// A `slither-sim-json-v4` session of independent worlds, run in this process.
+/// A `slither-sim-json-v5` session of independent worlds, run in this process.
 ///
 /// Reset through keyword arguments, step with flat world-major heading and boost
 /// arrays and read each world's frame as columns. Use one session from one
@@ -289,14 +354,10 @@ impl Session {
             reset_object(py, config)?,
             reset_object(py, placement)?,
         )
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        .map_err(|e| rejected(py, e))?;
         let prepared = py
             .detach(|| transport::Session::prepare_reset(options))
-            .map_err(|mut e| {
-                // Reset diagnostics predate the typed world's location metadata.
-                e.world = None;
-                PyValueError::new_err(e.to_string())
-            })?;
+            .map_err(|e| rejected(py, e))?;
         // Warnings can raise; retain both the old worlds and their frame buffers
         // until every warning has been accepted by Python.
         let category = py.get_type::<PyUserWarning>();
@@ -326,11 +387,13 @@ impl Session {
             headings,
             boosts,
         } = self;
-        py.detach(|| inner.step(headings, boosts))
-            .map_err(|error| match &error {
-                transport::StepError::Rejected(_) => PyValueError::new_err(error.to_string()),
+        py.detach(|| inner.step(headings, boosts)).map_err(|error| {
+            let exception = match &error {
+                transport::StepError::Rejected(_) => SimulationError::new_err(error.to_string()),
                 transport::StepError::Ended(_) => SessionEndedError::new_err(error.to_string()),
-            })
+            };
+            annotate(py, exception, error.cause())
+        })
     }
 
     /// World `world`'s current frame, copied. Indices outside the session,
@@ -341,11 +404,28 @@ impl Session {
             Err(error) if error.is_instance_of::<PyOverflowError>(py) => None,
             Err(error) => return Err(error),
         };
-        match world.and_then(|world| self.inner.frame(world)) {
-            Some(frame) => Frame::copy(py, &frame),
-            None if self.inner.worlds() == 0 => Err(PyValueError::new_err("Reset first")),
-            None => Err(PyIndexError::new_err("Unknown world")),
+        if self.inner.worlds() == 0 {
+            return Err(rejected(
+                py,
+                SimError::new(ErrorKind::NotReset, "Reset first"),
+            ));
         }
+        let Some(world) = world else {
+            let cause = SimError::new(ErrorKind::UnknownWorld, "Unknown world").at_field("world");
+            return Err(annotate(
+                py,
+                PyIndexError::new_err(cause.to_string()),
+                &cause,
+            ));
+        };
+        let frame = self.inner.frame_checked(world).map_err(|cause| {
+            if cause.kind == ErrorKind::UnknownWorld {
+                annotate(py, PyIndexError::new_err(cause.to_string()), &cause)
+            } else {
+                rejected(py, cause)
+            }
+        })?;
+        Frame::copy(py, &frame)
     }
 
     /// Answers one JSON request, given as a dict (or other JSON value), `str`
@@ -393,6 +473,8 @@ macro_rules! frame {
             radius: f64,
             #[pyo3(get)]
             vision: f64,
+            #[pyo3(get)]
+            rules: Py<Rules>,
             $($(
                 #[pyo3(get)]
                 $name: Py<PyAny>,
@@ -407,6 +489,7 @@ macro_rules! frame {
                     living: frame.living,
                     radius: frame.radius,
                     vision: frame.vision,
+                    rules: Py::new(py, Rules { value: frame.rules })?,
                     $($(
                         $name: array(py, frame.$table.$column)?,
                     )*)*
@@ -494,6 +577,8 @@ fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("ORIGINS", PyTuple::new(py, transport::ORIGINS)?)?;
     module.add("REASONS", PyTuple::new(py, transport::REASONS)?)?;
     module.add("SessionEndedError", py.get_type::<SessionEndedError>())?;
+    module.add("SimulationError", py.get_type::<SimulationError>())?;
+    module.add_class::<Rules>()?;
     module.add_class::<Session>()?;
     module.add_class::<Frame>()?;
     Ok(())

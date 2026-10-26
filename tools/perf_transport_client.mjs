@@ -12,14 +12,14 @@ import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
-// Protocol slither-sim-json-v4: reply decoding and the decision step. Another
+// Protocol slither-sim-json-v5: reply decoding and the decision step. Another
 // protocol replaces these two functions and leaves the timing loop unchanged.
-const protocol = 'slither-sim-json-v4';
+const protocol = 'slither-sim-json-v5';
 
 function decodeReply(line) {
   const reply = JSON.parse(line);
   if (reply.protocol !== protocol) throw new Error(`Unexpected protocol ${reply.protocol}`);
-  if ('error' in reply) throw new Error(`serve error: ${reply.error}`);
+  if ('error' in reply) throw new Error(`serve error: ${reply.error.message}`);
   return reply.result;
 }
 

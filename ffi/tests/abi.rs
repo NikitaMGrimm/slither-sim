@@ -101,11 +101,20 @@ fn frame_layout_matches_the_header() {
         death_killer,
         death_reason,
         death_food,
+        rules,
     );
     let types: HashMap<&str, (&str, usize, usize)> = [
         ("double", ("f64", size_of::<f64>(), align_of::<f64>())),
         ("uint32_t", ("u32", 4, align_of::<u32>())),
         ("size_t", ("usize", size_of::<usize>(), align_of::<usize>())),
+        (
+            "slither_world_rules",
+            (
+                std::any::type_name::<SlitherWorldRules>(),
+                size_of::<SlitherWorldRules>(),
+                align_of::<SlitherWorldRules>(),
+            ),
+        ),
         (
             "const double *",
             ("*const f64", size_of::<usize>(), align_of::<usize>()),
@@ -141,7 +150,10 @@ fn frame_layout_matches_the_header() {
         size_of::<SlitherFrame>()
     );
     #[cfg(target_pointer_width = "64")]
-    assert_eq!(size_of::<SlitherFrame>(), 32 + 6 * 8 + 39 * 8);
+    assert_eq!(
+        size_of::<SlitherFrame>(),
+        32 + 6 * 8 + 39 * 8 + size_of::<SlitherWorldRules>()
+    );
     compile_layout_assertions(&rust);
 }
 
@@ -161,11 +173,69 @@ fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
             "_Static_assert(offsetof(slither_frame, {name}) == {offset}, \"{name}\");\n"
         ));
     }
+    for (c_type, size, fields) in [
+        (
+            "slither_world_rules",
+            size_of::<SlitherWorldRules>(),
+            vec![
+                (
+                    "boundary_mode",
+                    offset_of!(SlitherWorldRules, boundary_mode),
+                ),
+                ("flags", offset_of!(SlitherWorldRules, flags)),
+                ("pit_radius", offset_of!(SlitherWorldRules, pit_radius)),
+                ("min_score", offset_of!(SlitherWorldRules, min_score)),
+                (
+                    "kill_score_seconds",
+                    offset_of!(SlitherWorldRules, kill_score_seconds),
+                ),
+            ],
+        ),
+        (
+            "slither_error",
+            size_of::<SlitherError>(),
+            vec![
+                ("code", offset_of!(SlitherError, code)),
+                ("rule", offset_of!(SlitherError, rule)),
+                ("flags", offset_of!(SlitherError, flags)),
+                ("world", offset_of!(SlitherError, world)),
+                ("slot", offset_of!(SlitherError, slot)),
+                ("field", offset_of!(SlitherError, field)),
+                ("message", offset_of!(SlitherError, message)),
+            ],
+        ),
+    ] {
+        source.push_str(&format!(
+            "_Static_assert(sizeof({c_type}) == {size}, \"{c_type} size\");\n"
+        ));
+        for (name, offset) in fields {
+            source.push_str(&format!(
+                "_Static_assert(offsetof({c_type}, {name}) == {offset}, \"{c_type}.{name}\");\n"
+            ));
+        }
+    }
     let path = std::env::temp_dir().join(format!("slither_sim_layout_{}.c", std::process::id()));
     std::fs::write(&path, source).unwrap();
-    let compiler = std::env::var("CC").unwrap_or_else(|_| "cc".into());
-    let result = Command::new(&compiler)
-        .args(["-std=c11", "-fsyntax-only", "-I"])
+    let compiler = std::env::var("CC").unwrap_or_else(|_| {
+        if cfg!(target_env = "msvc") {
+            "cl".into()
+        } else {
+            "cc".into()
+        }
+    });
+    let mut command = Command::new(&compiler);
+    let msvc = std::path::Path::new(&compiler)
+        .file_stem()
+        .is_some_and(|name| {
+            let name = name.to_string_lossy();
+            name.eq_ignore_ascii_case("cl") || name.eq_ignore_ascii_case("clang-cl")
+        });
+    if msvc {
+        command.args(["/nologo", "/std:c11", "/TC", "/Zs", "/I"]);
+    } else {
+        command.args(["-std=c11", "-fsyntax-only", "-I"]);
+    }
+    let result = command
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/include"))
         .arg(&path)
         .output();
@@ -213,6 +283,63 @@ fn constants_and_functions_match_the_header() {
     ] {
         assert_eq!(number(name), code as u64, "{name}");
     }
+    for code in [
+        slither_sim::ErrorCode::InvalidRequest,
+        slither_sim::ErrorCode::InvalidConfig,
+        slither_sim::ErrorCode::ActionShape,
+        slither_sim::ErrorCode::InvalidAction,
+        slither_sim::ErrorCode::UnknownSlot,
+        slither_sim::ErrorCode::UnknownWorld,
+        slither_sim::ErrorCode::UnknownEntity,
+        slither_sim::ErrorCode::DuplicateId,
+        slither_sim::ErrorCode::InvalidState,
+        slither_sim::ErrorCode::PlacementExhausted,
+        slither_sim::ErrorCode::NotReset,
+        slither_sim::ErrorCode::WorldStopped,
+        slither_sim::ErrorCode::UnsupportedCheckpoint,
+        slither_sim::ErrorCode::InvalidCheckpoint,
+        slither_sim::ErrorCode::NumericOverflow,
+        slither_sim::ErrorCode::RepresentationLimit,
+        slither_sim::ErrorCode::AllocationFailed,
+    ] {
+        assert_eq!(
+            number(&format!("SLITHER_CAUSE_{}", code.as_str().to_uppercase())),
+            code as u64
+        );
+    }
+    for (name, rule) in [
+        ("MISSING", slither_sim::Constraint::Missing),
+        ("NON_FINITE", slither_sim::Constraint::NonFinite),
+        ("NEGATIVE", slither_sim::Constraint::Negative),
+        ("NON_POSITIVE", slither_sim::Constraint::NonPositive),
+        ("OUT_OF_RANGE", slither_sim::Constraint::OutOfRange),
+        ("LENGTH_MISMATCH", slither_sim::Constraint::LengthMismatch),
+        ("DUPLICATE", slither_sim::Constraint::Duplicate),
+        ("ORDERING", slither_sim::Constraint::Ordering),
+        ("OUTSIDE_ARENA", slither_sim::Constraint::OutsideArena),
+        (
+            "INCONSISTENT_STATE",
+            slither_sim::Constraint::InconsistentState,
+        ),
+    ] {
+        assert_eq!(
+            number(&format!("SLITHER_CONSTRAINT_{name}")),
+            u64::from(rule.code())
+        );
+    }
+    for (name, code) in [
+        ("SLITHER_ERROR_HAS_WORLD", SLITHER_ERROR_HAS_WORLD),
+        ("SLITHER_ERROR_HAS_SLOT", SLITHER_ERROR_HAS_SLOT),
+        ("SLITHER_RULE_HAS_PIT", SLITHER_RULE_HAS_PIT),
+        ("SLITHER_RULE_HAS_MIN_SCORE", SLITHER_RULE_HAS_MIN_SCORE),
+        ("SLITHER_RULE_HAS_KILL_WINDOW", SLITHER_RULE_HAS_KILL_WINDOW),
+        (
+            "SLITHER_RULE_FREE_BOOST_AT_FLOOR",
+            SLITHER_RULE_FREE_BOOST_AT_FLOOR,
+        ),
+    ] {
+        assert_eq!(number(name), u64::from(code));
+    }
     assert_eq!(number("SLITHER_NONE"), u64::from(NONE));
     assert_eq!(number("SLITHER_NO_ORIGIN"), u64::from(NO_ORIGIN));
     for (code, origin) in ORIGINS.iter().enumerate() {
@@ -233,6 +360,7 @@ fn constants_and_functions_match_the_header() {
         "size_t slither_worlds(const slither_session *session)",
         "size_t slither_agents(const slither_session *session)",
         "const char *slither_last_error(const slither_session *session)",
+        "int32_t slither_read_error(const slither_session *session, slither_error *error)",
     ] {
         assert!(HEADER.contains(function), "{function}");
     }
@@ -255,7 +383,6 @@ impl Handle {
         let code =
             unsafe { slither_request(self.0, line.as_ptr(), line.len(), &mut reply, &mut len) };
         assert_eq!(code, SLITHER_OK);
-        assert_eq!(self.error(), "");
         let bytes = unsafe { std::slice::from_raw_parts(reply, len + 1) };
         assert_eq!(bytes[len], 0, "replies end with a NUL");
         bytes[..len].to_vec()
@@ -297,6 +424,12 @@ unsafe fn column<'a, T>(data: *const T, len: usize) -> &'a [T] {
 }
 
 fn assert_same(frame: &SlitherFrame, expected: FrameRef) {
+    let rules = SlitherWorldRules::from(expected.rules);
+    assert_eq!(frame.rules.boundary_mode, rules.boundary_mode);
+    assert_eq!(frame.rules.flags, rules.flags);
+    assert_eq!(frame.rules.pit_radius, rules.pit_radius);
+    assert_eq!(frame.rules.min_score, rules.min_score);
+    assert_eq!(frame.rules.kill_score_seconds, rules.kill_score_seconds);
     let (s, f, p, v, d) = (
         expected.snakes,
         expected.food,
@@ -408,7 +541,7 @@ fn sessions_match_the_rust_api() {
     );
     assert_eq!(
         handle.frame(2).unwrap_err(),
-        (SLITHER_REJECTED, "Unknown world".into())
+        (SLITHER_REJECTED, "World 2: Unknown world".into())
     );
     let (mut reasons, mut scored) = ([false; 3], false);
     for t in 0..80 {
@@ -485,7 +618,7 @@ fn terminal_failure_is_distinct_from_rejection_and_reset_recovers() {
     assert_eq!(unsafe { slither_worlds(handle.0) }, 0);
     assert_eq!(
         handle.request(step),
-        br#"{"error":"Reset first","protocol":"slither-sim-json-v4","sessionEnded":false}"#
+        br#"{"error":{"code":11,"field":null,"message":"Reset first","rule":null,"slot":null,"world":null},"protocol":"slither-sim-json-v5","sessionEnded":false}"#
     );
     handle.request(r#"{"op":"reset","agents":1}"#);
     assert_eq!(handle.step(&[0.0], &[0]), SLITHER_OK);
@@ -553,7 +686,14 @@ fn rejected_and_null_arguments_change_nothing() {
             SLITHER_OK
         );
         let empty = std::slice::from_raw_parts(reply, len);
-        assert!(empty.starts_with(br#"{"error":"EOF while parsing"#));
+        let decoded: serde_json::Value = serde_json::from_slice(empty).unwrap();
+        assert_eq!(decoded["error"]["code"], 1);
+        assert!(
+            decoded["error"]["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("EOF while parsing")
+        );
     }
     assert_eq!(snapshot(), before);
 
@@ -608,7 +748,7 @@ fn sessions_run_on_separate_threads() {
 #[test]
 fn c_frame_and_snapshot_expose_live_radius_without_changing_initial_config() {
     let fixture: serde_json::Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/serve-radius-v4.json")).unwrap();
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-radius-v5.json")).unwrap();
     let session = Handle::new();
     session.request(&serde_json::to_string(&fixture["reset"]).unwrap());
     for radius in fixture["liveRadii"].as_array().unwrap() {
@@ -623,4 +763,114 @@ fn c_frame_and_snapshot_expose_live_radius_without_changing_initial_config() {
         assert_eq!(session.frame(0).unwrap().radius, radius.as_f64().unwrap());
         assert_eq!(session.step(&[0.], &[0]), SLITHER_OK);
     }
+}
+
+fn assert_cause_matches(handle: &Handle, expected: &serde_json::Value) {
+    let mut error = std::mem::MaybeUninit::<SlitherError>::uninit();
+    assert_eq!(
+        unsafe { slither_read_error(handle.0, error.as_mut_ptr()) },
+        SLITHER_OK
+    );
+    let error = unsafe { error.assume_init() };
+    assert_eq!(u64::from(error.code), expected["code"].as_u64().unwrap());
+    assert_eq!(
+        (error.rule != 0).then_some(u64::from(error.rule)),
+        expected["rule"].as_u64()
+    );
+    assert_eq!(
+        (error.flags & SLITHER_ERROR_HAS_WORLD != 0).then_some(error.world as u64),
+        expected["world"].as_u64()
+    );
+    assert_eq!(
+        (error.flags & SLITHER_ERROR_HAS_SLOT != 0).then_some(error.slot as u64),
+        expected["slot"].as_u64()
+    );
+    let field = if error.field.is_null() {
+        None
+    } else {
+        Some(unsafe { CStr::from_ptr(error.field) }.to_str().unwrap())
+    };
+    assert_eq!(field, expected["field"].as_str());
+    assert_eq!(
+        unsafe { CStr::from_ptr(error.message) }.to_str().unwrap(),
+        expected["message"].as_str().unwrap()
+    );
+}
+
+#[test]
+fn c_error_inspection_matches_json_rust_and_preserves_rejected_ended() {
+    let handle = Handle::new();
+    let mut oracle = Session::new();
+    let cause: serde_json::Value =
+        serde_json::from_slice(&oracle.request(br#"{"op":"step","actions":[]}"#)).unwrap();
+    assert_eq!(handle.step(&[], &[]), SLITHER_REJECTED);
+    assert_cause_matches(&handle, &cause["error"]);
+    let reset =
+        r#"{"op":"reset","agents":2,"worlds":2,"config":{"preset":"sandbox","foodCount":0}}"#;
+    handle.request(reset);
+    oracle.request(reset.as_bytes());
+    let cause = oracle
+        .step(&[0., 0., 0., f64::NAN], &[false; 4])
+        .unwrap_err();
+    assert_eq!(
+        handle.step(&[0., 0., 0., f64::NAN], &[0; 4]),
+        SLITHER_REJECTED
+    );
+    assert_cause_matches(&handle, &serde_json::to_value(cause.details()).unwrap());
+    let cause: serde_json::Value =
+        serde_json::from_slice(&handle.request(r#"{"op":"reset","config":{"radius":-1}}"#))
+            .unwrap();
+    assert_cause_matches(&handle, &cause["error"]);
+    let huge = usize::MAX;
+    let cause = oracle.frame_checked(huge).unwrap_err();
+    assert!(handle.frame(huge).is_err());
+    assert_cause_matches(&handle, &serde_json::to_value(cause.details()).unwrap());
+    let cause = oracle.frame_checked(17).unwrap_err();
+    assert!(handle.frame(17).is_err());
+    assert_cause_matches(&handle, &serde_json::to_value(cause.details()).unwrap());
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-errors-v5.json")).unwrap();
+    let reset = serde_json::to_string(&fixture["reset"]).unwrap();
+    handle.request(&reset);
+    oracle.request(reset.as_bytes());
+    let cause: serde_json::Value =
+        serde_json::from_slice(&oracle.request(&serde_json::to_vec(&fixture["step"]).unwrap()))
+            .unwrap();
+    assert_eq!(
+        handle.step(&[std::f64::consts::PI; 2], &[0; 2]),
+        SLITHER_ENDED
+    );
+    assert_cause_matches(&handle, &cause["error"]);
+    assert_eq!(unsafe { slither_worlds(handle.0) }, 0);
+    handle.request(r#"{"op":"reset","agents":1}"#);
+    let mut error = std::mem::MaybeUninit::<SlitherError>::uninit();
+    unsafe {
+        slither_read_error(handle.0, error.as_mut_ptr());
+    }
+    assert_eq!(unsafe { error.assume_init() }.code, 0);
+}
+
+#[test]
+fn inline_c_rules_match_json_and_absent_fields_use_flags() {
+    let handle = Handle::new();
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-rules-v5.json")).unwrap();
+    handle.request(&serde_json::to_string(&fixture["reset"]).unwrap());
+    for _ in 0..3 {
+        let rules = handle.frame(0).unwrap().rules;
+        assert_eq!(rules.boundary_mode, SLITHER_BOUNDARY_HARD);
+        assert_eq!(rules.flags, 15);
+        assert_eq!(rules.pit_radius, 550.);
+        assert_eq!(rules.min_score, 400);
+        assert_eq!(rules.kill_score_seconds, 0.014);
+        assert_eq!(handle.step(&[0., 0.], &[1, 1]), SLITHER_OK);
+    }
+    handle.request(r#"{"op":"reset","agents":1,"config":{"preset":"sandbox","foodCount":0}}"#);
+    let rules = handle.frame(0).unwrap().rules;
+    assert_eq!(rules.boundary_mode, SLITHER_BOUNDARY_SLIDING);
+    assert_eq!(rules.flags, 0);
+    assert_eq!(
+        (rules.pit_radius, rules.min_score, rules.kill_score_seconds),
+        (0., 0, 0.)
+    );
 }

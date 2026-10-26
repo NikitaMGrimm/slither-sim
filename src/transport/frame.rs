@@ -4,7 +4,7 @@
 //!
 //! [`Frame`] collects the columns in the fixed-width types that in-process callers
 //! and the C ABI read directly; JSON is written from them only on request.
-use crate::{ErrorKind, SimError};
+use crate::{ErrorKind, SimError, WorldRules};
 use crate::{
     model::{DeathEvent, DeathReason, Origin},
     observation::Sighting,
@@ -90,6 +90,7 @@ pub struct FrameRef<'a> {
     pub radius: f64,
     /// Vision radius.
     pub vision: f64,
+    pub rules: WorldRules,
     pub snakes: SnakeColumns<'a>,
     pub food: FoodColumns<'a>,
     pub prey: PreyColumns<'a>,
@@ -261,6 +262,7 @@ pub(crate) struct Frame {
     living: u32,
     radius: f64,
     vision: f64,
+    rules: WorldRules,
     snakes: SnakeTable,
     food: FoodTable,
     prey: PreyTable,
@@ -286,6 +288,7 @@ impl Frame {
         self.living = count(world.living(), "living snake")?;
         self.radius = world.radius();
         self.vision = world.config().vision;
+        self.rules = world.rules();
         self.collect_snakes(world)?;
         self.collect_food(world)?;
         self.collect_prey(world)?;
@@ -337,6 +340,7 @@ impl Frame {
             living: self.living,
             radius: self.radius,
             vision: self.vision,
+            rules: self.rules,
             snakes: SnakeColumns {
                 slot: &s.slot,
                 x: &s.x,
@@ -564,12 +568,13 @@ struct Encoded<'a>(&'a Frame);
 impl Serialize for Encoded<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let frame = self.0;
-        let mut out = serializer.serialize_struct("Frame", 10)?;
+        let mut out = serializer.serialize_struct("Frame", 11)?;
         out.serialize_field("deaths", &Deaths(&frame.deaths))?;
         out.serialize_field("food", &Food(&frame.food))?;
         out.serialize_field("living", &frame.living)?;
         out.serialize_field("prey", &frame.prey)?;
         out.serialize_field("radius", &frame.radius)?;
+        out.serialize_field("rules", &frame.rules)?;
         out.serialize_field("snakes", &frame.snakes)?;
         out.serialize_field("ticks", &frame.ticks)?;
         out.serialize_field("time", &frame.time)?;

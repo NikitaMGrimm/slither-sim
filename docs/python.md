@@ -63,19 +63,23 @@ use NaN for no action. Pass float64 heading and bool/uint8 boost buffers
 multidimensional buffers use C order. Other iterables, including lists, accept
 `None` for no action and truthy values to boost.
 
-Rejected resets and steps raise `ValueError` with the protocol's error text and
-change nothing. Buffers of other item types raise `TypeError`. `frame` raises
+Rejected resets and steps raise `SimulationError` (a `ValueError`) with the
+protocol's diagnostic message and change nothing. Simulator exceptions expose
+`.code`, `.rule`, `.world`, `.slot` and `.field`; optional values are `None`.
+Codes and locations match the geometric v5 error object and C inspection.
+Frame lookup still raises `IndexError` for an unknown world, with the same
+cause attributes. Native Python buffer/type-conversion errors remain `TypeError`. Buffers of other item types raise `TypeError`. `frame` raises
 `ValueError` before the first reset and `IndexError` for any index outside the
 session; negative indices do not count from the end. `request` returns error
 replies instead of raising. Requests and `config` must be plain dicts; other
 mappings raise `TypeError`.
 
 Advancement or frame-collection failure makes `step` raise `SessionEndedError`
-(a `RuntimeError` subclass) and clear every world: `worlds` and `agents` become 0;
+(a `RuntimeError` subclass with the same cause attributes) and clear every world: `worlds` and `agents` become 0;
 `frame` raises `ValueError` ("Reset first"). Reset to continue. `request` instead
 returns an error reply with `sessionEnded: true` (false for unchanged-state errors).
 
-The module also exports `PROTOCOL` (`slither-sim-json-v4`), `NONE`, `NO_ORIGIN`,
+The module also exports `PROTOCOL` (`slither-sim-json-v5`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
 constants](bot-api.md#in-process-sessions). Type stubs ship with the package.
 
@@ -87,6 +91,12 @@ attribute per column, named like the [C ABI](c-api.md#frames) members.
 boundary. Snapshot `config.radius` stays at its initial, population-sized value,
 even across radius samples/controller steps. This config meaning is geometric
 v4; typed frame attributes retain their meanings.
+
+`frame.rules` is one small frozen `WorldRules` object owned by that frame.
+It has read-only `boundary_mode`, `pit_radius`, `min_score`, `kill_score_seconds`
+and `free_boost_at_floor` properties; absent values are `None`. It remains valid
+after steps/resets, with no rules repeated in entity arrays. Only geometric
+frames have these simulated rules; portable received-state frames are unchanged.
 
 The columns are:
 
@@ -139,5 +149,5 @@ the same wall time as one.
 ## Compatibility
 
 The package inherits the workspace's `slither-sim` crate version. Check
-`PROTOCOL` (`slither-sim-json-v4`) and record the commit for reproducibility.
+`PROTOCOL` (`slither-sim-json-v5`) and record the commit for reproducibility.
 The Python API is experimental and may change between `0.x` versions.

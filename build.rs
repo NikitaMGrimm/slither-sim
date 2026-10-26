@@ -1,4 +1,11 @@
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(slither_world_rules)");
+    println!("cargo:rerun-if-changed=src/transport/frame.rs");
+    if std::fs::read_to_string("src/transport/frame.rs")
+        .is_ok_and(|source| source.contains("pub rules: WorldRules"))
+    {
+        println!("cargo:rustc-cfg=slither_world_rules");
+    }
     println!("cargo:rustc-check-cfg=cfg(slither_runtime_radius)");
     println!("cargo:rerun-if-changed=src/simulator.rs");
     let source = std::fs::read_to_string("src/simulator.rs").expect("simulator source");

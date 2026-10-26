@@ -905,7 +905,7 @@ fn serve_resets_accept_a_preset() {
     )
     .unwrap();
     assert!(
-        reply["error"]
+        reply["error"]["message"]
             .as_str()
             .unwrap()
             .starts_with("spawnRadius must lie outside pit.radius")

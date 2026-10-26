@@ -1,4 +1,4 @@
-"""In-process slither-sim sessions: slither-sim-json-v4 without JSON on the hot path."""
+"""In-process slither-sim sessions: slither-sim-json-v5 without JSON on the hot path."""
 
 from array import array
 from collections.abc import Iterable
@@ -10,11 +10,11 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import Buffer
 
-__all__ = ["__version__", "PROTOCOL", "NONE", "NO_ORIGIN", "ORIGINS", "REASONS", "SessionEndedError", "Session", "Frame"]
+__all__ = ["__version__", "PROTOCOL", "NONE", "NO_ORIGIN", "ORIGINS", "REASONS", "SimulationError", "SessionEndedError", "WorldRules", "Session", "Frame"]
 
 __version__: Final[str]
 PROTOCOL: Final[str]
-"""The JSON protocol of `Session.request`: "slither-sim-json-v4"."""
+"""The JSON protocol of `Session.request`: "slither-sim-json-v5"."""
 NONE: Final[int]
 """Row or slot index meaning none (2**32 - 1): `view_self` of dead slots, `death_killer` without a killer."""
 NO_ORIGIN: Final[int]
@@ -24,8 +24,34 @@ ORIGINS: Final[tuple[str, ...]]
 REASONS: Final[tuple[str, ...]]
 """Names of the `death_reason` codes."""
 
+class SimulationError(ValueError):
+    code: int
+    rule: int | None
+    world: int | None
+    slot: int | None
+    field: str | None
+
 class SessionEndedError(RuntimeError):
-    """Advancement failed and cleared all worlds; reset the session to continue."""
+    """Advancement failed and cleared all worlds; reset to continue."""
+    code: int
+    rule: int | None
+    world: int | None
+    slot: int | None
+    field: str | None
+
+@final
+class WorldRules:
+    """Immutable geometric rules, copied once per owned frame."""
+    @property
+    def boundary_mode(self) -> str: ...
+    @property
+    def pit_radius(self) -> float | None: ...
+    @property
+    def min_score(self) -> int | None: ...
+    @property
+    def kill_score_seconds(self) -> float | None: ...
+    @property
+    def free_boost_at_floor(self) -> bool: ...
 
 @final
 class Session:
@@ -86,6 +112,8 @@ class Frame:
     def radius(self) -> float: ...
     @property
     def vision(self) -> float: ...
+    @property
+    def rules(self) -> WorldRules: ...
     @property
     def snake_slot(self) -> array[int]: ...
     @property

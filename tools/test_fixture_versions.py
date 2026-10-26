@@ -133,6 +133,18 @@ class FixtureVersionsTest(unittest.TestCase):
             self.assertIs(reply["sessionEnded"], ended)
             self.assertIsInstance(reply["error"], str)
 
+    def test_synthetic_serve_v5_structured_errors_and_rules(self):
+        fixture = json.loads((ROOT / "tests/fixtures/serve-errors-v5.json").read_text())
+        for name, code, ended in [("rejectedReply", 11, False), ("terminalReply", 15, True)]:
+            reply = fixture[name]
+            self.assertEqual(reply["protocol"], "slither-sim-json-v5")
+            self.assertIs(reply["sessionEnded"], ended)
+            self.assertEqual(set(reply["error"]), {"code", "rule", "world", "slot", "field", "message"})
+            self.assertEqual(reply["error"]["code"], code)
+        rules = json.loads((ROOT / "tests/fixtures/serve-rules-v5.json").read_text())
+        self.assertEqual(rules["protocol"], "slither-sim-json-v5")
+        self.assertEqual(set(rules["rules"]), {"boundaryMode", "pitRadius", "minScore", "killScoreSeconds", "freeBoostAtFloor"})
+
     def test_protocol19_food_interest_receipts(self):
         entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")
         self.assertEqual(entry["wireProtocol"], 19)

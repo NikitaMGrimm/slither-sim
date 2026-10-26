@@ -19,16 +19,20 @@ mod parallel;
 pub mod physics;
 pub mod prey;
 pub mod profiling;
+pub mod rules;
 pub mod simulator;
 pub mod spawn;
 pub mod transport;
 
 pub use boundary::{BoundaryMode, RadiusUpdate};
-pub use error::{Constraint, CoreStepError, ErrorCode, ErrorKind, SimError, WorldStatus};
+pub use error::{
+    Constraint, CoreStepError, ErrorCode, ErrorDetails, ErrorKind, SimError, WorldStatus,
+};
 pub use kiosk::KioskConfig;
 pub use model::*;
 pub use physics::{SpeedModel, SpeedState};
 pub use prey::{Prey, PreyConfig, PreyMode};
+pub use rules::{GeometricContext, WorldRules};
 pub use simulator::checkpoint::{Checkpoint, EventRecording, RestoreOptions};
 pub use simulator::{
     AmbientFoodConfig, BoostAccounting, BoostFoodConfig, Config, DeathFoodConfig, FoodSpawnEvent,

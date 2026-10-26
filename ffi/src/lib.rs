@@ -1,26 +1,27 @@
-//! `slither-sim-abi-v2`: a C ABI over [`slither_sim::transport::Session`].
+//! `slither-sim-abi-v3`: a C ABI over [`slither_sim::transport::Session`].
 //!
 //! `include/slither_sim.h` declares the API, and `tests/abi.rs` checks it
 //! against this crate. A panicking call returns [`SLITHER_PANICKED`] instead of unwinding;
-//! its session then accepts only [`slither_last_error`] and
+//! its session then accepts only [`slither_last_error`], [`slither_read_error`] and
 //! [`slither_session_free`].
 //!
 //! A session must not be used by two threads at once; separate sessions may
 //! run on separate threads.
 use slither_sim::transport::{FrameRef, Session, StepError};
+use slither_sim::{BoundaryMode, Constraint, SimError, WorldRules};
 use std::ffi::{CStr, CString, c_char};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::{ptr, slice};
 
 /// Increments with every incompatible change of this interface.
-pub const SLITHER_ABI_VERSION: u32 = 2;
+pub const SLITHER_ABI_VERSION: u32 = 3;
 
 pub const SLITHER_OK: i32 = 0;
 /// The session rejected the call and changed nothing.
 pub const SLITHER_REJECTED: i32 = 1;
 /// A required pointer was null; nothing changed.
 pub const SLITHER_INVALID: i32 = 2;
-/// An internal error; only [`slither_last_error`] and [`slither_session_free`]
+/// An internal error; only [`slither_last_error`], [`slither_read_error`] and [`slither_session_free`]
 /// remain valid.
 pub const SLITHER_PANICKED: i32 = 3;
 /// Advancement failed and cleared all worlds; reset to continue.
@@ -33,7 +34,62 @@ pub struct SlitherSession {
     reply: Vec<u8>,
     boosts: Vec<bool>,
     error: CString,
+    error_field: CString,
+    cause: Option<SimError>,
+    boundary_code: u32,
     poisoned: bool,
+}
+
+pub const SLITHER_BOUNDARY_SLIDING: u32 = 0;
+pub const SLITHER_BOUNDARY_HARD: u32 = 1;
+pub const SLITHER_RULE_HAS_PIT: u32 = 1;
+pub const SLITHER_RULE_HAS_MIN_SCORE: u32 = 2;
+pub const SLITHER_RULE_HAS_KILL_WINDOW: u32 = 4;
+pub const SLITHER_RULE_FREE_BOOST_AT_FLOOR: u32 = 8;
+pub const SLITHER_ERROR_HAS_WORLD: u32 = 1;
+pub const SLITHER_ERROR_HAS_SLOT: u32 = 2;
+pub const SLITHER_CAUSE_INVALID_POINTER: u32 = 18;
+pub const SLITHER_CAUSE_PANIC: u32 = 19;
+
+/// Inline, fixed-size geometric rules. Absent numeric members are zero.
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(C)]
+pub struct SlitherWorldRules {
+    pub boundary_mode: u32,
+    pub flags: u32,
+    pub pit_radius: f64,
+    pub min_score: u32,
+    pub kill_score_seconds: f64,
+}
+impl From<WorldRules> for SlitherWorldRules {
+    fn from(r: WorldRules) -> Self {
+        Self {
+            boundary_mode: match r.boundary_mode {
+                BoundaryMode::Sliding => SLITHER_BOUNDARY_SLIDING,
+                BoundaryMode::Hard => SLITHER_BOUNDARY_HARD,
+            },
+            flags: (u32::from(r.pit_radius.is_some()) * SLITHER_RULE_HAS_PIT)
+                | (u32::from(r.min_score.is_some()) * SLITHER_RULE_HAS_MIN_SCORE)
+                | (u32::from(r.kill_score_seconds.is_some()) * SLITHER_RULE_HAS_KILL_WINDOW)
+                | (u32::from(r.free_boost_at_floor) * SLITHER_RULE_FREE_BOOST_AT_FLOOR),
+            pit_radius: r.pit_radius.unwrap_or(0.),
+            min_score: r.min_score.unwrap_or(0),
+            kill_score_seconds: r.kill_score_seconds.unwrap_or(0.),
+        }
+    }
+}
+
+/// Error inspection; flags preserve full-range locations; zero rule/null field mean absent.
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct SlitherError {
+    pub code: u32,
+    pub rule: u32,
+    pub flags: u32,
+    pub world: usize,
+    pub slot: usize,
+    pub field: *const c_char,
+    pub message: *const c_char,
 }
 
 /// One world's current frame; see `slither_frame` in the header. Pointers of
@@ -91,6 +147,7 @@ pub struct SlitherFrame {
     pub death_killer: *const u32,
     pub death_reason: *const u8,
     pub death_food: *const u32,
+    pub rules: SlitherWorldRules,
 }
 
 impl From<FrameRef<'_>> for SlitherFrame {
@@ -147,14 +204,49 @@ impl From<FrameRef<'_>> for SlitherFrame {
             death_killer: d.killer.as_ptr(),
             death_reason: d.reason.as_ptr(),
             death_food: d.food.as_ptr(),
+            rules: f.rules.into(),
         }
     }
 }
 
-type Failure = (i32, String);
-
+struct Failure {
+    status: i32,
+    message: String,
+    cause: Option<Box<SimError>>,
+}
 fn invalid(what: &str) -> Failure {
-    (SLITHER_INVALID, format!("{what} is null"))
+    Failure {
+        status: SLITHER_INVALID,
+        message: format!("{what} is null"),
+        cause: None,
+    }
+}
+fn rejected(cause: SimError) -> Failure {
+    Failure {
+        status: SLITHER_REJECTED,
+        message: cause.to_string(),
+        cause: Some(Box::new(cause)),
+    }
+}
+impl SlitherSession {
+    fn clear_error(&mut self) {
+        if !self.error.is_empty() {
+            self.error = CString::default();
+        }
+        if !self.error_field.is_empty() {
+            self.error_field = CString::default();
+        }
+        self.cause = None;
+        self.boundary_code = 0;
+    }
+    fn record_error(&mut self, message: String, cause: Option<SimError>, boundary_code: u32) {
+        self.error = CString::new(message.replace('\0', " ")).expect("NULs replaced");
+        if let Some(field) = cause.as_ref().and_then(|e| e.field.as_deref()) {
+            self.error_field = CString::new(field.replace('\0', " ")).expect("NULs replaced");
+        }
+        self.cause = cause;
+        self.boundary_code = boundary_code;
+    }
 }
 
 /// `len` elements at `data`, which may be null only when `len` is 0.
@@ -185,19 +277,28 @@ unsafe fn with_session(
     if s.poisoned {
         return SLITHER_PANICKED;
     }
-    let (code, message) = match catch_unwind(AssertUnwindSafe(|| call(s))) {
-        Ok(Ok(())) => (SLITHER_OK, String::new()),
-        Ok(Err(failure)) => failure,
+    s.clear_error();
+    match catch_unwind(AssertUnwindSafe(|| call(s))) {
+        Ok(Ok(())) => SLITHER_OK,
+        Ok(Err(failure)) => {
+            let boundary = if failure.status == SLITHER_INVALID {
+                SLITHER_CAUSE_INVALID_POINTER
+            } else {
+                0
+            };
+            s.record_error(failure.message, failure.cause.map(|cause| *cause), boundary);
+            failure.status
+        }
         Err(_) => {
             s.poisoned = true;
-            (SLITHER_PANICKED, "Internal panic; free this session".into())
+            s.record_error(
+                "Internal panic; free this session".into(),
+                None,
+                SLITHER_CAUSE_PANIC,
+            );
+            SLITHER_PANICKED
         }
-    };
-    // Reuse an empty error after consecutive successes to avoid hot-path allocation.
-    if !(message.is_empty() && s.error.is_empty()) {
-        s.error = CString::new(message.replace('\0', " ")).expect("NULs were replaced");
     }
-    code
 }
 
 /// [`SLITHER_ABI_VERSION`] of this library.
@@ -216,6 +317,9 @@ pub extern "C" fn slither_session_new() -> *mut SlitherSession {
             reply: Vec::new(),
             boosts: Vec::new(),
             error: CString::default(),
+            error_field: CString::default(),
+            cause: None,
+            boundary_code: 0,
             poisoned: false,
         }))
     })
@@ -260,7 +364,11 @@ pub unsafe extern "C" fn slither_request(
             reply.write(ptr::null());
             reply_len.write(0);
             let line = elements(line, line_len, "line")?;
-            s.reply = s.session.request(line);
+            let (reply_bytes, cause) = s.session.request_with_cause(line);
+            s.reply = reply_bytes;
+            if let Some(error) = cause {
+                s.record_error(error.to_string(), Some(error.into_cause()), 0);
+            }
             let len = s.reply.len();
             s.reply.push(0);
             reply.write(s.reply.as_ptr());
@@ -289,12 +397,17 @@ pub unsafe extern "C" fn slither_step(
             let boosts = elements(boosts, boosts_len, "boosts")?;
             s.boosts.clear();
             s.boosts.extend(boosts.iter().map(|&boost| boost != 0));
-            s.session
-                .step(headings, &s.boosts)
-                .map_err(|error| match &error {
-                    StepError::Rejected(_) => (SLITHER_REJECTED, error.to_string()),
-                    StepError::Ended(_) => (SLITHER_ENDED, error.to_string()),
-                })
+            s.session.step(headings, &s.boosts).map_err(|error| {
+                let status = match &error {
+                    StepError::Rejected(_) => SLITHER_REJECTED,
+                    StepError::Ended(_) => SLITHER_ENDED,
+                };
+                Failure {
+                    status,
+                    message: error.to_string(),
+                    cause: Some(Box::new(error.into_cause())),
+                }
+            })
         })
     }
 }
@@ -314,14 +427,7 @@ pub unsafe extern "C" fn slither_read_frame(
             if frame.is_null() {
                 return Err(invalid("frame"));
             }
-            let columns = s.session.frame(world).ok_or_else(|| {
-                let error = if s.session.worlds() == 0 {
-                    "Reset first"
-                } else {
-                    "Unknown world"
-                };
-                (SLITHER_REJECTED, error.to_owned())
-            })?;
+            let columns = s.session.frame_checked(world).map_err(rejected)?;
             // SAFETY: non-null and writable by the caller's contract.
             frame.write(columns.into());
             Ok(())
@@ -362,6 +468,54 @@ pub unsafe extern "C" fn slither_last_error(session: *const SlitherSession) -> *
         Some(s) => s.error.as_ptr(),
         None => NULL_SESSION.as_ptr(),
     }
+}
+
+/// Inspect the latest request/step/frame cause without clearing it.
+/// JSON requests retain SLITHER_OK status; their embedded errors are inspectable here.
+///
+/// # Safety
+/// `session` is null or live; `error` is null or writable. Strings obey frame lifetimes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn slither_read_error(
+    session: *const SlitherSession,
+    error: *mut SlitherError,
+) -> i32 {
+    if error.is_null() {
+        return SLITHER_INVALID;
+    }
+    let Some(s) = (unsafe { session.as_ref() }) else {
+        unsafe {
+            error.write(SlitherError {
+                code: SLITHER_CAUSE_INVALID_POINTER,
+                rule: 0,
+                flags: 0,
+                world: 0,
+                slot: 0,
+                field: c"session".as_ptr(),
+                message: c"session is null".as_ptr(),
+            });
+        }
+        return SLITHER_INVALID;
+    };
+    let cause = s.cause.as_ref();
+    let value = SlitherError {
+        code: cause.map_or(s.boundary_code, |e| e.code() as u32),
+        rule: cause.and_then(SimError::rule).map_or(0, Constraint::code),
+        flags: (u32::from(cause.is_some_and(|e| e.world.is_some())) * SLITHER_ERROR_HAS_WORLD)
+            | (u32::from(cause.is_some_and(|e| e.slot.is_some())) * SLITHER_ERROR_HAS_SLOT),
+        world: cause.and_then(|e| e.world).unwrap_or(0),
+        slot: cause.and_then(|e| e.slot).unwrap_or(0),
+        field: if cause.is_some_and(|e| e.field.is_some()) {
+            s.error_field.as_ptr()
+        } else {
+            ptr::null()
+        },
+        message: s.error.as_ptr(),
+    };
+    unsafe {
+        error.write(value);
+    }
+    SLITHER_OK
 }
 
 #[cfg(test)]

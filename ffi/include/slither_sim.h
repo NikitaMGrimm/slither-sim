@@ -1,5 +1,5 @@
 /*
- * slither-sim-abi-v2: a C ABI over slither-sim transport sessions.
+ * slither-sim-abi-v3: a C ABI over slither-sim transport sessions.
  *
  * Guide: https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/c-api.md
  * Written by hand from ffi/src/lib.rs; ffi/tests/abi.rs checks that this
@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-#define SLITHER_ABI_VERSION 2u
+#define SLITHER_ABI_VERSION 3u
 
 /* Status codes. */
 #define SLITHER_OK 0
@@ -26,7 +26,7 @@ extern "C" {
 #define SLITHER_REJECTED 1
 /* A required pointer was null; nothing changed. */
 #define SLITHER_INVALID 2
-/* An internal error; only slither_last_error and slither_session_free remain valid. */
+/* An internal error; only slither_last_error, slither_read_error and slither_session_free remain valid. */
 #define SLITHER_PANICKED 3
 /* Advancement failed and cleared all worlds; reset to continue. */
 #define SLITHER_ENDED 4
@@ -51,6 +51,67 @@ typedef struct slither_session slither_session;
  * pointers of empty columns must not be dereferenced. Pointers stay valid
  * until the next call that takes the session.
  */
+#define SLITHER_BOUNDARY_SLIDING 0
+#define SLITHER_BOUNDARY_HARD 1
+#define SLITHER_RULE_HAS_PIT 1
+#define SLITHER_RULE_HAS_MIN_SCORE 2
+#define SLITHER_RULE_HAS_KILL_WINDOW 4
+#define SLITHER_RULE_FREE_BOOST_AT_FLOOR 8
+#define SLITHER_CAUSE_NONE 0
+#define SLITHER_CAUSE_INVALID_REQUEST 1
+#define SLITHER_CAUSE_INVALID_CONFIG 2
+#define SLITHER_CAUSE_ACTION_SHAPE 3
+#define SLITHER_CAUSE_INVALID_ACTION 4
+#define SLITHER_CAUSE_UNKNOWN_SLOT 5
+#define SLITHER_CAUSE_UNKNOWN_WORLD 6
+#define SLITHER_CAUSE_UNKNOWN_ENTITY 7
+#define SLITHER_CAUSE_DUPLICATE_ID 8
+#define SLITHER_CAUSE_INVALID_STATE 9
+#define SLITHER_CAUSE_PLACEMENT_EXHAUSTED 10
+#define SLITHER_CAUSE_NOT_RESET 11
+#define SLITHER_CAUSE_WORLD_STOPPED 12
+#define SLITHER_CAUSE_UNSUPPORTED_CHECKPOINT 13
+#define SLITHER_CAUSE_INVALID_CHECKPOINT 14
+#define SLITHER_CAUSE_NUMERIC_OVERFLOW 15
+#define SLITHER_CAUSE_REPRESENTATION_LIMIT 16
+#define SLITHER_CAUSE_ALLOCATION_FAILED 17
+#define SLITHER_CONSTRAINT_NONE 0
+#define SLITHER_CONSTRAINT_MISSING 1
+#define SLITHER_CONSTRAINT_NON_FINITE 2
+#define SLITHER_CONSTRAINT_NEGATIVE 3
+#define SLITHER_CONSTRAINT_NON_POSITIVE 4
+#define SLITHER_CONSTRAINT_OUT_OF_RANGE 5
+#define SLITHER_CONSTRAINT_LENGTH_MISMATCH 6
+#define SLITHER_CONSTRAINT_DUPLICATE 7
+#define SLITHER_CONSTRAINT_ORDERING 8
+#define SLITHER_CONSTRAINT_OUTSIDE_ARENA 9
+#define SLITHER_CONSTRAINT_INCONSISTENT_STATE 10
+#define SLITHER_ERROR_HAS_WORLD 1
+#define SLITHER_ERROR_HAS_SLOT 2
+#define SLITHER_CAUSE_INVALID_POINTER 18
+#define SLITHER_CAUSE_PANIC 19
+
+typedef struct slither_world_rules {
+    uint32_t boundary_mode;
+    uint32_t flags;
+    double pit_radius;
+    uint32_t min_score;
+    double kill_score_seconds;
+} slither_world_rules;
+
+/* code 0 means no error; rule 0 and NULL field mean absent.
+ * Location flags distinguish absent values from every valid size_t value.
+ * Strings remain valid until the next request/step/frame read on this session. */
+typedef struct slither_error {
+    uint32_t code;
+    uint32_t rule;
+    uint32_t flags;
+    size_t world;
+    size_t slot;
+    const char *field;
+    const char *message;
+} slither_error;
+
 typedef struct slither_frame {
     double time;
     double radius;
@@ -112,6 +173,7 @@ typedef struct slither_frame {
     const uint32_t *death_killer;
     const uint8_t *death_reason;
     const uint32_t *death_food;
+    slither_world_rules rules;
 } slither_frame;
 
 /* SLITHER_ABI_VERSION of the loaded library. */
@@ -124,7 +186,7 @@ slither_session *slither_session_new(void);
 void slither_session_free(slither_session *session);
 
 /*
- * Answers one slither-sim-json-v4 request line of line_len bytes, without its
+ * Answers one slither-sim-json-v5 request line of line_len bytes, without its
  * newline, as `slither-sim serve` would. Rejected requests still succeed with
  * an error reply. *reply receives line bytes without a newline, followed by a
  * NUL that *reply_len excludes, valid until the next call that takes the
@@ -156,6 +218,9 @@ size_t slither_agents(const slither_session *session);
  * takes the session.
  */
 const char *slither_last_error(const slither_session *session);
+
+/* Read the latest cause without clearing it, including embedded JSON errors. */
+int32_t slither_read_error(const slither_session *session, slither_error *error);
 
 #ifdef __cplusplus
 }
