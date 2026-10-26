@@ -2,6 +2,82 @@
 
 ## Unreleased
 
+## [0.5.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.4.0...v0.5.0) - 2026-10-26
+
+### Added
+
+- *(api)* [**breaking**] encapsulate simulator state and type initialization ([#136](https://github.com/NikitaMGrimm/slither-sim/pull/136))
+- *(host)* [**breaking**] group host settings by players and bots ([#137](https://github.com/NikitaMGrimm/slither-sim/pull/137))
+- *(bot)* wire default A4 policy into runtime clients ([#129](https://github.com/NikitaMGrimm/slither-sim/pull/129))
+- *(client)* make responsive delivery the default ([#131](https://github.com/NikitaMGrimm/slither-sim/pull/131))
+- *(bot)* make adopted A4 policy the default ([#130](https://github.com/NikitaMGrimm/slither-sim/pull/130))
+- *(api)* [**breaking**] add validated core checkpoints ([#128](https://github.com/NikitaMGrimm/slither-sim/pull/128))
+- *(bot)* port frozen Forager policy and adapter ([#124](https://github.com/NikitaMGrimm/slither-sim/pull/124))
+- *(api)* [**breaking**] add typed core failure causes ([#121](https://github.com/NikitaMGrimm/slither-sim/pull/121))
+- *(battledome)* queue safe outer-band spawns ([#113](https://github.com/NikitaMGrimm/slither-sim/pull/113))
+- *(client)* add responsive delivery profiles ([#106](https://github.com/NikitaMGrimm/slither-sim/pull/106))
+- *(host)* show pit edges with decorative pellets ([#102](https://github.com/NikitaMGrimm/slither-sim/pull/102))
+- *(host)* [**breaking**] follow measured official packet timing and network path ([#85](https://github.com/NikitaMGrimm/slither-sim/pull/85))
+- *(fidelity)* add transport parity measurement gates ([#84](https://github.com/NikitaMGrimm/slither-sim/pull/84))
+- [**breaking**] add Battledome rules and configurable mass floors ([#75](https://github.com/NikitaMGrimm/slither-sim/pull/75))
+- [**breaking**] make every limit a real bound, a warning or a named policy ([#77](https://github.com/NikitaMGrimm/slither-sim/pull/77))
+
+### Fixed
+
+- *(runtime)* keep official prey density when sizing worlds ([#138](https://github.com/NikitaMGrimm/slither-sim/pull/138))
+- *(simulator)* hold official arena radius by default ([#134](https://github.com/NikitaMGrimm/slither-sim/pull/134))
+- *(client)* preserve native state on rejected I/O ([#126](https://github.com/NikitaMGrimm/slither-sim/pull/126))
+- *(host)* leave room for a full message behind an unflushed batch ([#123](https://github.com/NikitaMGrimm/slither-sim/pull/123))
+- correct prey replenishment and batched pickup ([#117](https://github.com/NikitaMGrimm/slither-sim/pull/117))
+- correct simulator construction and spawn admission ([#116](https://github.com/NikitaMGrimm/slither-sim/pull/116))
+- *(host)* isolate client failures and bound poll work ([#112](https://github.com/NikitaMGrimm/slither-sim/pull/112))
+- *(client)* schedule pending commands and guard latency clocks ([#114](https://github.com/NikitaMGrimm/slither-sim/pull/114))
+- *(kiosk)* preserve pending growth during shrinkage ([#115](https://github.com/NikitaMGrimm/slither-sim/pull/115))
+- *(host)* bound crowded spawn admission work ([#110](https://github.com/NikitaMGrimm/slither-sim/pull/110))
+- limit Battledome food inflation ([#107](https://github.com/NikitaMGrimm/slither-sim/pull/107))
+- *(api)* [**breaking**] repair client contracts and session state ([#103](https://github.com/NikitaMGrimm/slither-sim/pull/103))
+- *(host)* admit crowded joins and size dynamic arenas for every seat ([#98](https://github.com/NikitaMGrimm/slither-sim/pull/98))
+
+### Other
+
+- *(changelog)* final pass on the v0.5.0 notes ([#141](https://github.com/NikitaMGrimm/slither-sim/pull/141))
+- *(host)* retry the first accept in the fragmented-upgrade test ([#139](https://github.com/NikitaMGrimm/slither-sim/pull/139))
+- adopt S-shaped snake branding ([#135](https://github.com/NikitaMGrimm/slither-sim/pull/135))
+- *(bot)* skip irrelevant occupancy and losing clearance scans ([#132](https://github.com/NikitaMGrimm/slither-sim/pull/132))
+- fix inconsistent precision and checkpoint guidance ([#133](https://github.com/NikitaMGrimm/slither-sim/pull/133))
+- *(changelog)* tighten unreleased notes ([#127](https://github.com/NikitaMGrimm/slither-sim/pull/127))
+- state the circular spawn search budget ([#125](https://github.com/NikitaMGrimm/slither-sim/pull/125))
+- *(host)* reduce recipient bookkeeping and frame copies ([#122](https://github.com/NikitaMGrimm/slither-sim/pull/122))
+- clarify the performance workload guide ([#120](https://github.com/NikitaMGrimm/slither-sim/pull/120))
+- use clean near-server timing references ([#119](https://github.com/NikitaMGrimm/slither-sim/pull/119))
+- *(research)* measure native Linux host capacity and CPU costs ([#118](https://github.com/NikitaMGrimm/slither-sim/pull/118))
+- *(research)* record verified remote timing study ([#111](https://github.com/NikitaMGrimm/slither-sim/pull/111))
+- cover Battledome spawn admission ([#109](https://github.com/NikitaMGrimm/slither-sim/pull/109))
+- remove timing races in the spin and pit-marker tests ([#105](https://github.com/NikitaMGrimm/slither-sim/pull/105))
+- final writing pass over README, changelog and doc comments ([#100](https://github.com/NikitaMGrimm/slither-sim/pull/100))
+- tighten performance and maintainer guides ([#99](https://github.com/NikitaMGrimm/slither-sim/pull/99))
+- *(interfaces)* share action validation and CLI exit handling ([#97](https://github.com/NikitaMGrimm/slither-sim/pull/97))
+- *(examples)* simplify portable bots and add a cautious seeker ([#89](https://github.com/NikitaMGrimm/slither-sim/pull/89))
+- *(client)* split simulation by ownership ([#96](https://github.com/NikitaMGrimm/slither-sim/pull/96))
+- *(client)* clarify host delivery and connection setup ([#95](https://github.com/NikitaMGrimm/slither-sim/pull/95))
+- *(client)* clarify protocol and receipt bookkeeping ([#93](https://github.com/NikitaMGrimm/slither-sim/pull/93))
+- tighten user guides and link canonical details ([#90](https://github.com/NikitaMGrimm/slither-sim/pull/90))
+- tighten contributor and research process guides ([#92](https://github.com/NikitaMGrimm/slither-sim/pull/92))
+- tighten interface guides and unreleased notes ([#91](https://github.com/NikitaMGrimm/slither-sim/pull/91))
+- *(core)* simplify cached state helpers ([#94](https://github.com/NikitaMGrimm/slither-sim/pull/94))
+- clarify Battledome rules and current host behavior ([#88](https://github.com/NikitaMGrimm/slither-sim/pull/88))
+- [**breaking**] require Rust 1.99 ([#87](https://github.com/NikitaMGrimm/slither-sim/pull/87))
+- *(host)* hand socket players' frames over before encoding bots' frames ([#86](https://github.com/NikitaMGrimm/slither-sim/pull/86))
+- *(performance)* compare published releases with pinned candidates ([#82](https://github.com/NikitaMGrimm/slither-sim/pull/82))
+- *(performance)* publish progress and retain merged PR evidence ([#81](https://github.com/NikitaMGrimm/slither-sim/pull/81))
+- *(pr-report)* add a manual A/A calibration pilot ([#79](https://github.com/NikitaMGrimm/slither-sim/pull/79))
+- *(pr-report)* replace the heuristic with an error-controlled comparison ([#78](https://github.com/NikitaMGrimm/slither-sim/pull/78))
+- *(observation)* trim food grid rows to the vision circle ([#76](https://github.com/NikitaMGrimm/slither-sim/pull/76))
+- *(release)* attach prebuilt CLI and C ABI archives to releases ([#72](https://github.com/NikitaMGrimm/slither-sim/pull/72))
+- *(package)* exclude maintainer-only crate payload ([#73](https://github.com/NikitaMGrimm/slither-sim/pull/73))
+- *(release)* publish the Python package to PyPI ([#71](https://github.com/NikitaMGrimm/slither-sim/pull/71))
+- add weekly extended checks and monthly action updates ([#68](https://github.com/NikitaMGrimm/slither-sim/pull/68))
+
 ### Breaking
 
 - Host settings are grouped: `maxClients` → `players.max`, `bots` →
