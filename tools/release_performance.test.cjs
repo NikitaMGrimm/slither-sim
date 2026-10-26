@@ -20,6 +20,14 @@ test('consolidation preserves missing, failed, undecided and every outcome label
   assert.match(body,/percentages are never summed/);
   assert.match(body,/do not measure the accumulated shipped-tree change/);
 });
+test('new host metrics and redefined outcomes preserve their meaning without erasing historical canaries',()=>{
+  const row=release.evidence(pr,[comment({state:'complete',outcomes:[{case:'host-official-500',label:'Redefined'}],
+    metrics:[{case:'host-official-500',label:'Redefined',metric:'cpuSeconds',change:null,interval:null}]})]);
+  const body=release.render({baseline:{tag_name:'v0.3.1',html_url:'https://example.invalid/release',commit:base},candidate,rows:[row]});
+  assert.match(body,/Redefined 1/);
+  assert.match(body,/`host-official-500` \(CPU\): Redefined \(head only; see source\)/);
+  assert.doesNotMatch(body,/Redefined \(interval unavailable\)/);
+});
 test('bot-generated release refresh updates only its separately owned comment and deduplicates',async()=>{
   const target={number:30,state:'open',user:bot,head:{sha:candidate,repo:{full_name:'owner/repo'},ref:'release-plz-main'},base:{ref:'main'}};
   const own=[],calls=[];

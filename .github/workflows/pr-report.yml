@@ -17,6 +17,7 @@ on:
       - rust-toolchain
       - rust-toolchain.toml
       - examples/perf_baseline.rs
+      - examples/host_load.rs
       - examples/perf_observation.rs
       - examples/perf_client_retained.rs
       - examples/support/state.rs

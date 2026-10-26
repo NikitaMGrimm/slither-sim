@@ -4,15 +4,31 @@
 
 ### Added
 
-- Python `Session.config` returns the resolved world config of the last reset
-  as a new camelCase dict, matching a JSON reset reply's `config`
-  ([Python](docs/python.md#api)).
+- PR comparisons focus timing on two regression canaries, official workloads and
+  500/80-client socket hosts, retain ten state traces, and run both runtimes with
+  the head workload configuration. Manual calibration retains CPU/wall noise.
 
 ### Changed
 
 - Host broadcasts share conservative prey visibility bounds across recipients,
   retaining the original distance check and packet order
   ([local measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-prey-visibility/REPORT.md)).
+
+## [0.6.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.0...v0.6.1) - 2026-10-26
+
+### Added
+
+- [Linux hosting guide](docs/hosting.md): release install, systemd service,
+  optional TLS proxy, join check, updates and resource use.
+- Python `Session.config` returns the resolved world config of the last reset
+  as a new camelCase dict, matching a JSON reset reply's `config`
+  ([Python](docs/python.md#api)).
+
+### Performance
+
+- Host broadcasts visit only the snakes each recipient already knows instead of
+  every world slot, with byte-identical output: about 6% less host CPU per tick
+  with 500 clients in the [single-core measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-known-slots/REPORT.md).
 
 ## [0.6.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.5.0...v0.6.0) - 2026-10-26
 

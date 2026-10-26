@@ -1,0 +1,63 @@
+{
+  "metric": "whole-process instructions:u, including construction and internal warmup; no real sockets or kernel work",
+  "decisions": 100,
+  "measuredPairs": 3,
+  "workloads": {
+    "client-official-500": {
+      "baseMedianInstructions": 24336716778,
+      "candidateMedianInstructions": 23428138141,
+      "pairedRatios": [
+        0.9626692924074196,
+        0.962589170908878,
+        0.9626663429875084
+      ],
+      "medianPairedRatio": 0.9626663429875084,
+      "pairedRatioRange": [
+        0.962589170908878,
+        0.9626692924074196
+      ]
+    },
+    "client-battledome-40": {
+      "baseMedianInstructions": 36544564591,
+      "candidateMedianInstructions": 36496958260,
+      "pairedRatios": [
+        0.9986983104134954,
+        0.9987128298140516,
+        0.9986829110241615
+      ],
+      "medianPairedRatio": 0.9986983104134954,
+      "pairedRatioRange": [
+        0.9986829110241615,
+        0.9987128298140516
+      ]
+    },
+    "client-battledome-64": {
+      "baseMedianInstructions": 80771727007,
+      "candidateMedianInstructions": 80687415710,
+      "pairedRatios": [
+        0.9989779846491968,
+        0.9989703033403956,
+        0.9989561781068184
+      ],
+      "medianPairedRatio": 0.9989703033403956,
+      "pairedRatioRange": [
+        0.9989561781068184,
+        0.9989779846491968
+      ]
+    },
+    "client-battledome-80": {
+      "baseMedianInstructions": 109321275754,
+      "candidateMedianInstructions": 109198668019,
+      "pairedRatios": [
+        0.9988568400951995,
+        0.9988901016084933,
+        0.9988784641035849
+      ],
+      "medianPairedRatio": 0.9988784641035849,
+      "pairedRatioRange": [
+        0.9988568400951995,
+        0.9988901016084933
+      ]
+    }
+  }
+}

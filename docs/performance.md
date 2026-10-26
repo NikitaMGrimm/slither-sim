@@ -69,7 +69,7 @@ worktrees are removed afterward.
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | Complete, with equal traces. |
+| 0 | Complete, with equal deterministic traces; socket rows are explicitly untraced. |
 | 3 | Complete, with changed traces or workload definitions; timings are labeled behavior-changed. |
 | 1 | Incomplete; inspect `failure.json`, logs and retained partial outputs. |
 

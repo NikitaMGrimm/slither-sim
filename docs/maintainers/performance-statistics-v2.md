@@ -68,3 +68,27 @@ without waiting for unused publication slots.
 
 The [reporting guide](pr-reports.md#publishing-and-permissions) describes trusted
 publication, failure withdrawal, postmerge identity and release consolidation.
+
+## PR metric extension
+
+New PR plans use `slither-perf-sequential-v3`; direct release comparisons retain
+v2. Paired analysis, order, error allocation, covered looks and ±5% band above are
+unchanged. Six timing rows consume six of ten reserved slots; unused slots lend
+no allocation. Ten deterministic trace checks remain separate.
+
+The fixed metric is whole-host process CPU per completed physics tick for
+`host-official-500`, simulation busy wall per tick for `host-battledome-80`, and
+operation wall for deterministic rows. Socket counts normalize to the requested
+operation count; actual tick counts remain raw. Host CPU covers simulation and
+gateway threads, excluding the separate driver. CPU rows retain their busy-wall
+values in Details. Plans pin the metric before any comparison pair; missing CPU
+is a failed measurement, never a switch to wall mid-run.
+
+The manual calibration workflow's `Host` group takes six balanced same-binary A/A
+pairs per current row after one discarded warmup pair, sockets first, bounded to
+240 seconds. CPU/wall log residual SDs describe those samples, not confidence
+guarantees or model validation. The pilot cannot change a routine PR's metric.
+Failures/incomplete cells remain and are not retried within the pilot. Counter
+probes preserve errors without changing runner permissions. See the
+[row audit](../../research/performance/2026-10-26-pr-report-audit/REPORT.md) for the
+observed results, failed attempts and fixed metric decision.

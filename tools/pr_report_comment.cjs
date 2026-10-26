@@ -144,10 +144,13 @@ async function publish({ github, context, core, directory, expectedSequence, una
 }
 
 function headlines(rows) {
-  return ['step-default', 'official-100-bot'].map(name => {
+  // Retain the historical canary for old artifacts while new reports headline
+  // the host path. The summary never substitutes one workload's percentage.
+  return ['host-official-500', 'step-default', 'official-100-bot'].map(name => {
     const row = rows.find(r => r.case === name);
     return { case: name, label: row?.label || 'Unavailable', n: row?.n_used || 0,
-      change: row?.result?.change_percent ?? null, interval: row?.result?.interval_percent ?? null };
+      change: row?.result?.change_percent ?? null, interval: row?.result?.interval_percent ?? null,
+      metric: row?.result?.metric ?? 'wallSeconds' };
   });
 }
 
