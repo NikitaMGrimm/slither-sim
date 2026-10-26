@@ -16,9 +16,9 @@ use std::{
 /// Messages in flight per direction of one connection before the run fails.
 /// A local resource budget; the protocol has no such field.
 pub(super) const MAX_IN_FLIGHT: usize = 4096;
-/// Fit the host's 1 MiB send buffer and native client's message limit, leaving
-/// room for the largest unmasked WebSocket header.
-const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
+/// Fit the native client's 1 MiB message limit, leaving room for the largest
+/// unmasked WebSocket header.
+pub(super) const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
 /// Retained wire bytes per slot before the run fails; drain to continue. Each
 /// record also counts a fixed overhead so empty events stay bounded. A local
 /// resource budget.

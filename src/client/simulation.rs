@@ -24,6 +24,8 @@ const SPAWN_ATTEMPTS: usize = 64;
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
 /// the rest of `connection::MAX_IN_FLIGHT` for broadcasts while the host drains.
 pub(super) const REMOTE_IN_FLIGHT: usize = connection::MAX_IN_FLIGHT / 2;
+/// Largest framed message a connection is sent.
+pub(super) const MAX_FRAME_BYTES: usize = connection::MAX_FRAME_BYTES;
 /// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
 /// leaderboard's u16 rank and living population must also count every snake.
 pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
