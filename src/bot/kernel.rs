@@ -578,6 +578,7 @@ pub(super) fn decide(
                         me.safe,
                         goal.crosses,
                         Some(ramp),
+                        |clearance| clearance < me.safe,
                     ) >= me.safe
                 })
         });
@@ -653,6 +654,7 @@ pub(super) fn decide(
                 me.safe,
                 goal.crosses,
                 None,
+                |clearance| clearance < me.safe,
             ) >= me.safe
         });
         if !any_clear {
@@ -2006,8 +2008,9 @@ fn to_tip(path: &mut [(Point, f64)], me: &Me, p: &Params) {
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
 /// capped at `cap`. Only clearance below `safe` changes a cost, so callers pass
 /// `safe` and obstacles that provably cannot lower the running minimum are
-/// skipped; the result equals `min(cap, exact clearance)`. With `ramp` the
-/// arc accelerates to boost speed.
+/// skipped. `stop` may accept a partial minimum once further decreases cannot
+/// change the caller's decision; otherwise the result is the exact capped
+/// clearance. With `ramp` the arc accelerates to boost speed.
 #[allow(clippy::too_many_arguments)]
 fn clearance(
     o: &Observation,
@@ -2018,6 +2021,7 @@ fn clearance(
     cap: f64,
     crosses: Option<usize>,
     ramp: Option<&[f64; RAMP_SUBSTEPS]>,
+    stop: impl Fn(f64) -> bool,
 ) -> f64 {
     let (mut path, points, rim_heading) = arc(me, p, heading, ramp);
     let path = &mut path[..points];
@@ -2044,6 +2048,9 @@ fn clearance(
     }
     let arcs = &arcs[..points - 1];
     for obstacle in near {
+        if stop(clearance) {
+            break;
+        }
         // A cut-off crosses ahead of its victim's head by design: check the
         // arc against where the head has been by each moment, not its whole
         // path.
@@ -2149,7 +2156,12 @@ fn search(
             break;
         }
         let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp);
+        // The minimum can only decrease, so this exact cost expression can
+        // only increase. Equal costs keep the earlier arc. A stopped arc
+        // therefore cannot replace best (including its exact clearance).
+        let loses =
+            |clearance: f64| offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight >= best.0;
+        let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp, loses);
         let mut cost = offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight;
         // The exit cost only adds, so skip it where the arc already loses.
         if p.exit_weight > 0.0 && cost < best.0 {
@@ -2383,6 +2395,110 @@ mod tests {
             sweep_bounds: (Point::default(), Point::default()),
             pickup_radius: 0.0,
             uncertainty: 0.0,
+        }
+    }
+
+    #[test]
+    fn clearance_stops_at_a_cost_tie_before_a_later_obstacle() {
+        let o = lone();
+        let p = Params::default();
+        let mut me = Me::new(&o.me);
+        me.safe = p.safe;
+        let obstacles = [
+            Obstacle::new(me.head, me.head, 10.0, 0, false),
+            Obstacle::new(me.head, me.head, 20.0, 1, false),
+        ];
+        let cost = |c: f64| 0.3 + (me.safe - c).max(0.0) * p.danger_weight;
+        let beaten = cost(-10.0);
+        let stopped = clearance(&o, &me, &p, &obstacles, 0.0, me.safe, None, None, |c| {
+            cost(c) >= beaten
+        });
+        let complete = clearance(&o, &me, &p, &obstacles, 0.0, me.safe, None, None, |_| false);
+        assert_eq!(stopped.to_bits(), (-10.0_f64).to_bits());
+        assert_eq!(complete.to_bits(), (-20.0_f64).to_bits());
+        assert_eq!(cost(stopped), beaten);
+        assert!(cost(complete) > beaten);
+    }
+
+    #[test]
+    fn pruned_search_matches_exhaustive_fan_costs_bit_for_bit() {
+        let mut seed = 0xd8a4_2910_32cf_765b;
+        for p in [
+            Params::default(),
+            crate::bot::params::A1,
+            crate::bot::params::A4_MEAN,
+        ] {
+            for case in 0..128 {
+                let mut o = lone();
+                o.me.head.x = lcg(&mut seed) * 3000.0;
+                o.me.heading = lcg(&mut seed) * std::f64::consts::TAU;
+                let mut me = Me::new(&o.me);
+                me.safe = p.safe + p.safe_width_factor * me.width;
+                let near: Vec<_> = (0..48)
+                    .map(|i| {
+                        let from = Point {
+                            x: me.head.x + (lcg(&mut seed) - 0.5) * 800.0,
+                            y: (lcg(&mut seed) - 0.5) * 800.0,
+                        };
+                        let to = Point {
+                            x: from.x + (lcg(&mut seed) - 0.5) * 200.0,
+                            y: from.y + (lcg(&mut seed) - 0.5) * 200.0,
+                        };
+                        Obstacle::new(from, to, lcg(&mut seed) * 80.0, i, i % 3 == 0)
+                            .during(0.0, p.lookahead_seconds)
+                    })
+                    .collect();
+                let goal = Goal {
+                    heading: lcg(&mut seed) * std::f64::consts::TAU,
+                    rate: 1.0,
+                    boost: false,
+                    crosses: (case % 5 == 0).then_some(0),
+                };
+                let ramp = (case % 4 == 0).then(|| me.boost_ramp());
+                let max_offset = if case % 3 == 0 {
+                    BOOST_MAX_OFFSET
+                } else {
+                    f64::INFINITY
+                };
+                let actual = search(&o, &me, &p, &near, &near, &goal, ramp.as_ref(), max_offset);
+                // Score every eligible arc and every exit in full, without
+                // offset/cost pruning or the losing-clearance shortcut.
+                let mut expected = (f64::INFINITY, goal.heading, f64::NEG_INFINITY, 0.0);
+                for &offset in p.fan[..p.fan_len].iter().filter(|o| o.abs() < max_offset) {
+                    let heading = goal.heading + offset;
+                    let c = clearance(
+                        &o,
+                        &me,
+                        &p,
+                        &near,
+                        heading,
+                        me.safe,
+                        goal.crosses,
+                        ramp.as_ref(),
+                        |_| false,
+                    );
+                    let mut cost = offset.abs() + (me.safe - c).max(0.0) * p.danger_weight;
+                    if p.exit_weight > 0.0 {
+                        let (path, points, _) = arc(&me, &p, heading, ramp.as_ref());
+                        let (end, end_heading) = path[points - 1];
+                        cost = blocked_exits(
+                            &o,
+                            &me,
+                            &p,
+                            &near,
+                            end,
+                            end_heading,
+                            cost,
+                            f64::INFINITY,
+                        );
+                    }
+                    if cost < expected.0 {
+                        expected = (cost, heading, c, offset);
+                    }
+                }
+                let bits = |(a, b, c, d): (f64, f64, f64, f64)| [a, b, c, d].map(f64::to_bits);
+                assert_eq!(bits(actual), bits(expected), "case {case}");
+            }
         }
     }
 
