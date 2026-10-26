@@ -114,6 +114,80 @@ fn make_bot(name: &str) -> ForagerBot {
     })
 }
 
+/// Opt-in, offline replay timing. Decode and allocate before warm-up; keep file
+/// I/O outside the timed loop. Run only on a quiet, pinned measurement host.
+#[test]
+#[ignore = "explicit FORAGER_REPLAY_OUTPUT and isolated measurement host required"]
+fn replay_benchmark() {
+    use std::{hint::black_box, io::Write, time::Instant};
+
+    let output = std::env::var("FORAGER_REPLAY_OUTPUT").expect("fresh CSV output path");
+    let policy = std::env::var("FORAGER_REPLAY_POLICY").unwrap_or_else(|_| "A1".into());
+    assert!(["A1", "A4-mean"].contains(&policy.as_str()));
+    let suite = std::env::var("FORAGER_REPLAY_SUITE").unwrap_or_else(|_| "all".into());
+    assert!(["all", "dense"].contains(&suite.as_str()));
+    let rounds: usize = std::env::var("FORAGER_REPLAY_ROUNDS")
+        .unwrap_or_else(|_| "2000".into())
+        .parse()
+        .unwrap();
+    assert!(rounds > 0);
+    let fixture = fixture();
+    let frames: Vec<(String, crate::client::ClientFrame)> = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|case| {
+            (
+                case["id"].as_str().unwrap().to_owned(),
+                serde_json::from_value::<crate::client::ClientFrame>(decode(&case["frame"]))
+                    .unwrap(),
+            )
+        })
+        .filter(|(_, frame)| {
+            frame.contract == crate::client::CONTRACT
+                && frame.status == crate::client::ClientStatus::Playing
+                && frame.observation.as_ref().is_some_and(|o| {
+                    suite == "all" || o.opponents.iter().map(|s| s.body.len()).sum::<usize>() >= 512
+                })
+        })
+        .collect();
+    assert!(!frames.is_empty());
+    let mut output = std::io::BufWriter::new(
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(output)
+            .unwrap(),
+    );
+    let mut bot = make_bot(&policy);
+    let mut samples = Vec::with_capacity(rounds.checked_mul(frames.len()).unwrap());
+    for _ in 0..200 {
+        for (_, frame) in &frames {
+            black_box(bot.decide(black_box(frame)));
+        }
+    }
+    for _ in 0..rounds {
+        for (_, frame) in &frames {
+            let start = Instant::now();
+            let result = black_box(bot.decide(black_box(frame))).unwrap();
+            let nanos = start.elapsed().as_nanos();
+            samples.push((nanos, result.heading.to_bits(), result.boost));
+        }
+    }
+    writeln!(output, "round,case,ns,heading_bits,boost").unwrap();
+    for (i, &(nanos, heading, boost)) in samples.iter().enumerate() {
+        writeln!(
+            output,
+            "{},{},{nanos},{heading:016x},{boost}",
+            i / frames.len(),
+            frames[i % frames.len()].0
+        )
+        .unwrap();
+    }
+    output.flush().unwrap();
+    eprintln!("{policy} {suite}: {} cases, {rounds} rounds", frames.len());
+}
+
 fn check_structure(frame: &crate::client::ClientFrame, result: Option<Action>) {
     let playing = frame.contract == crate::client::CONTRACT
         && frame.status == crate::client::ClientStatus::Playing
