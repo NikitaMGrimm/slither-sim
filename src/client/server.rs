@@ -42,7 +42,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tungstenite::{
-    HandshakeError, Message, WebSocket,
+    Bytes, HandshakeError, Message, WebSocket,
     handshake::{
         MidHandshake,
         server::{ErrorResponse, Request, Response, ServerHandshake},
@@ -1225,7 +1225,7 @@ impl<S: io::Read + io::Write> Open<S> {
             (Phase::Hello { .. }, [99, 0]) => {
                 self.phase = Phase::Reply;
                 let challenge = gate.challenge.clone();
-                self.send(&challenge)
+                self.send(challenge)
             }
             (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(gate, bytes),
             (Phase::Hello { .. }, _) => Err("Expected a login request".into()),
@@ -1290,7 +1290,7 @@ impl<S: io::Read + io::Write> Open<S> {
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
             }
-            if let Err(reason) = self.send(&message) {
+            if let Err(reason) = self.send(message) {
                 self.reject(gate, now, &reason);
                 break;
             }
@@ -1299,19 +1299,18 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     /// Queue one elapsed-framed message with this connection's header.
-    fn send(&mut self, framed: &[u8]) -> Result<(), String> {
-        let payload = &framed[2..];
-        let bytes = match &mut self.framing {
-            Framing::Elapsed => framed.to_vec(),
-            Framing::Bare => payload.to_vec(),
-            Framing::Sequence(next) => {
-                let mut bytes = next.to_be_bytes().to_vec();
-                *next = next.wrapping_add(1);
-                bytes.extend(payload);
-                bytes
-            }
-        };
-        match self.socket.write(Message::Binary(bytes.into())) {
+    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), String> {
+        if let Framing::Sequence(next) = &mut self.framing {
+            framed[..2].copy_from_slice(&next.to_be_bytes());
+            *next = next.wrapping_add(1);
+        }
+        // The delivery queue owns this allocation. Keep it through tungstenite;
+        // bare framing can also drop its header by slicing the owned bytes.
+        let mut bytes = Bytes::from(framed);
+        if self.framing == Framing::Bare {
+            bytes = bytes.slice(2..);
+        }
+        match self.socket.write(Message::Binary(bytes)) {
             Ok(()) => Ok(()),
             // The frame stays buffered; a later flush continues it.
             Err(tungstenite::Error::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -1685,6 +1684,52 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn owned_frames_preserve_websocket_bytes_and_sequence_wrap() {
+        for framing in [Framing::Elapsed, Framing::Bare, Framing::Sequence(u16::MAX)] {
+            let socket = WebSocket::from_raw_socket(
+                ReadBudget::new(io::Cursor::new(Vec::new())),
+                tungstenite::protocol::Role::Server,
+                Some(socket_config()),
+            );
+            let mut open = Open::new(socket, false);
+            open.framing = framing;
+            let mut expected = Vec::new();
+            let mut sequence = u16::MAX;
+            for size in [1, 123, 124, 125, 126, 65536] {
+                let mut framed = vec![0x12, 0x34];
+                framed.extend((0..size).map(|i| i as u8));
+                let mut payload = framed.clone();
+                match framing {
+                    Framing::Elapsed => {}
+                    Framing::Bare => {
+                        payload.drain(..2);
+                    }
+                    Framing::Sequence(_) => {
+                        payload[..2].copy_from_slice(&sequence.to_be_bytes());
+                        sequence = sequence.wrapping_add(1);
+                    }
+                }
+                expected.push(0x82);
+                match payload.len() {
+                    n @ 0..=125 => expected.push(n as u8),
+                    n @ 126..=65535 => {
+                        expected.push(126);
+                        expected.extend((n as u16).to_be_bytes());
+                    }
+                    n => {
+                        expected.push(127);
+                        expected.extend((n as u64).to_be_bytes());
+                    }
+                }
+                expected.extend(payload);
+                open.send(framed).unwrap();
+            }
+            open.socket.flush().unwrap();
+            assert_eq!(open.socket.get_ref().inner.get_ref(), &expected);
+        }
+    }
 
     /// Finite, always-readable input until its selected bytes have been read.
     struct Readable {
