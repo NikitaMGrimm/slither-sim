@@ -240,7 +240,9 @@ def render(report):
         lines += ["", "⚠️ **Incomplete report:** see details for missing results."]
     lines += ["", "<details><summary>Details</summary>", "",
               f"- PR head: `{report['head']}`. Runner: {cell(report['platform'])}.",
-              "- Paired operation wall time after warmup, with balanced order and covered checks at 8/12/26, "
+              ("- Paired time in each row's frozen metric after warmup, with balanced order and covered checks at 8/12/26, "
+               if any((r.get("result") or {}).get("metric") == "cpuSeconds" for r in performance) else
+               "- Paired operation wall time after warmup, with balanced order and covered checks at 8/12/26, ") +
               "then doubling through 53,248 pairs (finite safety guard). "
               "Base/PR are geometric means; Change shows estimate [interval] against a −5% to +5% band.",
               "- V2 order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 14 pre-budgeted looks "
@@ -372,7 +374,12 @@ def collect(output, head, job_start):
     report["identities"] = {label: build.record for label, build in builds.items()}
     report["fidelity"] = metric_rows(fidelity.get("baseline"), fidelity.get("candidate"))
     binaries = {label: build.binaries["perf_baseline"] for label, build in builds.items()}
-    primary_catalog = load_catalog(binaries["candidate"]) if "candidate" in binaries else None
+    primary_catalog = None
+    if "candidate" in binaries:
+        try:
+            primary_catalog = load_catalog(binaries["candidate"])
+        except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as error:
+            report["errors"].append(f"head workload definitions unavailable: {error}")
     with head_configs(primary_catalog, output) if primary_catalog else nullcontext():
         catalogs, suites = {}, {}
         for label, binary in binaries.items():

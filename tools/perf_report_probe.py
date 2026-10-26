@@ -74,7 +74,7 @@ def probe(binary, workloads, output, *, deadline):
                         if error:
                             raise ValueError(error)
                         pair[label] = row
-                except (OSError, RuntimeError, TimeoutError, ValueError) as error:
+                except (OSError, RuntimeError, TimeoutError, EOFError, ValueError) as error:
                     failure = str(error)
                     break
                 if index:

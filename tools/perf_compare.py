@@ -303,6 +303,13 @@ def parity(binaries, selections, output, *, deadline=None):
     budget = {"deadline": deadline} if deadline is not None else {}
     rows = []
     for index, workload in enumerate(selections["candidate"]):
+        if workload.mode == "socket-host":
+            definitions = {label: selected[index].fingerprint for label, selected in selections.items()}
+            rows.append({"case": workload.name, "traceIterations": 0,
+                         "reading": "Not applicable (socket scheduling)",
+                         "definition": "Equal" if len(set(definitions.values())) == 1 else "Changed",
+                         "synthetic": workload.synthetic, "errors": {}})
+            continue
         traces, errors = {}, {}
         for label, binary in binaries.items():
             directory = output / f"traces-{label}"

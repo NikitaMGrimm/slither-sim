@@ -91,3 +91,44 @@ Linux whole-case CPU diagnostics as well as socket-window CPU versus busy wall.
 Instruction-count availability is tested explicitly on the runner; no claim is
 made from an unavailable counter. Metric choice and pilot limits are documented
 in [the protocol extension](../../../docs/maintainers/performance-statistics-v2.md#pr-metric-extension).
+
+## Fixture-size investigation (no fixture changes)
+
+At the audited tree, `tests/fixtures` has 42 files totaling 12,292,562 bytes.
+Independent gzip level 9 compression of every file totals 1,394,021 bytes,
+saving 10,898,541 bytes (88.66%). These are working-tree file sizes, not Git pack
+or download-size estimates; Git already compresses objects.
+
+`forager-conformance.json` is 8,352,478 bytes (67.95% of the fixture directory).
+Lossless gzip level 9 with timestamp zero is 824,221 bytes: 7,528,257 bytes saved
+(90.13%). Compact JSON is 8,352,477 bytes, saving only the final newline; it is
+already compact. Gzipping compact JSON gives 824,218 bytes. Reproduce with Python
+standard-library `gzip.compress(raw, compresslevel=9, mtime=0)`; decompression
+returns every original byte and preserves f64 bit strings, record order and hashes.
+
+All 140 full case records are distinct. Five frame payloads repeat, totaling
+231,552 repeated serialized frame bytes (2.77% of the file). Pooling those frames
+could retain each case and its metadata, but deleting the cases would change the
+forward/reverse shared-instance sequence. `src/client/forager/conformance.rs`
+checks all 140 cases, both orders, fresh/shared determinism and input immutability;
+platform oracles also pin case IDs and every input hash. Repeated frames therefore
+are not evidence of dispensable regression cases. `expected` fields are empty
+in this input fixture; the separate platform oracles carry expected results.
+
+Prefer byte-preserving compression over dropping cases if a later task changes
+storage. The current tests use `include_str!` and package these fixtures, so gzip
+requires an explicit test-time decompression path (and likely a dev dependency or
+build preparation), package inclusion updates and exact-byte/hash verification.
+No fixture, oracle, loader, dependency or coverage changes are made here.
+
+## Hosted validation attempts
+
+The [first PR run](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40376588026)
+at head `9a64de2897b04b745aea922b895577e58b1b14ba` failed during the first
+500-socket A/A warmup: the driver inspected raw frame byte 2 rather than splitting
+bundled packets, so it did not count bundled own appearances and failed gameplay
+validation. The collector also failed to classify early EOF as a failed probe
+cell. No socket measurement from that attempt is accepted. The retained full
+artifact holds stderr, partial A/A records and the failed attempt. Corrections
+reuse the public protocol splitter, reconnect after death with a new socket
+session, add a bundled-lifecycle regression and retain EOF probe failures.

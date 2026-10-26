@@ -200,6 +200,69 @@ pub fn cpu_seconds() -> Option<f64> {
     None
 }
 
+#[derive(Default)]
+struct LoadLife {
+    own: Option<u16>,
+    playing: bool,
+    joins: u64,
+    deaths: u64,
+}
+
+impl LoadLife {
+    fn receive(&mut self, data: &[u8]) -> Result<(u64, bool), String> {
+        let packets = slither_sim::client::protocol::split_frame(data)?;
+        let mut died = false;
+        for packet in &packets {
+            if packet.first() == Some(&b's') && packet.len() > 7 {
+                let id = u16::from_be_bytes([packet[1], packet[2]]);
+                if self.own.is_none() {
+                    self.own = Some(id);
+                    self.joins += 1;
+                }
+                if self.own == Some(id) {
+                    self.playing = true;
+                }
+            }
+            if packet.first() == Some(&b's')
+                && packet.len() >= 3
+                && packet.len() <= 7
+                && self.own == Some(u16::from_be_bytes([packet[1], packet[2]]))
+            {
+                self.playing = false;
+            }
+            if packet.first() == Some(&b'v') {
+                died = true;
+                self.deaths += 1;
+                self.playing = false;
+                self.own = None;
+            }
+        }
+        Ok((packets.len() as u64, died))
+    }
+}
+
+#[cfg(test)]
+mod socket_tests {
+    use super::*;
+    #[test]
+    fn bundled_spawns_removals_and_death_track_only_the_own_life() {
+        let mut life = LoadLife::default();
+        let mut bundled = vec![0, 0];
+        for id in [7u16, 9] {
+            bundled.extend([0, 8, b's', (id >> 8) as u8, id as u8, 0, 0, 0, 0, 0]);
+        }
+        assert_eq!(life.receive(&bundled).unwrap(), (2, false));
+        assert_eq!((life.own, life.playing, life.joins), (Some(7), true, 1));
+        life.receive(&[0, 0, b's', 0, 9]).unwrap();
+        assert!(life.playing);
+        life.receive(&[0, 0, b's', 0, 7]).unwrap();
+        assert!(!life.playing);
+        assert_eq!(life.receive(&[0, 0, b'v', 0]).unwrap(), (1, true));
+        assert_eq!((life.own, life.playing, life.deaths), (None, false, 1));
+        assert!(life.receive(&[0, 0, 0, 20, b's']).is_err());
+    }
+}
+
 pub fn socket_driver() -> Result<(), String> {
     use std::{
         io::{self, Write},
@@ -223,8 +286,7 @@ pub fn socket_driver() -> Result<(), String> {
         let _ = io::stdin().read(&mut [0]);
         stopped.store(true, Ordering::Relaxed);
     });
-    let mut sockets = Vec::with_capacity(count);
-    for i in 0..count {
+    let connect_slot = |i| -> Result<_, String> {
         let (mut socket, _) = connect(url.as_str()).map_err(|e| e.to_string())?;
         socket
             .send(Message::Binary(
@@ -237,43 +299,31 @@ pub fn socket_driver() -> Result<(), String> {
             }
             _ => return Err("load driver requires plain loopback".into()),
         }
-        sockets.push(socket);
-    }
+        Ok(socket)
+    };
+    let mut sockets = (0..count)
+        .map(connect_slot)
+        .collect::<Result<Vec<_>, _>>()?;
     println!("ready");
     io::stdout().flush().map_err(|e| e.to_string())?;
     let started = Instant::now();
     let mut steer = started;
-    let (mut packets, mut bytes, mut joins, mut deaths) = (0u64, 0u64, 0u64, 0u64);
-    let mut playing = vec![false; count];
-    let mut own_ids = vec![None; count];
+    let (mut packets, mut bytes) = (0u64, 0u64);
+    let mut lives: Vec<_> = (0..count).map(|_| LoadLife::default()).collect();
     let mut minimum_playing = count;
     while !stop.load(Ordering::Relaxed) {
         let command = Instant::now() >= steer;
         for (i, socket) in sockets.iter_mut().enumerate() {
+            let mut died = false;
             for _ in 0..64 {
                 match socket.read() {
                     Ok(Message::Binary(data)) => {
-                        packets += 1;
                         bytes += data.len() as u64;
-                        if data.get(2) == Some(&b's') && data.len() > 10 {
-                            let id = u16::from_be_bytes([data[3], data[4]]);
-                            if own_ids[i].is_none() {
-                                own_ids[i] = Some(id);
-                                joins += 1;
-                            }
-                            if own_ids[i] == Some(id) {
-                                playing[i] = true;
-                            }
-                        }
-                        if data.get(2) == Some(&b'v') {
-                            deaths += 1;
-                            playing[i] = false;
-                            own_ids[i] = None;
-                            socket
-                                .write(Message::Binary(
-                                    login_packet(&format!("Load{i}"), 0)?.into(),
-                                ))
-                                .map_err(|e| e.to_string())?;
+                        let (count, death) = lives[i].receive(&data)?;
+                        packets += count;
+                        died |= death;
+                        if died {
+                            break;
                         }
                     }
                     Ok(_) => {}
@@ -284,6 +334,11 @@ pub fn socket_driver() -> Result<(), String> {
                     }
                     Err(e) => return Err(e.to_string()),
                 }
+            }
+            if died {
+                // Socket sessions keep their Playing generation after death.
+                // Reconnect through a new TCP session, as NetworkBackend does.
+                *socket = connect_slot(i)?;
             }
             if command {
                 let heading = ((started.elapsed().as_secs_f64() * 1.2
@@ -302,7 +357,7 @@ pub fn socket_driver() -> Result<(), String> {
             }
         }
         if started.elapsed().as_secs_f64() >= 1. {
-            minimum_playing = minimum_playing.min(playing.iter().filter(|p| **p).count());
+            minimum_playing = minimum_playing.min(lives.iter().filter(|life| life.playing).count());
         }
         if command {
             steer = Instant::now() + Duration::from_millis(100);
@@ -311,8 +366,8 @@ pub fn socket_driver() -> Result<(), String> {
     }
     println!(
         "{}",
-        serde_json::json!({"packets": packets, "bytes": bytes, "joins": joins, "deaths": deaths,
-        "playingAtEnd": playing.iter().filter(|p| **p).count(), "minimumPlaying": minimum_playing})
+        serde_json::json!({"packets": packets, "bytes": bytes, "joins": lives.iter().map(|life| life.joins).sum::<u64>(), "deaths": lives.iter().map(|life| life.deaths).sum::<u64>(),
+        "playingAtEnd": lives.iter().filter(|life| life.playing).count(), "minimumPlaying": minimum_playing})
     );
     Ok(())
 }
@@ -412,7 +467,9 @@ pub fn benchmark(
             || driver["packets"].as_u64().unwrap_or(0) == 0
             || driver["joins"].as_u64().unwrap_or(0) == 0
         {
-            return Err("socket workload delivered no gameplay or lost connections".into());
+            return Err(format!(
+                "socket validation: connected={connected}/{clients}, driver={driver}"
+            ));
         }
         let scale = ticks as f64 / actual as f64;
         Ok(
