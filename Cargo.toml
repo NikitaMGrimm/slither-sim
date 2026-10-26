@@ -17,7 +17,7 @@ include = [
     "/examples/basic.rs",
     "/examples/portable_bot.rs",
     "/examples/portable_bot.py",
-    "/examples/cautious_bot.rs",
+    "/examples/forager.rs",
     # Every [[example]] below must ship its source: maturin's sdist keeps the
     # manifest's target list, and pip fails on a missing target file.
     "/examples/host_load.rs",
@@ -70,7 +70,7 @@ name = "portable_bot"
 required-features = ["networking"]
 
 [[example]]
-name = "cautious_bot"
+name = "forager"
 required-features = ["bot"]
 
 [[example]]

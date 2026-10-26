@@ -49,7 +49,7 @@ It needs Python 3.11+ and the build above, and uses only the standard library.
 On Windows, use `py -3` if `python` is missing.
 
 More examples: [embedding the simulator](examples/basic.rs) and
-[the shared Forager runner](examples/cautious_bot.rs). To use the
+[the Forager on core observations](examples/forager.rs). To use the
 library elsewhere, run `cargo add slither-sim`; for the CLI alone,
 `cargo install slither-sim --locked`.
 

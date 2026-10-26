@@ -16,7 +16,9 @@
   checkpoints and the portable `client` contracts are unchanged
   ([frames](docs/bot-api.md#frames), [C ABI](docs/c-api.md#compatibility)).
 - The A1 Forager policy is removed: A4-mean is the only bot policy, and
-  `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`).
+  `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`). The
+  `cautious_bot` example is now `forager` and keeps only its core-observation
+  path; `portable_bot` runs the policy on received frames.
 - Config `radius` now retains the initial, population-sized setting; the live
   boundary is runtime state exposed by `Simulator::radius()`, frames and a new
   snapshot `radius` field. Checkpoints use
@@ -145,7 +147,7 @@
   policy (`bot::Forager`) and `client::ForagerBot`. The default policy is A4
   (A4-mean); A1 stays selectable. The [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
   records gameplay, cost and the maintainer's mean-cost gate. The
-  [`cautious_bot`](examples/cautious_bot.rs) example runs it.
+  [`cautious_bot`](https://github.com/NikitaMGrimm/slither-sim/blob/v0.5.0/examples/cautious_bot.rs) example runs it.
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from
