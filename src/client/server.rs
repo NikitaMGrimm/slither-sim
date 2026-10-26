@@ -24,7 +24,8 @@ use super::{
     latency::{LatencyConfig, Link, Random},
     protocol,
     simulation::{
-        MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT, RawSimulator,
+        MAX_FRAME_BYTES, MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT,
+        RawSimulator,
     },
 };
 use crate::{Action, simulator::population_radius};
@@ -63,8 +64,10 @@ pub(crate) const PHYSICAL_FOOD_HEADER: &str = "x-slithersim-food";
 const MAX_INPUT_BYTES: usize = 4 << 10;
 /// Output batched per socket write.
 const WRITE_BUFFER_BYTES: usize = 16 << 10;
-/// Queued output beyond this closes the connection as too slow.
-const MAX_SEND_BUFFER_BYTES: usize = 1 << 20;
+/// Queued output beyond this closes the connection as too slow. tungstenite
+/// refuses a frame before writing anything if it would overflow this, so leave
+/// room for the largest message and its 10-byte header behind an unflushed batch.
+const MAX_SEND_BUFFER_BYTES: usize = WRITE_BUFFER_BYTES + MAX_FRAME_BYTES + 10;
 /// Frames waiting for their delivery time on one connection, socket or bot.
 const MAX_QUEUED_FRAMES: usize = 4096;
 /// Host policy: an unadmitted bot waits a wall second after refusal instead of
@@ -1729,6 +1732,27 @@ mod tests {
             open.socket.flush().unwrap();
             assert_eq!(open.socket.get_ref().inner.get_ref(), &expected);
         }
+    }
+
+    #[test]
+    fn largest_message_fits_behind_an_unflushed_batch() {
+        let socket = WebSocket::from_raw_socket(
+            ReadBudget::new(io::Cursor::new(Vec::new())),
+            tungstenite::protocol::Role::Server,
+            Some(socket_config()),
+        );
+        let mut open = Open::new(socket, false);
+        // With its 4-byte header this fills the batch exactly, so it stays
+        // buffered without a write.
+        let batch = vec![1; WRITE_BUFFER_BYTES - 4];
+        let largest = vec![2; MAX_FRAME_BYTES];
+        open.send(batch.clone()).unwrap();
+        open.send(largest.clone()).unwrap();
+        open.socket.flush().unwrap();
+        let written = open.socket.get_ref().inner.get_ref();
+        assert_eq!(written.len(), WRITE_BUFFER_BYTES + MAX_FRAME_BYTES + 10);
+        assert_eq!(&written[4..WRITE_BUFFER_BYTES], &batch[..]);
+        assert_eq!(&written[WRITE_BUFFER_BYTES + 10..], &largest[..]);
     }
 
     /// Finite, always-readable input until its selected bytes have been read.

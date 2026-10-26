@@ -449,7 +449,7 @@ measured range.
 | Wire arena radius | at most 32,000 | Encoding margin. Anchors encode as `u16` around 32,550, so coordinates must stay within −32,550..32,985, and encoders reject anything outside. The 550 units left for heads and bodies near the rim are not derived; a hard-mode tick's overshoot grows with `dt`. |
 | Simulated link queues | 4,096 messages per direction; 2,048 combined for remote slots | Bounded memory; the run fails when full. |
 | Wire records | 32 MiB per slot or connection | Drain to continue. |
-| Messages | 1 MiB | Host send buffer and native client message size. |
+| Messages | 1 MiB | Native client message size. A host connection with more than one such message plus a 16 KiB batch unsent is closed as too slow. |
 | Host input | 4 KiB per message | Far above the largest stock login. |
 | Host sockets | 32 pending, 16 accepts and 32 reads per poll | Fairness; slow clients cannot starve physics. |
 | Host deadlines | upgrade 5 s, login 10 s, close 1 s | Connection lifecycle. |
