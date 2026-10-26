@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 
-PROTOCOL = "slither-sim-json-v4"
+PROTOCOL = "slither-sim-json-v5"
 
 
 def heading(frame, view):
@@ -58,7 +58,7 @@ def main():
         if reply.get("protocol") != PROTOCOL:
             raise RuntimeError("incompatible simulator protocol")
         if "error" in reply:
-            raise RuntimeError(reply["error"])
+            raise RuntimeError(reply["error"]["message"])
         return reply["result"]
 
     try:

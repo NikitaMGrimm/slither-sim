@@ -21,7 +21,7 @@ mod frame;
 #[cfg(test)]
 mod tests;
 
-pub const PROTOCOL: &str = "slither-sim-json-v4";
+pub const PROTOCOL: &str = "slither-sim-json-v5";
 
 /// A step rejected before advancement, or a failure after advancement began.
 #[derive(Debug, PartialEq, Eq)]
@@ -30,6 +30,24 @@ pub enum StepError {
     Rejected(SimError),
     /// All worlds were cleared after advancement failed; reset to continue.
     Ended(SimError),
+}
+
+impl StepError {
+    pub fn cause(&self) -> &SimError {
+        match self {
+            Self::Rejected(e) | Self::Ended(e) => e,
+        }
+    }
+    pub fn into_cause(self) -> SimError {
+        match self {
+            Self::Rejected(e) | Self::Ended(e) => e,
+        }
+    }
+    pub fn details(&self) -> crate::ErrorDetails {
+        let mut details = self.cause().details();
+        details.message = self.to_string();
+        details
+    }
 }
 
 impl std::fmt::Display for StepError {
@@ -440,19 +458,27 @@ impl Session {
     /// include `sessionEnded`: false for unchanged-state rejection, true when
     /// advancement failed and cleared all worlds. Reset to continue in that case.
     pub fn request(&mut self, line: &[u8]) -> Vec<u8> {
+        self.request_with_cause(line).0
+    }
+
+    /// The same reply plus its typed cause, for bindings without reparsing JSON.
+    pub fn request_with_cause(&mut self, line: &[u8]) -> (Vec<u8>, Option<StepError>) {
         let result = serde_json::from_slice(line)
             .map_err(|error| {
                 StepError::Rejected(SimError::new(ErrorKind::InvalidRequest, error.to_string()))
             })
             .and_then(|request| self.handle(request));
         match result {
-            Ok(reply) => reply,
-            Err(error) => crate::json::to_vec(&json!({
-                "protocol": PROTOCOL,
-                "error": error.to_string(),
-                "sessionEnded": matches!(error, StepError::Ended(_)),
-            }))
-            .expect("error replies serialize"),
+            Ok(reply) => (reply, None),
+            Err(error) => {
+                let reply = crate::json::to_vec(&json!({
+                    "protocol": PROTOCOL,
+                    "error": error.details(),
+                    "sessionEnded": matches!(error, StepError::Ended(_)),
+                }))
+                .expect("error replies serialize");
+                (reply, Some(error))
+            }
         }
     }
 
@@ -523,6 +549,18 @@ impl Session {
         Some(self.current.as_ref()?.worlds.get(world)?.frame.columns())
     }
 
+    /// Checked frame access retaining the same world location as JSON snapshots.
+    pub fn frame_checked(&self, world: usize) -> Result<FrameRef<'_>, SimError> {
+        if self.worlds() == 0 {
+            return Err(SimError::new(ErrorKind::NotReset, "Reset first"));
+        }
+        self.frame(world).ok_or_else(|| {
+            SimError::new(ErrorKind::UnknownWorld, "Unknown world")
+                .at_world(world)
+                .at_field("world")
+        })
+    }
+
     /// Worlds of the current session; 0 before the first reset.
     pub fn worlds(&self) -> usize {
         self.current.as_ref().map_or(0, |run| run.worlds.len())
@@ -537,6 +575,7 @@ impl Session {
         match request {
             Request::Info {} => Ok(reply(&json!({
                 "version": env!("CARGO_PKG_VERSION"),
+                "rulesRevision": crate::simulator::checkpoint::RULES_REVISION,
                 "defaultConfig": Config::default(),
                 "defaultDecisionTicks": default_decision_ticks(),
                 "maxAgents": MAX_AGENTS,
@@ -565,11 +604,7 @@ impl Session {
                     *config,
                     placement,
                 )?;
-                let prepared = Self::prepare_reset(options).map_err(|mut e| {
-                    // Preserve reset wire text while typed callers retain locations.
-                    e.world = None;
-                    e
-                })?;
+                let prepared = Self::prepare_reset(options)?;
                 // Encode every frame and the complete reply before installing it.
                 let frames: Vec<_> = prepared
                     .run
@@ -665,7 +700,11 @@ impl Session {
                 let world = &run
                     .worlds
                     .get(world)
-                    .ok_or_else(|| SimError::new(ErrorKind::UnknownWorld, "Unknown world"))?
+                    .ok_or_else(|| {
+                        SimError::new(ErrorKind::UnknownWorld, "Unknown world")
+                            .at_world(world)
+                            .at_field("world")
+                    })?
                     .world;
                 // Deliberately exclude hidden RNG/control state from this debug view.
                 Ok(reply(&SnapshotReply {

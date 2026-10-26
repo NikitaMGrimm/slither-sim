@@ -47,6 +47,7 @@ fn warmed_radius_controller_and_samples_allocate_nothing() {
     TRACK.store(true, Ordering::Relaxed);
     for _ in 0..511 {
         world.step(&[]).unwrap();
+        std::hint::black_box(world.rules());
     }
     TRACK.store(false, Ordering::Relaxed);
     assert_eq!(ALLOCATIONS.load(Ordering::Relaxed), 0);

@@ -42,6 +42,9 @@ def as_json(frame):
     return {
         "time": frame.time, "ticks": frame.ticks, "living": frame.living,
         "radius": frame.radius, "vision": frame.vision,
+        "rules": {"boundaryMode": frame.rules.boundary_mode, "pitRadius": frame.rules.pit_radius,
+                  "minScore": frame.rules.min_score, "killScoreSeconds": frame.rules.kill_score_seconds,
+                  "freeBoostAtFloor": frame.rules.free_boost_at_floor},
         "snakes": {
             "slot": list(frame.snake_slot), "x": list(frame.snake_x), "y": list(frame.snake_y),
             "heading": list(frame.snake_heading), "speed": list(frame.snake_speed),
@@ -302,8 +305,55 @@ class InputTests(unittest.TestCase):
 
 
 class ErrorTests(unittest.TestCase):
+    def assert_cause(self, exception, reply):
+        for key in ["code", "rule", "world", "slot", "field"]:
+            self.assertEqual(getattr(exception, key), reply["error"][key], key)
+        self.assertEqual(str(exception), reply["error"]["message"])
+
+    def test_stable_causes_match_json_for_reset_step_and_frame(self):
+        typed, encoded = Session(), Session()
+        for options in [{"seed": True}, {"seed": -1}, {"worlds": "2"},
+                        {"worlds": 0}, {"config": {"radius": -1}},
+                        {"config": {"colour": 1}}]:
+            with self.subTest(options):
+                with self.assertRaises(ValueError) as caught:
+                    typed.reset(**options)
+                self.assert_cause(caught.exception, encoded.request({"op":"reset", **options}))
+        typed.reset(agents=2, worlds=2, config={"preset":"sandbox", "foodCount":0})
+        encoded.request({"op":"reset", "agents":2, "worlds":2, "config":{"preset":"sandbox", "foodCount":0}})
+        with self.assertRaises(ValueError) as caught:
+            typed.step([0.,0.,0.,None], [False]*4)
+        reply = encoded.request({"op":"step", "actions":[{"heading":[0,0],"boost":[False,False]}, {"heading":[0,None],"boost":[False,False]}]})
+        self.assert_cause(caught.exception, reply)
+        with self.assertRaises(IndexError) as caught:
+            typed.frame(17)
+        self.assert_cause(caught.exception, encoded.request({"op":"snapshot", "world":17}))
+
+    def test_rules_are_one_frozen_object_per_owned_frame(self):
+        fixture = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/serve-rules-v5.json").read_text())
+        session = Session()
+        request = dict(fixture["reset"])
+        del request["op"]
+        request["decision_ticks"] = request.pop("decisionTicks")
+        session.reset(**request)
+        frame = session.frame(0)
+        self.assertIs(frame.rules, frame.rules)
+        self.assertEqual(as_json(frame)["rules"], fixture["rules"])
+        with self.assertRaises(AttributeError):
+            frame.rules.min_score = 0
+        session.step([0.,0.], [True,True])
+        self.assertEqual(as_json(session.frame(0))["rules"], fixture["rules"])
+        session.reset(config={"preset":"sandbox", "foodCount":0})
+        self.assertEqual(as_json(frame)["rules"], fixture["rules"])
+        rules = session.frame(0).rules
+        self.assertIsNone(rules.pit_radius)
+        self.assertIsNone(rules.min_score)
+        self.assertIsNone(rules.kill_score_seconds)
+        self.assertFalse(rules.free_boost_at_floor)
+
+
     def test_initial_config_and_live_radius_match_json_and_typed_frames(self):
-        path = Path(__file__).resolve().parents[2] / "tests/fixtures/serve-radius-v4.json"
+        path = Path(__file__).resolve().parents[2] / "tests/fixtures/serve-radius-v5.json"
         fixture = json.loads(path.read_text(encoding="utf-8"))
         session = Session()
         options = dict(fixture["reset"])
@@ -327,7 +377,7 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "^Reset first$"):
             session.frame(0)
         self.assertEqual(session.request({"op": "step", "actions": []}),
-                         {"protocol": slither_sim.PROTOCOL, "error": "Reset first", "sessionEnded": False})
+                         {"protocol": slither_sim.PROTOCOL, "error": {"code":11,"rule":None,"world":None,"slot":None,"field":None,"message":"Reset first"}, "sessionEnded": False})
 
     def test_unmeasured_settings_warn_on_reset(self):
         session = Session()
@@ -382,7 +432,7 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:
             typed.reset(seed=1, worlds=2, agents=3, decision_ticks=0)
         reply = encoded.request({"op": "reset", "seed": 1, "worlds": 2, "agents": 3, "decisionTicks": 0})
-        self.assertEqual(str(caught.exception), reply["error"])
+        self.assertEqual(str(caught.exception), reply["error"]["message"])
 
     def test_scalar_reset_errors_match_json_exactly(self):
         typed, encoded = Session(), Session()
@@ -395,7 +445,7 @@ class ErrorTests(unittest.TestCase):
                         typed.reset(**{field: value})
                     wire_field = "decisionTicks" if field == "decision_ticks" else field
                     reply = encoded.request({"op": "reset", wire_field: value})
-                    self.assertEqual(str(caught.exception), reply["error"])
+                    self.assertEqual(str(caught.exception), reply["error"]["message"])
                     self.assertEqual(fingerprint(typed), before)
 
     def test_tiny_arena_reset_keeps_legacy_error_and_previous_frames(self):
@@ -406,8 +456,8 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:
             typed.reset(config=config)
         reply = encoded.request({"op": "reset", "config": config})
-        self.assertEqual(reply["error"], "Initial spawn body extends outside arena")
-        self.assertEqual(str(caught.exception), reply["error"])
+        self.assertEqual(reply["error"]["message"], "World 0: Initial spawn body extends outside arena")
+        self.assertEqual(str(caught.exception), reply["error"]["message"])
         self.assertEqual(fingerprint(typed), before)
 
     def test_default_reset_matches_the_protocol_defaults(self):
@@ -464,11 +514,11 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:
             typed.step(headings, boosts)
         self.assertTrue(str(caught.exception).startswith("World 1: "))
-        self.assertEqual(str(caught.exception), json_step(encoded, headings, boosts)["error"])
+        self.assertEqual(str(caught.exception), json_step(encoded, headings, boosts)["error"]["message"])
 
     def test_terminal_steps_clear_worlds_and_reset_recovers(self):
         fixture = json.loads((Path(__file__).resolve().parents[2]
-                              / "tests/fixtures/serve-errors-v4.json").read_text(encoding="utf-8"))
+                              / "tests/fixtures/serve-errors-v5.json").read_text(encoding="utf-8"))
         typed, encoded = Session(), Session()
         options = fixture["reset"]
         typed.reset(worlds=options["worlds"], agents=options["agents"],
@@ -480,8 +530,9 @@ class ErrorTests(unittest.TestCase):
         self.assertNotIsInstance(caught.exception, ValueError)
         self.assertIn("mass would overflow", str(caught.exception))
         reply = encoded.request(fixture["step"])
-        self.assertEqual(reply["error"], str(caught.exception))
-        reply["error"] = fixture["terminalReply"]["error"]
+        self.assertEqual(reply["error"]["message"], str(caught.exception))
+        self.assert_cause(caught.exception, reply)
+        reply["error"]["message"] = fixture["terminalReply"]["error"]["message"]
         self.assertEqual(reply, fixture["terminalReply"])
         for session in (typed, encoded):
             self.assertEqual((session.worlds, session.agents), (0, 0))
@@ -501,7 +552,7 @@ class ErrorTests(unittest.TestCase):
             session.frame(-1)
         reset(session)
         for world in (WORLDS, -1, -WORLDS, 2**100, -(2**100)):
-            with self.subTest(world), self.assertRaisesRegex(IndexError, "^Unknown world$"):
+            with self.subTest(world), self.assertRaisesRegex(IndexError, "Unknown world$"):
                 session.frame(world)
         with self.assertRaises(TypeError):
             session.frame(0.0)

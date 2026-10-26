@@ -252,9 +252,9 @@ requests, see [hosting](raw-server.md#presets) and
 
 Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
-Rust `Observation` omits the rolling score. Geometric frames and portable
-`ClientFrame` omit pit geometry and the floor setting; retain world config
-separately. Portable clients receive per-life kills and the size-based
+Rust `Observation` omits the rolling score. Geometric frames carry pit
+geometry and the floor setting in [`rules`](bot-api.md#frames); `Observation`
+and portable `ClientFrame` omit them, so retain world config separately. Portable clients receive per-life kills and the size-based
 leaderboard, without rolling kill score or distinct pit death reason.
 The stock browser shows the pit edge as a ring of 749 decorative pellets:
 centers 3 units outside the pit, about 15 units apart, palette 8, size byte 31
@@ -488,3 +488,12 @@ measured range.
 | Decoder retention | 4,096 snakes, 65,536 body points (4,096 per snake), 131,072 food | A broken server cannot grow received state without bound; dense worlds can reach these first. |
 | Spawn attempts | 64 draws per spawn; 4,096 cached candidates with `spawnRadius` | An exhausted search defers the spawn even if a clear pose exists. With `spawnRadius`, the joiner waits for a later search. |
 | Network read floor | 1 ms per decision | A bot behind its schedule still reads its socket. |
+
+### Reading effective geometric rules
+
+`Simulator::rules()` and each geometric frame expose boundary mode, optional pit
+radius, minimum score, kill-score window and whether boost is free at that floor.
+They describe effective validated settings after overrides, and stay immutable
+for the world's lifetime. Live radius remains separate. Raw Rust bot drivers
+use `geometric_context(slot)` for these rules plus their own rolling kill score;
+`Observation` and portable received-state frames are unchanged.

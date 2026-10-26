@@ -4,12 +4,22 @@
 
 ### Breaking
 
+- Geometric JSON is `slither-sim-json-v5` and the C ABI is `slither-sim-abi-v3`
+  (`SLITHER_ABI_VERSION` 3). Frames carry each world's fixed rules: boundary
+  mode, pit radius, minimum score, kill-score window and free boost at the
+  floor. They appear as `rules` in JSON, `FrameRef::rules` in Rust, a frozen
+  rules object on Python frames and an inline `slither_world_rules` at the end
+  of `slither_frame`. Errors are objects with stable `code` and `rule` numbers
+  and optional world, slot and field. Python exceptions carry the same
+  attributes, and C adds `slither_read_error`. Rust drivers get
+  `Simulator::rules()` and `geometric_context(slot)`. Rebuild C callers;
+  checkpoints and the portable `client` contracts are unchanged
+  ([frames](docs/bot-api.md#frames), [C ABI](docs/c-api.md#compatibility)).
 - The A1 Forager policy is removed: A4-mean is the only bot policy, and
   `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`).
 - Config `radius` now retains the initial, population-sized setting; the live
   boundary is runtime state exposed by `Simulator::radius()`, frames and a new
-  snapshot `radius` field. Geometric JSON is `slither-sim-json-v4`; C ABI v2's
-  frame layout and Python frame scalars are unchanged. Checkpoints use
+  snapshot `radius` field. Checkpoints use
   `slither-sim-checkpoint-v2` and reject v1, preserving initial and live radii
   separately. Flat config keys, fixed ecology targets and radius timing stay
   unchanged ([configuration](docs/configuration.md#population-sizing)).

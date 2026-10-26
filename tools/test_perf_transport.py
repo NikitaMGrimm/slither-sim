@@ -38,7 +38,7 @@ class Watchdog(unittest.TestCase):
 
 
 def frame(heads, food, views):
-    """Synthetic slither-sim-json-v4 frame with only the columns the decision reads."""
+    """Synthetic slither-sim-json-v5 frame with only the columns the decision reads."""
     return {"snakes": {"x": [x for x, _ in heads], "y": [y for _, y in heads]},
             "food": {"x": [x for x, _ in food], "y": [y for _, y in food]}, "views": views}
 
@@ -100,7 +100,9 @@ class Decision(unittest.TestCase):
         self.assertEqual(perf_transport_client.decode_reply(ok.encode()), {"worlds": []})
         with self.assertRaisesRegex(RuntimeError, "Reset first"):
             perf_transport_client.decode_reply(json.dumps(
-                {"protocol": perf_transport_client.PROTOCOL, "error": "Reset first"}))
+                {"protocol": perf_transport_client.PROTOCOL, "error": {
+                    "code": 11, "rule": None, "world": None, "slot": None,
+                    "field": None, "message": "Reset first"}}))
         with self.assertRaisesRegex(RuntimeError, "protocol"):
             perf_transport_client.decode_reply('{"protocol":"other","result":{}}')
 

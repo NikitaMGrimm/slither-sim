@@ -225,13 +225,46 @@ pub fn spawn_distance(world: &Simulator, unit: f64) -> f64 {
 
 /// Project only the intended geometric v4 contract/radius split onto v3 for comparison.
 /// Full original replies are retained by the separate ordered radius comparison.
-pub fn geometric_reply(bytes: &[u8]) -> Result<Vec<u8>, String> {
+pub fn geometric_reply(
+    bytes: &[u8],
+    expected_rules: &serde_json::Value,
+) -> Result<Vec<u8>, String> {
     let mut value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     match value["protocol"].as_str() {
-        Some("slither-sim-json-v3" | "slither-sim-json-v4") => {}
+        Some("slither-sim-json-v3" | "slither-sim-json-v4" | "slither-sim-json-v5") => {}
         _ => return Err("Unknown geometric comparison contract".into()),
     }
     value["protocol"] = serde_json::json!("slither-sim-json-v3");
+    if let Some(worlds) = value
+        .get_mut("result")
+        .and_then(|result| result.get_mut("worlds"))
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for world in worlds {
+            if let Some(rules) = world.as_object_mut().unwrap().remove("rules") {
+                if &rules != expected_rules {
+                    return Err("Geometric frame rules differ from effective configuration".into());
+                }
+            } else if cfg!(slither_world_rules) {
+                return Err("Geometric frame has no rules".into());
+            }
+        }
+    }
+    if value.get("error").is_some_and(serde_json::Value::is_object) {
+        let error = &value["error"];
+        let message = error["message"].as_str().ok_or("Error has no message")?;
+        let expected = "World 0: Initial spawn body extends outside arena";
+        if message != expected
+            || error["code"] != 9
+            || error["rule"] != 9
+            || error["world"] != 0
+            || error["slot"] != 0
+            || error["field"] != "body"
+        {
+            return Err("Unexpected coded error in geometric comparison".into());
+        }
+        value["error"] = serde_json::json!("Initial spawn body extends outside arena");
+    }
     if let Some(result) = value
         .get_mut("result")
         .and_then(serde_json::Value::as_object_mut)
@@ -241,4 +274,33 @@ pub fn geometric_reply(bytes: &[u8]) -> Result<Vec<u8>, String> {
         result.get_mut("config").ok_or("Snapshot has no config")?["radius"] = radius;
     }
     serde_json::to_vec(&value).map_err(|e| e.to_string())
+}
+
+/// Config-derived legacy rules projection; validate new metadata before normalization.
+pub fn rules(config: &Config) -> serde_json::Value {
+    serde_json::json!({"boundaryMode":config.boundary_mode, "pitRadius":config.pit.as_ref().map(|p|p.radius),
+        "minScore":config.min_score, "killScoreSeconds":config.kill_score_seconds,
+        "freeBoostAtFloor":config.min_score.is_some()})
+}
+pub fn frame_debug(
+    frame: slither_sim::transport::FrameRef<'_>,
+    expected_rules: &serde_json::Value,
+) -> String {
+    #[cfg(slither_world_rules)]
+    assert_eq!(&serde_json::to_value(frame.rules).unwrap(), expected_rules);
+    #[cfg(not(slither_world_rules))]
+    let _ = expected_rules;
+    format!(
+        "FrameRef {{ time: {:?}, ticks: {:?}, living: {:?}, radius: {:?}, vision: {:?}, snakes: {:?}, food: {:?}, prey: {:?}, views: {:?}, deaths: {:?} }}",
+        frame.time,
+        frame.ticks,
+        frame.living,
+        frame.radius,
+        frame.vision,
+        frame.snakes,
+        frame.food,
+        frame.prey,
+        frame.views,
+        frame.deaths
+    )
 }

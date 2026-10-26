@@ -1,4 +1,4 @@
-# Geometric controller: slither-sim-json-v4
+# Geometric controller: slither-sim-json-v5
 
 Run `slither-sim serve` from a [release archive](../README.md#download-a-release)
 without Rust, or `cargo run --release --locked -- serve` from a checkout. One
@@ -8,12 +8,12 @@ process. Rust callers can use [in-process sessions](#in-process-sessions) or the
 library directly.
 
 ```json
-{"protocol":"slither-sim-json-v4","result":{}}
-{"protocol":"slither-sim-json-v4","error":"Reset first","sessionEnded":false}
+{"protocol":"slither-sim-json-v5","result":{}}
+{"protocol":"slither-sim-json-v5","error":{"code":11,"rule":null,"world":null,"slot":null,"field":null,"message":"Reset first"},"sessionEnded":false}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
-readers ignore additional fields. Error text is descriptive, not a stable code.
+readers ignore additional fields. Error `message` is descriptive; numeric `code`, optional `rule` and locations are stable.
 I/O failures stop the stream. Use trusted local controllers.
 
 Every error reply includes `sessionEnded`. When false, no world advanced and
@@ -33,7 +33,7 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v1`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
@@ -111,6 +111,34 @@ checkpoint. `config.radius` retains the initial setting after startup sizing;
 `radius` follows samples and the controller. This changed config meaning is the
 geometric v4 cutover from v3. Keep snapshots out of limited-visibility bot evaluations.
 
+## Structured errors
+
+Geometric v5 replaces the v4 error string with an object containing `code`,
+`rule`, `world`, `slot`, `field` and `message`. Absent rule/location values are
+null. Indices are zero-based; fields retain indexed paths. `sessionEnded`
+remains outside the object and preserves the rejected-versus-ended lifecycle.
+C inspection and Python exceptions use the same cause and location values.
+
+| Kind (`ErrorCode`) | Code |
+| --- | ---: |
+| InvalidRequest | 1 |
+| InvalidConfig | 2 |
+| ActionShape | 3 |
+| InvalidAction | 4 |
+| UnknownSlot / UnknownWorld / UnknownEntity | 5 / 6 / 7 |
+| DuplicateId / InvalidState / PlacementExhausted | 8 / 9 / 10 |
+| NotReset / WorldStopped | 11 / 12 |
+| UnsupportedCheckpoint / InvalidCheckpoint | 13 / 14 |
+| NumericOverflow / RepresentationLimit / AllocationFailed | 15 / 16 / 17 |
+
+Constraint codes are Missing 1, NonFinite 2, Negative 3, NonPositive 4,
+OutOfRange 5, LengthMismatch 6, Duplicate 7, Ordering 8, OutsideArena 9 and
+InconsistentState 10. Codes identify kinds/constraints; diagnostic messages
+may change. Location fields name the input being validated: native flat-array
+shape errors use `headings`/`boosts`, while nested JSON array errors name the
+world's `heading`/`boost` field. Future codes are additive; handle unknown values without treating
+an error as success. Codes 18/19 are reserved for C pointer/panic boundaries.
+
 ## Frames
 
 A frame stores visible entities once in columns; each living slot's view
@@ -122,9 +150,23 @@ indexes those rows.
 | `living` | Surviving snakes. |
 | `deaths` | Death events from this request: `time`, `victim` and `killer` slots, `reason` and dropped `food`. |
 | `radius`, `vision` | Live arena radius around the origin, and the vision radius. |
+| `rules` | One immutable world-rules object, shared by every slot in this frame; see below. |
 | `snakes` | One row per snake that some living slot sees, including each slot's own. |
 | `food`, `prey` | One row per item that some living slot sees. |
 | `views` | One entry per slot: `null` for dead slots, otherwise `self` (its own `snakes` row) and the `snakes`, `food` and `prey` rows it sees. |
+
+Every frame includes `rules`, even with no living slots:
+
+```json
+{"boundaryMode":"sliding","pitRadius":null,"minScore":null,"killScoreSeconds":null,"freeBoostAtFloor":false}
+```
+
+`boundaryMode` is `sliding` or `hard`; the optional numbers are null when absent.
+`freeBoostAtFloor` is true when the configured permanent `minScore` floor makes
+boosting free at that floor. Overrides are reflected directly; a preset name
+is not a rules identity. Radius remains separate runtime state. These rules are
+immutable until the world is replaced. Portable received-state frames contain
+only received information and do not invent simulated pit/floor metadata.
 
 Columns are arrays of equal length; row `r` is element `r` of each.
 
@@ -199,6 +241,12 @@ and retains the initial radius after startup sizing; `radius()` reports the live
 boundary. Radius evolution never changes the initial Config or ecology targets.
 An explicit `set_ambient_rate` still updates that effective rule. No mutable slices or config setters are
 exposed. Detached `Snake`, `Food` and `Prey` values remain editable.
+
+`world.rules()` returns a copyable `WorldRules` without allocating.
+`world.geometric_context(slot)?` returns those rules and the slot's rolling
+`kill_score`, including credits retained across lives and their expiration.
+Pass it beside `world.observe(slot)` to a raw Rust bot driver. It is not added
+to `Observation` or `Snake`; unknown slots return `UnknownSlot` with the slot.
 
 Use `append_dormant`, `spawn`, `retire` and the existing respawn methods for
 slot lifecycle. `spawn(id, body, heading)` validates geometry, mass floor and
@@ -295,7 +343,7 @@ with indexed paths for radius samples. `ErrorCode` numeric values 1–17 and
 `as_str()` names are stable; message wording is diagnostic. `Display`/`Error`
 retain human messages and chained causes. Successful steps allocate no error
 strings. JSON, C and Python error handling is unchanged by the radius split;
-wire cause codes remain separate future work.
+geometric v5 now carries stable cause codes and locations.
 
 ### Frozen Forager
 

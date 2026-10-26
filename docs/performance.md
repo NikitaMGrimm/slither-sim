@@ -131,8 +131,6 @@ trace of two-world sandbox, official-128 and Battledome sessions. Typed and JSON
 steps must agree on every frame column and debug snapshot. The shared overlay
 uses typed prepared reset where available and the existing JSON reset on older
 runtimes; every reset/step reply byte is retained for cross-revision comparison.
-
-
 `tools/perf_transport.py` measures [`serve` controller](bot-api.md) costs, including
 reply reading/parsing, beyond the Rust-only workloads above. Its scenario table
 defines `small`, `official-128`, `dense-64`, `heavy-food` and 16-world `worlds-16`.
@@ -210,3 +208,18 @@ reused with `uv run --project PATH --locked --only-group tools --no-sync --offli
 python -B ...`. Preserve raw results before cleaning ignored outputs. Dated
 measurements and decisions live in the
 [research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md).
+
+## Rules and typed/JSON transport
+
+`perf_session --bench typed 1000` and `--bench json 1000` compare native Session
+step/frame access with JSON request decoding/reply encoding for one 128-slot
+world. Both use the same fixed sandbox config and six-tick decisions, resetting
+every 100 decisions to bound the episode; reset costs are included. An untimed
+warmup precedes measurement. Every measured decision retains 128 living slots.
+Use matched release binaries, adjacent alternating pairs and retain both runs.
+Python owned-array copies and C call overhead are outside this native case.
+
+The shared frame adapter validates geometric rules against effective Config
+before projecting the added metadata and v5 coded-error envelope to the older
+trace representation. It never changes portable received frames. Checkpoint
+and rules revisions remain v2/v1; complete simulation state is still compared.

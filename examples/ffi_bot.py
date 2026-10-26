@@ -13,11 +13,17 @@ import os
 from pathlib import Path
 import sys
 
-ABI_VERSION = 2
-PROTOCOL = "slither-sim-json-v4"
+ABI_VERSION = 3
+PROTOCOL = "slither-sim-json-v5"
 NONE = 0xFFFFFFFF
 
 F64, U32, U8 = ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint8)
+
+
+class WorldRules(ctypes.Structure):
+    _fields_ = [("boundary_mode", ctypes.c_uint32), ("flags", ctypes.c_uint32),
+                ("pit_radius", ctypes.c_double), ("min_score", ctypes.c_uint32),
+                ("kill_score_seconds", ctypes.c_double)]
 
 
 class Frame(ctypes.Structure):
@@ -37,7 +43,7 @@ class Frame(ctypes.Structure):
         ("view_self", U32), ("view_snakes_start", U32), ("view_snakes", U32), ("view_food_start", U32),
         ("view_food", U32), ("view_prey_start", U32), ("view_prey", U32),
         ("death_time", F64), ("death_victim", U32), ("death_killer", U32), ("death_reason", U8),
-        ("death_food", U32),
+        ("death_food", U32), ("rules", WorldRules),
     ]
 
 
@@ -90,7 +96,7 @@ class Session:
         if reply.get("protocol") != PROTOCOL:
             raise RuntimeError("incompatible simulator protocol")
         if "error" in reply:
-            raise RuntimeError(reply["error"])
+            raise RuntimeError(reply["error"]["message"])
         return reply["result"]
 
     def step(self, headings, boosts):

@@ -276,7 +276,7 @@ fn rejected_requests_preserve_every_world() {
         snapshots[1].clone(),
     ]);
     for reply in &replies[3..14] {
-        assert!(reply["error"].is_string(), "{reply}");
+        assert!(reply["error"]["message"].is_string(), "{reply}");
     }
     assert_eq!(replies[1], replies[14]);
     assert_eq!(replies[2], replies[15]);
@@ -296,7 +296,7 @@ fn malformed_lines_and_unknown_requests_do_not_break_framing() {
     assert_eq!(lines.len(), 8);
     for reply in &lines[..6] {
         assert_eq!(reply["protocol"], transport::PROTOCOL);
-        assert!(reply["error"].is_string());
+        assert!(reply["error"]["message"].is_string());
     }
     for reply in &lines[6..] {
         let info = &reply["result"];
@@ -320,7 +320,7 @@ fn snapshots_exclude_hidden_state() {
         json!({"op":"reset","seed":9,"agents":2}),
         json!({"op":"snapshot"}),
     ]);
-    assert_eq!(replies[0]["error"], "Reset first");
+    assert_eq!(replies[0]["error"]["message"], "Reset first");
     let snapshot = replies[2]["result"].as_object().unwrap();
     assert_eq!(snapshot.len(), 7);
     for hidden in ["random", "boosts", "speeds", "joins", "kiosks"] {
@@ -377,7 +377,7 @@ fn columns_value(frame: transport::FrameRef) -> Value {
     let (s, f, p, d) = (frame.snakes, frame.food, frame.prey, frame.deaths);
     json!({
         "time": frame.time, "ticks": frame.ticks, "living": frame.living,
-        "radius": frame.radius, "vision": frame.vision,
+        "radius": frame.radius, "vision": frame.vision, "rules": frame.rules,
         "snakes": {
             "slot": s.slot, "x": s.x, "y": s.y, "heading": s.heading, "speed": s.speed,
             "radius": s.radius, "length": s.length, "segments": s.segments, "fam": s.fam,
@@ -434,7 +434,10 @@ fn requests_answer_with_the_serve_lines() {
     assert_eq!((session.worlds(), session.agents()), (2, 3));
     assert!(session.frame(1).is_some() && session.frame(2).is_none());
     let reply: Value = serde_json::from_slice(&session.request(input.last().unwrap())).unwrap();
-    assert_eq!(reply["error"], "Initial spawn body extends outside arena");
+    assert_eq!(
+        reply["error"]["message"],
+        "World 0: Initial spawn body extends outside arena"
+    );
     assert_eq!(reply["sessionEnded"], false);
 }
 
@@ -554,7 +557,7 @@ fn rejected_typed_steps_change_nothing() {
         br#"{"op":"step","actions":[{"heading":[0,1],"boost":[false,false]},{"heading":[0,null],"boost":[false,false]}]}"#,
     ))
     .unwrap();
-    assert_eq!(reply["error"], error.to_string());
+    assert_eq!(reply["error"]["message"], error.to_string());
     assert_eq!(reply["sessionEnded"], false);
     for (headings, boosts) in [
         (&[0.0, 1.0, 0.0, f64::INFINITY][..], &[false; 4][..]),
@@ -574,7 +577,7 @@ fn rejected_typed_steps_change_nothing() {
 fn terminal_steps_clear_all_worlds_and_allow_reset() {
     use slither_sim::transport::StepError;
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/serve-errors-v4.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/serve-errors-v5.json")).unwrap();
     let reset = serde_json::to_vec(&fixture["reset"]).unwrap();
     let step = serde_json::to_vec(&fixture["step"]).unwrap();
     let mut session = transport::Session::new();
@@ -613,9 +616,9 @@ fn terminal_steps_clear_all_worlds_and_allow_reset() {
         json!({"op":"step","actions":[{"heading":[0],"boost":[false]}]}),
     ]);
     assert_eq!(replies[0], fixture["rejectedReply"]);
-    assert_eq!(replies[2]["error"], error.to_string());
+    assert_eq!(replies[2]["error"]["message"], error.to_string());
     let mut terminal = replies[2].clone();
-    terminal["error"] = fixture["terminalReply"]["error"].clone();
+    terminal["error"]["message"] = fixture["terminalReply"]["error"]["message"].clone();
     assert_eq!(terminal, fixture["terminalReply"]);
     assert_eq!(replies[3], fixture["rejectedReply"]);
     assert!(replies[5]["result"]["worlds"][0]["time"].as_f64().unwrap() > 0.0);
@@ -741,7 +744,7 @@ fn reset_sizes_are_bounded_by_frame_types_and_memory_not_policy() {
     assert_eq!(replies[2]["result"]["worlds"][0]["ticks"], 1001);
     let errors: Vec<&str> = replies[4..9]
         .iter()
-        .map(|reply| reply["error"].as_str().unwrap())
+        .map(|reply| reply["error"]["message"].as_str().unwrap())
         .collect();
     assert!(errors[0].contains("u32::MAX means none"), "{}", errors[0]);
     assert!(errors[1].contains("ticks as u32"), "{}", errors[1]);
@@ -773,7 +776,7 @@ fn resolved_dynamic_radius_reset_replays_the_initial_frame() {
 #[test]
 fn initial_config_and_live_radius_survive_reset_replay_and_samples() {
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/serve-radius-v4.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/serve-radius-v5.json")).unwrap();
     let mut session = transport::Session::new();
     let first = result(&session.request(&serde_json::to_vec(&fixture["reset"]).unwrap()));
     assert_eq!(first["config"]["radius"], fixture["initialRadius"]);

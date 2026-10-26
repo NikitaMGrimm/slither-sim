@@ -1,4 +1,4 @@
-# C ABI: slither-sim-abi-v2
+# C ABI: slither-sim-abi-v3
 
 `slither-sim-ffi` wraps Rust [`transport::Session`](bot-api.md#in-process-sessions)
 for C callers, with the worlds, requests and frame values of [`serve`](bot-api.md).
@@ -28,17 +28,20 @@ an extracted library or another build with `--library PATH` or `SLITHER_SIM_FFI`
 
 | Function | Purpose |
 | --- | --- |
-| `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 2 for `slither-sim-abi-v2`. Check it first. |
+| `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 3 for `slither-sim-abi-v3`. Check it first. |
 | `slither_session_new()`, `slither_session_free(s)` | Create and free a session; free ignores null. |
-| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v4` request line as `serve` would. |
+| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v5` request line as `serve` would. |
 | `slither_step(s, headings, n, boosts, n)` | Steps every world like a JSON `step`, without JSON. |
 | `slither_read_frame(s, world, &frame)` | Fills a `slither_frame` with one world's current frame. |
 | `slither_worlds(s)`, `slither_agents(s)` | Worlds and slots per world; 0 before reset. |
-| `slither_last_error(s)` | Why the latest request, step or frame read failed, or an empty string. |
+| `slither_last_error(s)` | Diagnostic text for the latest request, step or frame error, including embedded JSON errors. |
+| `slither_read_error(s, &error)` | Read stable code, constraint and locations without clearing them. |
 
 Use `slither_request` for `info`, `reset` and `snapshot`. JSON errors, including
 terminal failures, return `SLITHER_OK`; inspect `error` and `sessionEnded`.
 Replies have no newline; a trailing NUL is excluded from `reply_len`.
+`error` is the geometric v5 structured object. A JSON failure still returns
+`SLITHER_OK`; both that object and `slither_read_error` retain its typed cause.
 
 `slither_step` takes `worlds × agents` entries per array, world-major: slot `s`
 of world `w` is entry `w × agents + s`. Headings are `double` radians, with NaN
@@ -53,15 +56,14 @@ return 0; reset the usable handle before reading frames or stepping again.
 | `SLITHER_OK` (0) | Success. |
 | `SLITHER_REJECTED` (1) | The session rejected the call, for example a step before reset, and changed nothing. |
 | `SLITHER_INVALID` (2) | A required pointer was null; nothing changed. Arrays may be null when their length is 0. |
-| `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_last_error` and `slither_session_free` remain valid. |
+| `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_last_error`, `slither_read_error` and `slither_session_free` remain valid. |
 | `SLITHER_ENDED` (4) | Advancement failed and cleared every world; reset to continue. |
 
 ## Frames
 
 `slither_frame.radius` is the live boundary, independent of the initial
 `snapshot.config.radius`. `slither_request` snapshots expose a separate live
-`radius` field. These JSON semantics use geometric v4; ABI v2's frame layout
-and column meanings are unchanged.
+`radius` field. ABI v3 appends an inline rules record to the frame; rebuild v2 callers.
 
 `slither_frame` holds the frame's `time`, `radius`, `vision`, `ticks` and
 `living`; the counts `slots`, `snakes`, `body`, `food`, `prey` and `deaths`; and
@@ -84,6 +86,25 @@ one pointer per column. Columns hold the values and fixed types of the
 
 Pointers of empty columns are not null, but must not be dereferenced.
 
+### Inline rules and error inspection
+
+`slither_frame.rules` is a `slither_world_rules` value. Boundary mode is
+`SLITHER_BOUNDARY_SLIDING` (0) or `SLITHER_BOUNDARY_HARD` (1). Its flags are
+`SLITHER_RULE_HAS_PIT` (1), `SLITHER_RULE_HAS_MIN_SCORE` (2),
+`SLITHER_RULE_HAS_KILL_WINDOW` (4) and `SLITHER_RULE_FREE_BOOST_AT_FLOOR` (8).
+Absent numeric fields are zero and ignored unless their presence flag is set.
+The header and Rust use native C layout; compiler assertions check every rules
+member, the appended frame member and the error structure.
+
+`slither_error.code` uses the [geometric cause codes](bot-api.md#structured-errors),
+with 0 for no error, 18 for a null-pointer boundary and 19 for an internal panic.
+`rule` is a constraint code or 0 when absent. `SLITHER_ERROR_HAS_WORLD` (1) and
+`SLITHER_ERROR_HAS_SLOT` (2) indicate location presence independently of the full
+`size_t` values, including `SIZE_MAX`. An absent location's numeric member is 0;
+`field` is null when absent. `message` is diagnostic text. Inspection succeeds
+without clearing the cause; the next request, step or frame read replaces it,
+and success clears it. Inspection remains available after a panic.
+
 ## Lifetimes and threads
 
 Pointers from `slither_request`, `slither_read_frame` and `slither_last_error`
@@ -94,8 +115,8 @@ separate threads. Steps advance several worlds in parallel on the library's
 
 ## Compatibility
 
-`slither-sim-abi-v2` covers function signatures, `slither_frame` layout, codes
+`slither-sim-abi-v3` covers function signatures, `slither_frame`/rules/error layouts, codes
 and column meanings. Incompatible changes need a new identifier and
-`SLITHER_ABI_VERSION`. Rebuild v1 callers; see [migration notes](../CHANGELOG.md#050---2026-10-26).
-Requests and replies follow `slither-sim-json-v4`; check `protocol` and record
+`SLITHER_ABI_VERSION`. Rebuild v1/v2 callers; see [migration notes](../CHANGELOG.md#unreleased).
+Requests and replies follow `slither-sim-json-v5`; check `protocol` and record
 the commit for reproducibility.

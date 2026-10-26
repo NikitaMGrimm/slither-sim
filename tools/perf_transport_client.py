@@ -13,9 +13,9 @@ import sys
 import time
 
 
-# Protocol slither-sim-json-v4: reply decoding and the decision step. Another
+# Protocol slither-sim-json-v5: reply decoding and the decision step. Another
 # protocol replaces these two functions and leaves the timing loop unchanged.
-PROTOCOL = "slither-sim-json-v4"
+PROTOCOL = "slither-sim-json-v5"
 
 
 def decode_reply(line):
@@ -23,7 +23,7 @@ def decode_reply(line):
     if reply.get("protocol") != PROTOCOL:
         raise RuntimeError(f"unexpected protocol {reply.get('protocol')!r}")
     if "error" in reply:
-        raise RuntimeError(f"serve error: {reply['error']}")
+        raise RuntimeError(f"serve error: {reply['error']['message']}")
     return reply["result"]
 
 
