@@ -168,7 +168,7 @@ impl SimulatorBackend {
         let appearance = self.profiles.get(slot).unwrap_or(&NATIVE_PROFILE);
         self.food_presentation
             .register(slot, appearance.skin, &appearance.custom_skin);
-        let latency = &self.config.latency;
+        let latency = self.player_latency.for_slot(slot, &self.config.latency);
         self.connections = self.connections.wrapping_add(1);
         let mut connection = Connection {
             open: true,
@@ -240,6 +240,7 @@ impl SimulatorBackend {
     }
 
     fn transmit(&mut self, slot: usize, at: f64) -> Result<(), String> {
+        let latency = self.player_latency.for_slot(slot, &self.config.latency);
         let s = &mut self.slots[slot];
         let Some((_, action, processing)) = s.outbox else {
             return Ok(());
@@ -256,7 +257,7 @@ impl SimulatorBackend {
         let mut random = self.random.clone();
         let arrivals = packets
             .iter()
-            .map(|_| link.uplink(&self.config.latency, &mut random, at))
+            .map(|_| link.uplink(latency, &mut random, at))
             .collect::<Result<Vec<_>, _>>()?;
         s.state.set_processing_seconds(processing)?;
         for packet in &packets {
@@ -278,10 +279,9 @@ impl SimulatorBackend {
 
     pub(super) fn uplink(&mut self, slot: usize, sent: f64, message: Uplink) -> Result<(), String> {
         self.slots[slot].uplink_room(1)?;
+        let latency = self.player_latency.for_slot(slot, &self.config.latency);
         let connection = &mut self.slots[slot].connection;
-        let arrival = connection
-            .link
-            .uplink(&self.config.latency, &mut self.random, sent)?;
+        let arrival = connection.link.uplink(latency, &mut self.random, sent)?;
         connection.uplink.push_back((arrival, message));
         Ok(())
     }
@@ -306,6 +306,7 @@ impl SimulatorBackend {
         physical: Option<&[Vec<u8>]>,
     ) -> Result<(), String> {
         let groups = frame_groups(packets);
+        let latency = self.player_latency.for_slot(slot, &self.config.latency);
         let connection = &mut self.slots[slot].connection;
         if connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
             return Err("Downlink queue is full".into());
@@ -319,11 +320,7 @@ impl SimulatorBackend {
             .map(|packets| {
                 frame_groups(packets)
                     .iter()
-                    .map(|_| {
-                        connection
-                            .link
-                            .downlink(&self.config.latency, &mut self.random, now)
-                    })
+                    .map(|_| connection.link.downlink(latency, &mut self.random, now))
                     .collect::<Result<Vec<_>, String>>()
             })
             .transpose()?;
@@ -331,7 +328,7 @@ impl SimulatorBackend {
             connection
                 .link
                 .clone()
-                .downlink(&self.config.latency, &mut self.random.clone(), now)?
+                .downlink(latency, &mut self.random.clone(), now)?
         } else {
             now
         };
@@ -347,9 +344,7 @@ impl SimulatorBackend {
                     .or_else(|| arrivals.last())
                     .copied()
                     .unwrap_or(extra),
-                None => connection
-                    .link
-                    .downlink(&self.config.latency, &mut self.random, now)?,
+                None => connection.link.downlink(latency, &mut self.random, now)?,
             };
             let arrival = arrival.max(connection.presented_at);
             connection.presented_at = arrival;

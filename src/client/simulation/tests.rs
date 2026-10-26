@@ -1623,6 +1623,48 @@ fn raw_latency_keeps_order_without_processing_delay() {
 }
 
 #[test]
+fn equal_player_and_bot_models_preserve_raw_frames_and_rng() {
+    for latency in [LatencyConfig::default(), LatencyConfig::measured_route()] {
+        let mut config = raw_config(2);
+        config.latency = latency.clone();
+        let mut baseline = RawSimulator::new(7, config.clone(), 2).unwrap();
+        let mut grouped = RawSimulator::new(7, config, 2).unwrap();
+        grouped.set_player_latency(1, latency);
+        for sim in [&mut baseline, &mut grouped] {
+            for slot in 0..2 {
+                assert!(sim.connect(slot, PlayerAppearance::default()).unwrap());
+            }
+        }
+        for tick in 0..80 {
+            for sim in [&mut baseline, &mut grouped] {
+                if tick == 40 {
+                    sim.disconnect(0).unwrap();
+                    assert!(sim.connect(0, PlayerAppearance::default()).unwrap());
+                }
+                if tick % 6 == 0 {
+                    for slot in 0..2 {
+                        sim.receive(slot, &[251]).unwrap();
+                        sim.receive(slot, &[tick as u8]).unwrap();
+                    }
+                }
+                sim.advance_ticks(1).unwrap();
+            }
+            for slot in 0..2 {
+                assert_eq!(grouped.take(slot).unwrap(), baseline.take(slot).unwrap());
+                assert_eq!(
+                    format!("{:?}", grouped.backend.slots[slot].connection.link),
+                    format!("{:?}", baseline.backend.slots[slot].connection.link),
+                );
+            }
+            assert_eq!(
+                format!("{:?}", grouped.backend.random),
+                format!("{:?}", baseline.backend.random)
+            );
+        }
+    }
+}
+
+#[test]
 fn every_full_appearance_is_followed_by_its_directed_motion() {
     let mut sim = RawSimulator::new(9, raw_config(4), 2).unwrap();
     let mut a = Remote::connect(&mut sim, 0, "");

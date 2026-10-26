@@ -4,9 +4,9 @@
 use slither_sim::{
     Action,
     client::{
-        Backend, ClientFrame, ClientStatus, Host, HostConfig, NetworkBackend, NetworkConfig,
-        RunningHost, SimulationConfig, challenge::solve_challenge, network::Handshake,
-        network::login_packet,
+        Backend, BotConfig, ClientFrame, ClientStatus, Host, HostConfig, LatencyConfig,
+        NetworkBackend, NetworkConfig, PlayerConfig, RunningHost, SimulationConfig,
+        challenge::solve_challenge, network::Handshake, network::login_packet,
     },
 };
 use std::{
@@ -53,10 +53,15 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
     HostConfig {
         bind: "127.0.0.1:0".parse().unwrap(),
         seed: 7,
-        max_clients,
-        bots,
+        players: PlayerConfig {
+            max: max_clients,
+            ..Default::default()
+        },
+        bots: BotConfig {
+            count: bots,
+            ..Default::default()
+        },
         simulation,
-        ..HostConfig::default()
     }
 }
 
@@ -221,7 +226,7 @@ fn pit_markers_reach_stock_sockets_but_not_portable_bots() {
 #[test]
 fn bot_threads_steer_their_snakes() {
     let mut config = config(1, 4);
-    config.bot_threads = 2;
+    config.bots.threads = 2;
     let host = Running::start(config);
     let mut watcher = network(host.url(), "Watcher", Handshake::Direct);
     let first = until(&mut watcher, "every bot", |f| {
@@ -765,6 +770,11 @@ fn login_deadline_closes_idle_upgrades() {
 fn configuration_is_bounded_and_documents_derived_fields() {
     let default = HostConfig::default();
     assert_eq!(default.bind, "127.0.0.1:8766".parse().unwrap());
+    assert_eq!(default.players.max, 4);
+    assert_eq!(default.bots.count, 4);
+    assert_eq!(default.bots.threads, 2);
+    assert_eq!(default.players.latency, LatencyConfig::default());
+    assert_eq!(default.bots.latency, LatencyConfig::default());
     default.validate().unwrap();
     assert!(config(0, 4).validate().is_err());
     // Protocol-19 rank and population are u16: 65535 slots, not a policy cap of 128.
@@ -780,12 +790,70 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     derived.simulation.controlled_slot = 50;
     derived.validate().unwrap();
     let mut threadless = config(1, 2);
-    threadless.bot_threads = 0;
-    assert!(threadless.validate().unwrap_err().contains("botThreads"));
-    threadless.bots = 0;
+    threadless.bots.threads = 0;
+    assert!(threadless.validate().unwrap_err().contains("bots.threads"));
+    threadless.bots.count = 0;
     threadless.validate().unwrap();
     let parsed: HostConfig =
-        serde_json::from_str(r#"{"bind":"0.0.0.0:9000","maxClients":3,"bots":0}"#).unwrap();
+        serde_json::from_str(r#"{"bind":"0.0.0.0:9000","players":{"max":3},"bots":{"count":0}}"#)
+            .unwrap();
     assert_eq!(parsed.bind.port(), 9000);
     assert!(serde_json::from_str::<HostConfig>(r#"{"port":1}"#).is_err());
+}
+
+#[test]
+fn host_latency_validation_names_the_role_and_rejects_player_processing() {
+    let mut host = config(1, 1);
+    host.simulation.latency = LatencyConfig::fixed(0.06);
+    let error = host.validate().unwrap_err();
+    for field in ["simulation.latency", "players.latency", "bots.latency"] {
+        assert!(error.contains(field), "{error}");
+    }
+    host.simulation.latency = LatencyConfig::default();
+    for (processing, jitter) in [([0.01, 0.01], 0.), ([0., 0.], 0.01)] {
+        host.players.latency.processing_seconds = processing;
+        host.players.latency.processing_jitter_seconds = jitter;
+        let error = host.validate().unwrap_err();
+        assert!(error.contains("players.latency"), "{error}");
+        assert!(error.contains("must be zero"), "{error}");
+    }
+    host.players.latency = LatencyConfig::fixed(0.06);
+    host.bots.latency.processing_seconds = [0.01, 0.02];
+    host.bots.latency.processing_jitter_seconds = 0.003;
+    host.validate().unwrap();
+    for player in [true, false] {
+        let mut invalid = host.clone();
+        let (latency, field) = if player {
+            (&mut invalid.players.latency, "players.latency")
+        } else {
+            (&mut invalid.bots.latency, "bots.latency")
+        };
+        latency.round_trip_seconds = vec![-1.];
+        assert!(invalid.validate().unwrap_err().contains(field));
+    }
+}
+
+#[test]
+fn legacy_host_keys_are_rejected_with_grouped_config_names() {
+    for (json, field) in [
+        (r#"{"maxClients":4,"bots":4,"botThreads":2}"#, "maxClients"),
+        (r#"{"botThreads":2}"#, "botThreads"),
+    ] {
+        let error = serde_json::from_str::<HostConfig>(json)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(&format!("unknown field `{field}`")),
+            "{error}"
+        );
+        assert!(
+            error.contains("players") && error.contains("bots"),
+            "{error}"
+        );
+    }
+    let error = serde_json::from_str::<HostConfig>(r#"{"bots":4}"#)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("BotConfig"), "{error}");
+    assert!(error.contains("expected"), "{error}");
 }

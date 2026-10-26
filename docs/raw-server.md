@@ -30,9 +30,8 @@ Save as `arena.json`:
 {
   "bind": "127.0.0.1:8766",
   "seed": 7,
-  "maxClients": 4,
-  "bots": 4,
-  "botThreads": 2,
+  "players": { "max": 4, "latency": {} },
+  "bots": { "count": 4, "threads": 2, "latency": {} },
   "simulation": {
     "world": {
       "radius": 1500,
@@ -61,11 +60,11 @@ background bots and derived simulation fields. Valid but unmeasured settings
 warn on stderr; see [limits](configuration.md#limits). Record on a client;
 host `recordWire` must be false.
 
-`--bind IP:PORT` overrides the file. Leave added latency at zero for normal
-remote use. On loopback, the [measured route](configuration.md#variation-and-pauses)
-models an official-like path for every connection, including bots. See
-[`LatencyConfig`](configuration.md#latencyconfig) for ordered delays and
-processing, which is not simulated twice for remote clients.
+`--bind IP:PORT` overrides the file. `players.latency` adds link delay to socket
+players, useful for emulating a route on loopback; its processing fields must be
+zero. `bots.latency` independently models bot links and processing.
+`simulation.latency` must stay at its default. See
+[`LatencyConfig`](configuration.md#latencyconfig) for ordered delays.
 
 ### Presets
 
@@ -92,7 +91,7 @@ by 14 ms of world time; at most one search runs per tick. Disconnected waiters
 are removed. A crowded world can wait indefinitely. Worlds without `spawnRadius`
 keep the official fallback and
 refusal behavior.
-A dynamic host arena starts sized for all seats (`maxClients` plus `bots`), with
+A dynamic host arena starts sized for all seats (`players.max` plus `bots.count`), with
 its food target and ambient rate scaled to the same density.
 For Rust constructors and the default `Config::official(1)`, see
 [world settings](configuration.md#official-and-sandbox).
@@ -115,7 +114,7 @@ at latency-model due times between ticks. OS scheduling and load affect delivery
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
 
-`botThreads` runs background Forager clients using `PolicyId::default()`. Each
+`bots.threads` runs background Forager clients using `PolicyId::default()`. Each
 decodes its slot's frames, decides every `decisionTicks × dt` with staggered phases, models processing delay,
 pings and rejoins after death. Each worker shares one stateless policy instance;
 its seats keep separate decoders, outboxes and sent histories. See [worker limits](configuration.md#hostconfig)

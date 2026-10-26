@@ -12,7 +12,8 @@
 //! anchor, tail, mass and motion deltas. Native and remote coverage is shared.
 use super::{
     Backend, Bot, ClientFrame, ClientState, ClientStatus, ForagerBot, WireEvent, WireRecord,
-    latency::Random, presentation::FoodPresentation,
+    latency::{LatencyConfig, Random},
+    presentation::FoodPresentation,
 };
 use crate::{Action, Simulator, model::Point, spawn};
 use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
@@ -76,6 +77,7 @@ use snakes::SnakeReports;
 /// A living snake is first removed without death food.
 pub struct SimulatorBackend {
     config: SimulationConfig,
+    player_latency: PlayerLatency,
     world: Simulator,
     slots: Vec<Slot>,
     /// Stateless scratch shared by sequential background decisions, never per slot.
@@ -117,6 +119,24 @@ pub struct SimulatorBackend {
     /// Connections opened so far; numbers session IDs.
     connections: u32,
     session_key: u32,
+}
+
+/// Only hosted socket slots override the simulation's link model. Native
+/// backends and raw simulations without an override retain one shared model.
+#[derive(Default)]
+struct PlayerLatency {
+    slots: usize,
+    config: LatencyConfig,
+}
+
+impl PlayerLatency {
+    fn for_slot<'a>(&'a self, slot: usize, simulation: &'a LatencyConfig) -> &'a LatencyConfig {
+        if slot < self.slots {
+            &self.config
+        } else {
+            simulation
+        }
+    }
 }
 
 impl SimulatorBackend {
@@ -165,6 +185,7 @@ impl SimulatorBackend {
             food_buckets: Vec::new(),
             slots: Vec::with_capacity(config.agents),
             background_policy: None,
+            player_latency: PlayerLatency::default(),
             world,
             config,
             tick: 0,

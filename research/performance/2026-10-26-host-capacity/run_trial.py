@@ -64,10 +64,12 @@ def main(args):
         return p
     try:
         if args.role == 'host':
-            config = {'bind': '0.0.0.0:8766', 'seed': 7, 'maxClients': args.count, 'bots': args.bots,
-                      'botThreads': 7 if args.bots else 0}
+            config = {'bind': '0.0.0.0:8766', 'seed': 7, 'players': {'max': args.count},
+                      'bots': {'count': args.bots, 'threads': 7 if args.bots else 0}}
             if args.bots:
-                config['simulation'] = {'latency': {'roundTripSeconds': [0.04]}}
+                latency = {'roundTripSeconds': [0.04]}
+                config['players']['latency'] = latency
+                config['bots']['latency'] = latency
             (out / 'config.json').write_text(json.dumps(config) + '\n')
             p = launch([str(Path(args.bin).resolve()/'host_probe'), str(out/'config.json'), str(args.warmup), str(args.hold),
                         str(out/'host.json'), str(args.epoch)], 'host')

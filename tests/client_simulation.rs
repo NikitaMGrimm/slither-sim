@@ -39,6 +39,8 @@ fn delivery_defaults_to_responsive_for_every_world_and_explicit_choices_win() {
         let host: HostConfig =
             serde_json::from_str(&format!(r#"{{"simulation":{json}}}"#)).unwrap();
         assert_eq!(host.simulation.delivery, expected, "{json}");
+        assert_eq!(host.players.latency, LatencyConfig::default());
+        assert_eq!(host.bots.latency, LatencyConfig::default());
         // Resolved JSON names the profile, so it stays readable if the default moves.
         let resolved = serde_json::to_value(&config).unwrap();
         assert_eq!(
