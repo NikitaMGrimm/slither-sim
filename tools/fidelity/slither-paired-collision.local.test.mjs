@@ -14,7 +14,11 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const binary = path.resolve(root, process.env.CARGO_TARGET_DIR ?? 'target', 'debug',
   process.platform === 'win32' ? 'slither-sim.exe' : 'slither-sim');
 
-test('localhost host completes all ladder offsets and reversed head-on join cells', { timeout: 300000 }, async () => {
+// A three-minute real-time acquisition run; shared CI runners time out its joins,
+// so it runs only on request.
+const skip = process.env.SLITHER_COLLISION_E2E ? false : 'set SLITHER_COLLISION_E2E=1 to run';
+
+test('localhost host completes all ladder offsets and reversed head-on join cells', { skip, timeout: 300000 }, async () => {
   assert.ok(fs.existsSync(binary), 'build first: CARGO_BUILD_JOBS=2 cargo build --locked --bin slither-sim');
   // Retain full archives, including failed runs, outside Git for diagnosis.
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-collision-'));

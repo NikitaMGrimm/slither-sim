@@ -233,7 +233,7 @@ For a complete **localhost-only** engineering check, build the binary and run:
 
 ```sh
 node --test tools/fidelity/slither-paired-collision.test.mjs
-node --test tools/fidelity/slither-paired-collision.local.test.mjs
+SLITHER_COLLISION_E2E=1 node --test tools/fidelity/slither-paired-collision.local.test.mjs
 cargo test --locked --example collision_curve
 cargo run --locked --example collision_curve
 ```
