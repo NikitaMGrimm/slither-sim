@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 use slither_sim::{Config, Observation, Simulator, Snake, transport};
+use slither_sim::{Constraint, ErrorKind};
 use std::io::Cursor;
 
 fn exchange(requests: &[Value]) -> Vec<Value> {
@@ -510,9 +511,8 @@ fn typed_steps_match_json_steps() {
 #[test]
 fn rejected_typed_steps_change_nothing() {
     let mut session = transport::Session::new();
-    assert_eq!(
-        session.step(&[], &[]).unwrap_err(),
-        transport::StepError::Rejected("Reset first".into())
+    assert!(
+        matches!(session.step(&[], &[]), Err(transport::StepError::Rejected(ref e)) if e.kind == ErrorKind::NotReset)
     );
     result(&session.request(br#"{"op":"reset","seed":3,"agents":2,"worlds":2}"#));
     let state = |session: &mut transport::Session| {
@@ -529,9 +529,18 @@ fn rejected_typed_steps_change_nothing() {
     let error = session
         .step(&[0.0, 1.0, 0.0, f64::NAN], &[false; 4])
         .unwrap_err();
+    let transport::StepError::Rejected(cause) = &error else {
+        panic!("{error}")
+    };
     assert_eq!(
-        error,
-        transport::StepError::Rejected("World 1: Missing or invalid action for 1".into())
+        cause.kind,
+        ErrorKind::InvalidAction {
+            rule: Constraint::Missing
+        }
+    );
+    assert_eq!(
+        (cause.world, cause.slot, cause.field.as_deref()),
+        (Some(1), Some(1), Some("heading"))
     );
     let reply: Value = serde_json::from_slice(&session.request(
         br#"{"op":"step","actions":[{"heading":[0,1],"boost":[false,false]},{"heading":[0,null],"boost":[false,false]}]}"#,
@@ -566,13 +575,19 @@ fn terminal_steps_clear_all_worlds_and_allow_reset() {
     let error = session
         .step(&[std::f64::consts::PI; 2], &[false; 2])
         .unwrap_err();
-    assert!(matches!(error, StepError::Ended(_)), "{error}");
-    assert!(error.to_string().contains("mass would overflow"), "{error}");
+    let StepError::Ended(cause) = &error else {
+        panic!("{error}")
+    };
+    assert_eq!(cause.kind, ErrorKind::NumericOverflow);
+    // Both worlds fail: parallel completion order must not choose the cause.
+    assert_eq!(
+        (cause.world, cause.slot, cause.field.as_deref()),
+        (Some(0), Some(0), Some("fam"))
+    );
     assert_eq!((session.worlds(), session.agents()), (0, 0));
     assert!(session.frame(0).is_none() && session.frame(1).is_none());
-    assert_eq!(
-        session.step(&[], &[]),
-        Err(StepError::Rejected("Reset first".into()))
+    assert!(
+        matches!(session.step(&[], &[]), Err(StepError::Rejected(ref e)) if e.kind == ErrorKind::NotReset)
     );
     let rejected: Value = serde_json::from_slice(&session.request(&step)).unwrap();
     assert_eq!(rejected, fixture["rejectedReply"]);

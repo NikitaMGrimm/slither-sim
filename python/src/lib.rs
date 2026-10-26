@@ -313,9 +313,9 @@ impl Session {
             boosts,
         } = self;
         py.detach(|| inner.step(headings, boosts))
-            .map_err(|error| match error {
-                transport::StepError::Rejected(message) => PyValueError::new_err(message),
-                transport::StepError::Ended(message) => SessionEndedError::new_err(message),
+            .map_err(|error| match &error {
+                transport::StepError::Rejected(_) => PyValueError::new_err(error.to_string()),
+                transport::StepError::Ended(_) => SessionEndedError::new_err(error.to_string()),
             })
     }
 

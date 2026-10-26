@@ -1,3 +1,4 @@
+use slither_sim::ErrorKind;
 use slither_sim::{Config, Simulator};
 
 #[test]
@@ -135,7 +136,8 @@ fn food_and_prey_targets_have_no_policy_cap() {
         },
     )
     .unwrap_err();
-    assert!(error.contains("foodCount"), "{error}");
+    assert_eq!(error.kind, ErrorKind::AllocationFailed);
+    assert_eq!(error.field.as_deref(), Some("foodCount"));
     let error = Simulator::new(
         7,
         Config {
@@ -147,7 +149,8 @@ fn food_and_prey_targets_have_no_policy_cap() {
         },
     )
     .unwrap_err();
-    assert!(error.contains("prey count"), "{error}");
+    assert_eq!(error.kind, ErrorKind::AllocationFailed);
+    assert_eq!(error.field.as_deref(), Some("prey.count"));
 }
 
 #[test]

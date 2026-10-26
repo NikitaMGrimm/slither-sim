@@ -103,7 +103,7 @@ fn world(case: &str) -> Result<Simulator, String> {
     if case == "observe-compact" {
         config.ambient_food.enabled = false;
     }
-    let mut world = Simulator::new(SEED, config)?;
+    let mut world = Simulator::new(SEED, config).map_err(|error| error.to_string())?;
     let agents = agents(case);
     let anchors = if case == "observe-clustered" {
         CLUSTERED_ANCHORS
@@ -111,7 +111,9 @@ fn world(case: &str) -> Result<Simulator, String> {
         ANCHORS
     };
     for slot in 0..agents {
-        world.add(slot.to_string(), slot, agents)?;
+        world
+            .add(slot.to_string(), slot, agents)
+            .map_err(|error| error.to_string())?;
         let snake = &mut world.snakes[slot];
         if case == "observe-strip" {
             snake.head = Point {
@@ -140,7 +142,9 @@ fn world(case: &str) -> Result<Simulator, String> {
         snake.fam = 0.75;
         snake.speed = physics::base_speed(snake.segments);
         Simulator::update_mass(snake);
-        world.initialize_speed_state(slot, Some(0.0))?;
+        world
+            .initialize_speed_state(slot, Some(0.0))
+            .map_err(|error| error.to_string())?;
     }
     if case == "observe-strip" {
         // Remap admitted seed-7 pellets without consuming RNG or changing order,
@@ -253,7 +257,10 @@ fn verify_scalar(
         .enumerate()
         .map(|(slot, snake)| {
             if snake.alive && selected[slot] {
-                world.observe(slot).map(Some)
+                world
+                    .observe(slot)
+                    .map(Some)
+                    .map_err(|error| error.to_string())
             } else {
                 Ok(None)
             }
@@ -360,7 +367,7 @@ fn run() -> Result<(), String> {
     }
     for iteration in 0..args.iterations {
         if args.trace {
-            let output = observe()?;
+            let output = observe().map_err(|error| error.to_string())?;
             black_box(&output);
             verify_scalar(&world, &selected, &output)?;
             line(
@@ -369,7 +376,7 @@ fn run() -> Result<(), String> {
             )?;
         } else {
             let start = Instant::now();
-            let output = observe()?;
+            let output = observe().map_err(|error| error.to_string())?;
             black_box(&output);
             let elapsed = start.elapsed().as_secs_f64();
             let start = Instant::now();

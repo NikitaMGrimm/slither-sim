@@ -84,7 +84,9 @@ impl RawSimulator {
         };
         b.slots[slot].living = None;
         b.world.snakes[slot].alive = false;
-        b.world.respawn_body(slot, body, heading)?;
+        b.world
+            .respawn_body(slot, body, heading)
+            .map_err(|error| error.to_string())?;
         b.profiles[slot] = appearance;
         let s = &mut b.slots[slot];
         s.life += 1;

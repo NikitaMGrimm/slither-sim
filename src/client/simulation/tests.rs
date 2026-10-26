@@ -24,13 +24,15 @@ fn exhaustive_spawn_pose(
         let distance = spawn::spawn_distance(&world.config, random.unit());
         let angle = random.unit() * TAU;
         let heading = random.unit() * TAU;
-        let (body, heading) = world.spawn_body(
-            Point {
-                x: angle.cos() * distance,
-                y: angle.sin() * distance,
-            },
-            heading,
-        )?;
+        let (body, heading) = world
+            .spawn_body(
+                Point {
+                    x: angle.cos() * distance,
+                    y: angle.sin() * distance,
+                },
+                heading,
+            )
+            .map_err(|error| error.to_string())?;
         if world.body_is_clear(&body, 600.) {
             return Ok((body, heading));
         }

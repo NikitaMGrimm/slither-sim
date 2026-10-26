@@ -1,4 +1,5 @@
 use slither_sim::*;
+use slither_sim::{Constraint, ErrorKind};
 
 #[test]
 fn shallow_contact_slides_at_normal_and_boost_speeds_without_rotating_the_heading() {
@@ -378,7 +379,13 @@ fn sliding_steps_are_bounded_by_the_contact_lead_not_a_literal() {
     config(below, BoundaryMode::Sliding).validate().unwrap();
     assert!(shallow_boost_slide_survives(below));
     let error = config(limit, BoundaryMode::Sliding).validate().unwrap_err();
-    assert!(error.contains("contact"), "{error}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::OutOfRange
+        }
+    );
+    assert_eq!(error.field.as_deref(), Some("dt"));
     assert!(config(beyond, BoundaryMode::Sliding).validate().is_err());
     assert!(!shallow_boost_slide_survives(beyond));
     // Hard boundaries kill on contact anyway, so longer steps stay valid.
@@ -391,7 +398,13 @@ fn hard_steps_are_bounded_by_exact_tick_counts() {
     let exact = 2f64.powi(53).min(usize::MAX as f64);
     let limit = physics::LOOP_SECONDS * exact;
     let error = long_config(1e308).validate().unwrap_err();
-    assert!(error.contains("substep"), "{error}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::OutOfRange
+        }
+    );
+    assert_eq!(error.field.as_deref(), Some("dt"));
     assert!(long_config(limit * 1.001).validate().is_err());
     // One tick just inside the bound keeps the head finite.
     let mut world = Simulator::new(1, long_config(limit * 0.999)).unwrap();
@@ -441,7 +454,13 @@ fn long_boost_steps_count_their_drops() {
     // A 430-segment boost costs no mass, and at dt 1e16 subtracting the 0.155 s
     // drop period no longer changed the clock, so the drop loop never ended.
     let error = long_config(1e16).validate().unwrap_err();
-    assert!(error.contains("exact integer"), "{error}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::OutOfRange
+        }
+    );
+    assert_eq!(error.field.as_deref(), Some("dt"));
     let world = boosted(100., 430);
     assert!(world.time == 100.);
     // A drop is due at once and then every 0.155 s: floor((0.155 + 1) / 0.155).

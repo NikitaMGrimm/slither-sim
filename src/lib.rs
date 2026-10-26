@@ -6,6 +6,7 @@ pub mod boundary;
 mod bounds_index;
 #[cfg(feature = "networking")]
 pub mod client;
+pub mod error;
 mod food_grid;
 mod json;
 pub mod kiosk;
@@ -21,6 +22,7 @@ pub mod spawn;
 pub mod transport;
 
 pub use boundary::{BoundaryMode, RadiusUpdate};
+pub use error::{Constraint, CoreStepError, ErrorCode, ErrorKind, SimError, WorldStatus};
 pub use kiosk::KioskConfig;
 pub use model::*;
 pub use physics::{SpeedModel, SpeedState};

@@ -291,9 +291,9 @@ pub unsafe extern "C" fn slither_step(
             s.boosts.extend(boosts.iter().map(|&boost| boost != 0));
             s.session
                 .step(headings, &s.boosts)
-                .map_err(|error| match error {
-                    StepError::Rejected(message) => (SLITHER_REJECTED, message),
-                    StepError::Ended(message) => (SLITHER_ENDED, message),
+                .map_err(|error| match &error {
+                    StepError::Rejected(_) => (SLITHER_REJECTED, error.to_string()),
+                    StepError::Ended(_) => (SLITHER_ENDED, error.to_string()),
                 })
         })
     }

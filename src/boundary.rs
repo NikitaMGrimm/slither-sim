@@ -1,5 +1,6 @@
 //! Measured radius changes and an approximate, locally calibrated rim constraint.
 use crate::model::Point;
+use crate::{Constraint, SimError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,15 +69,28 @@ pub struct RadiusUpdate {
     pub radius: f64,
 }
 
-pub(crate) fn validate(updates: &[RadiusUpdate]) -> Result<(), String> {
-    if updates
-        .iter()
-        .any(|u| !u.time.is_finite() || u.time < 0. || !u.radius.is_finite() || u.radius <= 0.)
-        || updates.windows(2).any(|w| w[0].time >= w[1].time)
-    {
-        return Err(
-            "Radius updates require increasing nonnegative times and positive finite radii".into(),
-        );
+pub(crate) fn validate(updates: &[RadiusUpdate]) -> Result<(), SimError> {
+    let message = "Radius updates require increasing nonnegative times and positive finite radii";
+    for (index, update) in updates.iter().enumerate() {
+        for (field, rule) in [
+            ("time", Constraint::nonnegative(update.time)),
+            ("radius", Constraint::positive(update.radius)),
+        ] {
+            if let Some(rule) = rule {
+                return Err(SimError::config(
+                    rule,
+                    &format!("radiusUpdates[{index}].{field}"),
+                    message,
+                ));
+            }
+        }
+    }
+    if let Some(index) = updates.windows(2).position(|w| w[0].time >= w[1].time) {
+        return Err(SimError::config(
+            Constraint::Ordering,
+            &format!("radiusUpdates[{}].time", index + 1),
+            message,
+        ));
     }
     Ok(())
 }

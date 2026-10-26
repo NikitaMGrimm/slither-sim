@@ -4,6 +4,11 @@
 
 ### Breaking
 
+- Rust core calls now return `SimError`; `step`/`step_profiled` return
+  `CoreStepError::{Rejected, Stopped}`, and `transport::StepError` carries
+  `SimError` causes. Match `kind` or `code()` instead of message text; inspect
+  `Simulator::status()` for the original stopped cause. Wire errors are unchanged
+  ([Rust errors](docs/bot-api.md#rust-library)).
 - The portable `client` JSON protocol is now `slither-client-json-v2`, because
   v0.4.0 requests with the removed broadcast and latency fields are rejected. The
   frame contract stays `slither-client-v2`

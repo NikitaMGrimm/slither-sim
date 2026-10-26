@@ -1,4 +1,5 @@
 //! Visibility, independent of stepping, rewards, and transport.
+use crate::{Constraint, ErrorKind, SimError};
 use crate::{model::*, physics::Bounds, prey::Prey, simulator::Simulator};
 use std::ops::Range;
 
@@ -30,7 +31,7 @@ impl<'a> VisibleState<'a> {
         }
     }
     /// Observation of one slot, without the batch index.
-    pub(crate) fn observe(self, index: usize) -> Result<Observation, String> {
+    pub(crate) fn observe(self, index: usize) -> Result<Observation, SimError> {
         let mut slot = None;
         Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot)?;
         Ok(slot.expect("observed"))
@@ -193,9 +194,11 @@ impl<'a> Observer<'a> {
         index: usize,
         marks: &mut Vec<u64>,
         slot: &mut Option<Observation>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimError> {
         let w = self.world;
-        let me = w.snakes.get(index).ok_or("Unknown agent slot")?;
+        let me = w.snakes.get(index).ok_or_else(|| {
+            SimError::new(ErrorKind::UnknownSlot, "Unknown agent slot").at_slot(index)
+        })?;
         let (previous_me, mut food, mut prey, mut opponents) = slot
             .take()
             .map(|o| (Some(o.me), o.food, o.prey, o.opponents))
@@ -240,9 +243,11 @@ impl<'a> Observer<'a> {
         index: usize,
         marks: &mut Vec<u64>,
         sink: &mut impl Sink,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimError> {
         let w = self.world;
-        let me = w.snakes.get(index).ok_or("Unknown agent slot")?;
+        let me = w.snakes.get(index).ok_or_else(|| {
+            SimError::new(ErrorKind::UnknownSlot, "Unknown agent slot").at_slot(index)
+        })?;
         let vision = w.vision;
         let visible = |p: Point| {
             (p.x - me.head.x).abs() <= vision
@@ -420,7 +425,7 @@ impl Sink for Copies<'_, '_> {
     }
 }
 impl Simulator {
-    pub fn observe(&self, index: usize) -> Result<Observation, String> {
+    pub fn observe(&self, index: usize) -> Result<Observation, SimError> {
         VisibleState::of(self).observe(index)
     }
     /// Detached observations; indexes live only for this immutable borrow of world state.
@@ -437,7 +442,10 @@ impl Simulator {
     }
     /// Materialize selected living slots using one shared observation index.
     /// The mask and result have one entry per snake; dead and unselected slots are None.
-    pub fn observe_selected(&self, selected: &[bool]) -> Result<Vec<Option<Observation>>, String> {
+    pub fn observe_selected(
+        &self,
+        selected: &[bool],
+    ) -> Result<Vec<Option<Observation>>, SimError> {
         let mut observations = Vec::new();
         self.observe_selected_into(selected, &mut observations)?;
         Ok(observations)
@@ -449,7 +457,7 @@ impl Simulator {
         &self,
         selected: &[bool],
         observations: &mut Vec<Option<Observation>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimError> {
         self.observe_matching(Some(selected), observations)
     }
     /// One entry per slot: what each living slot sees, by the same rules as
@@ -481,9 +489,13 @@ impl Simulator {
         &self,
         selected: Option<&[bool]>,
         observations: &mut Vec<Option<Observation>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimError> {
         if selected.is_some_and(|flags| flags.len() != self.snakes.len()) {
-            return Err("One selection flag per agent slot required".into());
+            return Err(SimError::state(
+                Constraint::LengthMismatch,
+                "selected",
+                "One selection flag per agent slot required",
+            ));
         }
         let wanted: Vec<bool> = (0..self.snakes.len())
             .map(|i| self.snakes[i].alive && selected.is_none_or(|flags| flags[i]))
@@ -507,7 +519,7 @@ impl Simulator {
                     *slot = None;
                 }
             }
-            Ok::<_, String>(())
+            Ok::<_, SimError>(())
         };
         #[cfg(feature = "parallel")]
         if self.parallel() {

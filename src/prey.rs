@@ -1,5 +1,6 @@
 //! Moving edible entities. Authoritative positions are quantized each server tick;
 //! client prediction is smooth. Steering and population control remain estimates.
+use crate::{Constraint, SimError};
 use crate::{
     model::*,
     physics::{MAX_SEGMENTS, REFERENCE_FRAME_SECONDS, SPEED_UNIT_SECONDS, advance, nutrition},
@@ -92,29 +93,45 @@ impl PreyConfig {
         self.escape_speed + (self.sprint_speed - self.escape_speed) * fraction
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), SimError> {
         // Zero is a stationary, non-turning or non-nourishing prey.
-        let nonnegative = [
-            self.cruise_speed,
-            self.escape_speed,
-            self.sprint_speed,
-            self.turn_rate,
-            self.nutrition_factor,
-        ];
-        let positive = [
-            self.flee_half_width,
-            self.size,
-            self.max_size,
-            self.respawn_seconds,
-        ];
-        if nonnegative.iter().any(|x| !x.is_finite() || *x < 0.0)
-            || positive.iter().any(|x| !x.is_finite() || *x <= 0.0)
-            || self.escape_speed < self.cruise_speed
-            || self.sprint_speed < self.escape_speed
-            || self.max_size < self.size
-            || self.size_steps().is_none()
-        {
-            return Err("Invalid prey settings".into());
+        let message = "Invalid prey settings";
+        for (field, value) in [
+            ("prey.cruiseSpeed", self.cruise_speed),
+            ("prey.escapeSpeed", self.escape_speed),
+            ("prey.sprintSpeed", self.sprint_speed),
+            ("prey.turnRate", self.turn_rate),
+            ("prey.nutritionFactor", self.nutrition_factor),
+        ] {
+            if let Some(rule) = Constraint::nonnegative(value) {
+                return Err(SimError::config(rule, field, message));
+            }
+        }
+        for (field, value) in [
+            ("prey.fleeHalfWidth", self.flee_half_width),
+            ("prey.size", self.size),
+            ("prey.maxSize", self.max_size),
+            ("prey.respawnSeconds", self.respawn_seconds),
+        ] {
+            if let Some(rule) = Constraint::positive(value) {
+                return Err(SimError::config(rule, field, message));
+            }
+        }
+        for (field, invalid) in [
+            ("prey.escapeSpeed", self.escape_speed < self.cruise_speed),
+            ("prey.sprintSpeed", self.sprint_speed < self.escape_speed),
+            ("prey.maxSize", self.max_size < self.size),
+        ] {
+            if invalid {
+                return Err(SimError::config(Constraint::Ordering, field, message));
+            }
+        }
+        if self.size_steps().is_none() {
+            return Err(SimError::config(
+                Constraint::OutOfRange,
+                "prey.size",
+                message,
+            ));
         }
         // A catch adds nutrition(size, mass) × nutritionFactor to the eater's
         // mass, largest at the minimum mass 2. Finite inputs alone can still
@@ -122,11 +139,12 @@ impl PreyConfig {
         let (_, upper) = self.size_steps().expect("checked above");
         let catch = nutrition(upper / 5.0, 2.0) * self.nutrition_factor;
         if !(catch + MAX_SEGMENTS as f64).is_finite() {
-            return Err(
+            return Err(SimError::config(
+                Constraint::OutOfRange,
+                "prey.nutritionFactor",
                 "Prey nutrition (largest size² × 0.0031535 × nutritionFactor), added to a \
-                 snake's mass, must be finite"
-                    .into(),
-            );
+                 snake's mass, must be finite",
+            ));
         }
         Ok(())
     }

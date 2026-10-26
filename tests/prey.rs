@@ -1,3 +1,4 @@
+use slither_sim::{Constraint, CoreStepError, ErrorKind, WorldStatus};
 use slither_sim::{profiling::StepProfile, *};
 
 fn entity(x: f64, speed: f64) -> Prey {
@@ -97,7 +98,13 @@ fn prey_nutrition_that_overflows_a_snake_mass_is_rejected() {
         ..PreyConfig::default()
     };
     let error = huge.validate().unwrap_err();
-    assert!(error.contains("nutritionFactor"), "{error}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::OutOfRange
+        }
+    );
+    assert_eq!(error.field.as_deref(), Some("prey.nutritionFactor"));
     let factor = PreyConfig {
         size: 1000.,
         max_size: 1000.,
@@ -157,21 +164,30 @@ fn accumulated_prey_mass_that_overflows_stops_the_world() {
     let fam = world.snakes[0].fam;
     assert!(fam.is_finite() && fam > 1e308);
     let error = catch(&mut world, 1).unwrap_err();
-    assert!(
-        error.contains("overflow") && error.contains("cannot advance"),
-        "{error}"
-    );
+    let CoreStepError::Stopped(cause) = &error else {
+        panic!("{error}")
+    };
+    assert_eq!(cause.kind, ErrorKind::NumericOverflow);
+    assert_eq!(cause.slot, Some(0));
+    assert_eq!(cause.field.as_deref(), Some("fam"));
+    assert_eq!(world.status(), WorldStatus::Stopped(cause));
     // The tick completed without the overflowing gain.
     assert!(world.prey.is_empty());
     assert_eq!(world.snakes[0].fam, fam);
     assert!(world.snakes[0].length.is_finite());
     let time = world.time;
-    assert_eq!(catch(&mut world, 2).unwrap_err(), error);
+    assert!(
+        matches!(catch(&mut world, 2), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
+    );
+    assert_eq!(world.status(), WorldStatus::Stopped(cause));
     assert_eq!(world.time, time);
 
     let encoded = serde_json::to_string(&world).unwrap();
     let mut restored: Simulator = serde_json::from_str(&encoded).unwrap();
-    assert_eq!(restored.step(&[None]).unwrap_err(), error);
+    assert!(
+        matches!(restored.step(&[None]), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
+    );
+    assert_eq!(restored.status(), WorldStatus::Stopped(cause));
     assert_eq!(restored.time, time);
     assert_eq!(restored.snakes[0].fam, fam);
 }
@@ -217,7 +233,16 @@ fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
         } else {
             world.step(&[])
         };
-        assert_eq!(result.unwrap_err(), "Invalid prey settings");
+        let CoreStepError::Rejected(cause) = result.unwrap_err() else {
+            panic!("expected rejection")
+        };
+        assert_eq!(
+            cause.kind,
+            ErrorKind::InvalidConfig {
+                rule: Constraint::OutOfRange
+            }
+        );
+        assert_eq!(cause.field.as_deref(), Some("prey.size"));
         assert_eq!(serde_json::to_value(&world).unwrap(), before);
         assert_eq!(profile.ticks, 0);
 
@@ -699,13 +724,21 @@ fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
     )
     .unwrap();
     let error = w.step(&[]).unwrap_err();
-    assert!(
-        error.contains("Prey motion") && error.contains("cannot advance"),
-        "{error}"
-    );
+    let CoreStepError::Stopped(cause) = &error else {
+        panic!("{error}")
+    };
+    assert_eq!(cause.kind, ErrorKind::NumericOverflow);
+    assert_eq!(cause.field.as_deref(), Some("prey.position"));
+    assert_eq!(w.status(), WorldStatus::Stopped(cause));
+    assert_eq!(w.time, 2.);
     assert!(w.prey.iter().all(|prey| prey.position.finite()));
     let time = w.time;
-    assert_eq!(w.step(&[]).unwrap_err(), error);
+    let before = serde_json::to_value(&w).unwrap();
+    assert!(
+        matches!(w.step(&[]), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
+    );
+    assert_eq!(serde_json::to_value(&w).unwrap(), before);
+    assert_eq!(w.status(), WorldStatus::Stopped(cause));
     assert_eq!(w.time, time);
 }
 

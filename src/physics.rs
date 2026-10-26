@@ -4,6 +4,7 @@
 //! Turning and boost progress use a separate 8 ms reference interval. Neither
 //! conversion is the physics tick. See docs/server-rules.md for each fit's evidence.
 use crate::model::Point;
+use crate::{Constraint, SimError};
 use serde::{Deserialize, Serialize};
 use std::{
     f64::consts::{PI, TAU},
@@ -98,15 +99,21 @@ impl SpeedState {
             progress: ((speed - base) / (BOOST_SPEED - base)).clamp(0.0, 1.0),
         }
     }
-    pub fn with_progress(speed: f64, progress: f64) -> Result<Self, String> {
-        if !speed.is_finite()
-            || speed < 0.0
-            || !progress.is_finite()
-            || !(0.0..=1.0).contains(&progress)
-        {
-            return Err(
-                "Speed state requires finite nonnegative speed and progress in 0..1".into(),
-            );
+    pub fn with_progress(speed: f64, progress: f64) -> Result<Self, SimError> {
+        let message = "Speed state requires finite nonnegative speed and progress in 0..1";
+        if let Some(rule) = Constraint::nonnegative(speed) {
+            return Err(SimError::state(rule, "speed", message));
+        }
+        if !progress.is_finite() || !(0.0..=1.0).contains(&progress) {
+            return Err(SimError::state(
+                if progress.is_finite() {
+                    Constraint::OutOfRange
+                } else {
+                    Constraint::NonFinite
+                },
+                "progress",
+                message,
+            ));
         }
         Ok(Self { speed, progress })
     }
