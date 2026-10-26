@@ -4,86 +4,59 @@
 
 ### Breaking
 
-- Host settings are grouped: migrate `maxClients` → `players.max`, `bots` →
-  `bots.count`, `botThreads` → `bots.threads`, and `simulation.latency` →
-  `bots.latency`. Sockets no longer receive the simulation's latency; use
-  `players.latency` for added socket link delay (processing must stay zero).
-  Legacy flat keys and non-default host `simulation.latency` are rejected.
-- Official worlds now hold their initial population-sized radius; the provisional,
-  unfaithful dynamic controller is opt-in. Hosts, resets and simulation backends
-  size official worlds for their population, scaling food with area and keeping
-  the official prey density (68 prey for 484 seats instead of 1), while explicit
-  fixed radii, sandbox and Battledome stay unchanged
-  ([configuration](docs/configuration.md#population-sizing)).
-- Config `radius` and `radiusUpdates[].radius` now reject values above `1e150`,
-  matching checkpoint continuation bounds.
-- Rust `Simulator` state is private, with borrowed read accessors and checked
-  lifecycle, replay and food/prey edits. `WorldOptions` selects empty, dormant or
-  placed initial populations; `Placement` defaults to the existing test ring.
-  Typed `Session::prepare_reset`/`commit_reset` keeps rejected resets atomic;
-  Python reset uses it without a full-frame JSON round trip. `add`, public
-  `update_mass` and the two-call speed import are removed. Flat config keys,
-  default wire replies and contract IDs remain unchanged
-  ([Rust API](docs/bot-api.md#rust-library)).
-- Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
-  and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
-  use `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot
-  restore worlds. `ErrorCode`, `ErrorKind` and `Constraint` are non-exhaustive:
-  callers matching them must include a wildcard arm.
-- Rust core calls now return `SimError`; `step`/`step_profiled` return
-  `CoreStepError::{Rejected, Stopped}`, and `transport::StepError` carries
-  `SimError` causes. Match `kind` or `code()` instead of message text; inspect
-  `Simulator::status()` for the original stopped cause. Wire errors are unchanged
-  ([Rust errors](docs/bot-api.md#rust-library)).
+- Host settings are grouped: `maxClients` → `players.max`, `bots` →
+  `bots.count`, `botThreads` → `bots.threads` and `simulation.latency` →
+  `bots.latency`. Sockets no longer inherit the simulation's latency;
+  `players.latency` sets their added link delay, with zero processing. Flat keys
+  and a non-default host `simulation.latency` are rejected
+  ([HostConfig](docs/configuration.md#hostconfig)).
+- Official worlds keep their initial radius, sized for their population. The
+  provisional dynamic controller, which did not match official servers, is
+  opt-in. Hosts, resets and simulation backends size official worlds for all
+  their snakes, scaling food with area and keeping the official prey density.
+  Fixed radii, sandbox and Battledome are unchanged
+  ([population sizing](docs/configuration.md#population-sizing)).
+- `SimulationConfig.broadcastTicks` is removed: gameplay updates go out every
+  tick, and configs that set it are rejected
+  ([SimulationConfig](docs/configuration.md#simulationconfig)).
+- `LatencyConfig.jitterSeconds` and `congestion` are replaced by `variation`
+  (lognormal per-message delay with a slow correlated part) and `pauses` (short
+  delivery holds per direction); the old fields are rejected.
+  `LatencyConfig::measured_route()` is fitted to one home connection to an
+  official server; near-server captures attribute its pauses to that connection
+  and its collector, not the server
+  ([variation and pauses](docs/configuration.md#variation-and-pauses)).
 - The portable `client` JSON protocol is now `slither-client-json-v2`, because
-  v0.4.0 requests with the removed broadcast and latency fields are rejected. The
-  frame contract stays `slither-client-v2`
+  v0.4.0 requests with the removed broadcast and latency fields are rejected.
+  The frame contract stays `slither-client-v2`
   ([portable bots](docs/client-api.md#interface-versions)).
+- Sessions tell a rejected step (state unchanged) from a terminal failure (all
+  worlds cleared; reset required). For example, a pickup that would overflow a
+  snake's mass completes its tick without the gain and stops the world. `serve`
+  uses `slither-sim-json-v3` with `sessionEnded` in error replies, Rust returns
+  `transport::StepError::{Rejected, Ended}`, C returns `SLITHER_ENDED` (4) and
+  Python raises `SessionEndedError`. Successful replies are unchanged
+  ([session errors](docs/bot-api.md)).
+- C ABI `slither-sim-abi-v2` (`SLITHER_ABI_VERSION` 2) adds `snake_kill_score`
+  after `snake_kills` in `slither_frame` and the `SLITHER_DEATH_PIT` death code;
+  rebuild against the new header ([C ABI](docs/c-api.md#compatibility)). Rust
+  adds `DeathReason::Pit`, and `transport::REASONS` has a third entry
+  ([frames](docs/bot-api.md#frames)).
 - With recording off, `NetworkBackend::drain_records` and the JSON `wire` op
   return an error, as simulation already did
   ([recording](docs/client-api.md#recording-and-network-bounds)).
-- Rust: `physics::crossed_anchor` drops its unused argument,
-  `physics::append_client_anchor` is removed, and `Minimap::from_snakes` returns
-  `Result` for an invalid side.
-- The minimum Rust version is 1.99 (was 1.86).
-- `SimulationConfig.broadcastTicks` is removed: gameplay updates go out every
-  tick. Configs that still set it are rejected
-  ([simulation settings](docs/configuration.md#simulationconfig)).
-- `LatencyConfig.jitterSeconds` and `congestion` are replaced by `variation`
-  (lognormal per-message delay with a slow correlated part) and `pauses` (short
-  delivery holds per direction). `LatencyConfig::measured_route()` returns the
-  fit to one home connection to an official server; near-server captures show
-  its pauses come from that connection and its collector, not the server.
-  Configs that set the old fields are rejected
-  ([variation and pauses](docs/configuration.md#variation-and-pauses)).
-- `Host::poll()` is removed. `Host::bind(config)?.start()?` returns a
-  `RunningHost` with load counters, `wait()` and `stop()`; dropping it stops the
-  host. `Host::run()` starts and waits. Physics, sockets and bots run on separate
-  threads ([embedding](docs/raw-server.md#embedding-and-load-checks)).
-- C ABI `slither-sim-abi-v2` (`SLITHER_ABI_VERSION` 2) adds `snake_kill_score`
-  after `snake_kills` in `slither_frame`, and the `SLITHER_DEATH_PIT` death code.
-  Rebuild against the new header ([C ABI](docs/c-api.md#compatibility)).
-- `DeathReason::Pit` is new, and `transport::REASONS` has a third entry
-  ([frames](docs/bot-api.md#frames)).
-- A pickup that would overflow a snake's mass completes its tick without the
-  gain, returns an error and stops the world. Sessions now tell a rejected step
-  (state unchanged) from a terminal failure (all worlds cleared; reset
-  required): `serve` uses `slither-sim-json-v3` with `sessionEnded` in error
-  replies, Rust returns `transport::StepError::{Rejected, Ended}`, C returns
-  `SLITHER_ENDED` (4), and Python raises `SessionEndedError`. Successful replies
-  are unchanged ([session errors](docs/bot-api.md)).
-- Arbitrary caps are gone; each [limit](docs/configuration.md#limits) is now a
+- Arbitrary caps are gone; each [limit](docs/configuration.md#limits) is a
   representation bound, a warning or a named policy. Hosts and simulated clients
   take up to 65,535 agents (was 128) and 65,536 prey (was 10,000). The caps on
   `foodCount`, ambient refill, `serve` agents and worlds, decision ticks, and
-  latency, processing and network intervals are removed. `info` reports the
-  `serve` maxima. Validation messages changed.
-- Sliding boundaries need `dt` below 16 / 437.5 s (about 36.57 ms), so a boosting
-  minimum-size snake cannot pass its contact lead; this replaces the 32 ms cap.
-  Hard boundaries accept steps up to about 6.3 × 10¹³ s
-  ([limits](docs/configuration.md#limits)).
-- `maxPerCell: 0` admits no food. Kiosk rates, prey speeds, prey turn rate and
-  nutrition factor may be zero ([limits](docs/configuration.md#limits)).
+  latency, processing and network intervals are removed; `info` reports the
+  `serve` maxima. `radius` and `radiusUpdates[].radius` reject values above
+  `1e150`, matching checkpoints. Validation messages changed.
+- Sliding boundaries need `dt` below 16 / 437.5 s (about 36.57 ms), so a
+  boosting minimum-size snake cannot pass its contact lead; this replaces the
+  32 ms cap. Hard boundaries accept steps up to about 6.3 × 10¹³ s.
+  `maxPerCell: 0` admits no food, and kiosk rates, prey speeds, prey turn rate
+  and nutrition factor may be zero ([limits](docs/configuration.md#limits)).
 - Ticks long enough for a snake to outrun the incremental body window warn
   instead of failing, and such snakes are resent in full. Incremental updates
   carry up to three new anchors, up from two
@@ -91,14 +64,40 @@
 - Simulated round trips are no longer clamped to 2 s, and pings slower than 2 s
   are reported instead of dropped
   ([timing](docs/configuration.md#timing-and-ping)).
+- The minimum Rust version is 1.99 (was 1.86).
+- `Host::poll()` is removed. `Host::bind(config)?.start()?` returns a
+  `RunningHost` with load counters, `wait()` and `stop()`; dropping it stops the
+  host, and `Host::run()` starts and waits. Physics, sockets and bots run on
+  separate threads ([embedding](docs/raw-server.md#embedding-and-load-checks)).
+- Rust `Simulator` state is private, with borrowed read accessors and checked
+  lifecycle, replay and food/prey edits. `WorldOptions` selects an empty,
+  dormant or placed initial population; `Placement` defaults to the existing
+  test ring. `add`, public `update_mass` and the two-call speed import are
+  removed. Typed `Session::prepare_reset`/`commit_reset` keeps rejected resets
+  atomic, and Python resets skip a full-frame JSON round trip. Config keys, wire
+  replies and contract IDs are unchanged
+  ([Rust API](docs/bot-api.md#rust-library)).
+- Continuation uses validated `Simulator::checkpoint`, `from_checkpoint` and
+  atomic `restore` instead of Simulator/runtime serde. Checkpoints use
+  `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot
+  restore worlds.
+- Core calls return `SimError`; `step`/`step_profiled` return
+  `CoreStepError::{Rejected, Stopped}`, and `transport::StepError` carries
+  `SimError` causes. Match `kind` or `code()` rather than message text, and read
+  `Simulator::status()` for the original stop cause. `ErrorCode`, `ErrorKind`
+  and `Constraint` are non-exhaustive, so matches need a wildcard arm. Wire
+  errors are unchanged ([Rust errors](docs/bot-api.md#rust-library)).
+- `physics::crossed_anchor` drops its unused argument,
+  `physics::append_client_anchor` is removed, and `Minimap::from_snakes` returns
+  `Result` for an invalid side.
 
 ### Added
 
 - A `bot` feature, on by default through `networking`, adds the frozen Forager
-  policy (`bot::Forager`) and `client::ForagerBot`. `PolicyId::default()` and
-  `Forager::default()` select A4 (A4-mean); A1 remains explicitly selectable.
-  The [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
-  records gameplay, cost and the maintainer's mean-cost gate.
+  policy (`bot::Forager`) and `client::ForagerBot`. The default policy is A4
+  (A4-mean); A1 stays selectable. The [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
+  records gameplay, cost and the maintainer's mean-cost gate. The
+  [`cautious_bot`](examples/cautious_bot.rs) example runs it.
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from
@@ -109,68 +108,51 @@
 - [Battledome](docs/configuration.md#battledome), our own mode:
   `Config::battledome()` or `"preset": "battledome"` gives a fixed 3,584-unit
   arena with a one-way pit, a permanent 400-point size floor (boosting at it is
-  free and drops nothing, and death food returns only mass above it), a
-  15-minute rolling kill score and no prey; ambient refill counts all food
-  toward its target. Circular newborns use an outer 2,684–3,400-unit band,
-  body, head-path and departure clearance, and wait for space; cached admission
-  searches serve waiting socket players before background bots. Other rules
-  follow the official preset. World settings: `pit`, `spawnRadius`, `spawnRadiusMax`,
-  `killScoreSeconds`, `minScore` and `ambientRefillCountsAllFood`.
-- World configs take `"preset": "official" | "sandbox" | "battledome"` in `serve`
-  and Python resets, `host` config files and `client` simulation requests; explicit fields
-  override the preset ([presets](docs/configuration.md#presets)).
+  free and drops nothing; death food returns only mass above it), a 15-minute
+  rolling kill score, no prey, and ambient refill that counts all food. Newborns
+  start in an outer 2,684–3,400-unit band once body, head path and departure are
+  clear; waiting socket players go before background bots. Other rules follow
+  the official preset. New world settings: `pit`, `spawnRadius`,
+  `spawnRadiusMax`, `killScoreSeconds`, `minScore` and
+  `ambientRefillCountsAllFood`.
+- The stock browser shows a pit's edge as a ring of decorative pellets. Physics
+  and bot food are unchanged; socket bots get real food only by sending the
+  `X-SlitherSim-Food: physical` upgrade header
+  ([Battledome](docs/configuration.md#battledome)).
+- World configs take `"preset": "official" | "sandbox" | "battledome"` in
+  `serve` and Python resets, `host` config files and `client` simulation
+  requests; explicit fields override the preset
+  ([presets](docs/configuration.md#presets)).
 - Frames carry each snake's rolling kill score: `snakes.killScore` in `serve`
   JSON (an additive `slither-sim-json-v3` column), `kill_score` in `FrameRef`,
-  `snake_kill_score` in Python and the C ABI, and `Simulator::kill_score` in Rust
-  ([frames](docs/bot-api.md#frames)).
+  `snake_kill_score` in Python and the C ABI, and `Simulator::kill_score` in
+  Rust ([frames](docs/bot-api.md#frames)).
 - `Config::warnings`, `SimulationConfig::warnings` and `HostConfig::warnings`
   flag valid but unmeasured settings: a `dt` outside the measured 6.94–7.07 ms
   loop, or ticks long enough to outrun the incremental body window
   (`dt × 437.5 ≥ 126`). `serve` returns them on reset, the CLI prints them, and
   Python's `Session.reset` issues `UserWarning`s
   ([limits](docs/configuration.md#limits)).
-- Host `bots.threads` (default 2) runs background bots on their own threads, apart
-  from physics and sockets. The `host_load` example measures simulation load,
-  deferred ticks and extra delivery delay
+- Host `bots.threads` (default 2) runs background bots on their own threads,
+  apart from physics and sockets. The `host_load` example measures simulation
+  load, deferred ticks and extra delivery delay
   ([hosting](docs/raw-server.md#embedding-and-load-checks)).
 - `SimulationConfig.delivery` chooses when visible state is sent. The default,
   `responsive`, is our own design and sends steering, speed and mass changes in
   the next frame; `official` keeps the measured pacing. Train bots meant for
   official servers with `official`
-  ([configuration](docs/configuration.md#simulationconfig)).
+  ([SimulationConfig](docs/configuration.md#simulationconfig)).
 - A localhost-only host/capture/compare command records transport baselines and
   checks them against official-reference gates
   ([transport parity](docs/research-workflow.md#transport-parity)).
-- The stock browser shows a pit's edge as a ring of decorative pellets. Physics
-  and bot food are unchanged; socket bots get real food only by sending the
-  `X-SlitherSim-Food: physical` upgrade header
-  ([Battledome](docs/configuration.md#battledome)).
-- A [`cautious_bot`](examples/cautious_bot.rs) example runs the default Forager,
-  with zero timing when built without networking.
 
 ### Changed
 
-- Adopt an S-shaped snake logo and square project icon, paired with
-  SlitherClient's C-shaped snake, with outlined Inter lettering and automatic
-  light/dark colors.
-- Host and native background bots, plus both Rust bot examples, now use the
-  shared default Forager policy. Worker scratch is shared while sent history and lifecycle
-  stay per client; boost-only changes are transmitted. A separate
-  `shared-forager-a1-8` workload preserves existing scripted benchmark identities.
-  Current-runtime cost and playing-strength qualification remains pending
-  ([portable bots](docs/client-api.md#rust)).
-- Transport checks now compare against timing recorded near the official
-  servers in #111 instead of the home captures, whose delay spikes came from the
-  home route. The home reference stays available and labeled. Each limit is the
-  six-session envelope widened until every session passes against the other
-  five. New fixtures cover rare server timing exceptions (motion reports 24 ms
-  apart, mass 84 ms apart, motion before mass in one frame, a 3 s prey gap);
-  simulator cadence rules and defaults are unchanged
-  ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
 - Gameplay updates go out every physics tick (7 ms by default). `official`
-  delivery uses measured per-family pacing: motion and standalone mass changes at least 6 and 15 ticks
-  apart per snake, anchors at once, ambient food on the shared 504 ms maintenance cycle and
-  prey corrections on one clock per prey. These are partial models
+  delivery uses measured per-family pacing: motion and standalone mass changes
+  at least 6 and 15 ticks apart per snake, anchors at once, ambient food on the
+  shared 504 ms maintenance cycle and prey corrections on one clock per prey.
+  These are partial models
   ([packet timing](docs/server-rules.md#packet-timing)).
 - Minimaps and leaderboards follow server-wide clocks at the official mean
   periods (`minimapIntervalSeconds` 2.504, `leaderboardIntervalSeconds` 3.008).
@@ -179,61 +161,75 @@
 - Input and pings that arrive during a tick take effect in that tick's frame,
   and pongs lead it, removing a tick from input delay and measured ping
   ([timing](docs/configuration.md#timing-and-ping)).
+- Host and native background bots and both Rust bot examples use the shared
+  default Forager, and boost-only changes are now sent
+  ([portable bots](docs/client-api.md#rust)).
+- Transport checks compare against timing recorded near the official servers
+  instead of home captures, whose delay spikes came from the home route. New
+  fixtures cover rare server timing exceptions; simulator cadence is unchanged
+  ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
+- New S-shaped snake logo and square project icon, paired with SlitherClient's
+  C-shaped snake.
 
 ### Fixed
 
+- A default `host` no longer refuses every player with `No clear spawn
+  position`. Host arenas start sized for all seats, and a crowded world places a
+  join at the most open spot ([hosting](docs/raw-server.md#presets)).
 - A host no longer drops a healthy client when a message near the 1 MiB limit
   follows a small one that is still waiting for its batch to fill.
-- Native recording failures leave pending decisions and client clocks intact,
-  and rejected sends no longer suppress a later boost change.
+- The host bounds raw socket reads per poll, so one long fragmented message
+  cannot stall other connections. A background bot whose decoder fails
+  reconnects alone, and stopping no longer waits out a long physics tick.
 - A new world starts at its configured radius instead of one population step
   smaller, so resetting with the returned config reproduces the first frame.
-  `Placement::TestRing` rejects initial populations whose bodies extend outside a
-  small arena, and a refused hosted join says the candidate search was exhausted
+  `Placement::TestRing` rejects initial bodies that extend outside a small
+  arena, and a refused hosted join says the candidate search was exhausted
   rather than implying the arena is full.
 - Prey respawn is no longer capped at one per tick, and a replacement waits a
   full `respawnSeconds` after the catch. With a coarse `dt`, pickup follows each
   prey motion step instead of the straight line between endpoints, and prey
   motion that overflows ends the world with an error instead of producing NaN
   positions.
-- Kiosk shrinkage no longer deletes pending growth: it removes only mass the
-  score shows, and a zero shrink rate changes nothing.
-- Native commands with processing delay apply in the tick they arrive instead of
-  one tick later. Cancelling or non-finite one-way legs fail validation, and
-  latency scheduling returns an error instead of hanging or producing non-finite
-  times.
-- The host bounds raw socket reads per poll, so one long fragmented message
-  cannot stall other connections. A background bot whose decoder fails now only
-  reconnects that bot, and stopping no longer waits out a long physics tick.
-- `Config::deserialize` called directly from Rust now accepts presets, like JSON
-  parsing ([presets](docs/configuration.md#presets)).
-- A world stopped by mass overflow stays stopped after checkpoint restore
-  ([limits](docs/configuration.md#limits)).
-- Python `Session.reset` issues its warnings before replacing worlds, so a
-  warning raised as an error keeps the previous session ([Python](docs/python.md)).
-- A default `host` no longer refuses every player with `No clear spawn
-  position`. Dynamic host arenas start sized for all seats, and a crowded world
-  places a join at the most open spot ([hosting](docs/raw-server.md#presets)).
 - Prey whose IDs share the low 16 bits (such as 0 and 65536) no longer hide each
   other on the wire; all 65,536 wire IDs can be live
   ([prey settings](docs/configuration.md#prey)).
-- A tiny food `cellSize` no longer merges distinct
-  [admission cells](docs/configuration.md#food-admission-limits).
 - Prey catches can no longer make `fam` or `length` infinite: settings where one
   catch overflows are rejected, and accumulated overflow stops the world
   ([limits](docs/configuration.md#limits)).
+- Kiosk shrinkage no longer deletes pending growth: it removes only mass the
+  score shows, and a zero shrink rate changes nothing.
+- A tiny food `cellSize` no longer merges distinct
+  [admission cells](docs/configuration.md#food-admission-limits).
+- Native commands with processing delay apply in the tick they arrive instead of
+  one tick later. Cancelling or non-finite one-way legs fail validation, and
+  latency scheduling returns an error instead of hanging or producing
+  non-finite times.
+- Native recording failures leave pending decisions and client clocks intact,
+  and rejected sends no longer suppress a later boost change.
 - Unrepresentable `serve` columns, `worlds × agents` products and host client
   counts return errors instead of panicking. A failed reset keeps the previous
   session; a failed step frame ends it ([session errors](docs/bot-api.md)).
+- A world stopped by mass overflow stays stopped after checkpoint restore
+  ([limits](docs/configuration.md#limits)).
+- `Config::deserialize` called directly from Rust accepts presets, like JSON
+  parsing ([presets](docs/configuration.md#presets)).
+- Python `Session.reset` issues its warnings before replacing worlds, so a
+  warning raised as an error keeps the previous session
+  ([Python](docs/python.md)).
 
 ### Performance
 
 - The host uses about 5% less CPU per tick at 250 and 500 socket clients, with
   byte-identical output. Unchanged food subscriptions stay in place, recipients
-  with the same history of a snake share one encoded delta, and delivered frames
-  reach the socket without an extra copy. 250 clients now narrowly meet the
-  10 ms delivery grade on one core; 500 still fall behind
+  with the same history of a snake share one encoded delta, and delivered
+  frames reach the socket without an extra copy. 250 clients now narrowly meet
+  the 10 ms delivery grade on one core; 500 still fall behind
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-efficiency/REPORT.md)).
+- The host hands players' frames to the socket thread before encoding bots'
+  frames. With 480 localhost bots, mean ping fell from about 8.3 to 7.1 ms and
+  p99 from 17–19 to 11–13 ms
+  ([host load checks](docs/raw-server.md#embedding-and-load-checks)).
 - Crowded hosts spend far less time choosing spawn positions: candidates stop
   being scored once they cannot win, and the chosen pose is unchanged. A
   64-seat Battledome host drops from about 45 to 3.5 ms per tick. Background
@@ -246,10 +242,6 @@
   Synthetic worst cases are slower: up to 15% when food clusters away from
   observers, 2.5–4% with sparse or narrow food
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md)).
-- The host hands players' frames to the socket thread before encoding bots'
-  frames. With 480 localhost bots, mean ping fell from about 8.3 to 7.1 ms and
-  p99 from 17–19 to 11–13 ms
-  ([host load checks](docs/raw-server.md#embedding-and-load-checks)).
 - A [native Linux capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md)
   finds that one core keeps official-like delivery for 100 socket clients and
   real time for 500 background bots, and profiles where the host's CPU goes.
