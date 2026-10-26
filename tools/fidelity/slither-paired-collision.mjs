@@ -355,7 +355,12 @@ export async function recordPair(opts, signal) {
             if (poses.some((p, i) => p && bots[i].world.radius -
                 Math.hypot(p.x - bots[i].world.grd, p.y - bots[i].world.grd) < C.rim))
               trial.end(now, 'arena_margin');
-            if (now - joinAt > C.stageMs + C.runMs) trial.end(now, 'pair_timeout');
+            if (now - joinAt > C.stageMs + C.runMs) {
+              // The frozen plan stops, rather than rejoins, a server whose population stays unknown.
+              if (!local && bots.some(b => b.population === null))
+                throw Error('population gate: no leaderboard within pair budget');
+              trial.end(now, 'pair_timeout');
+            }
             if (trial.phase === 'done') {
               results.push(trial.result); state = 'observe'; observedUntil = now + C.observeMs;
               stagingFailures = trial.result.reasons.includes('staging_timeout') ||
