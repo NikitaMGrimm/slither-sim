@@ -244,8 +244,10 @@ strings. JSON, C and Python errors and contract identifiers stay unchanged.
 
 ### Frozen Forager
 
-The dependency-free `bot` feature exposes `bot::PolicyId::A1` and
-`bot::Forager::new(PolicyId)`. Its `decide(&mut self, &Observation, &Timing,
+The dependency-free `bot` feature exposes `bot::PolicyId::{A1, A4}` and
+`bot::Forager::new(PolicyId)`. `PolicyId::default()` selects A4, the adopted
+A4-mean parameters; `Forager::default()` constructs that policy. Select
+`PolicyId::A1` explicitly to retain A1. The `decide(&mut self, &Observation, &Timing,
 &[Intent]) -> Action` method uses the received observation and explicit timing.
 `Timing`, `Sent` and `Intent` live in `bot`; opponent intentions follow observation
 order, with `Intent::default()` representing unknown wanted heading.
@@ -253,7 +255,7 @@ Parameters are private and fully resolved for the named release.
 
 Use `default-features = false, features = ["bot"]` for an offline policy without
 networking or Rayon. Core-only, C ABI and Python builds do not enable `bot`.
-`networking`, enabled by default, includes it and exposes `client::ForagerBot::new(PolicyId::A1)`,
+`networking`, enabled by default, includes it and exposes `client::ForagerBot::new(PolicyId::default())`,
 implementing the existing `client::Bot`. The adapter derives timing and intentions
 from the complete `ClientFrame` and returns `None` outside a compatible playing
 frame with an observation. Existing host, native background bots, examples and
@@ -263,9 +265,11 @@ One policy/adapter instance can be reused for sequential decisions across seats:
 scratch buffers retain no policy state. Keep each seat's received frame, sent
 commands and lifecycle separate. This heuristic does not guarantee safety;
 cross-platform floating-point identity is subject to OS math libraries.
-The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/50578c9ce90c36af19b3612e0657b1ad24bc03ea/research/bots/2026-10-26-forager-port/REPORT.md)
+The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
 pins the original kernel, immutable parameters, bounded fixtures and validation
-limits. A4-mean is retained only as private test data and is not selectable.
+limits. The [A4 adoption note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
+records selected held-out gameplay and cost results from private training tooling,
+including the maintainer's live-mean cost gate and the earlier tail-limit failures.
 
 ### Checkpoints
 

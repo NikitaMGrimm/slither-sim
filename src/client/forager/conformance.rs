@@ -107,11 +107,11 @@ fn fixture() -> Value {
 }
 
 fn make_bot(name: &str) -> ForagerBot {
-    let mut bot = ForagerBot::new(PolicyId::A1);
-    if name == "A4-mean" {
-        bot.policy = crate::bot::Forager::a4_mean_for_test();
-    }
-    bot
+    ForagerBot::new(match name {
+        "A1" => PolicyId::A1,
+        "A4-mean" => PolicyId::A4,
+        _ => panic!("unknown fixture policy: {name}"),
+    })
 }
 
 fn check_structure(frame: &crate::client::ClientFrame, result: Option<Action>) {

@@ -4,6 +4,10 @@ This change ports the received-observation Forager without changing runtime bot
 selection or simulator mechanics. A1 is the sole public `PolicyId`. A4-mean is
 retained as test-only resolved data; it is not adopted by this port.
 
+This records the port's historical scope. The subsequent
+[A4 adoption](../2026-10-26-a4-adoption/REPORT.md) makes A4-mean selectable and the
+default without changing these parameters or conformance fixtures.
+
 ## Source and parameters
 
 The oracle is the untouched kernel at

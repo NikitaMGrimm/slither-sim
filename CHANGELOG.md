@@ -73,9 +73,12 @@
 
 ### Added
 
-- A `bot` feature, on by default through `networking`, adds the frozen A1 Forager
-  policy (`bot::Forager`) and `client::ForagerBot`. Host and background bots keep
-  their current policy for now.
+- A `bot` feature, on by default through `networking`, adds the frozen Forager
+  policy (`bot::Forager`) and `client::ForagerBot`. `PolicyId::default()` and
+  `Forager::default()` select A4 (A4-mean); A1 remains explicitly selectable.
+  The [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
+  records gameplay, cost and the maintainer's mean-cost gate. Host and background
+  bots keep their current policy for now.
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from
