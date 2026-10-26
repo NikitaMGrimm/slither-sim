@@ -19,6 +19,15 @@
   `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`). The
   `cautious_bot` example is now `forager` and keeps only its core-observation
   path; `portable_bot` runs the policy on received frames.
+- Default official/host arenas now follow occupied seats outside a 3% dead zone:
+  they grow at once and shrink gradually at 23.4375 units/s; deaths and respawns
+  keep their seat. Hosts start sized for bots, then grow on the next tick after
+  player admission. Ambient target/refill and prey
+  target follow live area, removing stranded food and surplus prey on shrink.
+  This is a product model, not a recovered official law. The living-count
+  controller is removed. Checkpoint format stays v2; rules revision becomes
+  `slither-sim-rules-v2`, rejecting v1 continuations. JSON/ABI layouts are unchanged
+  by this model ([configuration](docs/configuration.md#population-sizing)).
 - Config `radius` now retains the initial, population-sized setting; the live
   boundary is runtime state exposed by `Simulator::radius()`, frames and a new
   snapshot `radius` field. Checkpoints use

@@ -8,7 +8,7 @@ use std::{
 };
 
 pub const FORMAT: &str = "slither-sim-checkpoint-v2";
-pub const RULES_REVISION: &str = "slither-sim-rules-v1";
+pub const RULES_REVISION: &str = "slither-sim-rules-v2";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EventRecording {

@@ -30,7 +30,7 @@ fn population_sized_backends_hold_across_death_and_respawn() {
         let mut backend = SimulatorBackend::new(7, config).unwrap();
         assert_eq!(backend.config().world.radius, radius);
         assert_eq!(backend.world.config().radius, radius);
-        assert!(!backend.world.config().dynamic_radius);
+        assert!(backend.world.config().dynamic_radius);
         assert_eq!(backend.world.config().food_count, 109 * 40);
         assert_eq!(
             backend.world.config().prey.count,
@@ -42,9 +42,7 @@ fn population_sized_backends_hold_across_death_and_respawn() {
                 .abs()
                 < 1e-9
         );
-        for slot in 0..backend.world.snakes().len() {
-            backend.world.retire(slot).unwrap();
-        }
+        backend.world.retire(0).unwrap();
         backend
             .world
             .respawn(
@@ -60,11 +58,11 @@ fn population_sized_backends_hold_across_death_and_respawn() {
         backend.slots[0].control = Action::default();
         backend.advance_ticks(1).unwrap();
         assert!(!backend.world.snakes()[0].alive);
-        assert_eq!(backend.world.config().radius, radius);
+        assert_eq!(backend.world.radius(), radius);
         backend.reconnect_slot(0).unwrap();
         backend.advance_ticks(1).unwrap();
         assert!(backend.world.snakes()[0].alive);
-        assert_eq!(backend.world.config().radius, radius);
+        assert_eq!(backend.world.radius(), radius);
     }
 }
 
@@ -96,6 +94,9 @@ fn validation_checks_the_prey_count_of_the_sized_world() {
     assert!(error.contains("prey count must be at most"), "{error}");
     assert!(SimulatorBackend::new(7, config.clone()).is_err());
     config.world.size_to_population = false;
+    // Growth still needs enough prey wire IDs even without startup sizing.
+    assert!(config.validate().is_err());
+    config.world.dynamic_radius = false;
     config.validate().unwrap();
 }
 
@@ -127,12 +128,12 @@ fn fixed_backend_worlds_keep_their_radius_and_food_settings() {
 }
 
 #[test]
-fn population_sizing_obeys_the_wire_radius_limit_with_a_fixed_boundary() {
+fn population_sizing_obeys_the_wire_radius_limit() {
     let mut config = SimulationConfig {
         agents: 2500,
         ..Default::default()
     };
-    assert!(!config.world.dynamic_radius);
+    assert!(config.world.dynamic_radius);
     assert!(
         config
             .validate()
@@ -146,9 +147,212 @@ fn population_sizing_obeys_the_wire_radius_limit_with_a_fixed_boundary() {
             .contains("arena radii up to 32000")
     );
     config.world.size_to_population = false;
+    config.world.dynamic_radius = false;
     config.validate().unwrap();
     config.world.dynamic_radius = true;
     assert!(config.validate().is_err());
+}
+
+#[test]
+fn hosted_disconnects_shrink_the_arena_but_bot_deaths_and_respawns_do_not() {
+    // Drive the same raw backend as the host, without sockets or wall time.
+    let mut config = SimulationConfig {
+        agents: 4,
+        ..Default::default()
+    };
+    config.world = Config::official(4);
+    config.world.food_count = 0;
+    config.world.ambient_replenish_per_second = 0.;
+    config.world.prey.count = 0;
+    // The threaded host routes bots as remote clients too: two players, two bots.
+    let mut host = RawSimulator::new(7, config, 4).unwrap();
+    assert_eq!(host.backend.world.occupied(), 0);
+    for slot in 0..4 {
+        assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+    }
+    assert_eq!(host.backend.world.occupied(), 4);
+    let radius = host.backend.world.radius();
+    // Kill a hosted bot; its seat stays occupied during its respawn wait.
+    let rim = Point {
+        x: radius - 1.,
+        y: 0.,
+    };
+    host.backend
+        .world
+        .correct_pose(2, rim, vec![rim; 2], 0.)
+        .unwrap();
+    host.backend.slots[2].control = Action::default();
+    host.advance_ticks(1).unwrap();
+    assert!(!host.backend.world.snakes()[2].alive);
+    assert_eq!(host.backend.world.occupied(), 4);
+    assert_eq!(host.backend.world.radius(), radius);
+    for _ in 0..10 {
+        host.advance_ticks(1).unwrap();
+    }
+    assert_eq!(host.backend.world.radius(), radius);
+    assert!(host.connect(2, PlayerAppearance::default()).unwrap());
+    host.advance_ticks(1).unwrap();
+    assert_eq!(host.backend.world.occupied(), 4);
+    assert_eq!(host.backend.world.radius(), radius);
+    host.disconnect(0).unwrap();
+    host.disconnect(1).unwrap();
+    host.advance_ticks(1).unwrap();
+    assert_eq!(host.backend.world.occupied(), 2);
+    assert_eq!(host.backend.world.radius(), radius - 23.4375 * host.dt());
+}
+
+#[test]
+fn bot_sized_host_admits_a_burst_of_thirty_players_without_waiting_for_growth() {
+    for seed in [1, 7, 42] {
+        let mut config = SimulationConfig {
+            agents: 34,
+            ..Default::default()
+        };
+        config.world.size_for_population(4); // Host startup sizing for four bots.
+        // Hosted bots use the same remote admission path as socket players.
+        let mut sim = RawSimulator::new(seed, config, 34).unwrap();
+        let mut remotes = Vec::new();
+        for slot in 0..4 {
+            remotes.push(Remote::connect(&mut sim, slot, "Bot"));
+        }
+        sim.advance_ticks(1).unwrap();
+        assert_eq!(sim.backend.world.radius(), 1340.);
+        for slot in 4..34 {
+            remotes.push(Remote::connect(&mut sim, slot, "Burst player"));
+        }
+        sim.advance_ticks(1).unwrap();
+        assert_eq!(sim.backend.world.occupied(), 34);
+        assert_eq!(
+            sim.backend.world.radius(),
+            crate::simulator::population_radius(34)
+        );
+        for (slot, remote) in remotes.iter_mut().enumerate() {
+            remote.pump(&mut sim, slot);
+            assert_eq!(
+                remote.frame(&sim).status,
+                ClientStatus::Playing,
+                "seed {seed}, slot {slot}"
+            );
+            assert_eq!(
+                remote.frame(&sim).observation.unwrap().arena.radius,
+                crate::simulator::population_radius(34).round()
+            );
+        }
+    }
+}
+
+#[test]
+fn shrinking_food_and_surplus_prey_leave_both_decoded_client_views_without_pickups() {
+    let mut config = SimulationConfig {
+        agents: 2,
+        ..Default::default()
+    };
+    config.world = Config::official(4);
+    config.world.food_count = 0;
+    config.world.ambient_replenish_per_second = 0.;
+    config.world.prey.count = 8;
+    config.world.prey.cruise_speed = 0.;
+    config.world.prey.escape_speed = 0.;
+    config.world.prey.sprint_speed = 0.;
+    config.world.radius_updates = vec![crate::RadiusUpdate {
+        time: 0.021,
+        radius: 670.,
+    }];
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    let mut a = Remote::connect(&mut sim, 0, "Observer A");
+    let mut b = Remote::connect(&mut sim, 1, "Observer B");
+    for (slot, y) in [(0, -100.), (1, 100.)] {
+        sim.backend.world.retire(slot).unwrap();
+        sim.backend
+            .world
+            .respawn(slot, Point { x: 0., y }, 0., 2)
+            .unwrap();
+        sim.backend.slots[slot].control = Action::default();
+    }
+    // All prey remain in range and far from either mouth. Only the reduced
+    // population target removes them; the sample isolates shrink from navigation.
+    let prey = sim
+        .backend
+        .world
+        .prey()
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(i, mut prey)| {
+            prey.position = Point {
+                x: 0.,
+                y: 300. + i as f64 * 20.,
+            };
+            prey.speed = 0.;
+            crate::ReplayPrey {
+                prey,
+                mode: crate::PreyMode::Roaming,
+            }
+        })
+        .collect();
+    sim.backend.world.replace_prey(prey).unwrap();
+    let pellet = |x, y, origin| Food {
+        x,
+        y,
+        value: 1.,
+        size: Some(2.),
+        origin: Some(origin),
+    };
+    let outside = [
+        pellet(1000., -60., Origin::Ambient),
+        pellet(1000., 0., Origin::Boost),
+        pellet(1000., 60., Origin::Death),
+    ];
+    let keys: Vec<_> = outside
+        .iter()
+        .map(|food| encode::food_key(food.point()).unwrap())
+        .collect();
+    let mut food = outside.to_vec();
+    food.push(pellet(400., 0., Origin::Ambient));
+    // Synthetic boost/death pellets need their source colors registered just
+    // as a physics birth would; this setup does not fabricate any pickup.
+    for food in &outside[1..] {
+        sim.backend
+            .food_presentation
+            .births(&[crate::FoodSpawnEvent {
+                source: Some(0),
+                food: food.clone(),
+            }])
+            .unwrap();
+    }
+    sim.backend.world.replace_food(food).unwrap();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 2);
+    for remote in [&a, &b] {
+        let observation = remote.frame(&sim).observation.unwrap();
+        assert_eq!(observation.food.len(), 4);
+        assert_eq!(observation.prey.len(), 8);
+    }
+    let removed: Vec<_> = sim.backend.world.prey()[2..]
+        .iter()
+        .map(|p| sim.backend.prey_wire[&p.id])
+        .collect();
+    a.packets.clear();
+    b.packets.clear();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
+    assert_eq!(sim.backend.world.food().len(), 1);
+    assert_eq!(sim.backend.world.prey().len(), 2);
+    assert!(sim.backend.world.pickup_events().unwrap().is_empty());
+    for remote in [&a, &b] {
+        for &key in &keys {
+            assert!(remote.packets.contains(&encode::food_remove(key, None)));
+            assert!(
+                !remote
+                    .packets
+                    .contains(&encode::sector_clear([key[0], key[1]]))
+            );
+        }
+        for &wire in &removed {
+            assert!(remote.packets.contains(&encode::prey_removal(wire, None)));
+        }
+        let observation = remote.frame(&sim).observation.unwrap();
+        assert_eq!(observation.food.len(), 1);
+        assert_eq!(observation.prey.len(), 2);
+    }
 }
 
 /// Original exhaustive admission, kept independent of the bounded scorer.

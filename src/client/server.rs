@@ -214,8 +214,8 @@ impl HostConfig {
             latency: self.bots.latency.clone(),
             ..self.simulation.clone()
         };
-        config.world.size_for_population(agents);
-        config.validate()?;
+        config.world.size_for_population(self.bots.count);
+        config.validate_for_population(self.bots.count)?;
         Ok(config)
     }
 }
@@ -2084,16 +2084,15 @@ mod tests {
         let host = HostConfig::default();
         let config = host.world_config().unwrap();
         let seats = host.players.max + host.bots.count;
-        let official = crate::Config::official(seats);
+        let official = crate::Config::official(host.bots.count);
         assert_eq!(config.world.radius, official.radius);
-        // The area scale floors 109 pellets × 8 rather than the 877.4 target.
+        // Startup sizing scales the floored one-seat food target by area.
         assert!(official.food_count - config.world.food_count < seats);
         assert!(
             (config.world.ambient_replenish_per_second - official.ambient_replenish_per_second)
                 .abs()
                 < 1e-9
         );
-        // Before, `Config::official(1)`'s 670-unit start refused these joins.
         let mut world = RawSimulator::new(host.seed, config, seats).unwrap();
         for slot in 0..seats {
             world.connect(slot, PlayerAppearance::default()).unwrap();
@@ -2180,7 +2179,7 @@ mod tests {
     }
 
     #[test]
-    fn omitted_and_official_host_worlds_size_to_all_seats_then_hold() {
+    fn omitted_and_official_host_worlds_start_sized_for_bots() {
         for simulation in [
             "{}",
             r#"{"world":{}}"#,
@@ -2190,38 +2189,19 @@ mod tests {
                 r#"{{"players":{{"max":4}},"bots":{{"count":480}},"simulation":{simulation}}}"#
             ))
             .unwrap();
-            let mut config = host.world_config().unwrap().world;
-            let radius = 14_740.; // 670 * sqrt(484)
+            let config = host.world_config().unwrap().world;
+            let radius = crate::simulator::population_radius(480);
             assert_eq!(config.radius, radius);
-            assert!(!config.dynamic_radius);
-            assert_eq!(config.food_count, 109 * 484);
+            assert!(config.dynamic_radius);
+            assert_eq!(config.food_count, 109 * 480);
             assert_eq!(config.prey.count, 68);
-            assert_eq!(config.prey.count, crate::Config::official(484).prey.count);
+            assert_eq!(config.prey.count, crate::Config::official(480).prey.count);
             assert!(
                 (config.ambient_replenish_per_second
-                    - crate::Config::official(484).ambient_replenish_per_second)
+                    - crate::Config::official(480).ambient_replenish_per_second)
                     .abs()
                     < 1e-9
             );
-            // Isolate boundary behavior without a 484-seat food/ecology run.
-            config.food_count = 0;
-            config.ambient_replenish_per_second = 0.;
-            config.prey.count = 0;
-            let mut world = crate::Simulator::new(crate::WorldOptions {
-                seed: host.seed,
-                config,
-                population: crate::InitialPopulation::Placed {
-                    ids: vec!["one".into()],
-                    placement: crate::Placement::TestRing,
-                },
-            })
-            .unwrap();
-            world.step(&[Some(Action::default())]).unwrap();
-            world.retire(0).unwrap();
-            world.step(&[Some(Action::default())]).unwrap();
-            world.respawn(0, crate::Point::default(), 0., 2).unwrap();
-            world.step(&[Some(Action::default())]).unwrap();
-            assert_eq!(world.config().radius, radius);
         }
     }
 
@@ -2255,20 +2235,20 @@ mod tests {
         .unwrap();
         assert_eq!(
             host.world_config().unwrap().world.radius,
-            crate::simulator::population_radius(8)
+            crate::simulator::population_radius(4)
         );
         assert!(host.world_config().unwrap().world.dynamic_radius);
     }
 
     #[test]
     fn population_sizing_keeps_custom_prey_density() {
-        for (prey, expected) in [(0, 0), (2, 968)] {
+        for (prey, expected) in [(0, 0), (2, 960)] {
             let host: HostConfig = serde_json::from_str(&format!(
                 r#"{{"players":{{"max":4}},"bots":{{"count":480}},"simulation":{{"world":{{"prey":{{"count":{prey}}}}}}}}}"#
             ))
             .unwrap();
             let world = host.world_config().unwrap().world;
-            assert_eq!(world.radius, 14_740.);
+            assert_eq!(world.radius, crate::simulator::population_radius(480));
             assert_eq!(world.prey.count, expected);
         }
     }

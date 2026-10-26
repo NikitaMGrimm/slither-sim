@@ -107,6 +107,12 @@ impl SimulationConfig {
     /// Checks the world as backends and hosts run it, after sizing it for
     /// `agents`; see [`Config::size_to_population`].
     pub fn validate(&self) -> Result<(), String> {
+        self.validate_for_population(self.agents)
+    }
+
+    /// Hosts start with bots only; capacity bounds still cover every seat and
+    /// recorded radius, including live-area prey growth.
+    pub(crate) fn validate_for_population(&self, population: usize) -> Result<(), String> {
         if !(1..=MAX_AGENTS).contains(&self.agents) || self.controlled_slot >= self.agents {
             return Err(format!(
                 "Simulation needs 1 to {MAX_AGENTS} agents, since protocol-19 snake IDs, \
@@ -114,7 +120,7 @@ impl SimulationConfig {
             ));
         }
         let mut world = self.world.clone();
-        world.size_for_population(self.agents);
+        world.size_for_population(population);
         world.validate().map_err(|error| error.to_string())?;
         // Live prey refill to `count`, and each needs one of the u16 wire IDs.
         if world.prey.count > MAX_PREY {
@@ -170,6 +176,11 @@ impl SimulationConfig {
                 "Protocol-19 simulation supports arena radii up to {}, a margin inside the \
                  ±32,550 u16 anchor coordinates",
                 encode::MAX_RADIUS
+            ));
+        }
+        if world.dynamic_radius && world.ecology_at_radius(largest).2 > MAX_PREY {
+            return Err(format!(
+                "Protocol-19 prey IDs are u16: live-area prey count must be at most {MAX_PREY}"
             ));
         }
         // After the radius limit, whose message is clearer than setup's range error.

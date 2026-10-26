@@ -1,0 +1,14 @@
+{
+  "origin": "synthetic",
+  "rulesRevision": "slither-sim-rules-v2",
+  "source": "research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md",
+  "initialSeats": 500,
+  "remainingSeats": 100,
+  "dt": 0.007,
+  "rate": 23.4375,
+  "deadZone": 0.03,
+  "movingTicks": 49216,
+  "shrinkSeconds": 344.512,
+  "stoppedRadius": 6907.155449248592,
+  "derivation": "ceil((670*sqrt(500) - 670*sqrt(100)/(1-0.03))/(23.4375*0.007)); radius = 670*sqrt(500) - movingTicks*23.4375*0.007. Independent scalar calculation, not measured official motion."
+}

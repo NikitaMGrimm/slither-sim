@@ -45,6 +45,7 @@ fn sub_margin_arenas_keep_startup_and_refill_food_inside() {
         seed: 7,
         config: Config {
             radius: 1.0,
+            dynamic_radius: false,
             food_count: 350,
             ambient_replenish_per_second: 100.0,
             dt: 0.01,

@@ -33,7 +33,7 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v1`), `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v2`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
@@ -238,8 +238,9 @@ Simulator fields are private. `config()`, `snakes()`, `food()`, `prey()`,
 `deaths()`, `pickup_events()` and `food_spawn_events()` borrow existing storage;
 `radius()` and `time()` return scalars. Config retains its existing flat keys
 and retains the initial radius after startup sizing; `radius()` reports the live
-boundary. Radius evolution never changes the initial Config or ecology targets.
-An explicit `set_ambient_rate` still updates that effective rule. No mutable slices or config setters are
+boundary. Radius evolution keeps the initial Config as the density reference;
+seat-following derives effective ecology targets from live area. An explicit
+`set_ambient_rate` updates the initial-area attempt rate. No mutable slices or config setters are
 exposed. Detached `Snake`, `Food` and `Prey` values remain editable.
 
 `world.rules()` returns a copyable `WorldRules` without allocating.
@@ -314,7 +315,7 @@ Before embedding:
 | `body_is_clear(&body, clearance)` | Check all supplied edges against living snakes and the 60-unit arena margin; invalid input returns false. |
 | `respawn_body(slot, body, heading)` | Replace a dead slot using supplied geometry and reset per-life motion, boost, penalty, death-time and join-order state. With `minScore`, the body needs at least the floor's segments; at exactly that many, the life starts at the floor's mass. |
 | `spawn_body(head, heading)` | The configured new-life body and heading at `head`. With `spawnRadius`, its anchors lie along the circle through `head`, turning the way `heading` leans, heading along it; an error if that circle cannot hold them. Otherwise two straight segments behind `heading`. Check it with `body_is_clear`. |
-| `set_ambient_rate(attempts_per_second)` | Change refill rate while preserving fractional placement credit. Zero discards pending credit and disables refill. |
+| `set_ambient_rate(attempts_per_second)` | Change initial-area refill rate while preserving fractional placement credit; seat-following scales it with live area. Zero discards pending credit and disables refill. |
 
 Supplied bodies are head-first, one anchor per segment, with 2–430 finite points.
 Respawn requires all points inside the arena; it does not enforce clearance or
@@ -383,13 +384,15 @@ the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
 The envelope is `slither-sim-checkpoint-v2`, with
-`rulesRevision: "slither-sim-rules-v1"`, producer provenance, today's flat Config
+`rulesRevision: "slither-sim-rules-v2"`, producer provenance, today's flat Config
 and ordered slot/entity records. `config.radius` is the initial radius and
 `state.radius` is the live radius; loading preserves both. Config must pass the
 same validation as a new world's, and the live radius must equal `config.radius`
 until the dynamic controller or a recorded update could have moved it. Version 1 is rejected
 because it stored the live radius in Config and cannot recover the initial value.
-The rules revision stays v1 because tick behavior is unchanged.
+Rules v1 is rejected: the seat-following controller and live-area ecology change
+tick behavior. No controller state is added; occupancy uses living state and
+death timestamps, and refill retains fractional credit in initial-area seconds.
 The checkpoint includes RNG, timers and terminal causes;
 debug `snapshot` replies and old Simulator JSON are rejected. Unknown fields and
 missing companion records reject, as do radii, headings and one tick of snake

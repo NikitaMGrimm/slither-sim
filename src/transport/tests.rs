@@ -17,7 +17,7 @@ fn population_sized_resets_hold_across_death_and_respawn() {
         assert_eq!(reply["result"]["config"]["radius"], radius);
         assert_eq!(reply["result"]["config"]["foodCount"], 109 * AGENTS);
         let world = &mut session.current.as_mut().unwrap().worlds[0].world;
-        assert!(!world.config().dynamic_radius);
+        assert!(world.config().dynamic_radius);
         assert!(
             (world.config().ambient_replenish_per_second
                 - Config::default().ambient_replenish_per_second * AGENTS as f64)
@@ -26,9 +26,7 @@ fn population_sized_resets_hold_across_death_and_respawn() {
         );
         // Inject a boundary death and a real respawn in one reset world; the
         // other world retains its population to catch cross-world sizing.
-        for slot in 0..world.snakes().len() {
-            world.retire(slot).unwrap();
-        }
+        world.retire(0).unwrap();
         world
             .respawn(
                 0,
@@ -43,7 +41,7 @@ fn population_sized_resets_hold_across_death_and_respawn() {
         session
             .step(&[0.; AGENTS * 2], &[false; AGENTS * 2])
             .unwrap();
-        assert_eq!(session.frame(0).unwrap().living, 0);
+        assert!(session.frame(0).unwrap().living < AGENTS as u32);
         assert_eq!(session.frame(0).unwrap().radius, radius);
         session.current.as_mut().unwrap().worlds[0]
             .world
@@ -52,7 +50,7 @@ fn population_sized_resets_hold_across_death_and_respawn() {
         session
             .step(&[0.; AGENTS * 2], &[false; AGENTS * 2])
             .unwrap();
-        assert_eq!(session.frame(0).unwrap().living, 1);
+        assert_eq!(session.frame(0).unwrap().radius, radius);
         for state in &session.current.as_ref().unwrap().worlds {
             assert_eq!(state.world.config().radius, radius);
         }

@@ -148,8 +148,9 @@ impl SimulatorBackend {
     /// client connects; the rest join and connect natively.
     fn build(seed: u32, mut config: SimulationConfig, remote: usize) -> Result<Self, String> {
         // Validate the world that will run, as the host and resets do.
-        config.world.size_for_population(config.agents);
-        config.validate()?;
+        let population = config.agents - remote;
+        config.world.size_for_population(population);
+        config.validate_for_population(population)?;
         let ids = (0..config.agents).map(|slot| slot.to_string()).collect();
         let mut world = Simulator::new(crate::WorldOptions {
             seed,

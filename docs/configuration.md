@@ -53,9 +53,9 @@ both delays.
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
 
-The host applies [population sizing](#population-sizing) to
-`players.max + bots.count`, including empty remote seats. For 484 seats this is
-14,740 units.
+The host applies [population sizing](#population-sizing) to `bots.count` at
+startup; reserved, disconnected player seats do not enlarge it. A host with no
+bots starts at radius 670. Connected players then contribute to live occupancy.
 
 ## SimulationConfig
 
@@ -89,7 +89,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
 | `radius` | `670` | Initial arena radius after startup sizing; positive, finite and at most `1e150`. Live radius is separate runtime state. |
-| `dynamicRadius` | `false` | Opt into the provisional living-population controller (`670 × sqrt(living)`, capped at 23.4375 units/s); it is not faithful to official radius waves. |
+| `dynamicRadius` | `true` | Follow occupied seats (`670 × sqrt(max(occupied, 1))`): grow at once, shrink at at most 23.4375 units/s, moving only outside a 3% dead zone of the current radius. Food/refill/prey targets follow live area. A product model, not an identified official law. Sandbox, Battledome and explicit JSON `radius` default to false. |
 | `sizeToPopulation` | `true` | Runtimes enlarge this arena to fit their population at creation, scaling food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. See [population sizing](#population-sizing). |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
 | `foodCount` | `109` | Refill target/startup placement attempts. Admission limits can reduce placement; memory bounds it. |
@@ -115,8 +115,10 @@ fit (for example, `size: 51, maxSize: 51.01`).
 `radiusUpdates` overrides the model at each sample's tick. For recorded replay,
 set `dynamicRadius` false to prevent model changes between samples. The controller
 runs first, then all due samples override it, including exact time-zero samples
-at construction. Neither path changes Config's initial `radius` or food/prey
-targets. `Simulator::radius()`, frame `radius` and snapshot `radius` report the
+at construction. Recorded samples are never rate-limited. Config retains its
+initial `radius` and ecology settings; with `dynamicRadius: true`, effective
+ecology follows the resulting live area even on sample ticks.
+`Simulator::radius()`, frame `radius` and snapshot `radius` report the
 live boundary; `config().radius` and `snapshot.config.radius` retain the initial
 setting. See [rules and evidence limits](server-rules.md).
 
@@ -124,16 +126,17 @@ setting. See [rules and evidence limits](server-rules.md).
 
 The host, `serve`/Python/C ABI resets and `SimulatorBackend` enlarge a smaller
 initial radius to `670 × sqrt(population)` when `sizeToPopulation` is true.
-Population is all host seats (`players.max + bots.count`), `agents` per reset
+Population is host bots at startup, `agents` per reset
 world, or `SimulationConfig.agents`. Food target and ambient attempt rate scale with area.
 A prey target at the official density keeps following it (68 prey for 484 seats);
-other prey targets scale with area. The boundary then holds unless `dynamicRadius`
-is explicitly enabled. This is a startup capacity policy, not an official radius law.
+other prey targets scale with area. Official worlds then follow occupied seats;
+startup sizing and subsequent motion are product policies, not official radius laws.
 
 Sandbox, Battledome and explicit JSON radii opt out unless `sizeToPopulation`
-is explicitly enabled. Larger radii are never shrunk. Rust callers choosing a
-custom fixed radius set `size_to_population` false. Resolved configs and
-checkpoints retain the flag. Core `Simulator::new(WorldOptions { .. })`
+is explicitly enabled. Startup sizing never shrinks a larger supplied radius.
+Rust callers choosing a custom fixed radius set both `size_to_population` and
+`dynamic_radius` false. Resolved configs and checkpoints retain both flags.
+Core `Simulator::new(WorldOptions { .. })`
 construction preserves the supplied Config; `Config::official(n)` selects that
 initial size directly. This resolved initial Config remains reproducible even
 when later radius samples or the controller move the boundary. Adding or
@@ -145,7 +148,7 @@ Both constructors return `Config`:
 
 | Constructor | Result |
 | --- | --- |
-| `Config::official(n)` | Holds radius `r = 670 × sqrt(max(n, 1))`; runtime population sizing enabled; food target `floor(7πr² / 90,000)` and refill `0.1024πr² / 90,000` attempts/s (per 300×300 sector: about 7 pellets, 0.1024 attempts/s); prey target `max(1, round(πr² / 10,000,000))`. |
+| `Config::official(n)` | Starts at `r = 670 × sqrt(max(n, 1))`; seat-following and runtime population sizing enabled; initial food target `floor(7πr² / 90,000)` and refill `0.1024πr² / 90,000` attempts/s (per 300×300 sector: about 7 pellets, 0.1024 attempts/s); prey target `max(1, round(πr² / 10,000,000))`. |
 | `Config::sandbox()` | `Config::official(1)` with radius 1000, fixed boundary, food target 350, 5 ambient attempts/s and no prey. |
 
 `Config::default()`, omitted JSON fields, `SimulationConfig` and `host` use
@@ -153,12 +156,33 @@ Both constructors return `Config`:
 retained boost speed and initial radius models rather than exact official rules;
 see [evidence limits](server-rules.md#defaults).
 
-`n` initializes radius, food and prey targets without spawning snakes. The radius
-then holds: this removes death/respawn jitter but omits official radius waves,
-which no tested law predicts
-([radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md)).
-`dynamicRadius` opts into the old living-population controller; food and prey
-targets stay fixed as it runs. One snake is a deliberately small start;
+`n` initializes radius, food and prey targets without spawning snakes. Occupied
+seats are living snakes plus dead snakes waiting to respawn. Death and respawn
+do not change occupancy; `retire` and inactive dormant slots do. The old
+living-count controller is removed. The 3% dead zone absorbs a single join or
+leave at 500 seats. Beyond the dead zone, growth jumps to the target in the next
+tick so joins do not wait for space; shrink moves at 23.4375 units/s. A host
+starting with 4 bots at radius 1340 can admit 30 players in a burst and grow to
+`670 × sqrt(34)` in one tick. The model grows at once and shrinks gradually.
+A 500→100 exodus
+stops after 344.512 s at radius about 6907.16, within 3% of its current radius
+from the 6700 target. Stopping short is intentional and stateless. Small worlds
+respond to a few seats. This is a product/feel model; no tested predictor
+reproduces official multi-minute waves
+([radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md),
+[default decision](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md)).
+
+While `dynamicRadius` is true, effective food target and refill rate scale by
+`(live radius / initial radius)²`. Custom prey targets scale by the same area
+ratio (rounded); the official target uses its density formula above, including
+the one-prey minimum. Zero targets stay zero. Refill preserves fractional attempt
+credit as area changes. On shrink, pellets outside the wall are removed from
+every origin, and surplus prey are removed in stable insertion order rather
+than compressed against the rim. Food inside the wall is retained: admission,
+pickup and death/boost drops mean actual density can differ from the target.
+Growth refills through the existing attempt and prey respawn clocks.
+With `dynamicRadius: false`, targets stay fixed and recorded shrinking radii
+retain outside food as before. One snake is a deliberately small start;
 runtimes with a known population apply [population sizing](#population-sizing).
 
 Prey density is a working assumption, not a calibrated global population.
@@ -185,7 +209,8 @@ JSON `"preset"` selects a constructor's world: `"official"`
 (`Config::official(1)`), `"sandbox"` or `"battledome"`. Fields given beside it
 override it; nested objects such as `kiosk` merge field by field, and `null`
 clears optional settings. Changing `radius` does not rescale food and disables
-runtime population sizing unless `sizeToPopulation` is explicitly supplied. Without
+runtime population sizing unless `sizeToPopulation` is explicitly supplied;
+it also disables seat-following unless `dynamicRadius` is explicitly supplied. Without
 `preset`, omitted fields use `Config::official(1)`. Repeated keys keep their last
 value because configs pass through a JSON value. Replies and snapshots print
 resolved fields, not the preset name.
