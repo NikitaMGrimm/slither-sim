@@ -1,134 +1,55 @@
 # Crowded Battledome admission, 2026-10-26
 
-Strict arena growth (B) admits the measured 40/64/80-seat populations while
-keeping all existing spawn checks. Fixed-arena relaxation (A) is rejected:
-it introduces strict head-path intrusions and leaves pending requests.
-This is a synthetic **local-simulator** product comparison, not an official
-rule or a measured comparison against a community Battledome server.
+Strict growth (B) fills the measured 40/64/80 seats with existing safety checks; fixed relaxation (A) is rejected for intrusions/queues.
+This synthetic **local-simulator** comparison measures neither official rules nor a community Battledome server.
 
-## Policy and selection
+## Policy
 
-Through 32 seats target the 3,584 wall, 1,784 pit and 2,684–3,400 spawn band.
-Above it target `3584 * (1 + 1.5 * (max(seats,32)/32 - 1))`: wall radii
-4,928/8,960/11,648 at 40/64/80. Before searching, queued joins contribute too.
-At two/four world seconds of selected-request queue age, allow 1.5/2 times
-the target. Keep main's immediate growth, 23.4375 units/s shrink and 3% dead zone.
-Before further host expansion, hold growth until the latest admitted life has
-its three-second departure window. Pause admissions during that hold, so births
-cannot postpone expansion indefinitely; spend no search work while held.
-Pit and spawn radii follow the live wall; snakes do not stretch or teleport.
-A growing pit passing over a snake does not count as physical entry. That
-unentered life may escape; a later inward crossing, or a life initialized
-inside, still commits it to the one-way exit rule. Already entered lives stay
-entered. This reuses the existing pit-entry bit, with no timer or immunity.
-Food target/refill retain main's live-area ecology. Floor, boosting, scoring,
-food and one-way pit rules are unchanged. The pit raster uses the live wall
-like snakes and the stock own-player marker; decorative food follows the pit.
+Through 32 seats retain the 3,584 wall, 1,784 pit and 2,684–3,400 spawn band.
+Target `3584 * (1 + 1.5 * (max(seats,32)/32 - 1))`: 4,928/8,960/11,648 at 40/64/80.
+Occupied/queued seats count before search; selected-request ages 2/4 world seconds permit 1.5/2 times target.
+Keep immediate growth, 23.4375 units/s shrink and the 3% dead zone. Further growth
+waits for the latest birth's three-second departure window; admissions pause with no search work,
+so repeated births cannot defer growth. Pit/spawn radii and ecology follow the live wall; snakes stay put.
+Keep 400-unit body clearance, 600-unit/two-second head paths, three-second normal head runway
+and inward/tangent departures; contact + 40 remains a lower bound. One 4,096-candidate
+search/tick, 14 ms after failure; sockets precede FIFO bots.
+Engulfment is not entry; later physical entry or birth inside commits the one-way pit. No immunity.
+Existing entry bit/live radius suffice; queue age/latest-birth tick are transient host state.
+Checkpoint format stays v2; rules v3 rejects v1/v2. Live-radius mapping fixes pit cells and own-marker alignment;
+decorative food follows the edge. A tried body 400/300/200, head horizon 1.5/1/0.5 s,
+path 600/400/200 and departure 400/300/200 after 2/3/4 s, retaining contact/runway;
+the best relaxed body margin followed strict exhaustion. None of those tiers is adopted.
 
-Keep 400-unit body clearance, the 600-unit/two-second head-path exclusion,
-three-second normal-speed head runway and inward/tangent departure checks.
-Contact + 40 remains a lower bound. At most one 4,096-candidate search per tick,
-14 ms after failure, waiting sockets before FIFO bots: queue length does not
-multiply search budgets. Request age is host queue state; the existing live
-radius retains the extra space. The latest-birth tick and request age are
-transient host state. No core saved field/format change; rules v3 rejects old
-v1/v2 checkpoints explicitly.
+## Method and measurement scope
 
-A kept strict-first searching but used body widths 400/300/200, head horizons
-1.5/1/0.5 s, path widths 600/400/200 and departure widths 400/300/200 after
-2/3/4 seconds. It retained contact exclusion and the head runway, and selected
-the best body-clearance relaxed pose only after exhausting the strict search.
-The production change contains none of those tiers.
+[PLAN.md](PLAN.md) is unchanged. Rust 1.99.0, locked release/thin LTO, shared Windows
+x86-64; four real loopback probes plus 36/60/76 A4 bots, one bot worker, no latency.
+Probes decide/42 ms, ping/250 ms, stay alive five seconds, close/100 ms and rejoin.
+Final strict cohort: 30 sequential 60-wall-second holds, seeds 7/29/47/71/101,
+40/64/80 seats, alternating control/growth order; six rejected A holds use seeds 7/29 (two/seat).
+Their fixed-pit path survives later moving-pit fixes.
+Every selected parent/child mask was verified 0x30, with PowerShell spot checks.
+Build/check masks 0xC0, CARGO_BUILD_JOBS=2, RAYON_NUM_THREADS=2, RUST_TEST_THREADS=2.
+Earlier search-only holds overlapped checks; final strict holds followed the Rust group.
+Shared frequency/cache/scheduling noise remains; all seeds had been seen, so this
+is adaptive corrective exploration, without independent held-out evidence.
+Queue waits use world time; sockets use wall time through first own appearance/handshake.
+Triples are p50/p95/max, index `round((N-1)*p)` over completed requests; pending requests remain right-censored.
+Early-death denominators include complete 3 s followup or deaths within 3 s;
+early administrative close/shutdown is censored. Late living uses world seconds 30–60.
+Intrusions test newborn polylines against living heads' strict 600/2 paths.
+GetThreadTimes times whole admit_waiting (queue/growth/connect/search and nested telemetry),
+plus nested searches; socket intake/broadcast are excluded. Counters accumulate without I/O and emit after ticks.
+Strict costs use completed consecutive tick records; A/host busy use pre-stop counters that can omit closeout ticks.
+Host busy includes telemetry/scheduling, not process CPU. Zero/near-zero CPU is below useful resolution,
+not zero cost; admission elapsed/tick is a conservative true CPU ceiling. A's two search-only holds/seat
+do not rank policies. [results.json](results.json) keeps 36 run summaries and pooled table values, with declared columns/units.
 
-[PLAN.md](PLAN.md) retains the frozen protocol and exploratory amendments.
-At 80 seats, initial sqrt-area growth reached 70.8 late living with 45 strict
-intrusions; linear-radius growth reached 79.8 but had 10 intrusions. Larger
-strict-growth screening reached 79.7 with zero intrusions. A later 40-seat run
-had a 10.535 s initial bot wait, motivating timed space allowances before the
-final comparison. Retain all 20 s pilots, 60 s preliminary runs and interrupted
-attempts. An initial control logger zeroed queue ages; a death logger repeated
-retained history. Corrections preserve the originals, emit new deaths only,
-deduplicate (victim,time), and require nonnegative ages. The initial apparent
-early pit death was a logger artifact, not a waived failure.
+## Selected outcomes
 
-## Method
-
-Shared Windows x86-64, Rust 1.99.0, locked release/thin LTO. The first 45-run comparison
-is retained in [initial-results.json](initial-results.json). Its growth/64/seed
-101 run had three real early pit deaths at ages 1.764/0.357/2.604 s, failing
-the safety gate. A controlled no-opponent repro died at 0.651 s because growth
-counted as entry. Physical-entry tracking fixes that repro and preserves later
-entry/exit and exact checkpoint continuation. These failures remain failures.
-
-An intermediate corrected comparison was also stopped and retained in
-[unqualified-corrected-results.json](unqualified-corrected-results.json).
-A live process check found affinity 0xFFFF: the Python wrapper's unchecked
-Win32 affinity call had failed because its ctypes HANDLE signature was missing.
-A minimal repro returns zero/ERROR_INVALID_HANDLE (6). All earlier cohorts are
-UNQUALIFIED for the requested resource limit and excluded from the final table.
-This was an agent measurement-harness mistake; their causal safety failures
-are preserved, not waived.
-
-The first affinity-verified growth/40/seed 7 hold then exposed a remaining pit
-death at age 2.534 s. [The rejected round](rejected-moving-edge-results.json)
-retains it. A controlled grazing chord reproduces false re-entry during slow
-shrink: a head inside the old edge was tested against the smaller new edge.
-The corrected test requires an unentered head to start outside both pre-update and
-live edges, then applies the ordinary swept test against the live pit. Growth
-and shrink passing over a head cannot enter it. No new state or timer is needed.
-
-The next corrected round still had a real growth/40/seed7 pit death at age
-2.891 s. [The pre-hold results](rejected-pre-hold-results.json) retain all its
-completed runs. Correct physical-entry tracking did not prevent actual later
-crossings near a recent birth after expansion. The final host growth hold
-leaves recent births their full three-second departure window, and pauses
-admissions while expansion is held. A manually stepped real-host regression
-checks that the queue stays intact until the deadline, then admits again;
-Raw growth denial leaves the whole core checkpoint unchanged.
-
-The `protected-*` search-only cohort was retained in
-[pre-delivery-results.json](pre-delivery-results.json) when timing was extended
-to the entire admission call and delivery integrated newer main and the
-source-review decoration correction. None of its safety outcomes is waived.
-
-The final confirmation has **30 new sequential 60-wall-second holds**: control
-and growth on integrated main with the hold, IDs `delivery-*`, seeds
-7/29/47/71/101, seats 40/64/80, alternating pair order.
-A was stopped for strict-path failures; all six completed, affinity-verified
-relaxed holds (two per seat count, seeds 7/29) are retained as its rejected
-comparison. Its fixed-pit/admission path is unchanged by the moving-edge fix.
-Its two-run cost is descriptive; no performance ranking is based on that sample.
-The typed wrapper asserts parent and every child process mask is exactly 0x30;
-separate PowerShell queries check active hosts. Earlier growth results are
-kept separate from the final candidate. No safety failure is waived.
-Four real loopback socket probes plus 36/60/76 background A4
-seekers, one bot worker, no added latency, default ecology. Probes use A4/42 ms,
-pings/250 ms, stay five seconds when alive, close for 100 ms and rejoin;
-deaths rejoin too. These are configured seats; living is reported separately.
-
-Qualified long runs use verified affinity **0x30**. Builds/checks use `CARGO_BUILD_JOBS=2`,
-`RAYON_NUM_THREADS=2`, `RUST_TEST_THREADS=2`; remaining checks were pinned to
-separate affinity 0xC0. Earlier search-only holds overlapped required checks
-on those separate CPUs; the final strict confirmation starts after the Rust
-group finishes. This shared desktop retains frequency/cache/scheduling noise: medians/ranges are descriptive, not
-confidence intervals. All seeds were examined by the correction round; this
-is adaptive corrective exploration, without an independent held-out claim.
-
-Queue waits are request-to-admission world time, sockets and bots pooled.
-Socket waits are wall request-to-first-own-appearance, including handshake.
-Quantiles select sorted index `round((N-1)*p)` among completed requests; pending requests remain
-right-censored. Bot respawns are later bot lives; socket waits include deliberate
-rejoin probes. Early-death denominators include lives with complete 3 s followup
-or deaths within 3 s; administrative close/shutdown before 3 s is censored.
-Late living averages per-run 30–60-world-second samples. Strict intrusions test
-the actual newborn polyline against living heads' 600/2 paths at admission.
-
-## Waits, population and safety
-
-Wait cells are **p50 / p95 / max seconds**, pooled across the reported seeds. Strict policies have five holds/cell;
-rejected A has two. Pending
-counts sum the reported shutdowns (five strict, two relaxed). Early deaths show deaths/qualified lives;
-intrusions show hits/all births. Zero observed failures is not immunity.
+Five holds/cell for strict policies, two for A. Pending counts sum shutdowns;
+early deaths are deaths/qualified lives, intrusions are hits/all births.
 
 | Seats / policy | Runs | Mean late living | Completed queue wait | Pending | Deaths ≤3 s | Strict intrusions |
 | --- | ---: | ---: | --- | ---: | ---: | ---: |
@@ -154,34 +75,10 @@ intrusions show hits/all births. Zero observed failures is not immunity.
 | 80 / A: fixed relaxation | 19.012 / 53.914 / 60.018 | 27.713 / 37.002 / 37.765 | 2.116 / 4.035 / 4.449 |
 | 80 / B: strict growth | 0.294 / 0.532 / 0.567 | 0.000 / 0.000 / 0.000 | 0.005 / 0.018 / 0.029 |
 
-Per-run causes, followup censoring, socket errors, deferrals and search timing
-are in [results.json](results.json). An absent respawn quantile means none was
-admitted, not zero wait. Every selected row has zero early deaths, so there is no selected early-death
-cause. Causes in rejected cohorts remain in their records.
-Socket error counts: control/40/seed 7: 4, control/64/seed 29: 4, control/80/seed 29: 4, control/80/seed 71: 1, growth/40/seed 101: 1, growth/40/seed 71: 4, growth/80/seed 29: 1, growth/80/seed 47: 2, fixed/80/seed 7: 2. Readers reported connection resets. Every host stopped successfully. The harness stops the host before joining readers, so shutdown is a plausible cause; missing error timestamps prevent exact attribution. All affected runs and errors are retained.
-
-## Admission cost
-
-Windows `GetThreadTimes` user+kernel deltas measure the entire
-`Simulation::admit_waiting` call, including queue scans, growth holds, connects,
-candidate searches and nested telemetry, divided by executed host ticks.
-Socket command intake and broadcasts are outside that call. A second nested
-counter measures searches. Full-call counters accumulate without I/O; per-tick
-emission happens afterwards. The rejected A holds have search-only counters;
-full admission was not collected for that arm, and its two-run CPU sample does
-not rank policies. Search CPU uses the same boundary in all arms.
-Coarse scheduler accounting makes zero/near-zero values below useful resolution,
-not zero cost. Full admission elapsed per tick is also shown as a conservative
-ceiling on true single-thread admission CPU. Search elapsed p50/p95/max and
-per-tick totals are retained in the JSON.
-Host busy includes telemetry and scheduling; it is not process CPU or generator
-cost. The host status counter is sampled before stop and can omit closeout ticks.
-Strict-policy phase costs divide by completed per-tick records after shutdown;
-the JSON retains both counts and checks consecutive world ticks and one
-admission call per tick. Host busy retains its pre-stop status denominator;
-rejected A has only its sampled pre-stop denominator.
-The fixed controls spend most admission work exhausting failed searches;
-growth removes repeated failures by providing geometrically clear poses.
+No selected early death occurred. Missing respawn quantiles mean none admitted, not zero wait.
+Rows retain 3 s censoring, maximum pending age, errors and deferrals. All 23 errors (13 control, 8 B, 2 A)
+were “connection reset without closing handshake”; hosts exited successfully, with no deferred ticks.
+Stopping hosts before joining readers makes shutdown plausible; missing timestamps prevent exact attribution.
 
 | Seats / policy | Full admission CPU ms/tick median (range) | Search CPU ms/tick median (range) | Full admission elapsed ms/tick median | Host busy ms/tick median | Searches |
 | --- | --- | --- | ---: | ---: | ---: |
@@ -195,71 +92,64 @@ growth removes repeated failures by providing geometrically clear poses.
 | 80 / A: fixed relaxation | — | 3.0736 (2.9595–3.1877) | — | 3.674 | 8692 |
 | 80 / B: strict growth | below resolution (0.0000–0.0018) | below resolution (0.0000–0.0018) | 0.0060 | 0.409 | 648 |
 
-The owner's separate [all-socket main baseline](https://github.com/NikitaMGrimm/slither-sim/blob/4915803/research/performance/2026-10-26-host-known-slots/REPORT.md)
-uses WSL2 with all host threads on one logical CPU. At 40/64/80, total process
-CPU is 3.203/2.859/3.132 ms/tick; inclusive admission shares are
-90.39/89.36/90.53% of sampled user CPU. At 64/80, completed wait p50/p99 is
-21.651/35.862 and 33.738/48.643 s, with about 29/44 waiting. Those shares cannot
-be multiplied into measured admission CPU/tick: denominators/platforms differ.
-Our matched Windows table measures full admission and search cost in a
-bot-plus-probe workload; it does not replace the one-core all-socket grade.
-Final strict-policy measurements include that worker's known-slot optimization
-through main integration; the same implementation is present in both arms.
+Repeated failed searches bind fixed admission; growth supplies clear geometry.
+The separate [all-socket baseline](https://github.com/NikitaMGrimm/slither-sim/blob/4915803/research/performance/2026-10-26-host-known-slots/REPORT.md)
+uses one WSL2 host CPU: process CPU 3.203/2.859/3.132 ms/tick and inclusive
+admission shares 90.39/89.36/90.53% at 40/64/80. At 64/80 wait p50/p99 is
+21.651/35.862 and 33.738/48.643 s, about 29/44 waiting. Shares cannot be multiplied
+into measured admission CPU/tick. Our bot-plus-probe workload does not replace
+that grade; both final strict arms include main's known-slot optimization.
+
+## Prior cohorts and local-only archives
+
+Exact removed files are in `outputs/spawn-capacity/pruned-record-c1ccde1/`.
+Counts below are completed rows, not unique runs: the same six rejected-A holds
+are reused in the last three files; do not add them as independent repetitions.
+
+| File | Completed rows | Key metric and disposition |
+| --- | --- | --- |
+| `initial-results.json` | 45: 15 each control/A/B | B had 3 pit deaths ≤3 s (64/101, ages 1.764/0.357/2.604 s); A had 878 strict intrusions. Safety failed; affinity also unqualified. |
+| `unqualified-corrected-results.json` | 25: 13 control, 12 B | B had 0 early deaths/intrusions, but unchecked Win32 affinity failed: observed 0xFFFF, ERROR_INVALID_HANDLE (6). Excluded from resource/timing claims. |
+| `rejected-moving-edge-results.json` | 20: 7 control, 7 B, 6 reused A | Verified 0x30; B had 1 pit death ≤3 s (40/7, age 2.534 s), exposing shrink false re-entry. Rejected. |
+| `rejected-pre-hold-results.json` | 30: 12 control, 12 B, 6 reused A | B had 1 pit death ≤3 s (40/7, age 2.891 s) after actual entry near a recent expansion. Rejected; motivated the birth hold. |
+| `pre-delivery-results.json` | 22: 8 control, 8 B, 6 reused A | B had 0 early deaths/intrusions. Stopped for whole-admission timing, integrated main and decoration correction; search-only costs are not final full-admission costs. |
+
+SHA-256 of each exact archived file:
+```text
+9965d2b0d8f46e63bcbeff5e9e7edd73c5063ea307bafcd3107fa66bceb1809a  initial-results.json
+367f0a44ee01bdd0a955f4c0a8b4d639f2a120044d06645c30f57bb364aac06c  pre-delivery-results.json
+68c8a0ac6e87b22261e1ba947f84457ea36a823f39dfb3e64d7257b19d3959fb  rejected-moving-edge-results.json
+5915693c696134ab21f613d24b71ad2162f80c835051a1faa444ad9d52c5a5c9  rejected-pre-hold-results.json
+47967b5d3aca8a9ab1ce905c2317fc88a66b77731e47a0e6bbf6839abed38ab8  unqualified-corrected-results.json
+```
+All unqualified runs remain excluded, not erased. Affinity was an agent harness
+mistake. Growth/shrink regressions reproduce false entry at 0.651/0.014 s; the
+old/new edge test prevents it, and the host hold covers later real crossings.
+Initial 20 s screens reached 70.8 living/45 intrusions (sqrt), 79.8/10 (linear), then 79.7/0 (larger strict).
+A 10.535 s bot join motivated allowances.
+An earlier zeroed-wait logger and repeated retained-death logger were corrected;
+their apparent early pit death was an artifact. Originals and interrupted runs
+remain local-only alongside raw events, full results, sources, binaries and logs.
+Hashes identify those files without making them downloadable; no safety failure
+is waived. [source-pins.json](source-pins.json) pins measured/instrumented/delivered
+source identities and the full local manifest; duplicate file inventories are omitted.
 
 ## Feel, verification and limits
 
-Tests check identical initial wall, pit, band and floor/score settings at 16 and
-32 seats. After a larger wave, gradual shrink and the 3% dead zone still apply.
-Normal radial spawn-to-pit distance stays 900–1,616 units, about 4.90–8.79 s at
-floor cruise; area/density at the same population are unchanged. At 80 the normal
-wall is 3.25 times base and density about 23.7% of 32-seat density; radial travel
-is about 15.92–28.58 s. Extra queue space can lengthen it further. This is an
-explicit tradeoff above typical sizes, not unchanged crowded-mode feel.
-
-Synthetic regressions cover growth/shrink, queued-seat room, 2/4 s allowances,
-strict body/head paths after admission, checkpoint continuation before/after tick one, bounded admission-radius
-validation and old-revision rejection, live pit collisions, wire-coordinate capacity, identical pit raster
-cells at 40/64/80 and allowance radii on 80/136/512-cell maps, and actual socket
-removal/replacement of pit food markers. Floor/food/scoring and cache/exhaustive
-regressions remain. Changed startup geometry exposed a debug food-index count
-wrap: addition now matches existing wrapping subtraction before rebuild.
-
-The CONTRIBUTING Rust group passed on the final production sources: formatting,
-Clippy feature groups, default/core/bot/networking tests, doctests, C ABI and
-Python crate check. The minimap extension and documentation checks passed. An independent
-GPT 6.1 Sol source review covered admission, moving-pit semantics, checkpoint
-contracts, stock geometry and regressions. Its redundant decorative-update
-finding was corrected with a failing-before/passing-after shrink regression;
-a same-cell physical replacement test preserves pickup lifetime identity.
-The review was read-only and did not independently run checks or measurements.
-No outside server, browser, macOS/Linux execution, full
-tools/WASM/package group or human gameplay test was run.
-
-Study base: `901b02e2e71144c6ffd35291ddb6603b2c6a1ca7`. The final strict
-measurement binary uses main `150d4b1b70f7ebf0447cde70e9daa97aa69d3bc1`
-plus this policy and instrumentation. Delivery rebases onto
-`3a23dc9` (prey-visibility bounds and fidelity-report updates); source merged
-automatically and both Unreleased changelog entries are preserved. This mode's
-prey count is zero. Admission, spawn geometry and safety owners are unchanged;
-the table stays pinned to the measured build rather than being relabeled as
-a fresh measurement. The full Rust group was rerun after that rebase.
-[Source pins](source-pins.json) retain measured production, instrumented and
-current production hashes separately. The six rejected A holds use the earlier
-`249cdb2` build; its fixed-pit admission is unaffected by later moving-pit fixes.
-Its cost remains descriptive and search-only.
-Full sources, runner, events,
-copied binaries and failed checks remain **local-only** under this worktree's
-`outputs/spawn-capacity/`. Hashes identify files without making them downloadable.
-Selected data and retained failed-cohort tables preserve the declared
-comparison cohorts; exploratory and interrupted attempts remain local-only. The owner relayed two-second spot reuse, a 500-unit clearance
-with crowded fallbacks, between-spot placement and modest population growth
-from a community Battledome server. This is inspiration only; its human death
-rate and performance were not measured here. Measured A weakens strict
-head-path protection; B instead makes its extra-space tradeoff explicit.
-
-This does not prove 80 simultaneous humans, one-core dense network throughput,
-long-run equilibrium or superiority over a community Battledome server. Search
-work and space allowances are bounded, not worst-case wait in every crowd: if
-all sampled poses violate strict safety, it continues waiting. Later turns,
-boosts and shrinking-pit encounters remain possible. Observed short waits and
-zero early failures apply to these runs.
+Tests retain fresh 16/32 wall, pit, band, floor/score and density: radial travel 900–1,616 units,
+4.90–8.79 s at floor cruise. Gradual shrink/dead zone remain after larger waves. At 80 the normal
+wall is 3.25× base, density 23.7% of 32-seat density, travel 15.92–28.58 s; queue allowance reaches
+6.5× base wall (23,296). This explicit high-population space/approach tradeoff is unchanged by pruning.
+Regressions cover strict queues/holds, moving-pit rules, checkpoint continuation/revision rejection,
+wire bounds, fixed pit cells on 80/136/512 maps, own-marker projection and socket decorations.
+Floor/food/scoring checks remain; debug food-index addition wraps like subtraction before rebuild.
+The implementation's full Rust group passed after rebase onto 3a23dc9; docs checks passed.
+Independent GPT 6.1 Sol source review covered policy, pit/minimap, contracts and regressions;
+its sub-cell marker update finding was fixed with tests preserving physical-food lifetimes.
+Review did not rerun checks/measurements. Strict timing stays on 150d4b1; delivery adds prey bounds/fidelity
+reports with zero prey in Battledome and unchanged admission owners. A uses 249cdb2. No new measurements.
+Owner-relayed community spot reuse/500-unit fallback/modest growth inspired the design;
+that server's human deaths/performance were not measured. No outside game server, browser, Linux/macOS,
+full tools/WASM/package or human gameplay test was run. No 80-human, dense one-core, equilibrium or
+superiority claim follows. Bounded work/space cannot guarantee a maximum wait if all sampled poses
+violate safety; later turns, boosts and shrink encounters remain. Zero observed early failures applies only here.
