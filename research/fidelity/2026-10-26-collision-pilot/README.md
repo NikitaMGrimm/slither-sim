@@ -1,6 +1,7 @@
 # Collision pilot preparation
 
-Official pilots and scouting: **not executed**. This PR builds tooling and tests
+Official pilots: **not executed**. One official scouting attempt failed
+before any join (see below). This PR builds tooling and tests
 only against a loopback SlitherSim host. [Frozen method](plan.json),
 [local verification and limits](REPORT.md).
 
@@ -19,7 +20,10 @@ sequential scouting archives privately. The selection file has this shape:
 
 Scout the first five active decoded entries (or all if fewer), one socket at a
 time, retaining failures with `population: null`. Record the first leaderboard
-within 10 seconds; close and await close before the next scout. `listedIndex`
+within 10 seconds; close and await close before the next scout. Every scout
+sends `Origin: http://slither.io`: official servers closed all five Origin-less
+scouts of 2026-10-26 before any frame. The preparer binds the same Origin into
+the plan unless `--origin` overrides it. `listedIndex`
 is the index in the full decoded list. Population ranks ascending, then list
 index; require at most 100. The preparer checks this normalized selection's
 ordering, bounds and digests; the collector must independently verify its
