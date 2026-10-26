@@ -23,10 +23,12 @@ pub(super) const FRESH_ANCHORS: usize = 4;
 /// identified; these minimum gaps are model choices. Clean [near-server data]
 /// includes 24 ms motion, 84 ms mass and motion-before-mass counterexamples;
 /// decoder regressions accept them without changing these release rules.
+/// Own wanted-heading and boost changes wait for this gate too, with rare
+/// exceptions ([wanted-gate check]).
 ///
 /// [scheduler study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md
 /// [near-server data]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md
-/// [Own wanted/speed evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-wanted-gate/REPORT.md) supports keeping the gate, with exceptions.
+/// [wanted-gate check]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-wanted-gate/REPORT.md
 pub(super) const MOTION_REPORT_TICKS: u64 = 6;
 pub(super) const FAM_REPORT_TICKS: u64 = 15;
 

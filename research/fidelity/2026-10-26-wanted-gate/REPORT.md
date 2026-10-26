@@ -1,10 +1,12 @@
 # Own wanted/speed changes: keep the motion gate
 
-The phase-conditioned P2 results support the existing official motion gate,
-not a universal wanted/speed bypass. **549/581** qualified steering commands
-sent while the nominal gate was armed reflected **41–44 ms after the previous
-own motion report**. After confound screens, **3/575 wanted** and **1/86 boost**
-observations contradict a literal 42 ms floor; those exceptions remain.
+**Official servers hold own steering and boost changes behind the six-tick
+motion gate, as our `official` profile does.** **549/581** qualified steering
+commands sent while the gate was armed were reflected **41–44 ms after the
+previous own motion report**. Reflection only looked fast overall because
+**78%** of held commands found the gate already open. After confound screens,
+**3/575 wanted** and **1/86 boost** observations contradict a literal 42 ms
+floor; those exceptions remain. No rule or runtime change follows.
 
 ## Method and denominators
 
