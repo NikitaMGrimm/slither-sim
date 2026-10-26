@@ -859,6 +859,65 @@ fn live_radius_inside_the_initial_spawn_ring_still_checkpoints() {
 }
 
 #[test]
+fn checkpoints_validate_the_initial_rules_and_unmoved_live_radius() {
+    // The live radius may shrink inside the pit or spawn band, but the initial
+    // Config must still be one a fresh world accepts.
+    let mut config = Config {
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        ..Config::battledome()
+    };
+    config.kiosk.enabled = false;
+    let mut dome = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Empty,
+    })
+    .unwrap();
+    let mut bad = value(&dome);
+    bad["config"]["radius"] = json!(1000.);
+    let error = rejects_atomic(&mut dome, &bad);
+    assert_eq!(error.field.as_deref(), Some("config.pit.radius"));
+
+    let mut config = Config {
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        spawn_radius: Some(500.),
+        ..Config::sandbox()
+    };
+    config.kiosk.enabled = false;
+    let mut ring = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Empty,
+    })
+    .unwrap();
+    let mut bad = value(&ring);
+    bad["config"]["radius"] = json!(550.);
+    bad["state"]["radius"] = json!(550.);
+    let error = rejects_atomic(&mut ring, &bad);
+    assert_eq!(error.field.as_deref(), Some("config.spawnRadius"));
+
+    // Before any recorded update, only a dynamic controller step moves it.
+    let mut fixed = world();
+    let actions: Vec<_> = fixed
+        .snakes()
+        .iter()
+        .map(|snake| {
+            Some(Action {
+                heading: snake.heading,
+                boost: false,
+            })
+        })
+        .collect();
+    fixed.step(&actions).unwrap();
+    let mut bad = value(&fixed);
+    bad["state"]["radius"] = json!(900.);
+    let error = rejects_atomic(&mut fixed, &bad);
+    assert_eq!(error.field.as_deref(), Some("state.radius"));
+}
+
+#[test]
 fn checked_prey_removal_cannot_leave_orphan_controls() {
     let mut source = world();
     let id = source.prey()[0].id;
@@ -871,12 +930,10 @@ fn checked_prey_removal_cannot_leave_orphan_controls() {
 }
 
 #[test]
-fn load_does_not_allocate_from_population_targets_or_require_initial_live_radius_equality() {
+fn load_does_not_allocate_from_population_targets() {
     let mut source = value(&world());
     source["config"]["foodCount"] = json!(usize::MAX);
     source["config"]["prey"]["count"] = json!(usize::MAX);
-    source["config"]["radius"] = json!(2000.);
-    source["state"]["radius"] = json!(1000.);
     let loaded = Simulator::from_checkpoint(&bytes(&source), options()).unwrap();
     assert_eq!(
         loaded.food().len(),
@@ -886,7 +943,6 @@ fn load_does_not_allocate_from_population_targets_or_require_initial_live_radius
         loaded.prey().len(),
         source["state"]["prey"].as_array().unwrap().len()
     );
-    assert_eq!(loaded.radius(), 1000.);
 }
 
 #[test]

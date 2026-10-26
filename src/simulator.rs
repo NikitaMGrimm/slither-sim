@@ -448,15 +448,9 @@ impl Config {
             ..Self::official(1)
         }
     }
+    /// Checks the initial rules. Checkpoints validate the live radius separately,
+    /// so a world that has shrunk inside its pit or spawn band still restores.
     pub fn validate(&self) -> Result<(), SimError> {
-        self.validate_against_radius(true)
-    }
-    /// Continuation validates effective rules independently of spawn admission.
-    /// The checkpoint validates the separate live radius and existing bodies.
-    pub(crate) fn validate_continuation(&self) -> Result<(), SimError> {
-        self.validate_against_radius(false)
-    }
-    fn validate_against_radius(&self, placement: bool) -> Result<(), SimError> {
         for (field, value) in [
             ("radius", self.radius),
             ("vision", self.vision),
@@ -526,7 +520,7 @@ impl Config {
         self.death_food.validate()?;
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
-        self.validate_mode(placement)?;
+        self.validate_mode()?;
         crate::boundary::validate(&self.radius_updates)?;
         if let Some(index) = self
             .radius_updates
@@ -540,11 +534,9 @@ impl Config {
         Ok(())
     }
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
-    fn validate_mode(&self, placement: bool) -> Result<(), SimError> {
+    fn validate_mode(&self) -> Result<(), SimError> {
         let pit = self.pit.as_ref().map(|pit| pit.radius);
-        if pit
-            .is_some_and(|pit| !(pit > 0.0 && pit.is_finite() && (!placement || pit < self.radius)))
-        {
+        if pit.is_some_and(|pit| !(pit > 0.0 && pit.is_finite() && pit < self.radius)) {
             return Err(SimError::config(
                 Constraint::positive(pit.unwrap()).unwrap_or(Constraint::OutOfRange),
                 "pit.radius",
@@ -615,7 +607,7 @@ impl Config {
             let lower = spawn - roundoff;
             let upper = spawn + roundoff;
             let fits = spawn.is_finite()
-                && (!placement || upper < self.radius - SPAWN_WALL_MARGIN)
+                && upper < self.radius - SPAWN_WALL_MARGIN
                 && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
                 && crate::spawn::ring_step(lower, segments).is_some()
                 && crate::spawn::ring_step(upper, segments).is_some();

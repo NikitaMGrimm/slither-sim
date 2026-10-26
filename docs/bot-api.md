@@ -338,7 +338,9 @@ the current world. Export also validates the complete state. Load errors carry
 The envelope is `slither-sim-checkpoint-v2`, with
 `rulesRevision: "slither-sim-rules-v1"`, producer provenance, today's flat Config
 and ordered slot/entity records. `config.radius` is the initial radius and
-`state.radius` is the live radius; loading preserves both. Version 1 is rejected
+`state.radius` is the live radius; loading preserves both. Config must pass the
+same validation as a new world's, and the live radius must equal `config.radius`
+until the dynamic controller or a recorded update could have moved it. Version 1 is rejected
 because it stored the live radius in Config and cannot recover the initial value.
 The rules revision stays v1 because tick behavior is unchanged.
 The checkpoint includes RNG, timers and terminal causes;

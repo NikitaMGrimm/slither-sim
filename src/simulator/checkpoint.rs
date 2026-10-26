@@ -536,9 +536,7 @@ impl Simulator {
             "state.prey.mode",
         )?;
         // Validate Config before its JSON serialization can turn NaN into null.
-        self.config
-            .validate_continuation()
-            .map_err(checkpoint_config_error)?;
+        self.config.validate().map_err(checkpoint_config_error)?;
         let config = self.config.clone();
         let mut slots = Vec::new();
         reserve(&mut slots, n, "state.slots")?;
@@ -680,7 +678,7 @@ impl Simulator {
         let envelope: Envelope = decode(bytes)?;
         envelope
             .config
-            .validate_continuation()
+            .validate()
             .map_err(checkpoint_config_error)?;
         let canonical = ConfigRecord::serialize(&envelope.config, serde_json::value::Serializer)
             .map_err(|e| invalid(Constraint::InconsistentState, "config", e.to_string()))?;
@@ -742,6 +740,14 @@ impl State {
                     "state.radius",
                 )?;
             }
+        } else if !config.dynamic_radius || self.time == 0. {
+            // Only the controller and recorded updates move the live radius,
+            // and the controller first runs in a step.
+            require(
+                self.radius == config.radius,
+                Constraint::InconsistentState,
+                "state.radius",
+            )?;
         }
         nonnegative(self.prey_clock, "state.preyClock")?;
         require(
