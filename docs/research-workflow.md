@@ -256,14 +256,16 @@ before reaching its coverage gate:
   lost five of seven slots to third-party proximity and one to the rim margin
   before a join failed.
 - The [food-interest pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-food-interest/REPORT.md)
-  ended at its first avoidance abort after three slots, as the October 23 food
-  lanes had after 13 seconds.
+  ended at its first avoidance abort after three slots, as the
+  [October 23 food lanes](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
+  had after 13 seconds.
 
 Before freezing another route, show offline that it survives interference.
 Restage or re-site after an abort within a fixed budget instead of ending the
 invocation. Keep the staging footprint away from the rim, pace reconnects and
 screen opponent bodies, not just heads. Check that the freshness gates can pass
-from the planned vantage: every October 23 food reintroduction was too stale.
+from the planned vantage: every October 23 food reintroduction failed the
+anchor-age gate.
 Keep failed pilots as evidence; a rerun of the same controller is not new data.
 
 ### Capture records
