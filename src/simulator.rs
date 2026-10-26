@@ -464,21 +464,25 @@ impl Config {
         }) {
             return Err("spawnRadiusMax requires spawnRadius and must be finite and at least spawnRadius, so the spawn band is ordered".into());
         }
-        if [self.spawn_radius, self.spawn_radius_max]
-            .into_iter()
-            .flatten()
-            .any(|spawn| {
-                let roundoff = crate::spawn::ring_roundoff(spawn);
-                let lower = spawn - roundoff;
-                let upper = spawn + roundoff;
-                !(upper < self.radius - SPAWN_WALL_MARGIN
-                    && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
-                    && crate::spawn::ring_step(lower, segments).is_some()
-                    && crate::spawn::ring_step(upper, segments).is_some())
-            })
-        {
+        let invalid = [
+            ("spawnRadius", self.spawn_radius),
+            ("spawnRadiusMax", self.spawn_radius_max),
+        ]
+        .into_iter()
+        .find_map(|(name, spawn)| {
+            let spawn = spawn?;
+            let roundoff = crate::spawn::ring_roundoff(spawn);
+            let lower = spawn - roundoff;
+            let upper = spawn + roundoff;
+            let fits = upper < self.radius - SPAWN_WALL_MARGIN
+                && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
+                && crate::spawn::ring_step(lower, segments).is_some()
+                && crate::spawn::ring_step(upper, segments).is_some();
+            (!fits).then_some(name)
+        });
+        if let Some(name) = invalid {
             return Err(format!(
-                "spawnRadius must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
+                "{name} must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
                  radius, with body chords outside the pit and room for a new life's \
                  {segments} anchors 42 apart plus its head-tail body clearance"
             ));

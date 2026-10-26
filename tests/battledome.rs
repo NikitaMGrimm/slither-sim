@@ -712,6 +712,15 @@ fn spawn_bands_reject_unordered_and_impossible_geometry() {
         config.spawn_radius_max = Some(outer);
         assert!(config.validate().is_err(), "{outer}");
     }
+    // An outer edge inside the wall margin names the outer setting.
+    let mut config = Config::battledome();
+    config.spawn_radius_max = Some(3524.);
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .starts_with("spawnRadiusMax must lie outside pit.radius")
+    );
     let mut config = Config::sandbox();
     config.spawn_radius_max = Some(800.);
     assert!(
