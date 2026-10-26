@@ -147,9 +147,22 @@ The implementation's full Rust group passed after rebase onto 3a23dc9; docs chec
 Independent GPT 6.1 Sol source review covered policy, pit/minimap, contracts and regressions;
 its sub-cell marker update finding was fixed with tests preserving physical-food lifetimes.
 Review did not rerun checks/measurements. Strict timing stays on 150d4b1; delivery adds prey bounds/fidelity
-reports with zero prey in Battledome and unchanged admission owners. A uses 249cdb2. No new measurements.
+reports with zero prey in Battledome and unchanged admission owners. A uses 249cdb2. Pruning added no measurements; the separate shrink follow-up is below.
 Owner-relayed community spot reuse/500-unit fallback/modest growth inspired the design;
 that server's human deaths/performance were not measured. No outside game server, browser, Linux/macOS,
 full tools/WASM/package or human gameplay test was run. No 80-human, dense one-core, equilibrium or
 superiority claim follows. Bounded work/space cannot guarantee a maximum wait if all sampled poses
 violate safety; later turns, boosts and shrink encounters remain. Zero observed early failures applies only here.
+
+## Review follow-up: shrink presentation
+
+Queued respawns retire before unique enqueue (`alive=false`, death time cleared); occupied/waiting seats are disjoint. No accounting fix.
+
+Five alternating release pairs after warmups replayed the full 11,648→3,694.7421875 shrink: 48,477 moving ticks, 32 pit-following synthetic views, no snakes/food.
+Worker-thread fixture CPU ms/tick median (range): **0.2614 (0.2601–0.2688) → 0.0406 (0.0406–0.0409)**.
+Sync/diff elapsed medians: 0.1321/0.1291→0.0125/0.0265 ms/tick. Separate profiles counted rebuilds 48,477→3,378 and retained-sector comparisons 12,348,818→864,069.
+Shrink now retains decoration handles within a radial food cell (300/256 units); growth past the cached edge refreshes immediately. Extra outward offset is <1 cell, plus normal grid rounding; physics/growth constants stay unchanged.
+
+All final world hashes match; wire differs intentionally at this presentation precision. The regression fails before/passes after, checks held handles, boundary packets, outside-edge bounds and growth; physical-food tests/full Rust pass.
+This empty-world component CPU includes views, core steps, timers and packet hashing; diff elapsed includes encoding/hash. All children used verified `0x30`, no errors; shared-desktop timings are descriptive, not a host/network capacity grade.
+Original admission rows/PLAN remain unchanged. Compact pairs/profiles are in results.json; full fixture, sources, binaries, attempts and pins stay local-only under outputs/spawn-capacity/shrink-phase/.

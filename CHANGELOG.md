@@ -25,8 +25,9 @@
   Further expansion leaves recent births their three-second departure window.
   Admission still runs at most one bounded search per tick, sockets first.
   The live-radius minimap keeps the pit's pixel size and player-marker alignment;
-  decorative food follows the live pit edge. The 16–32-seat geometry, floor,
-  scoring and one-way pit rule stay unchanged; growth passing over an outside
+  decorative food follows the live pit edge, with wire-cell caching during
+  shrink to avoid per-tick rebuilds and recipient diffs. The 16–32-seat geometry,
+  floor, scoring and one-way pit rule stay unchanged; growth passing over an outside
   snake does not count as pit entry. Checkpoint rules become
   `slither-sim-rules-v3` (v1/v2 rejected; format stays v2); no saved fields are
   added ([configuration](docs/configuration.md#battledome)).

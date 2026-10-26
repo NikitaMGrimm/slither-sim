@@ -325,8 +325,12 @@ At the base size the stock browser shows the pit edge as 749 decorative pellets:
 centers 3 units outside the pit, about 15 units apart, palette 8, size byte 31
 (6.2). These are design choices. Markers cannot be eaten and follow normal
 sector delivery. On radius changes the old decorations are removed and new
-ones follow the live pit edge. The minimap uses the live wall for both snakes
-and pit: proportional pit growth keeps its raster cells fixed while the stock
+ones follow the live pit edge. During shrink, their cached radius updates at
+food-grid steps (`300 / 256` units), leaving less than one cell of extra outward
+offset. Growth past the cached edge refreshes immediately. Unchanged listings
+keep their handles so recipients skip redundant food diffs. The minimap uses
+the live wall for both snakes and pit: proportional pit growth keeps its raster
+cells fixed while the stock
 own-player marker remains aligned. Bots get only real food, including any pellet a marker hides in
 the browser. The stock browser has no rolling kill-score display.
 

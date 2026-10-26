@@ -49,6 +49,16 @@ impl PitMarkers {
         self.1
     }
 
+    pub(super) fn needs_update(&self, radius: f64) -> bool {
+        // A shrinking edge may leave decorations at most one radial food cell
+        // outward, avoiding a rebuild and recipient diffs every 7 ms. Growth
+        // past the cached edge refreshes immediately so the ring stays outside.
+        // Protocol-19 food coordinates have 256 offsets per sector.
+        let cell = f64::from(encode::SECTOR_SIZE) / 256.;
+        let previous = self.radius();
+        radius > previous || (radius / cell).floor() != (previous / cell).floor()
+    }
+
     pub(super) fn overlay(
         &self,
         sector: u16,

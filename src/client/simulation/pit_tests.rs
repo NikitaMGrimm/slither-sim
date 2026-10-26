@@ -434,6 +434,101 @@ fn pit_markers_move_on_the_socket_to_the_live_pit_edge() {
 }
 
 #[test]
+fn shrinking_pit_keeps_decorated_handles_until_a_wire_cell_change() {
+    use std::{f64::consts::FRAC_PI_2, sync::Arc};
+    let mut config = config();
+    config.agents = 80;
+    config.world.radius_updates = vec![crate::RadiusUpdate {
+        time: 0.,
+        radius: 7168.,
+    }];
+    let mut sim = RawSimulator::new(7, config, 80).unwrap();
+    assert!(sim.connect(0, PlayerAppearance::default()).unwrap());
+    let near_pit = |sim: &mut RawSimulator| {
+        let head = Point {
+            x: sim.backend.world.pit_radius().unwrap() + 400.,
+            y: 0.,
+        };
+        let (body, heading) = sim.backend.world.spawn_body(head, FRAC_PI_2).unwrap();
+        sim.backend
+            .world
+            .correct_pose(0, head, body, heading)
+            .unwrap();
+        sim.backend.slots[0].control.heading = heading;
+    };
+    near_pit(&mut sim);
+    let mut state = ClientState::new();
+    state.new_connection(0.).unwrap();
+    sim.advance_ticks(1).unwrap();
+    pump(&mut sim, &mut state);
+    let visible = food(&state, sim.time());
+    assert!(!visible.is_empty());
+    let key = encode::food_key(visible[0].point()).unwrap();
+    let sector = usize::from(u16::from_be_bytes([key[0], key[1]]));
+    let held = sim.backend.decorated_food_sectors[sector]
+        .as_ref()
+        .unwrap()
+        .clone();
+    let before = sim.backend.world.pit_radius().unwrap();
+    sim.advance_ticks(1).unwrap();
+    let packets = pump(&mut sim, &mut state);
+    assert!(sim.backend.world.pit_radius().unwrap() < before);
+    assert!(Arc::ptr_eq(
+        &held,
+        sim.backend.decorated_food_sectors[sector].as_ref().unwrap()
+    ));
+    assert!(
+        !packets
+            .iter()
+            .any(|p| matches!(p[0], b'f' | b'F' | b'c' | b'<'))
+    );
+
+    // A complete radial wire-cell crossing still changes listings and packets.
+    let mut changes = Vec::new();
+    for _ in 0..20 {
+        sim.advance_ticks(1).unwrap();
+        changes.extend(pump(&mut sim, &mut state));
+        if !Arc::ptr_eq(
+            &held,
+            sim.backend.decorated_food_sectors[sector].as_ref().unwrap(),
+        ) {
+            break;
+        }
+    }
+    assert!(!Arc::ptr_eq(
+        &held,
+        sim.backend.decorated_food_sectors[sector].as_ref().unwrap()
+    ));
+    assert!(changes.iter().any(|p| matches!(p[0], b'f' | b'c' | b'<')));
+    let cell = f64::from(encode::SECTOR_SIZE) / 256.;
+    let live = sim.backend.world.pit_radius().unwrap();
+    assert!(food(&state, sim.time()).iter().all(|f| {
+        let offset = f.point().distance(Point::default()) - live;
+        offset > 0. && offset < 3. + cell + 1.
+    }));
+
+    // Growth cannot wait for a bucket: a previously safe decoration could be
+    // left behind the live edge. Move the viewport so it sees the new ring.
+    assert!(sim.grow_for_waiters(79, 0., true));
+    near_pit(&mut sim);
+    sim.advance_ticks(1).unwrap();
+    pump(&mut sim, &mut state);
+    assert_eq!(
+        sim.backend.pit_markers.as_ref().unwrap().radius(),
+        sim.backend.world.pit_radius().unwrap()
+    );
+    let live = sim.backend.world.pit_radius().unwrap();
+    let visible = food(&state, sim.time());
+    assert!(!visible.is_empty());
+    assert!(
+        visible
+            .iter()
+            .all(|f| (f.point().distance(Point::default()) - live - 3.).abs() < 1.)
+    );
+    assert!(sim.backend.world.food().is_empty());
+}
+
+#[test]
 fn queue_space_allowances_do_not_change_generic_circular_worlds() {
     let mut config = config();
     config.agents = 80;

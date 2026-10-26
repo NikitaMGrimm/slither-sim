@@ -214,13 +214,13 @@ impl SimulatorBackend {
     /// shows its first shown pellet in world order. Only new and changed
     /// listings are rebuilt, from the index.
     pub(super) fn sync_food_sectors(&mut self) -> Result<(), String> {
-        // Rebuild only when the live pit moves. Normal sector diffs remove old
-        // markers and add new ones, including sectors with no physical food.
+        // Shrink follows the wire grid rather than rebuilding every tick;
+        // unchanged decorated handles then skip each recipient's food diff.
         let pit = self.world.pit_radius();
         let pit_changed = self
             .pit_markers
             .as_ref()
-            .is_some_and(|m| Some(m.radius()) != pit);
+            .is_some_and(|m| pit.is_none_or(|radius| m.needs_update(radius)));
         if pit_changed {
             self.pit_markers = pit.map(super::markers::PitMarkers::new).transpose()?;
         }
