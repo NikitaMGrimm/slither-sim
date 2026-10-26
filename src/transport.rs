@@ -571,6 +571,12 @@ impl Session {
         self.current.as_ref().map_or(0, |run| run.agents)
     }
 
+    /// The resolved initial config every world was reset with; `None` before
+    /// the first reset or after a failed step ended the session.
+    pub fn config(&self) -> Option<&Config> {
+        Some(self.current.as_ref()?.worlds.first()?.world.config())
+    }
+
     fn handle(&mut self, request: Request) -> Result<Vec<u8>, StepError> {
         match request {
             Request::Info {} => Ok(reply(&json!({

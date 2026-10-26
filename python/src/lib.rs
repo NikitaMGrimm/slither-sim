@@ -456,6 +456,20 @@ impl Session {
     fn agents(&self) -> usize {
         self.inner.agents()
     }
+
+    /// The resolved world config of the last reset, as a new camelCase dict like
+    /// a JSON reset reply's `config`; `None` before the first reset or after the
+    /// session ended. Editing the dict does not change the worlds.
+    #[getter]
+    fn config(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        let Some(config) = self.inner.config() else {
+            return Ok(None);
+        };
+        let bytes =
+            serde_json::to_vec(config).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let loads = LOADS.import(py, "json", "loads")?;
+        Ok(Some(loads.call1((PyBytes::new(py, &bytes),))?.unbind()))
+    }
 }
 
 macro_rules! frame {
