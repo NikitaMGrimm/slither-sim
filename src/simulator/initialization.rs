@@ -141,7 +141,11 @@ const MAGNITUDE: f64 = 1e150;
 fn bounded(value: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
     if value.abs() > MAGNITUDE {
-        return Err(SimError::state(Constraint::OutOfRange, field, "State exceeds the finite continuation envelope"));
+        return Err(SimError::state(
+            Constraint::OutOfRange,
+            field,
+            "State exceeds the finite continuation envelope",
+        ));
     }
     Ok(())
 }

@@ -120,8 +120,7 @@ fn world(case: &str) -> Result<Simulator, String> {
     } else {
         ANCHORS
     };
-    for slot in 0..agents {
-        let snake = &mut snakes[slot];
+    for (slot, snake) in snakes.iter_mut().enumerate() {
         if case == "observe-strip" {
             snake.head = Point {
                 x: 0.0,

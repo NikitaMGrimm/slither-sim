@@ -89,8 +89,22 @@ fn numerical_import_and_correction_rejections_are_atomic() {
     let mut fast = life(&world);
     fast.speed = InitialSpeed::Known(SpeedState::idle(f64::MAX));
     assert!(world.import_life(0, fast).is_err());
-    assert!(world.correct_pose(0, Point { x: 1e151, y: 0. }, vec![Point::default(); 2], 0.).is_err());
-    assert!(world.insert_food(Food { x: f64::MAX, y: 0., value: 1., size: None, origin: None }).is_err());
+    assert!(
+        world
+            .correct_pose(0, Point { x: 1e151, y: 0. }, vec![Point::default(); 2], 0.)
+            .is_err()
+    );
+    assert!(
+        world
+            .insert_food(Food {
+                x: f64::MAX,
+                y: 0.,
+                value: 1.,
+                size: None,
+                origin: None
+            })
+            .is_err()
+    );
     assert_eq!(bytes(&world), before);
 }
 

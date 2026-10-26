@@ -757,9 +757,9 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                     && (eat.time - observed.time).abs() <= f.options.pickup_time_tolerance
             })
             .min_by(|(_, a), (_, b)| {
-                (a.time() - observed.time)
+                (a.time - observed.time)
                     .abs()
-                    .total_cmp(&(b.time() - observed.time).abs())
+                    .total_cmp(&(b.time - observed.time).abs())
             });
         if let Some((index, _)) = candidate {
             matched.insert(index);

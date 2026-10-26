@@ -83,8 +83,8 @@ fn rejected_batches_and_headings_preserve_exact_state() {
                 before
             );
             assert_eq!(
-                (&world.pickup_events(), &world.food_spawn_events()),
-                (&events.0, &events.1)
+                (world.pickup_events(), world.food_spawn_events()),
+                (events.0.as_deref(), events.1.as_deref())
             );
             assert_eq!(profile.ticks, 0);
             assert_eq!(world.status(), WorldStatus::Running);

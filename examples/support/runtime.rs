@@ -112,6 +112,22 @@ pub fn retire(world: &mut Simulator, slot: usize) -> Result<(), String> {
 
 #[cfg(not(slither_private_state))]
 pub trait LegacyState {
+    fn correct_mass(
+        &mut self,
+        slot: usize,
+        body: Vec<slither_sim::Point>,
+        fam: f64,
+    ) -> Result<(), String>;
+    fn correct_pose(
+        &mut self,
+        slot: usize,
+        head: slither_sim::Point,
+        body: Vec<slither_sim::Point>,
+        heading: f64,
+    ) -> Result<(), String>;
+    fn retire(&mut self, slot: usize) -> Result<(), String>;
+    fn insert_food(&mut self, food: Food) -> Result<usize, String>;
+    fn radius(&self) -> f64;
     fn config(&self) -> &Config;
     fn time(&self) -> f64;
     fn snakes(&self) -> &[Snake];
@@ -123,6 +139,44 @@ pub trait LegacyState {
 }
 #[cfg(not(slither_private_state))]
 impl LegacyState for Simulator {
+    fn correct_mass(
+        &mut self,
+        slot: usize,
+        body: Vec<slither_sim::Point>,
+        fam: f64,
+    ) -> Result<(), String> {
+        let snake = &mut self.snakes[slot];
+        snake.segments = body.len();
+        snake.body = body;
+        snake.fam = fam;
+        Simulator::update_mass(snake);
+        Ok(())
+    }
+    fn correct_pose(
+        &mut self,
+        slot: usize,
+        head: slither_sim::Point,
+        body: Vec<slither_sim::Point>,
+        heading: f64,
+    ) -> Result<(), String> {
+        let snake = &mut self.snakes[slot];
+        snake.head = head;
+        snake.body = body;
+        snake.heading = heading;
+        Ok(())
+    }
+    fn retire(&mut self, slot: usize) -> Result<(), String> {
+        retire(self, slot)
+    }
+    fn insert_food(&mut self, food: Food) -> Result<usize, String> {
+        let index = self.food.len();
+        self.food.push(food);
+        Ok(index)
+    }
+    fn radius(&self) -> f64 {
+        self.config.radius
+    }
+
     #[inline]
     fn config(&self) -> &Config {
         &self.config

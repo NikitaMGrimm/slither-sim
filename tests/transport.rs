@@ -122,7 +122,7 @@ fn view(frame: &Value, slot: usize) -> Value {
 
 fn world(seed: u32, agents: usize, config: Value) -> Simulator {
     let config: Config = serde_json::from_value(config).unwrap();
-    let world = Simulator::new(slither_sim::WorldOptions {
+    Simulator::new(slither_sim::WorldOptions {
         seed,
         config,
         population: slither_sim::InitialPopulation::Placed {
@@ -130,8 +130,7 @@ fn world(seed: u32, agents: usize, config: Value) -> Simulator {
             placement: slither_sim::Placement::TestRing,
         },
     })
-    .unwrap();
-    world
+    .unwrap()
 }
 
 fn assert_frame_matches(frame: &Value, world: &Simulator) {

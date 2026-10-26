@@ -36,7 +36,7 @@ fn startup_attempts_admit_only_two_per_cell_and_disabled_keeps_all() {
     let uncapped = tiny_world(false, 20, 0.0);
     assert_eq!(capped.food().len(), 2);
     assert_eq!(uncapped.food().len(), 20);
-    assert_eq!(capped.food(), uncapped.food()[..2]);
+    assert_eq!(capped.food(), &uncapped.food()[..2]);
 }
 
 #[test]

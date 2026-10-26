@@ -443,7 +443,7 @@ fn a_clock_past_u64_periods_stays_due() {
 }
 
 #[test]
-fn failed_ring_spawn_restores_the_existing_life() {
+fn failed_ring_admission_preserves_the_existing_life() {
     let mut world = Config::sandbox();
     world.food_count = 0;
     world.ambient_replenish_per_second = 0.0;
@@ -459,20 +459,17 @@ fn failed_ring_spawn_restores_the_existing_life() {
         },
     )
     .unwrap();
-    // Config is public and may be changed after construction. Force the
-    // early geometry error that used to bypass alive restoration.
+    // A measured live radius can shrink inside the initial spawn ring.
+    // Failed admission must preserve the existing life.
     {
         let mut config = backend.world.config().clone();
-        config.spawn_radius = Some(100.0);
+        config.radius = 100.0;
         crate::client::test_support::reconfigure(&mut backend.world, config);
     }
     let before = format!("{:?}", backend.world);
     let life = backend.slots[0].life;
     let connections = backend.connections;
-    assert_eq!(
-        backend.reconnect_slot(0).unwrap_err(),
-        "Spawn circle is too small for a new life's body"
-    );
+    assert_eq!(backend.reconnect_slot(0).unwrap_err(), spawn::WAITING);
     assert_eq!(format!("{:?}", backend.world), before);
     assert_eq!(backend.slots[0].life, life);
     assert_eq!(backend.connections, connections);
@@ -507,13 +504,6 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
     let neighbor = &mut detached_neighbor;
     neighbor.head = rows[0];
     neighbor.body = rows[1..].to_vec();
-    let neighbor = neighbor.clone();
-    let life = backend.slots[0].life;
-
-    assert_eq!(
-        backend.reconnect_slot(0).unwrap_err(),
-        "Spawn candidate search exhausted: no sampled position is clear of other snakes"
-    );
     backend
         .world
         .correct_mass(1, neighbor.body.clone(), neighbor.fam)
@@ -522,6 +512,13 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
         .world
         .correct_pose(1, neighbor.head, neighbor.body.clone(), neighbor.heading)
         .unwrap();
+    let neighbor = backend.world.snakes()[1].clone();
+    let life = backend.slots[0].life;
+
+    assert_eq!(
+        backend.reconnect_slot(0).unwrap_err(),
+        "Spawn candidate search exhausted: no sampled position is clear of other snakes"
+    );
     assert_eq!(backend.world.snakes()[1], neighbor);
     assert_eq!(backend.slots[0].life, life);
 }
@@ -1339,7 +1336,7 @@ fn prey_motion_changes_are_bounded_and_visibility_reentry_resets_the_clock() {
     sim.backend
         .world
         .insert_prey(crate::ReplayPrey {
-            prey: prey,
+            prey,
             mode: crate::PreyMode::Roaming,
         })
         .unwrap();
@@ -1380,7 +1377,7 @@ fn prey_pickup_reports_the_actual_eater_without_inventing_one_for_visibility_exi
     sim.backend
         .world
         .insert_prey(crate::ReplayPrey {
-            prey: prey,
+            prey,
             mode: crate::PreyMode::Roaming,
         })
         .unwrap();
@@ -2448,7 +2445,7 @@ fn sole_dead_session_still_receives_food_and_prey() {
     sim.backend
         .world
         .insert_prey(crate::ReplayPrey {
-            prey: prey,
+            prey,
             mode: crate::PreyMode::Roaming,
         })
         .unwrap();
@@ -2486,10 +2483,9 @@ fn remote_death_sends_mass_game_over_then_removal_and_stays_dead() {
     while !sim.backend.tick.is_multiple_of(6) {
         run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
     }
-    let mut detached_snake = sim.backend.world.snakes()[0].clone();
-    let snake = &mut detached_snake;
-    snake.fam = 0.75;
-    snake.alive = false;
+    let snake = sim.backend.world.snakes()[0].clone();
+    sim.backend.world.correct_mass(0, snake.body, 0.75).unwrap();
+    sim.backend.world.retire(0).unwrap();
     sim.advance_ticks(6).unwrap();
     let fam = encode::fam_u24(0.75);
     let death = [
@@ -2517,16 +2513,6 @@ fn remote_death_sends_mass_game_over_then_removal_and_stays_dead() {
     for _ in 0..600 {
         sim.advance_ticks(1).unwrap();
         b.pump(&mut sim, 1);
-        sim.backend
-            .world
-            .import_life(
-                0,
-                crate::ReplayLife::from_observed(
-                    snake.clone(),
-                    crate::InitialSpeed::Infer(snake.speed),
-                ),
-            )
-            .unwrap();
         let living = sim
             .backend
             .world
@@ -2711,7 +2697,8 @@ fn credit_and_hud_carry_the_represented_score() {
                     pickups: true,
                     food_births: true,
                 },
-                ..Default::default()
+                #[cfg(feature = "parallel")]
+                parallel: true,
             },
         )
         .unwrap();

@@ -1,3 +1,7 @@
+#[path = "../examples/support/runtime.rs"]
+mod runtime;
+#[cfg(not(slither_private_state))]
+use runtime::LegacyState;
 mod support;
 use serde::Deserialize;
 use slither_sim::{physics::*, *};
@@ -103,18 +107,15 @@ fn anchor_projects_current_head_ray_after_curved_crossing() {
 }
 
 fn scene() -> Simulator {
-    let mut s = Simulator::new(slither_sim::WorldOptions {
-        seed: 42,
-        config: Config {
+    let mut s = runtime::ring(
+        42,
+        Config {
             food_count: 0,
             radius: 10000.0,
             ..Config::sandbox()
         },
-        population: slither_sim::InitialPopulation::Placed {
-            ids: vec!["0".into()],
-            placement: slither_sim::Placement::TestRing,
-        },
-    })
+        1,
+    )
     .unwrap();
     {
         let mut snake = s.snakes()[0].clone();
@@ -511,14 +512,14 @@ fn collision_death_kill_and_food_ties() {
     assert_eq!(s.snakes()[1].kills, 1);
     assert_eq!(s.deaths()[0].killer.as_deref(), Some("1"));
     assert!(s.food().iter().any(|f| f.origin == Some(Origin::Death)));
-    let mut s = Simulator::new(slither_sim::WorldOptions {
-        seed: 1,
-        config: Config {
+    let mut s = runtime::ring(
+        1,
+        Config {
             food_count: 0,
             ..Config::sandbox()
         },
-        population: slither_sim::InitialPopulation::Empty,
-    })
+        0,
+    )
     .unwrap();
     for (id, y) in [("b", -20.0), ("a", 20.0)] {
         let i = support::ring_slot(&mut s, id, 0, 1).unwrap();

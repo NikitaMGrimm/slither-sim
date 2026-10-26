@@ -1,7 +1,15 @@
-use slither_sim::{Config, EventRecording, Point, RestoreOptions, SimError, Simulator};
+#[cfg(not(slither_private_state))]
+#[path = "../../examples/support/runtime.rs"]
+mod runtime;
+#[cfg(not(slither_private_state))]
+use runtime::LegacyState;
+#[cfg(slither_private_state)]
+use slither_sim::Point;
+use slither_sim::{Config, EventRecording, RestoreOptions, SimError, Simulator};
 
 /// Synthetic ring fixture matching TestRing, for tests that append a later slot.
 #[allow(dead_code)]
+#[cfg(slither_private_state)]
 pub fn ring_slot(
     world: &mut Simulator,
     id: impl Into<String>,
@@ -99,4 +107,15 @@ pub fn restore_prey(world: &mut Simulator, index: usize, prey: slither_sim::Prey
     world
         .restore(&serde_json::to_vec(&checkpoint).unwrap(), options)
         .unwrap();
+}
+
+#[allow(dead_code)]
+#[cfg(not(slither_private_state))]
+pub fn ring_slot(
+    world: &mut Simulator,
+    id: impl Into<String>,
+    index: usize,
+    count: usize,
+) -> Result<usize, SimError> {
+    world.add(id, index, count)
 }

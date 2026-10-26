@@ -50,7 +50,7 @@ fn living_slot_rejoins_keep_the_new_body_clear_of_other_lives() {
             );
 
             let mut others = backend.world().clone();
-            others.snakes[slot].alive = false;
+            others.retire(slot).unwrap();
             assert!(
                 others.spawn_is_clear(newborn.head, newborn.heading, newborn.segments, 600.),
                 "seed {seed}, rejoined slot {slot}"
@@ -65,7 +65,7 @@ fn crowded_rejoin_takes_the_most_open_candidate_without_replacing_the_neighbor()
     // Move inward from the constructor's test ring. Once the remaining head is
     // within 175 of center, even the farthest candidate (radius <= 400) is too close.
     backend.advance_ticks(60).unwrap();
-    for snake in &backend.world().snakes() {
+    for snake in backend.world().snakes() {
         assert!(snake.alive);
         assert!(snake.head.distance(Point::default()) < 175.);
         assert!(snake.head.distance(Point::default()) + 400. < 600.);
@@ -87,7 +87,7 @@ fn crowded_rejoin_takes_the_most_open_candidate_without_replacing_the_neighbor()
             frame.received.connection_generation + 1
         );
         let mut others = backend.world().clone();
-        others.snakes[slot].alive = false;
+        others.retire(slot).unwrap();
         let mut body = vec![newborn.head];
         body.extend(&newborn.body);
         let margin = others.spawn_margin(&body).unwrap();

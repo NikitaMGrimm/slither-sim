@@ -724,7 +724,10 @@ fn restored_kill_counts_saturate_when_one_tick_credits_several() {
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-        population: slither_sim::InitialPopulation::Placed { ids: (0..3).map(|i| i.to_string()).collect(), placement: slither_sim::Placement::TestRing },
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..3).map(|i| i.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
     })
     .unwrap();
     // Two heads beside the third snake's body, both lethal next tick.
@@ -735,10 +738,17 @@ fn restored_kill_counts_saturate_when_one_tick_credits_several() {
         world.correct_mass(i, body.clone(), fam).unwrap();
         world.correct_pose(i, head, body, PI).unwrap();
     }
-    let body = (0..11).map(|i| Point { x: -25., y: 300. - 42. * i as f64 }).collect::<Vec<_>>();
+    let body = (0..11)
+        .map(|i| Point {
+            x: -25.,
+            y: 300. - 42. * i as f64,
+        })
+        .collect::<Vec<_>>();
     let fam = world.snakes()[2].fam;
     world.correct_mass(2, body.clone(), fam).unwrap();
-    world.correct_pose(2, Point { x: -25., y: 342. }, body, FRAC_PI_2).unwrap();
+    world
+        .correct_pose(2, Point { x: -25., y: 342. }, body, FRAC_PI_2)
+        .unwrap();
     let mut source = value(&world);
     source["state"]["slots"][2]["snake"]["kills"] = json!(usize::MAX - 1);
     let mut world = Simulator::from_checkpoint(&bytes(&source), options()).unwrap();
@@ -809,7 +819,15 @@ fn live_radius_inside_the_initial_spawn_ring_still_checkpoints() {
         ..Config::sandbox()
     };
     config.kiosk.enabled = false;
-    let mut world = Simulator::new(slither_sim::WorldOptions { seed: 7, config, population: slither_sim::InitialPopulation::Placed { ids: vec!["a".into()], placement: slither_sim::Placement::TestRing } }).unwrap();
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     let heading = world.snakes()[0].heading;
     world
         .step(&[Some(Action {
@@ -902,7 +920,7 @@ fn valid_refill_credit_and_large_batched_motion_roundoff_are_preserved() {
 
 #[test]
 fn checkpoint_slots_have_no_500_agent_policy_cap() {
-    let mut source = Simulator::new(slither_sim::WorldOptions {
+    let source = Simulator::new(slither_sim::WorldOptions {
         seed: 7,
         config: Config {
             food_count: 0,

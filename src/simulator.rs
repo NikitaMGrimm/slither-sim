@@ -2815,7 +2815,7 @@ mod prey_index_tests {
         config.kiosk.enabled = false;
         let mut world = Simulator::new(crate::WorldOptions {
             seed: 123,
-            config: config,
+            config,
             ..Default::default()
         })
         .unwrap();
@@ -2899,17 +2899,17 @@ mod slot_tests {
         let mut generated = Simulator::new(crate::WorldOptions {
             seed: 3,
             config: Config::sandbox(),
-            ..Default::default()
+            population: InitialPopulation::Placed {
+                ids: (0..5).map(|s| s.to_string()).collect(),
+                placement: Placement::default(),
+            },
         })
         .unwrap();
-        for slot in 0..5 {
-            generated.push_ring(slot.to_string(), slot, 5).unwrap();
-        }
         assert_eq!(
             serde_json::to_value(generated.checkpoint().unwrap()).unwrap(),
             serde_json::to_value(checked.checkpoint().unwrap()).unwrap()
         );
-        // Caller-supplied IDs are still checked, and slots need an empty world.
+        // Caller-supplied IDs are still checked.
         assert_eq!(
             generated.append_dormant("3".into()).unwrap_err().kind,
             ErrorKind::DuplicateId

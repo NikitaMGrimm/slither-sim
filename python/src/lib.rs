@@ -272,6 +272,7 @@ impl Session {
         signature = (seed=None, worlds=None, agents=None, decision_ticks=None, config=None, placement=None),
         text_signature = "(self, seed=1, worlds=1, agents=4, decision_ticks=6, config=None, placement=None)"
     )]
+    #[allow(clippy::too_many_arguments)] // Public Python keyword signature.
     fn reset(
         &mut self,
         py: Python<'_>,

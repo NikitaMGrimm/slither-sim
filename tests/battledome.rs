@@ -993,7 +993,7 @@ fn floor_world() -> Simulator {
     config.kiosk.enabled = false;
     config.min_score = Some(400);
     config.spawn_radius = Some(500.0);
-    let world = Simulator::new(slither_sim::WorldOptions {
+    Simulator::new(slither_sim::WorldOptions {
         seed: 11,
         config,
         population: slither_sim::InitialPopulation::Placed {
@@ -1001,8 +1001,7 @@ fn floor_world() -> Simulator {
             placement: slither_sim::Placement::TestRing,
         },
     })
-    .unwrap();
-    world
+    .unwrap()
 }
 
 fn straight_boost(world: &Simulator) -> Vec<Option<Action>> {
@@ -1236,11 +1235,11 @@ fn kiosk_shrinking_stops_at_the_floor() {
         })
         .collect();
     s.head = s.body[0];
+    world.correct_mass(0, s.body.clone(), s.fam).unwrap();
+    world
+        .correct_pose(0, s.head, s.body.clone(), s.heading)
+        .unwrap();
     for _ in 0..1000 {
-        world.correct_mass(0, s.body.clone(), s.fam).unwrap();
-        world
-            .correct_pose(0, s.head, s.body.clone(), s.heading)
-            .unwrap();
         world.step(&circling(&world, false)).unwrap();
         let s = &world.snakes()[0];
         assert!(
