@@ -1,0 +1,40 @@
+{
+  "verifiedUtc": "2026-10-26T10:30:00.179317+00:00",
+  "attemptCount": 5,
+  "regions": {
+    "eu-central-1": {
+      "nonterminatedInstances": 0,
+      "openOrActiveSpotRequests": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0
+    },
+    "us-east-1": {
+      "nonterminatedInstances": 0,
+      "openOrActiveSpotRequests": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0
+    },
+    "us-west-2": {
+      "nonterminatedInstances": 0,
+      "openOrActiveSpotRequests": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0
+    },
+    "eu-west-1": {
+      "nonterminatedInstances": 0,
+      "openOrActiveSpotRequests": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0
+    }
+  },
+  "handoff": {
+    "buckets": 0,
+    "roles": 0,
+    "instanceProfiles": 0
+  },
+  "allZero": true
+}

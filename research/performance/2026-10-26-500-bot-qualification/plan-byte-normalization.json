@@ -1,0 +1,5 @@
+{
+  "reason": "Windows text writer emitted CRLF; Git publishes LF. No plan values changed; normalized before source upload and any trial.",
+  "originalSha256": "37e31eb42001328a2f93421045c140fe6ce9b9bf9e37daa5a59eabd095d539a1",
+  "publishedSha256": "ef54c0e40a9e9dd18ae978961b742fad4d89951fba8e4326903100c402107e7d"
+}

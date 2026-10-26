@@ -1,0 +1,12 @@
+{
+  "recordedUtc": "2026-10-26T08:34:57.210847+00:00",
+  "beforeGradedCollection": true,
+  "attempt1": {
+    "status": "invalid smoke; no graded holds",
+    "reason": "Watcher assumed one packet per WebSocket frame; short rival removals were misread as self appearance. Native smoke playing-time validity check failed.",
+    "cleanup": "Verified zero study resources across all four requested regions"
+  },
+  "correction": "Use public protocol::split_frame, detect full self appearance even when bundled with setup, detect bundled game-over; collect received leaderboard population as descriptive coverage. No host/runtime changes.",
+  "unchanged": "Original revisions, order, 30 s warmup, 300 s holds, affinity, both grade thresholds and regression criterion",
+  "attemptBudget": "One corrected full attempt; maximum combined compute cap under $1.67 plus $2 ancillary reserve, within $10 total"
+}

@@ -1,0 +1,18 @@
+{
+  "recordedUtc": "2026-10-26T08:56:56.985981+00:00",
+  "originalPlanSha256": "ef54c0e40a9e9dd18ae978961b742fad4d89951fba8e4326903100c402107e7d",
+  "authorization": "User requested attempt 3 after SSH setup failure; re-pin B at launch; retain failed attempt 2; bounded retries and same-slot rerun only after interrupted work is confirmed stopped.",
+  "revisions": {
+    "A": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+    "B": "768928591a81e4ecf3849ad20720640d56b4996e",
+    "originMain": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+    "pr136State": "OPEN",
+    "mergeBase": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+    "selection": "Launch-time main and PR head; merged case uses first parent and merge commit"
+  },
+  "unchanged": "500 bots, responsive/A4 defaults, two primary bot threads, affinity, 30+300 s, ABABAB, fixed grades and spread criterion",
+  "transport": "Five SSH setup attempts with 2/4/8/16 s backoff. Detached remote supervisor and exclusive claim make launch reconnects idempotent. Persistent job status distinguishes completed/running/interrupted work; never rerun a running hold. One same-slot retry for confirmed interruption, raw attempts retained separately.",
+  "failedAttempt2": "Transport failure after completed A1 and B1 summaries; A2 incomplete, full raw archive could not be recovered before cleanup. All results excluded from attempt-3 comparison.",
+  "cumulativeSpendBeforeAttempt3Usd": 0.07706888346093721,
+  "budget": "100-minute hard termination per instance, $0.50/h Spot cap; three-launch worst-case compute <= $2.50 plus $2 ancillary reserve, below $10 total"
+}
