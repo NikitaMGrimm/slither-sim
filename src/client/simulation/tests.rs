@@ -235,7 +235,7 @@ fn bounded_admission_matches_exhaustive_poses_errors_and_random_stream() {
     {
         let mut config = backend.world.config().clone();
         config.radius = 50.;
-        crate::client::test_support::reconfigure(&mut backend.world, config);
+        crate::client::fixtures::reconfigure(&mut backend.world, config);
     }
     let mut random = backend.spawn_random.clone();
     assert_eq!(
@@ -464,7 +464,7 @@ fn failed_ring_admission_preserves_the_existing_life() {
     {
         let mut config = backend.world.config().clone();
         config.radius = 100.0;
-        crate::client::test_support::reconfigure(&mut backend.world, config);
+        crate::client::fixtures::reconfigure(&mut backend.world, config);
     }
     let before = format!("{:?}", backend.world);
     let life = backend.slots[0].life;
@@ -1302,13 +1302,13 @@ fn prey_motion_changes_are_bounded_and_visibility_reentry_resets_the_clock() {
         {
             let mut prey = sim.backend.world.prey()[0].clone();
             prey.heading += 0.2;
-            crate::client::test_support::restore_prey(&mut sim.backend.world, 0, prey);
+            crate::client::fixtures::restore_prey(&mut sim.backend.world, 0, prey);
         }
         // Exact-11 pulse transitions are the retained shorter-gap stratum.
         {
             let mut prey = sim.backend.world.prey()[0].clone();
             prey.speed = 11. / physics::SPEED_UNIT_SECONDS;
-            crate::client::test_support::restore_prey(&mut sim.backend.world, 0, prey);
+            crate::client::fixtures::restore_prey(&mut sim.backend.world, 0, prey);
         }
         sim.backend.broadcast().unwrap();
         for packet in remote.pump(&mut sim, 0) {

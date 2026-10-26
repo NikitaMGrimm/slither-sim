@@ -200,4 +200,4 @@ impl<B: Backend> BotRunner<B> {
 }
 
 #[cfg(test)]
-pub(crate) mod test_support;
+pub(crate) mod fixtures;
