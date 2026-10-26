@@ -629,7 +629,7 @@ fn invalid_prey_configuration_is_rejected() {
 // Synthetic inputs pin local replenishment and numeric-error contracts, not
 // measured official population or coarse-timestep behavior.
 #[test]
-fn reviewed_refill_consumes_all_due_intervals_and_discards_credit_at_target() {
+fn refill_consumes_all_due_intervals_and_discards_credit_at_target() {
     for interval in [0.001, f64::MIN_POSITIVE] {
         let mut w = Simulator::new(
             1,
@@ -658,7 +658,7 @@ fn reviewed_refill_consumes_all_due_intervals_and_discards_credit_at_target() {
 }
 
 #[test]
-fn reviewed_refill_waits_a_full_interval_after_the_catch_tick() {
+fn refill_waits_a_full_interval_after_the_catch_tick() {
     let mut w = world();
     w.config.ambient_replenish_per_second = 0.;
     w.config.prey.count = 1;
@@ -678,7 +678,7 @@ fn reviewed_refill_waits_a_full_interval_after_the_catch_tick() {
 }
 
 #[test]
-fn reviewed_nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
+fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
     let mut w = Simulator::new(
         1,
         Config {
@@ -710,7 +710,7 @@ fn reviewed_nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
 }
 
 #[test]
-fn reviewed_batched_prey_pickup_sweeps_each_relative_substep() {
+fn batched_prey_pickup_sweeps_each_relative_substep() {
     for count in [1, 512] {
         let mut w = Simulator::new(
             1,
@@ -788,7 +788,7 @@ fn reviewed_batched_prey_pickup_sweeps_each_relative_substep() {
 }
 
 #[test]
-fn reviewed_indexed_prey_arc_can_leave_its_endpoint_bounds() {
+fn indexed_prey_arc_can_leave_its_endpoint_bounds() {
     for count in [1, 512] {
         let mut w = Simulator::new(
             1,
