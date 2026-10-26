@@ -56,7 +56,7 @@ cargo run --release --locked --example perf_baseline -- --list
   Refused clients wait 24 decisions (1.008 virtual seconds); successful lives
   reconnect after their next reported death. This deterministic harness policy
   keeps per-slot retries; circular hosts use a shared admission queue with socket
-  priority and a 250 ms failed-search backoff. It does not measure host waiting
+  priority and a 14 ms failed-search backoff. It does not measure host waiting
   or wall-clock scheduling. Both compared runtimes use the same harness policy.
   This is 64 seats: inspect `population.depleted` and refusals for living counts.
   Official uses eight warmup decisions, retaining its initial death/respawn burst
