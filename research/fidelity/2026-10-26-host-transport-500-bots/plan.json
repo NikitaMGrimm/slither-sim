@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "studyId": "host-transport-500-bots-20261026",
+  "title": "Official transport under 500 background bots",
+  "kind": "exploratory",
+  "dataOrigin": "local-simulator",
+  "question": "Does the protocol-19 host with 500 background bots meet the unchanged near-server official transport gates?",
+  "hypotheses": [
+    "Both official-delivery arms meet all four existing one-sided gates with at least 100 samples per statistic."
+  ],
+  "method": "Frozen 2026-10-26T10:06:22.842973+00:00. Measure origin/main 1ba386f543422e1df9e1a60b0a1ce229d40055a8 (v0.5.0 era), unchanged local_capture.py, transport_parity.py, collector, reference and tolerances. Six serial 300-second captures, order 0-r1,500-r1,0-r2,500-r2,0-r3,500-r3. seed=20261025+repetition; players.max=4; bots.threads=2; zero added latency; default official world sized to reserved seats; simulation.delivery=official. No responsive arm. AWS eu-central-1 one-time Spot c7i.4xlarge, 16 vCPUs; choose six distinct physical cores from lscpu for housekeeping, simulation, sockets, bot0, bot1, collector. Pin worker TIDs after readiness and before first collector packet via study-local node launcher. No warmup removal; preserve startup, deaths and rejoins. Prebuild with Rust1.99.0 release locked, CARGO_BUILD_JOBS=2. Detached entire sequence; self-termination with shutdown behavior terminate and 120-minute hard timer. Spot compute cap $0.60/hour plus 40GiB root storage and network allowance within $8. Unique resource tags, own resources only. No outside game-server traffic.",
+  "sampling": {
+    "unit": "One complete five-minute host restart and headless forage capture.",
+    "attempts": 6,
+    "selection": "All six planned attempts, no automatic replacements or value-based exclusions. Third repetition of each arm held out. 300 seconds targets >100 anchor windows even in single-client baseline; insufficient samples is a retained gate failure, not a reason to extend.",
+    "independence": "Fresh host each capture and paired seeds, but one machine/region/date; overlapping anchor windows, frames and bot lives are correlated, not independent trials."
+  },
+  "exclusions": [
+    "No timing or telemetry masking. Invalid/interrupted captures retained and collection stops on acquisition exit2; grade valid captures only, report missing/ineligible arm as inconclusive. Gate exit1 never stops sequence."
+  ],
+  "validation": "Use unchanged minimumSamples100 and all four gate formulas/limits at full precision; lower values allowed. Report per-capture, development pool, heldout repetition and all-three pool by pooling raw samples, never quantiles. Seal development summaries with SHA256 after repetition2 before starting repetition3; no fitting or outcome-dependent changes. Run existing transport tests. Publish selected summaries, source/config/raw hashes, affinity verification, attempt outcomes and all failures. Raw access local-only outside Git. Verify own resources absent in eu-central-1,us-east-1,us-west-2,eu-west-1.",
+  "limitations": [
+    "Headless stock-style protocol client, not stock browser renderer; transport gates do not establish renderer parity, gameplay equivalence or training transfer.",
+    "One-sided exploratory limits calibrated by six-capture LOO; no population false-reject guarantee or independent reference holdout.",
+    "Zero physical-route latency; receipt timestamps include local collector/OS scheduling. Default seat-sized worlds differ between arms, so no isolated causal bot-CPU effect.",
+    "500 configured background seats do not imply 500 snakes alive at every instant; report observed in-game leaderboard population and retained deaths.",
+    "CPU qualification is outside this study; pinned cores reduce competition but do not eliminate shared-cache, VM steal or host effects."
+  ],
+  "capture": {
+    "server": {
+      "ip": "127.0.0.1",
+      "port": 8766
+    },
+    "scenario": "forage",
+    "seconds": 300,
+    "bots": 1
+  }
+}

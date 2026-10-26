@@ -1,0 +1,17 @@
+{
+  "baseCommit": "1ba386f543422e1df9e1a60b0a1ce229d40055a8",
+  "files": {
+    "Cargo.lock": "f50740a0cfd8d0ad5e14f0c9c2aaaf73c0bebf0712ad3f25e394aa2b6d10d79b",
+    "Cargo.toml": "2c6d05afca22ab94720dbf289dec75468e43cf80a39e1ecd143639343f7ee051",
+    "tools/fidelity/local_capture.py": "2026a6aa10e5028bb79656370d543e40a7600d78939726339473b6acb8b1c4cb",
+    "tools/fidelity/transport_parity.py": "843b7e9ac36c61ed8049269639ba7ad93369a741cc04ae496131ffe020af0282",
+    "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+    "tools/fidelity/slither_protocol.py": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+    "tools/fidelity/packet_census.py": "5a8604430478cf0b8e25c029d7b2c197847b2f1b5a5be55d1399a2cb51cb3d4e",
+    "tools/fidelity/transport_tolerances.json": "785c69b4bb007be8380c8ebe7d4e4ea36e5fae80668bf41e9319f48ec4758bf1",
+    "tests/fixtures/transport-official-near-server.json": "2b8beddc67962f62580705c8d1d8749d024285e6dffd3702a9e5ab2dd8b7f6ac",
+    "research/fidelity/2026-10-26-host-transport-500-bots/run.py": "694cd625855c133cb01431a4a4eb3f66258a713fe3aa5583e600ee41b697e99e",
+    "research/fidelity/2026-10-26-host-transport-500-bots/continue.py": "455cbc50ead16646cf0d0e9a3f3f6db05a3650bf4bb861cf1949c2abf1079854",
+    "research/fidelity/2026-10-26-host-transport-500-bots/continuation-plan.json": "300c0c4b52cfccc76e1985f7d1854bd13359ec5d968f24ea0bdcb4b09fd7169c"
+  }
+}

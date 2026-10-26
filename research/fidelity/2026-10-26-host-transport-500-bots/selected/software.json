@@ -1,0 +1,12 @@
+{
+  "os": "Linux",
+  "architecture": "x86_64",
+  "instanceType": "c7i.4xlarge",
+  "vcpus": 16,
+  "physicalCores": 8,
+  "buildJobs": 2,
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "node": "v24.10.0",
+  "python": "Python 3.12.3",
+  "binarySha256": "a7e9ce877f6a55ebda84702cc794450a2980a4f46dc3c1c00b689bd6aa63f6c8"
+}
