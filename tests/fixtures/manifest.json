@@ -2,6 +2,20 @@
   "schemaVersion": 1,
   "fixtures": [
     {
+      "path": "tests/fixtures/protocol-catalog-13.json",
+      "wireProtocol": 13,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/protocol-catalog-19.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
+    },
+    {
       "path": "tests/fixtures/client-legacy-login.json",
       "wireProtocol": 13,
       "clientContract": null,

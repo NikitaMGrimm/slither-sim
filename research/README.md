@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Fidelity | [Protocol-13 message catalog](fidelity/2026-10-26-protocol13-catalog/REPORT.md) | Official legacy/stock captures, scrubbed wire-13/19 witnesses and an offline decoder; conditional timing and failed-attempt limits. |
 | Fidelity | [Legacy browser login](fidelity/2026-10-26-legacy-login/REPORT.md) | Two bounded official sessions: existing 27-byte challenge format, selector-12 login then protocol-13 setup; implementation stopped before changing the protocol-19 host. |
 | Performance | [Hosting resource samples](performance/2026-10-26-hosting-sizes/REPORT.md) | Three short loopback socket holds on one desktop core; CPU/RSS sizing only, with depleted Battledome admission and no VPS capacity claim. |
 | Bots | [A4 adoption](bots/2026-10-26-a4-adoption/REPORT.md) | A4-mean becomes the public default, with A1 selectable; selected private held-out gameplay and cost results, maintainer mean-cost gate and retained tail-limit failures. |
