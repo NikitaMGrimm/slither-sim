@@ -21,6 +21,9 @@ Original override files are retained byte for byte:
 - [A4-mean](../../../src/bot/data/a4-mean-overrides.json): SHA256
   `0c5f57ea712ce86e796bff079bb5911b9cd1c2217fb9d8d808bb9f061bd2719a`.
 
+These two immutable inputs retain their original CRLF bytes through a narrow Git
+attribute exception. Source, manifests and other new text use LF.
+
 Both are overrides. Omitted fields use the frozen kernel's defaults. An override
 fan replaces the whole fan with a zero-filled array, copies its entries and sets
 its length, matching the historical loader. The standalone oracle independently
