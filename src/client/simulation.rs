@@ -147,8 +147,9 @@ impl SimulatorBackend {
     /// The first `remote` slots start absent and unconnected until a remote
     /// client connects; the rest join and connect natively.
     fn build(seed: u32, mut config: SimulationConfig, remote: usize) -> Result<Self, String> {
-        config.validate()?;
+        // Validate the world that will run, as the host and resets do.
         config.world.size_for_population(config.agents);
+        config.validate()?;
         let mut world =
             Simulator::new(seed, config.world.clone()).map_err(|error| error.to_string())?;
         world.food_spawn_events = Some(Vec::new());

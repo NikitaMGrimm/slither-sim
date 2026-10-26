@@ -65,6 +65,20 @@ fn population_sized_backends_hold_across_death_and_respawn() {
 }
 
 #[test]
+fn backends_validate_spawn_rings_against_the_sized_arena() {
+    let mut config = SimulationConfig {
+        agents: 40,
+        ..Default::default()
+    };
+    // Outside the 670-unit start, inside 670 * sqrt(40), about 4,237 units.
+    config.world.spawn_radius = Some(2000.);
+    let backend = SimulatorBackend::new(7, config.clone()).unwrap();
+    assert_eq!(backend.world.config.radius, 670. * 40_f64.sqrt());
+    config.world.size_to_population = false;
+    assert!(SimulatorBackend::new(7, config).is_err());
+}
+
+#[test]
 fn fixed_backend_worlds_keep_their_radius_and_food_settings() {
     for world in [
         serde_json::json!({"preset": "battledome"}),

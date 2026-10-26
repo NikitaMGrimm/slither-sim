@@ -79,7 +79,6 @@ impl SimulationConfig {
             ));
         }
         self.latency.validate()?;
-        encode::setup(self.world.radius, self.world.prey.turn_rate)?;
         for speed in [
             self.world.prey.cruise_speed,
             self.world.prey.escape_speed,
@@ -137,6 +136,8 @@ impl SimulationConfig {
                 encode::MAX_RADIUS
             ));
         }
+        // After the radius limit, whose message is clearer than setup's range error.
+        encode::setup(self.world.radius, self.world.prey.turn_rate)?;
         Ok(())
     }
 
