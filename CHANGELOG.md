@@ -125,6 +125,9 @@
 
 ### Fixed
 
+- Construction preserves the configured initial radius (with recorded time-zero
+  overrides), rejects initial ring bodies outside the arena without adding a slot,
+  and reports hosted spawn failures as candidate-search exhaustion.
 - `Config::deserialize` called directly from Rust now accepts presets, like JSON
   parsing ([presets](docs/configuration.md#presets)).
 - A world stopped by mass overflow stays stopped after a JSON round trip

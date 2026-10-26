@@ -453,3 +453,18 @@ fn long_boost_steps_count_their_drops() {
         .count();
     assert_eq!(drops, 7);
 }
+
+#[test]
+fn reviewed_construction_keeps_the_configured_population_radius_until_a_tick() {
+    let config = Config {
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        ..Config::official(500)
+    };
+    let radius = config.radius;
+    let mut world = Simulator::new(1, config).unwrap();
+    assert_eq!(world.time, 0.);
+    assert_eq!(world.config.radius, radius);
+    world.step(&[]).unwrap();
+    assert!(world.config.radius < radius);
+}

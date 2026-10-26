@@ -153,7 +153,10 @@ fn actual_pickup_frees_capacity_before_the_same_step_refill() {
     // inward-facing snake can collect that cell while its head stays inside.
     let mut world = tiny_world(true, 0, 100.0);
     world.config.food_count = 5;
+    // Add a valid ring life before installing this synthetic tiny-arena pose.
+    world.config.radius = 100.;
     world.add("eater", 0, 1).unwrap();
+    world.config.radius = 20.;
     let snake = &mut world.snakes[0];
     snake.head = Point { x: -19.0, y: 0.0 };
     snake.heading = 0.0;

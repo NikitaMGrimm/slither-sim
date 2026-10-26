@@ -42,8 +42,12 @@ fn exhaustive_spawn_pose(
     }
     match open {
         Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
-        Some(_) => Err("No spawn position is clear of other snakes".into()),
-        None => Err("No spawn position fits inside the arena".into()),
+        Some(_) => Err(
+            "Spawn candidate search exhausted: no sampled position is clear of other snakes".into(),
+        ),
+        None => Err(
+            "Spawn candidate search exhausted: no sampled position fits inside the arena".into(),
+        ),
     }
 }
 
@@ -232,7 +236,7 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
 
     assert_eq!(
         backend.reconnect_slot(0).unwrap_err(),
-        "No spawn position is clear of other snakes"
+        "Spawn candidate search exhausted: no sampled position is clear of other snakes"
     );
     assert_eq!(backend.world.snakes[1], neighbor);
     assert_eq!(backend.slots[0].life, life);
@@ -2628,4 +2632,33 @@ fn rejected_departure_leaves_every_side_unchanged() {
     assert_eq!(backend.slots[0].previous_boost, Some(true));
     let commands = backend.frame().unwrap().timing.sent_commands;
     assert!(commands.len() == 1 && commands[0].action.boost);
+}
+
+#[test]
+fn reviewed_spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
+    let world = Config {
+        radius: 100.5,
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        ..Config::sandbox()
+    };
+    let mut backend = SimulatorBackend::new(
+        1,
+        SimulationConfig {
+            world,
+            agents: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    backend.world.snakes[0].alive = false;
+    let (body, _) = backend
+        .world
+        .spawn_body(Point { x: 21., y: 0. }, 0.)
+        .unwrap();
+    assert!(backend.world.body_is_clear(&body, 600.));
+    assert_eq!(
+        backend.spawn_pose(0).unwrap_err(),
+        "Spawn candidate search exhausted: no sampled position fits inside the arena"
+    );
 }
