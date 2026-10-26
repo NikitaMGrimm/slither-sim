@@ -52,7 +52,10 @@ worktrees are removed afterward.
 
 `summary.md`/`summary.json` hold paired ratios; `comparison.json` holds the plan,
 parity and build identities. Catalogs must select identical names, iterations
-and trace windows. Incomplete attempts support no speed claim. Changed behavior
+and trace windows. `--base` overlays the candidate harness on both runtimes,
+so added and retired workload names use that shared catalog. Copied executables
+with one-sided names fail before timing with a plan-mismatch diagnostic; select
+common names explicitly to compare them. Incomplete attempts support no speed claim. Changed behavior
 may suit a mechanics correction, but is not a behavior-preserving optimization.
 
 Operation wall time excludes setup, trace output and report serialization;

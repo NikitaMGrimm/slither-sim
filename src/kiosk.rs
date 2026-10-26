@@ -119,6 +119,9 @@ impl KioskState {
             return;
         }
         if physical > shrink_floor + 0.5 {
+            if config.shrink_per_second == 0.0 {
+                return;
+            }
             let target = (physical * (-config.shrink_per_second * dt).exp()).max(shrink_floor);
             // At the mass floor, use its exact mass rather than a bisection estimate.
             let target_mass = match floor {
@@ -127,12 +130,13 @@ impl KioskState {
                 }
                 _ => mass_for_score(target),
             };
-            let old_mass = snake.segments as f64 + snake.fam;
-            if target_mass < old_mass {
+            // The HUD clamps fam; its inverse excludes pending growth.
+            let represented_mass = snake.segments as f64 + snake.fam.min(1.0);
+            if target_mass < represented_mass {
                 let removed = remove_mass_above_floor(
                     &mut snake.segments,
                     &mut snake.fam,
-                    old_mass - target_mass,
+                    represented_mass - target_mass,
                     floor,
                 );
                 snake
@@ -188,6 +192,104 @@ fn mass_for_score(target: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::{Config, Simulator};
+
+    #[test]
+    fn zero_shrink_rate_preserves_all_pending_growth() {
+        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
+        world.add("player", 0, 1).unwrap();
+        let snake = &mut world.snakes[0];
+        // Synthetic backlog; HUD score intentionally represents at most one fam.
+        snake.segments = 380;
+        snake.fam = 3.25;
+        snake.body = vec![Point::default(); 380];
+        Simulator::update_mass(snake);
+        let before = snake.clone();
+        let mut state = KioskState::default();
+        state.step(
+            snake,
+            &KioskConfig {
+                grace_seconds: 0.,
+                shrink_per_second: 0.,
+                ..Default::default()
+            },
+            0.007,
+            None,
+        );
+        state.finish_score(snake);
+        assert!(
+            *snake == before,
+            "zero-rate shrink changed mass from {} to {}",
+            before.length,
+            snake.length
+        );
+        assert_eq!(state.score_credit, 0.);
+    }
+
+    #[test]
+    fn shrink_debits_only_the_mass_represented_by_the_clamped_score() {
+        let mut previous = f64::INFINITY;
+        for rate in [0.1, 0.01, 0.001, 0.000001] {
+            let mut world = Simulator::new(1, Config::sandbox()).unwrap();
+            world.add("player", 0, 1).unwrap();
+            let snake = &mut world.snakes[0];
+            snake.segments = 380;
+            snake.fam = 3.25;
+            snake.body = vec![Point::default(); 380];
+            let represented = 381.;
+            let score = score_exact(380, 1.);
+            let target = mass_for_score(score * (-rate * 0.007_f64).exp());
+            let debit = represented - target;
+            let mut state = KioskState::default();
+            state.step(
+                snake,
+                &KioskConfig {
+                    grace_seconds: 0.,
+                    shrink_per_second: rate,
+                    ..Default::default()
+                },
+                0.007,
+                None,
+            );
+            state.finish_score(snake);
+            assert!(
+                (snake.length - (383.25 - debit)).abs() < 1e-9,
+                "rate {rate}, mass {}",
+                snake.length
+            );
+            assert!(debit > 0. && debit < previous);
+            assert_eq!(snake.score, score.floor());
+            previous = debit;
+        }
+        assert!(previous < 0.0001);
+    }
+
+    #[test]
+    fn backlog_shrink_retains_the_existing_mode_floor() {
+        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
+        world.add("player", 0, 1).unwrap();
+        let snake = &mut world.snakes[0];
+        snake.segments = 380;
+        snake.fam = 3.25;
+        snake.body = vec![Point::default(); 380];
+        let floor = MassFloor {
+            segments: 379,
+            fam: 0.9,
+        };
+        let mut state = KioskState::default();
+        state.step(
+            snake,
+            &KioskConfig {
+                grace_seconds: 0.,
+                shrink_per_second: 1e6,
+                ..Default::default()
+            },
+            0.007,
+            Some(floor),
+        );
+        state.finish_score(snake);
+        assert!((snake.length - (379.9 + 2.25)).abs() < 1e-9);
+        assert!((snake.segments, snake.fam) >= (floor.segments, floor.fam));
+    }
 
     #[test]
     fn historical_twenty_minute_grace_has_no_effect_before_its_boundary() {

@@ -186,3 +186,17 @@ fn death_food_uses_penalized_physical_body() {
     assert_eq!(event.food, 2 * world.snakes[0].body.len() + 1);
     assert!(event.food <= 2 * short_body + 1);
 }
+
+#[test]
+fn a_frozen_kiosk_tick_preserves_a_growth_backlog() {
+    let mut world = world();
+    world.config.dt = 0.007;
+    world.config.kiosk.grace_seconds = 0.;
+    world.config.kiosk.shrink_per_second = 0.;
+    world.snakes[0].fam = 3.25;
+    Simulator::update_mass(&mut world.snakes[0]);
+    let before = world.snakes[0].length;
+    step(&mut world, 1);
+    assert_eq!(world.snakes[0].segments, 380);
+    assert_eq!(world.snakes[0].length, before);
+}

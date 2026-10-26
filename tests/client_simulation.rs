@@ -572,7 +572,7 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
     long.world.dt = 0.28;
     assert!(!long.warnings().iter().any(|w| w.contains("resent in full")));
     reject(|c| c.decision_ticks = 0, "at least 1");
-    // Delays have no fixed ceiling; only an unrepresentable largest draw fails.
+    // Preflight bounds cover individual draws; scheduling also checks clocks and OU accumulation.
     accept(|c| {
         c.latency.round_trip_seconds = vec![30.];
         c.latency.round_trip_spread = 3.;
@@ -594,7 +594,7 @@ fn wire_sizes_and_latency_are_bounded_by_encodings_and_arithmetic() {
             c.latency.round_trip_seconds = vec![1.];
             c.latency.round_trip_spread = 1000.;
         },
-        "Largest delay",
+        "Initial delay bound",
     );
     reject(|c| c.latency.pauses.mean_seconds = 1e308, "36.7");
     reject(
