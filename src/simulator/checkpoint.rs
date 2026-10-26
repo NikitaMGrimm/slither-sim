@@ -152,35 +152,16 @@ fn state_schema(raw: &Value) -> Result<(), SimError> {
         &["format", "rulesRevision", "producer", "config", "state"],
         "checkpoint",
     )?;
-    fields(
-        &raw["config"],
-        &[
-            "radius",
-            "dynamicRadius",
-            "sizeToPopulation",
-            "vision",
-            "foodCount",
-            "ambientRefillCountsAllFood",
-            "ambientReplenishPerSecond",
-            "dt",
-            "foodIndex",
-            "emitBoostFood",
-            "speedModel",
-            "prey",
-            "radiusUpdates",
-            "boundaryMode",
-            "kiosk",
-            "deathFood",
-            "ambientFood",
-            "boostFood",
-            "pit",
-            "spawnRadius",
-            "spawnRadiusMax",
-            "killScoreSeconds",
-            "minScore",
-        ],
-        "config",
-    )?;
+    // The record's own serialization names every config key, so a new setting
+    // cannot be left out of this list.
+    let canonical = ConfigRecord::serialize(&Config::default(), serde_json::value::Serializer)
+        .map_err(|e| invalid(Constraint::InconsistentState, "config", e.to_string()))?;
+    let keys: Vec<&str> = canonical
+        .as_object()
+        .into_iter()
+        .flat_map(|config| config.keys().map(String::as_str))
+        .collect();
+    fields(&raw["config"], &keys, "config")?;
     let state = &raw["state"];
     fields(
         state,
@@ -474,7 +455,16 @@ fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, SimError> {
 
 // Config's request decoder supplies defaults/presets. A checkpoint instead needs
 // all canonical fields, including nested configuration; reject fields it ignored.
+// Serde also reads a struct from an array positionally, filling missing entries
+// from container defaults, so every value must keep its canonical JSON type.
 fn config_shape(raw: &Value, resolved: &Value, path: &str) -> Result<(), SimError> {
+    if std::mem::discriminant(raw) != std::mem::discriminant(resolved) {
+        return Err(invalid(
+            Constraint::InconsistentState,
+            path,
+            "Checkpoint config value has a noncanonical JSON type",
+        ));
+    }
     match (raw, resolved) {
         (Value::Object(raw), Value::Object(resolved)) => {
             for (key, expected) in resolved {
@@ -497,6 +487,11 @@ fn config_shape(raw: &Value, resolved: &Value, path: &str) -> Result<(), SimErro
             }
         }
         (Value::Array(raw), Value::Array(resolved)) => {
+            require(
+                raw.len() == resolved.len(),
+                Constraint::InconsistentState,
+                path,
+            )?;
             for (index, (value, expected)) in raw.iter().zip(resolved).enumerate() {
                 config_shape(value, expected, &format!("{path}[{index}]"))?;
             }

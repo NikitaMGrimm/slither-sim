@@ -43,6 +43,10 @@
 
 ### Fixed
 
+- Checkpoints reject a config value with a noncanonical JSON type, such as
+  `"prey": []`. Serde had read such arrays positionally and filled the
+  missing settings from defaults. The checkpoint's config key list now comes
+  from the checkpoint record itself.
 - `SimulationConfig::validate()` checks the population-sized world that
   backends and hosts run. It no longer rejects a spawn ring that fits the sized
   arena or accepts a prey target that scales past the u16 prey IDs.
