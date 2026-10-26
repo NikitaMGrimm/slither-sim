@@ -1,0 +1,109 @@
+{
+  "basis": "Launch quotes times launch-to-cleanup-completion lifetimes plus conservative ancillary allowances; estimate, not invoice",
+  "initialRound": {
+    "basis": "Launch quotes times launch-to-cleanup-completion lifetimes; conservative ancillary allowance, not an invoice",
+    "instances": [
+      {
+        "role": "generator",
+        "instanceType": "c7a.4xlarge",
+        "hoursUpperEstimate": 0.6475671944444444,
+        "launchQuoteUsdHour": 0.4007,
+        "computeUsdEstimate": 0.2594801748138889
+      },
+      {
+        "role": "server",
+        "instanceType": "c7a.medium",
+        "hoursUpperEstimate": 0.6470116388888889,
+        "launchQuoteUsdHour": 0.0272,
+        "computeUsdEstimate": 0.017598716577777777
+      }
+    ],
+    "computeUsdEstimate": 0.2770788913916667,
+    "ancillaryAllowanceUsd": 0.2,
+    "totalUsdEstimate": 0.48,
+    "targetUsd": 3,
+    "hardCeilingUsd": 5,
+    "creditsBeforeUsd": 118.77,
+    "creditsAfterUsd": 118.77,
+    "creditReportingMayLag": true,
+    "cleanupVerifiedUTC": "2026-10-26T03:38:02.241900+00:00",
+    "cleanup": {
+      "region": "eu-central-1",
+      "nonterminatedInstances": 0,
+      "volumes": 0,
+      "addresses": 0,
+      "snapshots": 0,
+      "openOrActiveSpotRequests": 0,
+      "keyPairDeleted": true,
+      "securityGroupsDeleted": true
+    }
+  },
+  "finalRound": {
+    "basis": "Launch quotes times launch-to-cleanup-completion lifetimes; conservative ancillary allowance, not an invoice",
+    "instances": [
+      {
+        "role": "generator",
+        "instanceType": "c7a.4xlarge",
+        "hoursUpperEstimate": 0.5814758625,
+        "launchQuoteUsdHour": 0.4007,
+        "computeUsdEstimate": 0.23299737810375
+      },
+      {
+        "role": "server",
+        "instanceType": "c7a.medium",
+        "hoursUpperEstimate": 0.5809203069444445,
+        "launchQuoteUsdHour": 0.0272,
+        "computeUsdEstimate": 0.01580103234888889
+      }
+    ],
+    "computeUsdEstimate": 0.2487984104526389,
+    "ancillaryAllowanceUsd": 0.2,
+    "totalUsdEstimate": 0.45,
+    "targetUsd": 3,
+    "hardCeilingUsd": 5,
+    "creditsBeforeUsd": 118.77,
+    "creditsAfterUsd": 118.77,
+    "creditReportingMayLag": true,
+    "cleanupVerifiedUTC": "2026-10-26T04:14:59.313105+00:00",
+    "cleanup": {
+      "region": "eu-central-1",
+      "nonterminatedInstances": 0,
+      "volumes": 0,
+      "addresses": 0,
+      "snapshots": 0,
+      "openOrActiveSpotRequests": 0,
+      "keyPairDeleted": true,
+      "securityGroupsDeleted": true
+    }
+  },
+  "failedQuotaAttempt": {
+    "instancesLaunched": 0,
+    "cleanup": {
+      "region": "eu-central-1",
+      "nonterminatedInstances": 0,
+      "volumes": 0,
+      "addresses": 0,
+      "snapshots": 0,
+      "openOrActiveSpotRequests": 0,
+      "keyPairDeleted": true,
+      "securityGroupsDeleted": true
+    }
+  },
+  "totalUsdEstimate": 0.93,
+  "targetUsd": 3,
+  "hardCeilingUsd": 5,
+  "creditsBeforeUsd": 118.77,
+  "creditsAfterUsd": 118.77,
+  "creditReportingMayLag": true,
+  "cleanup": {
+    "region": "eu-central-1",
+    "nonterminatedInstances": 0,
+    "volumes": 0,
+    "addresses": 0,
+    "snapshots": 0,
+    "openOrActiveSpotRequests": 0,
+    "keyPairDeleted": true,
+    "securityGroupsDeleted": true
+  },
+  "cleanupVerifiedUTC": "2026-10-26T04:14:59.313105+00:00"
+}

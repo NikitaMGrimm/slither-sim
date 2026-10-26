@@ -1,0 +1,500 @@
+{
+  "method": "Five adjacent alternating pairs after untallied warmup; one pinned AWS c7a.4xlarge core",
+  "linuxProcessCpuAvailable": false,
+  "complete": true,
+  "behavior": "equal",
+  "rows": {
+    "client-official-500": {
+      "iterations": 25,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.9323287850019301,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 0.9377739026841215,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.948641662946951,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 0.9404404464294119,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.94350123271186,
+          "cpu_ratio_candidate_over_baseline": null
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 0.9404404464294119,
+      "median_cpu_ratio_candidate_over_baseline": null
+    },
+    "client-battledome-64": {
+      "iterations": 40,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.9916584140364456,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 0.9938565576489534,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 0.9929401000969336,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 0.9927561507149651,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.9927302127218501,
+          "cpu_ratio_candidate_over_baseline": null
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 0.9927561507149651,
+      "median_cpu_ratio_candidate_over_baseline": null
+    },
+    "official-100-step": {
+      "iterations": 1000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 1.002073027387699,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 1.0024792960744984,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 1.009756856722851,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 0.9993220082723825,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 1.0069635794417606,
+          "cpu_ratio_candidate_over_baseline": null
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 1.0024792960744984,
+      "median_cpu_ratio_candidate_over_baseline": null
+    },
+    "step-default": {
+      "iterations": 100000,
+      "pairs": [
+        {
+          "repetition": 0,
+          "wall_ratio_candidate_over_baseline": 0.9980127352451373,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 1,
+          "wall_ratio_candidate_over_baseline": 1.000477246126668,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 2,
+          "wall_ratio_candidate_over_baseline": 1.0038320193473147,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 3,
+          "wall_ratio_candidate_over_baseline": 1.0064765177072752,
+          "cpu_ratio_candidate_over_baseline": null
+        },
+        {
+          "repetition": 4,
+          "wall_ratio_candidate_over_baseline": 0.9993297858132761,
+          "cpu_ratio_candidate_over_baseline": null
+        }
+      ],
+      "median_wall_ratio_candidate_over_baseline": 1.000477246126668,
+      "median_cpu_ratio_candidate_over_baseline": null
+    }
+  },
+  "traceParity": [
+    {
+      "case": "client-official-500",
+      "traceIterations": 1,
+      "reading": "Equal",
+      "definition": "Equal"
+    },
+    {
+      "case": "client-battledome-64",
+      "traceIterations": 4,
+      "reading": "Equal",
+      "definition": "Equal"
+    },
+    {
+      "case": "official-100-step",
+      "traceIterations": 16,
+      "reading": "Equal",
+      "definition": "Equal"
+    },
+    {
+      "case": "step-default",
+      "traceIterations": 32,
+      "reading": "Equal",
+      "definition": "Equal"
+    }
+  ],
+  "samples": [
+    {
+      "case": "client-official-500",
+      "label": "candidate",
+      "repetition": -1,
+      "operationWallSeconds": 0.9920608970000001,
+      "processWallSeconds": 1.5927368410000327
+    },
+    {
+      "case": "client-official-500",
+      "label": "baseline",
+      "repetition": -1,
+      "operationWallSeconds": 1.054039268,
+      "processWallSeconds": 1.6600753999999824
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "baseline",
+      "repetition": -1,
+      "operationWallSeconds": 2.0111398659999997,
+      "processWallSeconds": 29.112715693999917
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "candidate",
+      "repetition": -1,
+      "operationWallSeconds": 1.9206084420000005,
+      "processWallSeconds": 27.830629551000015
+    },
+    {
+      "case": "official-100-step",
+      "label": "candidate",
+      "repetition": -1,
+      "operationWallSeconds": 0.16990296599999988,
+      "processWallSeconds": 0.5752830430000131
+    },
+    {
+      "case": "official-100-step",
+      "label": "baseline",
+      "repetition": -1,
+      "operationWallSeconds": 0.16698082699999997,
+      "processWallSeconds": 0.5693860850000192
+    },
+    {
+      "case": "step-default",
+      "label": "baseline",
+      "repetition": -1,
+      "operationWallSeconds": 0.17295819799999723,
+      "processWallSeconds": 0.19094889899997725
+    },
+    {
+      "case": "step-default",
+      "label": "candidate",
+      "repetition": -1,
+      "operationWallSeconds": 0.17345052799999955,
+      "processWallSeconds": 0.19051800600004754
+    },
+    {
+      "case": "client-official-500",
+      "label": "baseline",
+      "repetition": 0,
+      "operationWallSeconds": 1.0615558920000001,
+      "processWallSeconds": 1.6703788640000994
+    },
+    {
+      "case": "client-official-500",
+      "label": "candidate",
+      "repetition": 0,
+      "operationWallSeconds": 0.9897191150000002,
+      "processWallSeconds": 1.5816688080000176
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "candidate",
+      "repetition": 0,
+      "operationWallSeconds": 1.9191597009999997,
+      "processWallSeconds": 27.834061539000004
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "baseline",
+      "repetition": 0,
+      "operationWallSeconds": 1.935303199,
+      "processWallSeconds": 28.037305876000005
+    },
+    {
+      "case": "official-100-step",
+      "label": "baseline",
+      "repetition": 0,
+      "operationWallSeconds": 0.16814828500000012,
+      "processWallSeconds": 0.5716597770000362
+    },
+    {
+      "case": "official-100-step",
+      "label": "candidate",
+      "repetition": 0,
+      "operationWallSeconds": 0.16849686099999975,
+      "processWallSeconds": 0.5743465030000152
+    },
+    {
+      "case": "step-default",
+      "label": "candidate",
+      "repetition": 0,
+      "operationWallSeconds": 0.17268743899999553,
+      "processWallSeconds": 0.18967731700001877
+    },
+    {
+      "case": "step-default",
+      "label": "baseline",
+      "repetition": 0,
+      "operationWallSeconds": 0.17303129799999906,
+      "processWallSeconds": 0.19006330900003832
+    },
+    {
+      "case": "client-official-500",
+      "label": "candidate",
+      "repetition": 1,
+      "operationWallSeconds": 0.992678857,
+      "processWallSeconds": 1.586760995000077
+    },
+    {
+      "case": "client-official-500",
+      "label": "baseline",
+      "repetition": 1,
+      "operationWallSeconds": 1.058548179,
+      "processWallSeconds": 1.672819268000012
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "baseline",
+      "repetition": 1,
+      "operationWallSeconds": 1.9338417,
+      "processWallSeconds": 28.043561245999967
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "candidate",
+      "repetition": 1,
+      "operationWallSeconds": 1.9219612550000003,
+      "processWallSeconds": 27.848669536999978
+    },
+    {
+      "case": "official-100-step",
+      "label": "candidate",
+      "repetition": 1,
+      "operationWallSeconds": 0.16924997200000005,
+      "processWallSeconds": 0.5763063559999182
+    },
+    {
+      "case": "official-100-step",
+      "label": "baseline",
+      "repetition": 1,
+      "operationWallSeconds": 0.16883138900000025,
+      "processWallSeconds": 0.5750784709999834
+    },
+    {
+      "case": "step-default",
+      "label": "baseline",
+      "repetition": 1,
+      "operationWallSeconds": 0.17414494400000008,
+      "processWallSeconds": 0.19182354100007615
+    },
+    {
+      "case": "step-default",
+      "label": "candidate",
+      "repetition": 1,
+      "operationWallSeconds": 0.17422805400000288,
+      "processWallSeconds": 0.19213108300004933
+    },
+    {
+      "case": "client-official-500",
+      "label": "baseline",
+      "repetition": 2,
+      "operationWallSeconds": 1.054453456,
+      "processWallSeconds": 1.6670457950000355
+    },
+    {
+      "case": "client-official-500",
+      "label": "candidate",
+      "repetition": 2,
+      "operationWallSeconds": 1.0002984799999997,
+      "processWallSeconds": 1.5966731309999886
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "candidate",
+      "repetition": 2,
+      "operationWallSeconds": 1.9195011000000002,
+      "processWallSeconds": 27.837729433999925
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "baseline",
+      "repetition": 2,
+      "operationWallSeconds": 1.9331489379999993,
+      "processWallSeconds": 28.03862476000006
+    },
+    {
+      "case": "official-100-step",
+      "label": "baseline",
+      "repetition": 2,
+      "operationWallSeconds": 0.16701987599999968,
+      "processWallSeconds": 0.5706089010000142
+    },
+    {
+      "case": "official-100-step",
+      "label": "candidate",
+      "repetition": 2,
+      "operationWallSeconds": 0.16864946500000003,
+      "processWallSeconds": 0.5736325400000624
+    },
+    {
+      "case": "step-default",
+      "label": "candidate",
+      "repetition": 2,
+      "operationWallSeconds": 0.17321175500000083,
+      "processWallSeconds": 0.19032208800001627
+    },
+    {
+      "case": "step-default",
+      "label": "baseline",
+      "repetition": 2,
+      "operationWallSeconds": 0.17255053799999528,
+      "processWallSeconds": 0.18980120399999123
+    },
+    {
+      "case": "client-official-500",
+      "label": "candidate",
+      "repetition": 3,
+      "operationWallSeconds": 0.9901925100000001,
+      "processWallSeconds": 1.5831630659999973
+    },
+    {
+      "case": "client-official-500",
+      "label": "baseline",
+      "repetition": 3,
+      "operationWallSeconds": 1.0529029390000002,
+      "processWallSeconds": 1.657666008000092
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "baseline",
+      "repetition": 3,
+      "operationWallSeconds": 1.9341301079999997,
+      "processWallSeconds": 28.056727017999947
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "candidate",
+      "repetition": 3,
+      "operationWallSeconds": 1.9201195609999995,
+      "processWallSeconds": 27.836639999
+    },
+    {
+      "case": "official-100-step",
+      "label": "candidate",
+      "repetition": 3,
+      "operationWallSeconds": 0.16820062200000016,
+      "processWallSeconds": 0.5711719010000706
+    },
+    {
+      "case": "official-100-step",
+      "label": "baseline",
+      "repetition": 3,
+      "operationWallSeconds": 0.16831473800000027,
+      "processWallSeconds": 0.5729610639999692
+    },
+    {
+      "case": "step-default",
+      "label": "baseline",
+      "repetition": 3,
+      "operationWallSeconds": 0.17282790699999956,
+      "processWallSeconds": 0.18980198300005213
+    },
+    {
+      "case": "step-default",
+      "label": "candidate",
+      "repetition": 3,
+      "operationWallSeconds": 0.17394722999999637,
+      "processWallSeconds": 0.19077432000005956
+    },
+    {
+      "case": "client-official-500",
+      "label": "baseline",
+      "repetition": 4,
+      "operationWallSeconds": 1.052475069,
+      "processWallSeconds": 1.6675558209999508
+    },
+    {
+      "case": "client-official-500",
+      "label": "candidate",
+      "repetition": 4,
+      "operationWallSeconds": 0.9930115249999999,
+      "processWallSeconds": 1.5848724979999815
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "candidate",
+      "repetition": 4,
+      "operationWallSeconds": 1.9213558220000002,
+      "processWallSeconds": 27.83582136500013
+    },
+    {
+      "case": "client-battledome-64",
+      "label": "baseline",
+      "repetition": 4,
+      "operationWallSeconds": 1.9354259569999999,
+      "processWallSeconds": 28.046540869000182
+    },
+    {
+      "case": "official-100-step",
+      "label": "baseline",
+      "repetition": 4,
+      "operationWallSeconds": 0.16596335400000006,
+      "processWallSeconds": 0.5679809759999443
+    },
+    {
+      "case": "official-100-step",
+      "label": "candidate",
+      "repetition": 4,
+      "operationWallSeconds": 0.1671190530000001,
+      "processWallSeconds": 0.5699173579998842
+    },
+    {
+      "case": "step-default",
+      "label": "candidate",
+      "repetition": 4,
+      "operationWallSeconds": 0.17325524599999997,
+      "processWallSeconds": 0.19120448800003942
+    },
+    {
+      "case": "step-default",
+      "label": "baseline",
+      "repetition": 4,
+      "operationWallSeconds": 0.17337144200000115,
+      "processWallSeconds": 0.19116334800014556
+    }
+  ]
+}

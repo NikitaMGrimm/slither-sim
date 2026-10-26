@@ -183,6 +183,10 @@
 
 ### Performance
 
+- Synthetic client operations take about 6% less wall time at 500 official
+  slots and 3% less at 64 Battledome slots in a five-pair native AWS comparison,
+  with byte-identical client and retained-client traces
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-efficiency/REPORT.md)).
 - A [native Linux capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md)
   finds that one core keeps official-like delivery for 100 socket clients and
   real time for 500 background bots, and profiles where the host's CPU goes.
