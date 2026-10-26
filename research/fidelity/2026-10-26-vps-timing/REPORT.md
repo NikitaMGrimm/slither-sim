@@ -1,15 +1,18 @@
-# VPS official-server timing, 2026-10-26
+# Remote official-server timing, 2026-10-26
 
-The original attempt and first continuation stopped at the collectors' first
-deaths. Full raw-stream audit confirms that their requested post-death closes
-preceded socket-error/1006 events, which the study wrappers misclassified as
-unexpected failures. The earlier endpoint-unusable conclusion is withdrawn;
-a block is not indicated by these records. All four partial recordings have
-valid gzip/integrity receipts but remain quarantined, without editing raw data.
-**Q1 and Q2 remain inconclusive: zero eligible batches, no held-out data.**
-Across both attempts there were four connections, peak concurrency two, and no
-retries. No simulator model, default or bot policy changed. Spawn admission
-was outside scope.
+The original attempt and first continuation misclassified collector-requested
+post-death closes as endpoint failures. That interpretation and the endpoint-
+unusable conclusion are withdrawn; a block is not indicated. Their four raw
+streams remain unchanged and quarantined.
+
+With corrected life-ending handling, the second continuation completed all six
+ten-minute batches: **38 connections, 32 deaths and 32 rejoins, peak concurrency
+2**, and no unrequested socket error/close. Both held-out batches pass the frozen
+clean-exposure gates and classify as **near-zero**: clean frame-excess p99
+**2.322 / 2.372 ms**, with one >10 ms episode each. Server-clock motion/mass,
+reverse-order and long prey-correction counterexamples persist. No simulator
+model, default or bot policy changed; no new numeric replacement model is fitted.
+Spawn admission stayed outside scope.
 
 ## Original attempt: results and failure
 
@@ -220,22 +223,201 @@ and cleanup verification records remain local-only and hash-pinned.
 
 ## Second continuation: corrected life endings
 
-The [second continuation plan](second-continuation-plan.json) restarts the
-original three ten-minute rounds with the same questions, metrics, stall gauge,
-gates, development/held-out split, independent endpoints and two-socket limit.
-The [corrected collector](capture-second-continuation.mjs) treats events after
-the base collector's recorded post-death close request as that life ending,
-including an error/1006 sequence, and allows the base collector's rejoin after
-close. An unrequested error or close stops that endpoint for the remaining run,
-without retry. Intent resets for every new socket. The earlier collectors stay
-frozen as historical acquisition sources; no simulator or base collector changed.
+The [second plan](second-continuation-plan.json), corrected collector, analysis
+wrapper and regressions were frozen in **`a19f32db04ae44bac22cf923fe0a952d8684445f`**
+before any new game connection. A merge, `a20b5ac`, preserved that commit and the
+existing/rebased PR histories without rewriting either. All executed script pins
+match; the PR changes no simulator sources relative to its main base.
 
-A regression drives the actual base collector's post-death tick, requested
-close, socket error, close handler and rejoin through a fake socket. It also
-checks that an unrequested error in the next life is fatal, and that an error
-or close during death observation before a close request stops the endpoint.
-Results will be recorded after this separately frozen acquisition; prior raw
-streams remain quarantined and are not combined with it.
+The [corrected wrapper](capture-second-continuation.mjs) uses the base collector's
+recorded `deathObservation.closeRequestedAt` intent before `ws.close()`. Following
+error/close events, including 1006, end that life and may rejoin through the base
+collector after close. Intent resets for each new socket. An unrequested error
+or close stops only its endpoint for the rest of the run without retry. The
+historical wrappers remain frozen for the earlier attempt records.
+
+A regression drives the actual base post-death tick, requested close, socket
+error, close handler and rejoin through a fake socket, then checks that an
+unrequested error in the next life is fatal. Other tests cover errors/closes
+before a death-close request and unchanged independent endpoint cancellation.
+
+### Acquisition and split
+
+The second run used the same official endpoints, Origin, unchanged forage
+controls, one-CPU/1-GiB container, image and host networking. It ran on
+**2026-10-26, 00:02:47–00:33:48 UTC**, with 30-second round spacing. The original
+and first-continuation streams were never combined with these recordings.
+
+| Batch | Split | Outcome | Joins | Deaths | Rejoins |
+| --- | --- | --- | ---: | ---: | ---: |
+| low-1 | development | Completed | 7 | 6 | 6 |
+| second-1 | development | Completed | 8 | 7 | 7 |
+| low-2 | development | Completed | 8 | 7 | 7 |
+| second-2 | development | Completed | 5 | 4 | 4 |
+| low-3 | heldout | Completed | 6 | 5 | 5 |
+| second-3 | heldout | Completed | 4 | 3 | 3 |
+
+There were **6/6 completed batches**, **38 connection attempts including 32
+normal rejoins**, **peak concurrency 2 including connecting sockets**, and **0
+unrequested socket errors/closes or failure retries**. All 32 death observations
+had a recorded close request, followed by retained socket-error/1006 events;
+the base collector rejoined normally. Every new gzip/prefix receipt verifies
+with no quality issues. This validates the wrapper correction, without proving
+what causes the error event in the requested close sequence or re-admitting
+any previous interrupted archive.
+
+All four development captures were copied and hash-checked after their rounds.
+Development analysis was sealed at **00:23:59.893948 UTC**, SHA-256
+`83c6d28257af988f0f1034ef49bbb236588b843e5ee3645513e99c160c8db9f9`.
+Round 3 had started acquisition at 00:23:48, but no held-out timing was inspected
+before that seal. Final copy-back verified the development bytes were identical
+to the sealed inputs. Validation checked the seal and unchanged analysis-source
+pins before reading held-out data. No fitting, threshold change or new question
+was introduced.
+
+### Q1: the dominant historical tail largely vanishes here
+
+All six batches pass the frozen exposure criteria. Each held-out route has
+more than 300 clean eligible seconds and more than 80% clean/full exposure;
+both meet the predeclared near-zero criterion, p99 ≤3 ms and >10 ms run rate
+≤0.05/s. Exposure omits short setup epochs, burn-in, rejoin gaps and masked
+intervals; it is not the full 600-second wall budget.
+
+| Batch | Split | Clean seconds (% eligible exposure) | Excess p99 full / clean ms | Clean >10 / >20 ms episodes | Clean >10 runs/s |
+| --- | --- | ---: | ---: | ---: | ---: |
+| low-1 | development | 544.282 (94.81%) | 2.430 / 2.374 | 1 / 1 | 0.001837 |
+| second-1 | development | 527.486 (95.05%) | 2.396 / 2.355 | 1 / 1 | 0.001896 |
+| low-2 | development | 472.149 (92.00%) | 2.673 / 2.474 | 0 / 0 | 0.000000 |
+| second-2 | development | 537.060 (92.31%) | 2.729 / 2.502 | 0 / 0 | 0.000000 |
+| low-3 | heldout | 508.886 (88.04%) | 2.515 / 2.322 | 1 / 1 | 0.001965 |
+| second-3 | heldout | 516.900 (88.20%) | 2.549 / 2.372 | 1 / 0 | 0.001935 |
+
+Held-out clean excess p50/p90/p99 is **0.636/1.096/2.322 ms** on low and
+**0.661/1.102/2.372 ms** on second. The full held-out >10 ms counts/rates are
+**19/0.032873 per second** and **20/0.034126 per second**; full >20 ms counts are
+11/10. Masking leaves the clean 1/1 >10 ms episodes shown above and 1/0 >20 ms
+episodes. Clean peak excess is **23.514/19.531 ms**: rare events remain.
+The clean >10 ms episodes have observed durations **0.078/0.050 ms** and
+surrounding-receipt brackets **30.868/24.634 ms**. The low >20 ms episode is a
+single receipt, with observed duration zero. These durations are lower bounds,
+not measured physical pause lengths. Full maximum excess is 63.932/67.875 ms;
+full results and all excluded windows remain retained.
+
+For comparison, #108's CPU-contaminated held-out full p99 was **29.9/110.2 ms**
+and >10 ms run rates **2.598/4.831 per second**. Its empty/nearly empty clean
+subsets do not provide a clean-host reference. The older network-path held-out
+pooled excess p99 was **9.21 ms**, with >10 ms runs **0.351/s**. The same frozen
+model on the new held-out server schedules predicts clean p99 medians across
+three seeds of **13.424/13.468 ms**. All three seeds fail p50, p90, p99 and burst
+transfer gates on both routes. ACF gates at 50/100/500/1000 ms pass on both;
+10 ms ACF fails on low and passes on second. Every per-seed gate remains in
+selected results, including the passes.
+
+**Answer:** the large effective delivery tail measured at home does not persist
+on the low-RTT remote route under these gates. These observations do not support
+moving the fitted pauses into a shared server-processing process. They support
+treating that fit as route/collector-conditioned effective delivery, rather than
+a universal server law. This comparison does not separate home-path effects
+from the earlier collector/platform effects, prove the rare events' origin, or
+identify synchronized cross-client server delay. No kernel-arrival timestamps
+or same-server paired recipients were collected.
+
+The held-out game-ping medians are **6.323/23.519 ms**, separate from frame excess.
+The previously recorded 7.006 ms game-ping versus reported 1.64 ms ICMP gap
+remains a descriptive application/pong-scheduling observation, not a fitted
+wait law or one-way propagation estimate.
+
+### Q2: clean server-clock exceptions persist
+
+The following are fully clean intervals on the **server elapsed-header clock**,
+within one connection and uninterrupted entity appearance. They are not merely
+short receipt intervals. Counts include own/other snakes and correlated reports;
+they are not independent-trial confidence estimates.
+
+| Held-out batch | Motion <35 ms / gaps | Standalone mass <100 ms / gaps | Reverse motion-before-mass pairs | Repeat prey >500 ms / gaps |
+| --- | ---: | ---: | ---: | ---: |
+| low-3 | 119 / 61665 (min 24 ms) | 29 / 17544 (min 87 ms) | 0 | 1 / 878 (max 3044 ms) |
+| second-3 | 142 / 64290 (min 24 ms) | 36 / 19459 (min 84 ms) | 1 | 0 / 985 (max 355 ms) |
+
+Both held-out median motion gaps are **43 ms**, mass gaps **107 ms**, and repeat
+prey gaps **338 ms**. The short motion/mass exceptions replicate the development
+counterexamples in all four batches. Literal wire minima of 42/105 ms therefore
+miss real clean-path observations. An exact hidden six-/15-physics-tick rule
+cannot be inferred or rejected solely from these variable send headers.
+
+There are also **2/1** clean receipt-only motion <35 ms crossings and **11/14**
+receipt-only mass <100 ms crossings whose corresponding server gap meets the
+threshold. Those are compatible with delivery variation/compression and integer
+clock effects. They do not explain the **119/142 server-clock motion** or
+**29/36 server-clock mass** exceptions. The reverse pair is inside one ordered
+frame and cannot be created by downstream burst compression. Its retained
+second-route witness is connection 2, frame 19360, S=99234, entity 221: motion
+`330700` precedes mass `6800ddaccc18`; death packets share that frame. This is a
+counterexample to absolute ordering, not a recovered universal death scheduler.
+
+The long-prey counterexample persists on low: prey **27656**, connection **6**,
+frames **57677→58052**, S=**183621→186665**, receipt
+**528229.429→531273.821 ms**. The gaps are **3044 ms server / 3044.392 ms receipt**,
+with **374 intervening frames** and no intervening same-prey `j` or `y` entry,
+removal or reappearance. The whole interval passes the clean mask. This witness
+was checked directly against the raw frames; its archive digest and packet
+bytes are selected. It exceeds the earlier retained 2694 ms example and cannot
+be dismissed as downstream burst compression. The second route's full 675 ms
+example crosses a masked interval and is retained only as unfiltered evidence;
+its clean maximum is 355 ms.
+
+No clean server-clock repeat-prey gap is below 210 ms on either held-out route. Speed-11
+subsets have median 213/214 ms, but **9/10 clean sub-300 ms gaps** have neither
+previous nor current reported speed exactly 11. Thus an exclusive exact-11
+fast-correction guard misses clean cases too. The hidden flight/pulse state,
+trigger and rearm rule remain unidentified; absence of sub-210 ms cases here
+cannot erase historical shorter-gap counterexamples.
+
+**Answer:** sub-35 motion, sub-100 mass, reverse same-frame ordering and long
+repeat-prey gaps all persist with clean receipt timing. Only the separately
+counted receipt-only threshold crossings can be attributed to receipt-clock
+compression/variation at this level; packet-only data do not identify its
+physical mechanism. The strict adopted gates and common ordering remain model
+choices with counterexamples, not exact official rules.
+
+**Model proposal:** no numerical replacement law is fitted or adopted. Do not
+promote the retained route pauses to a shared server process on this evidence.
+The scheduler exceptions need continued explicit qualification; these recordings
+do not identify a replacement trigger/rearm mechanism or justify a new fitted
+stochastic exception model. No model/default changed in this PR.
+
+### Load, access and cleanup
+
+Per-second covariates are retained for all rounds. Host busy excludes idle and
+iowait and includes steal; host percentages cover four vCPUs, while capture CPU
+is percent of one core. Table entries are descriptive sample means/maxima,
+including the final partial sample in each round.
+
+| Round | Loadavg mean / max | Host busy mean / max % | Capture CPU mean / max % | Steal mean / max % | Throttled ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| round-1 | 0.739 / 1.750 | 15.659 / 85.213 | 17.133 / 28.962 | 0.598 / 2.778 | 3.067 |
+| round-2 | 0.457 / 0.850 | 14.132 / 72.519 | 16.622 / 34.336 | 0.563 / 3.817 | 18.058 |
+| round-3 | 1.053 / 2.190 | 20.978 / 99.501 | 17.611 / 28.844 | 0.988 / 9.367 | 0.000 |
+
+Across the run, mean loadavg was **0.750**, host busy **16.923%**, capture CPU
+**17.122% of one core**, and steal **0.717%**. The respective maxima were 2.190,
+99.501%, 34.336% and 9.367%. Observed cgroup throttled-time increase totaled
+**21.125 ms**; peak process RSS was **135,753,728 bytes**. This was not an entirely
+idle or stall-free host. No mask or gate was loosened for the load spikes.
+
+All **49** remote files matched their copy-back SHA-256 manifest. At
+**00:34:43 UTC**, checks verified that the remote scratch directory, study
+container and newly pulled image were absent. Existing containers, volumes,
+service directories and host configuration were not modified.
+
+Full inputs/outputs remain local-only under the existing scratch root's
+`second-continuation/` subtree. The live status prefixes are retained separately
+and were never timing-analysis inputs. A local operational formatter initially
+omitted request/end metadata from its retained event list; that incorrect derived
+summary and formatter are preserved under `superseded-derived/`. The corrected
+formatter re-read unchanged raw archives. Frozen primary metrics, development
+seal and validation were unaffected. Source pins identify both the correction
+and superseded outputs; public lifecycle counts were checked against raw order.
 
 ## Questions and method
 
@@ -351,7 +533,7 @@ not a complete evidence-bundle-v1 archive.
 From the repository root, offline checks are:
 
 ```powershell
-node --test research/fidelity/2026-10-26-vps-timing/test_capture.mjs research/fidelity/2026-10-26-vps-timing/test_continuation.mjs
+node --test research/fidelity/2026-10-26-vps-timing/test_capture.mjs research/fidelity/2026-10-26-vps-timing/test_continuation.mjs research/fidelity/2026-10-26-vps-timing/test_second_continuation.mjs
 python -B -m unittest discover -s research/fidelity/2026-10-26-vps-timing -p 'test_*.py'
 python -B -m unittest discover -s tools -p test_documentation.py
 ```
@@ -380,11 +562,17 @@ The continuation's validation again contains missing held-out batches.
 and maximum-prey witnesses on admitted data; quarantine prevented its use here.
 The original numerical/analysis functions were not changed or refitted.
 
-Verification on the final revision: **10** Python study tests, **5** Node
+For the second continuation use `analyze_second_continuation.py --raw <raw-copy>`,
+then the same command with `--validation`, with the pinned source and a fresh
+copy of the raw files. Development and its seal were first written under
+`second-continuation/development-copy`; identical capture hashes and the unchanged
+output/seal were verified in final `second-continuation/vps-copy` before validation.
+Legacy collector tests retain the first two frozen policies for their historical
+attempts; `test_second_continuation.mjs` covers the corrected active policy.
+
+Verification on the final revision: **11** Python study tests, **8** Node
 collector policy tests and **7** documentation tests passed. The original
 attempt also passed **104** existing headless collector tests and **20**
-capture-quality tests. All four archives' gzip, prefix receipts, protocol/setup
-and frozen source/plan hashes were checked. Both development runs and missing-data
-validation ran without changing their executed source. No Rust code changed or
-build was run. Passing offline tests does not make either failed acquisition
-eligible.
+capture-quality tests. All ten archives' gzip, prefix receipts, protocol/setup
+and frozen source/plan hashes were checked. The earlier missing-data validation and the second continuation's full development/held-out analysis ran without changing their executed source. No Rust code changed or
+build was run. Passing offline tests did not re-admit any of the four earlier interrupted archives.
