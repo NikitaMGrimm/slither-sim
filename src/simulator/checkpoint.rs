@@ -412,18 +412,22 @@ fn positive(value: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
     require(value > 0., Constraint::NonPositive, field)
 }
-/// Largest accepted coordinate, radius and one tick of travel. Boundaries then
-/// keep points within about twice this, so differences and squared distances
-/// stay finite. Individually finite values near f64::MAX overflow on the next
-/// step instead.
+/// Largest accepted radius, heading and one tick of snake travel. Individually
+/// finite values near f64::MAX would overflow on the next step.
 const MAGNITUDE: f64 = 1e150;
-fn bounded(value: f64, field: &str) -> Result<(), SimError> {
+/// Living snakes lie within this. A tick moves a head at most one more
+/// MAGNITUDE before the boundary constrains or kills it, so dead snakes and
+/// their food stay within DEAD and continuation remains exportable. Squared
+/// distances between such points stay finite.
+const LIVING: f64 = 2. * MAGNITUDE;
+const DEAD: f64 = LIVING + MAGNITUDE;
+fn bounded(value: f64, limit: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
-    require(value.abs() <= MAGNITUDE, Constraint::OutOfRange, field)
+    require(value.abs() <= limit, Constraint::OutOfRange, field)
 }
-fn position(p: Position, field: &str) -> Result<(), SimError> {
-    bounded(p.x, &format!("{field}.x"))?;
-    bounded(p.y, &format!("{field}.y"))
+fn position(p: Position, limit: f64, field: &str) -> Result<(), SimError> {
+    bounded(p.x, limit, &format!("{field}.x"))?;
+    bounded(p.y, limit, &format!("{field}.y"))
 }
 fn timestamp(value: f64, time: f64, field: &str) -> Result<(), SimError> {
     nonnegative(value, field)?;
@@ -708,9 +712,10 @@ impl State {
         nonnegative(self.time, "state.time")?;
         finite(self.time + config.dt, "state.time")?;
         positive(self.radius, "state.radius")?;
-        bounded(self.radius, "state.radius")?;
+        bounded(self.radius, MAGNITUDE, "state.radius")?;
         for (i, update) in config.radius_updates.iter().enumerate() {
-            bounded(update.radius, &format!("config.radiusUpdates[{i}].radius"))?;
+            let field = format!("config.radiusUpdates[{i}].radius");
+            bounded(update.radius, MAGNITUDE, &field)?;
         }
         let through = if self.time == 0. {
             0.
@@ -857,8 +862,8 @@ impl State {
         }
         for (i, food) in self.food.iter().enumerate() {
             let path = format!("state.food[{i}]");
-            bounded(food.x, &format!("{path}.x"))?;
-            bounded(food.y, &format!("{path}.y"))?;
+            bounded(food.x, DEAD, &format!("{path}.x"))?;
+            bounded(food.y, DEAD, &format!("{path}.y"))?;
             nonnegative(food.value, &format!("{path}.value"))?;
             if let Some(size) = food.size {
                 nonnegative(size, &format!("{path}.size"))?;
@@ -875,8 +880,9 @@ impl State {
             // Prey motion has its own stopped path for overflow.
             finite(prey.position.x, &format!("{path}.position.x"))?;
             finite(prey.position.y, &format!("{path}.position.y"))?;
-            finite(prey.heading, &format!("{path}.heading"))?;
-            finite(prey.target_heading, &format!("{path}.targetHeading"))?;
+            bounded(prey.heading, MAGNITUDE, &format!("{path}.heading"))?;
+            let field = format!("{path}.targetHeading");
+            bounded(prey.target_heading, MAGNITUDE, &field)?;
             nonnegative(prey.speed, &format!("{path}.speed"))?;
             positive(prey.size, &format!("{path}.size"))?;
             finite(prey.speed * LOOP_SECONDS, &format!("{path}.speed"))?;
@@ -1093,17 +1099,18 @@ impl Slot {
             Constraint::OutOfRange,
             "snake.segments",
         )?;
-        position(s.head, "snake.head")?;
+        let limit = if s.alive { LIVING } else { DEAD };
+        position(s.head, limit, "snake.head")?;
         for (i, &p) in s.body.iter().enumerate() {
-            position(p, &format!("snake.body[{i}]"))?;
+            position(p, limit, &format!("snake.body[{i}]"))?;
         }
-        finite(s.heading, "snake.heading")?;
+        bounded(s.heading, MAGNITUDE, "snake.heading")?;
         nonnegative(s.speed, "snake.speed")?;
-        bounded(s.speed * config.dt, "snake.speed")?;
+        bounded(s.speed * config.dt, MAGNITUDE, "snake.speed")?;
         nonnegative(s.fam, "snake.fam")?;
         finite(s.segments as f64 + s.fam, "snake.fam")?;
         nonnegative(self.speed.speed, "speed.speed")?;
-        bounded(self.speed.speed * config.dt, "speed.speed")?;
+        bounded(self.speed.speed * config.dt, MAGNITUDE, "speed.speed")?;
         finite(self.speed.progress, "speed.progress")?;
         require(
             (0. ..=1.).contains(&self.speed.progress),
@@ -1118,7 +1125,7 @@ impl Slot {
             )?;
         }
         if let Some(p) = self.kiosk.anchor {
-            position(p, "kiosk.anchor")?;
+            position(p, DEAD, "kiosk.anchor")?;
         }
         nonnegative(self.kiosk.held_seconds, "kiosk.heldSeconds")?;
         nonnegative(self.kiosk.score_credit, "kiosk.scoreCredit")?;

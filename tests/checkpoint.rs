@@ -194,6 +194,7 @@ fn malformed_state_versions_and_unknown_fields_reject_atomically() {
         ("/state/slots/0/killTimes", json!([1., 0.])),
         ("/state/slots/0/snake/segments", json!(usize::MAX)),
         ("/state/slots/0/speed/speed", json!(f64::MAX)),
+        ("/state/prey/0/targetHeading", json!(f64::MAX)),
         ("/state/slots/0/snake/length", json!(999)),
         ("/state/slots/0/snake/score", json!(999)),
         ("/state/slots/0/snake/radius", json!(999)),
@@ -630,6 +631,7 @@ fn export_rejects_invalid_public_edits_and_orphan_prey_controls() {
         // Finite but large enough to overflow continuation arithmetic.
         |w| w.food[0].x = 1e200,
         |w| w.snakes[0].speed = 1e200,
+        |w| w.prey[0].heading = -f64::MAX,
         |w| {
             let s = &mut w.snakes[0];
             s.body[1].x = 1e200;
@@ -703,6 +705,44 @@ fn restored_kill_counts_saturate_when_one_tick_credits_several() {
     let credited = |d: &&slither_sim::DeathEvent| d.killer.as_deref() == Some("2");
     assert_eq!(world.deaths.iter().filter(credited).count(), 2);
     assert_eq!(world.snakes[2].kills, usize::MAX);
+}
+
+#[test]
+fn a_step_from_an_accepted_far_state_stays_exportable() {
+    let mut world = Simulator::new(
+        7,
+        Config {
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            ..Config::sandbox()
+        },
+    )
+    .unwrap();
+    world.add("a", 0, 1).unwrap();
+    let mut source = value(&world);
+    source["config"]["radius"] = json!(1e150);
+    source["state"]["radius"] = json!(1e150);
+    let far = json!({"x": 7.5e149, "y": 0.});
+    let slot = &mut source["state"]["slots"][0];
+    slot["snake"]["head"] = far.clone();
+    for anchor in slot["snake"]["body"].as_array_mut().unwrap() {
+        *anchor = far.clone();
+    }
+    slot["snake"]["heading"] = json!(0.);
+    // One tick of travel at the 1e150 bound carries the head past the rim.
+    slot["snake"]["speed"] = json!(1e152);
+    slot["speed"]["speed"] = json!(1e152);
+    let mut world = Simulator::from_checkpoint(&bytes(&source), options()).unwrap();
+    world
+        .step(&[Some(Action {
+            heading: 0.,
+            boost: false,
+        })])
+        .unwrap();
+    assert!(world.snakes[0].head.x > 1e150);
+    let saved = value(&world);
+    let restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+    assert_eq!(value(&restored), saved);
 }
 
 #[test]
