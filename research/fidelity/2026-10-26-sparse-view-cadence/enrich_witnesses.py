@@ -32,5 +32,7 @@ for witness in witnesses.values():
             assert frame.server==int(witness['server']) and frame.conn==int(witness['conn'])
             assert [p.hex() for p in frame.packets]==witness['packetsHex']
             break
+    else:
+        raise ValueError(witness['capture']+': witness frame '+str(witness['frame'])+' not found')
 a.save(out/'selected-witnesses.json',witnesses)
 print('Verified five complete-prefix witnesses')

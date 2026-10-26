@@ -35,7 +35,8 @@ groups=defaultdict(Summary); windows=defaultdict(list); categories=defaultdict(C
 quiet=defaultdict(Counter); changed=defaultdict(Counter); witnesses={}
 activity_counts=defaultdict(Counter)
 for result in results:
-    if 'error' in result: continue
+    if 'error' in result:
+        raise ValueError(result['id']+': '+result['error'])
     name=result['id']; cohort=result['cohort']; previous=None
     with gzip.open(OUT/(name+'.frames.csv.gz'),'rt',encoding='utf-8') as stream:
         for row in csv.DictReader(stream):
