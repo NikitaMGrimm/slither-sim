@@ -48,7 +48,7 @@ impl WorldStats {
         Self {
             time: world.time(),
             physics_tick_ms: world.config().dt * 1000.0,
-            arena_radius: world.config().radius,
+            arena_radius: world.radius(),
             spawned: world.snakes().len(),
             living: world.living(),
             living_segments: world

@@ -7,7 +7,7 @@ use std::{
     mem::size_of,
 };
 
-pub const FORMAT: &str = "slither-sim-checkpoint-v1";
+pub const FORMAT: &str = "slither-sim-checkpoint-v2";
 pub const RULES_REVISION: &str = "slither-sim-rules-v1";
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -536,9 +536,7 @@ impl Simulator {
             "state.prey.mode",
         )?;
         // Validate Config before its JSON serialization can turn NaN into null.
-        self.config
-            .validate_continuation()
-            .map_err(checkpoint_config_error)?;
+        self.config.validate().map_err(checkpoint_config_error)?;
         let config = self.config.clone();
         let mut slots = Vec::new();
         reserve(&mut slots, n, "state.slots")?;
@@ -585,7 +583,7 @@ impl Simulator {
         }
         let state = State {
             time: self.time,
-            radius: self.config.radius,
+            radius: self.radius,
             radius_update_index: self.radius_update_index,
             next_join: self.next_join,
             random: self.random.0,
@@ -680,7 +678,7 @@ impl Simulator {
         let envelope: Envelope = decode(bytes)?;
         envelope
             .config
-            .validate_continuation()
+            .validate()
             .map_err(checkpoint_config_error)?;
         let canonical = ConfigRecord::serialize(&envelope.config, serde_json::value::Serializer)
             .map_err(|e| invalid(Constraint::InconsistentState, "config", e.to_string()))?;
@@ -742,6 +740,14 @@ impl State {
                     "state.radius",
                 )?;
             }
+        } else if !config.dynamic_radius || self.time == 0. {
+            // Only the controller and recorded updates move the live radius,
+            // and the controller first runs in a step.
+            require(
+                self.radius == config.radius,
+                Constraint::InconsistentState,
+                "state.radius",
+            )?;
         }
         nonnegative(self.prey_clock, "state.preyClock")?;
         require(
@@ -922,11 +928,7 @@ impl State {
         Ok(())
     }
 
-    fn into_world(
-        self,
-        mut config: Config,
-        options: RestoreOptions,
-    ) -> Result<Simulator, SimError> {
+    fn into_world(self, config: Config, options: RestoreOptions) -> Result<Simulator, SimError> {
         let mut snakes = Vec::new();
         let mut boosts = Vec::new();
         let mut speeds = Vec::new();
@@ -1044,11 +1046,9 @@ impl State {
             reason: d.reason,
             food: d.food,
         })?;
-        // Today's flat Config stores the live radius; the explicit state scalar
-        // is authoritative on load, including measured-radius continuations.
-        config.radius = self.radius;
         Ok(Simulator {
             config,
+            radius: self.radius,
             snakes,
             food,
             prey,

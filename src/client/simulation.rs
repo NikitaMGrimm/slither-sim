@@ -442,7 +442,11 @@ impl SimulatorBackend {
             SPAWN_ATTEMPTS
         };
         for _ in 0..attempts {
-            let distance = spawn::spawn_distance(self.world.config(), self.spawn_random.unit());
+            let distance = spawn::spawn_distance(
+                self.world.config(),
+                self.world.radius(),
+                self.spawn_random.unit(),
+            );
             let angle = self.spawn_random.unit() * TAU;
             let heading = self.spawn_random.unit() * TAU;
             let head = Point {

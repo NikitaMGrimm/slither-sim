@@ -88,7 +88,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
-| `radius` | `670` | Positive finite arena radius, at most `1e150`. |
+| `radius` | `670` | Initial arena radius after startup sizing; positive, finite and at most `1e150`. Live radius is separate runtime state. |
 | `dynamicRadius` | `false` | Opt into the provisional living-population controller (`670 × sqrt(living)`, capped at 23.4375 units/s); it is not faithful to official radius waves. |
 | `sizeToPopulation` | `true` | Runtimes enlarge this arena to fit their population at creation, scaling food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. See [population sizing](#population-sizing). |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
@@ -113,8 +113,12 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | `minScore` | `null` | Permanent integer displayed-score floor, 10–18,436,960; requires `spawnRadius`. Converted to mass at world creation. The maximum is the score at the table's end, 430 segments; larger snakes display less, so growth could break a higher floor. See [floor behavior](#battledome). |
 
 `radiusUpdates` overrides the model at each sample's tick. For recorded replay,
-set `dynamicRadius` false to prevent model changes between samples. See
-[rules and evidence limits](server-rules.md).
+set `dynamicRadius` false to prevent model changes between samples. The controller
+runs first, then all due samples override it, including exact time-zero samples
+at construction. Neither path changes Config's initial `radius` or food/prey
+targets. `Simulator::radius()`, frame `radius` and snapshot `radius` report the
+live boundary; `config().radius` and `snapshot.config.radius` retain the initial
+setting. See [rules and evidence limits](server-rules.md).
 
 ### Population sizing
 
@@ -131,7 +135,9 @@ is explicitly enabled. Larger radii are never shrunk. Rust callers choosing a
 custom fixed radius set `size_to_population` false. Resolved configs and
 checkpoints retain the flag. Core `Simulator::new(WorldOptions { .. })`
 construction preserves the supplied Config; `Config::official(n)` selects that
-initial size directly. Adding or respawning snakes does not reapply startup sizing.
+initial size directly. This resolved initial Config remains reproducible even
+when later radius samples or the controller move the boundary. Adding or
+respawning snakes does not reapply startup sizing.
 
 ### Official and sandbox
 

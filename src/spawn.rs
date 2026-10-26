@@ -32,14 +32,15 @@ pub(crate) const WAITING: &str = "Spawn candidate search exhausted: no safe circ
 
 /// Circular lives sample their configured band uniformly by area; a missing
 /// outer radius keeps a single circle. None keeps the official grid and stream.
-pub fn spawn_distance(config: &Config, unit: f64) -> f64 {
+/// `arena_radius` is the live boundary, independent of Config's initial radius.
+pub fn spawn_distance(config: &Config, arena_radius: f64, unit: f64) -> f64 {
     match config.spawn_radius {
         Some(inner) => config.spawn_radius_max.map_or(inner, |outer| {
             // Interpolate normalized squared radii to avoid squaring a large
             // finite custom radius. Validation guarantees 0 < inner <= outer.
             outer * ((inner / outer).powi(2) * (1.0 - unit) + unit).sqrt()
         }),
-        None => sample_spawn_distance(config.radius, unit),
+        None => sample_spawn_distance(arena_radius, unit),
     }
 }
 

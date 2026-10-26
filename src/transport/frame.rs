@@ -284,7 +284,7 @@ impl Frame {
         self.time = world.time();
         self.ticks = count(ticks, "tick")?;
         self.living = count(world.living(), "living snake")?;
-        self.radius = world.config().radius;
+        self.radius = world.radius();
         self.vision = world.config().vision;
         self.collect_snakes(world)?;
         self.collect_food(world)?;

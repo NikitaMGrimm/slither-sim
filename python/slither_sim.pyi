@@ -1,4 +1,4 @@
-"""In-process slither-sim sessions: slither-sim-json-v3 without JSON on the hot path."""
+"""In-process slither-sim sessions: slither-sim-json-v4 without JSON on the hot path."""
 
 from array import array
 from collections.abc import Iterable
@@ -14,7 +14,7 @@ __all__ = ["__version__", "PROTOCOL", "NONE", "NO_ORIGIN", "ORIGINS", "REASONS",
 
 __version__: Final[str]
 PROTOCOL: Final[str]
-"""The JSON protocol of `Session.request`: "slither-sim-json-v3"."""
+"""The JSON protocol of `Session.request`: "slither-sim-json-v4"."""
 NONE: Final[int]
 """Row or slot index meaning none (2**32 - 1): `view_self` of dead slots, `death_killer` without a killer."""
 NO_ORIGIN: Final[int]

@@ -75,14 +75,20 @@ Advancement or frame-collection failure makes `step` raise `SessionEndedError`
 `frame` raises `ValueError` ("Reset first"). Reset to continue. `request` instead
 returns an error reply with `sessionEnded: true` (false for unchanged-state errors).
 
-The module also exports `PROTOCOL` (`slither-sim-json-v3`), `NONE`, `NO_ORIGIN`,
+The module also exports `PROTOCOL` (`slither-sim-json-v4`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
 constants](bot-api.md#in-process-sessions). Type stubs ship with the package.
 
 ## Frames
 
 A frame has the scalars `time`, `ticks`, `living`, `radius` and `vision`, and one
-attribute per column, named like the [C ABI](c-api.md#frames) members:
+attribute per column, named like the [C ABI](c-api.md#frames) members.
+`frame.radius` and `request({"op": "snapshot"})["result"]["radius"]` report the live
+boundary. Snapshot `config.radius` stays at its initial, population-sized value,
+even across radius samples/controller steps. This config meaning is geometric
+v4; typed frame attributes retain their meanings.
+
+The columns are:
 
 | Table | Columns |
 | --- | --- |
@@ -133,5 +139,5 @@ the same wall time as one.
 ## Compatibility
 
 The package inherits the workspace's `slither-sim` crate version. Check
-`PROTOCOL` (`slither-sim-json-v3`) and record the commit for reproducibility.
+`PROTOCOL` (`slither-sim-json-v4`) and record the commit for reproducibility.
 The Python API is experimental and may change between `0.x` versions.

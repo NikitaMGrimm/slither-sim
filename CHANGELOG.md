@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Breaking
+
+- Config `radius` now retains the initial, population-sized setting; the live
+  boundary is runtime state exposed by `Simulator::radius()`, frames and a new
+  snapshot `radius` field. Geometric JSON is `slither-sim-json-v4`; C ABI v2's
+  frame layout and Python frame scalars are unchanged. Checkpoints use
+  `slither-sim-checkpoint-v2` and reject v1, preserving initial and live radii
+  separately. Flat config keys, fixed ecology targets and radius timing stay
+  unchanged ([configuration](docs/configuration.md#population-sizing)).
+
 ### Added
 
 - A two-client `paired-collision` collector and a frozen official pilot plan

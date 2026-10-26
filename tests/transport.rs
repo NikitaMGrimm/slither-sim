@@ -322,7 +322,7 @@ fn snapshots_exclude_hidden_state() {
     ]);
     assert_eq!(replies[0]["error"], "Reset first");
     let snapshot = replies[2]["result"].as_object().unwrap();
-    assert_eq!(snapshot.len(), 6);
+    assert_eq!(snapshot.len(), 7);
     for hidden in ["random", "boosts", "speeds", "joins", "kiosks"] {
         assert!(!snapshot.contains_key(hidden));
     }
@@ -574,7 +574,7 @@ fn rejected_typed_steps_change_nothing() {
 fn terminal_steps_clear_all_worlds_and_allow_reset() {
     use slither_sim::transport::StepError;
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/serve-errors-v3.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/serve-errors-v4.json")).unwrap();
     let reset = serde_json::to_vec(&fixture["reset"]).unwrap();
     let step = serde_json::to_vec(&fixture["step"]).unwrap();
     let mut session = transport::Session::new();
@@ -768,4 +768,28 @@ fn resolved_dynamic_radius_reset_replays_the_initial_frame() {
         serde_json::from_slice(&session.request(&serde_json::to_vec(&reset).unwrap())).unwrap();
     assert_eq!(first, replay);
     assert_eq!(first["result"]["worlds"][0]["radius"], 1000.);
+}
+
+#[test]
+fn initial_config_and_live_radius_survive_reset_replay_and_samples() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/serve-radius-v4.json")).unwrap();
+    let mut session = transport::Session::new();
+    let first = result(&session.request(&serde_json::to_vec(&fixture["reset"]).unwrap()));
+    assert_eq!(first["config"]["radius"], fixture["initialRadius"]);
+    assert_eq!(first["worlds"][0]["radius"], fixture["liveRadii"][0]);
+    let mut replay = transport::Session::new();
+    let mut resolved = fixture["reset"].clone();
+    resolved["config"] = first["config"].clone();
+    assert_eq!(
+        result(&replay.request(&serde_json::to_vec(&resolved).unwrap())),
+        first
+    );
+    for radius in fixture["liveRadii"].as_array().unwrap() {
+        let snapshot = result(&session.request(br#"{"op":"snapshot"}"#));
+        assert_eq!(snapshot["config"]["radius"], fixture["initialRadius"]);
+        assert_eq!(snapshot["radius"], *radius);
+        assert_eq!(session.frame(0).unwrap().radius, radius.as_f64().unwrap());
+        session.step(&[0.], &[false]).unwrap();
+    }
 }

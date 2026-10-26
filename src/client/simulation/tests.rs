@@ -158,7 +158,7 @@ fn exhaustive_spawn_pose(
 ) -> Result<(Vec<Point>, f64), String> {
     let mut open: Option<(f64, Vec<Point>, f64)> = None;
     for _ in 0..SPAWN_ATTEMPTS {
-        let distance = spawn::spawn_distance(world.config(), random.unit());
+        let distance = spawn::spawn_distance(world.config(), world.radius(), random.unit());
         let angle = random.unit() * TAU;
         let heading = random.unit() * TAU;
         let (body, heading) = world
@@ -249,11 +249,7 @@ fn bounded_admission_matches_exhaustive_poses_errors_and_random_stream() {
     assert!(outcomes.iter().all(|&count| count > 0), "{outcomes:?}");
     let mut backend = SimulatorBackend::new(7, SimulationConfig::default()).unwrap();
     backend.world.retire(0).unwrap();
-    {
-        let mut config = backend.world.config().clone();
-        config.radius = 50.;
-        crate::client::fixtures::reconfigure(&mut backend.world, config);
-    }
+    crate::client::fixtures::set_live_radius(&mut backend.world, 50.);
     let mut random = backend.spawn_random.clone();
     assert_eq!(
         backend.spawn_pose(0),
@@ -478,11 +474,7 @@ fn failed_ring_admission_preserves_the_existing_life() {
     .unwrap();
     // A measured live radius can shrink inside the initial spawn ring.
     // Failed admission must preserve the existing life.
-    {
-        let mut config = backend.world.config().clone();
-        config.radius = 100.0;
-        crate::client::fixtures::reconfigure(&mut backend.world, config);
-    }
+    crate::client::fixtures::set_live_radius(&mut backend.world, 100.0);
     let before = format!("{:?}", backend.world);
     let life = backend.slots[0].life;
     let connections = backend.connections;

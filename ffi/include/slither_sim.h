@@ -124,7 +124,7 @@ slither_session *slither_session_new(void);
 void slither_session_free(slither_session *session);
 
 /*
- * Answers one slither-sim-json-v3 request line of line_len bytes, without its
+ * Answers one slither-sim-json-v4 request line of line_len bytes, without its
  * newline, as `slither-sim serve` would. Rejected requests still succeed with
  * an error reply. *reply receives line bytes without a newline, followed by a
  * NUL that *reply_len excludes, valid until the next call that takes the

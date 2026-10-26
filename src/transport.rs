@@ -21,7 +21,7 @@ mod frame;
 #[cfg(test)]
 mod tests;
 
-pub const PROTOCOL: &str = "slither-sim-json-v3";
+pub const PROTOCOL: &str = "slither-sim-json-v4";
 
 /// A step rejected before advancement, or a failure after advancement began.
 #[derive(Debug, PartialEq, Eq)]
@@ -222,6 +222,7 @@ enum Request {
 #[derive(Serialize)]
 struct SnapshotReply<'a> {
     config: &'a Config,
+    radius: f64,
     time: f64,
     snakes: &'a [Snake],
     food: &'a [Food],
@@ -669,6 +670,7 @@ impl Session {
                 // Deliberately exclude hidden RNG/control state from this debug view.
                 Ok(reply(&SnapshotReply {
                     config: world.config(),
+                    radius: world.radius(),
                     time: world.time(),
                     snakes: world.snakes(),
                     food: world.food(),

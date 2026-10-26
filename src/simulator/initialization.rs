@@ -233,7 +233,11 @@ impl Simulator {
                     let mut margin = 0.0;
                     for _ in 0..attempts.get() {
                         let angle = random.next() * TAU;
-                        let distance = crate::spawn::spawn_distance(&world.config, random.next());
+                        let distance = crate::spawn::spawn_distance(
+                            &world.config,
+                            world.radius(),
+                            random.next(),
+                        );
                         let heading = random.next() * TAU;
                         let head = Point {
                             x: angle.cos() * distance,
@@ -290,13 +294,15 @@ impl Simulator {
         Ok(world)
     }
 
+    /// Effective rules; `radius` retains the initial setting after startup sizing.
     #[inline]
     pub fn config(&self) -> &Config {
         &self.config
     }
+    /// Live boundary after controller updates and recorded radius samples.
     #[inline]
     pub fn radius(&self) -> f64 {
-        self.config.radius
+        self.radius
     }
     #[inline]
     pub fn time(&self) -> f64 {

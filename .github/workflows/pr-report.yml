@@ -22,6 +22,7 @@ on:
       - examples/support/state.rs
       - examples/support/runtime.rs
       - examples/perf_session.rs
+      - examples/perf_radius.rs
       - examples/fidelity_metrics.rs
       - tests/movement_turns.rs
       - tests/physics.rs

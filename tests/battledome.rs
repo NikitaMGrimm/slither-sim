@@ -219,13 +219,13 @@ fn new_lives_start_on_the_configured_ring_outside_the_pit() {
     let ring = config.spawn_radius.unwrap();
     assert_eq!(ring, (1784.0 + 3584.0) / 2.0);
     for unit in [0.0, 0.3, 0.999] {
-        let radius = spawn::spawn_distance(&config, unit);
+        let radius = spawn::spawn_distance(&config, config.radius, unit);
         assert!(
             (radius * radius - (ring * ring + unit * (3400.0_f64.powi(2) - ring * ring))).abs()
                 < 1e-8
         );
         assert_eq!(
-            spawn::spawn_distance(&Config::official(4), unit),
+            spawn::spawn_distance(&Config::official(4), Config::official(4).radius, unit),
             spawn::sample_spawn_distance(Config::official(4).radius, unit)
         );
     }

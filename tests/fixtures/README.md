@@ -13,11 +13,11 @@ login challenges are inline in `tests/client_challenge.rs`, not `login-challenge
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
 The frame ID differs from the `slither-client-json-v2` request/reply
 envelope (also pinned with removed-field requests in `client-contract-v2.json`)
-and the geometric `slither-sim-json-v3` controller; see
+and the geometric `slither-sim-json-v4` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
-[`serve-errors-v3.json`](serve-errors-v3.json) pins the geometric controller's
-`slither-sim-json-v3` error envelope and a synthetic overflow reproducer for
+[`serve-errors-v4.json`](serve-errors-v4.json) pins the geometric controller's
+`slither-sim-json-v4` error envelope and a synthetic overflow reproducer for
 Rust/Python lifecycle tests. Without a wire protocol or client-frame contract,
 it stays outside this inventory. Error text is illustrative; tests check literal
 protocol and `sessionEnded` independently of runtime defaults.
@@ -146,3 +146,8 @@ and decoder/exporter source digests without changing replay values; older
 fixtures keep original provenance. Export checks gzip completion/window coverage,
 not full capture/study integrity, and labels that limit. Audit the study
 separately before treating derivatives as evidence.
+
+`serve-errors-v4.json` is the current geometric error-envelope fixture;
+`serve-errors-v3.json` is retained for the released historical contract.
+`serve-radius-v4.json` is a synthetic initial/live radius split fixture shared
+by Rust transport, C and Python tests; it includes time-zero and next-tick samples.

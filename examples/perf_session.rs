@@ -1,9 +1,17 @@
 //! Untimed typed/JSON session parity trace. Shared by perf_build overlays.
+#[path = "support/runtime.rs"]
+mod runtime;
 use serde_json::{Value, json};
 use slither_sim::{Config, transport::Session};
 use std::io::{self, Write};
 
-fn emit(out: &mut impl Write, value: Value) -> Result<(), Box<dyn std::error::Error>> {
+fn emit(out: &mut impl Write, mut value: Value) -> Result<(), Box<dyn std::error::Error>> {
+    for key in ["replyBytes", "snapshotBytes"] {
+        if let Some(bytes) = value.get_mut(key) {
+            let raw: Vec<u8> = serde_json::from_value(bytes.clone())?;
+            *bytes = serde_json::to_value(runtime::geometric_reply(&raw)?)?;
+        }
+    }
     serde_json::to_writer(&mut *out, &value)?;
     writeln!(out)?;
     Ok(())

@@ -485,7 +485,7 @@ fn terminal_failure_is_distinct_from_rejection_and_reset_recovers() {
     assert_eq!(unsafe { slither_worlds(handle.0) }, 0);
     assert_eq!(
         handle.request(step),
-        br#"{"error":"Reset first","protocol":"slither-sim-json-v3","sessionEnded":false}"#
+        br#"{"error":"Reset first","protocol":"slither-sim-json-v4","sessionEnded":false}"#
     );
     handle.request(r#"{"op":"reset","agents":1}"#);
     assert_eq!(handle.step(&[0.0], &[0]), SLITHER_OK);
@@ -602,5 +602,25 @@ fn sessions_run_on_separate_threads() {
                 .unwrap();
         }
         assert_eq!(*reply, session.request(br#"{"op":"snapshot"}"#));
+    }
+}
+
+#[test]
+fn c_frame_and_snapshot_expose_live_radius_without_changing_initial_config() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-radius-v4.json")).unwrap();
+    let session = Handle::new();
+    session.request(&serde_json::to_string(&fixture["reset"]).unwrap());
+    for radius in fixture["liveRadii"].as_array().unwrap() {
+        let snapshot: serde_json::Value =
+            serde_json::from_slice(&session.request(r#"{"op":"snapshot"}"#)).unwrap();
+        assert_eq!(snapshot["protocol"], fixture["protocol"]);
+        assert_eq!(
+            snapshot["result"]["config"]["radius"],
+            fixture["initialRadius"]
+        );
+        assert_eq!(snapshot["result"]["radius"], *radius);
+        assert_eq!(session.frame(0).unwrap().radius, radius.as_f64().unwrap());
+        assert_eq!(session.step(&[0.], &[0]), SLITHER_OK);
     }
 }

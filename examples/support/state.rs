@@ -59,7 +59,14 @@ fn empty(object: &Map<String, Value>) -> Result<(), String> {
 fn project(value: Value) -> Result<Value, String> {
     let mut envelope = object(value)?;
     // Producer data is provenance, explicitly outside the authoritative state.
-    for key in ["format", "rulesRevision", "producer"] {
+    let format = take(&mut envelope, "format")?;
+    if !matches!(
+        format.as_str(),
+        Some("slither-sim-checkpoint-v1" | "slither-sim-checkpoint-v2")
+    ) {
+        return Err("Unknown checkpoint comparison format".into());
+    }
+    for key in ["rulesRevision", "producer"] {
         take(&mut envelope, key)?;
     }
     let mut config = object(take(&mut envelope, "config")?)?;
@@ -82,6 +89,11 @@ fn project(value: Value) -> Result<Value, String> {
     let mut state = object(take(&mut envelope, "state")?)?;
     empty(&envelope)?;
     let radius = take(&mut state, "radius")?;
+    // The v2 initial/live split is intentional; compare live physics in the
+    // historical flat shape. Ordered radius traces separately retain both configs.
+    if format == "slither-sim-checkpoint-v2" {
+        config.insert("radius".into(), radius.clone());
+    }
     if config.get("radius") != Some(&radius) {
         return Err("Flat runtime Config radius differs from checkpoint live radius".into());
     }

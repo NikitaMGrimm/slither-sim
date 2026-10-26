@@ -1,4 +1,20 @@
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(slither_runtime_radius)");
+    println!("cargo:rerun-if-changed=src/simulator.rs");
+    let source = std::fs::read_to_string("src/simulator.rs").expect("simulator source");
+    if source
+        .split("pub struct Simulator {")
+        .nth(1)
+        .is_some_and(|fields| {
+            fields
+                .split('}')
+                .next()
+                .unwrap()
+                .contains("\n    radius: f64,")
+        })
+    {
+        println!("cargo:rustc-cfg=slither_runtime_radius");
+    }
     // The performance overlay copies this build script and one shared adapter
     // into both revisions. Select the runtime API at compile time, without a
     // compatibility layer in the simulator or two copies of workload logic.

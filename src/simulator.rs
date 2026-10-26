@@ -139,7 +139,7 @@ impl Preset {
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Boundary radius; the starting radius when `dynamicRadius` is set.
+    /// Initial boundary radius. Runtime updates are reported by `Simulator::radius`.
     pub radius: f64,
     /// Opt into the provisional living-population controller; not faithful to
     /// official radius waves. Disabled by default; see
@@ -448,16 +448,9 @@ impl Config {
             ..Self::official(1)
         }
     }
+    /// Checks the initial rules. Checkpoints validate the live radius separately,
+    /// so a world that has shrunk inside its pit or spawn band still restores.
     pub fn validate(&self) -> Result<(), SimError> {
-        self.validate_against_radius(true)
-    }
-    /// A checkpoint stores the live radius in `radius`. Measured updates can
-    /// move it inside the spawn ring or pit after construction, so continuation
-    /// skips the placement checks against it.
-    pub(crate) fn validate_continuation(&self) -> Result<(), SimError> {
-        self.validate_against_radius(false)
-    }
-    fn validate_against_radius(&self, placement: bool) -> Result<(), SimError> {
         for (field, value) in [
             ("radius", self.radius),
             ("vision", self.vision),
@@ -527,7 +520,7 @@ impl Config {
         self.death_food.validate()?;
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
-        self.validate_mode(placement)?;
+        self.validate_mode()?;
         crate::boundary::validate(&self.radius_updates)?;
         if let Some(index) = self
             .radius_updates
@@ -541,11 +534,9 @@ impl Config {
         Ok(())
     }
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
-    fn validate_mode(&self, placement: bool) -> Result<(), SimError> {
+    fn validate_mode(&self) -> Result<(), SimError> {
         let pit = self.pit.as_ref().map(|pit| pit.radius);
-        if pit
-            .is_some_and(|pit| !(pit > 0.0 && pit.is_finite() && (!placement || pit < self.radius)))
-        {
+        if pit.is_some_and(|pit| !(pit > 0.0 && pit.is_finite() && pit < self.radius)) {
             return Err(SimError::config(
                 Constraint::positive(pit.unwrap()).unwrap_or(Constraint::OutOfRange),
                 "pit.radius",
@@ -616,7 +607,7 @@ impl Config {
             let lower = spawn - roundoff;
             let upper = spawn + roundoff;
             let fits = spawn.is_finite()
-                && (!placement || upper < self.radius - SPAWN_WALL_MARGIN)
+                && upper < self.radius - SPAWN_WALL_MARGIN
                 && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
                 && crate::spawn::ring_step(lower, segments).is_some()
                 && crate::spawn::ring_step(upper, segments).is_some();
@@ -765,6 +756,8 @@ pub struct Simulator {
     /// Latest step only. Disabled by default.
     food_spawn_events: Option<Vec<FoodSpawnEvent>>,
     time: f64,
+    /// Live boundary, independent of the configured initial radius.
+    radius: f64,
     death_times: Vec<Option<f64>>,
     /// Join order of each slot's current life; collisions resolve oldest first.
     joins: Vec<u64>,
@@ -835,6 +828,7 @@ impl Simulator {
         config.validate()?;
         let min_mass = config.min_score.and_then(MassFloor::for_score);
         let mut world = Self {
+            radius: config.radius,
             config,
             snakes: vec![],
             food: vec![],
@@ -941,7 +935,7 @@ impl Simulator {
         let r = loop {
             let f = self.random.next().sqrt();
             if self.random.next() * 0.217 <= 0.217 - 0.172 * f {
-                break f * (self.config.radius - 20.0).max(0.0);
+                break f * (self.radius - 20.0).max(0.0);
             }
         };
         let size = ((3.0 + self.random.next() * 6.4) * 5.0).round() / 5.0;
@@ -967,7 +961,7 @@ impl Simulator {
             )?,
             // Two segments halfway to the wall, facing inward.
             None => {
-                let distance = self.config.radius * 0.5;
+                let distance = self.radius * 0.5;
                 let head = Point {
                     x: a.cos() * distance,
                     y: a.sin() * distance,
@@ -1118,7 +1112,7 @@ impl Simulator {
         stop_at: f64,
         excluded: Option<usize>,
     ) -> Option<f64> {
-        let limit = self.config.radius - SPAWN_WALL_MARGIN;
+        let limit = self.radius - SPAWN_WALL_MARGIN;
         if !(2..=430).contains(&body.len())
             || body
                 .iter()
@@ -1163,7 +1157,7 @@ impl Simulator {
             || clearance < 0.0
             || line
                 .iter()
-                .any(|p| p.distance(Point::default()) >= self.config.radius - SPAWN_WALL_MARGIN)
+                .any(|p| p.distance(Point::default()) >= self.radius - SPAWN_WALL_MARGIN)
         {
             return false;
         }
@@ -1271,7 +1265,7 @@ impl Simulator {
         }
         if body
             .iter()
-            .any(|p| p.distance(Point::default()) >= self.config.radius)
+            .any(|p| p.distance(Point::default()) >= self.radius)
         {
             return Err(SimError::state(
                 Constraint::OutsideArena,
@@ -1546,7 +1540,7 @@ impl Simulator {
                 c.dt,
             );
             let (head, lethal) =
-                crate::boundary::constrain(s.head, s.heading, sc, c.radius, c.boundary_mode);
+                crate::boundary::constrain(s.head, s.heading, sc, self.radius, c.boundary_mode);
             s.head = head;
             if lethal {
                 boundary_deaths.push((i, DeathReason::Boundary));
@@ -1909,7 +1903,7 @@ impl Simulator {
         if self.config.dynamic_radius {
             let target = population_radius(self.living());
             let step = RADIUS_RATE * self.config.dt;
-            self.config.radius += (target - self.config.radius).clamp(-step, step);
+            self.radius += (target - self.radius).clamp(-step, step);
         }
         // Tick comparisons retain their tolerance; construction uses exact zero
         // so a near-future recorded sample cannot affect the initial frame.
@@ -1921,7 +1915,7 @@ impl Simulator {
             if update.time > through {
                 break;
             }
-            self.config.radius = update.radius;
+            self.radius = update.radius;
             self.radius_update_index += 1;
         }
     }
@@ -1936,7 +1930,7 @@ impl Simulator {
     /// Spawn a prey with `next_prey_id`, which the caller has made unique.
     fn push_prey(&mut self) {
         let angle = self.prey_random.next() * TAU;
-        let radius = self.prey_random.next().sqrt() * self.config.radius * 0.95;
+        let radius = self.prey_random.next().sqrt() * self.radius * 0.95;
         let heading = self.prey_random.next() * TAU;
         let (min_size, max_size) = self
             .config
@@ -2013,6 +2007,7 @@ impl Simulator {
         outward: bool,
         snakes: &[Snake],
         c: &Config,
+        radius: f64,
         random: &mut Random,
     ) {
         let p = &c.prey;
@@ -2045,7 +2040,7 @@ impl Simulator {
             });
         // Roaming rim behavior remains provisional. Observed outward prey must
         // not be forced inward here; removal at the boundary is still unknown.
-        if !outward && old.distance(Point::default()) > c.radius * 0.9 {
+        if !outward && old.distance(Point::default()) > radius * 0.9 {
             prey.target_heading = (-old.y).atan2(-old.x);
         }
     }
@@ -2143,7 +2138,7 @@ impl Simulator {
             }
             let outward = self.prey_outward.contains(&prey.id);
             if decide {
-                Self::decide_prey(prey, outward, &self.snakes, c, &mut self.prey_random);
+                Self::decide_prey(prey, outward, &self.snakes, c, self.radius, &mut self.prey_random);
             }
             // Keep the default one-substep path allocation-free and preserve its
             // exact endpoint arithmetic. Coarse ticks need every quantized bend.
@@ -2173,8 +2168,8 @@ impl Simulator {
                 });
                 return true;
             }
-            if distance >= c.radius {
-                let ratio = c.radius * (1.0 - 1e-9) / distance;
+            if distance >= self.radius {
+                let ratio = self.radius * (1.0 - 1e-9) / distance;
                 prey.position.x *= ratio;
                 prey.position.y *= ratio;
             }

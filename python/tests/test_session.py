@@ -302,6 +302,23 @@ class InputTests(unittest.TestCase):
 
 
 class ErrorTests(unittest.TestCase):
+    def test_initial_config_and_live_radius_match_json_and_typed_frames(self):
+        path = Path(__file__).resolve().parents[2] / "tests/fixtures/serve-radius-v4.json"
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+        session = Session()
+        options = dict(fixture["reset"])
+        del options["op"]
+        options["decision_ticks"] = options.pop("decisionTicks")
+        session.reset(**options)
+        for radius in fixture["liveRadii"]:
+            snapshot = session.request({"op": "snapshot"})
+            self.assertEqual(snapshot["protocol"], fixture["protocol"])
+            self.assertEqual(snapshot["result"]["config"]["radius"], fixture["initialRadius"])
+            self.assertEqual(snapshot["result"]["radius"], radius)
+            self.assertEqual(session.frame(0).radius, radius)
+            session.step([0.], [False])
+
+
     def test_errors_before_reset(self):
         session = Session()
         self.assertEqual((session.worlds, session.agents), (0, 0))
@@ -451,7 +468,7 @@ class ErrorTests(unittest.TestCase):
 
     def test_terminal_steps_clear_worlds_and_reset_recovers(self):
         fixture = json.loads((Path(__file__).resolve().parents[2]
-                              / "tests/fixtures/serve-errors-v3.json").read_text(encoding="utf-8"))
+                              / "tests/fixtures/serve-errors-v4.json").read_text(encoding="utf-8"))
         typed, encoded = Session(), Session()
         options = fixture["reset"]
         typed.reset(worlds=options["worlds"], agents=options["agents"],
