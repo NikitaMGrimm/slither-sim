@@ -365,6 +365,13 @@ from the complete `ClientFrame` and returns `None` outside a compatible playing
 frame with an observation. Host bots, native background bots and the Rust
 examples use this default adapter; JSON operations are unchanged.
 
+Local host and native background bots use `ForagerBot::with_world_rules(&Config)`
+to enter the configured one-way pit and treat its edge as a wall from inside.
+The pit follows the live radius received in each frame. The adapter adds no
+fields to `ClientFrame`; network bots must obtain mode rules separately.
+Offline callers can supply the live pit radius to `Forager::decide_with_pit`.
+Without a pit these calls preserve the frozen A4 decisions.
+
 One policy/adapter instance can be reused for sequential decisions across seats:
 scratch buffers retain no policy state. Keep each seat's received frame, sent
 commands and lifecycle separate. This heuristic does not guarantee safety;

@@ -21,6 +21,10 @@ pub(crate) struct RawSimulator {
 }
 
 impl RawSimulator {
+    pub(crate) fn backend_config(&self) -> &crate::Config {
+        self.backend.world.config()
+    }
+
     /// Called by the host before any slots connect; bot slots keep config.latency.
     pub(crate) fn set_player_latency(&mut self, slots: usize, config: LatencyConfig) {
         self.backend.player_latency = PlayerLatency { slots, config };

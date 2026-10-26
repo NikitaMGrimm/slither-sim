@@ -7,6 +7,15 @@
 - Linux hosting resource guidance now includes real socket tests on one Zen 4
   and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
 
+### Fixed
+
+- Battledome background bots head into the pit after spawning and treat its
+  edge as a lethal wall once inside, instead of dying on it. In three local
+  three-minute runs with 64 bots, they spent 87–97% of their time in the pit
+  (previously 15–18%) and never died at its edge (previously 18–23 times a
+  minute) ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-pit-aware-bots/REPORT.md)).
+  Bots in worlds without a pit decide exactly as before.
+
 ### Performance
 
 - Host food updates reuse each broadcast's changed sectors for every recipient

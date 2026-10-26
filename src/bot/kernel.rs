@@ -468,6 +468,20 @@ pub(super) fn decide(
     p: &Params,
     scratch: &mut Scratch,
 ) -> Action {
+    decide_with_pit(o, timing, intents, p, scratch, None)
+}
+
+pub(super) fn decide_with_pit(
+    o: &Observation,
+    timing: &Timing,
+    intents: &[Intent],
+    p: &Params,
+    scratch: &mut Scratch,
+    pit: Option<f64>,
+) -> Action {
+    // The same food/obstacle/steering search handles a one-way pit. Outside,
+    // enter instead of foraging the spawn band. Inside, its edge is the rim
+    // for every food goal, steering arc and escape branch.
     let lead = timing.observation_age + timing.command_delay + timing.processing;
     let lead_steps = (lead * p.lead_scale / SUBSTEP)
         .round()
@@ -487,6 +501,12 @@ pub(super) fn decide(
         me.speed = motion.speed.speed.max(base_speed(o.me.segments));
         me.state = motion.speed;
     }
+    // Replay may carry a received outside head into the pit before this
+    // decision acts. A head already inside must also retain the hard edge.
+    let entering = pit.is_some_and(|radius| {
+        o.me.head.distance(o.arena.center) >= radius && me.head.distance(o.arena.center) >= radius
+    });
+    me.pit = pit.filter(|_| !entering);
     let pickup_radius = pickup_circle(me.head, me.heading, me.speed, o.me.segments).1;
     let view = View {
         o,
@@ -528,6 +548,14 @@ pub(super) fn decide(
     let mut goal = scene
         .food(&view, &me, p, race)
         .unwrap_or_else(|| roam(o, &me, p));
+    if entering {
+        goal = Goal {
+            heading: (o.arena.center.y - me.head.y).atan2(o.arena.center.x - me.head.x),
+            rate: f64::INFINITY,
+            boost: false,
+            crosses: None,
+        };
+    }
     // A raced food goal may be valued at boost speed: should boosting turn
     // out unsafe, food is valued again at cruise speed.
     let revalue = goal.boost && race.is_some_and(|r| r.charge.is_some());
@@ -1056,6 +1084,8 @@ struct Me {
     /// Clearance below which an arc is dangerous (`Params::safe`, widened by
     /// `safe_width_factor`).
     safe: f64,
+    /// Effective hard boundary while inside a configured one-way pit.
+    pit: Option<f64>,
 }
 
 impl Me {
@@ -1069,7 +1099,34 @@ impl Me {
             segments: me.segments,
             state: SpeedState::from_observed_speed(me.speed, me.segments),
             safe: 0.0,
+            pit: None,
         }
+    }
+    fn radius(&self, o: &Observation) -> f64 {
+        self.pit
+            .map_or(o.arena.radius, |pit| pit.min(o.arena.radius))
+    }
+    fn food_margin(&self, p: &Params) -> f64 {
+        if self.pit.is_some() {
+            p.rim_food_margin.max(0.)
+        } else {
+            p.rim_food_margin
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn boundary_blocks(
+        &self,
+        o: &Observation,
+        segments: usize,
+        speed: f64,
+        dt: f64,
+        chords: usize,
+        at: impl Fn(f64) -> (Point, f64),
+    ) -> bool {
+        branch_hits_rim(&o.arena, segments, dt, chords, &at)
+            || self
+                .pit
+                .is_some_and(|pit| branch_hits_pit(o.arena.center, pit, speed, dt, chords, at))
     }
     /// Cumulative distance after each substep of boosting from our speed
     /// state: the server accelerates gradually (`SpeedState::step`).
@@ -1491,7 +1548,7 @@ impl Scene {
                     return None;
                 }
             }
-            if q.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
+            if q.distance(o.arena.center) > me.radius(o) - me.width - me.food_margin(p) {
                 return None;
             }
             let seconds = me.reach(q, p.orbit_factor)?;
@@ -1592,6 +1649,20 @@ fn rim_kills(arena: &Arena, head: Point, heading: f64, segments: usize) -> bool 
         && x * heading.cos() + y * heading.sin() > boundary::LETHAL_OUTWARD * distance
 }
 
+/// Conservative head-center exit forecast for the hard one-way pit.
+fn branch_hits_pit(
+    center: Point,
+    radius: f64,
+    speed: f64,
+    dt: f64,
+    chords: usize,
+    at: impl Fn(f64) -> (Point, f64),
+) -> bool {
+    // The pit tests the head center, at every exit angle. Half a sample's
+    // travel bounds an outward excursion between adjacent samples too.
+    (0..=chords).any(|j| at(dt * j as f64).0.distance(center) + speed * dt / 2. >= radius)
+}
+
 /// Whether a branch `at(t)` (head and heading) dies at the rim within
 /// `chords` samples `dt` apart. Its first contact, located between
 /// samples by bisection, is lethal or starts a slide; while sliding, the head
@@ -1676,7 +1747,12 @@ impl Escapes {
             };
             let heads: [(Point, f64); TRAP_CHORDS + 1] = std::array::from_fn(|j| at(dt * j as f64));
             tips[b] = heads.map(|(q, h)| forward(q, h, radius));
-            blocked[b] = branch_hits_rim(&o.arena, enemy.segments, dt, TRAP_CHORDS, at);
+            let enemy_bounds = Me {
+                pit: me.pit.filter(|&pit| head.distance(o.arena.center) < pit),
+                ..*me
+            };
+            blocked[b] =
+                enemy_bounds.boundary_blocks(o, enemy.segments, enemy.speed, dt, TRAP_CHORDS, at);
         }
         // Other snakes' gathered bodies: a tip crossing their centre line, or
         // within their radius of it, dies.
@@ -1788,7 +1864,7 @@ fn cut(
         for step in 1..=samples {
             let tau = p.kill_horizon * step as f64 / samples as f64;
             let q = path(tau);
-            if q.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
+            if q.distance(o.arena.center) > me.radius(o) - me.width - me.food_margin(p) {
                 continue;
             }
             // Cross its path rather than meet its head: approach within
@@ -1936,7 +2012,7 @@ fn coil(view: &View, me: &Me, p: &Params) -> Option<Goal> {
         x: centre.x + orbit * phi.cos(),
         y: centre.y + orbit * phi.sin(),
     };
-    if aim.distance(o.arena.center) > o.arena.radius - me.width - p.rim_food_margin {
+    if aim.distance(o.arena.center) > me.radius(o) - me.width - me.food_margin(p) {
         return None;
     }
     let remaining = (std::f64::consts::TAU - wrapped.abs()).max(0.0) * radius / me.speed;
@@ -1955,7 +2031,7 @@ fn coil(view: &View, me: &Me, p: &Params) -> Option<Goal> {
 /// With nothing to eat in view, cross the middle of the arena rather than
 /// circling or following the rim.
 fn roam(o: &Observation, me: &Me, p: &Params) -> Goal {
-    let heading = if me.head.distance(o.arena.center) > p.roam_fraction * o.arena.radius {
+    let heading = if me.head.distance(o.arena.center) > p.roam_fraction * me.radius(o) {
         toward(me.head, o.arena.center)
     } else {
         me.heading
@@ -2005,6 +2081,53 @@ fn to_tip(path: &mut [(Point, f64)], me: &Me, p: &Params) {
     }
 }
 
+/// Lower bound on clearance along the full pit steering path. The ordinary
+/// two-step steering forecast can hide an early outward bulge during a turn.
+fn pit_arc_clearance(
+    o: &Observation,
+    me: &Me,
+    p: &Params,
+    heading: f64,
+    boost: bool,
+    cap: f64,
+) -> f64 {
+    let Some(pit) = me.pit else {
+        return cap;
+    };
+    let speed_limit = if boost {
+        me.speed.max(BOOST_SPEED)
+    } else {
+        me.speed
+    };
+    if me.head.distance(o.arena.center) + speed_limit * p.lookahead_seconds < pit - me.width - cap {
+        return cap;
+    }
+    let (mut head, mut angle, mut state) = (me.head, me.heading, me.state);
+    let (mut time, mut result) = (0., cap);
+    while time < p.lookahead_seconds {
+        let dt = SUBSTEP.min(p.lookahead_seconds - time);
+        let speed = if boost {
+            state.step(true, me.segments, dt, SpeedModel::default())
+        } else {
+            me.speed
+        };
+        let delta = wrap(heading - angle);
+        let next = turn_then_straight(head, angle, delta, speed, me.turn, dt);
+        // A constant-speed turn deviates from its chord by at most v*w*dt²/8;
+        // the chord itself stays within the larger endpoint center distance.
+        let bow = speed * me.turn * dt * dt / 8.;
+        let reach = head
+            .distance(o.arena.center)
+            .max(next.distance(o.arena.center))
+            + bow;
+        result = result.min(pit - me.width - reach);
+        head = next;
+        angle += delta.clamp(-me.turn * dt, me.turn * dt);
+        time += dt;
+    }
+    result
+}
+
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
 /// capped at `cap`. Only clearance below `safe` changes a cost, so callers pass
 /// `safe` and obstacles that provably cannot lower the running minimum are
@@ -2028,8 +2151,11 @@ fn clearance(
     let end = path[points - 1].0;
     // Look further toward the rim so a turn starts in time.
     let ahead = forward(end, rim_heading, me.speed * p.rim_ahead_seconds);
-    let rim = |q: Point| o.arena.radius - me.width - q.distance(o.arena.center);
+    let rim = |q: Point| me.radius(o) - me.width - q.distance(o.arena.center);
     let mut clearance = rim(end).min(rim(ahead) + p.rim_ahead_credit).min(cap);
+    if me.pit.is_some() {
+        clearance = clearance.min(pit_arc_clearance(o, me, p, heading, ramp.is_some(), cap));
+    }
     to_tip(path, me, p);
     let speed = if ramp.is_some() {
         me.speed.max(BOOST_SPEED)
@@ -2265,7 +2391,7 @@ fn blocked_exits(
     // Branches whose samples all stay further inside than the rim's contact
     // lead plus half a chord cannot touch it; others take the exact check.
     let inside =
-        o.arena.radius - boundary::CONTACT_LEAD * scale(o.me.segments) - me.speed * dt / 2.0 - 1e-6;
+        me.radius(o) - boundary::CONTACT_LEAD * scale(o.me.segments) - me.speed * dt / 2.0 - 1e-6;
     let mut blocked = 0;
     for (b, delta) in [-std::f64::consts::PI, 0.0, std::f64::consts::PI]
         .into_iter()
@@ -2283,9 +2409,10 @@ fn blocked_exits(
         };
         if near_rim && {
             let chords = (p.exit_seconds / EXIT_RIM_SECONDS).ceil().max(1.0) as usize;
-            branch_hits_rim(
-                &o.arena,
+            me.boundary_blocks(
+                o,
                 o.me.segments,
+                me.speed,
                 p.exit_seconds / chords as f64,
                 chords,
                 at,
@@ -2837,6 +2964,7 @@ mod tests {
                 segments,
                 state: SpeedState::from_observed_speed(base_speed(segments), segments),
                 safe: 0.0,
+                pit: None,
             };
             let (dt, tip) = (0.1 + lcg(&mut seed) * 0.4, lcg(&mut seed) * 30.0);
             let (heads, tips) = exit_branches(&me, head, heading, dt, tip);
@@ -2854,6 +2982,157 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn pit_clearance_detects_an_early_exit_hidden_by_the_coarse_endpoints() {
+        let mut o = lone();
+        o.arena.radius = 3584.;
+        o.me.head = Point { x: 1783.9, y: 0. };
+        o.me.heading = 80_f64.to_radians();
+        o.me.segments = 26;
+        o.me.speed = base_speed(26);
+        let mut me = Me::new(&o.me);
+        me.pit = Some(1784.);
+        let p = crate::bot::params::A4_MEAN;
+        let target = std::f64::consts::PI;
+        let (path, n, rim_heading) = arc(&me, &p, target, None);
+        let end = path[n - 1].0;
+        let ahead = forward(end, rim_heading, me.speed * p.rim_ahead_seconds);
+        let old = (1784. - me.width - end.distance(o.arena.center))
+            .min(1784. - me.width - ahead.distance(o.arena.center) + p.rim_ahead_credit);
+        assert!(
+            old >= p.safe,
+            "endpoint-only checks report this safe: {old}"
+        );
+        let (first_step, _) = advance(me.head, me.heading, target, me.speed, me.turn, 0.007);
+        assert!(first_step.distance(o.arena.center) > 1784.);
+        let checked = clearance(&o, &me, &p, &[], target, p.safe, None, None, |_| false);
+        assert!(checked < 0., "the full pit path must be unsafe: {checked}");
+        // A pit-less decision retains the original outer-rim arithmetic.
+        me.pit = None;
+        let expected = (o.arena.radius - me.width - end.distance(o.arena.center))
+            .min(o.arena.radius - me.width - ahead.distance(o.arena.center) + p.rim_ahead_credit)
+            .min(p.safe);
+        assert_eq!(
+            clearance(&o, &me, &p, &[], target, p.safe, None, None, |_| false).to_bits(),
+            expected.to_bits()
+        );
+        me.pit = Some(1784.);
+        me.speed = BOOST_SPEED;
+        me.state = SpeedState::from_observed_speed(BOOST_SPEED, me.segments);
+        let ramp = me.boost_ramp();
+        assert!(
+            clearance(&o, &me, &p, &[], target, p.safe, None, Some(&ramp), |_| {
+                false
+            }) < 0.
+        );
+    }
+
+    #[test]
+    fn forecast_entry_uses_the_pit_before_the_next_received_position() {
+        let mut o = lone();
+        o.arena.radius = 3584.;
+        o.me.head = Point { x: 1790., y: 0. };
+        o.me.heading = std::f64::consts::PI;
+        o.me.segments = 26;
+        o.me.speed = base_speed(26);
+        let timing = Timing {
+            observation_age: 0.8,
+            ..Default::default()
+        };
+        let p = crate::bot::params::A4_MEAN;
+        let steps = (0.8 * p.lead_scale / SUBSTEP).round() as usize;
+        let motion = replay(&o.me, &o.arena, &timing, steps, |_| {});
+        assert!(motion.head.distance(o.arena.center) < 1784.);
+        let mut projected = o.clone();
+        projected.me.head = motion.head;
+        projected.me.heading = motion.heading;
+        projected.me.speed = motion.speed.speed;
+        let mut distinguished = false;
+        for target in [Point { x: 1300., y: 300. }, Point { x: 1000., y: -500. }] {
+            let food = crate::Food {
+                x: target.x,
+                y: target.y,
+                value: 10.,
+                size: None,
+                origin: None,
+            };
+            o.food = vec![food.clone()];
+            projected.food = vec![food];
+            let run = |obs: &Observation, t: &Timing, pit| {
+                decide_with_pit(obs, t, &[], &p, &mut Scratch::default(), pit)
+            };
+            let expected = run(&projected, &Timing::default(), Some(1784.));
+            let entry = run(&projected, &Timing::default(), Some(1.));
+            if expected != entry {
+                assert_eq!(run(&o, &timing, Some(1784.)), expected);
+                distinguished = true;
+            }
+        }
+        assert!(
+            distinguished,
+            "regression must distinguish foraging inside from entering"
+        );
+    }
+
+    #[test]
+    fn pit_escape_forecasts_also_keep_a_smaller_outer_wall() {
+        let mut o = lone();
+        o.arena.radius = 1000.;
+        let mut me = Me::new(&o.me);
+        me.pit = Some(1784.);
+        let at = |t| {
+            (
+                Point {
+                    x: 900. + 190. * t,
+                    y: 0.,
+                },
+                0.,
+            )
+        };
+        assert!(!branch_hits_pit(o.arena.center, 1784., 190., 0.05, 30, at));
+        assert!(me.boundary_blocks(&o, 26, 190., 0.05, 30, at));
+    }
+
+    #[test]
+    fn a_tangent_pit_exit_is_lethal_even_when_the_outer_wall_would_slide() {
+        let arena = Arena {
+            center: Point::default(),
+            radius: 1784.,
+        };
+        let at = |t| {
+            (
+                Point {
+                    x: 1744.,
+                    y: BOOST_SPEED * t,
+                },
+                std::f64::consts::FRAC_PI_2,
+            )
+        };
+        assert!(!branch_hits_rim(&arena, 26, 0.05, 30, at));
+        assert!(branch_hits_pit(
+            arena.center,
+            arena.radius,
+            BOOST_SPEED,
+            0.05,
+            30,
+            at
+        ));
+        assert!(!branch_hits_pit(
+            arena.center,
+            arena.radius,
+            BOOST_SPEED,
+            0.05,
+            30,
+            |t| (
+                Point {
+                    x: 1200.,
+                    y: BOOST_SPEED * t
+                },
+                std::f64::consts::FRAC_PI_2
+            )
+        ));
     }
 
     #[test]
@@ -2907,6 +3186,7 @@ mod tests {
             segments,
             state: SpeedState::from_observed_speed(speed, segments),
             safe: 30.0,
+            pit: None,
         };
         let ramp = me.boost_ramp();
         let two = RAMP_SUBSTEPS as f64 * SUBSTEP;
