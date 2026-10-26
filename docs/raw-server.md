@@ -176,8 +176,10 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 
 ### Reports and game-over
 
-- `l`: top ten living snakes by size, recipient rank and population, after the recipient's
-  own snake appears; see [report clocks](server-rules.md#packet-timing).
+- `l`: top ten, recipient rank and population, after the recipient's own snake
+  appears; see [report clocks](server-rules.md#packet-timing). It ranks living
+  snakes by size, or, with `killScoreSeconds`, living seats and recently scoring
+  dead or disconnected seats by rolling kills ([Battledome](configuration.md#battledome)).
 - `k`: simulator collision-attributed kills.
 - `F`/`w` and birth/pickup deltas: [sector food delivery](server-rules.md#food-sector-delivery).
 - `M`/`V`: [global minimap](server-rules.md#client-delivery-and-spawning), with
