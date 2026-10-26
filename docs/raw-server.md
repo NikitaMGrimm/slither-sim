@@ -99,10 +99,9 @@ For Rust constructors and the default `Config::official(1)`, see
 
 ## VPS use
 
-Follow the [Linux hosting runbook](hosting.md) for verified release downloads,
-official/Battledome configs, systemd, a TLS proxy, join checks, upgrades and
-rollback. It also lists replacement limits and short resource samples.
-The host serves plain `ws`; a TLS proxy supplies `wss`. Game assets are not included.
+[Linux hosting](hosting.md) installs a release as a systemd service, with an
+optional TLS proxy for `wss`, upgrades and resource numbers. The host itself
+serves plain `ws`. Game assets are not included.
 
 The simulation thread owns the world, physics and per-tick encoding. A separate
 socket thread owns the listener and nonblocking connections, releasing frames

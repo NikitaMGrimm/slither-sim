@@ -4,8 +4,8 @@
 
 ### Added
 
-- Linux [hosting runbook](docs/hosting.md) with release verification, service and
-  TLS setup, replacement checks, upgrades/rollback and bounded socket-load sizes.
+- [Linux hosting guide](docs/hosting.md): verified release install, systemd
+  service, optional TLS proxy, join check, upgrades, rollback and resource use.
 - Python `Session.config` returns the resolved world config of the last reset
   as a new camelCase dict, matching a JSON reset reply's `config`
   ([Python](docs/python.md#api)).
