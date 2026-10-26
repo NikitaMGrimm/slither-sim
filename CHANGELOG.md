@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-
-
 ### Breaking
 
 - The portable `client` JSON protocol is now `slither-client-json-v2`, because
