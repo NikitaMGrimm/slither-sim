@@ -321,6 +321,52 @@ fn malformed_state_versions_and_unknown_fields_reject_atomically() {
 }
 
 #[test]
+fn nested_config_values_keep_their_canonical_json_type() {
+    let mut incumbent = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
+            radius_updates: vec![RadiusUpdate {
+                time: 1.,
+                radius: 4000.,
+            }],
+            ..Config::battledome()
+        },
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["0".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    let original = value(&incumbent);
+    // Serde would read these positionally, filling absent entries from defaults.
+    for (path, replacement) in [
+        ("/config", json!([])),
+        ("/config/prey", json!([])),
+        ("/config/kiosk", json!([])),
+        ("/config/deathFood", json!([])),
+        ("/config/ambientFood", json!([])),
+        ("/config/boostFood", json!([])),
+        ("/config/pit", json!([1784.])),
+        ("/config/radiusUpdates/0", json!([1., 4000.])),
+        ("/config/radiusUpdates", json!({})),
+    ] {
+        let mut bad = original.clone();
+        *bad.pointer_mut(path).unwrap() = replacement;
+        let cause = rejects_atomic(&mut incumbent, &bad);
+        assert!(
+            matches!(cause.kind, ErrorKind::InvalidCheckpoint { .. }),
+            "{path}: {cause}"
+        );
+    }
+    // Explicit nulls remain the canonical form of absent optional settings.
+    assert_eq!(original["config"]["killScoreSeconds"], json!(900.));
+    let mut fixed = original.clone();
+    fixed["config"]["killScoreSeconds"] = Value::Null;
+    let restored = Simulator::from_checkpoint(&bytes(&fixed), options()).unwrap();
+    assert_eq!(restored.config().kill_score_seconds, None);
+}
+
+#[test]
 fn debug_snapshot_is_full_precision_but_not_a_checkpoint() {
     let mut session = slither_sim::transport::Session::new();
     session.request(br#"{"op":"reset","agents":1}"#);
