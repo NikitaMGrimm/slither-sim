@@ -1649,12 +1649,14 @@ impl Simulator {
             let step = RADIUS_RATE * self.config.dt;
             self.config.radius += (target - self.config.radius).clamp(-step, step);
         }
-        self.apply_radius_updates(time);
+        // Tick comparisons retain their tolerance; construction uses exact zero
+        // so a near-future recorded sample cannot affect the initial frame.
+        self.apply_radius_updates(time + 1e-9);
     }
 
-    fn apply_radius_updates(&mut self, time: f64) {
+    fn apply_radius_updates(&mut self, through: f64) {
         while let Some(update) = self.config.radius_updates.get(self.radius_update_index) {
-            if update.time > time + 1e-9 {
+            if update.time > through {
                 break;
             }
             self.config.radius = update.radius;
