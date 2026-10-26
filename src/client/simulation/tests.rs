@@ -2737,7 +2737,7 @@ fn pending_departure_keeps_earlier_receipts_before_measured_processing() {
 }
 
 #[test]
-fn reviewed_spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
+fn spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
     let world = Config {
         radius: 100.5,
         food_count: 0,

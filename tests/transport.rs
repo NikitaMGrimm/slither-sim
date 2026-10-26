@@ -733,7 +733,7 @@ fn reset_sizes_are_bounded_by_frame_types_and_memory_not_policy() {
 }
 
 #[test]
-fn reviewed_resolved_dynamic_radius_reset_replays_the_initial_frame() {
+fn resolved_dynamic_radius_reset_replays_the_initial_frame() {
     let mut session = transport::Session::new();
     let mut reset = json!({"op":"reset", "seed":1, "agents":1,
         "config":{"radius":1000., "dynamicRadius":true, "foodCount":0,

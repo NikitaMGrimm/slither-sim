@@ -103,7 +103,7 @@ fn tiny_custom_arena_without_a_spawn_band_uses_its_center() {
 }
 
 #[test]
-fn reviewed_initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
+fn initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
     for radius in [50., 84.] {
         let mut world = Simulator::new(
             1,
