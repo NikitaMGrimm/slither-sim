@@ -104,7 +104,8 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | `ambientFood` | Defaults below | Ambient-food admission limit. |
 | `boostFood` | Defaults below | Boost-food admission limit. |
 | `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary; entry allowed, exit lethal. Uses the head center's swept path; see [Battledome](#battledome). |
-| `spawnRadius` | `null` | New lives follow this ring with anchors 42 apart. `add` keeps its ring angles, turning counterclockwise; the host samples uniform angle and direction. Body chords must clear the pit (`spawnRadius > hypot(pit.radius, 21)`); the ring must stay more than 60 (spawn wall margin) inside `radius`; head-tail gap must exceed newborn body diameter. Validation allows for floating-point rounding at every angle. `null` keeps the official radial grid and straight 2-segment newborns. |
+| `spawnRadius` | `null` | Inner radius for circular newborn bodies, anchors 42 apart and tangent heading; uses the [circular admission policy](#battledome), with strict waiting. `null` keeps official admission and straight two-segment newborns. Body chords must clear the pit (`spawnRadius > hypot(pit.radius, 21)`), all spawn radii must stay more than 60 inside the wall, and the head-tail gap must exceed newborn diameter, including rounding error. |
+| `spawnRadiusMax` | `null` | Optional outer spawn radius, finite and at least `spawnRadius`; requires it. The host samples radius uniformly by area, angle and tangent direction uniformly. `null` keeps one circle. Deterministic `Simulator::add` initialization stays on the inner circle with arena containment checks and no neighbor admission checks, for synthetic tests. |
 | `killScoreSeconds` | `null` | Positive finite rolling kill-score window, per slot across lives; `null` reads as 0. See [score semantics](#battledome). |
 | `minScore` | `null` | Permanent integer displayed-score floor, 10–18,436,960; requires `spawnRadius`. Converted to mass at world creation. The maximum is the score at the table's end, 430 segments; larger snakes display less, so growth could break a higher floor. See [floor behavior](#battledome). |
 
@@ -177,8 +178,8 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 | Outer wall | `radius: 3584`, `dynamicRadius: false` | Author-chosen fixed arena; inherited boundary behavior |
 | Pit | `pit.radius: 1784`; entry allowed, exit lethal | Author-chosen one-way boundary |
 | Size floor | `minScore: 400` | Permanent minimum size, including newborns |
-| Spawn ring | `spawnRadius: 2684` | Midway between pit and wall, giving equal room in both directions |
-| Spawn body | 26 anchors, 42 units apart along the ring, heading along it | Keeps the whole new body clear of pit and wall; host samples angle and direction with 600-unit clearance |
+| Spawn band | `spawnRadius: 2684`, `spawnRadiusMax: 3400` | Outside the old ring; at least 2.12 s at maximum boost or 5.04 s at normal newborn speed before the 60-unit wall margin along a straight tangent |
+| Spawn body | 26 anchors, 42 units apart along its own circle, tangent heading | 400-unit body clearance and the circular safety checks below; wait when sampled poses fail |
 | Kill score | `killScoreSeconds: 900` | +1 per credited kill for 15 minutes; retained across lives so death does not erase recent kills |
 | Death food | Only the fraction of mass above `minScore`; pit and body deaths | Prevents free floor mass becoming food each life; wall deaths still drop none |
 | Prey | `prey.count: 0` | Snakes only |
@@ -204,6 +205,17 @@ A new world clears the rolling score.
 
 Host and portable configs that name the preset also default to
 [`responsive` delivery](#simulationconfig).
+The [local spawn study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-safe-spawn/REPORT.md)
+records safety, waiting and load limits. Admission does not grant collision immunity
+or predict later turns. The host serves waiting sockets before background bots.
+
+Every world with `spawnRadius` requires the whole newborn body to miss living
+heads' straight two-second paths by 600 units. Its head also keeps three seconds
+of normal travel plus contact margin from old bodies (about 627 units at the
+floor). Inward and tangent departure segments cover three seconds at normal
+newborn speed and must clear old bodies and projected paths by 400 units.
+Larger contact exclusions still apply. These custom checks preserve room to
+leave spawn while allowing the trailing body to use 400-unit clearance.
 
 These rules have synthetic offline regressions in
 [`tests/battledome.rs`](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/battledome.rs),

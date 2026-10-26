@@ -408,6 +408,8 @@ impl Host {
             routes,
             max_clients: self.max_clients,
             generations: vec![0; agents],
+            waiting: VecDeque::new(),
+            next_spawn_tick: 0,
             shared,
             ticks: 0,
             deferred: 0,
@@ -528,9 +530,19 @@ struct Simulation {
     max_clients: usize,
     /// Current session per slot; zero while closed.
     generations: Vec<u64>,
+    waiting: VecDeque<PendingJoin>,
+    next_spawn_tick: u64,
     shared: Arc<Shared>,
     ticks: u64,
     deferred: u64,
+}
+
+struct PendingJoin {
+    slot: usize,
+    generation: u64,
+    appearance: PlayerAppearance,
+    session_id: bool,
+    physical_food: bool,
 }
 
 impl Simulation {
@@ -600,7 +612,50 @@ impl Simulation {
         while let Ok(command) = self.commands.try_recv() {
             self.apply(command)?;
         }
+        self.admit_waiting()?;
         Ok(())
+    }
+
+    /// Circular worlds wait for a safe pose. A waiting socket gets the next
+    /// attempt before any bot, including bots whose commands arrived first.
+    /// One failed search per 14 ms of world time bounds total retry work,
+    /// replacing per-bot refusal retries. Successful joins allow the next tick.
+    /// research/battledome/2026-10-26-safe-spawn/REPORT.md
+    fn admit_waiting(&mut self) -> Result<(), String> {
+        if self.ticks < self.next_spawn_tick || self.waiting.is_empty() {
+            return Ok(());
+        }
+        let first = self
+            .waiting
+            .iter()
+            .position(|join| join.slot < self.max_clients)
+            .unwrap_or(0);
+        let join = self.waiting.remove(first).unwrap();
+        if !self.join(&join)? {
+            self.waiting.insert(first, join);
+            self.next_spawn_tick =
+                self.ticks + (crate::spawn::RETRY_SECONDS / self.world.dt()).ceil() as u64;
+        }
+        Ok(())
+    }
+
+    fn join(&mut self, join: &PendingJoin) -> Result<bool, String> {
+        let slot = join.slot;
+        match self.world.connect(slot, join.appearance.clone()) {
+            Ok(false) => return Ok(false),
+            Ok(true) => {
+                if join.physical_food {
+                    self.world.physical_food(slot);
+                }
+                if join.session_id
+                    && let Err(reason) = self.world.request_session_id(slot)
+                {
+                    self.close(slot, reason)?;
+                }
+            }
+            Err(reason) => self.close(slot, reason)?,
+        }
+        Ok(true)
     }
 
     /// Client faults close only that session; errors are simulator failures.
@@ -618,15 +673,22 @@ impl Simulation {
                 physical_food,
             } => {
                 self.generations[slot] = generation;
-                let mut joined = self.world.connect(slot, appearance);
-                if joined.is_ok() && physical_food {
-                    self.world.physical_food(slot);
-                }
-                if joined.is_ok() && session_id {
-                    joined = self.world.request_session_id(slot);
-                }
-                if let Err(reason) = joined {
-                    self.close(slot, reason)?;
+                let join = PendingJoin {
+                    slot,
+                    generation,
+                    appearance,
+                    session_id,
+                    physical_food,
+                };
+                if self.world.waits_for_spawn() {
+                    // A bot has reset its decoder for this generation. Retire
+                    // the previous life and queued frames before it waits, or
+                    // old death/gameplay frames would arrive before new setup.
+                    self.world.disconnect(slot)?;
+                    self.waiting.retain(|pending| pending.slot != slot);
+                    self.waiting.push_back(join);
+                } else {
+                    self.join(&join)?;
                 }
             }
             Command::Message {
@@ -635,6 +697,9 @@ impl Simulation {
                 bytes,
                 sent,
             } if generation == self.generations[slot] => {
+                if self.waiting.iter().any(|join| join.slot == slot) {
+                    return Ok(());
+                }
                 let sent = self.world_time(sent);
                 if let Err(reason) = self.world.receive_at(slot, &bytes, sent) {
                     self.close(slot, reason)?;
@@ -652,6 +717,8 @@ impl Simulation {
                 }
             }
             Command::Disconnect { slot, generation } if generation == self.generations[slot] => {
+                self.waiting
+                    .retain(|join| join.slot != slot || join.generation != generation);
                 self.generations[slot] = 0;
                 self.world.disconnect(slot)?;
             }
@@ -661,6 +728,7 @@ impl Simulation {
     }
 
     fn close(&mut self, slot: usize, reason: String) -> Result<(), String> {
+        self.waiting.retain(|join| join.slot != slot);
         self.world.disconnect(slot)?;
         let generation = std::mem::take(&mut self.generations[slot]);
         let route = self.route(slot);
@@ -1947,6 +2015,8 @@ mod tests {
             batches: vec![Vec::new()],
             max_clients: 1,
             generations: vec![0],
+            waiting: VecDeque::new(),
+            next_spawn_tick: 0,
             shared: shared(dt, 1),
             ticks: 0,
             deferred,
@@ -2091,6 +2161,8 @@ mod tests {
             batches: vec![Vec::new(), Vec::new()],
             max_clients: 1,
             generations: vec![0, 0],
+            waiting: VecDeque::new(),
+            next_spawn_tick: 0,
             shared: shared(dt, 1),
             ticks: 0,
             deferred: 0,
@@ -2173,6 +2245,123 @@ mod tests {
             received.try_recv().unwrap(),
             Command::Connect { generation: 4, .. }
         ));
+    }
+
+    #[test]
+    fn waiting_sockets_precede_bots_and_cancel_without_spawning() {
+        let (mut simulation, gate, _deliveries) = connected(LatencyConfig::default(), 0);
+        let mut world = crate::Config::sandbox();
+        world.spawn_radius = Some(400.);
+        world.min_score = Some(400);
+        world.food_count = 0;
+        world.ambient_replenish_per_second = 0.;
+        simulation.world = RawSimulator::new(
+            7,
+            SimulationConfig {
+                agents: 3,
+                world,
+                ..Default::default()
+            },
+            3,
+        )
+        .unwrap();
+        assert!(
+            simulation
+                .world
+                .connect(2, PlayerAppearance::default())
+                .unwrap()
+        );
+        simulation.generations = vec![0, 0, 1];
+        for slot in [1, 0] {
+            let command = Command::Connect {
+                slot,
+                generation: 2,
+                appearance: PlayerAppearance::default(),
+                session_id: false,
+                physical_food: true,
+            };
+            if slot == 0 {
+                gate.send(command);
+            } else {
+                gate.commands.send(command).unwrap();
+            }
+        }
+        simulation.apply_commands().unwrap();
+        assert_eq!(simulation.waiting.len(), 2);
+        assert!(simulation.next_spawn_tick > simulation.ticks);
+        // Input while waiting does not close or accidentally connect the socket.
+        gate.send(Command::Message {
+            slot: 0,
+            generation: 2,
+            bytes: vec![251],
+            sent: 0.,
+        });
+        simulation.apply_commands().unwrap();
+        assert_eq!(simulation.waiting.len(), 2);
+        simulation.world.disconnect(2).unwrap();
+        simulation.ticks = simulation.next_spawn_tick;
+        simulation.apply_commands().unwrap();
+        assert_eq!(simulation.waiting.len(), 1);
+        assert_eq!(simulation.waiting[0].slot, 1);
+        // A disconnected waiting generation must never be admitted later.
+        gate.commands
+            .send(Command::Disconnect {
+                slot: 1,
+                generation: 2,
+            })
+            .unwrap();
+        simulation.apply_commands().unwrap();
+        assert!(simulation.waiting.is_empty());
+        assert_eq!(simulation.generations[1], 0);
+    }
+
+    #[test]
+    fn a_queued_bot_rejoin_retires_its_old_connection_before_waiting() {
+        let (mut simulation, gate, _deliveries) = connected(LatencyConfig::default(), 0);
+        let mut world = crate::Config::sandbox();
+        world.spawn_radius = Some(400.);
+        world.min_score = Some(400);
+        simulation.world = RawSimulator::new(
+            7,
+            SimulationConfig {
+                agents: 2,
+                world,
+                ..Default::default()
+            },
+            2,
+        )
+        .unwrap();
+        assert!(
+            simulation
+                .world
+                .connect(1, PlayerAppearance::default())
+                .unwrap()
+        );
+        simulation.generations = vec![0, 1];
+        for slot in [1, 0] {
+            let command = Command::Connect {
+                slot,
+                generation: 2,
+                appearance: PlayerAppearance::default(),
+                session_id: false,
+                physical_food: true,
+            };
+            if slot == 0 {
+                gate.send(command);
+            } else {
+                gate.commands.send(command).unwrap();
+            }
+        }
+        simulation.apply_commands().unwrap();
+        assert_eq!(simulation.waiting.len(), 1);
+        assert_eq!(simulation.waiting[0].slot, 1);
+        assert!(simulation.world.take(1).unwrap().is_empty());
+        simulation
+            .world
+            .advance_tick_with(0, &mut |_| Ok(()))
+            .unwrap();
+        assert!(!simulation.world.take(0).unwrap().is_empty());
+        assert!(simulation.world.take(1).unwrap().is_empty());
     }
 
     #[test]
@@ -2265,6 +2454,8 @@ mod tests {
         };
         config.world.food_count = 0;
         config.world.ambient_replenish_per_second = 0.;
+        // Keep this presentation fixture within pit-marker food interest.
+        config.world.spawn_radius_max = None;
         let world = RawSimulator::new(7, config, 1).unwrap();
         let shared = shared(world.dt(), 1);
         let (commands, inbox) = mpsc::channel();
@@ -2291,6 +2482,8 @@ mod tests {
             batches: vec![Vec::new()],
             max_clients: 1,
             generations: vec![0],
+            waiting: VecDeque::new(),
+            next_spawn_tick: 0,
             shared,
             ticks: 0,
             deferred: 0,

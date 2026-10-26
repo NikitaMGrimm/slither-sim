@@ -17,8 +17,8 @@ use super::{
 use crate::{Action, Simulator, model::Point, spawn};
 use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
 
-/// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
-/// pose may exist after this many failures.
+/// Official candidate budget. A failed random search does not prove that no
+/// legal pose exists; circular worlds use their larger cached-query budget.
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
@@ -387,14 +387,23 @@ impl SimulatorBackend {
     /// and refusing would disconnect a socket player. That candidate must still
     /// clear every contact range, or the first tick could kill the newborn or
     /// its neighbor. Failure exhausts the configured candidate search, which
-    /// does not establish that no legal pose exists. Evidence:
+    /// does not establish that no legal pose exists. Circular worlds instead
+    /// require full body/head-path clearance and wait without a tight fallback.
+    /// Evidence:
     /// research/fidelity/2026-10-25-spawn-admission/REPORT.md.
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
         let alive = self.world.snakes[slot].alive;
         self.world.snakes[slot].alive = false;
         let pose = (|| {
+            let circular = self.world.config.spawn_radius.is_some();
+            let mut safety = None;
             let mut open: Option<(f64, Vec<Point>, f64)> = None;
-            for _ in 0..SPAWN_ATTEMPTS {
+            let attempts = if circular {
+                spawn::CIRCULAR_ATTEMPTS
+            } else {
+                SPAWN_ATTEMPTS
+            };
+            for _ in 0..attempts {
                 let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
                 let angle = self.spawn_random.unit() * TAU;
                 let heading = self.spawn_random.unit() * TAU;
@@ -405,8 +414,27 @@ impl SimulatorBackend {
                 // Local policy: official joins keep a median 925 units from
                 // visible bodies, but three came within 550-600.
                 let (body, heading) = self.world.spawn_body(head, heading)?;
-                if self.world.body_is_clear(&body, 600.) {
+                let clear = if circular {
+                    safety
+                        .get_or_insert_with(|| {
+                            spawn::Safety::new(
+                                &self.world,
+                                body.len(),
+                                spawn::CIRCULAR_CLEARANCE,
+                                spawn::HEAD_PATH_SECONDS,
+                            )
+                        })
+                        .clears(&body)
+                } else {
+                    self.world.body_is_clear(&body, spawn::CLEARANCE)
+                };
+                if clear
+                    && (!circular || safety.as_ref().unwrap().clears_departures(body[0], heading))
+                {
                     return Ok((body, heading));
+                }
+                if circular {
+                    continue;
                 }
                 // A candidate's margin only decreases while scanning neighbors.
                 // Stop once it cannot beat zero (admission) or the incumbent;
@@ -418,6 +446,9 @@ impl SimulatorBackend {
                 {
                     open = Some((margin, body, heading));
                 }
+            }
+            if circular {
+                return Err(spawn::WAITING.into());
             }
             match open {
                 Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),

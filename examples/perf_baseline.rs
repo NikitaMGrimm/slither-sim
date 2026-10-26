@@ -362,7 +362,7 @@ impl Driver {
                 "clearance": scenario.clearance, "controller": scenario.controller.definition(),
                 "lifecycle": {
                     "placement": if scenario.world.config().spawn_radius.is_some() {
-                        "add, mark dead, then Simulator::spawn_body and respawn_body on the configured ring; floor-size lives; blocked initial slots queue for retries"
+                        "add, mark dead, then Simulator::spawn_body and respawn_body in the configured band; floor-size lives; blocked initial slots queue for retries"
                     } else {
                         "add, mark dead, then Simulator::respawn at a clear sampled pose"
                     },
@@ -1300,6 +1300,8 @@ mod portable {
                                     | "No spawn position fits inside the arena"
                                     | "Spawn candidate search exhausted: no sampled position is clear of other snakes"
                                     | "Spawn candidate search exhausted: no sampled position fits inside the arena"
+                                    | "No safe circular spawn position"
+                                    | "Spawn candidate search exhausted: no safe circular pose sampled"
                             ) =>
                         {
                             deferred.push(slot);
@@ -2175,16 +2177,12 @@ mod tests {
                     assert!(scene.queue.is_empty());
                 }
                 assert!(scene.world.deaths.is_empty());
-                if matches!(scenario.world, World::Battledome) {
-                    assert!(scene.world.living() < scenario.population);
-                    assert!(!scene.queue.is_empty());
-                }
             }
         }
     }
 
     #[test]
-    fn battledome_lives_use_the_presets_ring_body() {
+    fn battledome_lives_use_the_presets_circular_body() {
         let scenario = REGISTRATIONS
             .iter()
             .find_map(|registration| match registration {
@@ -2199,9 +2197,11 @@ mod tests {
             serde_json::to_value(&scene.world.config).unwrap(),
             serde_json::to_value(Config::battledome()).unwrap()
         );
-        let ring = scene.world.config.spawn_radius.unwrap();
         let check = |world: &Simulator, slot: usize| {
             let snake = &world.snakes[slot];
+            let ring = snake.head.distance(Point::default());
+            assert!(ring >= world.config.spawn_radius.unwrap() - 1e-9);
+            assert!(ring <= world.config.spawn_radius_max.unwrap() + 1e-9);
             let (body, heading) = world.spawn_body(snake.head, snake.heading).unwrap();
             assert_eq!(snake.body, body);
             assert!((snake.heading - heading).abs() < 1e-12);
@@ -2221,7 +2221,11 @@ mod tests {
         let (head, heading) = scene.pose(26, PLACEMENT_ATTEMPTS).unwrap();
         scene.respawn(0, head, heading, 26).unwrap();
         check(&scene.world, 0);
-        let queued = scene.queue.front().unwrap().0;
+        // The wider band can fit all initial bodies at this workload's contact
+        // clearance. Queue a known dead slot to test retry geometry separately.
+        let queued = 0;
+        scene.queue.clear();
+        scene.queue.push_back((queued, 26, scene.retry_ticks));
         for snake in &mut scene.world.snakes {
             snake.alive = false;
         }

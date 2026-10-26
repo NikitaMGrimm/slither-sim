@@ -43,6 +43,9 @@ impl RawSimulator {
     pub(crate) fn dt(&self) -> f64 {
         self.backend.world.config.dt
     }
+    pub(crate) fn waits_for_spawn(&self) -> bool {
+        self.backend.world.config.spawn_radius.is_some()
+    }
 
     fn remote(&self, slot: usize) -> Result<(), String> {
         if slot < self.backend.remote {
@@ -63,17 +66,22 @@ impl RawSimulator {
     /// Start a new session and life in `slot`, replacing any existing one and
     /// its in-flight messages. The server answers with setup once the connect
     /// arrives; the first broadcast after it begins with the slot's own snake.
+    /// False leaves the session untouched while circular admission waits.
     pub(crate) fn connect(
         &mut self,
         slot: usize,
         appearance: PlayerAppearance,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         self.remote(slot)?;
         if appearance.nickname.len() > MAX_NICKNAME || appearance.custom_skin.len() > 255 {
             return Err("Nickname or custom skin is too long".into());
         }
         let b = &mut self.backend;
-        let (body, heading) = b.spawn_pose(slot)?;
+        let (body, heading) = match b.spawn_pose(slot) {
+            Ok(pose) => pose,
+            Err(reason) if reason == crate::spawn::WAITING => return Ok(false),
+            Err(reason) => return Err(reason),
+        };
         b.slots[slot].living = None;
         b.world.snakes[slot].alive = false;
         b.world.respawn_body(slot, body, heading)?;
@@ -86,7 +94,7 @@ impl RawSimulator {
         };
         b.connect(slot)?;
         b.slots[slot].connection.decorations = true;
-        Ok(())
+        Ok(true)
     }
 
     pub(crate) fn physical_food(&mut self, slot: usize) {

@@ -187,7 +187,11 @@ fn new_lives_start_on_the_configured_ring_outside_the_pit() {
     let ring = config.spawn_radius.unwrap();
     assert_eq!(ring, (1784.0 + 3584.0) / 2.0);
     for unit in [0.0, 0.3, 0.999] {
-        assert_eq!(spawn::spawn_distance(&config, unit), ring);
+        let radius = spawn::spawn_distance(&config, unit);
+        assert!(
+            (radius * radius - (ring * ring + unit * (3400.0_f64.powi(2) - ring * ring))).abs()
+                < 1e-8
+        );
         assert_eq!(
             spawn::spawn_distance(&Config::official(4), unit),
             spawn::sample_spawn_distance(Config::official(4).radius, unit)
@@ -240,7 +244,9 @@ fn hosted_lives_start_on_the_ring_at_varied_angles() {
     for slot in [0, 1, 2, 0, 1, 2] {
         backend.reconnect_slot(slot).unwrap();
         let snake = &backend.world().snakes[slot];
-        assert_on_ring(snake, 2684.0, 26);
+        let radius = distance(snake.head);
+        assert!((2684.0..=3400.0).contains(&radius));
+        assert_on_ring(snake, radius, 26);
         angles.push(snake.head.y.atan2(snake.head.x));
     }
     angles.sort_by(f64::total_cmp);
@@ -510,6 +516,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
         "ambientReplenishPerSecond",
         "pit",
         "spawnRadius",
+        "spawnRadiusMax",
         "killScoreSeconds",
         "minScore",
     ] {
@@ -605,6 +612,7 @@ fn presets_select_a_base_that_explicit_fields_override() {
 fn mode_settings_reject_unreachable_rules() {
     let with = |change: fn(&mut Config)| {
         let mut config = Config::battledome();
+        config.spawn_radius_max = None;
         change(&mut config);
         config.validate()
     };
@@ -660,6 +668,7 @@ fn mode_settings_reject_unreachable_rules() {
         // A 429-segment body needs a longer ring than Battledome's.
         config.radius = 30_000.0;
         config.spawn_radius = Some(15_000.0);
+        config.spawn_radius_max = None;
         config.validate().unwrap();
     }
     let mut config = Config::battledome();
@@ -694,6 +703,40 @@ fn mode_settings_reject_unreachable_rules() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn spawn_bands_reject_unordered_and_impossible_geometry() {
+    for outer in [2600., 3524., f64::INFINITY, f64::NAN] {
+        let mut config = Config::battledome();
+        config.spawn_radius_max = Some(outer);
+        assert!(config.validate().is_err(), "{outer}");
+    }
+    // An outer edge inside the wall margin names the outer setting.
+    let mut config = Config::battledome();
+    config.spawn_radius_max = Some(3524.);
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .starts_with("spawnRadiusMax must lie outside pit.radius")
+    );
+    let mut config = Config::sandbox();
+    config.spawn_radius_max = Some(800.);
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .contains("requires spawnRadius")
+    );
+    let config = Config::battledome();
+    let tangent_seconds =
+        ((config.radius - 60.).powi(2) - config.spawn_radius_max.unwrap().powi(2)).sqrt()
+            / slither_sim::physics::BOOST_SPEED;
+    assert!(tangent_seconds > 2.1);
+    let normal_seconds =
+        tangent_seconds * slither_sim::physics::BOOST_SPEED / slither_sim::physics::base_speed(26);
+    assert!(normal_seconds > 5.);
 }
 
 #[test]
@@ -833,6 +876,7 @@ fn growth_past_the_score_table_keeps_the_top_floor() {
     let mut config = floor_world().config;
     config.radius = 30_000.0;
     config.spawn_radius = Some(15_000.0);
+    config.spawn_radius_max = None;
     config.min_score = Some(high);
     let mut world = Simulator::new(3, config).unwrap();
     world.add("giant", 0, 1).unwrap();
