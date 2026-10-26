@@ -65,6 +65,20 @@ scatter and tail-first ordering, not network jitter; it remains unchanged.
 
 ## Changing a protocol or contract
 
+`forager-conformance.json` contains full selected synthetic/local client frames
+with binary64 bit encoding. Compact independent Windows x86_64 MSVC and Linux
+x86_64 GNU outputs live in `forager-oracle-windows-x86_64-msvc.json` and
+`forager-oracle-linux-x86_64-gnu.json`. Exact target tests compare every
+Timing/Intent/action bit after verifying a SHA-256 of each shared canonical frame.
+Each oracle case contains only its ID, input hash and byte-preserved expectations;
+raw output hashes and projection instructions are in the port record.
+Its historical contract is `slither-client-v2`, protocol 19. The
+[port record](../../research/bots/2026-10-26-forager-port/REPORT.md) describes
+selection, provenance and four retained last-bit platform differences. macOS
+conformance is unverified because no macOS oracle exists; macOS and other targets
+without an oracle run explicit determinism and structural invariant tests. `forager-native-parity.json` remains
+the separate twelve-case historical default-policy regression.
+
 Runtime defaults advance independently. Never derive historical tags from
 `protocol::PROTOCOL_VERSION`, rewrite old packets or relabel expectations to pass
 a new default. Inventory checks compare literal historical tags with setup bytes

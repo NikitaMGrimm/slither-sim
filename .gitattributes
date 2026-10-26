@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.sh text eol=lf
+# Frozen input bytes retain their original hashes, including line endings.
+src/bot/data/*-overrides.json -text whitespace=cr-at-eol

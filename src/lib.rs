@@ -2,6 +2,8 @@
 //!
 //! The default physics tick is 7 ms. Mechanics include measured rules and explicit
 //! approximations; see `docs/server-rules.md` for mechanics and evidence limits.
+#[cfg(feature = "bot")]
+pub mod bot;
 pub mod boundary;
 mod bounds_index;
 #[cfg(feature = "networking")]

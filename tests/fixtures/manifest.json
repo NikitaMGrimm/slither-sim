@@ -56,6 +56,27 @@
       "clientContract": "slither-client-v2",
       "dataOrigin": "captured",
       "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/forager-conformance.json",
+      "wireProtocol": 19,
+      "clientContract": "slither-client-v2",
+      "dataOrigin": "synthetic",
+      "expectedOrigin": "synthetic"
+    },
+    {
+      "path": "tests/fixtures/forager-oracle-windows-x86_64-msvc.json",
+      "wireProtocol": 19,
+      "clientContract": "slither-client-v2",
+      "dataOrigin": "synthetic",
+      "expectedOrigin": "synthetic"
+    },
+    {
+      "path": "tests/fixtures/forager-oracle-linux-x86_64-gnu.json",
+      "wireProtocol": 19,
+      "clientContract": "slither-client-v2",
+      "dataOrigin": "synthetic",
+      "expectedOrigin": "synthetic"
     }
   ]
 }

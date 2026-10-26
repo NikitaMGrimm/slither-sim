@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "compilerWindows": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-pc-windows-msvc\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "compilerLinux": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "build": {
+    "profile": "dev",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_DEV_OPT_LEVEL": "0",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": "",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "CARGO_BUILD_JOBS": "2",
+    "RUST_TEST_THREADS": "4",
+    "RAYON_NUM_THREADS": "4"
+  },
+  "inputsSha256": "168c0f3d54f2df1958a6745e8a26b74100b2c0b8002a073ef40775229afe5cda",
+  "exporterSha256": "6a5c4e7467858cc0837244ad7585e6ba42610e608a7fb6b1acce117bf6a91c82",
+  "oracleCargoLockSha256": "3ad6bbe4f420b8eaf3548c7c9626e08951d0c0b5051643bdea5c30a8faecddb0",
+  "platforms": {
+    "x86_64-pc-windows-msvc": {
+      "oracleCasesPerPolicy": 140,
+      "policies": [
+        "A1",
+        "A4-mean"
+      ],
+      "oracleSha256": "8cfae5a73be7494f088ad756c97193fd19bd686b4863ff8c4e4b3bed4743eef4",
+      "fixture": "tests/fixtures/forager-oracle-windows-x86_64-msvc.json",
+      "portConformance": {
+        "A1": {
+          "cases": 140,
+          "mismatches": 0
+        },
+        "A4-mean": {
+          "cases": 140,
+          "mismatches": 0
+        }
+      },
+      "rawOutputSha256": "16f640ccb248b1ed6bcef8b64514bd1ea4ce67b8ebb58c6b083923d2c7c08045",
+      "rawOutputBytes": 9882974,
+      "projectedBytes": 1546854
+    },
+    "x86_64-unknown-linux-gnu": {
+      "oracleCasesPerPolicy": 140,
+      "policies": [
+        "A1",
+        "A4-mean"
+      ],
+      "oracleSha256": "089a1a4f3c7ceb97dc4ced909eb6d884be486c7b113d63ef5ce60a7ba9d5fdf7",
+      "fixture": "tests/fixtures/forager-oracle-linux-x86_64-gnu.json",
+      "portConformance": {
+        "A1": {
+          "cases": 140,
+          "mismatches": 0
+        },
+        "A4-mean": {
+          "cases": 140,
+          "mismatches": 0
+        }
+      },
+      "rawOutputSha256": "bb40c98f10d3a013a8b4584de6671711baae5771554a7f61c0a6267a30469fdc",
+      "rawOutputBytes": 9882971,
+      "projectedBytes": 1546851
+    }
+  },
+  "crossPlatformDifferences": [
+    {
+      "path": "root.cases[11].expected.A4-mean.action.heading",
+      "windows": "bfdff45ed8fb1661",
+      "linux": "bfdff45ed8fb1660",
+      "caseId": "selected-5-17"
+    },
+    {
+      "path": "root.cases[77].expected.A1.action.heading",
+      "windows": "3feac74d32095f93",
+      "linux": "3feac74d32095f92",
+      "caseId": "current-8-1"
+    },
+    {
+      "path": "root.cases[112].expected.A4-mean.action.heading",
+      "windows": "bfec3a5c096a3b19",
+      "linux": "bfec3a5c096a3b18",
+      "caseId": "current-17-0"
+    },
+    {
+      "path": "root.cases[132].expected.A4-mean.action.heading",
+      "windows": "bfe5f095cfc48e54",
+      "linux": "bfe5f095cfc48e53",
+      "caseId": "current-22-0"
+    }
+  ],
+  "macOS": "macOS conformance is unverified because no macOS oracle exists.",
+  "mathLibraries": {
+    "windowsUcrtFileVersion": "10.0.26100.9444 (WinBuild.160101.0800)",
+    "linux": "glibc 2.39",
+    "differingFunction": "not isolated"
+  },
+  "localChecks": {
+    "command": "python tools/check.py rust package wasm",
+    "target": "x86_64-pc-windows-msvc",
+    "sourceCommit": "de4d867a261fca4b0ea54ece6b2386f8d6989f17",
+    "mainIntegrated": "b6bc684",
+    "commandsPassed": 18,
+    "commandsFailed": 0,
+    "elapsedSeconds": 164.9,
+    "ci": "PR #124 checks are tracked separately; ready promotion requires success"
+  },
+  "focusedPythonTests": {
+    "documentation": {
+      "passed": 7
+    },
+    "fixtureVersions": {
+      "passed": 9
+    },
+    "checkRunner": {
+      "passed": 15,
+      "skipped": 1,
+      "skipReason": "existing platform-specific test"
+    }
+  },
+  "projection": {
+    "script": "project_oracle.py",
+    "scriptSha256": "ee7cd9c6595ef64365ca07255106ae050f8eb837bb7e3e9216e067afd97ecfb2",
+    "canonicalInputFrame": "Compact UTF-8 JSON of the bit-encoded frame, recursively sorted object keys, non-ASCII preserved, no trailing newline.",
+    "expectedValues": "Raw expected JSON subtrees copied byte-for-byte; no policy execution or value recomputation."
+  },
+  "rawExporterSha256": "c19ad22ec3741434246b0b0f7ec683221caa87b7392c86724e7207fa393720d9",
+  "maintainerFollowup": {
+    "sourceCommit": "98a394d3a124740a2b150e1a0c10b137779d170e",
+    "command": "python tools/check.py rust package wasm",
+    "commandsPassed": 18,
+    "commandsFailed": 0,
+    "windowsConformance": {
+      "A1": 140,
+      "A4-mean": 140,
+      "mismatches": 0
+    },
+    "linuxConformance": {
+      "A1": 140,
+      "A4-mean": 140,
+      "mismatches": 0
+    },
+    "expectedSubtreesByteIdenticalPerPlatform": 140,
+    "projectionCliReproducesCommittedBytes": true,
+    "fixturesBytes": {
+      "forager-conformance.json": 8352478,
+      "forager-oracle-windows-x86_64-msvc.json": 1546854,
+      "forager-oracle-linux-x86_64-gnu.json": 1546851
+    },
+    "fixturesTotalBytes": 11446183,
+    "previousFixturesTotalBytes": 28118423,
+    "compressedPackageBytes": 1333935,
+    "previousCompressedPackageBytes": 3101422
+  }
+}

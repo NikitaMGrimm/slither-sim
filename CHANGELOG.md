@@ -68,6 +68,9 @@
 
 ### Added
 
+- A `bot` feature, on by default through `networking`, adds the frozen A1 Forager
+  policy (`bot::Forager`) and `client::ForagerBot`. Host and background bots keep
+  their current policy for now.
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from
