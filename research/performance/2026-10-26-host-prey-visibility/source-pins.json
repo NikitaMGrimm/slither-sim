@@ -40,7 +40,10 @@
     "checks.log": "4e05caa281a5b322a75cc824e414022e50a8e40c79a9b43a6b8a4f49bc88cae2",
     "parity.log": "b94babe84317d06c44e750303dca14f90fed89fe7eeb5a7bf44dd6dd9a1fd6db",
     "series.log": "c091874b108f0dca2e56c54b0e844af06bd9567a716cb660b84724a4eaa28dd1",
-    "screen.log": "f00c5a474da3fc5a24becc823e4bded6dcbd98b455dfeb69100ccff8947c14a7"
+    "screen.log": "f00c5a474da3fc5a24becc823e4bded6dcbd98b455dfeb69100ccff8947c14a7",
+    "integration-rust-checks.log": "10a369512f0adab4ba4baab7750653d74afe0c639cfdf3b9e63b482f0cb0698e",
+    "integration-windows.log": "4888a2f42b352aef264035dc255171db17d4f9ad8cbf9d89f69f2e8bd7ad131f",
+    "documentation-final.log": "112301f8bf6a6cea43c9de9a93a07717ef51bcb3de5afbd6853a5014dc5f0f41"
   },
   "harnessSha256": {
     "loopback.py": "e75d1127127f4fe3957cf8548100431df61fba2ac8c180b1bab4342438e43251",
@@ -64,5 +67,20 @@
     "src/client/simulation/prey_visibility.rs": "a65c8667a152c9908e9737c7d0317c0aa596a5460868c58e87e2b22161814c7f"
   },
   "integrationBaseCommit": "c012a723ae9180477af0b6d33447ca93485629b2",
-  "integrationLimit": "timings and traces are at the frozen runtime pins; the later main integration is not retimed; prey source hashes unchanged"
+  "integrationLimit": "No paired timing after main integration; supplemental profiles only. Frozen prey source hashes unchanged.",
+  "integratedProfiles": {
+    "runtimeCommit": "bf5e29c1928d6edb69399ab18e7d3dd242e8b6c9",
+    "metric": "separate user CPU profiles after main integration; unpaired, not speed measurements",
+    "hostProbeSha256": "0c1ceb8f90a7566569e0501d7a6cb4afaf2252583826b823a9b4116ba1f376da",
+    "artifacts": {
+      "archiveSha256": "0fb0867579f4ecae3d6be8fcdf7e08a99778f73f289cc9b56e642f892cd76d28",
+      "buildLogSha256": "fb77893940e304771ac80de1d6b433a63e43af1c157e6231a5dced0fc536be30",
+      "perfDataSha256": {
+        "official-500": "cb31cc95e45735db0f124a1ce6b9ce6a9418c2d7c8aed9e4c06bca3b3f97e3c3",
+        "dome-40": "6e16a8bcca00ddb4b2d948eb93f3a974b353728744d17ac70f025427c1d4e4ba",
+        "dome-64": "4126d416d846ce64c1dd71e700a9b84fc37f9237cf7ddc8db75d5ddc6cb5eab3",
+        "dome-80": "d6a4b8773e1f5609b845ff30996749d35fd079ac83ed796de6ef420b5973e6b6"
+      }
+    }
+  }
 }

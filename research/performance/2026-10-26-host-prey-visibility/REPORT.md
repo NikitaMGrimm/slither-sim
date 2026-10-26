@@ -9,16 +9,15 @@ Recipients reject distant bounds, then retain the exact `distance <= vision`
 comparison. Half-width `max(1, 2*vision)` leaves rounding slack. Sorted ID output
 and first-visible duplicate selection stay unchanged. No persistent cache,
 mechanics, radius, admission, socket-service or thread-ownership changes.
-The retained #168 profile attributed 11.86% of sampled user CPU to `hypot` in
-the prey loop; this motivated the candidate, not its expected gain.
+Frozen profiles put all-caller `hypot` self share at 11.57 → 5.64%.
 
 ## Method and parity
 
 Frozen main baseline `249cdb217d83a234895bc7eee4d98c3636c1cd76`; measured runtime
 `fde812bb4c5c6dea52ebb32a8341d98fe45ea76b`. [Plan](PLAN.md) predates timing;
 [pins](source-pins.json) identify archives, copied binaries and shared harness.
-The PR subsequently integrates main, including #168. That combination has not
-been timed; do not add gains. The prey source remains unchanged.
+The PR integrates main `c012a723`, including #168. Only supplemental profiles
+cover that combination; no paired CPU gain is claimed. Prey source is unchanged.
 
 Shared WSL2 Linux x86-64; Rust 1.99.0, locked release, thin LTO, one codegen unit,
 debug level 1, independent targets and copied executables. At most four logical
@@ -89,6 +88,10 @@ framing/flush 6.96 → 6.67%, socket service 4.55 → 4.97%, allocation 4.12 →
 other/unknown 1.26 → 1.05%. [Profiles](profiles.json) retain all workloads and
 profile-hold populations. Shares are not speed measurements; physics includes
 Battledome admission.
+
+A separate integrated-runtime profile (`bf5e29c`) has encoding 36.72%,
+visibility/food 30.76%, physics 14.95%; Battledome physics/admission is
+88.93–90.22%. This unpaired snapshot updates remaining costs, not speed.
 
 Instruction diagnostic: one discarded pair, then three alternating pairs of
 100 deterministic decisions, including construction/internal warmup; at least

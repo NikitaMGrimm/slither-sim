@@ -74,6 +74,14 @@ alive/waiting populations, total deferrals and wait quantiles with censored
 intervals separate. A rerun is new descriptive evidence, not a native capacity
 qualification or a replacement for the retained selected results.
 
+For the supplemental integrated profiles, extract
+`bf5e29c1928d6edb69399ab18e7d3dd242e8b6c9` into a fresh source root. Copy only
+the capacity study's `host_probe.rs` into `examples/` and build `host_probe`
+with the same locked release flags above; no catalog overlays are needed.
+Repeat the four `loopback.py` profile calls with this copied probe and the same
+baseline-built generators, using fresh outputs. These single-arm profiles
+update attribution only; they do not replace the frozen paired comparison.
+
 The rejected grid is retained as [a patch against the same baseline](rejected-grid.patch).
 Apply it with `git apply` to a fresh baseline source root to rebuild that attempt;
 its full timings/profiles remain local-only. It is outside the proposed runtime.

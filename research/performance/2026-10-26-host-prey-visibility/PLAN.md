@@ -61,3 +61,12 @@ The second candidate's single 25-decision screen retired 8,628,984,992 user
 instructions versus a fresh baseline's 8,969,555,316 (100% scheduled). This
 screen is not a repeated result or CPU-speed claim. Candidate runtime pin:
 `fde812bb4c5c6dea52ebb32a8341d98fe45ea76b` (source unchanged during timing).
+
+## Supplemental profile after main integration
+
+After the frozen series, main advanced through #168 and v0.6.1. Integrate main
+`c012a723` without rewriting the measured runtime pin. Profile combined runtime
+`bf5e29c1928d6edb69399ab18e7d3dd242e8b6c9` separately on all four workloads,
+using the same probe, baseline-built generators, CPU affinity, warmup, hold and
+sampling settings. This updates the remaining-cost breakdown; it is not a paired
+CPU comparison and cannot establish an additive gain. Complete checks first.
