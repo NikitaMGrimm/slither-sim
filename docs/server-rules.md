@@ -119,6 +119,13 @@ the fixed simulator release model is unchanged. The
 found 451 motion gaps under 35 ms and 107 standalone `h` gaps under 100 ms in
 its three held-out runs, so neither gap is a hard floor. It selects no
 replacement scheduler: clients never see when state changes or inputs apply.
+Own wanted-heading and boost changes wait for the same six-tick gate. In a
+[follow-up check](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-wanted-gate/REPORT.md),
+549 of 581 held steering commands sent while the gate was armed were reflected
+41–44 ms after the previous own motion report; 78% of held commands found it
+already open, which keeps median reflection short. After confound screens,
+3 of 575 steering and 1 of 86 boost commands were reflected sooner. The server
+clock bounds the send time, not arrival or the physics tick.
 
 Each tick reads all inputs and pings received during it; pongs lead its frame.
 Official input reflection takes about one ping round trip (median 13.2 vs
