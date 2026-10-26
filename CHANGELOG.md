@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [0.6.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.0...v0.6.1) - 2026-10-26
+
+### Added
+
+- *(python)* expose the resolved reset config as Session.config ([#166](https://github.com/NikitaMGrimm/slither-sim/pull/166))
+
+### Other
+
+- *(host)* enumerate only known snake slots ([#168](https://github.com/NikitaMGrimm/slither-sim/pull/168))
+- *(hosting)* add Linux server replacement runbook ([#170](https://github.com/NikitaMGrimm/slither-sim/pull/170))
+
 ### Added
 
 - [Linux hosting guide](docs/hosting.md): verified release install, systemd
