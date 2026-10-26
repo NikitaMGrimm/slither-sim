@@ -1,0 +1,95 @@
+{
+  "baseline": {
+    "sources": {
+      "src\\client\\simulation.rs": "d32f7c353f7c15c901e9f50e94a520b3f0e98c2ef92f01c12b6bf9d7e5b01333",
+      "src\\client\\simulation\\remote.rs": "29060b08e36eecd572c6524912b39b774a3e1a964e2fc7c9b7daf95bb8aef392",
+      "src\\simulator.rs": "dbfa495781ae3d4189a6fa2e6e199a01f3741df04d5e623f87f7de02dacf9e84",
+      "src\\spawn.rs": "52a5c084e0d5ae44aea234aa4ba4472acefe70e7c72a0057499c26867ec5ff03",
+      "src\\client\\server.rs": "aee712c6dc77cf0b4cb6a149d3cb9360d533a9031d5bc0128da5c358c6493c90"
+    },
+    "binarySha256": "d151f1f8947fe340bebaf3139f49f7f3ac69a3dc3121d7fe586a3d783ba2bbdc"
+  },
+  "candidate": {
+    "sources": {
+      "src\\client\\simulation.rs": "0fdf4f7d3c35a0911117c930c963e79c10a204f309c37ee4bd14de75bd89e520",
+      "src\\client\\simulation\\remote.rs": "a41195766248940870d9e3ec9ef42f4841373fe46f0f72092e8c4e09d4ec08ca",
+      "src\\simulator.rs": "d2ebcf397767dd2a446fcc4708335350da7b2cc6fb0a41864a174ff9471d4def",
+      "src\\spawn.rs": "f4146acdacc923ab85215b6f945755213336bf1dd1ddf6d1ce55a3799ce1b767",
+      "src\\client\\server.rs": "35a4b17cdfcbe0365d3ef676865c4211a126c6ef306bf39e3d5a17cdeabe0cce"
+    },
+    "binarySha256": "b6cd553de3a025b69942e71ed64128e5032768fc4eb8374e7fc7ccc9a5688b54"
+  },
+  "measurementFiles": {
+    "analyze.py": "6e964c074284ff7a5877defc1a307cc273fa93792812eedc585eb471a83f1b10",
+    "harness.rs": "ead4d34c9bf6b1f38117fc82cac8768ad92f500bb736a02e9f9c2577ff57a718",
+    "instrument.py": "5b96bd34e3b54fd36f9c3edd843ebd207f619ed66882b11d4a97563bc2a25ac5",
+    "PLAN.md": "f59b1f37f1d7fb9f8f11bfbecd8d827a75319c3103949ff6d587bb8462b34f6e",
+    "run.ps1": "18c38c28181711355d260ddf94b5d2b08c26d6254b227e810b52b3c5aafdbed6",
+    "select.py": "795aab63f4de14f458fc7eeee37f8727a645041900ff8931badd2870d6f42916"
+  },
+  "finalRawFiles": {
+    "baseline-29-16-config.json": "e60029d2765d0913deebaf1e8de1f53c3e9a44395416f83dbce5a720a0749e0d",
+    "baseline-29-16-events.jsonl": "1adea378428816855f5ebb6f423ec026abbdc3366a51cf9643f28b60cc2cb9b6",
+    "baseline-29-16.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-29-16.jsonl": "8fb4be08da8ae2cee5f2b05590cd70b0ececf468ebd57b6491856b4eb9f45e1d",
+    "baseline-29-32-config.json": "34ee23c40eb5bf4fc01df555bfc3c0ec5d4685036160fd901774a9a99ab98028",
+    "baseline-29-32-events.jsonl": "694d3e198cd4cd9ce9fdf1033661b2722b0757e396a32a60aeb2958954228907",
+    "baseline-29-32.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-29-32.jsonl": "0057cae55bfd29f77a396de1e26b90e16f3efbcb4cad69fb1612310843454106",
+    "baseline-29-64-config.json": "82437e031544763e1488aa849b70cf1c756415c2e324616740d2a909978abc37",
+    "baseline-29-64-events.jsonl": "917cae61119927a36b79320dbf1193a6e3ed0ca07308330340b85b06650bfdc8",
+    "baseline-29-64.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-29-64.jsonl": "bc0bc4a6e84f8b628705e9387abfcc815235ae16d14fd7006e8df82f0b1b33ac",
+    "baseline-7-16-config.json": "10101ca2d8a4e47e40b0bec008b374010616a70e3c232576ae1763664ed76f40",
+    "baseline-7-16-events.jsonl": "57672d568a9b57da7b15950b3956b1021d6fe7248e73c18dcc2574137e57c33a",
+    "baseline-7-16.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-7-16.jsonl": "36f47c800fc11502d4011625bde4114d23b16a1a6ceef3090da8ad6ff93d3352",
+    "baseline-7-32-config.json": "d40be15036dd45d594fe25987337f75459e367ef3e92c8e31b47d2dbf2168eb5",
+    "baseline-7-32-events.jsonl": "04a9359124b1b86047c2e99f2b7850b0424d5f6d7b3ccc3ac111a77054f48eab",
+    "baseline-7-32.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-7-32.jsonl": "6f92528e69973ac23e65b233b685a37ee33054eb1112bcb6f9dd018a89990568",
+    "baseline-7-64-config.json": "1e1de464e4ad7bccabd4f5dda14815b981a46343f285db4ac30c92e5a8b00fc7",
+    "baseline-7-64-events.jsonl": "61dd689c78cbb0d9bb1b5a08787d3159d4b0dcfc593c36843c05145c0ed9411c",
+    "baseline-7-64.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-7-64.jsonl": "afdef75c01b4acd87f521d1f55d1f18456dded3e946b75f3e4182d1d6930f396",
+    "candidate-29-16-config.json": "e60029d2765d0913deebaf1e8de1f53c3e9a44395416f83dbce5a720a0749e0d",
+    "candidate-29-16-events.jsonl": "626c312baf7d131381d56fbd27011277caccd173a316aef30052206e38d02b8a",
+    "candidate-29-16.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-29-16.jsonl": "d470c22d0d463999b70df6f95b3b0cdb9eaea105cad156caf7fb278cea295497",
+    "candidate-29-32-config.json": "34ee23c40eb5bf4fc01df555bfc3c0ec5d4685036160fd901774a9a99ab98028",
+    "candidate-29-32-events.jsonl": "d601ac353168d19885875c70fabaeee5249d8aae0df8c5eeed8c0e5dae81e2e7",
+    "candidate-29-32.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-29-32.jsonl": "e44cc0c3f394de3eb3f1d6355db757ff1a85f6056cf18297bda441c9b4683c3e",
+    "candidate-29-64-config.json": "82437e031544763e1488aa849b70cf1c756415c2e324616740d2a909978abc37",
+    "candidate-29-64-events.jsonl": "59c95ce0a3e83e1071c0e61e735c8b1040450106644828c5f7580efa7be0136a",
+    "candidate-29-64.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-29-64.jsonl": "1db26f5244f36e45c4664fccc103ae6abc7d6a2aa5afb5e72121e42c860fa08b",
+    "candidate-7-16-config.json": "10101ca2d8a4e47e40b0bec008b374010616a70e3c232576ae1763664ed76f40",
+    "candidate-7-16-events.jsonl": "4241e14c29560385c27a2758068d73a6383513e65408a212715d9f196842e165",
+    "candidate-7-16.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-7-16.jsonl": "8980ffdfa17608c81266f65400663d373a83af1ef1e70076316d8a08addfcfa8",
+    "candidate-7-32-config.json": "d40be15036dd45d594fe25987337f75459e367ef3e92c8e31b47d2dbf2168eb5",
+    "candidate-7-32-events.jsonl": "b8169a438d99b04b74b821312f04798ccaab9769a287251414edd9ee34a24cc3",
+    "candidate-7-32.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-7-32.jsonl": "625008559d3a1cddf40d6bb94219d7d92a61019b906452d37a373ff14d63f297",
+    "candidate-7-64-config.json": "1e1de464e4ad7bccabd4f5dda14815b981a46343f285db4ac30c92e5a8b00fc7",
+    "candidate-7-64-events.jsonl": "b246462ca87f27285074a00142a41572ee38e3526a0c97dece3811c3e85a363e",
+    "candidate-7-64.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-7-64.jsonl": "98addcc2d7e2be242e27325271ccaf68d9fa738d60569be3c2253b842e9cf51e"
+  },
+  "finalSourceComparison": {
+    "measuredOwnersMatch": {
+      "src\\client\\simulation.rs": true,
+      "src\\client\\simulation\\remote.rs": true,
+      "src\\simulator.rs": true,
+      "src\\spawn.rs": true,
+      "src\\client\\server.rs": true
+    },
+    "exception": "server.rs comparison removes only the later cfg(test) pit-marker fixture pin; runtime source unchanged"
+  },
+  "verificationArtifacts": {
+    "outputs/safe-spawn/perf-compare-delivery/comparison.json": "d319cbab3251c23466aa0701708a642be63e366a20f5d031e73600c8dcbc399a",
+    "outputs/safe-spawn/check-rust-delivery.log": "517520c54abaa5b6ad01fccfa4b840aa87086e5632c98bab1b18e767458db3a4",
+    "outputs/safe-spawn/check-docs.log": "1331369dd70275901fc95ebe45d364c3bb3e079ca22a0704e82fece7e40f5124"
+  }
+}

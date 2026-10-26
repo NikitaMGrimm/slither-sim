@@ -387,12 +387,15 @@ impl SimulatorBackend {
     /// and refusing would disconnect a socket player. That candidate must still
     /// clear every contact range, or the first tick could kill the newborn or
     /// its neighbor. Failure exhausts the configured candidate search, which
-    /// does not establish that no legal pose exists. Evidence:
+    /// does not establish that no legal pose exists. Circular worlds instead
+    /// require full body/head-path clearance and wait without a tight fallback.
+    /// Evidence:
     /// research/fidelity/2026-10-25-spawn-admission/REPORT.md.
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
         let alive = self.world.snakes[slot].alive;
         self.world.snakes[slot].alive = false;
         let pose = (|| {
+            let circular = self.world.config.spawn_radius.is_some();
             let mut open: Option<(f64, Vec<Point>, f64)> = None;
             for _ in 0..SPAWN_ATTEMPTS {
                 let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
@@ -405,8 +408,13 @@ impl SimulatorBackend {
                 // Local policy: official joins keep a median 925 units from
                 // visible bodies, but three came within 550-600.
                 let (body, heading) = self.world.spawn_body(head, heading)?;
-                if self.world.body_is_clear(&body, 600.) {
+                if self.world.body_is_clear(&body, spawn::CLEARANCE)
+                    && (!circular || self.world.body_clears_head_paths(&body))
+                {
                     return Ok((body, heading));
+                }
+                if circular {
+                    continue;
                 }
                 // A candidate's margin only decreases while scanning neighbors.
                 // Stop once it cannot beat zero (admission) or the incumbent;
@@ -418,6 +426,9 @@ impl SimulatorBackend {
                 {
                     open = Some((margin, body, heading));
                 }
+            }
+            if circular {
+                return Err(spawn::WAITING.into());
             }
             match open {
                 Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),

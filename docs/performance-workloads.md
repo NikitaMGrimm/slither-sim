@@ -43,7 +43,7 @@ cargo run --release --locked --example perf_baseline -- --list
   populations, giving a scaling curve.
 - **Battledome:** `battledome-32-step` and `battledome-32-bot` use the unmodified
   [`Config::battledome()`](configuration.md#battledome): pit, permanent size floor,
-  spawn ring, ambient food and rolling kill score. They replace the obsolete
+  circular spawn band, ambient food and rolling kill score. They replace the obsolete
   sandbox-mechanics `dome-proxy-*` stand-ins.
 - **Client admission:** `client-battledome-64` and `client-official-500` run
   `SimulatorBackend` with wire recording. Each timed decision includes
@@ -55,8 +55,9 @@ cargo run --release --locked --example perf_baseline -- --list
   ongoing churn, then times 40 decisions, sized on the bounded-admission runtime.
   Refused clients wait 24 decisions (1.008 virtual seconds); successful lives
   reconnect after their next reported death. This deterministic harness policy
-  mirrors the host's one-second refusal backoff in virtual time; it does not
-  measure the host's wall-clock scheduling. Both runtimes use the same policy.
+  keeps per-slot retries; circular hosts use a shared admission queue with socket
+  priority and a 250 ms failed-search backoff. It does not measure host waiting
+  or wall-clock scheduling. Both compared runtimes use the same harness policy.
   This is 64 seats: inspect `population.depleted` and refusals for living counts.
   Official uses eight warmup decisions, retaining its initial death/respawn burst
   in the measured window.

@@ -85,6 +85,12 @@ mechanics and stock-browser limits.
 Native and remote clients share the
 [coverage and spawning models](server-rules.md#client-delivery-and-spawning),
 including hosted bot startup. The browser sends no viewport or zoom to the host.
+With `spawnRadius`, a login keeps its socket and seat while waiting for a safe
+body; setup and self appearance arrive on admission. Waiting sockets precede
+background bots. One failed 64-pose search delays all further admission searches
+by 250 ms of world time; disconnected waiters are removed. A crowded world can
+wait indefinitely. Worlds without `spawnRadius` keep the official fallback and
+refusal behavior.
 A dynamic host arena starts sized for all seats (`maxClients` plus `bots`), with
 its food target and ambient rate scaled to the same density.
 For Rust constructors and the default `Config::official(1)`, see

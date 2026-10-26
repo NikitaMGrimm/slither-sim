@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Battledome | [Safe spawn band](battledome/2026-10-26-safe-spawn/REPORT.md) | Local 16/32/64-seat comparison; full-clearance outer-band admission, two-second head-path protection and socket-first waiting. |
 | Battledome | [Food balance](battledome/2026-10-25-food-balance/REPORT.md) | Offline custom-mode before/after runs at 32 and 64 slots; floor-aware death food and total-food refill. |
 | Fidelity | [Official baseline selection](fidelity/2026-10-23-official-defaults/REPORT.md) | Configuration choices and explicit model assumptions; no new measurements. |
 | Fidelity | [Transport parity reference](fidelity/2026-10-25-transport-parity/REPORT.md) | Offline official headless summaries, empirical transport gates and a localhost host baseline. |

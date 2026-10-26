@@ -1,0 +1,1494 @@
+{
+  "aggregates": [
+    {
+      "variant": "baseline",
+      "seats": 16,
+      "births": 96,
+      "safety": {
+        "3": {
+          "spawns": 29,
+          "deaths": 1,
+          "causes": {
+            "body": 1
+          }
+        },
+        "10": {
+          "spawns": 29,
+          "deaths": 2,
+          "causes": {
+            "body": 2
+          }
+        }
+      },
+      "headPathHits": 33,
+      "minNewbornToHead": 111.486,
+      "inwardRouteHits": 1,
+      "failedSearches": 3,
+      "socketOutcomes": {
+        "accepted": 66,
+        "refused": 0,
+        "censored": 0
+      },
+      "socketWaitSeconds": {
+        "min": 0.0128,
+        "p50": 0.0198,
+        "p90": 0.0247,
+        "max": 0.0319
+      },
+      "socketOver1s": 0,
+      "socketCensoredSeconds": [],
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 0.0008,
+        "p90": 0.0096,
+        "max": 1.0365
+      },
+      "botWaitsCompleted": 30,
+      "botWaitsCensored": 0,
+      "msPerTick": [
+        0.1582,
+        0.2103
+      ],
+      "deferredTicks": 0,
+      "living": [
+        {
+          "seed": 7,
+          "samples": [
+            [
+              5,
+              12
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              20,
+              12
+            ],
+            [
+              30,
+              12
+            ]
+          ],
+          "last": [
+            39.039,
+            12
+          ]
+        },
+        {
+          "seed": 29,
+          "samples": [
+            [
+              5,
+              12
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              20,
+              13
+            ],
+            [
+              30,
+              13
+            ]
+          ],
+          "last": [
+            39.039,
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "candidate",
+      "seats": 16,
+      "births": 98,
+      "safety": {
+        "3": {
+          "spawns": 32,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 31,
+          "deaths": 1,
+          "causes": {
+            "pit": 1
+          }
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 618.458,
+      "inwardRouteHits": 0,
+      "failedSearches": 41,
+      "socketOutcomes": {
+        "accepted": 66,
+        "refused": 0,
+        "censored": 0
+      },
+      "socketWaitSeconds": {
+        "min": 0.0136,
+        "p50": 0.018,
+        "p90": 0.0291,
+        "max": 1.022
+      },
+      "socketOver1s": 1,
+      "socketCensoredSeconds": [],
+      "botWaitSeconds": {
+        "min": 0.0007,
+        "p50": 0.0268,
+        "p90": 2.8432,
+        "max": 3.8539
+      },
+      "botWaitsCompleted": 32,
+      "botWaitsCensored": 0,
+      "msPerTick": [
+        0.1533,
+        0.1662
+      ],
+      "deferredTicks": 0,
+      "living": [
+        {
+          "seed": 7,
+          "samples": [
+            [
+              5,
+              12
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              20,
+              13
+            ],
+            [
+              30,
+              12
+            ]
+          ],
+          "last": [
+            39.039,
+            12
+          ]
+        },
+        {
+          "seed": 29,
+          "samples": [
+            [
+              5,
+              12
+            ],
+            [
+              10,
+              12
+            ],
+            [
+              20,
+              12
+            ],
+            [
+              30,
+              12
+            ]
+          ],
+          "last": [
+            39.039,
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "seats": 32,
+      "births": 162,
+      "safety": {
+        "3": {
+          "spawns": 104,
+          "deaths": 15,
+          "causes": {
+            "body": 15
+          }
+        },
+        "10": {
+          "spawns": 100,
+          "deaths": 27,
+          "causes": {
+            "body": 24,
+            "pit": 3
+          }
+        }
+      },
+      "headPathHits": 145,
+      "minNewbornToHead": 93.957,
+      "inwardRouteHits": 15,
+      "failedSearches": 175,
+      "socketOutcomes": {
+        "accepted": 55,
+        "refused": 11,
+        "censored": 0
+      },
+      "socketWaitSeconds": {
+        "min": 0.0366,
+        "p50": 0.049,
+        "p90": 0.0613,
+        "max": 0.1014
+      },
+      "socketOver1s": 0,
+      "socketCensoredSeconds": [],
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 0.0213,
+        "p90": 6.832,
+        "max": 10.437
+      },
+      "botWaitsCompleted": 107,
+      "botWaitsCensored": 0,
+      "msPerTick": [
+        0.6929,
+        0.7344
+      ],
+      "deferredTicks": 0,
+      "living": [
+        {
+          "seed": 7,
+          "samples": [
+            [
+              5,
+              19
+            ],
+            [
+              10,
+              27
+            ],
+            [
+              20,
+              29
+            ],
+            [
+              30,
+              29
+            ]
+          ],
+          "last": [
+            39.039,
+            28
+          ]
+        },
+        {
+          "seed": 29,
+          "samples": [
+            [
+              5,
+              19
+            ],
+            [
+              10,
+              25
+            ],
+            [
+              20,
+              28
+            ],
+            [
+              30,
+              28
+            ]
+          ],
+          "last": [
+            39.039,
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "candidate",
+      "seats": 32,
+      "births": 108,
+      "safety": {
+        "3": {
+          "spawns": 57,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 51,
+          "deaths": 2,
+          "causes": {
+            "pit": 1,
+            "body": 1
+          }
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 608.378,
+      "inwardRouteHits": 0,
+      "failedSearches": 316,
+      "socketOutcomes": {
+        "accepted": 47,
+        "refused": 0,
+        "censored": 1
+      },
+      "socketWaitSeconds": {
+        "min": 0.0375,
+        "p50": 0.7571,
+        "p90": 2.2915,
+        "max": 3.3325
+      },
+      "socketOver1s": 18,
+      "socketCensoredSeconds": [
+        2.6236843
+      ],
+      "botWaitSeconds": {
+        "min": 0.0055,
+        "p50": 8.7006,
+        "p90": 28.3251,
+        "max": 39.8995
+      },
+      "botWaitsCompleted": 61,
+      "botWaitsCensored": 11,
+      "msPerTick": [
+        0.4545,
+        0.5296
+      ],
+      "deferredTicks": 0,
+      "living": [
+        {
+          "seed": 7,
+          "samples": [
+            [
+              5,
+              12
+            ],
+            [
+              10,
+              15
+            ],
+            [
+              20,
+              18
+            ],
+            [
+              30,
+              20
+            ]
+          ],
+          "last": [
+            39.039,
+            19
+          ]
+        },
+        {
+          "seed": 29,
+          "samples": [
+            [
+              5,
+              13
+            ],
+            [
+              10,
+              17
+            ],
+            [
+              20,
+              20
+            ],
+            [
+              30,
+              21
+            ]
+          ],
+          "last": [
+            39.039,
+            23
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "seats": 64,
+      "births": 205,
+      "safety": {
+        "3": {
+          "spawns": 167,
+          "deaths": 34,
+          "causes": {
+            "body": 34
+          }
+        },
+        "10": {
+          "spawns": 130,
+          "deaths": 49,
+          "causes": {
+            "body": 45,
+            "pit": 4
+          }
+        }
+      },
+      "headPathHits": 187,
+      "minNewbornToHead": 80.732,
+      "inwardRouteHits": 80,
+      "failedSearches": 1523,
+      "socketOutcomes": {
+        "accepted": 22,
+        "refused": 44,
+        "censored": 0
+      },
+      "socketWaitSeconds": {
+        "min": 0.0309,
+        "p50": 0.0577,
+        "p90": 0.0771,
+        "max": 0.4581
+      },
+      "socketOver1s": 0,
+      "socketCensoredSeconds": [],
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 2.6567,
+        "p90": 25.5612,
+        "max": 39.0847
+      },
+      "botWaitsCompleted": 183,
+      "botWaitsCensored": 33,
+      "msPerTick": [
+        4.1067,
+        4.5463
+      ],
+      "deferredTicks": 2306,
+      "living": [
+        {
+          "seed": 7,
+          "samples": [
+            [
+              5,
+              18
+            ],
+            [
+              10,
+              28
+            ],
+            [
+              20,
+              35
+            ],
+            [
+              30,
+              40
+            ]
+          ],
+          "last": [
+            31.031000000000002,
+            41
+          ]
+        },
+        {
+          "seed": 29,
+          "samples": [
+            [
+              5,
+              19
+            ],
+            [
+              10,
+              28
+            ],
+            [
+              20,
+              36
+            ],
+            [
+              30,
+              41
+            ]
+          ],
+          "last": [
+            30.03,
+            41
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "candidate",
+      "seats": 64,
+      "births": 102,
+      "safety": {
+        "3": {
+          "spawns": 55,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 49,
+          "deaths": 1,
+          "causes": {
+            "pit": 1
+          }
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 621.456,
+      "inwardRouteHits": 0,
+      "failedSearches": 316,
+      "socketOutcomes": {
+        "accepted": 43,
+        "refused": 0,
+        "censored": 0
+      },
+      "socketWaitSeconds": {
+        "min": 0.0217,
+        "p50": 0.3943,
+        "p90": 2.8216,
+        "max": 6.7916
+      },
+      "socketOver1s": 17,
+      "socketCensoredSeconds": [],
+      "botWaitSeconds": {
+        "min": 0.0096,
+        "p50": 6.4166,
+        "p90": 33.5881,
+        "max": 38.9257
+      },
+      "botWaitsCompleted": 59,
+      "botWaitsCensored": 79,
+      "msPerTick": [
+        0.4105,
+        0.6746
+      ],
+      "deferredTicks": 0,
+      "living": [
+        {
+          "seed": 7,
+          "samples": [
+            [
+              5,
+              12
+            ],
+            [
+              10,
+              17
+            ],
+            [
+              20,
+              16
+            ],
+            [
+              30,
+              17
+            ]
+          ],
+          "last": [
+            39.039,
+            17
+          ]
+        },
+        {
+          "seed": 29,
+          "samples": [
+            [
+              5,
+              13
+            ],
+            [
+              10,
+              18
+            ],
+            [
+              20,
+              21
+            ],
+            [
+              30,
+              19
+            ]
+          ],
+          "last": [
+            39.039,
+            24
+          ]
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "name": "baseline-7-16",
+      "births": 46,
+      "safety": {
+        "3": {
+          "spawns": 12,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 12,
+          "deaths": 0,
+          "causes": {}
+        }
+      },
+      "headPathHits": 13,
+      "minNewbornToHead": 204.445,
+      "inwardRouteHits": 1,
+      "blockedCalls": 1,
+      "socketOutcomes": {
+        "accepted": 33
+      },
+      "socketWaitSeconds": {
+        "min": 0.0128,
+        "p50": 0.019,
+        "p90": 0.0232,
+        "max": 0.0319
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 0.0008,
+        "p90": 0.0069,
+        "max": 1.0202
+      },
+      "botWaitsCompleted": 13,
+      "botWaitsCensored": 0,
+      "living": [
+        [
+          5.005,
+          12
+        ],
+        [
+          10.01,
+          13
+        ],
+        [
+          20.02,
+          12
+        ],
+        [
+          30.03,
+          12
+        ],
+        [
+          39.039,
+          12
+        ]
+      ],
+      "msPerTick": 0.1582,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "baseline-7-32",
+      "births": 81,
+      "safety": {
+        "3": {
+          "spawns": 49,
+          "deaths": 7,
+          "causes": {
+            "body": 7
+          }
+        },
+        "10": {
+          "spawns": 47,
+          "deaths": 13,
+          "causes": {
+            "body": 12,
+            "pit": 1
+          }
+        }
+      },
+      "headPathHits": 73,
+      "minNewbornToHead": 97.095,
+      "inwardRouteHits": 6,
+      "blockedCalls": 84,
+      "socketOutcomes": {
+        "accepted": 30,
+        "refused": 3
+      },
+      "socketWaitSeconds": {
+        "min": 0.039,
+        "p50": 0.0508,
+        "p90": 0.0595,
+        "max": 0.1014
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 0.0205,
+        "p90": 6.832,
+        "max": 10.0635
+      },
+      "botWaitsCompleted": 51,
+      "botWaitsCensored": 0,
+      "living": [
+        [
+          5.005,
+          19
+        ],
+        [
+          10.01,
+          27
+        ],
+        [
+          20.02,
+          29
+        ],
+        [
+          30.03,
+          29
+        ],
+        [
+          39.039,
+          28
+        ]
+      ],
+      "msPerTick": 0.6929,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "baseline-7-64",
+      "births": 105,
+      "safety": {
+        "3": {
+          "spawns": 87,
+          "deaths": 20,
+          "causes": {
+            "body": 20
+          }
+        },
+        "10": {
+          "spawns": 69,
+          "deaths": 26,
+          "causes": {
+            "body": 23,
+            "pit": 3
+          }
+        }
+      },
+      "headPathHits": 96,
+      "minNewbornToHead": 80.732,
+      "inwardRouteHits": 49,
+      "blockedCalls": 757,
+      "socketOutcomes": {
+        "accepted": 11,
+        "refused": 22
+      },
+      "socketWaitSeconds": {
+        "min": 0.0475,
+        "p50": 0.0577,
+        "p90": 0.0771,
+        "max": 0.0819
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 2.5708,
+        "p90": 28.6657,
+        "max": 39.0847
+      },
+      "botWaitsCompleted": 94,
+      "botWaitsCensored": 15,
+      "living": [
+        [
+          5.005,
+          18
+        ],
+        [
+          10.01,
+          28
+        ],
+        [
+          20.02,
+          35
+        ],
+        [
+          30.03,
+          40
+        ],
+        [
+          31.031,
+          41
+        ]
+      ],
+      "msPerTick": 4.1067,
+      "deferredTicks": 1066,
+      "totalDeferred": 1144
+    },
+    {
+      "name": "baseline-29-16",
+      "births": 50,
+      "safety": {
+        "3": {
+          "spawns": 17,
+          "deaths": 1,
+          "causes": {
+            "body": 1
+          }
+        },
+        "10": {
+          "spawns": 17,
+          "deaths": 2,
+          "causes": {
+            "body": 2
+          }
+        }
+      },
+      "headPathHits": 20,
+      "minNewbornToHead": 111.486,
+      "inwardRouteHits": 0,
+      "blockedCalls": 2,
+      "socketOutcomes": {
+        "accepted": 33
+      },
+      "socketWaitSeconds": {
+        "min": 0.0153,
+        "p50": 0.0214,
+        "p90": 0.0265,
+        "max": 0.0294
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.0003,
+        "p50": 0.0011,
+        "p90": 0.0096,
+        "max": 1.0365
+      },
+      "botWaitsCompleted": 17,
+      "botWaitsCensored": 0,
+      "living": [
+        [
+          5.005,
+          12
+        ],
+        [
+          10.01,
+          13
+        ],
+        [
+          20.02,
+          13
+        ],
+        [
+          30.03,
+          13
+        ],
+        [
+          39.039,
+          12
+        ]
+      ],
+      "msPerTick": 0.2103,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "baseline-29-32",
+      "births": 81,
+      "safety": {
+        "3": {
+          "spawns": 55,
+          "deaths": 8,
+          "causes": {
+            "body": 8
+          }
+        },
+        "10": {
+          "spawns": 53,
+          "deaths": 14,
+          "causes": {
+            "body": 12,
+            "pit": 2
+          }
+        }
+      },
+      "headPathHits": 72,
+      "minNewbornToHead": 93.957,
+      "inwardRouteHits": 9,
+      "blockedCalls": 91,
+      "socketOutcomes": {
+        "accepted": 25,
+        "refused": 8
+      },
+      "socketWaitSeconds": {
+        "min": 0.0366,
+        "p50": 0.0487,
+        "p90": 0.0647,
+        "max": 0.0818
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 0.0222,
+        "p90": 7.1426,
+        "max": 10.437
+      },
+      "botWaitsCompleted": 56,
+      "botWaitsCensored": 0,
+      "living": [
+        [
+          5.005,
+          19
+        ],
+        [
+          10.01,
+          25
+        ],
+        [
+          20.02,
+          28
+        ],
+        [
+          30.03,
+          28
+        ],
+        [
+          39.039,
+          28
+        ]
+      ],
+      "msPerTick": 0.7344,
+      "deferredTicks": 0,
+      "totalDeferred": 18
+    },
+    {
+      "name": "baseline-29-64",
+      "births": 100,
+      "safety": {
+        "3": {
+          "spawns": 80,
+          "deaths": 14,
+          "causes": {
+            "body": 14
+          }
+        },
+        "10": {
+          "spawns": 61,
+          "deaths": 23,
+          "causes": {
+            "body": 22,
+            "pit": 1
+          }
+        }
+      },
+      "headPathHits": 91,
+      "minNewbornToHead": 81.435,
+      "inwardRouteHits": 31,
+      "blockedCalls": 766,
+      "socketOutcomes": {
+        "accepted": 11,
+        "refused": 22
+      },
+      "socketWaitSeconds": {
+        "min": 0.0309,
+        "p50": 0.0604,
+        "p90": 0.074,
+        "max": 0.4581
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.0002,
+        "p50": 2.7367,
+        "p90": 22.6064,
+        "max": 34.3866
+      },
+      "botWaitsCompleted": 89,
+      "botWaitsCensored": 18,
+      "living": [
+        [
+          5.005,
+          19
+        ],
+        [
+          10.01,
+          28
+        ],
+        [
+          20.02,
+          36
+        ],
+        [
+          30.03,
+          41
+        ],
+        [
+          30.03,
+          41
+        ]
+      ],
+      "msPerTick": 4.5463,
+      "deferredTicks": 1240,
+      "totalDeferred": 1329
+    },
+    {
+      "name": "candidate-7-16",
+      "births": 47,
+      "safety": {
+        "3": {
+          "spawns": 14,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 13,
+          "deaths": 0,
+          "causes": {}
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 618.458,
+      "inwardRouteHits": 0,
+      "blockedCalls": 20,
+      "socketOutcomes": {
+        "accepted": 33
+      },
+      "socketWaitSeconds": {
+        "min": 0.0137,
+        "p50": 0.018,
+        "p90": 0.0221,
+        "max": 0.7779
+      },
+      "socketOver1s": 0,
+      "botWaitSeconds": {
+        "min": 0.001,
+        "p50": 0.0268,
+        "p90": 2.8432,
+        "max": 3.8539
+      },
+      "botWaitsCompleted": 14,
+      "botWaitsCensored": 0,
+      "living": [
+        [
+          5.005,
+          12
+        ],
+        [
+          10.01,
+          13
+        ],
+        [
+          20.02,
+          13
+        ],
+        [
+          30.03,
+          12
+        ],
+        [
+          39.039,
+          12
+        ]
+      ],
+      "msPerTick": 0.1533,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "candidate-7-32",
+      "births": 49,
+      "safety": {
+        "3": {
+          "spawns": 25,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 23,
+          "deaths": 0,
+          "causes": {}
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 608.378,
+      "inwardRouteHits": 0,
+      "blockedCalls": 158,
+      "socketOutcomes": {
+        "accepted": 22,
+        "censored": 1
+      },
+      "socketWaitSeconds": {
+        "min": 0.0458,
+        "p50": 0.7564,
+        "p90": 2.457,
+        "max": 3.3199
+      },
+      "socketOver1s": 8,
+      "botWaitSeconds": {
+        "min": 0.0055,
+        "p50": 6.1781,
+        "p90": 35.0827,
+        "max": 39.8995
+      },
+      "botWaitsCompleted": 27,
+      "botWaitsCensored": 7,
+      "living": [
+        [
+          5.005,
+          12
+        ],
+        [
+          10.01,
+          15
+        ],
+        [
+          20.02,
+          18
+        ],
+        [
+          30.03,
+          20
+        ],
+        [
+          39.039,
+          19
+        ]
+      ],
+      "msPerTick": 0.4545,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "candidate-7-64",
+      "births": 48,
+      "safety": {
+        "3": {
+          "spawns": 24,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 22,
+          "deaths": 0,
+          "causes": {}
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 622.936,
+      "inwardRouteHits": 0,
+      "blockedCalls": 158,
+      "socketOutcomes": {
+        "accepted": 23
+      },
+      "socketWaitSeconds": {
+        "min": 0.0217,
+        "p50": 0.2808,
+        "p90": 2.8216,
+        "max": 3.6197
+      },
+      "socketOver1s": 7,
+      "botWaitSeconds": {
+        "min": 0.0099,
+        "p50": 6.1493,
+        "p90": 31.5312,
+        "max": 38.3787
+      },
+      "botWaitsCompleted": 25,
+      "botWaitsCensored": 43,
+      "living": [
+        [
+          5.005,
+          12
+        ],
+        [
+          10.01,
+          17
+        ],
+        [
+          20.02,
+          16
+        ],
+        [
+          30.03,
+          17
+        ],
+        [
+          39.039,
+          17
+        ]
+      ],
+      "msPerTick": 0.4105,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "candidate-29-16",
+      "births": 51,
+      "safety": {
+        "3": {
+          "spawns": 18,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 18,
+          "deaths": 1,
+          "causes": {
+            "pit": 1
+          }
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 621.456,
+      "inwardRouteHits": 0,
+      "blockedCalls": 21,
+      "socketOutcomes": {
+        "accepted": 33
+      },
+      "socketWaitSeconds": {
+        "min": 0.0136,
+        "p50": 0.0183,
+        "p90": 0.2692,
+        "max": 1.022
+      },
+      "socketOver1s": 1,
+      "botWaitSeconds": {
+        "min": 0.0007,
+        "p50": 0.0132,
+        "p90": 1.8265,
+        "max": 3.3532
+      },
+      "botWaitsCompleted": 18,
+      "botWaitsCensored": 0,
+      "living": [
+        [
+          5.005,
+          12
+        ],
+        [
+          10.01,
+          12
+        ],
+        [
+          20.02,
+          12
+        ],
+        [
+          30.03,
+          12
+        ],
+        [
+          39.039,
+          12
+        ]
+      ],
+      "msPerTick": 0.1662,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "candidate-29-32",
+      "births": 59,
+      "safety": {
+        "3": {
+          "spawns": 32,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 28,
+          "deaths": 2,
+          "causes": {
+            "pit": 1,
+            "body": 1
+          }
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 609.438,
+      "inwardRouteHits": 0,
+      "blockedCalls": 158,
+      "socketOutcomes": {
+        "accepted": 25
+      },
+      "socketWaitSeconds": {
+        "min": 0.0375,
+        "p50": 0.7571,
+        "p90": 2.052,
+        "max": 3.3325
+      },
+      "socketOver1s": 10,
+      "botWaitSeconds": {
+        "min": 0.0065,
+        "p50": 9.2082,
+        "p90": 23.521,
+        "max": 28.3251
+      },
+      "botWaitsCompleted": 34,
+      "botWaitsCensored": 4,
+      "living": [
+        [
+          5.005,
+          13
+        ],
+        [
+          10.01,
+          17
+        ],
+        [
+          20.02,
+          20
+        ],
+        [
+          30.03,
+          21
+        ],
+        [
+          39.039,
+          23
+        ]
+      ],
+      "msPerTick": 0.5296,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    },
+    {
+      "name": "candidate-29-64",
+      "births": 54,
+      "safety": {
+        "3": {
+          "spawns": 31,
+          "deaths": 0,
+          "causes": {}
+        },
+        "10": {
+          "spawns": 27,
+          "deaths": 1,
+          "causes": {
+            "pit": 1
+          }
+        }
+      },
+      "headPathHits": 0,
+      "minNewbornToHead": 621.456,
+      "inwardRouteHits": 0,
+      "blockedCalls": 158,
+      "socketOutcomes": {
+        "accepted": 20
+      },
+      "socketWaitSeconds": {
+        "min": 0.0842,
+        "p50": 1.0052,
+        "p90": 2.4948,
+        "max": 6.7916
+      },
+      "socketOver1s": 10,
+      "botWaitSeconds": {
+        "min": 0.0096,
+        "p50": 8.965,
+        "p90": 35.8894,
+        "max": 38.9257
+      },
+      "botWaitsCompleted": 34,
+      "botWaitsCensored": 36,
+      "living": [
+        [
+          5.005,
+          13
+        ],
+        [
+          10.01,
+          18
+        ],
+        [
+          20.02,
+          21
+        ],
+        [
+          30.03,
+          19
+        ],
+        [
+          39.039,
+          24
+        ]
+      ],
+      "msPerTick": 0.6746,
+      "deferredTicks": 0,
+      "totalDeferred": 0
+    }
+  ],
+  "verification": {
+    "rust": "passed on bb9d457 plus this change",
+    "documentation": "7 passed",
+    "perfCompareExit": 3,
+    "baseCommit": "bb9d457a9649ac7c6a63fdb3970b1a7f945f3366",
+    "behavior": "changed",
+    "parity": [
+      {
+        "case": "step-default",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "75ff0aad2e0ddc5e47a996f4d5034ce4178392a29f39b3d66fce7d8e89e21e5f",
+        "candidateSha256": "75ff0aad2e0ddc5e47a996f4d5034ce4178392a29f39b3d66fce7d8e89e21e5f"
+      },
+      {
+        "case": "step-food",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "b5fcb1153d9f228aa78374b51d152354d56f0728dcb3289fd17e85ed70bc2f7c",
+        "candidateSha256": "b5fcb1153d9f228aa78374b51d152354d56f0728dcb3289fd17e85ed70bc2f7c"
+      },
+      {
+        "case": "step-body",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "ac2ec2f0934706e8291635f8c91051f538b3bdfdb646f7d9688ddc3f7bcc084d",
+        "candidateSha256": "ac2ec2f0934706e8291635f8c91051f538b3bdfdb646f7d9688ddc3f7bcc084d"
+      },
+      {
+        "case": "observe",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "9b170285abb7679b2575ed89c78c4b4fb97482e6c164039014ededdb379e12f6",
+        "candidateSha256": "9b170285abb7679b2575ed89c78c4b4fb97482e6c164039014ededdb379e12f6"
+      },
+      {
+        "case": "portable",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "cfba8f0752dd07bbc501b502cfab394ab2ac1e569a3fd9bc3f5cbf2e049c25e5",
+        "candidateSha256": "cfba8f0752dd07bbc501b502cfab394ab2ac1e569a3fd9bc3f5cbf2e049c25e5"
+      },
+      {
+        "case": "protocol",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "4b0405da764e374820b7b6b6e817dafaa77c938864b991d95b5e841e450bb6f8",
+        "candidateSha256": "4b0405da764e374820b7b6b6e817dafaa77c938864b991d95b5e841e450bb6f8"
+      },
+      {
+        "case": "official-100-step",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "45f85d491f4b15772e548c52dd25aec9efe1aa2841949d327b5c7c238416c0f2",
+        "candidateSha256": "45f85d491f4b15772e548c52dd25aec9efe1aa2841949d327b5c7c238416c0f2"
+      },
+      {
+        "case": "official-100-bot",
+        "definition": "Equal",
+        "reading": "Equal",
+        "baselineSha256": "20e3f22d72ce869e986b84b92303259b42e851cd77241c23a4f4e88366d70fd8",
+        "candidateSha256": "20e3f22d72ce869e986b84b92303259b42e851cd77241c23a4f4e88366d70fd8"
+      },
+      {
+        "case": "battledome-32-step",
+        "definition": "Changed",
+        "reading": "Changed",
+        "baselineSha256": "4d5fd07562dbef6a8f7d41d6558af4c016d6a087ec0f7b3de09e3b881ba36c3a",
+        "candidateSha256": "b703240400016119816745e4aad78308ef3932f73f78c236d9a8729cab2037a1"
+      },
+      {
+        "case": "client-battledome-64",
+        "definition": "Changed",
+        "reading": "Changed",
+        "baselineSha256": "3f19cfb7535030bc83763236ef580ddafd58b79aea237a669439e982dce702f6",
+        "candidateSha256": "eff9f1b41a7b4daad83276d010acf5572674af683b57d745534e952efd4b6cf9"
+      }
+    ]
+  }
+}

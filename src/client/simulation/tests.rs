@@ -53,14 +53,14 @@ fn exhaustive_spawn_pose(
 
 #[test]
 fn bounded_admission_matches_exhaustive_poses_errors_and_random_stream() {
-    let mut outcomes = [0; 3]; // clear preference, crowded fallback, refused
+    let mut outcomes = [0; 3];
     for seed in [7, 29] {
-        for neighbors in [0, 6, 16] {
+        for spacing in [None, Some(1000), Some(100)] {
             let mut backend = SimulatorBackend::new(
                 seed,
                 SimulationConfig {
-                    world: Config::battledome(),
-                    agents: neighbors + 1,
+                    world: Config::sandbox(),
+                    agents: 2,
                     ..Default::default()
                 },
             )
@@ -68,29 +68,25 @@ fn bounded_admission_matches_exhaustive_poses_errors_and_random_stream() {
             for snake in &mut backend.world.snakes {
                 snake.alive = false;
             }
-            // Synthetic ring arcs leave ample space, narrow fallback gaps, or
-            // no full-newborn gap. No live server evidence is implied.
-            for slot in 1..=neighbors {
-                let angle = (slot - 1) as f64 * TAU / neighbors as f64;
-                let (body, heading) = backend
-                    .world
-                    .spawn_body(
-                        Point {
-                            x: 2684. * angle.cos(),
-                            y: 2684. * angle.sin(),
-                        },
-                        angle + std::f64::consts::FRAC_PI_2,
-                    )
-                    .unwrap();
-                backend.world.respawn_body(slot, body, heading).unwrap();
+            if let Some(spacing) = spacing {
+                let neighbor = &mut backend.world.snakes[1];
+                neighbor.alive = true;
+                neighbor.body = (-1000..=1000)
+                    .step_by(spacing)
+                    .enumerate()
+                    .flat_map(|(i, y)| {
+                        let x = if i % 2 == 0 { -1000. } else { 1000. };
+                        [Point { x, y: y as f64 }, Point { x: -x, y: y as f64 }]
+                    })
+                    .collect();
+                neighbor.head = neighbor.body[0];
             }
             for _ in 0..3 {
                 let mut random = backend.spawn_random.clone();
                 let expected = exhaustive_spawn_pose(&backend.world, &mut random);
                 let actual = backend.spawn_pose(0);
-                assert_eq!(actual, expected, "seed {seed}, neighbors {neighbors}");
+                assert_eq!(actual, expected, "seed {seed}, spacing {spacing:?}");
                 assert_eq!(backend.spawn_random.unit(), random.unit());
-                assert!(!backend.world.snakes[0].alive);
                 let kind = match actual {
                     Ok((body, _)) if backend.world.body_is_clear(&body, 600.) => 0,
                     Ok(_) => 1,
@@ -101,19 +97,9 @@ fn bounded_admission_matches_exhaustive_poses_errors_and_random_stream() {
         }
     }
     assert!(outcomes.iter().all(|&count| count > 0), "{outcomes:?}");
-
-    let mut backend = SimulatorBackend::new(
-        7,
-        SimulationConfig {
-            world: Config::battledome(),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let mut backend = SimulatorBackend::new(7, SimulationConfig::default()).unwrap();
     backend.world.snakes[0].alive = false;
-    // All sampled ring bodies violate the wall margin: preserve the distinct
-    // invalid-geometry error rather than treating a pruned score as invalid.
-    backend.world.config.radius = 2000.;
+    backend.world.config.radius = 50.;
     let mut random = backend.spawn_random.clone();
     assert_eq!(
         backend.spawn_pose(0),
@@ -161,6 +147,93 @@ fn bounded_spawn_margins_only_prune_losing_candidates() {
         world.spawn_margin_bounded(&[Point::default(); 2], 0.),
         Some(f64::INFINITY)
     );
+}
+
+#[test]
+fn circular_spawns_clear_bodies_and_two_seconds_of_forward_travel() {
+    let mut backend = SimulatorBackend::new(
+        29,
+        SimulationConfig {
+            agents: 8,
+            world: Config::battledome(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    for slot in 0..8 {
+        let (body, _) = backend.spawn_pose(slot).unwrap();
+        let alive = backend.world.snakes[slot].alive;
+        backend.world.snakes[slot].alive = false;
+        assert!(backend.world.body_is_clear(&body, 600.));
+        assert!(backend.world.body_clears_head_paths(&body));
+        assert!(
+            body.iter()
+                .all(|p| p.distance(Point::default()) >= 2684. - 1e-9)
+        );
+        backend.world.snakes[slot].alive = alive;
+    }
+    // A newborn can clear the present body and still block an approaching head.
+    let mut world = Simulator::new(
+        7,
+        Config {
+            radius: 5000.,
+            ..Config::sandbox()
+        },
+    )
+    .unwrap();
+    world.add_slots(1).unwrap();
+    let snake = &mut world.snakes[0];
+    snake.head = Point { x: 1000., y: 0. };
+    snake.body = vec![snake.head, Point { x: 958., y: 0. }];
+    snake.heading = 0.;
+    snake.speed = physics::BOOST_SPEED;
+    let body: Vec<_> = (0..26)
+        .rev()
+        .map(|i| Point {
+            x: 2100.,
+            y: i as f64 * 42.,
+        })
+        .collect();
+    // The head misses the zone; the tail must be checked too.
+    assert!(world.body_is_clear(&body, 600.));
+    assert!(!world.body_clears_head_paths(&body));
+    world.snakes[0].heading = std::f64::consts::PI;
+    assert!(world.body_clears_head_paths(&body));
+}
+
+#[test]
+fn a_circular_join_waits_instead_of_using_a_positive_tight_margin() {
+    let mut backend = SimulatorBackend::new(
+        7,
+        SimulationConfig {
+            agents: 2,
+            world: Config::battledome(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    backend.world.snakes[0].alive = false;
+    // Concentric arcs cover the whole band within 600, while leaving positive
+    // contact margins. This used to admit the most open of these tight spots.
+    let body: Vec<_> = (0..360)
+        .map(|i| {
+            let a = i as f64 * TAU / 359.;
+            Point {
+                x: 3000. * a.cos(),
+                y: 3000. * a.sin(),
+            }
+        })
+        .collect();
+    backend.world.snakes[1].head = body[0];
+    backend.world.snakes[1].body = body;
+    let (candidate, _) = backend
+        .world
+        .spawn_body(Point { x: 2684., y: 0. }, 0.)
+        .unwrap();
+    assert!(backend.world.spawn_margin(&candidate).unwrap() > 0.);
+    assert!(!backend.world.body_is_clear(&candidate, 600.));
+    assert_eq!(backend.spawn_pose(0).unwrap_err(), spawn::WAITING);
+    assert!(!backend.world.snakes[0].alive);
 }
 
 #[test]

@@ -1,13 +1,28 @@
 use crate::{Config, Point, physics};
 use std::f64::consts::{FRAC_PI_2, PI, SQRT_2, TAU};
 
-/// Head distance of a new life: `config.spawn_radius`, or the official grid of
-/// `sample_spawn_distance`. Callers draw `unit` either way, so the setting never
-/// shifts the rest of their spawn stream.
+// Custom circular-spawn policy, not official evidence: keep two seconds of
+// straight travel plus the full 600-unit clearance around every living head.
+// This gives approaching players room without predicting their future turns.
+// research/battledome/2026-10-26-safe-spawn/REPORT.md
+#[cfg(feature = "networking")]
+pub(crate) const CLEARANCE: f64 = 600.0;
+#[cfg(feature = "networking")]
+pub(crate) const HEAD_PATH_SECONDS: f64 = 2.0;
+#[cfg(feature = "networking")]
+pub(crate) const WAITING: &str = "No safe circular spawn position";
+
+/// Circular lives sample their configured band uniformly by area; a missing
+/// outer radius keeps a single circle. None keeps the official grid and stream.
 pub fn spawn_distance(config: &Config, unit: f64) -> f64 {
-    config
-        .spawn_radius
-        .unwrap_or_else(|| sample_spawn_distance(config.radius, unit))
+    match config.spawn_radius {
+        Some(inner) => config.spawn_radius_max.map_or(inner, |outer| {
+            // Interpolate normalized squared radii to avoid squaring a large
+            // finite custom radius. Validation guarantees 0 < inner <= outer.
+            outer * ((inner / outer).powi(2) * (1.0 - unit) + unit).sqrt()
+        }),
+        None => sample_spawn_distance(config.radius, unit),
+    }
 }
 
 /// A `segments`-anchor body along the circle through `head` around the center,

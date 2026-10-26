@@ -151,9 +151,11 @@ pub struct Config {
     pub boost_food: BoostFoodConfig,
     /// Optional one-way inner boundary; leaving it kills with `DeathReason::Pit`.
     pub pit: Option<PitConfig>,
-    /// Fixed distance of new lives from the center; `None` keeps the official
-    /// radial grid of `spawn::sample_spawn_distance`.
+    /// Inner distance of circular newborn bodies; `None` keeps official admission.
     pub spawn_radius: Option<f64>,
+    /// Outer distance, sampled uniformly by area from `spawn_radius`. None keeps
+    /// a single circle. Circular lives require full clearance and head-path safety.
+    pub spawn_radius_max: Option<f64>,
     /// Window of `Simulator::kill_score`: each credited kill counts for this
     /// many seconds, across the slot's lives. `None` keeps no kill score.
     pub kill_score_seconds: Option<f64>,
@@ -196,6 +198,8 @@ struct ConfigWire {
     pit: Option<PitConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     spawn_radius: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    spawn_radius_max: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     kill_score_seconds: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -319,6 +323,7 @@ impl Config {
             boost_food: BoostFoodConfig::default(),
             pit: None,
             spawn_radius: None,
+            spawn_radius_max: None,
             kill_score_seconds: None,
             min_score: None,
         }
@@ -343,7 +348,7 @@ impl Config {
     }
 
     /// Battledome: official physics in a fixed 3584-unit arena,
-    /// with a one-way pit of radius 1784, spawns midway between the two, a
+    /// with a one-way pit of radius 1784, spawns in an outer band, a
     /// 15-minute kill score, a 400-point size floor and no prey. See docs/configuration.md#battledome.
     pub fn battledome() -> Self {
         const RADIUS: f64 = 3584.0;
@@ -364,6 +369,11 @@ impl Config {
             },
             pit: Some(PitConfig { radius: PIT }),
             spawn_radius: Some((PIT + RADIUS) / 2.0),
+            // Custom policy: sqrt((3584 - 60)^2 - 3200^2) / 437.5 = 3.37 s
+            // of straight tangent travel at maximum boost before the spawn wall
+            // margin. Never place a life between the old ring and the middle.
+            // research/battledome/2026-10-26-safe-spawn/REPORT.md
+            spawn_radius_max: Some(3200.0),
             kill_score_seconds: Some(900.0),
             min_score: Some(400),
             ..Self::official(1)
@@ -449,15 +459,24 @@ impl Config {
             .min_score
             .and_then(MassFloor::for_score)
             .map_or(2, |floor| floor.segments);
-        if self.spawn_radius.is_some_and(|spawn| {
-            let roundoff = crate::spawn::ring_roundoff(spawn);
-            let lower = spawn - roundoff;
-            let upper = spawn + roundoff;
-            !(upper < self.radius - SPAWN_WALL_MARGIN
-                && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
-                && crate::spawn::ring_step(lower, segments).is_some()
-                && crate::spawn::ring_step(upper, segments).is_some())
+        if self.spawn_radius_max.is_some_and(|outer| {
+            !outer.is_finite() || self.spawn_radius.is_none_or(|inner| outer < inner)
         }) {
+            return Err("spawnRadiusMax requires spawnRadius and must be finite and at least spawnRadius, so the spawn band is ordered".into());
+        }
+        if [self.spawn_radius, self.spawn_radius_max]
+            .into_iter()
+            .flatten()
+            .any(|spawn| {
+                let roundoff = crate::spawn::ring_roundoff(spawn);
+                let lower = spawn - roundoff;
+                let upper = spawn + roundoff;
+                !(upper < self.radius - SPAWN_WALL_MARGIN
+                    && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
+                    && crate::spawn::ring_step(lower, segments).is_some()
+                    && crate::spawn::ring_step(upper, segments).is_some())
+            })
+        {
             return Err(format!(
                 "spawnRadius must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
                  radius, with body chords outside the pit and room for a new life's \
@@ -945,6 +964,24 @@ impl Simulator {
         (2..=430).contains(&body.len())
             && body.iter().all(|p| p.finite())
             && self.line_is_clear(body, body.len(), clearance)
+    }
+    /// Custom circular admission: the newborn must also miss each living
+    /// head's straight two-second path by the full preferred clearance. This
+    /// protects a player continuing its current motion; later turns are unknown.
+    /// research/battledome/2026-10-26-safe-spawn/REPORT.md
+    #[cfg(feature = "networking")]
+    pub(crate) fn body_clears_head_paths(&self, body: &[Point]) -> bool {
+        self.snakes.iter().filter(|s| s.alive).all(|s| {
+            let travel = s.speed * crate::spawn::HEAD_PATH_SECONDS;
+            let end = Point {
+                x: s.head.x + s.heading.cos() * travel,
+                y: s.head.y + s.heading.sin() * travel,
+            };
+            let width =
+                (collision_distance(s.segments, body.len()) + 40.).max(crate::spawn::CLEARANCE);
+            body.windows(2)
+                .all(|edge| swept_distance(edge[0], edge[1], s.head, end) > width)
+        })
     }
     /// Least distance between a supplied head-first body's centerline and any
     /// living snake, beyond that snake's contact range (collision distance plus
