@@ -543,7 +543,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
             world.step(&actions).unwrap();
         }
         assert!(world.prey.is_empty());
-        serde_json::to_string(&world).unwrap()
+        serde_json::to_string(&world.checkpoint().unwrap()).unwrap()
     };
     assert_eq!(run(), run());
 }

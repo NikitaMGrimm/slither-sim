@@ -261,11 +261,11 @@ fn pit_markers_preserve_physics_rng_and_native_bot_frames() {
             }
             marked.next_frame().unwrap();
             plain.next_frame().unwrap();
-            // Simulator serialization includes physics RNG, prey RNG, admission
+            // Checkpoints include physics RNG, prey RNG, admission
             // clocks, pit state and rolling scores. Events are checked separately.
             assert_eq!(
-                serde_json::to_vec(marked.world()).unwrap(),
-                serde_json::to_vec(plain.world()).unwrap()
+                serde_json::to_vec(&marked.world().checkpoint().unwrap()).unwrap(),
+                serde_json::to_vec(&plain.world().checkpoint().unwrap()).unwrap()
             );
             assert_eq!(marked.world.pickup_events, plain.world.pickup_events);
             assert_eq!(
@@ -318,8 +318,8 @@ fn pit_markers_socket_delivery_preserves_world_and_background_bots() {
             sim.take(0).unwrap();
         }
         assert_eq!(
-            serde_json::to_vec(marked.backend.world()).unwrap(),
-            serde_json::to_vec(plain.backend.world()).unwrap(),
+            serde_json::to_vec(&marked.backend.world().checkpoint().unwrap()).unwrap(),
+            serde_json::to_vec(&plain.backend.world().checkpoint().unwrap()).unwrap(),
             "tick {tick}"
         );
         assert_eq!(

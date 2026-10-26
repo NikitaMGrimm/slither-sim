@@ -4,6 +4,11 @@
 
 ### Breaking
 
+- Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
+  and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
+  use `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot
+  restore worlds. `ErrorCode`, `ErrorKind` and `Constraint` are non-exhaustive:
+  callers matching them must include a wildcard arm.
 - Rust core calls now return `SimError`; `step`/`step_profiled` return
   `CoreStepError::{Rejected, Stopped}`, and `transport::StepError` carries
   `SimError` causes. Match `kind` or `code()` instead of message text; inspect

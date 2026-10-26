@@ -11,7 +11,7 @@ fn rejected_batches_and_headings_preserve_exact_state() {
         world.add("a", 0, 1).unwrap();
         world.pickup_events = Some(Vec::new());
         world.food_spawn_events = Some(Vec::new());
-        let before = serde_json::to_value(&world).unwrap();
+        let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
         let events = (world.pickup_events.clone(), world.food_spawn_events.clone());
         let mut profile = StepProfile::default();
         for (actions, kind) in [
@@ -62,7 +62,10 @@ fn rejected_batches_and_headings_preserve_exact_state() {
                     (Some(0), Some("heading"))
                 );
             }
-            assert_eq!(serde_json::to_value(&world).unwrap(), before);
+            assert_eq!(
+                serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+                before
+            );
             assert_eq!(
                 (&world.pickup_events, &world.food_spawn_events),
                 (&events.0, &events.1)
@@ -125,7 +128,7 @@ fn food_overflow_completes_one_tick_and_retries_preserve_all_state() {
         assert_eq!(world.snakes[0].fam, f64::MAX);
         assert!(world.food.is_empty());
         assert_eq!(world.pickup_events.as_ref().unwrap().len(), 2);
-        let before = serde_json::to_value(&world).unwrap();
+        let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
         let events = (world.pickup_events.clone(), world.food_spawn_events.clone());
         let ticks = profile.ticks;
         let result = if profiled {
@@ -137,7 +140,10 @@ fn food_overflow_completes_one_tick_and_retries_preserve_all_state() {
             matches!(result, Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
         );
         assert_eq!(world.status(), WorldStatus::Stopped(&cause));
-        assert_eq!(serde_json::to_value(&world).unwrap(), before);
+        assert_eq!(
+            serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+            before
+        );
         assert_eq!(
             (world.pickup_events.clone(), world.food_spawn_events.clone()),
             events

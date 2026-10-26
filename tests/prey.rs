@@ -182,8 +182,8 @@ fn accumulated_prey_mass_that_overflows_stops_the_world() {
     assert_eq!(world.status(), WorldStatus::Stopped(cause));
     assert_eq!(world.time, time);
 
-    let encoded = serde_json::to_string(&world).unwrap();
-    let mut restored: Simulator = serde_json::from_str(&encoded).unwrap();
+    let encoded = serde_json::to_string(&world.checkpoint().unwrap()).unwrap();
+    let mut restored = Simulator::from_checkpoint(encoded.as_bytes(), Default::default()).unwrap();
     assert!(
         matches!(restored.step(&[None]), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
     );
@@ -225,7 +225,13 @@ fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
         reference.prey.clear();
         world.config.prey.size = 9.21;
         world.config.prey.max_size = 9.39;
-        let before = serde_json::to_value(&world).unwrap();
+        let before = format!("{world:?}");
+        assert!(matches!(
+            world.checkpoint().unwrap_err().kind,
+            ErrorKind::InvalidCheckpoint {
+                rule: Constraint::OutOfRange
+            }
+        ));
         assert!(world.validate_actions(&[]).is_err());
         let mut profile = StepProfile::default();
         let result = if profiled {
@@ -243,7 +249,7 @@ fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
             }
         );
         assert_eq!(cause.field.as_deref(), Some("prey.size"));
-        assert_eq!(serde_json::to_value(&world).unwrap(), before);
+        assert_eq!(format!("{world:?}"), before);
         assert_eq!(profile.ticks, 0);
 
         world.config.prey = config.prey;
@@ -251,8 +257,8 @@ fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
         reference.step(&[]).unwrap();
         assert_eq!(world.prey.len(), 1);
         assert_eq!(
-            serde_json::to_value(&world).unwrap(),
-            serde_json::to_value(&reference).unwrap()
+            serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+            serde_json::to_value(reference.checkpoint().unwrap()).unwrap()
         );
     }
 }
@@ -675,7 +681,10 @@ fn refill_consumes_all_due_intervals_and_discards_credit_at_target() {
         assert_eq!(w.prey.len(), if interval == 0.001 { 7 } else { 10 });
         w.step(&[]).unwrap();
         assert_eq!(w.prey.len(), 10);
-        assert_eq!(serde_json::to_value(&w).unwrap()["prey_clock"], 0.);
+        assert_eq!(
+            serde_json::to_value(w.checkpoint().unwrap()).unwrap()["state"]["preyClock"],
+            0.
+        );
         w.prey.clear();
         w.step(&[]).unwrap();
         assert_eq!(w.prey.len(), if interval == 0.001 { 7 } else { 10 });
@@ -733,11 +742,14 @@ fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
     assert_eq!(w.time, 2.);
     assert!(w.prey.iter().all(|prey| prey.position.finite()));
     let time = w.time;
-    let before = serde_json::to_value(&w).unwrap();
+    let before = serde_json::to_value(w.checkpoint().unwrap()).unwrap();
     assert!(
         matches!(w.step(&[]), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
     );
-    assert_eq!(serde_json::to_value(&w).unwrap(), before);
+    assert_eq!(
+        serde_json::to_value(w.checkpoint().unwrap()).unwrap(),
+        before
+    );
     assert_eq!(w.status(), WorldStatus::Stopped(cause));
     assert_eq!(w.time, time);
 }

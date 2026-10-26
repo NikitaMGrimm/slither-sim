@@ -3,6 +3,8 @@
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
 //! No additional dependencies, sockets, files, or wall-clock bot processing samples.
+#[path = "support/state.rs"]
+mod checkpoint_state;
 use serde_json::{Value, json};
 use slither_sim::{
     Action, Config, DeathEvent, DeathReason, Observation, Point, Simulator, physics,
@@ -803,12 +805,7 @@ fn births(world: &Simulator) -> Option<Vec<Value>> {
 }
 
 fn world_events(world: &Simulator) -> Result<Value, String> {
-    let mut state = serde_json::to_value(world).map_err(|e| e.to_string())?;
-    // This private HashSet is semantically unordered; every ordered array, including
-    // food, snakes, deaths and event buffers, retains its original order.
-    if let Some(outward) = state.get_mut("prey_outward").and_then(Value::as_array_mut) {
-        outward.sort_unstable_by_key(Value::as_u64);
-    }
+    let state = checkpoint_state::projection(world)?;
     Ok(json!({"world": state, "pickupEvents": pickups(world), "foodSpawnEvents": births(world)}))
 }
 

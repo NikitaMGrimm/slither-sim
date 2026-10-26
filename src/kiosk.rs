@@ -72,12 +72,12 @@ impl KioskConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct KioskState {
-    anchor: Option<Point>,
-    held_seconds: f64,
+    pub(crate) anchor: Option<Point>,
+    pub(crate) held_seconds: f64,
     /// Displayed score minus the score implied by physical segment mass.
-    score_credit: f64,
+    pub(crate) score_credit: f64,
 }
 
 impl KioskState {

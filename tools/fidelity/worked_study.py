@@ -354,6 +354,8 @@ def source_digests():
              *sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "src").rglob("*.rs")),
              *(f"tools/fidelity/{name}" for name in ("worked_study.py", "slither_protocol.py",
                                                    "capture_quality.py", "prepare-fidelity-replay.py"))]
+    if (ROOT / "build.rs").is_file():
+        names.append("build.rs")
     files = {name: file_sha256(ROOT / name) for name in names}
     combined = json.dumps(files, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
     return {"files": files, "combinedSha256": sha256(combined)}

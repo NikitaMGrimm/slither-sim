@@ -53,8 +53,8 @@ fn indexed_pickup_matches_scanning_every_eater() {
         if tick % 20 == 0 {
             scanned.config.food_index = true;
             assert_eq!(
-                serde_json::to_string(&indexed).unwrap(),
-                serde_json::to_string(&scanned).unwrap(),
+                serde_json::to_string(&indexed.checkpoint().unwrap()).unwrap(),
+                serde_json::to_string(&scanned.checkpoint().unwrap()).unwrap(),
                 "tick {tick}"
             );
             scanned.config.food_index = false;
@@ -129,8 +129,8 @@ fn hashed_pickup_matches_scanning_every_eater() {
     }
     scanned.config.food_index = true;
     assert_eq!(
-        serde_json::to_string(&indexed).unwrap(),
-        serde_json::to_string(&scanned).unwrap()
+        serde_json::to_string(&indexed.checkpoint().unwrap()).unwrap(),
+        serde_json::to_string(&scanned.checkpoint().unwrap()).unwrap()
     );
     assert!(pickups > 1000, "only {pickups} pickups");
 }

@@ -1,7 +1,7 @@
 use slither_sim::{Action, AmbientFoodConfig, Config, KioskConfig, Point, Simulator, physics};
 
 fn snapshot(world: &Simulator) -> serde_json::Value {
-    serde_json::to_value(world).unwrap()
+    serde_json::to_value(world.checkpoint().unwrap()).unwrap()
 }
 
 fn empty_world() -> Simulator {

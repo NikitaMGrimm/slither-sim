@@ -116,7 +116,7 @@ fn initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
             },
         )
         .unwrap();
-        let before = serde_json::to_value(&world).unwrap();
+        let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
         let error = world.add("a", 0, 1).unwrap_err();
         assert_eq!(
             error.kind,
@@ -126,7 +126,10 @@ fn initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
         );
         assert_eq!(error.slot, Some(0));
         assert_eq!(error.field.as_deref(), Some("body"));
-        assert_eq!(serde_json::to_value(&world).unwrap(), before);
+        assert_eq!(
+            serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+            before
+        );
         // The same ring remains available once the arena contains its tail.
         world.config.radius = 85.;
         assert_eq!(world.add("a", 0, 1).unwrap(), 0);

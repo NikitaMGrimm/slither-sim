@@ -36,6 +36,16 @@ A temporary index preserves your index, HEAD, stash and files. The candidate's
 measurement examples, selected tests and fixtures overlay the detached baseline;
 this shared harness must compile against the base API.
 
+`examples/support/state.rs` supplies compile-selected state adapters for legacy
+Simulator serde and validated checkpoint v1. The overlay copies that adapter and
+`build.rs` into both revisions; the build script selects the API from the runtime
+source, without changing it. Workloads and measurement code stay shared. The
+checkpoint adapter projects every authoritative field back to the legacy shape,
+preserving RNG, failures, timers and ordered arrays; only the envelope, slot
+grouping, field spelling and optional null representation are normalized.
+Producer provenance is outside state comparison. Unprojected fields fail instead
+of disappearing. Build identities record adapter selection and source hashes.
+
 Separate persistent targets live under `target/perf-suite/` (or
 `CARGO_TARGET_DIR`). Locks refuse concurrent use; verify ownership before removing
 stale locks. Freshly built binaries are copied to output, bound to source/tree,
