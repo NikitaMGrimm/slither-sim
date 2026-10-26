@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.6.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.1...v0.6.2) - 2026-10-26
+
 ### Added
 
 - `slither-sim host --stats SECONDS` prints the tick rate, deferred ticks,

@@ -10,7 +10,7 @@ Pick a version from [releases](https://github.com/NikitaMGrimm/slither-sim/relea
 and your platform (`x86_64-unknown-linux-gnu` or `aarch64-unknown-linux-gnu`):
 
 ```sh
-VERSION=v0.6.0
+VERSION=v0.6.2
 TARGET=x86_64-unknown-linux-gnu
 BASE=https://github.com/NikitaMGrimm/slither-sim/releases/download/$VERSION
 curl -fLO "$BASE/slither-sim-$TARGET.tar.gz"
