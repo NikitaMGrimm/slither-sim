@@ -94,7 +94,9 @@ in [the protocol extension](../../../docs/maintainers/performance-statistics-v2.
 
 ## Fixture-size investigation (no fixture changes)
 
-At the audited tree, `tests/fixtures` has 42 files totaling 12,292,562 bytes.
+At commit `249cdb217d83a234895bc7eee4d98c3636c1cd76`, the `tests/fixtures`
+Git tree is `9248b1d9afe335ae3f54d6a3f085818614980647` (unchanged in these PRs).
+It has 42 tracked files totaling 12,292,562 bytes.
 Independent gzip level 9 compression of every file totals 1,394,021 bytes,
 saving 10,898,541 bytes (88.66%). These are working-tree file sizes, not Git pack
 or download-size estimates; Git already compresses objects.
