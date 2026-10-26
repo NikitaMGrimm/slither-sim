@@ -52,6 +52,8 @@ six decision ticks and `Config::official(1)`. Every world shares `agents`,
 `config` and nested objects use camelCase [world settings](configuration.md#world-config)
 with defaults for omitted fields and an optional [`preset`](configuration.md#presets),
 such as `{"preset":"battledome"}`. Replies print resolved fields.
+Default and official worlds are first sized for `agents`
+([population sizing](configuration.md#population-sizing)).
 Invalid resets preserve the previous session.
 
 Returns `seed`, the resolved `config`, `decisionTicks`, `warnings` and `worlds`,

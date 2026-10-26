@@ -16,6 +16,8 @@ use serde_json::json;
 use std::io::{self, BufRead, Write};
 
 mod frame;
+#[cfg(test)]
+mod tests;
 
 pub const PROTOCOL: &str = "slither-sim-json-v3";
 
@@ -357,7 +359,7 @@ impl Session {
                 worlds,
                 agents,
                 decision_ticks,
-                config,
+                mut config,
             } => {
                 if worlds == 0 || agents == 0 || decision_ticks == 0 {
                     return Err(SimError::config(
@@ -413,6 +415,7 @@ impl Session {
                     )
                     .at_field("worlds")
                 })?;
+                config.size_for_population(agents);
                 for index in 0..worlds {
                     let mut world =
                         Simulator::new(seed.wrapping_add(index as u32), (*config).clone())?;

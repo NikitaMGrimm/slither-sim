@@ -1,0 +1,69 @@
+{
+  "previous_publication_commit": "39ce3c8618b0074142a78d64c6f335b185a9cf79",
+  "previous_publication_sha256": {
+    "analyze.py": "06b8301d3e995aed329e2cd1d92d6d95e8fdeeb6eecfb42200816b607b507093",
+    "results.json": "122c2b543c890473dffcc2223bdc7e4ff5de9f9a3b45787da8e0bc2cdd01e38a",
+    "tables.json": "999331bd22a88807596089057f3baf726ad54694badf234fc00a30b3997d58eb",
+    "free-run-summary.json": "32e6aa03d304f54c97e3ef168919a0412ae228d291c1d30a9ef8d6d66037907f"
+  },
+  "source_commit": "8890b2ebd3370a2b98348b6620f9e419eb4a55a7",
+  "archives": 91,
+  "completed_archives": 53,
+  "initialized_connections": 263,
+  "run_gap_limit_ms": 1000,
+  "connections_with_changed_run_duration_summary": 250,
+  "nonzero_run_seconds_before": {
+    "n": 8012,
+    "min": 0.064,
+    "median": 1.504,
+    "p95": 8.763,
+    "max": 81.332
+  },
+  "nonzero_run_seconds_after": {
+    "n": 554,
+    "min": 0.064,
+    "median": 6.038,
+    "p95": 26.705,
+    "max": 79.302
+  },
+  "long_connection_nonzero_run_seconds_before": {
+    "n": 77,
+    "min": 1.045,
+    "median": 1.504,
+    "p95": 23.221,
+    "max": 81.332
+  },
+  "long_connection_nonzero_run_seconds_after": {
+    "n": 15,
+    "min": 1.014,
+    "median": 18.554,
+    "p95": 79.302,
+    "max": 79.302
+  },
+  "longest_observed_shrink_witness": {
+    "archive": "run4-radius-long-20260927/bot0.jsonl.gz",
+    "conn": 4,
+    "direction": -1,
+    "start_ms": 320066,
+    "start_radius": 14610,
+    "max_gap_ms": 389,
+    "end_ms": 399368,
+    "end_radius": 12926,
+    "seconds": 79.302,
+    "delta": -1684
+  },
+  "forecast_connections": 114,
+  "forecast_origin_differs_from_setup": 113,
+  "forecast_predictions_and_errors_unchanged": true,
+  "interval_totals_and_other_models_unchanged": true,
+  "historical_method_byte_pins": {
+    "historical-tools/analyze-global-radius.py": "fd9cb60bec31a47f058b145c1f25a3ce5d3c2b796c327812c1b837f8896ad2c9",
+    "historical-tools/analyze-radius-dynamics.py": "761d2d530fefef6c331151e569adaab703bb97396955bb6ff6d088e28116a932",
+    "historical-tools/analyze-radius-motion.py": "0032ebfb74474cdc969d20c6e9ef88480485084934a5153eba7153eff4aa8405"
+  },
+  "rerun_method_byte_pins": {
+    "methods/analyze-global-radius.py": "24b0ab56cda0f914d76c71a0c3862c5ac248681df322164a1f5213d55ab88816",
+    "methods/analyze-radius-dynamics.py": "41543d11562dbee890cb5c3b63d91a4f4dba76e61e60cd874f081fa5761fea80",
+    "methods/analyze-radius-motion.py": "da178e7b741d21ad2275a32323bffc181fafd0beb44f424817cde240c5faed1c"
+  }
+}

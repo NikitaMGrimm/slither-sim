@@ -43,6 +43,33 @@ fn world() -> Simulator {
     world.food_spawn_events = Some(Vec::new());
     world
 }
+
+#[test]
+fn radius_controller_and_population_sizing_settings_round_trip_and_continue() {
+    for dynamic_radius in [false, true] {
+        for size_to_population in [false, true] {
+            let config = Config {
+                dynamic_radius,
+                size_to_population,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::official(4)
+            };
+            let mut original = Simulator::new(7, config).unwrap();
+            original.step(&[]).unwrap();
+            let saved = value(&original);
+            let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+            assert_eq!(restored.config.dynamic_radius, dynamic_radius);
+            assert_eq!(restored.config.size_to_population, size_to_population);
+            assert_eq!(value(&restored), saved);
+            for _ in 0..10 {
+                original.step(&[]).unwrap();
+                restored.step(&[]).unwrap();
+                assert_eq!(value(&original), value(&restored));
+            }
+        }
+    }
+}
 fn rejects_atomic(incumbent: &mut Simulator, bad: &Value) -> slither_sim::SimError {
     let before = value(incumbent);
     let events = (

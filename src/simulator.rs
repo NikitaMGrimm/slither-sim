@@ -133,8 +133,14 @@ impl Preset {
 pub struct Config {
     /// Boundary radius; the starting radius when `dynamicRadius` is set.
     pub radius: f64,
-    /// Enable the population-driven boundary model used by [`Config::official`].
+    /// Opt into the provisional living-population controller; not faithful to
+    /// official radius waves. Disabled by default; see
+    /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
     pub dynamic_radius: bool,
+    /// Runtimes enlarge this arena to fit their population at creation, scaling
+    /// food with area. Explicit JSON `radius` opts out unless `sizeToPopulation`
+    /// is also supplied; Rust callers choosing a fixed radius set this to false.
+    pub size_to_population: bool,
     pub vision: f64,
     /// Refill target; counts ambient pellets unless `ambient_refill_counts_all_food`.
     pub food_count: usize,
@@ -193,6 +199,7 @@ pub struct Config {
 struct ConfigWire {
     radius: f64,
     dynamic_radius: bool,
+    size_to_population: bool,
     vision: f64,
     food_count: usize,
     #[serde(skip_serializing_if = "is_false")]
@@ -253,6 +260,10 @@ impl<'de> Deserialize<'de> for Config {
             }
         }
         let mut fields = Map::deserialize(deserializer)?;
+        // Preserve custom radii without changing the preset's other defaults.
+        // Serialized configs include the flag, so resolved round trips retain it.
+        let explicit_radius = fields.contains_key("radius");
+        let explicit_population_sizing = fields.contains_key("sizeToPopulation");
         let fields = match fields.remove("preset") {
             None => fields,
             Some(preset) => {
@@ -266,7 +277,12 @@ impl<'de> Deserialize<'de> for Config {
                 base
             }
         };
-        ConfigWire::deserialize(Value::Object(fields)).map_err(D::Error::custom)
+        let mut config =
+            ConfigWire::deserialize(Value::Object(fields)).map_err(D::Error::custom)?;
+        if explicit_radius && !explicit_population_sizing {
+            config.size_to_population = false;
+        }
+        Ok(config)
     }
 }
 /// Whether segment `a`-`b` passes within `radius` of the center. Endpoints
@@ -302,9 +318,25 @@ fn official_food(radius: f64) -> (usize, f64) {
     ((7.0 * sectors) as usize, 0.1024 * sectors)
 }
 impl Config {
+    /// Startup capacity policy, independent of later boundary motion. Holding
+    /// the selected radius avoids death jitter but omits real official waves:
+    /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
+    pub(crate) fn size_for_population(&mut self, population: usize) {
+        let radius = population_radius(population);
+        if self.size_to_population && self.radius > 0. && self.radius < radius {
+            let area = (radius / self.radius).powi(2);
+            self.radius = radius;
+            self.food_count = (self.food_count as f64 * area) as usize;
+            self.ambient_replenish_per_second *= area;
+        }
+    }
+
     /// Best-current official-server approximation, initialized for `snakes`.
     /// Includes provisional models; this is not an identified server preset.
-    /// Radius and food use the existing population model. Prey uses an explicit
+    /// Holds a population-sized initial radius; this practical baseline omits
+    /// real official waves, whose controller remains unidentified. See
+    /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
+    /// Food uses the initial area. Prey uses an explicit
     /// working estimate of one per ten million square units, with at least one.
     /// Received prey density does not establish a global census; see
     /// docs/configuration.md#official-and-sandbox.
@@ -314,7 +346,8 @@ impl Config {
         let (food_count, ambient_replenish_per_second) = official_food(radius);
         Self {
             radius,
-            dynamic_radius: true,
+            dynamic_radius: false,
+            size_to_population: true,
             // A finite receipt approximation: the paired visibility census
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
             // Exact server entry/exit geometry and size scaling remain unknown.
@@ -352,6 +385,7 @@ impl Config {
         Self {
             radius: 1000.0,
             dynamic_radius: false,
+            size_to_population: false,
             food_count: 350,
             ambient_replenish_per_second: 5.0,
             prey: PreyConfig {
@@ -372,6 +406,7 @@ impl Config {
         Self {
             radius: RADIUS,
             dynamic_radius: false,
+            size_to_population: false,
             food_count,
             // Design choice: death/boost food already feeds snakes, so it also
             // fills the ambient target. Independent of minScore for custom worlds.
@@ -1872,6 +1907,8 @@ impl Simulator {
         self.buffers = buffers;
     }
     fn update_radius(&mut self, time: f64) {
+        // Provisional opt-in only: death/respawn jitter differs from official
+        // sustained waves. research/fidelity/2026-10-26-arena-radius/REPORT.md
         if self.config.dynamic_radius {
             let target = population_radius(self.living());
             let step = RADIUS_RATE * self.config.dt;

@@ -1,0 +1,2899 @@
+{
+  "source_commit": "8890b2ebd3370a2b98348b6620f9e419eb4a55a7",
+  "source_pins": [
+    {
+      "label": "src/simulator.rs",
+      "sha256": "fd110e431195b88a5f74e283fb3297e5fe160e241bdfbe326ee795da3e7aeae6"
+    },
+    {
+      "label": "src/client/protocol.rs",
+      "sha256": "621e7461e6368bc7b881521a8f72578a8e01d1574a006684311bcd44a18e5cfd"
+    },
+    {
+      "label": "docs/configuration.md",
+      "sha256": "222b8e1a8c3682e2c83950f46a3b952a167be97eb35d41308954b5253de6c4f5"
+    },
+    {
+      "label": "docs/server-rules.md",
+      "sha256": "f869ad90c4dbac4aa79cf860d8dc469f4a9979336b09b6a26846df4e098c582a"
+    },
+    {
+      "label": "docs/research-workflow.md",
+      "sha256": "f20319680a503b843dabb7681184abbc43989bb81c87394af8726351ce2a4de3"
+    },
+    {
+      "label": "CONTRIBUTING.md",
+      "sha256": "e39bd1d121a714b2fe962f978b31e090a988b37da9ee801a8a962fdff7e612ff"
+    },
+    {
+      "label": "tests/fixtures/arena-radius-updates.json",
+      "sha256": "d3200c00ed54c14415d472747aa66fe15c71b149a55f406d0bd2e5536384ced7"
+    },
+    {
+      "label": "tools/fidelity/slither_protocol.py",
+      "sha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+    },
+    {
+      "label": "uv.lock",
+      "sha256": "b73541db469e2d1d20744a177642e2e0dbe05e1ffeeeafd469bc809092467559"
+    },
+    {
+      "label": "methods/analyze-global-radius.py",
+      "sha256": "24b0ab56cda0f914d76c71a0c3862c5ac248681df322164a1f5213d55ab88816"
+    },
+    {
+      "label": "methods/analyze-radius-dynamics.py",
+      "sha256": "41543d11562dbee890cb5c3b63d91a4f4dba76e61e60cd874f081fa5761fea80"
+    },
+    {
+      "label": "methods/analyze-radius-motion.py",
+      "sha256": "da178e7b741d21ad2275a32323bffc181fafd0beb44f424817cde240c5faed1c"
+    },
+    {
+      "label": "analyze.py",
+      "sha256": "a74cbc07b7f0c88fd66d567e8633be4b187bf6f1e04252fef75e0fc2ecf1a2c1"
+    },
+    {
+      "label": "PLAN.md",
+      "sha256": "b71d8754df76e093d40993c5f21df959cf0e869ae73b8ee4d2c533d391376496"
+    }
+  ],
+  "pooled": {
+    "interval_ms": {
+      "n": 41941,
+      "min": 13,
+      "median": 128,
+      "p95": 1506,
+      "max": 67707
+    },
+    "receipt_interval_ms": {
+      "n": 41941,
+      "min": 0.023999999999432475,
+      "median": 128.71999999997206,
+      "p95": 1506.400999999998,
+      "max": 67711.726
+    },
+    "dense_intervals": 32890,
+    "dense_signed_deltas": {
+      "-6": 6,
+      "-5": 2,
+      "-4": 3,
+      "-3": 5410,
+      "-2": 5905,
+      "-1": 6698,
+      "0": 7,
+      "1": 5654,
+      "2": 4598,
+      "3": 2800,
+      "4": 1296,
+      "5": 392,
+      "6": 101,
+      "7": 17,
+      "9": 1
+    },
+    "dense_rates": {
+      "n": 32890,
+      "min": -33.557046979865774,
+      "median": -7.633587786259542,
+      "p95": 30.76923076923077,
+      "max": 55.118110236220474
+    },
+    "coefficient_radius_over_sqrt_players": {
+      "n": 32507,
+      "min": 444.9518158419545,
+      "median": 639.4168435201585,
+      "p95": 707.0333957652019,
+      "max": 788.5063289341632
+    },
+    "opposite_states_count": 231,
+    "train_windows": 51,
+    "holdout_windows": 2444,
+    "eligible_directions": 2495
+  },
+  "long_connection": {
+    "conn": 4,
+    "protocol": 19,
+    "game_seconds": 401.676,
+    "radius_rows": 2135,
+    "z_packets": 2134,
+    "radius_start": 13631,
+    "radius_end": 12931,
+    "radius_min": 12926,
+    "radius_max": 14611,
+    "total_variation": 6270,
+    "growth": 864,
+    "shrink": 1269,
+    "same": 1,
+    "dense_intervals": 2021,
+    "delta_counts_dense": {
+      "-3": 633,
+      "-2": 287,
+      "-1": 291,
+      "0": 1,
+      "1": 270,
+      "2": 249,
+      "3": 135,
+      "4": 72,
+      "5": 42,
+      "6": 39,
+      "7": 2
+    },
+    "all_interval_ms": {
+      "n": 2134,
+      "min": 109,
+      "median": 127.0,
+      "p95": 379,
+      "max": 3555
+    },
+    "dense_rate": {
+      "n": 2021,
+      "min": -24.390243902439025,
+      "median": -7.874015748031496,
+      "p95": 31.746031746031747,
+      "max": 55.118110236220474
+    },
+    "nonzero_run_seconds": {
+      "n": 15,
+      "min": 1.014,
+      "median": 18.554,
+      "p95": 79.302,
+      "max": 79.302
+    },
+    "player_min": 447,
+    "player_max": 505,
+    "marked_deaths": 13,
+    "plain_visibility_removals": 58,
+    "archive": "run4-radius-long-20260927/bot0.jsonl.gz",
+    "sha256": "3180b8201f51d5f4fe9732b6c69e85bab8ce49448742a2a72cfd228ef60613ef",
+    "bins_30s": [
+      {
+        "seconds": [
+          0,
+          30
+        ],
+        "samples": 21,
+        "start": 13631,
+        "end": 13498,
+        "min": 13383,
+        "max": 13631,
+        "variation": 363,
+        "growth": 5,
+        "shrink": 14,
+        "players_min": 460,
+        "players_max": 494
+      },
+      {
+        "seconds": [
+          30,
+          60
+        ],
+        "samples": 20,
+        "start": 13547,
+        "end": 13901,
+        "min": 13547,
+        "max": 13957,
+        "variation": 466,
+        "growth": 14,
+        "shrink": 5,
+        "players_min": 462,
+        "players_max": 492
+      },
+      {
+        "seconds": [
+          60,
+          90
+        ],
+        "samples": 20,
+        "start": 13878,
+        "end": 13646,
+        "min": 13509,
+        "max": 13878,
+        "variation": 506,
+        "growth": 6,
+        "shrink": 13,
+        "players_min": 447,
+        "players_max": 478
+      },
+      {
+        "seconds": [
+          90,
+          120
+        ],
+        "samples": 146,
+        "start": 13669,
+        "end": 13661,
+        "min": 13637,
+        "max": 13696,
+        "variation": 178,
+        "growth": 62,
+        "shrink": 83,
+        "players_min": 458,
+        "players_max": 498
+      },
+      {
+        "seconds": [
+          120,
+          150
+        ],
+        "samples": 195,
+        "start": 13660,
+        "end": 13523,
+        "min": 13400,
+        "max": 13660,
+        "variation": 385,
+        "growth": 74,
+        "shrink": 120,
+        "players_min": 472,
+        "players_max": 489
+      },
+      {
+        "seconds": [
+          150,
+          180
+        ],
+        "samples": 183,
+        "start": 13522,
+        "end": 13391,
+        "min": 13311,
+        "max": 13522,
+        "variation": 291,
+        "growth": 51,
+        "shrink": 131,
+        "players_min": 456,
+        "players_max": 498
+      },
+      {
+        "seconds": [
+          180,
+          210
+        ],
+        "samples": 212,
+        "start": 13392,
+        "end": 13808,
+        "min": 13392,
+        "max": 13808,
+        "variation": 416,
+        "growth": 211,
+        "shrink": 0,
+        "players_min": 485,
+        "players_max": 496
+      },
+      {
+        "seconds": [
+          210,
+          240
+        ],
+        "samples": 187,
+        "start": 13809,
+        "end": 13693,
+        "min": 13599,
+        "max": 13815,
+        "variation": 316,
+        "growth": 54,
+        "shrink": 132,
+        "players_min": 469,
+        "players_max": 503
+      },
+      {
+        "seconds": [
+          240,
+          270
+        ],
+        "samples": 203,
+        "start": 13696,
+        "end": 13758,
+        "min": 13696,
+        "max": 13940,
+        "variation": 426,
+        "growth": 108,
+        "shrink": 94,
+        "players_min": 463,
+        "players_max": 498
+      },
+      {
+        "seconds": [
+          270,
+          300
+        ],
+        "samples": 200,
+        "start": 13755,
+        "end": 14276,
+        "min": 13619,
+        "max": 14276,
+        "variation": 793,
+        "growth": 137,
+        "shrink": 62,
+        "players_min": 471,
+        "players_max": 498
+      },
+      {
+        "seconds": [
+          300,
+          330
+        ],
+        "samples": 201,
+        "start": 14281,
+        "end": 14499,
+        "min": 14281,
+        "max": 14611,
+        "variation": 442,
+        "growth": 131,
+        "shrink": 69,
+        "players_min": 474,
+        "players_max": 505
+      },
+      {
+        "seconds": [
+          330,
+          360
+        ],
+        "samples": 235,
+        "start": 14497,
+        "end": 13797,
+        "min": 13797,
+        "max": 14497,
+        "variation": 700,
+        "growth": 0,
+        "shrink": 234,
+        "players_min": 480,
+        "players_max": 494
+      },
+      {
+        "seconds": [
+          360,
+          390
+        ],
+        "samples": 237,
+        "start": 13794,
+        "end": 13086,
+        "min": 13086,
+        "max": 13794,
+        "variation": 708,
+        "growth": 0,
+        "shrink": 236,
+        "players_min": 449,
+        "players_max": 483
+      },
+      {
+        "seconds": [
+          390,
+          420
+        ],
+        "samples": 75,
+        "start": 13083,
+        "end": 12931,
+        "min": 12926,
+        "max": 13083,
+        "variation": 162,
+        "growth": 5,
+        "shrink": 69,
+        "players_min": 462,
+        "players_max": 483
+      }
+    ]
+  },
+  "models_pooled_holdout": {
+    "majority": {
+      "direction": -1,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.6863,
+        "balanced_accuracy": 0.5
+      },
+      "test": {
+        "n": 2444,
+        "expanding": 1166,
+        "shrinking": 1278,
+        "accuracy": 0.5229,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "last_direction": {
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7647,
+        "balanced_accuracy": 0.7438
+      },
+      "test": {
+        "n": 2444,
+        "expanding": 1166,
+        "shrinking": 1278,
+        "accuracy": 0.8048,
+        "balanced_accuracy": 0.8032
+      }
+    },
+    "instant_population": {
+      "coefficient": 610,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7451,
+        "balanced_accuracy": 0.6446
+      },
+      "test": {
+        "n": 2444,
+        "expanding": 1166,
+        "shrinking": 1278,
+        "accuracy": 0.5348,
+        "balanced_accuracy": 0.5192
+      }
+    },
+    "ema_population": {
+      "tau_seconds": 120,
+      "coefficient": 600,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7451,
+        "balanced_accuracy": 0.6107
+      },
+      "test": {
+        "n": 2444,
+        "expanding": 1166,
+        "shrinking": 1278,
+        "accuracy": 0.5368,
+        "balanced_accuracy": 0.52
+      }
+    },
+    "fixed_cycle": {
+      "period_seconds": 120,
+      "phase_24ths": 12,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.6078,
+        "balanced_accuracy": 0.6634
+      },
+      "test": {
+        "n": 2444,
+        "expanding": 1166,
+        "shrinking": 1278,
+        "accuracy": 0.5057,
+        "balanced_accuracy": 0.5059
+      }
+    },
+    "current_670": {
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.3137254901960784,
+        "balanced_accuracy": 0.5
+      },
+      "test": {
+        "n": 2444,
+        "expanding": 1166,
+        "shrinking": 1278,
+        "accuracy": 0.5368248772504092,
+        "balanced_accuracy": 0.5424266582916596
+      }
+    }
+  },
+  "models_by_directory": {
+    "anchor-encoder-holdout-20260928": {
+      "majority": {
+        "n": 29,
+        "expanding": 13,
+        "shrinking": 16,
+        "accuracy": 0.5517,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 29,
+        "expanding": 13,
+        "shrinking": 16,
+        "accuracy": 0.8276,
+        "balanced_accuracy": 0.8221
+      },
+      "instant_population": {
+        "n": 29,
+        "expanding": 13,
+        "shrinking": 16,
+        "accuracy": 0.5172,
+        "balanced_accuracy": 0.4976
+      },
+      "ema_population": {
+        "n": 29,
+        "expanding": 13,
+        "shrinking": 16,
+        "accuracy": 0.5862,
+        "balanced_accuracy": 0.5601
+      },
+      "fixed_cycle": {
+        "n": 29,
+        "expanding": 13,
+        "shrinking": 16,
+        "accuracy": 0.2069,
+        "balanced_accuracy": 0.2308
+      },
+      "current_670": {
+        "n": 29,
+        "expanding": 13,
+        "shrinking": 16,
+        "accuracy": 0.5172413793103449,
+        "balanced_accuracy": 0.5552884615384616
+      }
+    },
+    "death-cell-prospective-20260928": {
+      "majority": {
+        "n": 76,
+        "expanding": 47,
+        "shrinking": 29,
+        "accuracy": 0.3816,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 76,
+        "expanding": 47,
+        "shrinking": 29,
+        "accuracy": 0.8553,
+        "balanced_accuracy": 0.8566
+      },
+      "instant_population": {
+        "n": 76,
+        "expanding": 47,
+        "shrinking": 29,
+        "accuracy": 0.4474,
+        "balanced_accuracy": 0.4079
+      },
+      "ema_population": {
+        "n": 76,
+        "expanding": 47,
+        "shrinking": 29,
+        "accuracy": 0.5526,
+        "balanced_accuracy": 0.5062
+      },
+      "fixed_cycle": {
+        "n": 76,
+        "expanding": 47,
+        "shrinking": 29,
+        "accuracy": 0.5658,
+        "balanced_accuracy": 0.5697
+      },
+      "current_670": {
+        "n": 76,
+        "expanding": 47,
+        "shrinking": 29,
+        "accuracy": 0.6447368421052632,
+        "balanced_accuracy": 0.5344827586206896
+      }
+    },
+    "death-window-validation-20260927": {
+      "majority": {
+        "n": 27,
+        "expanding": 12,
+        "shrinking": 15,
+        "accuracy": 0.5556,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 27,
+        "expanding": 12,
+        "shrinking": 15,
+        "accuracy": 0.7778,
+        "balanced_accuracy": 0.775
+      },
+      "instant_population": {
+        "n": 27,
+        "expanding": 12,
+        "shrinking": 15,
+        "accuracy": 0.5556,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 27,
+        "expanding": 12,
+        "shrinking": 15,
+        "accuracy": 0.5556,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 27,
+        "expanding": 12,
+        "shrinking": 15,
+        "accuracy": 0.4444,
+        "balanced_accuracy": 0.45
+      },
+      "current_670": {
+        "n": 27,
+        "expanding": 12,
+        "shrinking": 15,
+        "accuracy": 0.5925925925925926,
+        "balanced_accuracy": 0.5583333333333333
+      }
+    },
+    "fidelity-followup-20260927": {
+      "majority": {
+        "n": 20,
+        "expanding": 8,
+        "shrinking": 12,
+        "accuracy": 0.6,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 20,
+        "expanding": 8,
+        "shrinking": 12,
+        "accuracy": 0.85,
+        "balanced_accuracy": 0.8333
+      },
+      "instant_population": {
+        "n": 20,
+        "expanding": 8,
+        "shrinking": 12,
+        "accuracy": 0.6,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 20,
+        "expanding": 8,
+        "shrinking": 12,
+        "accuracy": 0.6,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 20,
+        "expanding": 8,
+        "shrinking": 12,
+        "accuracy": 0.65,
+        "balanced_accuracy": 0.625
+      },
+      "current_670": {
+        "n": 20,
+        "expanding": 8,
+        "shrinking": 12,
+        "accuracy": 0.55,
+        "balanced_accuracy": 0.4583333333333333
+      }
+    },
+    "fidelity-motion-clock-20260927": {
+      "majority": {
+        "n": 77,
+        "expanding": 39,
+        "shrinking": 38,
+        "accuracy": 0.4935,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 77,
+        "expanding": 39,
+        "shrinking": 38,
+        "accuracy": 0.8052,
+        "balanced_accuracy": 0.8053
+      },
+      "instant_population": {
+        "n": 77,
+        "expanding": 39,
+        "shrinking": 38,
+        "accuracy": 0.5195,
+        "balanced_accuracy": 0.525
+      },
+      "ema_population": {
+        "n": 77,
+        "expanding": 39,
+        "shrinking": 38,
+        "accuracy": 0.4935,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 77,
+        "expanding": 39,
+        "shrinking": 38,
+        "accuracy": 0.4026,
+        "balanced_accuracy": 0.4025
+      },
+      "current_670": {
+        "n": 77,
+        "expanding": 39,
+        "shrinking": 38,
+        "accuracy": 0.5194805194805194,
+        "balanced_accuracy": 0.5131578947368421
+      }
+    },
+    "fidelity-next-movement-20260927": {
+      "majority": {
+        "n": 66,
+        "expanding": 33,
+        "shrinking": 33,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 66,
+        "expanding": 33,
+        "shrinking": 33,
+        "accuracy": 0.803,
+        "balanced_accuracy": 0.803
+      },
+      "instant_population": {
+        "n": 66,
+        "expanding": 33,
+        "shrinking": 33,
+        "accuracy": 0.5303,
+        "balanced_accuracy": 0.5303
+      },
+      "ema_population": {
+        "n": 66,
+        "expanding": 33,
+        "shrinking": 33,
+        "accuracy": 0.5909,
+        "balanced_accuracy": 0.5909
+      },
+      "fixed_cycle": {
+        "n": 66,
+        "expanding": 33,
+        "shrinking": 33,
+        "accuracy": 0.5606,
+        "balanced_accuracy": 0.5606
+      },
+      "current_670": {
+        "n": 66,
+        "expanding": 33,
+        "shrinking": 33,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "fidelity-next-spawns-20260927": {
+      "majority": {
+        "n": 6,
+        "expanding": 3,
+        "shrinking": 3,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 6,
+        "expanding": 3,
+        "shrinking": 3,
+        "accuracy": 0.6667,
+        "balanced_accuracy": 0.6667
+      },
+      "instant_population": {
+        "n": 6,
+        "expanding": 3,
+        "shrinking": 3,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 6,
+        "expanding": 3,
+        "shrinking": 3,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 6,
+        "expanding": 3,
+        "shrinking": 3,
+        "accuracy": 0.8333,
+        "balanced_accuracy": 0.8333
+      },
+      "current_670": {
+        "n": 6,
+        "expanding": 3,
+        "shrinking": 3,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "fidelity-paired-adaptive-20260927": {
+      "majority": {
+        "n": 125,
+        "expanding": 62,
+        "shrinking": 63,
+        "accuracy": 0.504,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 125,
+        "expanding": 62,
+        "shrinking": 63,
+        "accuracy": 0.768,
+        "balanced_accuracy": 0.7675
+      },
+      "instant_population": {
+        "n": 125,
+        "expanding": 62,
+        "shrinking": 63,
+        "accuracy": 0.504,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 125,
+        "expanding": 62,
+        "shrinking": 63,
+        "accuracy": 0.504,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 125,
+        "expanding": 62,
+        "shrinking": 63,
+        "accuracy": 0.616,
+        "balanced_accuracy": 0.6156
+      },
+      "current_670": {
+        "n": 125,
+        "expanding": 62,
+        "shrinking": 63,
+        "accuracy": 0.512,
+        "balanced_accuracy": 0.5158730158730158
+      }
+    },
+    "fidelity-paired-coil-20260927": {
+      "majority": {
+        "n": 145,
+        "expanding": 89,
+        "shrinking": 56,
+        "accuracy": 0.3862,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 145,
+        "expanding": 89,
+        "shrinking": 56,
+        "accuracy": 0.8069,
+        "balanced_accuracy": 0.8063
+      },
+      "instant_population": {
+        "n": 145,
+        "expanding": 89,
+        "shrinking": 56,
+        "accuracy": 0.4414,
+        "balanced_accuracy": 0.4324
+      },
+      "ema_population": {
+        "n": 145,
+        "expanding": 89,
+        "shrinking": 56,
+        "accuracy": 0.4345,
+        "balanced_accuracy": 0.4797
+      },
+      "fixed_cycle": {
+        "n": 145,
+        "expanding": 89,
+        "shrinking": 56,
+        "accuracy": 0.5241,
+        "balanced_accuracy": 0.5164
+      },
+      "current_670": {
+        "n": 145,
+        "expanding": 89,
+        "shrinking": 56,
+        "accuracy": 0.6137931034482759,
+        "balanced_accuracy": 0.5198635634028892
+      }
+    },
+    "fidelity-paired-collection-20260927": {
+      "majority": {
+        "n": 63,
+        "expanding": 28,
+        "shrinking": 35,
+        "accuracy": 0.5556,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 63,
+        "expanding": 28,
+        "shrinking": 35,
+        "accuracy": 0.7778,
+        "balanced_accuracy": 0.7571
+      },
+      "instant_population": {
+        "n": 63,
+        "expanding": 28,
+        "shrinking": 35,
+        "accuracy": 0.5556,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 63,
+        "expanding": 28,
+        "shrinking": 35,
+        "accuracy": 0.5556,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 63,
+        "expanding": 28,
+        "shrinking": 35,
+        "accuracy": 0.4762,
+        "balanced_accuracy": 0.475
+      },
+      "current_670": {
+        "n": 63,
+        "expanding": 28,
+        "shrinking": 35,
+        "accuracy": 0.5555555555555556,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "fidelity-paired-gated-20260927": {
+      "majority": {
+        "n": 151,
+        "expanding": 70,
+        "shrinking": 81,
+        "accuracy": 0.5364,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 151,
+        "expanding": 70,
+        "shrinking": 81,
+        "accuracy": 0.8146,
+        "balanced_accuracy": 0.8146
+      },
+      "instant_population": {
+        "n": 151,
+        "expanding": 70,
+        "shrinking": 81,
+        "accuracy": 0.5364,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 151,
+        "expanding": 70,
+        "shrinking": 81,
+        "accuracy": 0.5364,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 151,
+        "expanding": 70,
+        "shrinking": 81,
+        "accuracy": 0.4106,
+        "balanced_accuracy": 0.4099
+      },
+      "current_670": {
+        "n": 151,
+        "expanding": 70,
+        "shrinking": 81,
+        "accuracy": 0.46357615894039733,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "fidelity-paired-rendezvous-20260927": {
+      "majority": {
+        "n": 104,
+        "expanding": 50,
+        "shrinking": 54,
+        "accuracy": 0.5192,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 104,
+        "expanding": 50,
+        "shrinking": 54,
+        "accuracy": 0.7981,
+        "balanced_accuracy": 0.7952
+      },
+      "instant_population": {
+        "n": 104,
+        "expanding": 50,
+        "shrinking": 54,
+        "accuracy": 0.5192,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 104,
+        "expanding": 50,
+        "shrinking": 54,
+        "accuracy": 0.5192,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 104,
+        "expanding": 50,
+        "shrinking": 54,
+        "accuracy": 0.5192,
+        "balanced_accuracy": 0.5163
+      },
+      "current_670": {
+        "n": 104,
+        "expanding": 50,
+        "shrinking": 54,
+        "accuracy": 0.4230769230769231,
+        "balanced_accuracy": 0.44
+      }
+    },
+    "fidelity-paired-shape-20260927": {
+      "majority": {
+        "n": 115,
+        "expanding": 57,
+        "shrinking": 58,
+        "accuracy": 0.5043,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 115,
+        "expanding": 57,
+        "shrinking": 58,
+        "accuracy": 0.8261,
+        "balanced_accuracy": 0.8262
+      },
+      "instant_population": {
+        "n": 115,
+        "expanding": 57,
+        "shrinking": 58,
+        "accuracy": 0.5043,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 115,
+        "expanding": 57,
+        "shrinking": 58,
+        "accuracy": 0.5043,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 115,
+        "expanding": 57,
+        "shrinking": 58,
+        "accuracy": 0.5478,
+        "balanced_accuracy": 0.5479
+      },
+      "current_670": {
+        "n": 115,
+        "expanding": 57,
+        "shrinking": 58,
+        "accuracy": 0.5652173913043478,
+        "balanced_accuracy": 0.5679068360556564
+      }
+    },
+    "fidelity-paired-small-20260927": {
+      "majority": {
+        "n": 98,
+        "expanding": 44,
+        "shrinking": 54,
+        "accuracy": 0.551,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 98,
+        "expanding": 44,
+        "shrinking": 54,
+        "accuracy": 0.8163,
+        "balanced_accuracy": 0.8144
+      },
+      "instant_population": {
+        "n": 98,
+        "expanding": 44,
+        "shrinking": 54,
+        "accuracy": 0.551,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 98,
+        "expanding": 44,
+        "shrinking": 54,
+        "accuracy": 0.551,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 98,
+        "expanding": 44,
+        "shrinking": 54,
+        "accuracy": 0.5306,
+        "balanced_accuracy": 0.5299
+      },
+      "current_670": {
+        "n": 98,
+        "expanding": 44,
+        "shrinking": 54,
+        "accuracy": 0.6122448979591837,
+        "balanced_accuracy": 0.585016835016835
+      }
+    },
+    "fidelity-prey-transitions-20260927": {
+      "majority": {
+        "n": 18,
+        "expanding": 9,
+        "shrinking": 9,
+        "accuracy": 0.5,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 18,
+        "expanding": 9,
+        "shrinking": 9,
+        "accuracy": 0.7778,
+        "balanced_accuracy": 0.7778
+      },
+      "instant_population": {
+        "n": 18,
+        "expanding": 9,
+        "shrinking": 9,
+        "accuracy": 0.6111,
+        "balanced_accuracy": 0.6111
+      },
+      "ema_population": {
+        "n": 18,
+        "expanding": 9,
+        "shrinking": 9,
+        "accuracy": 0.6111,
+        "balanced_accuracy": 0.6111
+      },
+      "fixed_cycle": {
+        "n": 18,
+        "expanding": 9,
+        "shrinking": 9,
+        "accuracy": 0.7222,
+        "balanced_accuracy": 0.7222
+      },
+      "current_670": {
+        "n": 18,
+        "expanding": 9,
+        "shrinking": 9,
+        "accuracy": 0.7222222222222222,
+        "balanced_accuracy": 0.7222222222222222
+      }
+    },
+    "meander-shape-20260928": {
+      "majority": {
+        "n": 106,
+        "expanding": 40,
+        "shrinking": 66,
+        "accuracy": 0.6226,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 106,
+        "expanding": 40,
+        "shrinking": 66,
+        "accuracy": 0.8113,
+        "balanced_accuracy": 0.7943
+      },
+      "instant_population": {
+        "n": 106,
+        "expanding": 40,
+        "shrinking": 66,
+        "accuracy": 0.6132,
+        "balanced_accuracy": 0.5958
+      },
+      "ema_population": {
+        "n": 106,
+        "expanding": 40,
+        "shrinking": 66,
+        "accuracy": 0.566,
+        "balanced_accuracy": 0.5333
+      },
+      "fixed_cycle": {
+        "n": 106,
+        "expanding": 40,
+        "shrinking": 66,
+        "accuracy": 0.5566,
+        "balanced_accuracy": 0.5701
+      },
+      "current_670": {
+        "n": 106,
+        "expanding": 40,
+        "shrinking": 66,
+        "accuracy": 0.5188679245283019,
+        "balanced_accuracy": 0.5791666666666666
+      }
+    },
+    "movement-20260927-first": {
+      "majority": {
+        "n": 23,
+        "expanding": 11,
+        "shrinking": 12,
+        "accuracy": 0.5217,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 23,
+        "expanding": 11,
+        "shrinking": 12,
+        "accuracy": 0.6957,
+        "balanced_accuracy": 0.6932
+      },
+      "instant_population": {
+        "n": 23,
+        "expanding": 11,
+        "shrinking": 12,
+        "accuracy": 0.5217,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 23,
+        "expanding": 11,
+        "shrinking": 12,
+        "accuracy": 0.5217,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 23,
+        "expanding": 11,
+        "shrinking": 12,
+        "accuracy": 0.5217,
+        "balanced_accuracy": 0.5227
+      },
+      "current_670": {
+        "n": 23,
+        "expanding": 11,
+        "shrinking": 12,
+        "accuracy": 0.6086956521739131,
+        "balanced_accuracy": 0.6098484848484849
+      }
+    },
+    "paired-prey-crossing-20260928": {
+      "majority": {
+        "n": 117,
+        "expanding": 50,
+        "shrinking": 67,
+        "accuracy": 0.5726,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 117,
+        "expanding": 50,
+        "shrinking": 67,
+        "accuracy": 0.8205,
+        "balanced_accuracy": 0.8078
+      },
+      "instant_population": {
+        "n": 117,
+        "expanding": 50,
+        "shrinking": 67,
+        "accuracy": 0.5726,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 117,
+        "expanding": 50,
+        "shrinking": 67,
+        "accuracy": 0.5726,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 117,
+        "expanding": 50,
+        "shrinking": 67,
+        "accuracy": 0.4872,
+        "balanced_accuracy": 0.4888
+      },
+      "current_670": {
+        "n": 117,
+        "expanding": 50,
+        "shrinking": 67,
+        "accuracy": 0.5726495726495726,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "paired-prey-crossing-refined-20260928": {
+      "majority": {
+        "n": 60,
+        "expanding": 29,
+        "shrinking": 31,
+        "accuracy": 0.5167,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 60,
+        "expanding": 29,
+        "shrinking": 31,
+        "accuracy": 0.8,
+        "balanced_accuracy": 0.7998
+      },
+      "instant_population": {
+        "n": 60,
+        "expanding": 29,
+        "shrinking": 31,
+        "accuracy": 0.5167,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 60,
+        "expanding": 29,
+        "shrinking": 31,
+        "accuracy": 0.5167,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 60,
+        "expanding": 29,
+        "shrinking": 31,
+        "accuracy": 0.5667,
+        "balanced_accuracy": 0.5695
+      },
+      "current_670": {
+        "n": 60,
+        "expanding": 29,
+        "shrinking": 31,
+        "accuracy": 0.5166666666666667,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "paired-prey-crossing-strict-20260928": {
+      "majority": {
+        "n": 88,
+        "expanding": 40,
+        "shrinking": 48,
+        "accuracy": 0.5455,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 88,
+        "expanding": 40,
+        "shrinking": 48,
+        "accuracy": 0.7614,
+        "balanced_accuracy": 0.7562
+      },
+      "instant_population": {
+        "n": 88,
+        "expanding": 40,
+        "shrinking": 48,
+        "accuracy": 0.5455,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 88,
+        "expanding": 40,
+        "shrinking": 48,
+        "accuracy": 0.5455,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 88,
+        "expanding": 40,
+        "shrinking": 48,
+        "accuracy": 0.6136,
+        "balanced_accuracy": 0.6104
+      },
+      "current_670": {
+        "n": 88,
+        "expanding": 40,
+        "shrinking": 48,
+        "accuracy": 0.5681818181818182,
+        "balanced_accuracy": 0.5395833333333333
+      }
+    },
+    "paired-prey-overlap-20260927": {
+      "majority": {
+        "n": 118,
+        "expanding": 52,
+        "shrinking": 66,
+        "accuracy": 0.5593,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 118,
+        "expanding": 52,
+        "shrinking": 66,
+        "accuracy": 0.822,
+        "balanced_accuracy": 0.8185
+      },
+      "instant_population": {
+        "n": 118,
+        "expanding": 52,
+        "shrinking": 66,
+        "accuracy": 0.5593,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 118,
+        "expanding": 52,
+        "shrinking": 66,
+        "accuracy": 0.5593,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 118,
+        "expanding": 52,
+        "shrinking": 66,
+        "accuracy": 0.3814,
+        "balanced_accuracy": 0.3715
+      },
+      "current_670": {
+        "n": 118,
+        "expanding": 52,
+        "shrinking": 66,
+        "accuracy": 0.559322033898305,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "prey-boundary-validation-20260927": {
+      "majority": {
+        "n": 35,
+        "expanding": 21,
+        "shrinking": 14,
+        "accuracy": 0.4,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 35,
+        "expanding": 21,
+        "shrinking": 14,
+        "accuracy": 0.7429,
+        "balanced_accuracy": 0.75
+      },
+      "instant_population": {
+        "n": 35,
+        "expanding": 21,
+        "shrinking": 14,
+        "accuracy": 0.6,
+        "balanced_accuracy": 0.5833
+      },
+      "ema_population": {
+        "n": 35,
+        "expanding": 21,
+        "shrinking": 14,
+        "accuracy": 0.6,
+        "balanced_accuracy": 0.6071
+      },
+      "fixed_cycle": {
+        "n": 35,
+        "expanding": 21,
+        "shrinking": 14,
+        "accuracy": 0.4286,
+        "balanced_accuracy": 0.4167
+      },
+      "current_670": {
+        "n": 35,
+        "expanding": 21,
+        "shrinking": 14,
+        "accuracy": 0.5428571428571428,
+        "balanced_accuracy": 0.4523809523809524
+      }
+    },
+    "prey-controlled-20260927-first": {
+      "majority": {
+        "n": 33,
+        "expanding": 17,
+        "shrinking": 16,
+        "accuracy": 0.4848,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 33,
+        "expanding": 17,
+        "shrinking": 16,
+        "accuracy": 0.8485,
+        "balanced_accuracy": 0.8493
+      },
+      "instant_population": {
+        "n": 33,
+        "expanding": 17,
+        "shrinking": 16,
+        "accuracy": 0.4545,
+        "balanced_accuracy": 0.443
+      },
+      "ema_population": {
+        "n": 33,
+        "expanding": 17,
+        "shrinking": 16,
+        "accuracy": 0.5152,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 33,
+        "expanding": 17,
+        "shrinking": 16,
+        "accuracy": 0.2727,
+        "balanced_accuracy": 0.2702
+      },
+      "current_670": {
+        "n": 33,
+        "expanding": 17,
+        "shrinking": 16,
+        "accuracy": 0.5151515151515151,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "prey-steering-validation-20260927": {
+      "majority": {
+        "n": 22,
+        "expanding": 9,
+        "shrinking": 13,
+        "accuracy": 0.5909,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 22,
+        "expanding": 9,
+        "shrinking": 13,
+        "accuracy": 0.8182,
+        "balanced_accuracy": 0.812
+      },
+      "instant_population": {
+        "n": 22,
+        "expanding": 9,
+        "shrinking": 13,
+        "accuracy": 0.5909,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 22,
+        "expanding": 9,
+        "shrinking": 13,
+        "accuracy": 0.5909,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 22,
+        "expanding": 9,
+        "shrinking": 13,
+        "accuracy": 0.5909,
+        "balanced_accuracy": 0.5684
+      },
+      "current_670": {
+        "n": 22,
+        "expanding": 9,
+        "shrinking": 13,
+        "accuracy": 0.5454545454545454,
+        "balanced_accuracy": 0.5128205128205128
+      }
+    },
+    "prey-width-confirmation-20260927": {
+      "majority": {
+        "n": 39,
+        "expanding": 20,
+        "shrinking": 19,
+        "accuracy": 0.4872,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 39,
+        "expanding": 20,
+        "shrinking": 19,
+        "accuracy": 0.8205,
+        "balanced_accuracy": 0.8224
+      },
+      "instant_population": {
+        "n": 39,
+        "expanding": 20,
+        "shrinking": 19,
+        "accuracy": 0.4872,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 39,
+        "expanding": 20,
+        "shrinking": 19,
+        "accuracy": 0.4872,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 39,
+        "expanding": 20,
+        "shrinking": 19,
+        "accuracy": 0.5897,
+        "balanced_accuracy": 0.5868
+      },
+      "current_670": {
+        "n": 39,
+        "expanding": 20,
+        "shrinking": 19,
+        "accuracy": 0.5128205128205128,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "rim-angle-discovery-20260927": {
+      "majority": {
+        "n": 69,
+        "expanding": 30,
+        "shrinking": 39,
+        "accuracy": 0.5652,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 69,
+        "expanding": 30,
+        "shrinking": 39,
+        "accuracy": 0.7826,
+        "balanced_accuracy": 0.7769
+      },
+      "instant_population": {
+        "n": 69,
+        "expanding": 30,
+        "shrinking": 39,
+        "accuracy": 0.5652,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 69,
+        "expanding": 30,
+        "shrinking": 39,
+        "accuracy": 0.5652,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 69,
+        "expanding": 30,
+        "shrinking": 39,
+        "accuracy": 0.4493,
+        "balanced_accuracy": 0.4513
+      },
+      "current_670": {
+        "n": 69,
+        "expanding": 30,
+        "shrinking": 39,
+        "accuracy": 0.5362318840579711,
+        "balanced_accuracy": 0.47435897435897434
+      }
+    },
+    "rim-angle-validation-20260927": {
+      "majority": {
+        "n": 63,
+        "expanding": 31,
+        "shrinking": 32,
+        "accuracy": 0.5079,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 63,
+        "expanding": 31,
+        "shrinking": 32,
+        "accuracy": 0.7937,
+        "balanced_accuracy": 0.7933
+      },
+      "instant_population": {
+        "n": 63,
+        "expanding": 31,
+        "shrinking": 32,
+        "accuracy": 0.5079,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 63,
+        "expanding": 31,
+        "shrinking": 32,
+        "accuracy": 0.5079,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 63,
+        "expanding": 31,
+        "shrinking": 32,
+        "accuracy": 0.5714,
+        "balanced_accuracy": 0.5701
+      },
+      "current_670": {
+        "n": 63,
+        "expanding": 31,
+        "shrinking": 32,
+        "accuracy": 0.5396825396825397,
+        "balanced_accuracy": 0.533266129032258
+      }
+    },
+    "rim-boost-threshold-20260927": {
+      "majority": {
+        "n": 47,
+        "expanding": 23,
+        "shrinking": 24,
+        "accuracy": 0.5106,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 47,
+        "expanding": 23,
+        "shrinking": 24,
+        "accuracy": 0.8085,
+        "balanced_accuracy": 0.8071
+      },
+      "instant_population": {
+        "n": 47,
+        "expanding": 23,
+        "shrinking": 24,
+        "accuracy": 0.5106,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 47,
+        "expanding": 23,
+        "shrinking": 24,
+        "accuracy": 0.5106,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 47,
+        "expanding": 23,
+        "shrinking": 24,
+        "accuracy": 0.4681,
+        "balanced_accuracy": 0.4683
+      },
+      "current_670": {
+        "n": 47,
+        "expanding": 23,
+        "shrinking": 24,
+        "accuracy": 0.5957446808510638,
+        "balanced_accuracy": 0.5896739130434783
+      }
+    },
+    "run3-single-20260927": {
+      "majority": {
+        "n": 7,
+        "expanding": 5,
+        "shrinking": 2,
+        "accuracy": 0.2857,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 7,
+        "expanding": 5,
+        "shrinking": 2,
+        "accuracy": 0.7143,
+        "balanced_accuracy": 0.65
+      },
+      "instant_population": {
+        "n": 7,
+        "expanding": 5,
+        "shrinking": 2,
+        "accuracy": 0.2857,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 7,
+        "expanding": 5,
+        "shrinking": 2,
+        "accuracy": 0.2857,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 7,
+        "expanding": 5,
+        "shrinking": 2,
+        "accuracy": 0.2857,
+        "balanced_accuracy": 0.5
+      },
+      "current_670": {
+        "n": 7,
+        "expanding": 5,
+        "shrinking": 2,
+        "accuracy": 0.2857142857142857,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "run3-small-circle-20260927": {
+      "majority": {
+        "n": 53,
+        "expanding": 17,
+        "shrinking": 36,
+        "accuracy": 0.6792,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 53,
+        "expanding": 17,
+        "shrinking": 36,
+        "accuracy": 0.8302,
+        "balanced_accuracy": 0.8129
+      },
+      "instant_population": {
+        "n": 53,
+        "expanding": 17,
+        "shrinking": 36,
+        "accuracy": 0.6604,
+        "balanced_accuracy": 0.5948
+      },
+      "ema_population": {
+        "n": 53,
+        "expanding": 17,
+        "shrinking": 36,
+        "accuracy": 0.6415,
+        "balanced_accuracy": 0.5498
+      },
+      "fixed_cycle": {
+        "n": 53,
+        "expanding": 17,
+        "shrinking": 36,
+        "accuracy": 0.566,
+        "balanced_accuracy": 0.6029
+      },
+      "current_670": {
+        "n": 53,
+        "expanding": 17,
+        "shrinking": 36,
+        "accuracy": 0.37735849056603776,
+        "balanced_accuracy": 0.49509803921568624
+      }
+    },
+    "run4-radius-long-20260927": {
+      "majority": {
+        "n": 176,
+        "expanding": 85,
+        "shrinking": 91,
+        "accuracy": 0.517,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 176,
+        "expanding": 85,
+        "shrinking": 91,
+        "accuracy": 0.8068,
+        "balanced_accuracy": 0.8058
+      },
+      "instant_population": {
+        "n": 176,
+        "expanding": 85,
+        "shrinking": 91,
+        "accuracy": 0.5455,
+        "balanced_accuracy": 0.5418
+      },
+      "ema_population": {
+        "n": 176,
+        "expanding": 85,
+        "shrinking": 91,
+        "accuracy": 0.5227,
+        "balanced_accuracy": 0.5171
+      },
+      "fixed_cycle": {
+        "n": 176,
+        "expanding": 85,
+        "shrinking": 91,
+        "accuracy": 0.5057,
+        "balanced_accuracy": 0.5053
+      },
+      "current_670": {
+        "n": 176,
+        "expanding": 85,
+        "shrinking": 91,
+        "accuracy": 0.48295454545454547,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "run4-spawns-20260927": {
+      "majority": {
+        "n": 19,
+        "expanding": 8,
+        "shrinking": 11,
+        "accuracy": 0.5789,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 19,
+        "expanding": 8,
+        "shrinking": 11,
+        "accuracy": 0.9474,
+        "balanced_accuracy": 0.9545
+      },
+      "instant_population": {
+        "n": 19,
+        "expanding": 8,
+        "shrinking": 11,
+        "accuracy": 0.5263,
+        "balanced_accuracy": 0.4545
+      },
+      "ema_population": {
+        "n": 19,
+        "expanding": 8,
+        "shrinking": 11,
+        "accuracy": 0.5789,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 19,
+        "expanding": 8,
+        "shrinking": 11,
+        "accuracy": 0.5263,
+        "balanced_accuracy": 0.5227
+      },
+      "current_670": {
+        "n": 19,
+        "expanding": 8,
+        "shrinking": 11,
+        "accuracy": 0.42105263157894735,
+        "balanced_accuracy": 0.48295454545454547
+      }
+    },
+    "run5-long-circles-20260927": {
+      "majority": {
+        "n": 15,
+        "expanding": 8,
+        "shrinking": 7,
+        "accuracy": 0.4667,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 15,
+        "expanding": 8,
+        "shrinking": 7,
+        "accuracy": 0.8,
+        "balanced_accuracy": 0.8036
+      },
+      "instant_population": {
+        "n": 15,
+        "expanding": 8,
+        "shrinking": 7,
+        "accuracy": 0.4667,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 15,
+        "expanding": 8,
+        "shrinking": 7,
+        "accuracy": 0.4667,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 15,
+        "expanding": 8,
+        "shrinking": 7,
+        "accuracy": 0.7333,
+        "balanced_accuracy": 0.7321
+      },
+      "current_670": {
+        "n": 15,
+        "expanding": 8,
+        "shrinking": 7,
+        "accuracy": 0.7333333333333333,
+        "balanced_accuracy": 0.75
+      }
+    },
+    "speedprobe-grid-holdout-20260928": {
+      "majority": {
+        "n": 31,
+        "expanding": 14,
+        "shrinking": 17,
+        "accuracy": 0.5484,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 31,
+        "expanding": 14,
+        "shrinking": 17,
+        "accuracy": 0.7742,
+        "balanced_accuracy": 0.7689
+      },
+      "instant_population": {
+        "n": 31,
+        "expanding": 14,
+        "shrinking": 17,
+        "accuracy": 0.5484,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 31,
+        "expanding": 14,
+        "shrinking": 17,
+        "accuracy": 0.5484,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 31,
+        "expanding": 14,
+        "shrinking": 17,
+        "accuracy": 0.5484,
+        "balanced_accuracy": 0.5504
+      },
+      "current_670": {
+        "n": 31,
+        "expanding": 14,
+        "shrinking": 17,
+        "accuracy": 0.5161290322580645,
+        "balanced_accuracy": 0.5336134453781513
+      }
+    },
+    "speedprobe-prepost-20260928": {
+      "majority": {
+        "n": 36,
+        "expanding": 15,
+        "shrinking": 21,
+        "accuracy": 0.5833,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 36,
+        "expanding": 15,
+        "shrinking": 21,
+        "accuracy": 0.8611,
+        "balanced_accuracy": 0.8524
+      },
+      "instant_population": {
+        "n": 36,
+        "expanding": 15,
+        "shrinking": 21,
+        "accuracy": 0.5833,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 36,
+        "expanding": 15,
+        "shrinking": 21,
+        "accuracy": 0.5833,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 36,
+        "expanding": 15,
+        "shrinking": 21,
+        "accuracy": 0.3333,
+        "balanced_accuracy": 0.3429
+      },
+      "current_670": {
+        "n": 36,
+        "expanding": 15,
+        "shrinking": 21,
+        "accuracy": 0.6666666666666666,
+        "balanced_accuracy": 0.6285714285714286
+      }
+    },
+    "speedprobe-retained-holdout-20260928": {
+      "majority": {
+        "n": 31,
+        "expanding": 17,
+        "shrinking": 14,
+        "accuracy": 0.4516,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 31,
+        "expanding": 17,
+        "shrinking": 14,
+        "accuracy": 0.8065,
+        "balanced_accuracy": 0.8046
+      },
+      "instant_population": {
+        "n": 31,
+        "expanding": 17,
+        "shrinking": 14,
+        "accuracy": 0.4516,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 31,
+        "expanding": 17,
+        "shrinking": 14,
+        "accuracy": 0.4516,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 31,
+        "expanding": 17,
+        "shrinking": 14,
+        "accuracy": 0.4194,
+        "balanced_accuracy": 0.4265
+      },
+      "current_670": {
+        "n": 31,
+        "expanding": 17,
+        "shrinking": 14,
+        "accuracy": 0.7096774193548387,
+        "balanced_accuracy": 0.6848739495798319
+      }
+    },
+    "speedprobe-sized-holdout-20260928": {
+      "majority": {
+        "n": 51,
+        "expanding": 23,
+        "shrinking": 28,
+        "accuracy": 0.549,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 51,
+        "expanding": 23,
+        "shrinking": 28,
+        "accuracy": 0.7255,
+        "balanced_accuracy": 0.7189
+      },
+      "instant_population": {
+        "n": 51,
+        "expanding": 23,
+        "shrinking": 28,
+        "accuracy": 0.5294,
+        "balanced_accuracy": 0.4821
+      },
+      "ema_population": {
+        "n": 51,
+        "expanding": 23,
+        "shrinking": 28,
+        "accuracy": 0.549,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 51,
+        "expanding": 23,
+        "shrinking": 28,
+        "accuracy": 0.5686,
+        "balanced_accuracy": 0.5644
+      },
+      "current_670": {
+        "n": 51,
+        "expanding": 23,
+        "shrinking": 28,
+        "accuracy": 0.45098039215686275,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "visibility-covariates-20260928": {
+      "majority": {
+        "n": 46,
+        "expanding": 25,
+        "shrinking": 21,
+        "accuracy": 0.4565,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 46,
+        "expanding": 25,
+        "shrinking": 21,
+        "accuracy": 0.8261,
+        "balanced_accuracy": 0.8248
+      },
+      "instant_population": {
+        "n": 46,
+        "expanding": 25,
+        "shrinking": 21,
+        "accuracy": 0.5435,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 46,
+        "expanding": 25,
+        "shrinking": 21,
+        "accuracy": 0.5435,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 46,
+        "expanding": 25,
+        "shrinking": 21,
+        "accuracy": 0.413,
+        "balanced_accuracy": 0.4067
+      },
+      "current_670": {
+        "n": 46,
+        "expanding": 25,
+        "shrinking": 21,
+        "accuracy": 0.5434782608695652,
+        "balanced_accuracy": 0.5
+      }
+    },
+    "visibility-crossing-20260928": {
+      "majority": {
+        "n": 39,
+        "expanding": 12,
+        "shrinking": 27,
+        "accuracy": 0.6923,
+        "balanced_accuracy": 0.5
+      },
+      "last_direction": {
+        "n": 39,
+        "expanding": 12,
+        "shrinking": 27,
+        "accuracy": 0.8205,
+        "balanced_accuracy": 0.7778
+      },
+      "instant_population": {
+        "n": 39,
+        "expanding": 12,
+        "shrinking": 27,
+        "accuracy": 0.6923,
+        "balanced_accuracy": 0.5
+      },
+      "ema_population": {
+        "n": 39,
+        "expanding": 12,
+        "shrinking": 27,
+        "accuracy": 0.6923,
+        "balanced_accuracy": 0.5
+      },
+      "fixed_cycle": {
+        "n": 39,
+        "expanding": 12,
+        "shrinking": 27,
+        "accuracy": 0.5128,
+        "balanced_accuracy": 0.5324
+      },
+      "current_670": {
+        "n": 39,
+        "expanding": 12,
+        "shrinking": 27,
+        "accuracy": 0.48717948717948717,
+        "balanced_accuracy": 0.35185185185185186
+      }
+    }
+  },
+  "motion": {
+    "anchor-encoder-holdout-20260928": {
+      "all": {
+        "windows": 2,
+        "linear_forecast_mae": 6.633873406381239,
+        "current_velocity_forecast_mae": 2.26440180605668,
+        "acceleration_forecast_mae": 0.33021712841833084,
+        "acceleration_beats_current_velocity": 2
+      },
+      "stable_fit_only": {
+        "windows": 1,
+        "linear_forecast_mae": 6.312455916169532,
+        "current_velocity_forecast_mae": 2.313416504021055,
+        "acceleration_forecast_mae": 0.2124885072347731,
+        "acceleration_beats_current_velocity": 1
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "death-cell-prospective-20260928": {
+      "all": {
+        "windows": 19,
+        "linear_forecast_mae": 4.605696715291315,
+        "current_velocity_forecast_mae": 1.7304811178508699,
+        "acceleration_forecast_mae": 1.4252197404834235,
+        "acceleration_beats_current_velocity": 9
+      },
+      "stable_fit_only": {
+        "windows": 19,
+        "linear_forecast_mae": 4.605696715291315,
+        "current_velocity_forecast_mae": 1.7304811178508699,
+        "acceleration_forecast_mae": 1.4252197404834235,
+        "acceleration_beats_current_velocity": 9
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "death-window-validation-20260927": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-followup-20260927": {
+      "all": {
+        "windows": 6,
+        "linear_forecast_mae": 2.483868368507671,
+        "current_velocity_forecast_mae": 2.0761501691205857,
+        "acceleration_forecast_mae": 2.7087776036630005,
+        "acceleration_beats_current_velocity": 2
+      },
+      "stable_fit_only": {
+        "windows": 6,
+        "linear_forecast_mae": 2.483868368507671,
+        "current_velocity_forecast_mae": 2.0761501691205857,
+        "acceleration_forecast_mae": 2.7087776036630005,
+        "acceleration_beats_current_velocity": 2
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-motion-clock-20260927": {
+      "all": {
+        "windows": 47,
+        "linear_forecast_mae": 3.878480972022062,
+        "current_velocity_forecast_mae": 1.853808298662789,
+        "acceleration_forecast_mae": 1.5216317418403442,
+        "acceleration_beats_current_velocity": 32
+      },
+      "stable_fit_only": {
+        "windows": 47,
+        "linear_forecast_mae": 3.878480972022062,
+        "current_velocity_forecast_mae": 1.853808298662789,
+        "acceleration_forecast_mae": 1.5216317418403442,
+        "acceleration_beats_current_velocity": 32
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-next-movement-20260927": {
+      "all": {
+        "windows": 32,
+        "linear_forecast_mae": 4.344652712109278,
+        "current_velocity_forecast_mae": 1.7677810197603467,
+        "acceleration_forecast_mae": 1.284858031148555,
+        "acceleration_beats_current_velocity": 24
+      },
+      "stable_fit_only": {
+        "windows": 32,
+        "linear_forecast_mae": 4.344652712109278,
+        "current_velocity_forecast_mae": 1.7677810197603467,
+        "acceleration_forecast_mae": 1.284858031148555,
+        "acceleration_beats_current_velocity": 24
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-next-spawns-20260927": {
+      "all": {
+        "windows": 11,
+        "linear_forecast_mae": 5.708662667221751,
+        "current_velocity_forecast_mae": 2.5816160703541327,
+        "acceleration_forecast_mae": 1.3795877727101258,
+        "acceleration_beats_current_velocity": 10
+      },
+      "stable_fit_only": {
+        "windows": 9,
+        "linear_forecast_mae": 5.65399608983519,
+        "current_velocity_forecast_mae": 2.416526415492733,
+        "acceleration_forecast_mae": 1.245579129522918,
+        "acceleration_beats_current_velocity": 8
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-adaptive-20260927": {
+      "all": {
+        "windows": 49,
+        "linear_forecast_mae": 3.9410336255629144,
+        "current_velocity_forecast_mae": 1.5110893236872474,
+        "acceleration_forecast_mae": 0.9913932464803259,
+        "acceleration_beats_current_velocity": 30
+      },
+      "stable_fit_only": {
+        "windows": 49,
+        "linear_forecast_mae": 3.9410336255629144,
+        "current_velocity_forecast_mae": 1.5110893236872474,
+        "acceleration_forecast_mae": 0.9913932464803259,
+        "acceleration_beats_current_velocity": 30
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-coil-20260927": {
+      "all": {
+        "windows": 41,
+        "linear_forecast_mae": 4.925064300797237,
+        "current_velocity_forecast_mae": 2.2855790150955366,
+        "acceleration_forecast_mae": 1.8288091416749581,
+        "acceleration_beats_current_velocity": 29
+      },
+      "stable_fit_only": {
+        "windows": 40,
+        "linear_forecast_mae": 4.898153583859836,
+        "current_velocity_forecast_mae": 2.27429382209242,
+        "acceleration_forecast_mae": 1.8491134288710116,
+        "acceleration_beats_current_velocity": 28
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-collection-20260927": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-gated-20260927": {
+      "all": {
+        "windows": 46,
+        "linear_forecast_mae": 3.6553511820792894,
+        "current_velocity_forecast_mae": 1.7174900843868302,
+        "acceleration_forecast_mae": 1.496171946195321,
+        "acceleration_beats_current_velocity": 27
+      },
+      "stable_fit_only": {
+        "windows": 46,
+        "linear_forecast_mae": 3.6553511820792894,
+        "current_velocity_forecast_mae": 1.7174900843868302,
+        "acceleration_forecast_mae": 1.496171946195321,
+        "acceleration_beats_current_velocity": 27
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-rendezvous-20260927": {
+      "all": {
+        "windows": 23,
+        "linear_forecast_mae": 3.4742096887369627,
+        "current_velocity_forecast_mae": 1.8118929976959863,
+        "acceleration_forecast_mae": 1.317027599840023,
+        "acceleration_beats_current_velocity": 16
+      },
+      "stable_fit_only": {
+        "windows": 21,
+        "linear_forecast_mae": 3.469298162348657,
+        "current_velocity_forecast_mae": 1.8488550403835164,
+        "acceleration_forecast_mae": 1.411839104870338,
+        "acceleration_beats_current_velocity": 14
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-shape-20260927": {
+      "all": {
+        "windows": 44,
+        "linear_forecast_mae": 4.023503272086872,
+        "current_velocity_forecast_mae": 1.8564082902071841,
+        "acceleration_forecast_mae": 1.4252454172081095,
+        "acceleration_beats_current_velocity": 29
+      },
+      "stable_fit_only": {
+        "windows": 43,
+        "linear_forecast_mae": 3.931979547864561,
+        "current_velocity_forecast_mae": 1.8314828471243896,
+        "acceleration_forecast_mae": 1.453780271535303,
+        "acceleration_beats_current_velocity": 28
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-paired-small-20260927": {
+      "all": {
+        "windows": 40,
+        "linear_forecast_mae": 4.069780532067353,
+        "current_velocity_forecast_mae": 1.6617666186191644,
+        "acceleration_forecast_mae": 0.8974758385623888,
+        "acceleration_beats_current_velocity": 29
+      },
+      "stable_fit_only": {
+        "windows": 39,
+        "linear_forecast_mae": 4.106883426680214,
+        "current_velocity_forecast_mae": 1.6852414917811174,
+        "acceleration_forecast_mae": 0.8881805144315525,
+        "acceleration_beats_current_velocity": 29
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "fidelity-prey-transitions-20260927": {
+      "all": {
+        "windows": 14,
+        "linear_forecast_mae": 4.627450574913275,
+        "current_velocity_forecast_mae": 2.1626119022420056,
+        "acceleration_forecast_mae": 1.0964330370451207,
+        "acceleration_beats_current_velocity": 13
+      },
+      "stable_fit_only": {
+        "windows": 14,
+        "linear_forecast_mae": 4.627450574913275,
+        "current_velocity_forecast_mae": 2.1626119022420056,
+        "acceleration_forecast_mae": 1.0964330370451207,
+        "acceleration_beats_current_velocity": 13
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "meander-shape-20260928": {
+      "all": {
+        "windows": 33,
+        "linear_forecast_mae": 2.806975844936095,
+        "current_velocity_forecast_mae": 1.4980355669964966,
+        "acceleration_forecast_mae": 1.558982827670571,
+        "acceleration_beats_current_velocity": 13
+      },
+      "stable_fit_only": {
+        "windows": 33,
+        "linear_forecast_mae": 2.806975844936095,
+        "current_velocity_forecast_mae": 1.4980355669964966,
+        "acceleration_forecast_mae": 1.558982827670571,
+        "acceleration_beats_current_velocity": 13
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "movement-20260927-first": {
+      "all": {
+        "windows": 9,
+        "linear_forecast_mae": 5.187797729200145,
+        "current_velocity_forecast_mae": 1.6050488341775415,
+        "acceleration_forecast_mae": 1.5441726443373895,
+        "acceleration_beats_current_velocity": 5
+      },
+      "stable_fit_only": {
+        "windows": 9,
+        "linear_forecast_mae": 5.187797729200145,
+        "current_velocity_forecast_mae": 1.6050488341775415,
+        "acceleration_forecast_mae": 1.5441726443373895,
+        "acceleration_beats_current_velocity": 5
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "paired-prey-crossing-20260928": {
+      "all": {
+        "windows": 1,
+        "linear_forecast_mae": 7.653237812383276,
+        "current_velocity_forecast_mae": 2.4649071441751245,
+        "acceleration_forecast_mae": 0.7935145065950691,
+        "acceleration_beats_current_velocity": 1
+      },
+      "stable_fit_only": {
+        "windows": 1,
+        "linear_forecast_mae": 7.653237812383276,
+        "current_velocity_forecast_mae": 2.4649071441751245,
+        "acceleration_forecast_mae": 0.7935145065950691,
+        "acceleration_beats_current_velocity": 1
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "paired-prey-crossing-refined-20260928": {
+      "all": {
+        "windows": 2,
+        "linear_forecast_mae": 2.4951679458374225,
+        "current_velocity_forecast_mae": 2.052873580201968,
+        "acceleration_forecast_mae": 1.8650224248988454,
+        "acceleration_beats_current_velocity": 1
+      },
+      "stable_fit_only": {
+        "windows": 2,
+        "linear_forecast_mae": 2.4951679458374225,
+        "current_velocity_forecast_mae": 2.052873580201968,
+        "acceleration_forecast_mae": 1.8650224248988454,
+        "acceleration_beats_current_velocity": 1
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "paired-prey-crossing-strict-20260928": {
+      "all": {
+        "windows": 9,
+        "linear_forecast_mae": 3.79182058938496,
+        "current_velocity_forecast_mae": 2.386068166937478,
+        "acceleration_forecast_mae": 2.6175860288762585,
+        "acceleration_beats_current_velocity": 3
+      },
+      "stable_fit_only": {
+        "windows": 9,
+        "linear_forecast_mae": 3.79182058938496,
+        "current_velocity_forecast_mae": 2.386068166937478,
+        "acceleration_forecast_mae": 2.6175860288762585,
+        "acceleration_beats_current_velocity": 3
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "paired-prey-overlap-20260927": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "prey-boundary-validation-20260927": {
+      "all": {
+        "windows": 33,
+        "linear_forecast_mae": 4.4274599301369575,
+        "current_velocity_forecast_mae": 1.8223583401936554,
+        "acceleration_forecast_mae": 1.574257748640576,
+        "acceleration_beats_current_velocity": 20
+      },
+      "stable_fit_only": {
+        "windows": 32,
+        "linear_forecast_mae": 4.453383327640376,
+        "current_velocity_forecast_mae": 1.7380367818653166,
+        "acceleration_forecast_mae": 1.465580440060435,
+        "acceleration_beats_current_velocity": 20
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "prey-controlled-20260927-first": {
+      "all": {
+        "windows": 41,
+        "linear_forecast_mae": 4.180573898683669,
+        "current_velocity_forecast_mae": 1.6235593889013322,
+        "acceleration_forecast_mae": 1.1385579964494392,
+        "acceleration_beats_current_velocity": 28
+      },
+      "stable_fit_only": {
+        "windows": 39,
+        "linear_forecast_mae": 4.1548437928313025,
+        "current_velocity_forecast_mae": 1.60630498249791,
+        "acceleration_forecast_mae": 1.099406421868056,
+        "acceleration_beats_current_velocity": 27
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "prey-steering-validation-20260927": {
+      "all": {
+        "windows": 23,
+        "linear_forecast_mae": 3.8116972332583425,
+        "current_velocity_forecast_mae": 1.6280740647678353,
+        "acceleration_forecast_mae": 0.9451797209873981,
+        "acceleration_beats_current_velocity": 16
+      },
+      "stable_fit_only": {
+        "windows": 23,
+        "linear_forecast_mae": 3.8116972332583425,
+        "current_velocity_forecast_mae": 1.6280740647678353,
+        "acceleration_forecast_mae": 0.9451797209873981,
+        "acceleration_beats_current_velocity": 16
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "prey-width-confirmation-20260927": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "rim-angle-discovery-20260927": {
+      "all": {
+        "windows": 56,
+        "linear_forecast_mae": 4.060022812022579,
+        "current_velocity_forecast_mae": 1.8427366009804071,
+        "acceleration_forecast_mae": 1.3570554884814947,
+        "acceleration_beats_current_velocity": 40
+      },
+      "stable_fit_only": {
+        "windows": 56,
+        "linear_forecast_mae": 4.060022812022579,
+        "current_velocity_forecast_mae": 1.8427366009804071,
+        "acceleration_forecast_mae": 1.3570554884814947,
+        "acceleration_beats_current_velocity": 40
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "rim-angle-validation-20260927": {
+      "all": {
+        "windows": 36,
+        "linear_forecast_mae": 3.7378075882066573,
+        "current_velocity_forecast_mae": 2.0302929985901037,
+        "acceleration_forecast_mae": 1.8537006884529659,
+        "acceleration_beats_current_velocity": 20
+      },
+      "stable_fit_only": {
+        "windows": 35,
+        "linear_forecast_mae": 3.716912329671268,
+        "current_velocity_forecast_mae": 1.8993351912557155,
+        "acceleration_forecast_mae": 1.679365073710492,
+        "acceleration_beats_current_velocity": 20
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "rim-boost-threshold-20260927": {
+      "all": {
+        "windows": 21,
+        "linear_forecast_mae": 3.5974770112350543,
+        "current_velocity_forecast_mae": 1.8786464225414905,
+        "acceleration_forecast_mae": 1.4984389515152603,
+        "acceleration_beats_current_velocity": 15
+      },
+      "stable_fit_only": {
+        "windows": 21,
+        "linear_forecast_mae": 3.5974770112350543,
+        "current_velocity_forecast_mae": 1.8786464225414905,
+        "acceleration_forecast_mae": 1.4984389515152603,
+        "acceleration_beats_current_velocity": 15
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "run3-large-radius-20260927": {
+      "all": {
+        "windows": 33,
+        "linear_forecast_mae": 3.8133190901111074,
+        "current_velocity_forecast_mae": 1.5785884299134465,
+        "acceleration_forecast_mae": 1.3079143386694052,
+        "acceleration_beats_current_velocity": 20
+      },
+      "stable_fit_only": {
+        "windows": 32,
+        "linear_forecast_mae": 3.8186200978440605,
+        "current_velocity_forecast_mae": 1.612540215010085,
+        "acceleration_forecast_mae": 1.2857619452029376,
+        "acceleration_beats_current_velocity": 20
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "run3-single-20260927": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "run3-small-circle-20260927": {
+      "all": {
+        "windows": 30,
+        "linear_forecast_mae": 3.3427783118895182,
+        "current_velocity_forecast_mae": 1.586464540824455,
+        "acceleration_forecast_mae": 1.1834371309682779,
+        "acceleration_beats_current_velocity": 21
+      },
+      "stable_fit_only": {
+        "windows": 29,
+        "linear_forecast_mae": 3.311192598058474,
+        "current_velocity_forecast_mae": 1.5896394002023093,
+        "acceleration_forecast_mae": 1.2073474875756183,
+        "acceleration_beats_current_velocity": 20
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "run4-radius-long-20260927": {
+      "all": {
+        "windows": 125,
+        "linear_forecast_mae": 3.5921257739508166,
+        "current_velocity_forecast_mae": 1.7033166537533775,
+        "acceleration_forecast_mae": 1.2264651206971688,
+        "acceleration_beats_current_velocity": 82
+      },
+      "stable_fit_only": {
+        "windows": 120,
+        "linear_forecast_mae": 3.5700076717534053,
+        "current_velocity_forecast_mae": 1.6420607524933841,
+        "acceleration_forecast_mae": 1.1244543462168233,
+        "acceleration_beats_current_velocity": 80
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "run4-spawns-20260927": {
+      "all": {
+        "windows": 6,
+        "linear_forecast_mae": 5.198194376204716,
+        "current_velocity_forecast_mae": 2.97781004376034,
+        "acceleration_forecast_mae": 2.671658679293385,
+        "acceleration_beats_current_velocity": 3
+      },
+      "stable_fit_only": {
+        "windows": 4,
+        "linear_forecast_mae": 5.2755237067239715,
+        "current_velocity_forecast_mae": 2.166745489488253,
+        "acceleration_forecast_mae": 1.7914575967177122,
+        "acceleration_beats_current_velocity": 2
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "run5-long-circles-20260927": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "speedprobe-grid-holdout-20260928": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "speedprobe-prepost-20260928": {
+      "all": {
+        "windows": 1,
+        "linear_forecast_mae": 0.048973943832125943,
+        "current_velocity_forecast_mae": 0.09239481798820748,
+        "acceleration_forecast_mae": 0.1526465380142219,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 1,
+        "linear_forecast_mae": 0.048973943832125943,
+        "current_velocity_forecast_mae": 0.09239481798820748,
+        "acceleration_forecast_mae": 0.1526465380142219,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "speedprobe-retained-holdout-20260928": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "speedprobe-sized-holdout-20260928": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "visibility-covariates-20260928": {
+      "all": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "stable_fit_only": {
+        "windows": 0,
+        "linear_forecast_mae": null,
+        "current_velocity_forecast_mae": null,
+        "acceleration_forecast_mae": null,
+        "acceleration_beats_current_velocity": 0
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    },
+    "visibility-crossing-20260928": {
+      "all": {
+        "windows": 4,
+        "linear_forecast_mae": 3.805240827703426,
+        "current_velocity_forecast_mae": 1.229391208740046,
+        "acceleration_forecast_mae": 2.2683220627138434,
+        "acceleration_beats_current_velocity": 1
+      },
+      "stable_fit_only": {
+        "windows": 4,
+        "linear_forecast_mae": 3.805240827703426,
+        "current_velocity_forecast_mae": 1.229391208740046,
+        "acceleration_forecast_mae": 2.2683220627138434,
+        "acceleration_beats_current_velocity": 1
+      },
+      "interpretation": "Equal weight per window; units are radius world units. A short forecast of inertia does not identify future target changes."
+    }
+  }
+}
