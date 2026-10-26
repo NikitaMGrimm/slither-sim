@@ -167,6 +167,10 @@
 
 ### Performance
 
+- A [native Linux capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md)
+  finds that one core keeps official-like delivery for 100 socket clients and
+  real time for 500 background bots, and profiles where the host's CPU goes.
+
 - Crowded hosts spend far less time choosing spawn positions: candidates stop
   being scored once they cannot win, and the chosen pose is unchanged. A
   64-seat Battledome host drops from about 45 to 3.5 ms per tick. Background

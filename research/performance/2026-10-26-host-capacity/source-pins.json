@@ -1,0 +1,337 @@
+{
+  "sourceCommit": "6bcb6f0b1057810bc7b31889c080ce9e3e57d6ae",
+  "archiveSha256": "75e5318cbf1266884df6ad27df1a33d3172a6e7a8626e726dae37203bbcd2dde",
+  "harnessSha256": {
+    "analyze.py": "2206c642a68266afdbaf6c7766993918ff93b9b2be2377fe221d36abcc469899",
+    "aws_run.py": "f261993fcba914e1c7969693eab0ef1385c8f2799be2fe89ec2d66cc148691d7",
+    "host_capacity_load.rs": "0e05b2ffcd897f99b2ce6464f09cf63b338c1ff25c44e78e1d69905ca6dd1020",
+    "host_probe.rs": "89fa27f8f9cdff6524f25f527eca04f0b289afbbe62b53efd7ae9cb87f643e84",
+    "plan.json": "418341fce2cebd574bd72c89abc9d618bbe1637d63d96191cdc45ea1e793b7f1",
+    "prepare.py": "c11828cde6533714feec7ac4c8f1bddd320f07180c45dfd38af6a4dd2cdbf26b",
+    "profile.py": "d29f4c4a0d5f36ac2209574c2d76cbba3167d1e18ea445b570a35787282b2ba7",
+    "run_trial.py": "6b24bb604bfb3ae65528e6a66c1dcce09f984f97c6729180696fbea3ef0a9fdd",
+    "smoke.py": "8af7c001f2e3e0a5f8834ab40e708ba1eff0d51b653ad2d4e8a3613b9ed130ef",
+    "test_analysis.py": "32fff7329467f905f5a3aab6d928e78c2057d08bea9d5c055540314cac490205",
+    "test_profile.py": "74db783025c4f577eea8c4925687637bcfc7c65cfa878853ebb9f57820af945d",
+    "test_sampling.py": "6c178187785edc1a40dcb7e0069495a13aca9f053d8ba731ac4c794a3b972401"
+  },
+  "dataOrigin": "local-simulator",
+  "access": "local-only; full raw archives and perf data excluded from Git",
+  "planSha256": "418341fce2cebd574bd72c89abc9d618bbe1637d63d96191cdc45ea1e793b7f1",
+  "returnedArchives": {
+    "server": {
+      "sha256": "eb93f908d7c4559a37662c946fd07906b8a760d932b67d07598f28c1f0a29aaf",
+      "bytes": 20819714
+    },
+    "generator": {
+      "sha256": "9312fdd34a0543a4fc1f9e0fe6b9a6b0ec10bcc9e8569b4e089b74ed0f8270c8",
+      "bytes": 505271031
+    }
+  },
+  "reductionSources": {
+    "analyze.py": "d9d2eafdb9e5c3c1fe92df033e49732dd376c54e3012783cf7401c2c299d072e",
+    "aws_run.py": "c84f86e1129109a82319e64207925925a81a736e363d4259e96b10e6a53a3fca",
+    "flamegraph.py": "f687d13823b764cd5eb24caebe59ddfaa27fbb05fa94424ffbdaf58c8fcb9a1c",
+    "prepare.py": "c11828cde6533714feec7ac4c8f1bddd320f07180c45dfd38af6a4dd2cdbf26b",
+    "profile.py": "8407b6396c2ada2bb0cf86927c0f260f0d1d65e3c8c63700219487ff99c919e8",
+    "run_trial.py": "dfcf3528ca45e64d6659799e3b30b0875d526ce0125cca7f0273c16718dbfeac",
+    "select_results.py": "65132ec29591751b0f5b9d7a1cf423e6535d0974dc17a44f293fee1f7a5e40d7",
+    "smoke.py": "8af7c001f2e3e0a5f8834ab40e708ba1eff0d51b653ad2d4e8a3613b9ed130ef",
+    "test_analysis.py": "32fff7329467f905f5a3aab6d928e78c2057d08bea9d5c055540314cac490205",
+    "test_profile.py": "644e6e840569a5f2930a97aeb21ad8fcfe05e464d251a9a2046aafc5ebe0a09e",
+    "test_sampling.py": "dd5ca23f191edf0e4200773d8e2b390d041a140a3735703852545d5dae4575e3",
+    "write_report.py": "db295ecddd9bb813b3106f7a421248d12fb164d3081266a4a6536153abb23518"
+  },
+  "runtimeAmendments": {
+    "fp-worker-amendment": {
+      "runTrialSha256": "db139c60c599287c88e6bf409417811d04c295cb36a5832e1d5e0e0f5da6060c",
+      "callGraph": "fp",
+      "capacityBinaryUnchanged": true
+    },
+    "hardware-profile-amendment": {
+      "hardwareProbe": "cycles supported on server; no sysctl changes",
+      "primaryEvent": "cycles",
+      "runTrialSha256": "0e8a81f1bfb694b86646d878ba3a634674da36e4d7a47d433d2a2bb41c6f4689",
+      "profile250": "Hardware cycles recorded separately during the already running diagnostic hold, alongside its supplementary software-clock capture. No unprofiled capacity hold is contaminated.",
+      "laterProfiles": "cycles only"
+    },
+    "profile-period-amendment": {
+      "runTrialSha256": "200adc506ab0d48eee2e7bbbc5d3e18d2f39180952d5eba99263e824fcfded13",
+      "change": "After perf record finishes, export per-sample periods with stacks, so reduction can weight CPU time instead of assuming all samples have equal periods. Unprofiled workload execution unchanged."
+    },
+    "thread-sampler-amendment": {
+      "runTrialSha256": "912250de2718cb63c38c52eb1839b665c511de22156efc67c25ef11aae44bab2",
+      "appliesFrom": "sweep-250",
+      "priorThreadCpu": "invalid group counters; process CPU and all capacity timings unaffected"
+    }
+  },
+  "binariesManifestSha256": "9a3c8a1c29f2fa17753422b98df02a3f59712e6bdd6e77704d43e2400dfc5e95",
+  "binaries": {
+    "bin/host_capacity_load": "0a7208eceab4108529a8226684505b3eb392e32d40b647637e0e09a3d0f29193",
+    "bin/host_probe": "b0f810c89c6a31b35d17db5ee2fcb94b0ea0cb41cefd286ffeaeb0bb281d0ebb",
+    "bin/slither-sim": "369b11a10e653b3ea3d92d2cd122a9e497bf942d8deb41dee0c0f5358ec69814"
+  },
+  "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "machines": {
+    "server": {
+      "Architecture": "x86_64",
+      "CPU(s)": "1",
+      "Model name": "AMD EPYC 9R14",
+      "Thread(s) per core": "1",
+      "Core(s) per socket": "1",
+      "kernel": "7.0.0-1014-aws",
+      "distribution": "Ubuntu 24.04 (Canonical noble AMI selection)"
+    },
+    "generator": {
+      "Architecture": "x86_64",
+      "CPU(s)": "16",
+      "Model name": "AMD EPYC 9R14",
+      "Thread(s) per core": "1",
+      "Core(s) per socket": "16",
+      "kernel": "7.0.0-1014-aws",
+      "distribution": "Ubuntu 24.04 (Canonical noble AMI selection)"
+    }
+  },
+  "hardwareEventProbe": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "\n Performance counter stats for 'true':\n\n           1606617      cycles                                                                \n\n       0.001090412 seconds time elapsed\n\n       0.000000000 seconds user\n       0.033702000 seconds sys\n\n\n"
+  },
+  "botAffinityVerified": [
+    {
+      "name": "host_probe",
+      "cpus": [
+        1
+      ]
+    },
+    {
+      "name": "slither-bots-0",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-bots-1",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-bots-2",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-bots-3",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-bots-4",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-bots-5",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-bots-6",
+      "cpus": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "name": "slither-simulat",
+      "cpus": [
+        0
+      ]
+    },
+    {
+      "name": "slither-sockets",
+      "cpus": [
+        1
+      ]
+    }
+  ],
+  "followupPlan": {
+    "reason": "250-client 300s confirmation exceeded 10ms p99 (11.393ms), while 120s had passed",
+    "additionalHold": {
+      "name": "confirm-100",
+      "count": 100,
+      "warmup": 15,
+      "hold": 300
+    },
+    "selection": "Next lower predeclared sweep count; same source, binaries and instance pair",
+    "status": "Frozen before 100-client confirmation data",
+    "primaryResultsPreserved": true
+  },
+  "serverClockBridge": {
+    "unixMinusMonotonic": 1792977592.6539526,
+    "readUncertaintySeconds": 7.152557373046875e-07
+  },
+  "framePointerProfilePlan": {
+    "reason": "Original DWARF perf export lacks user callchains for 2561 of5840 hardware samples; self IPs remain available in leaf export. Never renormalize away missing user samples.",
+    "sourceCommit": "6bcb6f0b1057810bc7b31889c080ce9e3e57d6ae",
+    "flags": "CARGO_PROFILE_RELEASE_DEBUG=1 RUSTFLAGS=-C force-frame-pointers=yes",
+    "target": "separate release profile binary; capacity binary preserved",
+    "profiles": [
+      500,
+      100
+    ],
+    "event": "cycles",
+    "callGraph": "fp",
+    "warmupSeconds": 15,
+    "holdSeconds": 120,
+    "sampleStartSecondsIntoHold": 15,
+    "sampleSeconds": 60,
+    "unprofiledResultsUnchanged": true
+  },
+  "framePointerBinaries": {
+    "bin-fp/host_probe": "91be56fd60f6347ea69e5f02da356445c2da8f27133ccd195d75f7699752fbf9"
+  },
+  "functionExports": {
+    "profile-fp-500": "3d559eb3dff9cce97aed25801f0d33b284d3eebb8609f3d2e0d0f3afe83c37ec",
+    "profile-fp-100": "c50d4295367b096e5c5326f1fa4ac6c601f20103041bbe1310bcf574508d4920"
+  },
+  "awsSummarySha256": "d787f5a80d14388d065bf65f8040663c2511851ef65a98ae922ff2a91a090ca5",
+  "rawCleanupVerificationSha256": "7cd8d16035fde6568801602bf22efdcd1885db214bcd236dc73bef2684935414",
+  "creditPlanRecordHashes": {
+    "credits-after-final.json": "2b1b8f0e4e5a2fe8d51b8f8e547cb2404699cdf06d1c9f8a3519baba43719f5a",
+    "credits-after.json": "2b1b8f0e4e5a2fe8d51b8f8e547cb2404699cdf06d1c9f8a3519baba43719f5a",
+    "credits-before.json": "2b1b8f0e4e5a2fe8d51b8f8e547cb2404699cdf06d1c9f8a3519baba43719f5a"
+  },
+  "failedAttemptArchives": {
+    "aws-1/generator-partial.tar.gz": {
+      "sha256": "ac06159670504b3c3c2ea4be3707306ae1b770bafb00d64de654aa4d86870511",
+      "bytes": 13288652
+    },
+    "aws-1/server-partial.tar.gz": {
+      "sha256": "7f727c17d0852979f6ebccb14d4783f221b015afed8cd66b0e593b0e7541b7ce",
+      "bytes": 6306
+    }
+  },
+  "scratchNotesSha256": "e878dc508f4e8bf812668778788487217534c31fa24f417397d86af5ca595d43",
+  "flamegraphs": {
+    "host-100.svg": {
+      "sha256": "9bbf29e7e632a895195baa6041f06bcaf67584cb0e81a87f6f7d7599fcb8b589",
+      "bytes": 416466,
+      "access": "local-only"
+    },
+    "host-500.svg": {
+      "sha256": "94e618458880dbb8fa51f00d42a2266ab88fa2ddfae30ec03a5db2834a9f4f57",
+      "bytes": 1751511,
+      "access": "local-only"
+    }
+  },
+  "flamegraphRenderer": {
+    "revision": "41fee1f99f9276008b7cd112fca19dc3ea84ac32",
+    "tools": {
+      "flamegraph.pl": {
+        "url": "https://raw.githubusercontent.com/brendangregg/FlameGraph/41fee1f99f9276008b7cd112fca19dc3ea84ac32/flamegraph.pl",
+        "sha256": "088f82e6848a4f12a56e1e8e8170ee6761fccf12e5615cd64630f6b087c99ea7"
+      }
+    }
+  },
+  "generatorOrigin": {
+    "label": "2026-10-24 host I/O study host_study_load.rs",
+    "sha256": "8d06b4c75c4b52c432372ea305a93fb3de540725f3e2597b93601d1907cdea17",
+    "access": "local-only original study"
+  }
+}

@@ -1,0 +1,6524 @@
+{
+  "dataOrigin": "local-simulator",
+  "sourceCommit": "6bcb6f0b1057810bc7b31889c080ce9e3e57d6ae",
+  "thresholds": {
+    "aLargestSweepN": 100,
+    "bLargestSweepN": 250,
+    "cFirstSweepNWithDeferredTicks": 500,
+    "aLargestConfirmedN": 100,
+    "bLargestConfirmedN": 100
+  },
+  "trials": {
+    "sweep-100": {
+      "requested": 100,
+      "holdSeconds": 119.99947500228882,
+      "ticksPerSecond": 142.85895833855125,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 17143,
+      "worldLagStartMs": 2.038867950439453,
+      "worldLagEndMs": 0.5138702392578125,
+      "simulationLoadPercent": 8.437720611533406,
+      "hostResources": {
+        "windowSeconds": 120.00271034240723,
+        "cpuPercentOneCore": 21.191188038536662,
+        "peakRssBytes": 14946304,
+        "nic": {
+          "rxBytes": 42654642,
+          "txBytes": 116286065,
+          "rxPackets": 796336,
+          "txPackets": 1343113,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "systemBusyPercentAllCpus": 20.320662943613762,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          21.191188038536662
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 120.00199031829834,
+        "cpuPercentOneCore": 20.207998163762348,
+        "peakRssBytes": 131878912,
+        "nic": {
+          "rxBytes": 97394166,
+          "txBytes": 53698952,
+          "rxPackets": 1342282,
+          "txPackets": 795738,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "systemBusyPercentAllCpus": 0.6424796126132779,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          2.558290901556718,
+          2.666622438104722,
+          2.574957291794872,
+          2.6666224381047225,
+          2.424959779651482,
+          2.4916253406041,
+          2.4082933894133274,
+          2.4166265845324046
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 100.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 100.0,
+      "holdCounters": {
+        "bytesIn": 24884937,
+        "bytesOut": 167799,
+        "controls": 119999,
+        "framesIn": 1338271,
+        "messagesOut": 167799
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 2.492,
+          "connectCallMs": {
+            "count": 13,
+            "max": 2.012,
+            "mean": 0.304,
+            "min": 0.14,
+            "p50": 0.164,
+            "p99": 2.012
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.116,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.526,
+            "p99": 1.054
+          },
+          "pollIntervalMs": {
+            "count": 113330,
+            "max": 3.06,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.476,
+          "connectCallMs": {
+            "count": 13,
+            "max": 2.681,
+            "mean": 0.356,
+            "min": 0.135,
+            "p50": 0.152,
+            "p99": 2.681
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.128,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.53,
+            "p99": 1.052
+          },
+          "pollIntervalMs": {
+            "count": 113330,
+            "max": 1.464,
+            "mean": 1.059,
+            "min": 1.016,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.58,
+          "connectCallMs": {
+            "count": 13,
+            "max": 1.682,
+            "mean": 0.288,
+            "min": 0.138,
+            "p50": 0.179,
+            "p99": 1.682
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.109,
+            "mean": 0.518,
+            "min": 0.0,
+            "p50": 0.515,
+            "p99": 1.039
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.568,
+            "mean": 1.059,
+            "min": 1.018,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.285,
+          "connectCallMs": {
+            "count": 12,
+            "max": 1.401,
+            "mean": 0.272,
+            "min": 0.126,
+            "p50": 0.174,
+            "p99": 1.401
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.157,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.535,
+            "p99": 1.05
+          },
+          "pollIntervalMs": {
+            "count": 113330,
+            "max": 1.862,
+            "mean": 1.059,
+            "min": 1.016,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.584,
+          "connectCallMs": {
+            "count": 13,
+            "max": 2.338,
+            "mean": 0.342,
+            "min": 0.15,
+            "p50": 0.18,
+            "p99": 2.338
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.138,
+            "mean": 0.518,
+            "min": 0.0,
+            "p50": 0.514,
+            "p99": 1.044
+          },
+          "pollIntervalMs": {
+            "count": 113330,
+            "max": 3.238,
+            "mean": 1.059,
+            "min": 1.017,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.308,
+          "connectCallMs": {
+            "count": 12,
+            "max": 1.352,
+            "mean": 0.263,
+            "min": 0.131,
+            "p50": 0.168,
+            "p99": 1.352
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.09,
+            "mean": 0.539,
+            "min": 0.0,
+            "p50": 0.546,
+            "p99": 1.045
+          },
+          "pollIntervalMs": {
+            "count": 113329,
+            "max": 2.949,
+            "mean": 1.059,
+            "min": 1.017,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.382,
+          "connectCallMs": {
+            "count": 12,
+            "max": 1.098,
+            "mean": 0.252,
+            "min": 0.132,
+            "p50": 0.182,
+            "p99": 1.098
+          },
+          "controlLatenessMs": {
+            "count": 14399,
+            "max": 1.121,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.524,
+            "p99": 1.046
+          },
+          "pollIntervalMs": {
+            "count": 113320,
+            "max": 3.709,
+            "mean": 1.059,
+            "min": 1.009,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.309,
+          "connectCallMs": {
+            "count": 12,
+            "max": 1.501,
+            "mean": 0.252,
+            "min": 0.126,
+            "p50": 0.137,
+            "p99": 1.501
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 3.337,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.047
+          },
+          "pollIntervalMs": {
+            "count": 113329,
+            "max": 3.892,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2073.74475,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3554.4732180041824,
+        "txBytes": 9690.28655004521
+      },
+      "excessMs": {
+        "count": 1338271,
+        "p50": 0.9317589999991469,
+        "p99": 2.3230470000016794,
+        "max": 10.526900000004389,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 327389,
+        "p50": 41.331,
+        "p99": 43.415,
+        "max": 51.997,
+        "min": 2.05
+      },
+      "criterionA": true,
+      "criterionB": true,
+      "threadCpuLimit": "Unavailable: initial sampler read group CPU per thread; corrected before sweep-250. Process CPU is valid.",
+      "scenario": "unprofiled sockets",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 100,
+          "min": 0.85284400000819,
+          "median": 0.9345880000000761,
+          "max": 1.0235189999984868
+        },
+        "excessMs.p99": {
+          "clients": 100,
+          "min": 2.14292700000442,
+          "median": 2.2932550000041374,
+          "max": 2.540801000010106
+        },
+        "excessMs.max": {
+          "clients": 100,
+          "min": 9.29839899999206,
+          "median": 9.87227300000086,
+          "max": 10.526900000004389
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 100,
+          "min": 41.301,
+          "median": 41.328,
+          "max": 41.361
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 100,
+          "min": 43.39,
+          "median": 43.407,
+          "max": 43.494
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 100,
+          "min": 45.539,
+          "median": 46.646,
+          "max": 51.997
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 100,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "sweep-250": {
+      "requested": 250,
+      "holdSeconds": 119.99726629257202,
+      "ticksPerSecond": 142.86158784819895,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 17143,
+      "worldLagStartMs": 11.835861206054688,
+      "worldLagEndMs": 8.102153778076172,
+      "simulationLoadPercent": 27.081209559197756,
+      "hostResources": {
+        "windowSeconds": 120.00059533119202,
+        "cpuPercentOneCore": 49.9580854866118,
+        "peakRssBytes": 32133120,
+        "nic": {
+          "rxBytes": 108131194,
+          "txBytes": 296607746,
+          "rxPackets": 2021846,
+          "txPackets": 3418899,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.4416644755280109,
+          "slither-simulat": 23.25821794714488,
+          "slither-sockets": 26.258203063938918
+        },
+        "systemBusyPercentAllCpus": 50.78751036197845,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          49.9580854866118
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 120.00133872032166,
+        "cpuPercentOneCore": 44.58283596709578,
+        "peakRssBytes": 275259392,
+        "nic": {
+          "rxBytes": 248653945,
+          "txBytes": 136337098,
+          "rxPackets": 3418184,
+          "txPackets": 2021205,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 44.582835967095775
+        },
+        "systemBusyPercentAllCpus": 2.1803256983979877,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          5.566604565611211,
+          5.891600939950789,
+          5.366606796786856,
+          5.716602892229479,
+          5.433272719728309,
+          5.716602892229479,
+          5.524938363772805,
+          5.366606796786857
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 250.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 250.0,
+      "holdCounters": {
+        "bytesIn": 64029964,
+        "bytesOut": 419592,
+        "controls": 299999,
+        "framesIn": 3411491,
+        "messagesOut": 419592
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 5.805,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.179,
+            "mean": 0.143,
+            "min": 0.119,
+            "p50": 0.138,
+            "p99": 0.179
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.302,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.522,
+            "p99": 1.066
+          },
+          "pollIntervalMs": {
+            "count": 113333,
+            "max": 1.094,
+            "mean": 1.059,
+            "min": 1.015,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.048,
+          "connectCallMs": {
+            "count": 32,
+            "max": 0.231,
+            "mean": 0.146,
+            "min": 0.123,
+            "p50": 0.136,
+            "p99": 0.231
+          },
+          "controlLatenessMs": {
+            "count": 38400,
+            "max": 1.188,
+            "mean": 0.527,
+            "min": 0.0,
+            "p50": 0.526,
+            "p99": 1.055
+          },
+          "pollIntervalMs": {
+            "count": 113329,
+            "max": 1.71,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.187,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.192,
+            "mean": 0.145,
+            "min": 0.122,
+            "p50": 0.142,
+            "p99": 0.192
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.226,
+            "mean": 0.534,
+            "min": 0.0,
+            "p50": 0.538,
+            "p99": 1.066
+          },
+          "pollIntervalMs": {
+            "count": 113333,
+            "max": 1.331,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 5.987,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.176,
+            "mean": 0.136,
+            "min": 0.124,
+            "p50": 0.132,
+            "p99": 0.176
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 2.897,
+            "mean": 0.534,
+            "min": 0.0,
+            "p50": 0.533,
+            "p99": 1.062
+          },
+          "pollIntervalMs": {
+            "count": 113327,
+            "max": 3.649,
+            "mean": 1.059,
+            "min": 1.015,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.389,
+          "connectCallMs": {
+            "count": 32,
+            "max": 0.199,
+            "mean": 0.14,
+            "min": 0.123,
+            "p50": 0.136,
+            "p99": 0.199
+          },
+          "controlLatenessMs": {
+            "count": 38400,
+            "max": 1.294,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.057
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.187,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 5.884,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.199,
+            "mean": 0.139,
+            "min": 0.121,
+            "p50": 0.134,
+            "p99": 0.199
+          },
+          "controlLatenessMs": {
+            "count": 37199,
+            "max": 1.156,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.058
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.853,
+            "mean": 1.059,
+            "min": 1.016,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.202,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.164,
+            "mean": 0.134,
+            "min": 0.12,
+            "p50": 0.131,
+            "p99": 0.164
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.229,
+            "mean": 0.534,
+            "min": 0.0,
+            "p50": 0.533,
+            "p99": 1.066
+          },
+          "pollIntervalMs": {
+            "count": 113329,
+            "max": 3.298,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 5.824,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.181,
+            "mean": 0.144,
+            "min": 0.126,
+            "p50": 0.136,
+            "p99": 0.181
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.177,
+            "mean": 0.527,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.054
+          },
+          "pollIntervalMs": {
+            "count": 113329,
+            "max": 4.356,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2134.3321333333333,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3604.3552517907624,
+        "txBytes": 9886.875816953621
+      },
+      "excessMs": {
+        "count": 3411491,
+        "p50": 1.4391730000024836,
+        "p99": 7.9366509999963455,
+        "max": 30.103490000012243,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 818229,
+        "p50": 41.354,
+        "p99": 45.572,
+        "max": 70.975,
+        "min": 0.001
+      },
+      "criterionA": false,
+      "criterionB": true,
+      "scenario": "unprofiled sockets",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 250,
+          "min": 1.2923589999991236,
+          "median": 1.4294730000037816,
+          "max": 1.602831000003789
+        },
+        "excessMs.p99": {
+          "clients": 250,
+          "min": 6.242852999996103,
+          "median": 7.881573999999091,
+          "max": 9.145007999999507
+        },
+        "excessMs.max": {
+          "clients": 250,
+          "min": 26.715856000009808,
+          "median": 27.711495000010473,
+          "max": 30.103490000012243
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 250,
+          "min": 41.297,
+          "median": 41.354,
+          "max": 41.395
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 250,
+          "min": 44.53,
+          "median": 45.565,
+          "max": 47.684
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 250,
+          "min": 52.144,
+          "median": 56.136,
+          "max": 70.975
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 250,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "sweep-500": {
+      "requested": 500,
+      "holdSeconds": 120.00030326843262,
+      "ticksPerSecond": 140.05797937363434,
+      "deferredTicks": 341,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 341,
+      "executedTicks": 16807,
+      "worldLagStartMs": 245.74887657165527,
+      "worldLagEndMs": 2597.0521450042725,
+      "simulationLoadPercent": 98.10581461836142,
+      "hostResources": {
+        "windowSeconds": 119.99501514434814,
+        "cpuPercentOneCore": 96.58734561646412,
+        "peakRssBytes": 65724416,
+        "nic": {
+          "rxBytes": 216908967,
+          "txBytes": 593756078,
+          "rxPackets": 4057254,
+          "txPackets": 6869737,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.39168293735753357,
+          "slither-simulat": 57.360716124083055,
+          "slither-sockets": 38.83494655502353
+        },
+        "systemBusyPercentAllCpus": 99.38441061475751,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          96.58734561646412
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 119.99841594696045,
+        "cpuPercentOneCore": 88.60116957459977,
+        "peakRssBytes": 509124608,
+        "nic": {
+          "rxBytes": 497490119,
+          "txBytes": 273605809,
+          "rxPackets": 6868888,
+          "txPackets": 4056656,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 88.60116957459978
+        },
+        "systemBusyPercentAllCpus": 5.902399847829992,
+        "systemStealPercentAllCpus": 0.0005283680823408819,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          10.775142236640097,
+          11.650153787179317,
+          10.841809783347847,
+          11.658487230517782,
+          10.775142236640097,
+          11.566819353794628,
+          10.61680681320919,
+          10.716808133270815
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.13,
+        "login": 0.013000000000000001,
+        "playing": 499.85599999999994,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 499.85599999999994,
+      "holdCounters": {
+        "admitted": 61,
+        "bytesIn": 126491215,
+        "bytesOut": 838955,
+        "connectAttempts": 61,
+        "controls": 599828,
+        "deaths": 62,
+        "framesIn": 6851073,
+        "lifeStarts": 61,
+        "loginsSent": 61,
+        "messagesOut": 835427,
+        "opened": 61,
+        "rejoins": 61
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 12.34,
+          "connectCallMs": {
+            "count": 66,
+            "max": 0.232,
+            "mean": 0.156,
+            "min": 0.116,
+            "p50": 0.153,
+            "p99": 0.232
+          },
+          "controlLatenessMs": {
+            "count": 75593,
+            "max": 2.939,
+            "mean": 0.527,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.069
+          },
+          "pollIntervalMs": {
+            "count": 113323,
+            "max": 4.273,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.062
+          }
+        },
+        {
+          "busySecondsInWindow": 12.265,
+          "connectCallMs": {
+            "count": 69,
+            "max": 0.233,
+            "mean": 0.162,
+            "min": 0.123,
+            "p50": 0.162,
+            "p99": 0.233
+          },
+          "controlLatenessMs": {
+            "count": 75583,
+            "max": 1.722,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.066
+          },
+          "pollIntervalMs": {
+            "count": 113327,
+            "max": 3.41,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 13.244,
+          "connectCallMs": {
+            "count": 69,
+            "max": 0.256,
+            "mean": 0.159,
+            "min": 0.123,
+            "p50": 0.155,
+            "p99": 0.256
+          },
+          "controlLatenessMs": {
+            "count": 75580,
+            "max": 3.5,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.079
+          },
+          "pollIntervalMs": {
+            "count": 113319,
+            "max": 4.531,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 12.071,
+          "connectCallMs": {
+            "count": 72,
+            "max": 0.254,
+            "mean": 0.162,
+            "min": 0.122,
+            "p50": 0.153,
+            "p99": 0.254
+          },
+          "controlLatenessMs": {
+            "count": 74374,
+            "max": 1.39,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.068
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.604,
+            "mean": 1.059,
+            "min": 1.006,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 13.221,
+          "connectCallMs": {
+            "count": 72,
+            "max": 0.276,
+            "mean": 0.162,
+            "min": 0.123,
+            "p50": 0.154,
+            "p99": 0.276
+          },
+          "controlLatenessMs": {
+            "count": 75577,
+            "max": 2.806,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.073
+          },
+          "pollIntervalMs": {
+            "count": 113324,
+            "max": 3.886,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 12.255,
+          "connectCallMs": {
+            "count": 69,
+            "max": 0.265,
+            "mean": 0.157,
+            "min": 0.122,
+            "p50": 0.153,
+            "p99": 0.265
+          },
+          "controlLatenessMs": {
+            "count": 74383,
+            "max": 4.045,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.533,
+            "p99": 1.076
+          },
+          "pollIntervalMs": {
+            "count": 113312,
+            "max": 4.358,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 13.128,
+          "connectCallMs": {
+            "count": 72,
+            "max": 0.28,
+            "mean": 0.155,
+            "min": 0.122,
+            "p50": 0.142,
+            "p99": 0.28
+          },
+          "controlLatenessMs": {
+            "count": 74374,
+            "max": 2.65,
+            "mean": 0.534,
+            "min": 0.0,
+            "p50": 0.533,
+            "p99": 1.077
+          },
+          "pollIntervalMs": {
+            "count": 113317,
+            "max": 3.885,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 12.193,
+          "connectCallMs": {
+            "count": 75,
+            "max": 0.265,
+            "mean": 0.168,
+            "min": 0.127,
+            "p50": 0.16,
+            "p99": 0.265
+          },
+          "controlLatenessMs": {
+            "count": 74365,
+            "max": 1.336,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.527,
+            "p99": 1.064
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.333,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2108.794249410497,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3616.3411374709244,
+        "txBytes": 9899.196700774453
+      },
+      "excessMs": {
+        "count": 6851012,
+        "p50": 1171.7862029999924,
+        "p99": 2349.4615019999947,
+        "max": 2409.430199000013,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 1587777,
+        "p50": 40.148,
+        "p99": 83.602,
+        "max": 289.023,
+        "min": 2.068
+      },
+      "criterionA": false,
+      "criterionB": false,
+      "scenario": "unprofiled sockets",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 500,
+          "min": 285.97752500000934,
+          "median": 1215.1201400000064,
+          "max": 1328.4436289999976
+        },
+        "excessMs.p99": {
+          "clients": 500,
+          "min": 1051.1564809999982,
+          "median": 2350.858769000006,
+          "max": 2368.146286999985
+        },
+        "excessMs.max": {
+          "clients": 500,
+          "min": 1259.7788359999831,
+          "median": 2402.7199260000016,
+          "max": 2409.430199000013
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 500,
+          "min": 39.338,
+          "median": 40.146,
+          "max": 40.217
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 500,
+          "min": 76.223,
+          "median": 82.563,
+          "max": 96.375
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 500,
+          "min": 110.202,
+          "median": 132.367,
+          "max": 289.023
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 500,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "sweep-750": {
+      "requested": 750,
+      "holdSeconds": 119.99793696403503,
+      "ticksPerSecond": 70.75954982913468,
+      "deferredTicks": 8650,
+      "deferredAtStart": 1359,
+      "deferredAtEnd": 10009,
+      "executedTicks": 8491,
+      "worldLagStartMs": 9794.338455200195,
+      "worldLagEndMs": 70355.27541923523,
+      "simulationLoadPercent": 99.90993420822943,
+      "hostResources": {
+        "windowSeconds": 119.99836897850037,
+        "cpuPercentOneCore": 96.96798464056438,
+        "peakRssBytes": 103591936,
+        "nic": {
+          "rxBytes": 187754515,
+          "txBytes": 444408520,
+          "rxPackets": 3450108,
+          "txPackets": 5037064,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.39167199021197363,
+          "slither-simulat": 55.93409358090995,
+          "slither-sockets": 40.650552516042715
+        },
+        "systemBusyPercentAllCpus": 100.0,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          96.96798464056438
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 120.00018692016602,
+        "cpuPercentOneCore": 115.44148684715094,
+        "peakRssBytes": 433901568,
+        "nic": {
+          "rxBytes": 373784788,
+          "txBytes": 235950573,
+          "rxPackets": 5036163,
+          "txPackets": 3449451,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 115.44148684715095
+        },
+        "systemBusyPercentAllCpus": 7.660213354405373,
+        "systemStealPercentAllCpus": 0.0005268010009219018,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          14.158311279384211,
+          15.21664296418809,
+          13.866645067036684,
+          15.158309721718588,
+          13.941644950211762,
+          15.233309604893666,
+          13.866645067036682,
+          13.999978192681267
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.018000000000000002,
+        "login": 0.002,
+        "playing": 749.978,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 749.978,
+      "holdCounters": {
+        "admitted": 9,
+        "bytesIn": 101941241,
+        "bytesOut": 1184028,
+        "connectAttempts": 9,
+        "controls": 899974,
+        "deaths": 9,
+        "framesIn": 4948198,
+        "lifeStarts": 9,
+        "loginsSent": 9,
+        "messagesOut": 1183506,
+        "opened": 9,
+        "rejoins": 9
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 15.957,
+          "connectCallMs": {
+            "count": 96,
+            "max": 0.268,
+            "mean": 0.147,
+            "min": 0.125,
+            "p50": 0.141,
+            "p99": 0.268
+          },
+          "controlLatenessMs": {
+            "count": 112796,
+            "max": 4.308,
+            "mean": 0.527,
+            "min": 0.0,
+            "p50": 0.526,
+            "p99": 1.063
+          },
+          "pollIntervalMs": {
+            "count": 113321,
+            "max": 4.435,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.06,
+            "p99": 1.062
+          }
+        },
+        {
+          "busySecondsInWindow": 16.286,
+          "connectCallMs": {
+            "count": 94,
+            "max": 0.267,
+            "mean": 0.154,
+            "min": 0.123,
+            "p50": 0.154,
+            "p99": 0.267
+          },
+          "controlLatenessMs": {
+            "count": 112800,
+            "max": 3.094,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.527,
+            "p99": 1.07
+          },
+          "pollIntervalMs": {
+            "count": 113321,
+            "max": 4.285,
+            "mean": 1.059,
+            "min": 1.015,
+            "p50": 1.06,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 17.432,
+          "connectCallMs": {
+            "count": 98,
+            "max": 1.875,
+            "mean": 0.173,
+            "min": 0.122,
+            "p50": 0.145,
+            "p99": 1.875
+          },
+          "controlLatenessMs": {
+            "count": 112787,
+            "max": 4.001,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.084
+          },
+          "pollIntervalMs": {
+            "count": 113316,
+            "max": 4.16,
+            "mean": 1.059,
+            "min": 1.002,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 15.947,
+          "connectCallMs": {
+            "count": 95,
+            "max": 0.232,
+            "mean": 0.144,
+            "min": 0.119,
+            "p50": 0.138,
+            "p99": 0.232
+          },
+          "controlLatenessMs": {
+            "count": 111596,
+            "max": 1.354,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.53,
+            "p99": 1.071
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.269,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.06,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 17.49,
+          "connectCallMs": {
+            "count": 95,
+            "max": 0.23,
+            "mean": 0.159,
+            "min": 0.119,
+            "p50": 0.155,
+            "p99": 0.23
+          },
+          "controlLatenessMs": {
+            "count": 112797,
+            "max": 3.877,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.532,
+            "p99": 1.082
+          },
+          "pollIntervalMs": {
+            "count": 113319,
+            "max": 4.282,
+            "mean": 1.059,
+            "min": 1.004,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 16.034,
+          "connectCallMs": {
+            "count": 94,
+            "max": 0.217,
+            "mean": 0.149,
+            "min": 0.119,
+            "p50": 0.144,
+            "p99": 0.217
+          },
+          "controlLatenessMs": {
+            "count": 112800,
+            "max": 1.407,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.077
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.298,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.06,
+            "p99": 1.062
+          }
+        },
+        {
+          "busySecondsInWindow": 17.518,
+          "connectCallMs": {
+            "count": 95,
+            "max": 0.251,
+            "mean": 0.154,
+            "min": 0.124,
+            "p50": 0.147,
+            "p99": 0.251
+          },
+          "controlLatenessMs": {
+            "count": 112800,
+            "max": 1.391,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.081
+          },
+          "pollIntervalMs": {
+            "count": 113327,
+            "max": 1.11,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 16.099,
+          "connectCallMs": {
+            "count": 94,
+            "max": 0.228,
+            "mean": 0.154,
+            "min": 0.12,
+            "p50": 0.154,
+            "p99": 0.228
+          },
+          "controlLatenessMs": {
+            "count": 111598,
+            "max": 1.581,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.076
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.15,
+            "mean": 1.059,
+            "min": 1.024,
+            "p50": 1.06,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 1132.7136818235558,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 2086.2508296366445,
+        "txBytes": 4938.084410633711
+      },
+      "excessMs": {
+        "count": 4948189,
+        "p50": 28670.240721999995,
+        "p99": 59930.691375,
+        "max": 60558.785338999995,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 1213361,
+        "p50": 79.469,
+        "p99": 154.419,
+        "max": 387.472,
+        "min": 5.697
+      },
+      "criterionA": false,
+      "criterionB": false,
+      "scenario": "unprofiled sockets",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 750,
+          "min": 13594.144492,
+          "median": 28822.541380999995,
+          "max": 36793.712189
+        },
+        "excessMs.p99": {
+          "clients": 750,
+          "min": 32617.761101999993,
+          "median": 59939.23081200001,
+          "max": 60208.77439199999
+        },
+        "excessMs.max": {
+          "clients": 750,
+          "min": 33145.47241,
+          "median": 60550.68988400001,
+          "max": 60558.785338999995
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 750,
+          "min": 79.195,
+          "median": 79.47,
+          "max": 80.307
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 750,
+          "min": 146.272,
+          "median": 153.621,
+          "max": 158.704
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 750,
+          "min": 168.28,
+          "median": 198.016,
+          "max": 387.472
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 750,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "confirm-250": {
+      "requested": 250,
+      "holdSeconds": 299.9979295730591,
+      "ticksPerSecond": 142.85765258777545,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 42857,
+      "worldLagStartMs": 8.322872161865234,
+      "worldLagEndMs": 7.252445220947266,
+      "simulationLoadPercent": 31.78706942101634,
+      "hostResources": {
+        "windowSeconds": 299.9998104572296,
+        "cpuPercentOneCore": 53.21336695402997,
+        "peakRssBytes": 33157120,
+        "nic": {
+          "rxBytes": 275863548,
+          "txBytes": 768150886,
+          "rxPackets": 5161118,
+          "txPackets": 8757066,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.44333361343560423,
+          "slither-simulat": 26.630016825090546,
+          "slither-sockets": 26.13334984462509
+        },
+        "systemBusyPercentAllCpus": 58.24353448275862,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          53.21336695402997
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 299.99951171875,
+        "cpuPercentOneCore": 45.39674055459075,
+        "peakRssBytes": 597794816,
+        "nic": {
+          "rxBytes": 645312276,
+          "txBytes": 347873038,
+          "rxPackets": 8755011,
+          "txPackets": 5159548,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 45.39674055459074
+        },
+        "systemBusyPercentAllCpus": 2.266600882161741,
+        "systemStealPercentAllCpus": 0.00021175269825875756,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          5.690009261082782,
+          6.066676540814682,
+          5.516675645630934,
+          5.873342892810697,
+          5.456675547974524,
+          5.793342762602152,
+          5.516675645630934,
+          5.48334225804404
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 250.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 250.0,
+      "holdCounters": {
+        "bytesIn": 172427425,
+        "bytesOut": 1048874,
+        "controls": 750000,
+        "framesIn": 8735283,
+        "messagesOut": 1048874
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 14.966,
+          "connectCallMs": {
+            "count": 31,
+            "max": 1.798,
+            "mean": 0.204,
+            "min": 0.121,
+            "p50": 0.155,
+            "p99": 1.798
+          },
+          "controlLatenessMs": {
+            "count": 93000,
+            "max": 3.457,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.07
+          },
+          "pollIntervalMs": {
+            "count": 283240,
+            "max": 3.481,
+            "mean": 1.059,
+            "min": 1.009,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 15.492,
+          "connectCallMs": {
+            "count": 32,
+            "max": 0.207,
+            "mean": 0.149,
+            "min": 0.126,
+            "p50": 0.137,
+            "p99": 0.207
+          },
+          "controlLatenessMs": {
+            "count": 96000,
+            "max": 2.304,
+            "mean": 0.534,
+            "min": 0.0,
+            "p50": 0.534,
+            "p99": 1.065
+          },
+          "pollIntervalMs": {
+            "count": 283276,
+            "max": 3.483,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 15.929,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.189,
+            "mean": 0.139,
+            "min": 0.121,
+            "p50": 0.137,
+            "p99": 0.189
+          },
+          "controlLatenessMs": {
+            "count": 93000,
+            "max": 3.017,
+            "mean": 0.525,
+            "min": 0.0,
+            "p50": 0.526,
+            "p99": 1.057
+          },
+          "pollIntervalMs": {
+            "count": 283301,
+            "max": 3.685,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.059,
+            "p99": 1.067
+          }
+        },
+        {
+          "busySecondsInWindow": 14.961,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.177,
+            "mean": 0.149,
+            "min": 0.127,
+            "p50": 0.147,
+            "p99": 0.177
+          },
+          "controlLatenessMs": {
+            "count": 93000,
+            "max": 3.298,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.535,
+            "p99": 1.062
+          },
+          "pollIntervalMs": {
+            "count": 283323,
+            "max": 3.464,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 16.496,
+          "connectCallMs": {
+            "count": 32,
+            "max": 0.206,
+            "mean": 0.141,
+            "min": 0.12,
+            "p50": 0.133,
+            "p99": 0.206
+          },
+          "controlLatenessMs": {
+            "count": 96000,
+            "max": 3.163,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.53,
+            "p99": 1.067
+          },
+          "pollIntervalMs": {
+            "count": 283301,
+            "max": 3.701,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.059,
+            "p99": 1.067
+          }
+        },
+        {
+          "busySecondsInWindow": 14.806,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.175,
+            "mean": 0.139,
+            "min": 0.115,
+            "p50": 0.134,
+            "p99": 0.175
+          },
+          "controlLatenessMs": {
+            "count": 93000,
+            "max": 3.452,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.059
+          },
+          "pollIntervalMs": {
+            "count": 283248,
+            "max": 3.444,
+            "mean": 1.059,
+            "min": 1.01,
+            "p50": 1.059,
+            "p99": 1.062
+          }
+        },
+        {
+          "busySecondsInWindow": 15.701,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.168,
+            "mean": 0.132,
+            "min": 0.119,
+            "p50": 0.13,
+            "p99": 0.168
+          },
+          "controlLatenessMs": {
+            "count": 93000,
+            "max": 3.219,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.53,
+            "p99": 1.068
+          },
+          "pollIntervalMs": {
+            "count": 283249,
+            "max": 3.737,
+            "mean": 1.059,
+            "min": 1.01,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 14.879,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.175,
+            "mean": 0.15,
+            "min": 0.123,
+            "p50": 0.155,
+            "p99": 0.175
+          },
+          "controlLatenessMs": {
+            "count": 93000,
+            "max": 3.242,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.527,
+            "p99": 1.057
+          },
+          "pollIntervalMs": {
+            "count": 283233,
+            "max": 4.245,
+            "mean": 1.059,
+            "min": 1.01,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2299.03196,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3678.1829639099633,
+        "txBytes": 10242.018284335065
+      },
+      "excessMs": {
+        "count": 8735282,
+        "p50": 1.6848930000051041,
+        "p99": 11.393331000006583,
+        "max": 43.15118099999381,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 2047188,
+        "p50": 41.35,
+        "p99": 47.615,
+        "max": 77.561,
+        "min": 0.001
+      },
+      "criterionA": false,
+      "criterionB": false,
+      "scenario": "unprofiled sockets",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 250,
+          "min": 1.5030079999851296,
+          "median": 1.6801419999901555,
+          "max": 1.9732260000091628
+        },
+        "excessMs.p99": {
+          "clients": 250,
+          "min": 10.25763899998492,
+          "median": 11.23680600001535,
+          "max": 12.833923000027426
+        },
+        "excessMs.max": {
+          "clients": 250,
+          "min": 38.154686999980186,
+          "median": 41.28875499998685,
+          "max": 43.15118099999381
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 250,
+          "min": 41.306,
+          "median": 41.351,
+          "max": 41.39
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 250,
+          "min": 46.521,
+          "median": 47.601,
+          "max": 48.724
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 250,
+          "min": 58.178,
+          "median": 70.959,
+          "max": 77.561
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 250,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "bots-500": {
+      "requested": 1,
+      "holdSeconds": 120.00052523612976,
+      "ticksPerSecond": 142.85770804975266,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 17143,
+      "worldLagStartMs": 4.083717346191406,
+      "worldLagEndMs": 3.6089534759521484,
+      "simulationLoadPercent": 51.10329537085768,
+      "hostResources": {
+        "windowSeconds": 120.00107455253601,
+        "cpuPercentOneCore": 94.94081650920708,
+        "peakRssBytes": 127279104,
+        "nic": {
+          "rxBytes": 99266,
+          "txBytes": 118186,
+          "rxPackets": 705,
+          "txPackets": 901,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.49166226402556107,
+          "slither-bots-0": 6.199944481949448,
+          "slither-bots-1": 6.4749420194552725,
+          "slither-bots-2": 6.3999426910445925,
+          "slither-bots-3": 5.516617267541042,
+          "slither-bots-4": 6.141611670963364,
+          "slither-bots-5": 6.199944481949448,
+          "slither-bots-6": 5.549950302390232,
+          "slither-simulat": 50.87454443857712,
+          "slither-sockets": 1.0749903738863964
+        },
+        "systemBusyPercentAllCpus": 6.1245326882598725,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          94.94081650920708
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 119.99789762496948,
+        "cpuPercentOneCore": 0.7666800987424666,
+        "peakRssBytes": 5496832,
+        "nic": {
+          "rxBytes": 99266,
+          "txBytes": 118186,
+          "rxPackets": 705,
+          "txPackets": 901,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 0.7666800987424666
+        },
+        "systemBusyPercentAllCpus": 6.12469303229117,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          0.7666800987424666
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.002,
+        "login": 0.0,
+        "playing": 0.998,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 0.998,
+      "holdCounters": {
+        "admitted": 1,
+        "bytesIn": 261167,
+        "bytesOut": 1736,
+        "connectAttempts": 1,
+        "controls": 1198,
+        "deaths": 1,
+        "framesIn": 14989,
+        "lifeStarts": 1,
+        "loginsSent": 1,
+        "messagesOut": 1680,
+        "opened": 1,
+        "rejoins": 1
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 0.297,
+          "connectCallMs": {
+            "count": 2,
+            "max": 0.08,
+            "mean": 0.07,
+            "min": 0.06,
+            "p50": 0.06,
+            "p99": 0.08
+          },
+          "controlLatenessMs": {
+            "count": 1198,
+            "max": 1.036,
+            "mean": 0.534,
+            "min": 0.009,
+            "p50": 0.537,
+            "p99": 1.027
+          },
+          "pollIntervalMs": {
+            "count": 113386,
+            "max": 2.008,
+            "mean": 1.058,
+            "min": 1.006,
+            "p50": 1.059,
+            "p99": 1.063
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2180.753173012692,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 828.8669933215813,
+        "txBytes": 986.8482105927951
+      },
+      "excessMs": {
+        "count": 14988,
+        "p50": 0.5018700000073295,
+        "p99": 1.0074800000002142,
+        "max": 2.1603910000048927,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 2837,
+        "p50": 42.31,
+        "p99": 63.524,
+        "max": 63.681,
+        "min": 6.326
+      },
+      "criterionA": true,
+      "criterionB": true,
+      "scenario": "500 bots and one watcher",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 1,
+          "min": 0.5018700000073295,
+          "median": 0.5018700000073295,
+          "max": 0.5018700000073295
+        },
+        "excessMs.p99": {
+          "clients": 1,
+          "min": 1.0074800000002142,
+          "median": 1.0074800000002142,
+          "max": 1.0074800000002142
+        },
+        "excessMs.max": {
+          "clients": 1,
+          "min": 2.1603910000048927,
+          "median": 2.1603910000048927,
+          "max": 2.1603910000048927
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 1,
+          "min": 42.31,
+          "median": 42.31,
+          "max": 42.31
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 1,
+          "min": 63.524,
+          "median": 63.524,
+          "max": 63.524
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 1,
+          "min": 63.681,
+          "median": 63.681,
+          "max": 63.681
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 7,
+        "bots": 500,
+        "maxClients": 1,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "profile-250": {
+      "requested": 250,
+      "holdSeconds": 120.00003504753113,
+      "ticksPerSecond": 142.8582916097465,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 17143,
+      "worldLagStartMs": 5.111665725708008,
+      "worldLagEndMs": 4.1467132568359375,
+      "simulationLoadPercent": 29.92114959364649,
+      "hostResources": {
+        "windowSeconds": 119.99895191192627,
+        "cpuPercentOneCore": 52.39212426300498,
+        "peakRssBytes": 32092160,
+        "nic": {
+          "rxBytes": 109420158,
+          "txBytes": 301213458,
+          "rxPackets": 2046245,
+          "txPackets": 3465482,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 1.0166755463792916,
+          "slither-simulat": 24.633548484403164,
+          "slither-sockets": 26.741900232222516
+        },
+        "systemBusyPercentAllCpus": 58.8429054054054,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          52.39212426300498
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 120.00095248222351,
+        "cpuPercentOneCore": 44.79131114226975,
+        "peakRssBytes": 276971520,
+        "nic": {
+          "rxBytes": 252598885,
+          "txBytes": 137949067,
+          "rxPackets": 3464564,
+          "txPackets": 2045558,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 44.78297787508049
+        },
+        "systemBusyPercentAllCpus": 2.1903379287689813,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          5.5666224824253385,
+          5.899953169995716,
+          5.441623474586445,
+          5.791620696535345,
+          5.449956741775705,
+          5.716621291832008,
+          5.474956543343484,
+          5.449956741775705
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 250.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 250.0,
+      "holdCounters": {
+        "bytesIn": 65453967,
+        "bytesOut": 419535,
+        "controls": 299999,
+        "framesIn": 3460754,
+        "messagesOut": 419535
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 5.888,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.207,
+            "mean": 0.149,
+            "min": 0.123,
+            "p50": 0.147,
+            "p99": 0.207
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 3.503,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.06
+          },
+          "pollIntervalMs": {
+            "count": 113220,
+            "max": 3.457,
+            "mean": 1.06,
+            "min": 1.009,
+            "p50": 1.059,
+            "p99": 1.062
+          }
+        },
+        {
+          "busySecondsInWindow": 6.059,
+          "connectCallMs": {
+            "count": 32,
+            "max": 0.202,
+            "mean": 0.154,
+            "min": 0.125,
+            "p50": 0.152,
+            "p99": 0.202
+          },
+          "controlLatenessMs": {
+            "count": 38400,
+            "max": 1.354,
+            "mean": 0.527,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.058
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.34,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.272,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.175,
+            "mean": 0.145,
+            "min": 0.125,
+            "p50": 0.144,
+            "p99": 0.175
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 3.811,
+            "mean": 0.526,
+            "min": 0.0,
+            "p50": 0.523,
+            "p99": 1.055
+          },
+          "pollIntervalMs": {
+            "count": 113287,
+            "max": 4.364,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 5.941,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.183,
+            "mean": 0.151,
+            "min": 0.121,
+            "p50": 0.15,
+            "p99": 0.183
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.21,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.534,
+            "p99": 1.056
+          },
+          "pollIntervalMs": {
+            "count": 113333,
+            "max": 1.171,
+            "mean": 1.059,
+            "min": 1.031,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.417,
+          "connectCallMs": {
+            "count": 32,
+            "max": 0.385,
+            "mean": 0.157,
+            "min": 0.117,
+            "p50": 0.147,
+            "p99": 0.385
+          },
+          "controlLatenessMs": {
+            "count": 38400,
+            "max": 3.373,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.056
+          },
+          "pollIntervalMs": {
+            "count": 113253,
+            "max": 3.623,
+            "mean": 1.06,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 5.912,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.172,
+            "mean": 0.147,
+            "min": 0.121,
+            "p50": 0.146,
+            "p99": 0.172
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.212,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.53,
+            "p99": 1.056
+          },
+          "pollIntervalMs": {
+            "count": 113330,
+            "max": 3.055,
+            "mean": 1.059,
+            "min": 1.017,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.194,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.198,
+            "mean": 0.137,
+            "min": 0.12,
+            "p50": 0.133,
+            "p99": 0.198
+          },
+          "controlLatenessMs": {
+            "count": 37199,
+            "max": 1.212,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.058
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.462,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.066
+          }
+        },
+        {
+          "busySecondsInWindow": 5.909,
+          "connectCallMs": {
+            "count": 31,
+            "max": 0.186,
+            "mean": 0.151,
+            "min": 0.122,
+            "p50": 0.151,
+            "p99": 0.186
+          },
+          "controlLatenessMs": {
+            "count": 37200,
+            "max": 1.225,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.057
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.778,
+            "mean": 1.059,
+            "min": 1.016,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2181.7989,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3647.370456378965,
+        "txBytes": 10040.536294719535
+      },
+      "excessMs": {
+        "count": 3460754,
+        "p50": 1.5524390000064159,
+        "p99": 19.140019999998913,
+        "max": 278.6947069999951,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 818112,
+        "p50": 41.36,
+        "p99": 48.647,
+        "max": 170.492,
+        "min": 0.0
+      },
+      "criterionA": false,
+      "criterionB": false,
+      "scenario": "profiled sockets",
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 250,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "profileLimit": "Initial DWARF callchains incomplete; retained as diagnostic attempt, excluded from selected function/category shares."
+    },
+    "profile-500": {
+      "requested": 500,
+      "holdSeconds": 120.00017595291138,
+      "ticksPerSecond": 138.38313042571096,
+      "deferredTicks": 504,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 504,
+      "executedTicks": 16606,
+      "worldLagStartMs": 25.700397491455078,
+      "worldLagEndMs": 3783.876350402832,
+      "simulationLoadPercent": 99.35435598926506,
+      "hostResources": {
+        "windowSeconds": 119.99928975105286,
+        "cpuPercentOneCore": 96.09223541174191,
+        "peakRssBytes": 65658880,
+        "nic": {
+          "rxBytes": 214111473,
+          "txBytes": 585777333,
+          "rxPackets": 4003708,
+          "txPackets": 6769205,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 1.1500068065926965,
+          "slither-simulat": 56.617001768049136,
+          "slither-sockets": 38.316893454443615
+        },
+        "systemBusyPercentAllCpus": 99.79145812479146,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          96.09223541174191
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 120.00194311141968,
+        "cpuPercentOneCore": 87.9902418763016,
+        "peakRssBytes": 503189504,
+        "nic": {
+          "rxBytes": 490895452,
+          "txBytes": 270044843,
+          "rxPackets": 6768195,
+          "txPackets": 4002947,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 87.99024187630158
+        },
+        "systemBusyPercentAllCpus": 5.82745408904743,
+        "systemStealPercentAllCpus": 0.0005284713964856652,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          10.858157511584523,
+          11.458147796184742,
+          10.658160750051113,
+          11.649811359320921,
+          10.59982836127054,
+          11.533146581759768,
+          10.566495567681637,
+          10.666493948448341
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.166,
+        "login": 0.018000000000000002,
+        "playing": 499.81499999999994,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 499.81499999999994,
+      "holdCounters": {
+        "admitted": 78,
+        "bytesIn": 125328376,
+        "bytesOut": 837266,
+        "connectAttempts": 78,
+        "controls": 599778,
+        "deaths": 79,
+        "framesIn": 6754651,
+        "lifeStarts": 78,
+        "loginsSent": 78,
+        "messagesOut": 832759,
+        "opened": 78,
+        "rejoins": 78
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 12.118,
+          "connectCallMs": {
+            "count": 71,
+            "max": 0.26,
+            "mean": 0.161,
+            "min": 0.12,
+            "p50": 0.154,
+            "p99": 0.26
+          },
+          "controlLatenessMs": {
+            "count": 75580,
+            "max": 1.367,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.067
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.121,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 12.362,
+          "connectCallMs": {
+            "count": 73,
+            "max": 0.27,
+            "mean": 0.167,
+            "min": 0.125,
+            "p50": 0.16,
+            "p99": 0.27
+          },
+          "controlLatenessMs": {
+            "count": 75569,
+            "max": 3.708,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.533,
+            "p99": 1.073
+          },
+          "pollIntervalMs": {
+            "count": 113310,
+            "max": 4.044,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.062
+          }
+        },
+        {
+          "busySecondsInWindow": 13.238,
+          "connectCallMs": {
+            "count": 76,
+            "max": 0.255,
+            "mean": 0.167,
+            "min": 0.124,
+            "p50": 0.156,
+            "p99": 0.255
+          },
+          "controlLatenessMs": {
+            "count": 75563,
+            "max": 1.547,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.071
+          },
+          "pollIntervalMs": {
+            "count": 113328,
+            "max": 1.093,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 12.004,
+          "connectCallMs": {
+            "count": 72,
+            "max": 0.24,
+            "mean": 0.166,
+            "min": 0.117,
+            "p50": 0.162,
+            "p99": 0.24
+          },
+          "controlLatenessMs": {
+            "count": 74373,
+            "max": 1.419,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.069
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.14,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 13.014,
+          "connectCallMs": {
+            "count": 73,
+            "max": 0.27,
+            "mean": 0.164,
+            "min": 0.119,
+            "p50": 0.164,
+            "p99": 0.27
+          },
+          "controlLatenessMs": {
+            "count": 75569,
+            "max": 3.809,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.076
+          },
+          "pollIntervalMs": {
+            "count": 113321,
+            "max": 4.308,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.06,
+            "p99": 1.067
+          }
+        },
+        {
+          "busySecondsInWindow": 12.063,
+          "connectCallMs": {
+            "count": 73,
+            "max": 0.27,
+            "mean": 0.16,
+            "min": 0.12,
+            "p50": 0.148,
+            "p99": 0.27
+          },
+          "controlLatenessMs": {
+            "count": 74372,
+            "max": 1.492,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.075
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.744,
+            "mean": 1.059,
+            "min": 1.017,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 13.1,
+          "connectCallMs": {
+            "count": 69,
+            "max": 0.269,
+            "mean": 0.152,
+            "min": 0.119,
+            "p50": 0.139,
+            "p99": 0.269
+          },
+          "controlLatenessMs": {
+            "count": 74380,
+            "max": 3.922,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.073
+          },
+          "pollIntervalMs": {
+            "count": 113321,
+            "max": 4.288,
+            "mean": 1.059,
+            "min": 1.004,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 12.142,
+          "connectCallMs": {
+            "count": 71,
+            "max": 0.275,
+            "mean": 0.159,
+            "min": 0.122,
+            "p50": 0.146,
+            "p99": 0.275
+          },
+          "controlLatenessMs": {
+            "count": 74371,
+            "max": 4.159,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.068
+          },
+          "pollIntervalMs": {
+            "count": 113305,
+            "max": 4.349,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2089.579411048755,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3569.86652191149,
+        "txBytes": 9766.626986734609
+      },
+      "excessMs": {
+        "count": 6754573,
+        "p50": 2403.730545999999,
+        "p99": 3738.523558999994,
+        "max": 3762.875129,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 1567983,
+        "p50": 40.248,
+        "p99": 83.679,
+        "max": 403.396,
+        "min": 0.0
+      },
+      "criterionA": false,
+      "criterionB": false,
+      "scenario": "profiled sockets",
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 500,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "profileLimit": "Initial DWARF callchains incomplete; retained as diagnostic attempt, excluded from selected function/category shares."
+    },
+    "confirm-100": {
+      "requested": 100,
+      "holdSeconds": 300.0000169277191,
+      "ticksPerSecond": 142.85665860587537,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 42857,
+      "worldLagStartMs": 4.276096343994141,
+      "worldLagEndMs": 5.293024063110352,
+      "simulationLoadPercent": 9.180454085319505,
+      "hostResources": {
+        "windowSeconds": 300.0022485256195,
+        "cpuPercentOneCore": 21.95650210080837,
+        "peakRssBytes": 16355328,
+        "nic": {
+          "rxBytes": 107142363,
+          "txBytes": 293269671,
+          "rxPackets": 2001012,
+          "txPackets": 3377996,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.43666339383723946,
+          "slither-simulat": 9.463262405373458,
+          "slither-sockets": 12.056576301597675
+        },
+        "systemBusyPercentAllCpus": 20.570456437542983,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          21.95650210080837
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 300.00443625450134,
+        "cpuPercentOneCore": 20.316366238096084,
+        "peakRssBytes": 263090176,
+        "nic": {
+          "rxBytes": 245730092,
+          "txBytes": 134898515,
+          "rxPackets": 3375898,
+          "txPackets": 1999401,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 20.316366238096084
+        },
+        "systemBusyPercentAllCpus": 0.646177993240763,
+        "systemStealPercentAllCpus": 0.0002109624529026324,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          2.5966282689871782,
+          2.659960665791743,
+          2.5666287126060685,
+          2.7266263466386538,
+          2.426630782827555,
+          2.5599621445213767,
+          2.3899646583617544,
+          2.3899646583617544
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 100.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 100.0,
+      "holdCounters": {
+        "bytesIn": 63389402,
+        "bytesOut": 419596,
+        "controls": 300000,
+        "framesIn": 3366230,
+        "messagesOut": 419596
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 6.183,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.169,
+            "mean": 0.147,
+            "min": 0.119,
+            "p50": 0.15,
+            "p99": 0.169
+          },
+          "controlLatenessMs": {
+            "count": 39000,
+            "max": 1.22,
+            "mean": 0.526,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.041
+          },
+          "pollIntervalMs": {
+            "count": 283332,
+            "max": 1.263,
+            "mean": 1.059,
+            "min": 1.018,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.287,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.227,
+            "mean": 0.155,
+            "min": 0.126,
+            "p50": 0.15,
+            "p99": 0.227
+          },
+          "controlLatenessMs": {
+            "count": 39000,
+            "max": 1.153,
+            "mean": 0.524,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.036
+          },
+          "pollIntervalMs": {
+            "count": 283329,
+            "max": 1.184,
+            "mean": 1.059,
+            "min": 1.016,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.612,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.155,
+            "mean": 0.135,
+            "min": 0.12,
+            "p50": 0.132,
+            "p99": 0.155
+          },
+          "controlLatenessMs": {
+            "count": 39000,
+            "max": 1.19,
+            "mean": 0.527,
+            "min": 0.0,
+            "p50": 0.536,
+            "p99": 1.051
+          },
+          "pollIntervalMs": {
+            "count": 283333,
+            "max": 1.507,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 5.678,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.143,
+            "mean": 0.132,
+            "min": 0.121,
+            "p50": 0.13,
+            "p99": 0.143
+          },
+          "controlLatenessMs": {
+            "count": 36000,
+            "max": 1.184,
+            "mean": 0.536,
+            "min": 0.0,
+            "p50": 0.547,
+            "p99": 1.048
+          },
+          "pollIntervalMs": {
+            "count": 283332,
+            "max": 1.099,
+            "mean": 1.059,
+            "min": 1.009,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.431,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.18,
+            "mean": 0.151,
+            "min": 0.127,
+            "p50": 0.147,
+            "p99": 0.18
+          },
+          "controlLatenessMs": {
+            "count": 39000,
+            "max": 1.248,
+            "mean": 0.518,
+            "min": 0.0,
+            "p50": 0.513,
+            "p99": 1.032
+          },
+          "pollIntervalMs": {
+            "count": 283332,
+            "max": 1.178,
+            "mean": 1.059,
+            "min": 1.018,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 5.784,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.172,
+            "mean": 0.148,
+            "min": 0.118,
+            "p50": 0.145,
+            "p99": 0.172
+          },
+          "controlLatenessMs": {
+            "count": 36000,
+            "max": 1.142,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.046
+          },
+          "pollIntervalMs": {
+            "count": 283333,
+            "max": 1.115,
+            "mean": 1.059,
+            "min": 1.015,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 6.123,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.173,
+            "mean": 0.146,
+            "min": 0.124,
+            "p50": 0.141,
+            "p99": 0.173
+          },
+          "controlLatenessMs": {
+            "count": 36000,
+            "max": 1.131,
+            "mean": 0.52,
+            "min": 0.0,
+            "p50": 0.51,
+            "p99": 1.037
+          },
+          "pollIntervalMs": {
+            "count": 283332,
+            "max": 1.337,
+            "mean": 1.059,
+            "min": 1.018,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 5.687,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.2,
+            "mean": 0.156,
+            "min": 0.131,
+            "p50": 0.153,
+            "p99": 0.2
+          },
+          "controlLatenessMs": {
+            "count": 36000,
+            "max": 1.099,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.533,
+            "p99": 1.023
+          },
+          "pollIntervalMs": {
+            "count": 283330,
+            "max": 3.36,
+            "mean": 1.059,
+            "min": 1.017,
+            "p50": 1.059,
+            "p99": 1.06
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2112.9800666666665,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3571.385332161945,
+        "txBytes": 9775.58243117486
+      },
+      "excessMs": {
+        "count": 3366230,
+        "p50": 0.990869000001112,
+        "p99": 2.427776000004087,
+        "max": 11.997414999990724,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 818933,
+        "p50": 41.328,
+        "p99": 43.424,
+        "max": 52.961,
+        "min": 0.86
+      },
+      "criterionA": true,
+      "criterionB": true,
+      "scenario": "unprofiled sockets",
+      "perClientSpread": {
+        "excessMs.p50": {
+          "clients": 100,
+          "min": 0.918483000001288,
+          "median": 0.9822330000024522,
+          "max": 1.0873670000073616
+        },
+        "excessMs.p99": {
+          "clients": 100,
+          "min": 2.2676590000191936,
+          "median": 2.4054249999753665,
+          "max": 2.6432929999937187
+        },
+        "excessMs.max": {
+          "clients": 100,
+          "min": 10.633606000003056,
+          "median": 11.304489000009198,
+          "max": 11.997414999990724
+        },
+        "ownUpdateGapMs.p50": {
+          "clients": 100,
+          "min": 41.301,
+          "median": 41.325,
+          "max": 41.346
+        },
+        "ownUpdateGapMs.p99": {
+          "clients": 100,
+          "min": 43.404,
+          "median": 43.418,
+          "max": 43.476
+        },
+        "ownUpdateGapMs.max": {
+          "clients": 100,
+          "min": 45.663,
+          "median": 46.828,
+          "max": 52.961
+        }
+      },
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 100,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "profile-100": {
+      "requested": 100,
+      "holdSeconds": 119.99911451339722,
+      "ticksPerSecond": 142.85105410578836,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 17142,
+      "worldLagStartMs": 2.810129165649414,
+      "worldLagEndMs": 7.924642562866211,
+      "simulationLoadPercent": 9.098948719143252,
+      "hostResources": {
+        "windowSeconds": 120.00206589698792,
+        "cpuPercentOneCore": 23.182934220383522,
+        "peakRssBytes": 15314944,
+        "nic": {
+          "rxBytes": 43128598,
+          "txBytes": 123687482,
+          "rxPackets": 804859,
+          "txPackets": 1362647,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.9416504553930043,
+          "slither-simulat": 9.49983645263739,
+          "slither-sockets": 12.733114122482398
+        },
+        "systemBusyPercentAllCpus": 28.15695184829153,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          23.182934220383522
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 119.99974727630615,
+        "cpuPercentOneCore": 20.33337615604942,
+        "peakRssBytes": 132775936,
+        "nic": {
+          "rxBytes": 97956947,
+          "txBytes": 54194508,
+          "rxPackets": 1356933,
+          "txPackets": 803322,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 20.33337615604942
+        },
+        "systemBusyPercentAllCpus": 0.6769902405846159,
+        "systemStealPercentAllCpus": 0.0005272509661873955,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          2.6416722301096995,
+          2.650005580993326,
+          2.608338826575192,
+          2.6750056336442065,
+          2.375005001833641,
+          2.5083386159716703,
+          2.408338405368149,
+          2.4666718615535363
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 100.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 100.0,
+      "holdCounters": {
+        "bytesIn": 24668130,
+        "bytesOut": 167861,
+        "controls": 120002,
+        "framesIn": 1353591,
+        "messagesOut": 167861
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 2.541,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.169,
+            "mean": 0.144,
+            "min": 0.12,
+            "p50": 0.139,
+            "p99": 0.169
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 2.534,
+            "mean": 0.522,
+            "min": 0.0,
+            "p50": 0.515,
+            "p99": 1.045
+          },
+          "pollIntervalMs": {
+            "count": 113298,
+            "max": 2.914,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.567,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.204,
+            "mean": 0.144,
+            "min": 0.118,
+            "p50": 0.135,
+            "p99": 0.204
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.128,
+            "mean": 0.524,
+            "min": 0.0,
+            "p50": 0.521,
+            "p99": 1.05
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.326,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.595,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.189,
+            "mean": 0.155,
+            "min": 0.124,
+            "p50": 0.152,
+            "p99": 0.189
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 2.623,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.056
+          },
+          "pollIntervalMs": {
+            "count": 113291,
+            "max": 2.968,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.288,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.171,
+            "mean": 0.146,
+            "min": 0.12,
+            "p50": 0.146,
+            "p99": 0.171
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.084,
+            "mean": 0.523,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.037
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.075,
+            "mean": 1.059,
+            "min": 1.034,
+            "p50": 1.059,
+            "p99": 1.06
+          }
+        },
+        {
+          "busySecondsInWindow": 2.557,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.374,
+            "mean": 0.166,
+            "min": 0.126,
+            "p50": 0.154,
+            "p99": 0.374
+          },
+          "controlLatenessMs": {
+            "count": 15601,
+            "max": 2.846,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.532,
+            "p99": 1.055
+          },
+          "pollIntervalMs": {
+            "count": 113237,
+            "max": 3.039,
+            "mean": 1.06,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.065
+          }
+        },
+        {
+          "busySecondsInWindow": 2.247,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.179,
+            "mean": 0.139,
+            "min": 0.124,
+            "p50": 0.131,
+            "p99": 0.179
+          },
+          "controlLatenessMs": {
+            "count": 14401,
+            "max": 2.315,
+            "mean": 0.524,
+            "min": 0.0,
+            "p50": 0.521,
+            "p99": 1.043
+          },
+          "pollIntervalMs": {
+            "count": 113319,
+            "max": 2.878,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.388,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.164,
+            "mean": 0.136,
+            "min": 0.124,
+            "p50": 0.132,
+            "p99": 0.164
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.102,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.537,
+            "p99": 1.053
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.076,
+            "mean": 1.059,
+            "min": 1.015,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.348,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.173,
+            "mean": 0.143,
+            "min": 0.126,
+            "p50": 0.136,
+            "p99": 0.173
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.175,
+            "mean": 0.524,
+            "min": 0.0,
+            "p50": 0.518,
+            "p99": 1.041
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.096,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2055.6775,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3593.987959925825,
+        "txBytes": 10307.112721390622
+      },
+      "excessMs": {
+        "count": 1353591,
+        "p50": 0.9462229999953706,
+        "p99": 3.0008420000012848,
+        "max": 46.44778799999767,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 327311,
+        "p50": 41.326,
+        "p99": 43.444,
+        "max": 87.978,
+        "min": 0.0
+      },
+      "criterionA": false,
+      "criterionB": true,
+      "scenario": "profiled sockets",
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 100,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "profileLimit": "Initial DWARF callchains incomplete; retained as diagnostic attempt, excluded from selected function/category shares."
+    },
+    "profile-fp-500": {
+      "requested": 500,
+      "holdSeconds": 119.99942636489868,
+      "ticksPerSecond": 129.74228687274896,
+      "deferredTicks": 1553,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 1553,
+      "executedTicks": 15569,
+      "worldLagStartMs": 112.19082832336426,
+      "worldLagEndMs": 11128.617193222046,
+      "simulationLoadPercent": 99.63936308113448,
+      "hostResources": {
+        "windowSeconds": 119.99808549880981,
+        "cpuPercentOneCore": 96.65987546205513,
+        "peakRssBytes": 66523136,
+        "nic": {
+          "rxBytes": 202916433,
+          "txBytes": 551735429,
+          "rxPackets": 3789783,
+          "txPackets": 6347971,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 1.1500183475957932,
+          "slither-simulat": 57.10091099801722,
+          "slither-sockets": 38.40894611644212
+        },
+        "systemBusyPercentAllCpus": 99.89997499374844,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          96.65987546205513
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 119.99767708778381,
+        "cpuPercentOneCore": 86.53500844356869,
+        "peakRssBytes": 478732288,
+        "nic": {
+          "rxBytes": 462765100,
+          "txBytes": 255872753,
+          "rxPackets": 6347119,
+          "txPackets": 3789143,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 86.53500844356867
+        },
+        "systemBusyPercentAllCpus": 5.684381818854248,
+        "systemStealPercentAllCpus": 0.000528337375114253,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          10.625205678500583,
+          11.616891541827307,
+          10.583538205251564,
+          11.283551755835129,
+          10.358533849706845,
+          11.033546916340999,
+          10.483536269453909,
+          10.550204226652344
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.002,
+        "dead": 0.0,
+        "idle": 0.191,
+        "login": 0.020999999999999998,
+        "playing": 499.78599999999994,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 499.78599999999994,
+      "holdCounters": {
+        "admitted": 91,
+        "bytesIn": 119945267,
+        "bytesOut": 829548,
+        "connectAttempts": 91,
+        "controls": 599740,
+        "deaths": 91,
+        "framesIn": 6335839,
+        "lifeStarts": 91,
+        "loginsSent": 91,
+        "messagesOut": 824288,
+        "opened": 91,
+        "rejoins": 91
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 12.035,
+          "connectCallMs": {
+            "count": 87,
+            "max": 0.287,
+            "mean": 0.174,
+            "min": 0.118,
+            "p50": 0.163,
+            "p99": 0.287
+          },
+          "controlLatenessMs": {
+            "count": 75534,
+            "max": 1.279,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.062
+          },
+          "pollIntervalMs": {
+            "count": 113333,
+            "max": 1.113,
+            "mean": 1.059,
+            "min": 1.019,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 12.09,
+          "connectCallMs": {
+            "count": 78,
+            "max": 0.267,
+            "mean": 0.17,
+            "min": 0.124,
+            "p50": 0.16,
+            "p99": 0.267
+          },
+          "controlLatenessMs": {
+            "count": 75559,
+            "max": 1.296,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.535,
+            "p99": 1.069
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.183,
+            "mean": 1.059,
+            "min": 1.025,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 12.805,
+          "connectCallMs": {
+            "count": 69,
+            "max": 0.23,
+            "mean": 0.157,
+            "min": 0.121,
+            "p50": 0.152,
+            "p99": 0.23
+          },
+          "controlLatenessMs": {
+            "count": 75582,
+            "max": 1.325,
+            "mean": 0.534,
+            "min": 0.0,
+            "p50": 0.534,
+            "p99": 1.078
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.323,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.06,
+            "p99": 1.067
+          }
+        },
+        {
+          "busySecondsInWindow": 11.902,
+          "connectCallMs": {
+            "count": 73,
+            "max": 0.248,
+            "mean": 0.16,
+            "min": 0.126,
+            "p50": 0.148,
+            "p99": 0.248
+          },
+          "controlLatenessMs": {
+            "count": 74367,
+            "max": 1.388,
+            "mean": 0.53,
+            "min": 0.0,
+            "p50": 0.528,
+            "p99": 1.069
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.073,
+            "mean": 1.059,
+            "min": 1.032,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 13.195,
+          "connectCallMs": {
+            "count": 70,
+            "max": 0.363,
+            "mean": 0.165,
+            "min": 0.122,
+            "p50": 0.159,
+            "p99": 0.363
+          },
+          "controlLatenessMs": {
+            "count": 75578,
+            "max": 1.361,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.531,
+            "p99": 1.073
+          },
+          "pollIntervalMs": {
+            "count": 113328,
+            "max": 1.089,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.06,
+            "p99": 1.068
+          }
+        },
+        {
+          "busySecondsInWindow": 11.762,
+          "connectCallMs": {
+            "count": 71,
+            "max": 0.243,
+            "mean": 0.158,
+            "min": 0.125,
+            "p50": 0.147,
+            "p99": 0.243
+          },
+          "controlLatenessMs": {
+            "count": 74375,
+            "max": 1.326,
+            "mean": 0.533,
+            "min": 0.0,
+            "p50": 0.532,
+            "p99": 1.074
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.125,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 12.521,
+          "connectCallMs": {
+            "count": 74,
+            "max": 0.27,
+            "mean": 0.154,
+            "min": 0.12,
+            "p50": 0.135,
+            "p99": 0.27
+          },
+          "controlLatenessMs": {
+            "count": 74366,
+            "max": 1.578,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.529,
+            "p99": 1.076
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.09,
+            "mean": 1.059,
+            "min": 1.011,
+            "p50": 1.06,
+            "p99": 1.067
+          }
+        },
+        {
+          "busySecondsInWindow": 11.983,
+          "connectCallMs": {
+            "count": 69,
+            "max": 0.229,
+            "mean": 0.154,
+            "min": 0.124,
+            "p50": 0.148,
+            "p99": 0.229
+          },
+          "controlLatenessMs": {
+            "count": 74379,
+            "max": 1.311,
+            "mean": 0.531,
+            "min": 0.0,
+            "p50": 0.53,
+            "p99": 1.068
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.139,
+            "mean": 1.059,
+            "min": 1.014,
+            "p50": 1.059,
+            "p99": 1.062
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 1999.9437592622978,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3383.4426203790954,
+        "txBytes": 9199.674654500479
+      },
+      "excessMs": {
+        "count": 6335748,
+        "p50": 5026.842426000003,
+        "p99": 10890.291849000008,
+        "max": 11126.033648000011,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 1467338,
+        "p50": 42.434,
+        "p99": 90.939,
+        "max": 393.914,
+        "min": 0.0
+      },
+      "criterionA": false,
+      "criterionB": false,
+      "scenario": "profiled sockets",
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 500,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    },
+    "profile-fp-100": {
+      "requested": 100,
+      "holdSeconds": 119.9978506565094,
+      "ticksPerSecond": 142.85255866014228,
+      "deferredTicks": 0,
+      "deferredAtStart": 0,
+      "deferredAtEnd": 0,
+      "executedTicks": 17142,
+      "worldLagStartMs": 1.9676132202148438,
+      "worldLagEndMs": 5.818269729614258,
+      "simulationLoadPercent": 8.70831348214081,
+      "hostResources": {
+        "windowSeconds": 119.99877214431763,
+        "cpuPercentOneCore": 22.883567480986372,
+        "peakRssBytes": 15196160,
+        "nic": {
+          "rxBytes": 43478425,
+          "txBytes": 139276077,
+          "rxPackets": 811386,
+          "txPackets": 1382113,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_probe": 0.9083426276138071,
+          "slither-simulat": 9.375095927206726,
+          "slither-sockets": 12.591795507563877
+        },
+        "systemBusyPercentAllCpus": 23.529941467807294,
+        "systemStealPercentAllCpus": 0.0,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          22.883567480986372
+        ]
+      },
+      "generatorResources": {
+        "windowSeconds": 120.00139474868774,
+        "cpuPercentOneCore": 20.274764348325256,
+        "peakRssBytes": 133099520,
+        "nic": {
+          "rxBytes": 98372083,
+          "txBytes": 54547912,
+          "rxPackets": 1366841,
+          "txPackets": 808673,
+          "rxDrops": 0,
+          "txDrops": 0
+        },
+        "threadCpuPercentOneCore": {
+          "host_capacity_l": 20.274764348325256
+        },
+        "systemBusyPercentAllCpus": 0.6476451663941776,
+        "systemStealPercentAllCpus": 0.0005273983439691999,
+        "nofile": [
+          4096,
+          1048576
+        ],
+        "perProcessCpuPercentOneCore": [
+          2.5499703619348653,
+          2.7666345103345606,
+          2.5666368348886888,
+          2.6333027267039792,
+          2.391638868873551,
+          2.5416371254579544,
+          2.3999721053504617,
+          2.424971814781196
+        ]
+      },
+      "clientsTimeWeighted": {
+        "connecting": 0.0,
+        "dead": 0.0,
+        "idle": 0.0,
+        "login": 0.0,
+        "playing": 100.0,
+        "setup": 0.0
+      },
+      "admittedTimeWeighted": 100.0,
+      "holdCounters": {
+        "bytesIn": 24548043,
+        "bytesOut": 167848,
+        "controls": 120000,
+        "framesIn": 1363590,
+        "messagesOut": 167848
+      },
+      "generatorService": [
+        {
+          "busySecondsInWindow": 2.477,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.208,
+            "mean": 0.142,
+            "min": 0.12,
+            "p50": 0.133,
+            "p99": 0.208
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.112,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.04
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.071,
+            "mean": 1.059,
+            "min": 1.036,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.462,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.264,
+            "mean": 0.144,
+            "min": 0.126,
+            "p50": 0.134,
+            "p99": 0.264
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.108,
+            "mean": 0.519,
+            "min": 0.0,
+            "p50": 0.507,
+            "p99": 1.047
+          },
+          "pollIntervalMs": {
+            "count": 113331,
+            "max": 1.376,
+            "mean": 1.059,
+            "min": 1.012,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.54,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.155,
+            "mean": 0.141,
+            "min": 0.126,
+            "p50": 0.143,
+            "p99": 0.155
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.154,
+            "mean": 0.525,
+            "min": 0.0,
+            "p50": 0.525,
+            "p99": 1.037
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.078,
+            "mean": 1.059,
+            "min": 1.028,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.293,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.153,
+            "mean": 0.135,
+            "min": 0.124,
+            "p50": 0.13,
+            "p99": 0.153
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.149,
+            "mean": 0.537,
+            "min": 0.0,
+            "p50": 0.54,
+            "p99": 1.056
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.098,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        },
+        {
+          "busySecondsInWindow": 2.703,
+          "connectCallMs": {
+            "count": 13,
+            "max": 0.191,
+            "mean": 0.134,
+            "min": 0.119,
+            "p50": 0.126,
+            "p99": 0.191
+          },
+          "controlLatenessMs": {
+            "count": 15600,
+            "max": 1.141,
+            "mean": 0.529,
+            "min": 0.0,
+            "p50": 0.532,
+            "p99": 1.056
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.116,
+            "mean": 1.059,
+            "min": 1.016,
+            "p50": 1.059,
+            "p99": 1.064
+          }
+        },
+        {
+          "busySecondsInWindow": 2.278,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.157,
+            "mean": 0.134,
+            "min": 0.122,
+            "p50": 0.133,
+            "p99": 0.157
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.089,
+            "mean": 0.545,
+            "min": 0.0,
+            "p50": 0.551,
+            "p99": 1.048
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.069,
+            "mean": 1.059,
+            "min": 1.043,
+            "p50": 1.059,
+            "p99": 1.06
+          }
+        },
+        {
+          "busySecondsInWindow": 2.439,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.2,
+            "mean": 0.139,
+            "min": 0.122,
+            "p50": 0.132,
+            "p99": 0.2
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.113,
+            "mean": 0.532,
+            "min": 0.0,
+            "p50": 0.536,
+            "p99": 1.052
+          },
+          "pollIntervalMs": {
+            "count": 113333,
+            "max": 1.073,
+            "mean": 1.059,
+            "min": 1.029,
+            "p50": 1.059,
+            "p99": 1.063
+          }
+        },
+        {
+          "busySecondsInWindow": 2.32,
+          "connectCallMs": {
+            "count": 12,
+            "max": 0.14,
+            "mean": 0.131,
+            "min": 0.122,
+            "p50": 0.131,
+            "p99": 0.14
+          },
+          "controlLatenessMs": {
+            "count": 14400,
+            "max": 1.156,
+            "mean": 0.528,
+            "min": 0.0,
+            "p50": 0.535,
+            "p99": 1.049
+          },
+          "pollIntervalMs": {
+            "count": 113332,
+            "max": 1.128,
+            "mean": 1.059,
+            "min": 1.013,
+            "p50": 1.059,
+            "p99": 1.061
+          }
+        }
+      ],
+      "payloadBytesPerPlayingClientSecond": 2045.67025,
+      "hostNicBytesPerPlayingClientSecond": {
+        "rxBytes": 3623.239156789894,
+        "txBytes": 11606.458508800268
+      },
+      "excessMs": {
+        "count": 1363590,
+        "p50": 0.9479229999924428,
+        "p99": 2.5621439999958966,
+        "max": 62.47595299999739,
+        "min": 0.0
+      },
+      "ownUpdateGapMs": {
+        "count": 327355,
+        "p50": 41.326,
+        "p99": 43.437,
+        "max": 102.825,
+        "min": 0.001
+      },
+      "criterionA": true,
+      "criterionB": true,
+      "scenario": "profiled sockets",
+      "inputHostConfig": {
+        "botThreads": 0,
+        "bots": 0,
+        "maxClients": 100,
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 1.6045635608990814,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": true,
+            "emitBoostFood": true,
+            "foodCount": 109,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 1,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 670.0,
+            "radiusUpdates": [],
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      }
+    }
+  },
+  "profiles": {
+    "profile-fp-500": {
+      "event": "cycles",
+      "sampleWindowPerfSeconds": [
+        2432.36034488678,
+        2552.36034488678
+      ],
+      "sampleWeight": "hardware cycles",
+      "samples": 5841,
+      "totalWeight": 193059401708,
+      "topSelf": [
+        {
+          "function": "__irqentry_text_start",
+          "samples": 747,
+          "weight": 24636211282,
+          "percent": 12.760948736007155
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 591,
+          "weight": 20247219672,
+          "percent": 10.487559524619098
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 560,
+          "weight": 19189020610,
+          "percent": 9.939438556337786
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 394,
+          "weight": 13367095805,
+          "percent": 6.923825354653056
+        },
+        {
+          "function": "[unknown]",
+          "samples": 332,
+          "weight": 11201974119,
+          "percent": 5.802345816829397
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 242,
+          "weight": 8246750079,
+          "percent": 4.271612781372393
+        },
+        {
+          "function": "recv",
+          "samples": 156,
+          "weight": 5207796193,
+          "percent": 2.697509754472734
+        },
+        {
+          "function": "hypot",
+          "samples": 141,
+          "weight": 4777699349,
+          "percent": 2.474730216053509
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 137,
+          "weight": 4430810326,
+          "percent": 2.2950502730250593
+        },
+        {
+          "function": "asm_sysvec_apic_timer_interrupt",
+          "samples": 117,
+          "weight": 3975544690,
+          "percent": 2.059233922216833
+        },
+        {
+          "function": "entry_SYSCALL_64_after_hwframe",
+          "samples": 77,
+          "weight": 2532354710,
+          "percent": 1.3116971707133722
+        },
+        {
+          "function": "do_syscall_64",
+          "samples": 60,
+          "weight": 1893368511,
+          "percent": 0.9807181076131671
+        },
+        {
+          "function": "entry_SYSCALL_64",
+          "samples": 53,
+          "weight": 1698001686,
+          "percent": 0.8795229193594036
+        },
+        {
+          "function": "realloc",
+          "samples": 43,
+          "weight": 1437132784,
+          "percent": 0.7443992736358138
+        },
+        {
+          "function": "entry_SYSRETQ_unsafe_stack",
+          "samples": 41,
+          "weight": 1351194514,
+          "percent": 0.699885373126591
+        },
+        {
+          "function": "core::slice::sort::unstable::quicksort::quicksort::<usize, <usize as core::cmp::PartialOrd>::lt>",
+          "samples": 40,
+          "weight": 1349372929,
+          "percent": 0.6989418371040589
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::sync",
+          "samples": 38,
+          "weight": 1307025748,
+          "percent": 0.6770070436542949
+        },
+        {
+          "function": "malloc",
+          "samples": 36,
+          "weight": 1195939578,
+          "percent": 0.6194671522958742
+        },
+        {
+          "function": "__send",
+          "samples": 30,
+          "weight": 992090881,
+          "percent": 0.51387856391502
+        },
+        {
+          "function": "slither_sim::client::encode::minimap_delta",
+          "samples": 29,
+          "weight": 985945193,
+          "percent": 0.5106952493778211
+        },
+        {
+          "function": "ena_clean_rx_irq",
+          "samples": 29,
+          "weight": 938186184,
+          "percent": 0.48595726273874773
+        },
+        {
+          "function": "__ip_finish_output",
+          "samples": 28,
+          "weight": 910964658,
+          "percent": 0.4718571848564117
+        },
+        {
+          "function": "aa_inet_msg_perm",
+          "samples": 27,
+          "weight": 894812169,
+          "percent": 0.4634905946478548
+        },
+        {
+          "function": "release_sock",
+          "samples": 27,
+          "weight": 867327891,
+          "percent": 0.4492544177215585
+        },
+        {
+          "function": "memset_orig",
+          "samples": 27,
+          "weight": 864342038,
+          "percent": 0.44770781964159756
+        },
+        {
+          "function": "tcp_sendmsg_locked",
+          "samples": 26,
+          "weight": 854935170,
+          "percent": 0.4428352944411788
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 25,
+          "weight": 849254714,
+          "percent": 0.4398929585850926
+        },
+        {
+          "function": "floor",
+          "samples": 25,
+          "weight": 839841120,
+          "percent": 0.4350169494828589
+        },
+        {
+          "function": "tcp_clean_rtx_queue",
+          "samples": 27,
+          "weight": 828019724,
+          "percent": 0.4288937584362609
+        },
+        {
+          "function": "fdget",
+          "samples": 24,
+          "weight": 779912617,
+          "percent": 0.4039754656339443
+        }
+      ],
+      "topInclusive": [
+        {
+          "function": "[unknown]",
+          "samples": 5835,
+          "weight": 192875618639,
+          "percent": 99.90480491114441
+        },
+        {
+          "function": "<std::sys::thread::unix::Thread>::new::thread_start",
+          "samples": 5641,
+          "weight": 188911155497,
+          "percent": 97.85131095699023
+        },
+        {
+          "function": "<std::thread::lifecycle::spawn_unchecked<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Simulation>::{closure#0}, core::result::Result<(), alloc::string::String>>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}",
+          "samples": 3337,
+          "weight": 113821002939,
+          "percent": 58.95646724895216
+        },
+        {
+          "function": "std::sys::backtrace::__rust_begin_short_backtrace::<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Simulation>::{closure#0}, core::result::Result<(), alloc::string::String>>",
+          "samples": 3337,
+          "weight": 113821002939,
+          "percent": 58.95646724895216
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 3336,
+          "weight": 113781051572,
+          "percent": 58.93577342795896
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 2570,
+          "weight": 87706935136,
+          "percent": 45.430025349739594
+        },
+        {
+          "function": "<std::thread::lifecycle::spawn_unchecked<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Gateway>::{closure#0}, core::result::Result<(), alloc::string::String>>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}",
+          "samples": 2304,
+          "weight": 75090152558,
+          "percent": 38.89484370803808
+        },
+        {
+          "function": "std::sys::backtrace::__rust_begin_short_backtrace::<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Gateway>::{closure#0}, core::result::Result<(), alloc::string::String>>",
+          "samples": 2304,
+          "weight": 75090152558,
+          "percent": 38.89484370803808
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 2298,
+          "weight": 74894910041,
+          "percent": 38.79371290825693
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 1770,
+          "weight": 60485982186,
+          "percent": 31.330244293144716
+        },
+        {
+          "function": "entry_SYSCALL_64_after_hwframe",
+          "samples": 1668,
+          "weight": 52104834255,
+          "percent": 26.989016745119685
+        },
+        {
+          "function": "do_syscall_64",
+          "samples": 1567,
+          "weight": 48855727219,
+          "percent": 25.306059578954716
+        },
+        {
+          "function": "x64_sys_call",
+          "samples": 1452,
+          "weight": 45255232692,
+          "percent": 23.441092374484818
+        },
+        {
+          "function": "__send",
+          "samples": 1332,
+          "weight": 43348776079,
+          "percent": 22.453594953414648
+        },
+        {
+          "function": "__x64_sys_sendto",
+          "samples": 1114,
+          "weight": 36440650585,
+          "percent": 18.875356632522898
+        },
+        {
+          "function": "__sys_sendto",
+          "samples": 1091,
+          "weight": 35664087621,
+          "percent": 18.473116204380194
+        },
+        {
+          "function": "inet_sendmsg",
+          "samples": 1037,
+          "weight": 33938964003,
+          "percent": 17.5795447943697
+        },
+        {
+          "function": "tcp_sendmsg",
+          "samples": 1025,
+          "weight": 33544484720,
+          "percent": 17.37521427251475
+        },
+        {
+          "function": "tcp_sendmsg_locked",
+          "samples": 956,
+          "weight": 31280988373,
+          "percent": 16.20277909092048
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 810,
+          "weight": 27847001537,
+          "percent": 14.424058756339798
+        },
+        {
+          "function": "__irqentry_text_start",
+          "samples": 747,
+          "weight": 24636211282,
+          "percent": 12.760948736007155
+        },
+        {
+          "function": "tcp_push",
+          "samples": 711,
+          "weight": 23363460522,
+          "percent": 12.101695289275241
+        },
+        {
+          "function": "__tcp_push_pending_frames",
+          "samples": 705,
+          "weight": 23139494655,
+          "percent": 11.985686503886614
+        },
+        {
+          "function": "tcp_write_xmit",
+          "samples": 683,
+          "weight": 22399448923,
+          "percent": 11.60236109965724
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 648,
+          "weight": 22141772338,
+          "percent": 11.46889099526433
+        },
+        {
+          "function": "<tungstenite::protocol::WebSocketContext>::read::<slither_sim::client::server::ReadBudget<std::net::tcp::TcpStream>>",
+          "samples": 663,
+          "weight": 21702576020,
+          "percent": 11.241398154141637
+        },
+        {
+          "function": "recv",
+          "samples": 609,
+          "weight": 19913016920,
+          "percent": 10.314450756518037
+        },
+        {
+          "function": "asm_common_interrupt",
+          "samples": 532,
+          "weight": 16991038242,
+          "percent": 8.800937997155268
+        },
+        {
+          "function": "common_interrupt",
+          "samples": 531,
+          "weight": 16967682129,
+          "percent": 8.788840107700848
+        },
+        {
+          "function": "__tcp_transmit_skb",
+          "samples": 513,
+          "weight": 16913471836,
+          "percent": 8.760760515347199
+        }
+      ],
+      "topApplicationSelf": [
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 591,
+          "weight": 20247219672,
+          "percent": 10.487559524619098
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 560,
+          "weight": 19189020610,
+          "percent": 9.939438556337786
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 394,
+          "weight": 13367095805,
+          "percent": 6.923825354653056
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 242,
+          "weight": 8246750079,
+          "percent": 4.271612781372393
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 137,
+          "weight": 4430810326,
+          "percent": 2.2950502730250593
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::sync",
+          "samples": 38,
+          "weight": 1307025748,
+          "percent": 0.6770070436542949
+        },
+        {
+          "function": "slither_sim::client::encode::minimap_delta",
+          "samples": 29,
+          "weight": 985945193,
+          "percent": 0.5106952493778211
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 25,
+          "weight": 849254714,
+          "percent": 0.4398929585850926
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::candidates",
+          "samples": 17,
+          "weight": 585997427,
+          "percent": 0.3035321884433859
+        },
+        {
+          "function": "slither_sim::client::encode::segment_credit",
+          "samples": 15,
+          "weight": 522613837,
+          "percent": 0.27070105489627855
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>::{closure#11}",
+          "samples": 11,
+          "weight": 400063799,
+          "percent": 0.207223163161508
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::emit_presented",
+          "samples": 11,
+          "weight": 393646619,
+          "percent": 0.20389922247629552
+        },
+        {
+          "function": "slither_sim::client::encode::motion",
+          "samples": 11,
+          "weight": 363060755,
+          "percent": 0.18805650063555307
+        },
+        {
+          "function": "<slither_sim::client::visibility::SectorInterest>::advance",
+          "samples": 11,
+          "weight": 357271089,
+          "percent": 0.1850575966978123
+        },
+        {
+          "function": "slither_sim::client::encode::minimap",
+          "samples": 10,
+          "weight": 355812614,
+          "percent": 0.18430214268360898
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::new",
+          "samples": 10,
+          "weight": 344666285,
+          "percent": 0.17852861966354974
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance_prey::{closure#6}::{closure#0}",
+          "samples": 5,
+          "weight": 163868582,
+          "percent": 0.08487987663395395
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::hand_over_early",
+          "samples": 4,
+          "weight": 137353517,
+          "percent": 0.07114572809447815
+        },
+        {
+          "function": "<slither_sim::physics::SpeedState>::step",
+          "samples": 4,
+          "weight": 132732147,
+          "percent": 0.06875197261864292
+        },
+        {
+          "function": "<slither_sim::client::server::Open>::send",
+          "samples": 3,
+          "weight": 89668821,
+          "percent": 0.04644623375328957
+        },
+        {
+          "function": "slither_sim::client::simulation::connection::frame_groups",
+          "samples": 2,
+          "weight": 67695782,
+          "percent": 0.03506474245806949
+        },
+        {
+          "function": "slither_sim::physics::swept_distance",
+          "samples": 2,
+          "weight": 64338151,
+          "percent": 0.03332557255994747
+        },
+        {
+          "function": "slither_sim::physics::segments_intersect",
+          "samples": 1,
+          "weight": 39056547,
+          "percent": 0.020230326342289485
+        },
+        {
+          "function": "<slither_sim::client::simulation::food::FoodIndex>::add",
+          "samples": 1,
+          "weight": 33959615,
+          "percent": 0.01759024150057375
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance_prey::{closure#6}",
+          "samples": 1,
+          "weight": 33595714,
+          "percent": 0.01740174977378885
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::uplink",
+          "samples": 1,
+          "weight": 33176206,
+          "percent": 0.017184454994933946
+        },
+        {
+          "function": "<slither_sim::client::minimap::Minimap>::from_snakes",
+          "samples": 1,
+          "weight": 33026365,
+          "percent": 0.017106841059184457
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::advance_tick::{closure#0}",
+          "samples": 1,
+          "weight": 31999190,
+          "percent": 0.01657478978848095
+        },
+        {
+          "function": "<slither_sim::client::server::Gate>::forward",
+          "samples": 1,
+          "weight": 30031810,
+          "percent": 0.01555573555823132
+        }
+      ],
+      "topApplicationInclusive": [
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 3336,
+          "weight": 113781051572,
+          "percent": 58.93577342795896
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 2570,
+          "weight": 87706935136,
+          "percent": 45.430025349739594
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 2298,
+          "weight": 74894910041,
+          "percent": 38.79371290825693
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 1770,
+          "weight": 60485982186,
+          "percent": 31.330244293144716
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 810,
+          "weight": 27847001537,
+          "percent": 14.424058756339798
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 648,
+          "weight": 22141772338,
+          "percent": 11.46889099526433
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::emit_presented",
+          "samples": 51,
+          "weight": 1743363002,
+          "percent": 0.9030189602663409
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::sync",
+          "samples": 50,
+          "weight": 1721898255,
+          "percent": 0.8919007516683131
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::minimap",
+          "samples": 48,
+          "weight": 1648623671,
+          "percent": 0.8539463276145045
+        },
+        {
+          "function": "<slither_sim::client::visibility::SectorInterest>::advance",
+          "samples": 48,
+          "weight": 1574825813,
+          "percent": 0.8157208605576769
+        },
+        {
+          "function": "slither_sim::client::encode::motion",
+          "samples": 35,
+          "weight": 1181945178,
+          "percent": 0.6122183988675557
+        },
+        {
+          "function": "slither_sim::client::encode::minimap_delta",
+          "samples": 34,
+          "weight": 1151153167,
+          "percent": 0.5962688979742645
+        },
+        {
+          "function": "<slither_sim::client::server::Open>::send",
+          "samples": 31,
+          "weight": 982223386,
+          "percent": 0.5087674453097089
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::hand_over_early",
+          "samples": 29,
+          "weight": 966196831,
+          "percent": 0.5004660858015922
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::candidates",
+          "samples": 19,
+          "weight": 655178472,
+          "percent": 0.33936626043778456
+        },
+        {
+          "function": "slither_sim::client::encode::segment_credit",
+          "samples": 16,
+          "weight": 555476630,
+          "percent": 0.28772316970097717
+        },
+        {
+          "function": "<slither_sim::client::server::Clock>::sleep_until",
+          "samples": 14,
+          "weight": 439263979,
+          "percent": 0.22752788784893338
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>::{closure#11}",
+          "samples": 12,
+          "weight": 434919048,
+          "percent": 0.22527732094488193
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::new",
+          "samples": 11,
+          "weight": 371285555,
+          "percent": 0.19231674381834296
+        },
+        {
+          "function": "slither_sim::client::encode::minimap",
+          "samples": 10,
+          "weight": 355812614,
+          "percent": 0.18430214268360898
+        },
+        {
+          "function": "<slither_sim::client::server::Gate>::forward",
+          "samples": 9,
+          "weight": 283412471,
+          "percent": 0.1468006574622343
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance_prey::{closure#6}",
+          "samples": 8,
+          "weight": 270315517,
+          "percent": 0.14001675888794524
+        },
+        {
+          "function": "<slither_sim::client::server::Gate>::send",
+          "samples": 8,
+          "weight": 253380661,
+          "percent": 0.13124492190400297
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance_prey::{closure#6}::{closure#0}",
+          "samples": 7,
+          "weight": 236719803,
+          "percent": 0.12261500911415639
+        },
+        {
+          "function": "<slither_sim::physics::SpeedState>::step",
+          "samples": 5,
+          "weight": 163188387,
+          "percent": 0.08452755243011706
+        },
+        {
+          "function": "slither_sim::client::simulation::connection::frame_groups",
+          "samples": 3,
+          "weight": 98342050,
+          "percent": 0.050938752078358324
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::spawn_pose",
+          "samples": 3,
+          "weight": 98262228,
+          "percent": 0.05089740625458916
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::advance_tick::{closure#0}",
+          "samples": 3,
+          "weight": 97325778,
+          "percent": 0.05041234829226502
+        },
+        {
+          "function": "slither_sim::client::simulation::snakes::full",
+          "samples": 2,
+          "weight": 71049847,
+          "percent": 0.03680206525629973
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::has_room",
+          "samples": 2,
+          "weight": 70343117,
+          "percent": 0.036435996578085904
+        }
+      ],
+      "categories": {
+        "per-recipient delta encoding": {
+          "samples": 1407,
+          "weight": 47818790705,
+          "percent": 24.768952085185337
+        },
+        "framing/flush": {
+          "samples": 1373,
+          "weight": 44690793202,
+          "percent": 23.148726664756936
+        },
+        "visibility/food-sector work": {
+          "samples": 1126,
+          "weight": 38736261487,
+          "percent": 20.064426360125225
+        },
+        "socket service": {
+          "samples": 897,
+          "weight": 29265545687,
+          "percent": 15.158829576848985
+        },
+        "physics": {
+          "samples": 670,
+          "weight": 22840598755,
+          "percent": 11.830865812764783
+        },
+        "allocation": {
+          "samples": 152,
+          "weight": 4991490902,
+          "percent": 2.585468958175665
+        },
+        "other/unknown": {
+          "samples": 216,
+          "weight": 4715920970,
+          "percent": 2.4427305421430723
+        }
+      },
+      "limits": "Categories use retained call chains and ordered rules in profile.py; allocation is removed from its callers. Inline attribution, incomplete unwind and kernel symbol restrictions limit precision. Inclusive percentages overlap.",
+      "role": "primary hardware-cycle profile, separate frame-pointer release build",
+      "symbolPresentation": "Function tables: --no-inline; detailed inline callchains determine categories. Both exports have identical event count and total period weight."
+    },
+    "profile-fp-100": {
+      "event": "cycles",
+      "sampleWindowPerfSeconds": [
+        2623.587049484253,
+        2743.587049484253
+      ],
+      "sampleWeight": "hardware cycles",
+      "samples": 1217,
+      "totalWeight": 45033373137,
+      "topSelf": [
+        {
+          "function": "__irqentry_text_start",
+          "samples": 122,
+          "weight": 3888112482,
+          "percent": 8.633846881004516
+        },
+        {
+          "function": "[unknown]",
+          "samples": 81,
+          "weight": 3756339526,
+          "percent": 8.341235098184868
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 56,
+          "weight": 3727524990,
+          "percent": 8.277250248743675
+        },
+        {
+          "function": "recv",
+          "samples": 93,
+          "weight": 2826684210,
+          "percent": 6.276865384701907
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 39,
+          "weight": 2638766829,
+          "percent": 5.859580673587063
+        },
+        {
+          "function": "hypot",
+          "samples": 31,
+          "weight": 2025589738,
+          "percent": 4.497974717189793
+        },
+        {
+          "function": "do_syscall_64",
+          "samples": 63,
+          "weight": 1905490493,
+          "percent": 4.231285289696464
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 27,
+          "weight": 1781882793,
+          "percent": 3.956805073382305
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 21,
+          "weight": 1249054938,
+          "percent": 2.7736206528437024
+        },
+        {
+          "function": "entry_SYSCALL_64_after_hwframe",
+          "samples": 36,
+          "weight": 1018458410,
+          "percent": 2.261563678345075
+        },
+        {
+          "function": "asm_sysvec_apic_timer_interrupt",
+          "samples": 20,
+          "weight": 729968692,
+          "percent": 1.62095051103389
+        },
+        {
+          "function": "release_sock",
+          "samples": 23,
+          "weight": 725155400,
+          "percent": 1.6102622332862802
+        },
+        {
+          "function": "entry_SYSRETQ_unsafe_stack",
+          "samples": 22,
+          "weight": 674931122,
+          "percent": 1.498735437709124
+        },
+        {
+          "function": "aa_inet_msg_perm",
+          "samples": 19,
+          "weight": 584218576,
+          "percent": 1.2973013907323734
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::sync",
+          "samples": 9,
+          "weight": 580486360,
+          "percent": 1.2890137237422816
+        },
+        {
+          "function": "entry_SYSCALL_64",
+          "samples": 18,
+          "weight": 532402249,
+          "percent": 1.182239330330269
+        },
+        {
+          "function": "__sys_recvfrom",
+          "samples": 16,
+          "weight": 486645423,
+          "percent": 1.0806328487087409
+        },
+        {
+          "function": "tcp_recvmsg",
+          "samples": 11,
+          "weight": 368177763,
+          "percent": 0.8175664787088764
+        },
+        {
+          "function": "x64_sys_call",
+          "samples": 13,
+          "weight": 366257116,
+          "percent": 0.8133015372527768
+        },
+        {
+          "function": "<tungstenite::protocol::WebSocketContext>::read::<slither_sim::client::server::ReadBudget<std::net::tcp::TcpStream>>",
+          "samples": 11,
+          "weight": 354689090,
+          "percent": 0.7876138634362765
+        },
+        {
+          "function": "slither_sim::client::encode::minimap_delta",
+          "samples": 5,
+          "weight": 345474054,
+          "percent": 0.7671511813005943
+        },
+        {
+          "function": "realloc",
+          "samples": 4,
+          "weight": 337931174,
+          "percent": 0.7504016476224193
+        },
+        {
+          "function": "tcp_recvmsg_locked",
+          "samples": 10,
+          "weight": 320330537,
+          "percent": 0.71131810629751
+        },
+        {
+          "function": "slither_sim::client::encode::segment_credit",
+          "samples": 4,
+          "weight": 297676544,
+          "percent": 0.6610132070151883
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 11,
+          "weight": 291619952,
+          "percent": 0.6475640878884138
+        },
+        {
+          "function": "__tcp_transmit_skb",
+          "samples": 10,
+          "weight": 281231303,
+          "percent": 0.6244953096105891
+        },
+        {
+          "function": "__fget_files",
+          "samples": 10,
+          "weight": 281192778,
+          "percent": 0.6244097619437892
+        },
+        {
+          "function": "syscall_return_via_sysret",
+          "samples": 9,
+          "weight": 259210741,
+          "percent": 0.5755969916164888
+        },
+        {
+          "function": "arch_exit_to_user_mode_prepare.isra.0",
+          "samples": 10,
+          "weight": 256688404,
+          "percent": 0.5699959521555393
+        },
+        {
+          "function": "fdget",
+          "samples": 8,
+          "weight": 248278700,
+          "percent": 0.5513215704377494
+        }
+      ],
+      "topInclusive": [
+        {
+          "function": "[unknown]",
+          "samples": 1216,
+          "weight": 45004847380,
+          "percent": 99.9366564060986
+        },
+        {
+          "function": "<std::sys::thread::unix::Thread>::new::thread_start",
+          "samples": 1130,
+          "weight": 43953164425,
+          "percent": 97.60131512086869
+        },
+        {
+          "function": "<std::thread::lifecycle::spawn_unchecked<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Gateway>::{closure#0}, core::result::Result<(), alloc::string::String>>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}",
+          "samples": 840,
+          "weight": 25175727499,
+          "percent": 55.90460084437978
+        },
+        {
+          "function": "std::sys::backtrace::__rust_begin_short_backtrace::<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Gateway>::{closure#0}, core::result::Result<(), alloc::string::String>>",
+          "samples": 840,
+          "weight": 25175727499,
+          "percent": 55.90460084437978
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 836,
+          "weight": 25057686146,
+          "percent": 55.642481121211596
+        },
+        {
+          "function": "entry_SYSCALL_64_after_hwframe",
+          "samples": 669,
+          "weight": 18933921075,
+          "percent": 42.04419912627785
+        },
+        {
+          "function": "<std::thread::lifecycle::spawn_unchecked<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Simulation>::{closure#0}, core::result::Result<(), alloc::string::String>>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}",
+          "samples": 290,
+          "weight": 18777436926,
+          "percent": 41.69671427648891
+        },
+        {
+          "function": "std::sys::backtrace::__rust_begin_short_backtrace::<<slither_sim::client::server::RunningHost>::spawn<slither_sim::client::server::Simulation>::{closure#0}, core::result::Result<(), alloc::string::String>>",
+          "samples": 290,
+          "weight": 18777436926,
+          "percent": 41.69671427648891
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 289,
+          "weight": 18711118770,
+          "percent": 41.549449811537
+        },
+        {
+          "function": "do_syscall_64",
+          "samples": 620,
+          "weight": 17487951178,
+          "percent": 38.83331396206622
+        },
+        {
+          "function": "x64_sys_call",
+          "samples": 531,
+          "weight": 14851356614,
+          "percent": 32.97855696667309
+        },
+        {
+          "function": "<tungstenite::protocol::WebSocketContext>::read::<slither_sim::client::server::ReadBudget<std::net::tcp::TcpStream>>",
+          "samples": 421,
+          "weight": 12842033350,
+          "percent": 28.516703181287614
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 189,
+          "weight": 12552233813,
+          "percent": 27.873181462143066
+        },
+        {
+          "function": "recv",
+          "samples": 405,
+          "weight": 12328493407,
+          "percent": 27.376349023410707
+        },
+        {
+          "function": "__send",
+          "samples": 294,
+          "weight": 8781946464,
+          "percent": 19.50097417149647
+        },
+        {
+          "function": "__x64_sys_sendto",
+          "samples": 257,
+          "weight": 7741262977,
+          "percent": 17.19005803418194
+        },
+        {
+          "function": "__sys_sendto",
+          "samples": 252,
+          "weight": 7597067300,
+          "percent": 16.86986066286505
+        },
+        {
+          "function": "inet_sendmsg",
+          "samples": 239,
+          "weight": 7211034955,
+          "percent": 16.01264673881451
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 106,
+          "weight": 7175196838,
+          "percent": 15.933065498273248
+        },
+        {
+          "function": "tcp_sendmsg",
+          "samples": 236,
+          "weight": 7116483055,
+          "percent": 15.802687116841811
+        },
+        {
+          "function": "tcp_sendmsg_locked",
+          "samples": 228,
+          "weight": 6863458999,
+          "percent": 15.24082812566597
+        },
+        {
+          "function": "__tcp_push_pending_frames",
+          "samples": 181,
+          "weight": 5474170287,
+          "percent": 12.15580780579448
+        },
+        {
+          "function": "tcp_push",
+          "samples": 181,
+          "weight": 5474170287,
+          "percent": 12.15580780579448
+        },
+        {
+          "function": "tcp_write_xmit",
+          "samples": 172,
+          "weight": 5202121157,
+          "percent": 11.551702203550615
+        },
+        {
+          "function": "__x64_sys_recvfrom",
+          "samples": 146,
+          "weight": 4526044194,
+          "percent": 10.050422339519008
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 67,
+          "weight": 4367583731,
+          "percent": 9.698548935503872
+        },
+        {
+          "function": "__tcp_transmit_skb",
+          "samples": 139,
+          "weight": 4175766146,
+          "percent": 9.272603527380756
+        },
+        {
+          "function": "__sys_recvfrom",
+          "samples": 130,
+          "weight": 4007294565,
+          "percent": 8.898499681134378
+        },
+        {
+          "function": "__irqentry_text_start",
+          "samples": 122,
+          "weight": 3888112482,
+          "percent": 8.633846881004516
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 58,
+          "weight": 3876960538,
+          "percent": 8.60908314863636
+        }
+      ],
+      "topApplicationSelf": [
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 56,
+          "weight": 3727524990,
+          "percent": 8.277250248743675
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 39,
+          "weight": 2638766829,
+          "percent": 5.859580673587063
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 27,
+          "weight": 1781882793,
+          "percent": 3.956805073382305
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 21,
+          "weight": 1249054938,
+          "percent": 2.7736206528437024
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::sync",
+          "samples": 9,
+          "weight": 580486360,
+          "percent": 1.2890137237422816
+        },
+        {
+          "function": "slither_sim::client::encode::minimap_delta",
+          "samples": 5,
+          "weight": 345474054,
+          "percent": 0.7671511813005943
+        },
+        {
+          "function": "slither_sim::client::encode::segment_credit",
+          "samples": 4,
+          "weight": 297676544,
+          "percent": 0.6610132070151883
+        },
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 11,
+          "weight": 291619952,
+          "percent": 0.6475640878884138
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 3,
+          "weight": 194083751,
+          "percent": 0.430977600566497
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::advance_tick::{closure#0}",
+          "samples": 2,
+          "weight": 143632041,
+          "percent": 0.3189457750878316
+        },
+        {
+          "function": "<slither_sim::client::visibility::SectorInterest>::advance",
+          "samples": 2,
+          "weight": 137633613,
+          "percent": 0.3056258135078903
+        },
+        {
+          "function": "slither_sim::client::encode::minimap",
+          "samples": 2,
+          "weight": 125768737,
+          "percent": 0.2792789618876379
+        },
+        {
+          "function": "<slither_sim::physics::SpeedState>::step",
+          "samples": 2,
+          "weight": 123416674,
+          "percent": 0.274056028680204
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::new",
+          "samples": 2,
+          "weight": 91026725,
+          "percent": 0.20213170513139125
+        },
+        {
+          "function": "slither_sim::client::encode::motion",
+          "samples": 1,
+          "weight": 70482823,
+          "percent": 0.15651242198886142
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::client_until",
+          "samples": 1,
+          "weight": 66318156,
+          "percent": 0.1472644649519095
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::push",
+          "samples": 1,
+          "weight": 51820615,
+          "percent": 0.11507158222936562
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::candidates",
+          "samples": 1,
+          "weight": 38464614,
+          "percent": 0.08541357513456388
+        }
+      ],
+      "topApplicationInclusive": [
+        {
+          "function": "<slither_sim::client::server::Gateway>::run",
+          "samples": 836,
+          "weight": 25057686146,
+          "percent": 55.642481121211596
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::run",
+          "samples": 289,
+          "weight": 18711118770,
+          "percent": 41.549449811537
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::broadcast_with",
+          "samples": 189,
+          "weight": 12552233813,
+          "percent": 27.873181462143066
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+          "samples": 106,
+          "weight": 7175196838,
+          "percent": 15.933065498273248
+        },
+        {
+          "function": "<slither_sim::simulator::Simulator>::advance::<false>",
+          "samples": 67,
+          "weight": 4367583731,
+          "percent": 9.698548935503872
+        },
+        {
+          "function": "slither_sim::client::simulation::food::food_updates",
+          "samples": 58,
+          "weight": 3876960538,
+          "percent": 8.60908314863636
+        },
+        {
+          "function": "<slither_sim::client::server::Clock>::sleep_until",
+          "samples": 55,
+          "weight": 1896361198,
+          "percent": 4.211013001915074
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::sync",
+          "samples": 10,
+          "weight": 626564485,
+          "percent": 1.3913336740152085
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::minimap",
+          "samples": 7,
+          "weight": 471242791,
+          "percent": 1.0464301431882321
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::emit_presented",
+          "samples": 6,
+          "weight": 435279355,
+          "percent": 0.9665706223599957
+        },
+        {
+          "function": "<slither_sim::client::visibility::SectorInterest>::advance",
+          "samples": 7,
+          "weight": 433326552,
+          "percent": 0.9622342760817384
+        },
+        {
+          "function": "slither_sim::client::encode::minimap_delta",
+          "samples": 5,
+          "weight": 345474054,
+          "percent": 0.7671511813005943
+        },
+        {
+          "function": "slither_sim::client::encode::segment_credit",
+          "samples": 4,
+          "weight": 297676544,
+          "percent": 0.6610132070151883
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::hand_over_early",
+          "samples": 3,
+          "weight": 216358063,
+          "percent": 0.48043938956515214
+        },
+        {
+          "function": "slither_sim::client::encode::motion",
+          "samples": 3,
+          "weight": 199272538,
+          "percent": 0.4424996932692015
+        },
+        {
+          "function": "<slither_sim::client::server::Simulation>::advance_tick::{closure#0}",
+          "samples": 2,
+          "weight": 143632041,
+          "percent": 0.3189457750878316
+        },
+        {
+          "function": "slither_sim::client::encode::minimap",
+          "samples": 2,
+          "weight": 125768737,
+          "percent": 0.2792789618876379
+        },
+        {
+          "function": "<slither_sim::physics::SpeedState>::step",
+          "samples": 2,
+          "weight": 123416674,
+          "percent": 0.274056028680204
+        },
+        {
+          "function": "slither_sim::client::encode::fam",
+          "samples": 1,
+          "weight": 97346979,
+          "percent": 0.21616630560596062
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::new",
+          "samples": 2,
+          "weight": 91026725,
+          "percent": 0.20213170513139125
+        },
+        {
+          "function": "<slither_sim::client::server::Open>::send",
+          "samples": 3,
+          "weight": 84471190,
+          "percent": 0.18757464545909705
+        },
+        {
+          "function": "<slither_sim::client::simulation::SimulatorBackend>::client_until",
+          "samples": 1,
+          "weight": 66318156,
+          "percent": 0.1472644649519095
+        },
+        {
+          "function": "<slither_sim::food_grid::FoodCache>::push",
+          "samples": 1,
+          "weight": 51820615,
+          "percent": 0.11507158222936562
+        },
+        {
+          "function": "<slither_sim::bounds_index::BoundsIndex>::candidates",
+          "samples": 1,
+          "weight": 38464614,
+          "percent": 0.08541357513456388
+        }
+      ],
+      "categories": {
+        "socket service": {
+          "samples": 526,
+          "weight": 15812164271,
+          "percent": 35.1121028018408
+        },
+        "framing/flush": {
+          "samples": 301,
+          "weight": 8992971071,
+          "percent": 19.9695702199382
+        },
+        "per-recipient delta encoding": {
+          "samples": 104,
+          "weight": 6922152871,
+          "percent": 15.37116229322087
+        },
+        "visibility/food-sector work": {
+          "samples": 80,
+          "weight": 5243038886,
+          "percent": 11.642563105476661
+        },
+        "physics": {
+          "samples": 70,
+          "weight": 4537740247,
+          "percent": 10.076394306940632
+        },
+        "other/unknown": {
+          "samples": 113,
+          "weight": 2512208571,
+          "percent": 5.578548520798983
+        },
+        "allocation": {
+          "samples": 23,
+          "weight": 1013097220,
+          "percent": 2.249658751783855
+        }
+      },
+      "limits": "Categories use retained call chains and ordered rules in profile.py; allocation is removed from its callers. Inline attribution, incomplete unwind and kernel symbol restrictions limit precision. Inclusive percentages overlap.",
+      "role": "primary hardware-cycle profile, separate frame-pointer release build",
+      "symbolPresentation": "Function tables: --no-inline; detailed inline callchains determine categories. Both exports have identical event count and total period weight."
+    }
+  },
+  "limits": "Single source pin, seed and instance pair. Exact nearest-rank receipt quantiles over correlated samples, with one-minute CPU profiles. No product capacity, mature-world, clustered, boosting or slow-reader claim."
+}
