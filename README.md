@@ -112,11 +112,10 @@ The host binds loopback by default. Stop it with Ctrl+C.
 ## Defaults and fidelity
 
 The default world, [`Config::official(1)`](docs/configuration.md#official-and-sandbox),
-holds its initial radius; the host, resets and simulation backend size it for
-their population at startup.
-Holding is a practical default that omits real official radius waves. It combines
-measured movement and protocol constants with provisional visibility, spawning and
-ecology models; it is not an exact official replica.
+is sized for the population at startup and then holds its radius; official
+radius waves are not modeled. It combines measured movement and protocol
+constants with provisional visibility, spawning and ecology models; it is not an
+exact official replica.
 [`Config::sandbox()`](docs/configuration.md#official-and-sandbox) uses the same
 mechanics in a compact fixed arena.
 

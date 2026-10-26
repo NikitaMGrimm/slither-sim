@@ -146,15 +146,13 @@ Both constructors return `Config`:
 retained boost speed and initial radius models rather than exact official rules;
 see [evidence limits](server-rules.md#defaults).
 
-`n` initializes radius, food and prey targets without spawning snakes. Holding
-that radius is a practical default that removes death/respawn jitter; it omits
-real official waves and is not an identified official rule. The exploratory,
-retrospective [radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md)
-found no tested predictive replacement. Enable `dynamicRadius` explicitly to
-experiment with the old living-population controller; food and prey targets
-stay fixed as it runs. One snake is a deliberately small start, not a typical
-official lobby; use `Config::official(n)` or explicit world fields for larger
-scenes. Runtimes with a known population apply the startup sizing policy above.
+`n` initializes radius, food and prey targets without spawning snakes. The radius
+then holds: this removes death/respawn jitter but omits official radius waves,
+which no tested law predicts
+([radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md)).
+`dynamicRadius` opts into the old living-population controller; food and prey
+targets stay fixed as it runs. One snake is a deliberately small start;
+runtimes with a known population apply [population sizing](#population-sizing).
 
 Prey density is a working assumption, not a calibrated global population.
 Received density of about 0.04–0.18 per million square units near recorded

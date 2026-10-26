@@ -212,7 +212,7 @@ No fitted parameters enter these two forecasts.
 
 The source commit and source hashes are in [results.json](results.json);
 compressed archive hashes are in [source-inventory.json](source-inventory.json).
-The three [method scripts](methods/) are exact historical copies matching those
+The three method scripts ([global](methods/analyze-global-radius.py), [dynamics](methods/analyze-radius-dynamics.py), [motion](methods/analyze-radius-motion.py)) are exact historical copies matching those
 pins. `analyze.py` now reads those bundled methods and omits unused endpoint
 group identifiers; `tabulate.py` takes an explicit output directory. Their
 numeric methods are unchanged. The standalone [driver](simulation/src/main.rs)

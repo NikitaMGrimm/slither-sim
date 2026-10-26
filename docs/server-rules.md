@@ -15,11 +15,8 @@ sandbox defaults and overrides. Neither is an exact official replica.
 size-floor, free-boost and food-budget rules and synthetic regressions. These
 are design choices, not official-server measurements.
 
-Initial population sizing, food admission limits, prey population, kiosk penalty
-and rim sliding are provisional. Official worlds hold their selected initial
-radius by default. This practical choice omits genuine official waves; it is
-not an identified official rule. The old living-population radius controller
-remains an explicit opt-in and is not faithful. In particular:
+The held radius, food admission limits, prey population, kiosk penalty and rim
+sliding are provisional. In particular:
 
 - For measured radius replay, use [recorded samples](configuration.md#world-config).
 - [Food admission limits](configuration.md#food-admission-limits) count all origins
@@ -159,9 +156,9 @@ reported players), versus frequent death/respawn reversals in the local
 controller. Holding the initial radius beats the reported-count controller in
 94/114 connection forecasts (mean MAE 211 versus 520 units), but loses in 20 and
 suppresses real waves. No tested population, EMA, clock or load proxy identifies
-the official controller. Host, reset and simulation-backend population sizing
-is a separate startup capacity policy; see
-[configuration](configuration.md#population-sizing).
+the official controller, so official worlds hold their
+[population-sized](configuration.md#population-sizing) starting radius and the
+old living-population controller is an unfaithful opt-in.
 
 ## Movement and geometry
 
