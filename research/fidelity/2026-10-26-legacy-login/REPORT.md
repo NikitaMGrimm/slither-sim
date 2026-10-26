@@ -112,3 +112,137 @@ compatibility unexplained. Supporting another protocol, or establishing a
 different compatible official exchange, requires a separate decision before
 host implementation. No optional identity service or protocol-13 output was
 implemented.
+
+## Local follow-up: can this browser client play protocol 19?
+
+The owner subsequently authorized a cheaper **local-only** experiment before
+deciding about another encoder. The official-collection conclusions above are
+retained as the original decision; no additional official or third-party
+connections were made. This follow-up used base `4022581` and the same unpacked
+extension, read as data outside sandboxed Chromium.
+
+### Challenge parser and the official-format conflict
+
+Static inspection found one incoming game-WebSocket challenge route. Every
+`6` command goes to the same decoder, regardless of request variant or server
+classification. After decoding the shifted letter pairs, that decoder takes
+the **first nonempty single-quoted substring** and copies its first 24 character
+codes into a 24-byte array. It does not require a particular JavaScript template
+or evaluate that source. For uppercase ASCII letters, subtract 65 from each
+literal byte; initialize the rotation to 2 plus the first value, write
+`65 + ((value + rotation) % 26)`, then increase the rotation by `3 + value`.
+Lowercase uses base 97; punctuation uses JavaScript's signed remainder and
+byte-array coercion. Prefix/suffix syntax is not validated by this client.
+
+An original, synthetic source accepted in both local runs was:
+
+```text
+var a = 'ABCDEFGHIJKLMNOPQRSTUVWX';
+```
+
+It was sent using the same +23/+17 nibble encoding as the other challenge.
+The actual returned 24 bytes were `CGLRYGPZKWJXMCTLEYTPMKJJ`
+(`43474c525947505a4b574a584d43544c455954504d4b4a4a`). This is a
+**client-derived local test input**, not an observed official profile.
+
+The captured official format uses double quotes and 27 characters. Apostrophes
+inside its random literal contents do not make it compatible: in attempt 2,
+this decoder's first single-quoted match would be the unrelated 17-character
+substring `";a+="<1VMX#Wyqr}`. It still constructs a 24-byte response, rather
+than the independently recorded accepted 27-byte reply. A source without a
+single-quoted match throws, as observed in the earlier loopback diagnostic.
+No alternate 27-byte decoder or request/server-type bypass was found. This
+package is therefore incompatible with the official challenge exchange retained
+here; the assumption that it currently works on that official path is not
+supported. No new official-server run was made to test how that server would
+reject a different reply.
+
+### Scratch patch and browser result
+
+An **uncommitted** 48-line `server.rs` patch on a scratch branch answered
+`[99]`, `[99, 3]` and `[99, 4]` with that synthetic challenge, admitted its
+reply, and parsed selector-11/12 legacy login offsets. Only `[99, 4]` was
+exercised by the real client. Stock challenge handling and all output encoding
+were left on their normal paths, including **setup version 19**. The scratch
+patch was saved outside Git and removed after the failed trial. No encoder,
+broadcast, spawn or CI source was edited.
+
+Two fresh persistent Chromium profiles loaded the actual extension with
+sandboxing enabled, loopback mappings for the two game-domain names, all other
+names failing resolution, the local deny proxy and request/WebSocket
+allowlists. The local static shell was unchanged. Host and browser inherited a
+two-logical-CPU affinity mask; Cargo used one build job and one Rayon thread.
+No packet rewriting or alternate gameplay encoding was used in these runs.
+
+| Check | Observed result |
+| --- | --- |
+| Challenge/login | Both runs sent `[99, 4]`, the expected 24-byte reply, then `730c07084c6f63616c4d6f6400ff`: selector 12, skin 7, eight-byte controlled nickname, empty custom skin. No optional player-ID message. |
+| Setup | Read as 19; the client set its playing flag. |
+| Nickname/skin | Host's own appearance contained the correct nickname and skin 7; nickname appeared in the leaderboard. The client never constructed its own snake, so no skin was rendered. |
+| Rendering | Empty arena, no snake or food, displayed length 0. No JavaScript page exceptions occurred; blocked external requests generated expected network errors. |
+| Steering/boost | Mouse steering and Space down/up produced no heading or boost packets; only pings followed login. Own snake remained null throughout. |
+| Death/Play Again | In the longer run, the host emitted game-over and own removal in a bundle. The client ignored it, retained its playing flag and never presented Play Again. |
+
+The first self/food message starts `0000003373000098`: elapsed header `0000`,
+then the two-byte length `0033`, then `s`. The browser dispatcher reads the
+single code at frame byte 2, sees zero, and ignores the entire bundle. This
+alone prevents play. The longer run's received frame 80 (zero-based among
+`rawReceived` entries) starts `00b600027600000473000001`: it bundles `v0`
+and own removal, which are likewise ignored. The longer run retained 115
+received frames, including 11 bundles; all 64 sent messages were the three
+initial messages and 61 pings.
+
+### Static estimate for legacy/protocol-13 output
+
+Reading the setup version does not select a complete protocol-19 parser in
+this package. Its relevant version checks concern old appearance fields,
+pre-version-3 anchors and minimap format. The following differences remain
+even if frame bundling were disabled; these are source comparisons, not a
+validated implementation specification:
+
+| Family | Existing host output versus client parser | Owning encoder entry points |
+| --- | --- | --- |
+| Framing | Host groups logical packets behind lengths; client expects one command after the elapsed header. | `frame`, plus `simulation/connection.rs` grouping/emission |
+| Setup | Host advertises 19; a protocol-13 path would advertise its actual layout. Changing that byte alone does not fix the other families. | `setup` |
+| Appearance body | Host ends body anchors with a 16-bit direction; client consumes all remaining bytes as coordinate deltas. | `appearance` |
+| Motion | Host omits self IDs and can send own `d`/`7` forms; client always consumes a two-byte snake ID and dispatches only the older `e`/`E`/`3`/`4`/`5` forms. | `motion` (and ID selection) |
+| Body/growth | Host sends angle-based `g`/`G`/`n`/`N`, or `=`/`+` absolute fallbacks; client expects IDs plus absolute coordinates or relative coordinate bytes, and has no `=`/`+` dispatch. | `anchor`, `anchor_at` |
+| Food | Host listings use a sector header plus four-byte entries; client expects repeated six-byte color/absolute-position/size entries. Birth/removal keys also differ, and host pickup `<` has no handler. | `food_key`, `food_sector`, `food_add`, `food_remove` |
+
+This is a **medium, cross-cutting change**: roughly ten current encoder entry
+points spanning about 200 existing production lines (around a third of the
+pre-test encoder module), plus protocol selection and framing in the server/
+connection path, and integration in snake/food delivery and cache reuse. A
+planning estimate is several hundred new/changed Rust lines across roughly
+five source modules, with separate mixed-protocol, stock-byte-parity and browser
+regressions. This is an impact estimate, not a completed design or measured
+implementation cost. Changing cache/profile selection must be coordinated with
+the capacity owner; none of that hot path was edited here.
+
+Basic mass/tail/removal, radius, pong/game-over, leaderboard and session field
+layouts appear reusable. The high-resolution `M`/`V` minimap structure also
+appears compatible with the client's version-at-least-13 branch. Prey and
+optional report paths still require a complete audit and browser coverage; this
+estimate does not certify them. There is no basis to build the whole protocol
+from only the two short official sessions or this failed local trial.
+
+### Local provenance and disposition
+
+All local raw events, screenshots, harnesses and the scratch patch remain
+outside Git. Source and selected-artifact SHA-256 values:
+
+| Local artifact | SHA-256 |
+| --- | --- |
+| Unpacked main client (read-only) | `f7ecd6f9b577dd2343c8d390c1570deb54708ffe138ca7bdd599f58d260f0eb8` |
+| Final local browser harness | `568697290b05d561689b0330247f7ea4e8c0b807a3e9d49ceba6f8996db9823a` |
+| Scratch patch | `b913941e368d216a5e1aa149854994d531dc16540849454dee0d3dba3dded82f` |
+| First run events | `f54d09c2874952cf49be18546accc38ad0525db5027132774ed39c9fd2446dc1` |
+| Longer/death run events | `50c3160206a6d6cf99b8e697269903b866bee7081065565a549dff64c69dc485` |
+
+The final harness adds a ten-second death observation to the first run's
+interaction sequence; its digest identifies the longer run's harness. The
+deny proxy saw locally aborted requests and one harmless connection-abort while
+returning a local 403; it made no upstream connections. The prototype was
+compiled for the experiment, then its source was restored exactly. The PR stays
+evidence-only. No claim of playable protocol-19 compatibility or implemented
+protocol-13 support is made.
