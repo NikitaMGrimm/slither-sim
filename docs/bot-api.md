@@ -258,8 +258,8 @@ networking or Rayon. Core-only, C ABI and Python builds do not enable `bot`.
 `networking`, enabled by default, includes it and exposes `client::ForagerBot::new(PolicyId::default())`,
 implementing the existing `client::Bot`. The adapter derives timing and intentions
 from the complete `ClientFrame` and returns `None` outside a compatible playing
-frame with an observation. Existing host, native background bots, examples and
-JSON operations retain their current behavior.
+frame with an observation. Host bots, native background bots and the Rust
+examples use this default adapter; JSON operations are unchanged.
 
 One policy/adapter instance can be reused for sequential decisions across seats:
 scratch buffers retain no policy state. Keep each seat's received frame, sent

@@ -11,8 +11,8 @@
 //! 300-unit-sector interest. Snakes appear once per entry or life, then receive
 //! anchor, tail, mass and motion deltas. Native and remote coverage is shared.
 use super::{
-    Backend, ClientFrame, ClientState, ClientStatus, WireEvent, WireRecord, latency::Random,
-    presentation::FoodPresentation,
+    Backend, Bot, ClientFrame, ClientState, ClientStatus, ForagerBot, WireEvent, WireRecord,
+    latency::Random, presentation::FoodPresentation,
 };
 use crate::{Action, Simulator, model::Point, spawn};
 use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
@@ -78,6 +78,8 @@ pub struct SimulatorBackend {
     config: SimulationConfig,
     world: Simulator,
     slots: Vec<Slot>,
+    /// Stateless scratch shared by sequential background decisions, never per slot.
+    background_policy: Option<ForagerBot>,
     random: Random,
     spawn_random: Random,
     food_presentation: FoodPresentation,
@@ -162,6 +164,7 @@ impl SimulatorBackend {
             listed: Vec::new(),
             food_buckets: Vec::new(),
             slots: Vec::with_capacity(config.agents),
+            background_policy: None,
             world,
             config,
             tick: 0,
@@ -189,7 +192,6 @@ impl SimulatorBackend {
                 pinged_at: None,
                 records: (backend.config.record_wire && !remote).then(Vec::new),
                 record_bytes: 0,
-                seeker: None,
                 remote,
                 living: None,
             });
@@ -385,7 +387,6 @@ impl SimulatorBackend {
         s.processing_override = None;
         s.previous_boost = None;
         s.pinged_at = None;
-        s.seeker = None;
         self.connect(slot)?;
         self.client_until(slot, now)
     }
@@ -473,7 +474,7 @@ impl SimulatorBackend {
         pose
     }
 
-    /// Drive non-controlled slots with a food seeker over their own frames.
+    /// Drive non-controlled slots with the shared policy over their own frames.
     fn drive_background(&mut self) -> Result<(), String> {
         for slot in 0..self.slots.len() {
             // Remote slots replace the controlled slot; they are never driven.
@@ -492,7 +493,11 @@ impl SimulatorBackend {
                 }
                 ClientStatus::Playing if !self.pending(slot) => {
                     let frame = self.frame_for(slot)?;
-                    if let Some(action) = seeker_action(&frame, &mut self.slots[slot].seeker) {
+                    if let Some(action) = self
+                        .background_policy
+                        .get_or_insert_with(|| ForagerBot::new(crate::bot::PolicyId::default()))
+                        .decide(&frame)
+                    {
                         self.send_to(slot, action)?;
                     }
                 }
@@ -537,40 +542,8 @@ pub(crate) fn client_message(bytes: &[u8]) -> bool {
     matches!(bytes, [0..=251 | 253 | 254] | [252, _])
 }
 
-/// The background seeker's decision. It sends only when its heading byte
-/// changes; `sent` holds the last byte sent on this connection.
-pub(crate) fn seeker_action(frame: &ClientFrame, sent: &mut Option<u8>) -> Option<Action> {
-    let heading = seek(frame)?;
-    let byte = (heading.rem_euclid(TAU) * 251. / TAU).floor() as u8;
-    if *sent == Some(byte) {
-        return None;
-    }
-    *sent = Some(byte);
-    Some(Action {
-        heading,
-        boost: false,
-    })
-}
-
-/// Turn inward near the rim, otherwise toward the nearest received food.
-fn seek(frame: &ClientFrame) -> Option<f64> {
-    let observation = frame.observation.as_ref()?;
-    let head = observation.me.head;
-    let arena = &observation.arena;
-    let from_center = head.distance(arena.center);
-    if from_center > arena.radius * 0.8 {
-        return Some((arena.center.y - head.y).atan2(arena.center.x - head.x));
-    }
-    observation
-        .food
-        .iter()
-        .min_by(|a, b| {
-            a.point()
-                .distance(head)
-                .total_cmp(&b.point().distance(head))
-        })
-        .map(|food| (food.y - head.y).atan2(food.x - head.x))
-}
+#[cfg(test)]
+mod bot_tests;
 
 #[cfg(test)]
 mod tests;

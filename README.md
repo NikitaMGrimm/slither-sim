@@ -39,7 +39,7 @@ cargo run --release --locked --example portable_bot -- --steps 200
 
 The bot runs locally, prints a summary and exits. No game window opens.
 
-For the same bot in Python:
+For a simple portable controller in Python:
 
 ```sh
 python examples/portable_bot.py --steps 200
@@ -49,7 +49,7 @@ It needs Python 3.11+ and the build above, and uses only the standard library.
 On Windows, use `py -3` if `python` is missing.
 
 More examples: [embedding the simulator](examples/basic.rs) and
-[a bot that also avoids walls and snakes](examples/cautious_bot.rs). To use the
+[the shared Forager runner](examples/cautious_bot.rs). To use the
 library elsewhere, run `cargo add slither-sim`; for the CLI alone,
 `cargo install slither-sim --locked`.
 

@@ -70,6 +70,10 @@ name = "portable_bot"
 required-features = ["networking"]
 
 [[example]]
+name = "cautious_bot"
+required-features = ["bot"]
+
+[[example]]
 name = "host_load"
 required-features = ["networking"]
 

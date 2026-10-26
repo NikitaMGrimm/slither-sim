@@ -115,9 +115,10 @@ at latency-model due times between ticks. OS scheduling and load affect delivery
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
 
-`botThreads` runs background seekers separately. Each decodes its slot's frames,
-decides every `decisionTicks × dt` with staggered phases, models processing delay,
-pings and rejoins after death. See [worker limits](configuration.md#hostconfig)
+`botThreads` runs background Forager clients using `PolicyId::default()`. Each
+decodes its slot's frames, decides every `decisionTicks × dt` with staggered phases, models processing delay,
+pings and rejoins after death. Each worker shares one stateless policy instance;
+its seats keep separate decoders, outboxes and sent histories. See [worker limits](configuration.md#hostconfig)
 and [decision timing](configuration.md#timing-and-ping).
 An unadmitted background bot waits one wall second after its connection is
 refused before retrying, a host policy that limits crowded-arena admission work.
@@ -142,7 +143,8 @@ Dropping `RunningHost` also stops and joins its threads. `Host::run()` is
 
 From a checkout, the
 [`host_load` example](https://github.com/NikitaMGrimm/slither-sim/blob/main/examples/host_load.rs)
-measures simulation-thread load, deferred ticks and loopback watcher excess delay:
+reports the selected policy and frozen parameter-manifest hash, and measures
+simulation-thread load, deferred ticks and loopback watcher excess delay:
 
 ```sh
 cargo run --release --locked --features networking --example host_load -- --bots 500 --seconds 60

@@ -25,6 +25,11 @@ pub enum PolicyId {
     A4,
 }
 
+/// SHA256 of the complete frozen `bot/data/resolved.json` parameter manifest.
+/// Identifies the resolved A1 and A4 data, not a performance result.
+pub const PARAMETER_MANIFEST_SHA256: &str =
+    "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482";
+
 /// Reusable policy instance. Decisions carry no learned or per-seat state.
 #[derive(Clone, Debug)]
 pub struct Forager {
