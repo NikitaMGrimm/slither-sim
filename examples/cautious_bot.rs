@@ -50,20 +50,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(not(feature = "networking"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use slither_sim::{
-        Config, Simulator,
+        Config, InitialPopulation, Placement, Simulator, WorldOptions,
         bot::{Forager, PolicyId, Timing},
     };
-    let mut world = Simulator::new(1, Config::sandbox())?;
-    world.add("Forager", 0, 1)?;
+    let mut world = Simulator::new(WorldOptions {
+        seed: 1,
+        config: Config::sandbox(),
+        population: InitialPopulation::Placed {
+            ids: vec!["Forager".into()],
+            placement: Placement::default(),
+        },
+    })?;
     let mut bot = Forager::new(PolicyId::default());
     let timing = Timing::default(); // Explicit zero observation/command/processing delay.
     for _ in 0..200 {
-        if !world.snakes[0].alive {
+        if !world.snakes()[0].alive {
             break;
         }
         let action = bot.decide(&world.observe(0)?, &timing, &[]);
         world.step(&[Some(action)])?;
     }
-    println!("score={}", world.snakes[0].score);
+    println!("score={}", world.snakes()[0].score);
     Ok(())
 }
