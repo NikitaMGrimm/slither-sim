@@ -184,7 +184,8 @@ for 99% of received frames. A missed target can occur even below 100% average
 CPU. These short synthetic tests are sizing examples, not a capacity guarantee;
 bots, TLS, larger snakes and longer sessions can add work.
 
-Battledome's 32-seat arena keeps its original size; above 32 seats it grows.
+Battledome's 32-seat arena keeps its original size. Its growth above 32 seats is
+being reworked, so treat the 80-seat rows as provisional.
 Playing counts exclude clients waiting to spawn. The study reports those waits
 separately, including unfinished requests. Measure your intended workload before
 choosing a player limit.
