@@ -695,7 +695,7 @@ fn core_config(case: &str) -> Result<(usize, Config), String> {
 
 fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
     let (agents, config) = core_config(case)?;
-    let mut world = Simulator::new(SEED, config)?;
+    let mut world = Simulator::new(SEED, config).map_err(|error| error.to_string())?;
     let mut centers = vec![Point::default(); agents];
     let orbit = if case == "step-body" {
         400.0
@@ -703,7 +703,9 @@ fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
         world.config.radius * 0.5
     };
     for (slot, center) in centers.iter_mut().enumerate() {
-        world.add(slot.to_string(), slot, agents)?;
+        world
+            .add(slot.to_string(), slot, agents)
+            .map_err(|error| error.to_string())?;
         if case == "step-body" || case == "observe" {
             let snake = &mut world.snakes[slot];
             if case == "step-body" {
@@ -750,7 +752,9 @@ fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
             snake.fam = 0.75;
             snake.speed = physics::base_speed(snake.segments);
             Simulator::update_mass(snake);
-            world.initialize_speed_state(slot, Some(0.0))?;
+            world
+                .initialize_speed_state(slot, Some(0.0))
+                .map_err(|error| error.to_string())?;
         }
     }
     // Keep timing and trace workloads on the same telemetry path. Events are
@@ -898,9 +902,11 @@ fn run_core(args: &Args, out: &mut impl Write) -> Result<Value, String> {
         } else {
             meter.operation(args.trace, || {
                 if args.profile {
-                    world.step_profiled(&actions, &mut profile)
+                    world
+                        .step_profiled(&actions, &mut profile)
+                        .map_err(|error| error.to_string())
                 } else {
-                    world.step(&actions)
+                    world.step(&actions).map_err(|error| error.to_string())
                 }
             })?;
             black_box(&world);
@@ -1664,11 +1670,14 @@ impl Boundary {
 
 impl Scene {
     fn place(scenario: &Scenario) -> Result<Self, String> {
-        let mut world = Simulator::new(SEED, scenario.world.config())?;
+        let mut world =
+            Simulator::new(SEED, scenario.world.config()).map_err(|error| error.to_string())?;
         world.pickup_events = Some(Vec::new());
         world.food_spawn_events = Some(Vec::new());
         for slot in 0..scenario.population {
-            world.add(slot.to_string(), slot, scenario.population)?;
+            world
+                .add(slot.to_string(), slot, scenario.population)
+                .map_err(|error| error.to_string())?;
         }
         // Initial lives enter through the respawn path, so they share its spawn rules.
         for snake in &mut world.snakes {
@@ -1749,10 +1758,17 @@ impl Scene {
         segments: usize,
     ) -> Result<(), String> {
         if self.world.config.spawn_radius.is_some() {
-            let (body, heading) = self.world.spawn_body(head, heading)?;
-            self.world.respawn_body(slot, body, heading)
+            let (body, heading) = self
+                .world
+                .spawn_body(head, heading)
+                .map_err(|error| error.to_string())?;
+            self.world
+                .respawn_body(slot, body, heading)
+                .map_err(|error| error.to_string())
         } else {
-            self.world.respawn(slot, head, heading, segments)
+            self.world
+                .respawn(slot, head, heading, segments)
+                .map_err(|error| error.to_string())
         }
     }
 
@@ -1762,8 +1778,11 @@ impl Scene {
         profile: Option<&mut StepProfile>,
     ) -> Result<(), String> {
         match profile {
-            Some(profile) => self.world.step_profiled(actions, profile),
-            None => self.world.step(actions),
+            Some(profile) => self
+                .world
+                .step_profiled(actions, profile)
+                .map_err(|error| error.to_string()),
+            None => self.world.step(actions).map_err(|error| error.to_string()),
         }
     }
 

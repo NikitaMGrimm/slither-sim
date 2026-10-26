@@ -195,7 +195,9 @@ impl SimulatorBackend {
             .zip(&self.slots)
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
-        self.world.step(&actions)?;
+        self.world
+            .step(&actions)
+            .map_err(|error| error.to_string())?;
         let births = self.world.food_spawn_events.as_deref().unwrap_or(&[]);
         // Physics appends boost/death food, visits pickups in reverse food
         // order, then appends ambient replenishment. Preserve that ordering for

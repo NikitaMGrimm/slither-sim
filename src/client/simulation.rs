@@ -124,10 +124,13 @@ impl SimulatorBackend {
     /// client connects; the rest join and connect natively.
     fn build(seed: u32, config: SimulationConfig, remote: usize) -> Result<Self, String> {
         config.validate()?;
-        let mut world = Simulator::new(seed, config.world.clone())?;
+        let mut world =
+            Simulator::new(seed, config.world.clone()).map_err(|error| error.to_string())?;
         world.food_spawn_events = Some(Vec::new());
         world.pickup_events = Some(Vec::new());
-        world.add_slots(config.agents)?;
+        world
+            .add_slots(config.agents)
+            .map_err(|error| error.to_string())?;
         for snake in &mut world.snakes {
             // Native experiments retain their synthetic ring initialization.
             // Hosted lives enter through the same admission rule as rejoins.
@@ -196,7 +199,10 @@ impl SimulatorBackend {
             if backend.remote > 0
                 && let Ok((body, heading)) = backend.spawn_pose(slot)
             {
-                backend.world.respawn_body(slot, body, heading)?;
+                backend
+                    .world
+                    .respawn_body(slot, body, heading)
+                    .map_err(|error| error.to_string())?;
                 backend.slots[slot].control.heading = heading;
             }
             backend.connect(slot)?;
@@ -364,7 +370,9 @@ impl SimulatorBackend {
         s.record(now, WireEvent::Disconnect, &[])?;
         s.living = None;
         self.world.snakes[slot].alive = false;
-        self.world.respawn_body(slot, body, heading)?;
+        self.world
+            .respawn_body(slot, body, heading)
+            .map_err(|error| error.to_string())?;
         let s = &mut self.slots[slot];
         s.life += 1;
         s.control = Action {
@@ -413,7 +421,10 @@ impl SimulatorBackend {
                 };
                 // Local policy: official joins keep a median 925 units from
                 // visible bodies, but three came within 550-600.
-                let (body, heading) = self.world.spawn_body(head, heading)?;
+                let (body, heading) = self
+                    .world
+                    .spawn_body(head, heading)
+                    .map_err(|error| error.to_string())?;
                 let clear = if circular {
                     safety
                         .get_or_insert_with(|| {

@@ -225,7 +225,22 @@ rescaled pending clock. Use the setter instead of directly
 editing `config.ambient_replenish_per_second` when changing a running world.
 Rejected operations leave the world unchanged. Numeric overflow during a tick
 (pickup mass or prey motion) completes that tick without the invalid update,
-returns an error, and every later step is rejected with it.
+returns `CoreStepError::Stopped(cause)`, and every later step returns
+`CoreStepError::Rejected` with `ErrorKind::WorldStopped`. The original cause stays
+available through `Simulator::status()`: `WorldStatus::Running` or
+`WorldStatus::Stopped(&SimError)`. Action validation failures return
+`CoreStepError::Rejected(cause)` before any state changes. `step_profiled` has the
+same lifecycle.
+
+Other fallible core calls return `SimError`. Replace `Result<_, String>`
+propagation and prose matching with `SimError` (or a boxed `std::error::Error`)
+and checks on `kind`/`code()`. Causes carry optional zero-based `world`/`slot`
+and string `field` locations, a `Constraint` where applicable, and
+`expected`/`actual` counts for action shape errors. Config fields use JSON names,
+with indexed paths for radius samples. `ErrorCode` numeric values 1–17 and
+`as_str()` names are stable; message wording is diagnostic. `Display`/`Error`
+retain human messages and chained causes. Successful steps allocate no error
+strings. JSON, C and Python errors and contract identifiers stay unchanged.
 
 ### In-process sessions
 
@@ -241,9 +256,11 @@ requests and typed steps act on the same worlds and may be mixed.
 | `worlds()`, `agents()` | Session shape; 0 before the first reset. |
 
 A NaN heading means no action; only dead slots may give it. Typed steps return
-`Result<(), transport::StepError>` with JSON error text: `Rejected(message)`
-leaves the session unchanged; `Ended(message)` clears every world after an
+`Result<(), transport::StepError>`: `Rejected(SimError)` leaves the session
+unchanged; `Ended(SimError)` clears every world after an
 advancement or frame-collection failure, including worlds that succeeded.
+The cause names the first failing world in stable world order, including when
+worlds advance in parallel. Formatting `StepError` retains the JSON error text.
 Then `frame` returns `None`, `worlds()` and `agents()` return 0; reset to continue.
 
 `FrameRef` columns hold the values the JSON frame prints, rounded alike, in

@@ -4,6 +4,7 @@
 //!
 //! [`Frame`] collects the columns in the fixed-width types that in-process callers
 //! and the C ABI read directly; JSON is written from them only on request.
+use crate::{ErrorKind, SimError};
 use crate::{
     model::{DeathEvent, DeathReason, Origin},
     observation::Sighting,
@@ -53,16 +54,25 @@ fn origin_code(origin: Option<Origin>) -> u8 {
 }
 
 /// A row or slot index: a `u32` other than the [`NONE`] sentinel.
-fn row(i: usize, what: &str) -> Result<u32, String> {
-    u32::try_from(i)
-        .ok()
-        .filter(|&i| i != NONE)
-        .ok_or_else(|| format!("Frame {what} index {i} must be below u32::MAX, which means none"))
+fn row(i: usize, what: &str) -> Result<u32, SimError> {
+    u32::try_from(i).ok().filter(|&i| i != NONE).ok_or_else(|| {
+        SimError::new(
+            ErrorKind::RepresentationLimit,
+            format!("Frame {what} index {i} must be below u32::MAX, which means none"),
+        )
+        .at_field(what)
+    })
 }
 
 /// A count or column offset: any `u32`.
-fn count(i: usize, what: &str) -> Result<u32, String> {
-    u32::try_from(i).map_err(|_| format!("Frame {what} count {i} exceeds u32::MAX"))
+fn count(i: usize, what: &str) -> Result<u32, SimError> {
+    u32::try_from(i).map_err(|_| {
+        SimError::new(
+            ErrorKind::RepresentationLimit,
+            format!("Frame {what} count {i} exceeds u32::MAX"),
+        )
+        .at_field(what)
+    })
 }
 
 /// Read-only columns of one world's current frame, with the values its JSON frame
@@ -269,7 +279,7 @@ impl Frame {
         world: &Simulator,
         ticks: usize,
         deaths: &[DeathEvent],
-    ) -> Result<(), String> {
+    ) -> Result<(), SimError> {
         world.sight_all_into(&mut self.sightings, &mut self.marks);
         self.time = world.time;
         self.ticks = count(ticks, "tick")?;
@@ -379,7 +389,7 @@ impl Frame {
         }
     }
 
-    fn collect_snakes(&mut self, world: &Simulator) -> Result<(), String> {
+    fn collect_snakes(&mut self, world: &Simulator) -> Result<(), SimError> {
         self.snake_row.clear();
         self.snake_row.resize(world.snakes.len(), UNSEEN);
         for (slot, sighting) in self.sightings.iter().enumerate() {
@@ -444,7 +454,7 @@ impl Frame {
         Ok(())
     }
 
-    fn collect_food(&mut self, world: &Simulator) -> Result<(), String> {
+    fn collect_food(&mut self, world: &Simulator) -> Result<(), SimError> {
         self.food_seen.clear();
         self.food_seen.resize(world.food.len().div_ceil(64), 0);
         for sighting in self.sightings.iter().flatten() {
@@ -476,7 +486,7 @@ impl Frame {
         Ok(())
     }
 
-    fn collect_prey(&mut self, world: &Simulator) -> Result<(), String> {
+    fn collect_prey(&mut self, world: &Simulator) -> Result<(), SimError> {
         self.prey_row.clear();
         self.prey_row.resize(world.prey.len(), UNSEEN);
         for sighting in self.sightings.iter().flatten() {
@@ -512,7 +522,7 @@ impl Frame {
         Ok(())
     }
 
-    fn collect_views(&mut self) -> Result<(), String> {
+    fn collect_views(&mut self) -> Result<(), SimError> {
         let v = &mut self.views;
         for column in [
             &mut v.me,
@@ -662,7 +672,8 @@ mod tests {
         #[cfg(target_pointer_width = "64")]
         {
             let error = count(u32::MAX as usize + 1, "body anchor").unwrap_err();
-            assert!(error.contains("body anchor"), "{error}");
+            assert_eq!(error.kind, ErrorKind::RepresentationLimit);
+            assert_eq!(error.field.as_deref(), Some("body anchor"));
             assert!(row(usize::MAX, "food row").is_err());
         }
     }

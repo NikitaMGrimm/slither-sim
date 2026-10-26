@@ -122,7 +122,7 @@ impl<'de> Deserialize<'de> for SimulationConfig {
 }
 impl SimulationConfig {
     pub fn validate(&self) -> Result<(), String> {
-        self.world.validate()?;
+        self.world.validate().map_err(|error| error.to_string())?;
         // Live prey refill to `count`, and each needs one of the u16 wire IDs.
         if self.world.prey.count > MAX_PREY {
             return Err(format!(

@@ -1,6 +1,6 @@
 use slither_sim::{Action, Config, Simulator};
 
-fn main() -> Result<(), String> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut world = Simulator::new(7, Config::default())?;
     for slot in 0..4 {
         world.add(slot.to_string(), slot, 4)?;

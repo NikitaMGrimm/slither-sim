@@ -3,6 +3,8 @@ use crate::food_grid::{EaterGrid, FoodCache};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
+use crate::{Constraint, ErrorKind, SimError};
+use crate::{CoreStepError, WorldStatus};
 use crate::{model::*, physics::*};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -27,9 +29,13 @@ impl Default for DeathFoodConfig {
     }
 }
 impl DeathFoodConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
-            return Err("Death-food cellSize must be positive and finite".into());
+    pub fn validate(&self) -> Result<(), SimError> {
+        if let Some(rule) = Constraint::positive(self.cell_size) {
+            return Err(SimError::config(
+                rule,
+                "deathFood.cellSize",
+                "Death-food cellSize must be positive and finite",
+            ));
         }
         Ok(())
     }
@@ -53,9 +59,13 @@ impl Default for AmbientFoodConfig {
     }
 }
 impl AmbientFoodConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
-            return Err("Ambient-food cellSize must be positive and finite".into());
+    pub fn validate(&self) -> Result<(), SimError> {
+        if let Some(rule) = Constraint::positive(self.cell_size) {
+            return Err(SimError::config(
+                rule,
+                "ambientFood.cellSize",
+                "Ambient-food cellSize must be positive and finite",
+            ));
         }
         Ok(())
     }
@@ -79,9 +89,13 @@ impl Default for BoostFoodConfig {
     }
 }
 impl BoostFoodConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if !self.cell_size.is_finite() || self.cell_size <= 0.0 {
-            return Err("Boost-food cellSize must be positive and finite".into());
+    pub fn validate(&self) -> Result<(), SimError> {
+        if let Some(rule) = Constraint::positive(self.cell_size) {
+            return Err(SimError::config(
+                rule,
+                "boostFood.cellSize",
+                "Boost-food cellSize must be positive and finite",
+            ));
         }
         Ok(())
     }
@@ -379,12 +393,19 @@ impl Config {
             ..Self::official(1)
         }
     }
-    pub fn validate(&self) -> Result<(), String> {
-        if [self.radius, self.vision, self.dt]
-            .iter()
-            .any(|n| !n.is_finite() || *n <= 0.0)
-        {
-            return Err("Settings must be positive finite numbers".into());
+    pub fn validate(&self) -> Result<(), SimError> {
+        for (field, value) in [
+            ("radius", self.radius),
+            ("vision", self.vision),
+            ("dt", self.dt),
+        ] {
+            if let Some(rule) = Constraint::positive(value) {
+                return Err(SimError::config(
+                    rule,
+                    field,
+                    "Settings must be positive finite numbers",
+                ));
+            }
         }
         check_ambient_rate(self.ambient_replenish_per_second, self.dt)?;
         // A slide leaves the head one contact lead behind the rim along its
@@ -394,12 +415,16 @@ impl Config {
         // cap claimed body-radius tunneling, but collision tests are swept.
         let lead = crate::boundary::CONTACT_LEAD * MIN_SCALE;
         if self.boundary_mode == crate::BoundaryMode::Sliding && self.dt * BOOST_SPEED >= lead {
-            return Err(format!(
-                "With sliding boundaries dt must be below {lead} / {BOOST_SPEED} = {} s: a \
+            return Err(SimError::config(
+                Constraint::OutOfRange,
+                "dt",
+                format!(
+                    "With sliding boundaries dt must be below {lead} / {BOOST_SPEED} = {} s: a \
                  boosting minimum-size snake would pass its {lead}-unit forward contact \
                  lead in one tick and die on shallow rim contact. Use boundaryMode \"hard\" \
                  for longer steps",
-                lead / BOOST_SPEED
+                    lead / BOOST_SPEED
+                ),
             ));
         }
         // Prey advance in LOOP_SECONDS substeps and boosting snakes drop food
@@ -409,11 +434,15 @@ impl Config {
         // about 6.3e13 s on 64-bit targets. It also keeps a tick of boost
         // travel, dt × BOOST_SPEED, far inside f64, so heads stay finite.
         if (self.dt + 2.0 * LOOP_SECONDS) / LOOP_SECONDS >= max_tick_count() {
-            return Err(format!(
-                "dt {} is too long: prey advance in {LOOP_SECONDS} s substeps, and one \
+            return Err(SimError::config(
+                Constraint::OutOfRange,
+                "dt",
+                format!(
+                    "dt {} is too long: prey advance in {LOOP_SECONDS} s substeps, and one \
                  tick's count of them must be an exact integer that fits usize (below {})",
-                self.dt,
-                max_tick_count()
+                    self.dt,
+                    max_tick_count()
+                ),
             ));
         }
         self.prey.validate()?;
@@ -425,32 +454,45 @@ impl Config {
         crate::boundary::validate(&self.radius_updates)
     }
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
-    fn validate_mode(&self) -> Result<(), String> {
+    fn validate_mode(&self) -> Result<(), SimError> {
         let pit = self.pit.as_ref().map(|pit| pit.radius);
         if pit.is_some_and(|pit| !(pit > 0.0 && pit < self.radius)) {
-            return Err("pit.radius must be positive and less than radius, so the pit lies inside the arena".into());
+            return Err(SimError::config(
+                Constraint::positive(pit.unwrap()).unwrap_or(Constraint::OutOfRange),
+                "pit.radius",
+                "pit.radius must be positive and less than radius, so the pit lies inside the arena",
+            ));
         }
         if self
             .kill_score_seconds
             .is_some_and(|window| !(window.is_finite() && window > 0.0))
         {
-            return Err(
-                "killScoreSeconds must be positive and finite, so kills count and then expire"
-                    .into(),
-            );
+            return Err(SimError::config(
+                Constraint::positive(self.kill_score_seconds.unwrap()).unwrap(),
+                "killScoreSeconds",
+                "killScoreSeconds must be positive and finite, so kills count and then expire",
+            ));
         }
         let scores = MassFloor::score_range();
         if self.min_score.is_some_and(|score| !scores.contains(&score)) {
-            return Err(format!(
-                "minScore must be from a newborn's displayed {} to {}, the score at \
+            return Err(SimError::config(
+                Constraint::OutOfRange,
+                "minScore",
+                format!(
+                    "minScore must be from a newborn's displayed {} to {}, the score at \
                  {MAX_SEGMENTS} segments, where the score table ends and larger snakes \
                  display less, so growth never falls below the floor",
-                scores.start(),
-                scores.end()
+                    scores.start(),
+                    scores.end()
+                ),
             ));
         }
         if self.min_score.is_some() && self.spawn_radius.is_none() {
-            return Err("minScore requires spawnRadius, the ring new lives lie along".into());
+            return Err(SimError::config(
+                Constraint::Missing,
+                "spawnRadius",
+                "minScore requires spawnRadius, the ring new lives lie along",
+            ));
         }
         // The whole centerline must clear the pit: the midpoint of a 42-unit
         // chord is sqrt(spawn^2 - 21^2) from the center. Check both rounded
@@ -462,7 +504,17 @@ impl Config {
         if self.spawn_radius_max.is_some_and(|outer| {
             !outer.is_finite() || self.spawn_radius.is_none_or(|inner| outer < inner)
         }) {
-            return Err("spawnRadiusMax requires spawnRadius and must be finite and at least spawnRadius, so the spawn band is ordered".into());
+            return Err(SimError::config(
+                if !self.spawn_radius_max.unwrap().is_finite() {
+                    Constraint::NonFinite
+                } else if self.spawn_radius.is_none() {
+                    Constraint::Missing
+                } else {
+                    Constraint::Ordering
+                },
+                "spawnRadiusMax",
+                "spawnRadiusMax requires spawnRadius and must be finite and at least spawnRadius, so the spawn band is ordered",
+            ));
         }
         let invalid = [
             ("spawnRadius", self.spawn_radius),
@@ -481,10 +533,18 @@ impl Config {
             (!fits).then_some(name)
         });
         if let Some(name) = invalid {
-            return Err(format!(
-                "{name} must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
+            return Err(SimError::config(
+                if name == "spawnRadius" && !self.spawn_radius.unwrap().is_finite() {
+                    Constraint::NonFinite
+                } else {
+                    Constraint::OutsideArena
+                },
+                name,
+                format!(
+                    "{name} must lie outside pit.radius and more than {SPAWN_WALL_MARGIN} inside \
                  radius, with body chords outside the pit and room for a new life's \
                  {segments} anchors 42 apart plus its head-tail body clearance"
+                ),
             ));
         }
         Ok(())
@@ -512,16 +572,24 @@ impl Config {
 /// `interval + dt` until it runs out. Unless that subtraction changes the
 /// largest such clock (and so every smaller one), the loop never ends, so f64
 /// resolution, not a policy cap, bounds the rate.
-fn check_ambient_rate(rate: f64, dt: f64) -> Result<(), String> {
-    if !rate.is_finite() || rate < 0.0 {
-        return Err("ambientReplenishPerSecond must be finite and nonnegative".into());
+fn check_ambient_rate(rate: f64, dt: f64) -> Result<(), SimError> {
+    if let Some(rule) = Constraint::nonnegative(rate) {
+        return Err(SimError::config(
+            rule,
+            "ambientReplenishPerSecond",
+            "ambientReplenishPerSecond must be finite and nonnegative",
+        ));
     }
     let interval = 1.0 / rate;
     let clock = dt + interval;
     if rate > 0.0 && clock - interval >= clock {
-        return Err(format!(
-            "ambientReplenishPerSecond {rate} with dt {dt} is too high: one attempt interval \
+        return Err(SimError::config(
+            Constraint::OutOfRange,
+            "ambientReplenishPerSecond",
+            format!(
+                "ambientReplenishPerSecond {rate} with dt {dt} is too high: one attempt interval \
              no longer changes the refill clock in f64"
+            ),
         ));
     }
     Ok(())
@@ -626,9 +694,9 @@ pub struct Simulator {
     prey_motion_clock: f64,
     radius_update_index: usize,
     /// Why the world stopped: a pickup whose gain would overflow the eater's
-    /// mass. Validation rejects every later step with it.
+    /// mass, or non-finite prey motion. Validation rejects every later step.
     #[serde(default)]
-    failure: Option<String>,
+    failure: Option<SimError>,
     #[serde(skip)]
     food_cache: FoodCache,
     #[serde(skip)]
@@ -657,20 +725,24 @@ impl Simulator {
     /// Set ambient placement attempts per second, preserving fractional refill credit.
     /// Zero disables refill and discards pending credit. Invalid rates or unrepresentable
     /// clock rescaling leave the world unchanged. Use this instead of editing the rate directly.
-    pub fn set_ambient_rate(&mut self, rate: f64) -> Result<(), String> {
+    pub fn set_ambient_rate(&mut self, rate: f64) -> Result<(), SimError> {
         check_ambient_rate(rate, self.config.dt)?;
         if rate != self.config.ambient_replenish_per_second {
             let credit = self.ambient_clock * self.config.ambient_replenish_per_second;
             let clock = if rate > 0.0 { credit / rate } else { 0.0 };
             if !clock.is_finite() {
-                return Err("Ambient refill credit cannot be represented at this rate".into());
+                return Err(SimError::new(
+                    ErrorKind::NumericOverflow,
+                    "Ambient refill credit cannot be represented at this rate",
+                )
+                .at_field("ambientReplenishPerSecond"));
             }
             self.ambient_clock = clock;
             self.config.ambient_replenish_per_second = rate;
         }
         Ok(())
     }
-    pub fn new(seed: u32, config: Config) -> Result<Self, String> {
+    pub fn new(seed: u32, config: Config) -> Result<Self, SimError> {
         config.validate()?;
         let min_mass = config.min_score.and_then(MassFloor::for_score);
         let mut world = Self {
@@ -715,10 +787,14 @@ impl Simulator {
         let admits = !ambient.enabled || ambient.max_per_cell > 0;
         let startup = if admits { world.config.food_count } else { 0 };
         world.food.try_reserve(startup).map_err(|_| {
-            format!(
-                "foodCount {} does not fit in memory",
-                world.config.food_count
+            SimError::new(
+                ErrorKind::AllocationFailed,
+                format!(
+                    "foodCount {} does not fit in memory",
+                    world.config.food_count
+                ),
             )
+            .at_field("foodCount")
         })?;
         world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
@@ -740,10 +816,14 @@ impl Simulator {
             .prey
             .try_reserve(world.config.prey.count)
             .map_err(|_| {
-                format!(
-                    "prey count {} does not fit in memory",
-                    world.config.prey.count
+                SimError::new(
+                    ErrorKind::AllocationFailed,
+                    format!(
+                        "prey count {} does not fit in memory",
+                        world.config.prey.count
+                    ),
                 )
+                .at_field("prey.count")
             })?;
         // A new world has no prey, so IDs 0..count need no collision scan.
         for _ in 0..world.config.prey.count {
@@ -786,22 +866,29 @@ impl Simulator {
         id: impl Into<String>,
         index: usize,
         count: usize,
-    ) -> Result<usize, String> {
+    ) -> Result<usize, SimError> {
         let id = id.into();
         if count == 0 || index >= count {
-            return Err("Invalid spawn slot".into());
+            return Err(
+                SimError::state(Constraint::OutOfRange, "index", "Invalid spawn slot")
+                    .at_slot(index),
+            );
         }
         if self.snakes.iter().any(|s| s.id == id) {
-            return Err("Duplicate agent id".into());
+            return Err(SimError::new(ErrorKind::DuplicateId, "Duplicate agent id").at_field("id"));
         }
         self.push_snake(id, index, count)
     }
     /// Adds slots `0..count` of a ring as `add(slot.to_string(), slot, count)`
     /// would, to a world without snakes. Those IDs are distinct, so the
     /// duplicate scan, quadratic over a large ring, is skipped.
-    pub(crate) fn add_slots(&mut self, count: usize) -> Result<(), String> {
+    pub(crate) fn add_slots(&mut self, count: usize) -> Result<(), SimError> {
         if !self.snakes.is_empty() {
-            return Err("Slots are added to a world without snakes".into());
+            return Err(SimError::state(
+                Constraint::InconsistentState,
+                "snakes",
+                "Slots are added to a world without snakes",
+            ));
         }
         for slot in 0..count {
             self.push_snake(slot.to_string(), slot, count)?;
@@ -810,7 +897,7 @@ impl Simulator {
     }
     /// Spawns `id` at slot `index` of a ring of `count`; the caller has checked
     /// both and that `id` is new.
-    fn push_snake(&mut self, id: String, index: usize, count: usize) -> Result<usize, String> {
+    fn push_snake(&mut self, id: String, index: usize, count: usize) -> Result<usize, SimError> {
         let a = index as f64 / count as f64 * TAU;
         let (body, heading) = match self.config.spawn_radius {
             // A ring life lies along the ring, counterclockwise.
@@ -841,7 +928,12 @@ impl Simulator {
             .iter()
             .any(|point| !point.finite() || point.distance(Point::default()) >= self.config.radius)
         {
-            return Err("Initial spawn body extends outside arena".into());
+            return Err(SimError::state(
+                Constraint::OutsideArena,
+                "body",
+                "Initial spawn body extends outside arena",
+            )
+            .at_slot(self.snakes.len()));
         }
         let segments = body.len();
         let mut snake = Snake {
@@ -889,12 +981,14 @@ impl Simulator {
         &mut self,
         index: usize,
         progress: Option<f64>,
-    ) -> Result<(), String> {
-        let snake = self.snakes.get(index).ok_or("Unknown speed-state slot")?;
+    ) -> Result<(), SimError> {
+        let snake = self.snakes.get(index).ok_or_else(|| {
+            SimError::new(ErrorKind::UnknownSlot, "Unknown speed-state slot").at_slot(index)
+        })?;
         let state = match progress {
-            Some(q) => SpeedState::with_progress(snake.speed, q)?,
+            Some(q) => SpeedState::with_progress(snake.speed, q).map_err(|e| e.at_slot(index))?,
             None => {
-                SpeedState::with_progress(snake.speed, 0.0)?;
+                SpeedState::with_progress(snake.speed, 0.0).map_err(|e| e.at_slot(index))?;
                 SpeedState::from_observed_speed(snake.speed, snake.segments)
             }
         };
@@ -925,7 +1019,7 @@ impl Simulator {
     /// center, turning the way `heading` leans, and it heads along the circle;
     /// an error if that circle cannot hold them. Otherwise two segments lie
     /// straight behind `heading`. Pass the result to `body_is_clear` and `respawn_body`.
-    pub fn spawn_body(&self, head: Point, heading: f64) -> Result<(Vec<Point>, f64), String> {
+    pub fn spawn_body(&self, head: Point, heading: f64) -> Result<(Vec<Point>, f64), SimError> {
         if self.config.spawn_radius.is_none() {
             let tail = Point {
                 x: head.x - heading.cos() * 42.0,
@@ -933,8 +1027,13 @@ impl Simulator {
             };
             return Ok((vec![head, tail], heading));
         }
-        crate::spawn::ring_body(head, heading, self.spawn_segments())
-            .ok_or_else(|| "Spawn circle is too small for a new life's body".into())
+        crate::spawn::ring_body(head, heading, self.spawn_segments()).ok_or_else(|| {
+            SimError::state(
+                Constraint::OutOfRange,
+                "body",
+                "Spawn circle is too small for a new life's body",
+            )
+        })
     }
     /// Calibrated spawn exclusion, not collision immunity. Check the whole new
     /// body so its tail cannot appear in front of an existing player either.
@@ -1063,10 +1162,31 @@ impl Simulator {
         head: Point,
         heading: f64,
         segments: usize,
-    ) -> Result<(), String> {
-        let s = self.snakes.get(index).ok_or("Unknown respawn slot")?;
+    ) -> Result<(), SimError> {
+        let s = self.snakes.get(index).ok_or_else(|| {
+            SimError::new(ErrorKind::UnknownSlot, "Unknown respawn slot").at_slot(index)
+        })?;
         if s.alive || !head.finite() || !heading.is_finite() || !(2..=430).contains(&segments) {
-            return Err("Respawn requires a dead slot, finite pose and 2..430 segments".into());
+            return Err(SimError::state(
+                if s.alive {
+                    Constraint::InconsistentState
+                } else if !head.finite() || !heading.is_finite() {
+                    Constraint::NonFinite
+                } else {
+                    Constraint::OutOfRange
+                },
+                if s.alive {
+                    "alive"
+                } else if !head.finite() {
+                    "head"
+                } else if !heading.is_finite() {
+                    "heading"
+                } else {
+                    "segments"
+                },
+                "Respawn requires a dead slot, finite pose and 2..430 segments",
+            )
+            .at_slot(index));
         }
         let body = (0..segments)
             .map(|i| Point {
@@ -1086,27 +1206,56 @@ impl Simulator {
         index: usize,
         body: Vec<Point>,
         heading: f64,
-    ) -> Result<(), String> {
-        let s = self.snakes.get(index).ok_or("Unknown respawn slot")?;
+    ) -> Result<(), SimError> {
+        let s = self.snakes.get(index).ok_or_else(|| {
+            SimError::new(ErrorKind::UnknownSlot, "Unknown respawn slot").at_slot(index)
+        })?;
         if s.alive
             || !heading.is_finite()
             || !(2..=430).contains(&body.len())
             || body.iter().any(|p| !p.finite())
         {
-            return Err("Respawn requires a dead slot, finite pose and 2..430 segments".into());
+            return Err(SimError::state(
+                if s.alive {
+                    Constraint::InconsistentState
+                } else if !heading.is_finite() || body.iter().any(|p| !p.finite()) {
+                    Constraint::NonFinite
+                } else {
+                    Constraint::OutOfRange
+                },
+                if s.alive {
+                    "alive"
+                } else if !heading.is_finite() {
+                    "heading"
+                } else {
+                    "body"
+                },
+                "Respawn requires a dead slot, finite pose and 2..430 segments",
+            )
+            .at_slot(index));
         }
         if body
             .iter()
             .any(|p| p.distance(Point::default()) >= self.config.radius)
         {
-            return Err("Spawn body extends outside arena".into());
+            return Err(SimError::state(
+                Constraint::OutsideArena,
+                "body",
+                "Spawn body extends outside arena",
+            )
+            .at_slot(index));
         }
         let floor = self.min_mass;
         if let Some(floor) = floor.filter(|floor| body.len() < floor.segments) {
-            return Err(format!(
-                "minScore needs a spawn body of at least {} segments",
-                floor.segments
-            ));
+            return Err(SimError::state(
+                Constraint::OutOfRange,
+                "body",
+                format!(
+                    "minScore needs a spawn body of at least {} segments",
+                    floor.segments
+                ),
+            )
+            .at_slot(index));
         }
         let s = &mut self.snakes[index];
         s.head = body[0];
@@ -1142,23 +1291,51 @@ impl Simulator {
     /// change nothing. If a pickup would overflow its eater's mass, the tick
     /// completes without that gain, returns an error and stops the world;
     /// every later step is rejected.
-    pub fn step(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
-        self.validate_actions(actions)?;
+    pub fn step(&mut self, actions: &[Option<Action>]) -> Result<(), CoreStepError> {
+        self.validate_actions(actions)
+            .map_err(CoreStepError::Rejected)?;
         self.advance_validated(actions)
+            .map_err(CoreStepError::Stopped)
     }
-    pub fn validate_actions(&self, actions: &[Option<Action>]) -> Result<(), String> {
+    /// Persistent terminal cause, including after later rejected retries.
+    pub fn status(&self) -> WorldStatus<'_> {
+        self.failure
+            .as_ref()
+            .map_or(WorldStatus::Running, WorldStatus::Stopped)
+    }
+    pub fn validate_actions(&self, actions: &[Option<Action>]) -> Result<(), SimError> {
         if let Some(failure) = &self.failure {
-            return Err(failure.clone());
+            let mut error = failure.clone();
+            error.kind = ErrorKind::WorldStopped;
+            return Err(error);
         }
         // The public configuration may have changed since construction. Reject
         // invalid prey settings before movement, clocks or refill mutate state.
         self.config.prey.validate()?;
         if actions.len() != self.snakes.len() {
-            return Err("Action batch must have one slot per spawned agent".into());
+            return Err(SimError::new(
+                ErrorKind::ActionShape {
+                    expected: self.snakes.len(),
+                    actual: actions.len(),
+                },
+                "Action batch must have one slot per spawned agent",
+            )
+            .at_field("actions"));
         }
-        for (s, a) in self.snakes.iter().zip(actions) {
+        for (slot, (s, a)) in self.snakes.iter().zip(actions).enumerate() {
             if s.alive && a.is_none_or(|a| !a.heading.is_finite()) {
-                return Err(format!("Missing or invalid action for {}", s.id));
+                return Err(SimError::new(
+                    ErrorKind::InvalidAction {
+                        rule: if a.is_none() {
+                            Constraint::Missing
+                        } else {
+                            Constraint::NonFinite
+                        },
+                    },
+                    format!("Missing or invalid action for {}", s.id),
+                )
+                .at_slot(slot)
+                .at_field("heading"));
             }
         }
         Ok(())
@@ -1167,13 +1344,16 @@ impl Simulator {
         &mut self,
         actions: &[Option<Action>],
         profile: &mut StepProfile,
-    ) -> Result<(), String> {
-        self.validate_actions(actions)?;
+    ) -> Result<(), CoreStepError> {
+        self.validate_actions(actions)
+            .map_err(CoreStepError::Rejected)?;
         self.advance::<true>(actions, profile);
-        self.failure.clone().map_or(Ok(()), Err)
+        self.failure
+            .clone()
+            .map_or(Ok(()), |cause| Err(CoreStepError::Stopped(cause)))
     }
     /// Advance validated actions; errors only when the tick stopped the world.
-    pub(crate) fn advance_validated(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
+    pub(crate) fn advance_validated(&mut self, actions: &[Option<Action>]) -> Result<(), SimError> {
         self.advance::<false>(actions, &mut StepProfile::default());
         self.failure.clone().map_or(Ok(()), Err)
     }
@@ -1607,7 +1787,7 @@ impl Simulator {
             let gain = f
                 .size
                 .map_or(f.value, |size| nutrition(size, s.segments as f64 + s.fam));
-            gain_mass(s, gain, "food", &mut self.failure);
+            gain_mass(s, i, gain, "food", &mut self.failure);
         }
         if !hits.is_empty() {
             eaten.clear();
@@ -1748,10 +1928,20 @@ impl Simulator {
     /// roaming prey keeps its immediate first-step decision. Mode remains internal,
     /// so observations retain their public schema. The exact-11 pulse is not
     /// modeled: its advertised speed does not reproduce recorded displacement.
-    pub fn set_prey_mode(&mut self, id: u64, mode: PreyMode) -> Result<(), String> {
+    pub fn set_prey_mode(&mut self, id: u64, mode: PreyMode) -> Result<(), SimError> {
         let mut matching = self.prey.iter_mut().filter(|prey| prey.id == id);
-        let (Some(prey), None) = (matching.next(), matching.next()) else {
-            return Err("prey mode requires exactly one matching identity".into());
+        let first = matching.next();
+        let duplicate = matching.next().is_some();
+        let kind = if duplicate {
+            ErrorKind::DuplicateId
+        } else {
+            ErrorKind::UnknownEntity
+        };
+        let Some(prey) = first.filter(|_| !duplicate) else {
+            return Err(
+                SimError::new(kind, "prey mode requires exactly one matching identity")
+                    .at_field("prey.id"),
+            );
         };
         match mode {
             PreyMode::Roaming => {
@@ -1931,7 +2121,7 @@ impl Simulator {
             if !finite_motion || !distance.is_finite() {
                 prey.position = old;
                 self.failure.get_or_insert_with(|| {
-                    "Prey motion overflowed f64; the tick completed without that motion and the world cannot advance further".into()
+                    SimError::new(ErrorKind::NumericOverflow, "Prey motion overflowed f64; the tick completed without that motion and the world cannot advance further").at_field("prey.position")
                 });
                 return true;
             }
@@ -2025,7 +2215,7 @@ impl Simulator {
                 }
                 let s = &mut self.snakes[i];
                 let gain = nutrition(prey.size, s.segments as f64 + s.fam) * p.nutrition_factor;
-                gain_mass(s, gain, "prey", &mut self.failure);
+                gain_mass(s, i, gain, "prey", &mut self.failure);
                 false
             } else {
                 true
@@ -2215,17 +2405,17 @@ fn drops_in(elapsed: f64) -> (usize, f64) {
 
 /// Add `gain` to `s`'s mass, or record why not when the sum overflows f64.
 /// Validation bounds one catch, not the mass that catches accumulate.
-fn gain_mass(s: &mut Snake, gain: f64, item: &str, failure: &mut Option<String>) {
+fn gain_mass(s: &mut Snake, slot: usize, gain: f64, item: &str, failure: &mut Option<SimError>) {
     let fam = s.fam + gain;
     if fam.is_finite() {
         s.fam = fam;
         Simulator::update_mass(s);
     } else if failure.is_none() {
-        *failure = Some(format!(
+        *failure = Some(SimError::new(ErrorKind::NumericOverflow, format!(
             "Snake {}'s mass would overflow f64 after eating {item} worth {gain:e}; the tick \
              completed without that gain and the world cannot advance further",
             s.id
-        ));
+        )).at_slot(slot).at_field("fam"));
     }
 }
 
@@ -2679,7 +2869,10 @@ mod slot_tests {
             serde_json::to_value(&checked).unwrap()
         );
         // Caller-supplied IDs are still checked, and slots need an empty world.
-        assert_eq!(generated.add("3", 0, 1).unwrap_err(), "Duplicate agent id");
+        assert_eq!(
+            generated.add("3", 0, 1).unwrap_err().kind,
+            ErrorKind::DuplicateId
+        );
         assert!(generated.add_slots(1).is_err());
         // The largest protocol-19 ring is linear work: the old per-slot scan
         // made 2.1 billion ID comparisons here.

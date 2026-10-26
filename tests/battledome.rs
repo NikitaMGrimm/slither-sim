@@ -2,6 +2,7 @@
 //! `spawnRadius`, `killScoreSeconds` and `minScore`. Worlds here are synthetic setups.
 use slither_sim::physics::{MAX_SEGMENTS, MassFloor, score};
 use slither_sim::{Action, Config, DeathReason, PitConfig, Point, Preset, Simulator, spawn};
+use slither_sim::{Constraint, ErrorKind};
 use std::f64::consts::{FRAC_PI_2, PI};
 
 /// A food-free arena of radius 1000 with a pit of radius 200.
@@ -616,45 +617,94 @@ fn mode_settings_reject_unreachable_rules() {
         change(&mut config);
         config.validate()
     };
-    let pit = "pit.radius must be positive and less than radius";
-    let ring = "spawnRadius must lie outside pit.radius and more than 60 inside radius";
-    let window = "killScoreSeconds must be positive and finite";
-    let floor = "minScore must be from a newborn's displayed 10 to";
-    for (change, error) in [
+    for (change, field, rule) in [
         (
             (|c| c.pit = Some(PitConfig { radius: 0.0 })) as fn(&mut Config),
-            pit,
+            "pit.radius",
+            Constraint::NonPositive,
         ),
-        (|c| c.pit = Some(PitConfig { radius: 3584.0 }), pit),
-        (|c| c.pit = Some(PitConfig { radius: f64::NAN }), pit),
-        (|c| c.spawn_radius = Some(3584.0), ring),
-        // Every anchor lies on the ring, inside the 60-unit spawn wall margin.
-        (|c| c.spawn_radius = Some(3524.0), ring),
-        (|c| c.spawn_radius = Some(1784.0), ring),
-        (|c| c.spawn_radius = Some(-1.0), ring),
-        (|c| c.spawn_radius = Some(f64::NAN), ring),
-        (|c| c.kill_score_seconds = Some(0.0), window),
-        (|c| c.kill_score_seconds = Some(f64::INFINITY), window),
-        (|c| c.kill_score_seconds = Some(f64::NAN), window),
-        (|c| c.min_score = Some(9), floor),
-        (|c| c.min_score = Some(0), floor),
-        (|c| c.min_score = Some(u32::MAX), floor),
+        (
+            |c| c.pit = Some(PitConfig { radius: 3584.0 }),
+            "pit.radius",
+            Constraint::OutOfRange,
+        ),
+        (
+            |c| c.pit = Some(PitConfig { radius: f64::NAN }),
+            "pit.radius",
+            Constraint::NonFinite,
+        ),
+        (
+            |c| c.spawn_radius = Some(3584.0),
+            "spawnRadius",
+            Constraint::OutsideArena,
+        ),
+        (
+            |c| c.spawn_radius = Some(3524.0),
+            "spawnRadius",
+            Constraint::OutsideArena,
+        ),
+        (
+            |c| c.spawn_radius = Some(1784.0),
+            "spawnRadius",
+            Constraint::OutsideArena,
+        ),
+        (
+            |c| c.spawn_radius = Some(-1.0),
+            "spawnRadius",
+            Constraint::OutsideArena,
+        ),
+        (
+            |c| c.spawn_radius = Some(f64::NAN),
+            "spawnRadius",
+            Constraint::NonFinite,
+        ),
+        (
+            |c| c.kill_score_seconds = Some(0.0),
+            "killScoreSeconds",
+            Constraint::NonPositive,
+        ),
+        (
+            |c| c.kill_score_seconds = Some(f64::INFINITY),
+            "killScoreSeconds",
+            Constraint::NonFinite,
+        ),
+        (
+            |c| c.kill_score_seconds = Some(f64::NAN),
+            "killScoreSeconds",
+            Constraint::NonFinite,
+        ),
+        (
+            |c| c.min_score = Some(9),
+            "minScore",
+            Constraint::OutOfRange,
+        ),
+        (
+            |c| c.min_score = Some(0),
+            "minScore",
+            Constraint::OutOfRange,
+        ),
+        (
+            |c| c.min_score = Some(u32::MAX),
+            "minScore",
+            Constraint::OutOfRange,
+        ),
         (
             |c| c.spawn_radius = None,
-            "minScore requires spawnRadius, the ring new lives lie along",
+            "spawnRadius",
+            Constraint::Missing,
         ),
-        // 26 anchors 42 apart wrap a circle of radius 150.
         (
             |c| {
                 c.pit = None;
                 c.spawn_radius = Some(150.0);
             },
-            "spawnRadius must lie outside pit.radius and more than 60 inside radius, \
-             with body chords outside the pit and room for a new life's 26 anchors 42 apart",
+            "spawnRadius",
+            Constraint::OutsideArena,
         ),
     ] {
-        let message = with(change).unwrap_err();
-        assert!(message.starts_with(error), "{message}");
+        let cause = with(change).unwrap_err();
+        assert_eq!(cause.kind, ErrorKind::InvalidConfig { rule });
+        assert_eq!(cause.field.as_deref(), Some(field));
     }
     // Both ends of the displayed-score range are valid floors: a newborn's 10,
     // and the score at 430 segments, the least any larger snake displays.
@@ -673,7 +723,12 @@ fn mode_settings_reject_unreachable_rules() {
     }
     let mut config = Config::battledome();
     config.min_score = Some(high + 1);
-    assert!(config.validate().unwrap_err().starts_with(floor));
+    assert_eq!(
+        config.validate().unwrap_err().kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::OutOfRange
+        }
+    );
     // A fractional score is not a displayed score.
     let error = serde_json::from_str::<Config>(r#"{"minScore":400.5}"#).unwrap_err();
     assert!(
@@ -715,20 +770,24 @@ fn spawn_bands_reject_unordered_and_impossible_geometry() {
     // An outer edge inside the wall margin names the outer setting.
     let mut config = Config::battledome();
     config.spawn_radius_max = Some(3524.);
-    assert!(
-        config
-            .validate()
-            .unwrap_err()
-            .starts_with("spawnRadiusMax must lie outside pit.radius")
+    let error = config.validate().unwrap_err();
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::OutsideArena
+        }
     );
+    assert_eq!(error.field.as_deref(), Some("spawnRadiusMax"));
     let mut config = Config::sandbox();
     config.spawn_radius_max = Some(800.);
-    assert!(
-        config
-            .validate()
-            .unwrap_err()
-            .contains("requires spawnRadius")
+    let error = config.validate().unwrap_err();
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidConfig {
+            rule: Constraint::Missing
+        }
     );
+    assert_eq!(error.field.as_deref(), Some("spawnRadiusMax"));
     let config = Config::battledome();
     let tangent_seconds =
         ((config.radius - 60.).powi(2) - config.spawn_radius_max.unwrap().powi(2)).sqrt()
@@ -935,8 +994,10 @@ fn min_score_spawns_and_respawns_at_the_floor() {
     world.snakes[0].alive = false;
     let (short, heading) = (vec![Point::default(); 25], 0.0);
     assert_eq!(
-        world.respawn_body(0, short, heading).unwrap_err(),
-        "minScore needs a spawn body of at least 26 segments"
+        world.respawn_body(0, short, heading).unwrap_err().kind,
+        ErrorKind::InvalidState {
+            rule: Constraint::OutOfRange
+        }
     );
     let (body, heading) = world.spawn_body(Point { x: 0.0, y: -500.0 }, 0.0).unwrap();
     assert!(world.body_is_clear(&body, 600.0));

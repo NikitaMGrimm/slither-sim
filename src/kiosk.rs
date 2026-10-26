@@ -3,6 +3,7 @@
 
 use crate::model::{Point, Snake};
 use crate::physics::{MAX_SEGMENTS, MassFloor, remove_mass_above_floor, score_exact};
+use crate::{Constraint, SimError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -46,22 +47,26 @@ impl Default for KioskConfig {
 }
 
 impl KioskConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if !self.floor_score.is_finite()
-            || self.floor_score <= 0.0
-            || !self.grace_seconds.is_finite()
-            || self.grace_seconds < 0.0
-            || !self.stationary_radius.is_finite()
-            || self.stationary_radius <= 0.0
-            // A zero rate freezes that phase: exp(-0 * dt) keeps the score.
-            || !self.shrink_per_second.is_finite()
-            || self.shrink_per_second < 0.0
-            || !self.score_decay_per_second.is_finite()
-            || self.score_decay_per_second < 0.0
-            || !self.recovery_per_second.is_finite()
-            || self.recovery_per_second < 0.0
-        {
-            return Err("Invalid kiosk penalty configuration".into());
+    pub fn validate(&self) -> Result<(), SimError> {
+        let message = "Invalid kiosk penalty configuration";
+        for (field, value) in [
+            ("kiosk.floorScore", self.floor_score),
+            ("kiosk.stationaryRadius", self.stationary_radius),
+        ] {
+            if let Some(rule) = Constraint::positive(value) {
+                return Err(SimError::config(rule, field, message));
+            }
+        }
+        // Zero freezes a phase: exp(-0 * dt) keeps the score.
+        for (field, value) in [
+            ("kiosk.graceSeconds", self.grace_seconds),
+            ("kiosk.shrinkPerSecond", self.shrink_per_second),
+            ("kiosk.scoreDecayPerSecond", self.score_decay_per_second),
+            ("kiosk.recoveryPerSecond", self.recovery_per_second),
+        ] {
+            if let Some(rule) = Constraint::nonnegative(value) {
+                return Err(SimError::config(rule, field, message));
+            }
         }
         Ok(())
     }
