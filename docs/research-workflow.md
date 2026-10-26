@@ -250,7 +250,7 @@ Measure complete elapsed-header protocol-19 captures on receipt and server clock
 
 ```sh
 uv run --locked --only-group tools python tools/fidelity/transport_parity.py measure CAPTURE.jsonl.gz --output outputs/transport.json
-uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-reference.json outputs/transport.json
+uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-near-server.json outputs/transport.json
 uv run --locked --only-group tools python tools/fidelity/local_capture.py --config arena.json --seconds 60 --out outputs/local-transport
 ```
 
@@ -258,11 +258,18 @@ uv run --locked --only-group tools python tools/fidelity/local_capture.py --conf
 and reports per-capture/setup-epoch and pooled statistics. `compare` prints four
 initial gates; exit 1 means failure (including insufficient samples), 2 invalid
 input. Optional `--tolerances FILE` supplies JSON with explanatory `comment`
-fields. Limits use the observed per-capture official envelope, requiring
-100 samples per gated statistic. The
-[reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-transport-parity/REPORT.md)
-include the fixture's full retained headless manifest and exclusions. Community
-recordings are excluded; raw reference captures require local access.
+fields. Limits use `max + allowance * max(spread, floor)`, requiring 100 samples
+per gated statistic. The common allowance is the smallest of {0.5, 1, 2} passing
+all six leave-one-capture-out comparisons: 1. Only integer-header frame-gap p50
+uses a 1 ms spread floor; receipt-derived metrics have none. The
+[reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)
+pin all six completed #111 batches **unfiltered**, using the same measurement as
+`measure`/`local_capture` candidates. Masked development and held-out summaries
+remain separate server characterization, with whole-window masking and the
+first attempt's held-out exceedance retained. Community recordings are excluded;
+raw inputs require local access. `local_capture.py` defaults to this near-server reference. Its
+`--reference tests/fixtures/transport-official-reference.json` option retains the
+older home-route/collector envelope with its original labels and selection.
 
 Frame cadence and the header-delta histogram expose batching. Anchor correction
 is `v_local * gap - 42` world units: local speed is nine anchor spacings divided
@@ -281,10 +288,15 @@ Samples overlap and correlate; receipt timing includes network jitter and
 collector stalls. Reports retain `collector-timing` metadata and final counters
 (missing older metadata stays unknown), without summing repeated cumulative
 counters. No clock here identifies absolute one-way latency or guarantees
-stock-client playing equivalence. Retained collector stalls can widen the
-official envelope.
+stock-client playing equivalence. Unfiltered captures (including the retained
+home reference) can have collector stalls that widen their envelope. Reference
+and candidate use the same +/-600-frame delay gauge, not #111's slope-corrected
++/-10-second gauge. False-reject control is only the LOO check over six captures;
+batch drift was observed, with no population error-rate guarantee or independent
+held-out validation. The original masked development envelope and its 1.096 ms
+held-out delay p90 exceeding 1.090 ms remain documented as the first attempt.
 
-`local_capture.py` starts `cargo run --release --locked -j 3 -- host --config FILE`,
+`local_capture.py` starts `cargo run --release --locked -j 2 -- host --config FILE`,
 runs the headless collector, stops both process trees, then measures/compares.
 A new output directory retains capture path, frozen config, Git head, logs and
 comparison table; the Cargo target is isolated by default. Config must bind a

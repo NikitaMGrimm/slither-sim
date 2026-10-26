@@ -32,11 +32,11 @@ pub struct SimulationConfig {
     /// Physics ticks between `next_frame`/`step_all` decisions.
     pub decision_ticks: usize,
     /// Seconds between minimaps on one server-wide clock; connections join its
-    /// running phase. The default is the official mean period.
+    /// running phase. The default approximates the observed period.
     pub minimap_interval_seconds: f64,
     pub minimap_side: usize,
     /// Seconds between leaderboards on their own server-wide clock. The
-    /// default is the official mean period.
+    /// default approximates the observed period.
     pub leaderboard_interval_seconds: f64,
     /// Offer a world-run record and victory entry. This local rule is not an
     /// established official-server qualification policy.
@@ -81,6 +81,9 @@ impl Default for SimulationConfig {
             // Official HUD clocks are shared by all recipients and average
             // 2503.994/3008.062 ms, not their nominal 2.5/3 s; see the
             // scheduler study linked from `super::snakes::MOTION_REPORT_TICKS`.
+            // Clean #111 medians remain 2504/3008 ms; these fixed clocks are
+            // models, not universal gaps. See the cadence-near-server fixture
+            // and research/fidelity/2026-10-26-vps-timing/REPORT.md.
             minimap_interval_seconds: 2.504,
             // Retained protocol-19 minimap receipts and the earlier browser
             // bridge use 136 cells per side; 32 was a local backend shortcut.

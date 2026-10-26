@@ -59,7 +59,7 @@ reconstructed poses and renderer predictions are distinct states.
 | Snakes | Complete centerline intersects `world.vision`, default 1,500. | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
 | Prey coverage | Points checked independently at the same configurable distance. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
 | Hosted spawning | Without `spawnRadius`, radial-lattice candidates prefer 600-unit body clearance, then the most open positive-contact-margin pose of 64 draws; a failed search refuses. A refusal means the sampled candidates failed, not that no legal pose exists. Circular worlds require body, head-path and departure clearance and queue joins; see [configuration](configuration.md#battledome). | `spawn.rs` and host tests. Official joins were never seen refused, and three of 181 came within 550–600 units of visible bodies; see the [spawn admission record](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-spawn-admission/REPORT.md). The preference, fallback and custom circular admission are local policies. Initial geometric test rings are synthetic. |
-| Minimap | Global living heads and body centerlines, 136×136 by default, server-wide 2.504 s clock; stop after death and reset on reconnect. | `client-reporting-cadence.json` and client tests. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
+| Minimap | Global living heads and body centerlines, 136×136 by default, server-wide 2.504 s model clock; stop after death and reset on reconnect. | `client-reporting-cadence-near-server.json` and client tests; the original home summary remains. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
 | Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins 0–8 select matching boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes, pooled ambient counts and weights. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
 
 The [visibility study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
@@ -111,6 +111,10 @@ continuing. Strict gates, common ordering and bounded prey corrections miss
 these exceptions. Exact dirty comparators, rearm rules, event-to-send deadlines
 and visibility triggers remain unknown. Incremental food indexing and a snake
 coverage grid preserve wire selection/order as performance mechanisms, not rules.
+The later [near-server study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md)
+retains clean held-out 24 ms motion, 84 ms mass, same-frame motion-before-mass
+and 3,044 ms repeat-prey witnesses. Decoder tests accept those exceptions;
+the fixed simulator release model is unchanged.
 
 Each tick reads all inputs and pings received during it; pongs lead its frame.
 Official input reflection takes about one ping round trip (median 13.2 vs

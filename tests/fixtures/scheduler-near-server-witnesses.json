@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "wireProtocol": 19,
+  "clientContract": "slither-client-v2",
+  "dataOrigin": "captured",
+  "provenance": {
+    "study": "research/fidelity/2026-10-26-vps-timing/REPORT.md",
+    "sourcePinsSha256": "08ed65f3a3ccaa13e7f15021ae811e5dea8dd689fbeb7fa0789174b1f9e859eb",
+    "selectedResultsSha256": "b0bef1bcbe96afee82f13503ef5affdcf7b02084738d66c375f2c3e108d9183f",
+    "builderSha256": "c9b0b82cb0dfc94980914823a44caf043be224072cc5442dde47275a8822fc1a",
+    "decoderSha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+  },
+  "selection": "Held-out clean minimum motion/mass gaps, first reverse pair, maximum repeat-prey gap; ties first batch/frame.",
+  "limits": "Selected logical packets with setup/appearance context, not complete wire frames or simulator cadence requirements. Frame indices are zero-based post-setup across the archive; packet indices zero-based. Intervening traffic checked in full raw stream; omitted here.",
+  "cases": [
+    {
+      "kind": "motion",
+      "connection": 2,
+      "entity": 401,
+      "setupHex": "61007f2601ae012c006630021b002805780021001d01ae132a10a70026b101000008fe33e9715c00feddcd060000000000000000000000000000000000",
+      "appearanceHex": "7301911c71c7301c71c7169e8eb90f3f02a83c0260eb00000c02a762025e7d60cd9ecd228a",
+      "first": {
+        "frame": 14948,
+        "packet": 1,
+        "serverMs": 47931,
+        "receiptMs": 138232.288,
+        "packetHex": "350191f0f1"
+      },
+      "last": {
+        "frame": 14952,
+        "packet": 0,
+        "serverMs": 47955,
+        "receiptMs": 138257.009,
+        "packetHex": "350191f2f2"
+      },
+      "serverGapMs": 24,
+      "receiptGapMs": 24.720999999990454,
+      "interveningFrames": 3,
+      "clean": true,
+      "source": {
+        "archive": "round-3/low-3/network0.jsonl.gz",
+        "archiveSha256": "8542c31f38ba3405c701fb0bf248ab34ab853991ce36275c9e9317ecf93215ca",
+        "batch": "low-3"
+      }
+    },
+    {
+      "kind": "mass",
+      "connection": 2,
+      "entity": 104,
+      "setupHex": "61007f2601ae012c006630021b002805780021001d01ae132a19de002eca01000008fe33e9715c00feddcd060000000000000000000000000000000000",
+      "appearanceHex": "7300684a28a2304a28a2169ed785c41f02a6da022cd9073130306b42415a5e0000000000000000011f031e021602060104010c010d011301190112010a0113011d05130109020d01130112010e010601020106010a01140313010a01050302051a0119011801130114011301120129051b0113031c011d011e012001210002a65002285c92aa9dafa3b69ec36cd169d04a28",
+      "first": {
+        "frame": 17932,
+        "packet": 1,
+        "serverMs": 86352,
+        "receiptMs": 168826.276,
+        "packetHex": "68006885e30b"
+      },
+      "last": {
+        "frame": 17942,
+        "packet": 0,
+        "serverMs": 86436,
+        "receiptMs": 168910.879,
+        "packetHex": "680068ba309f"
+      },
+      "serverGapMs": 84,
+      "receiptGapMs": 84.60299999997369,
+      "interveningFrames": 9,
+      "clean": true,
+      "source": {
+        "archive": "round-3/second-3/network0.jsonl.gz",
+        "archiveSha256": "4f3b5cb3c551a0ae123cc41d5fdba51c103d12400cd0c9c137ecf8c4d70b82c3",
+        "batch": "second-3"
+      }
+    },
+    {
+      "kind": "reverse",
+      "connection": 2,
+      "entity": 221,
+      "setupHex": "61007f2601ae012c006630021b002805780021001d01ae132a19de002eca01000008fe33e9715c00feddcd060000000000000000000000000000000000",
+      "appearanceHex": "7300ddda69a530da69a5169e0000000002a09f023b651528426f74292074696d696e6720726573656172636800ff02a021023c0dda69",
+      "frame": 19360,
+      "serverMs": 99234,
+      "receiptMs": 181708.622,
+      "packetIndices": [
+        0,
+        1
+      ],
+      "packetHex": [
+        "330700",
+        "6800ddaccc18"
+      ],
+      "source": {
+        "archive": "round-3/second-3/network0.jsonl.gz",
+        "archiveSha256": "4f3b5cb3c551a0ae123cc41d5fdba51c103d12400cd0c9c137ecf8c4d70b82c3",
+        "batch": "second-3"
+      }
+    },
+    {
+      "kind": "prey",
+      "connection": 6,
+      "entity": 27656,
+      "setupHex": "61007f2601ae012c006630021b002805780021001d01ae132a10a700266a01000008fe33e9715c00feddcd060000000000000000000000000000000000",
+      "appearanceHex": "796c08000232c1025b7f1e32fdd6acaadf251809",
+      "first": {
+        "frame": 57677,
+        "packet": 4,
+        "serverMs": 183621,
+        "receiptMs": 528229.429,
+        "packetHex": "6a6c08255e27e03092e40692e406"
+      },
+      "last": {
+        "frame": 58052,
+        "packet": 3,
+        "serverMs": 186665,
+        "receiptMs": 531273.821,
+        "packetHex": "6a6c08243f27503191db585525e82af5"
+      },
+      "serverGapMs": 3044,
+      "receiptGapMs": 3044.3919999999925,
+      "interveningFrames": 374,
+      "clean": true,
+      "source": {
+        "archive": "round-3/low-3/network0.jsonl.gz",
+        "archiveSha256": "8542c31f38ba3405c701fb0bf248ab34ab853991ce36275c9e9317ecf93215ca",
+        "batch": "low-3"
+      }
+    }
+  ]
+}

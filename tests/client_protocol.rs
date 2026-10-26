@@ -1248,6 +1248,124 @@ fn hex(text: &str) -> Vec<u8> {
         .collect()
 }
 
+fn scheduler_witness(kind: &str) -> Value {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "fixtures/scheduler-near-server-witnesses.json"
+    ))
+    .unwrap();
+    assert_eq!(fixture["wireProtocol"], 19);
+    assert_eq!(fixture["clientContract"], "slither-client-v2");
+    fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["kind"] == kind)
+        .unwrap()
+        .clone()
+}
+
+fn witness_client(case: &Value) -> Client {
+    let mut client = Client::with_setup(&hex(case["setupHex"].as_str().unwrap()));
+    if case["kind"] == "prey" {
+        // Synthetic own-snake context makes the captured prey observable.
+        client.send(&straight(9, 0.));
+    }
+    client.send(&hex(case["appearanceHex"].as_str().unwrap()));
+    client
+}
+
+fn witness_pair(client: &mut Client, case: &Value) -> ClientFrame {
+    let first = hex(case["first"]["packetHex"].as_str().unwrap());
+    let last = hex(case["last"]["packetHex"].as_str().unwrap());
+    // Selected logical packets, reframed for this test: unrelated intervening
+    // traffic is omitted, preserving the recorded cumulative clock difference.
+    client
+        .state
+        .receive_frame(&bundled(&[&first]), client.time)
+        .unwrap();
+    let before = client.frame();
+    let gap = case["serverGapMs"].as_u64().unwrap();
+    let mut frame = bundled(&[&last]);
+    frame[..2].copy_from_slice(&(gap as u16).to_be_bytes());
+    client.time += case["receiptGapMs"].as_f64().unwrap() / 1000.;
+    client.state.receive_frame(&frame, client.time).unwrap();
+    before
+}
+
+#[test]
+fn clean_server_motion_and_mass_exceptions_update_receipt_state() {
+    // #111's clean server-clock minima contradict universal 42/105 ms gates.
+    // These are decoder contracts, not changes to the simulator release model.
+    for (kind, gap) in [("motion", 24), ("mass", 84)] {
+        let case = scheduler_witness(kind);
+        assert_eq!(case["serverGapMs"], gap);
+        let mut client = witness_client(&case);
+        let before = witness_pair(&mut client, &case);
+        let after = client.frame();
+        let id = case["entity"].as_u64().unwrap().to_string();
+        let receipt = after.received.snake(&id).unwrap();
+        if kind == "motion" {
+            assert_ne!(before.observation.unwrap().me.heading, client.me().heading);
+            assert!(close(client.me().heading, 242. * TAU / 256., 1e-12));
+            assert_eq!(receipt.heading.age_seconds, 0.);
+        } else {
+            assert_ne!(before.observation.unwrap().me.fam, client.me().fam);
+            assert_eq!(client.me().fam, 0xba309f as f64 / 16_777_215.);
+            assert_eq!(receipt.mass.age_seconds, 0.);
+        }
+        after.received.validate().unwrap();
+    }
+}
+
+#[test]
+fn clean_server_same_frame_motion_before_mass_is_accepted() {
+    let case = scheduler_witness("reverse");
+    let mut client = witness_client(&case);
+    let packets: Vec<_> = case["packetHex"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|packet| hex(packet.as_str().unwrap()))
+        .collect();
+    assert_eq!(packets[0][0], b'3');
+    assert_eq!(packets[1][0], b'h');
+    let frame = bundled(&[&packets[0], &packets[1]]);
+    assert_eq!(
+        split_frame(&frame).unwrap(),
+        vec![packets[0].as_slice(), packets[1].as_slice()]
+    );
+    client.state.receive_frame(&frame, client.time).unwrap();
+    let me = client.me();
+    assert_eq!(me.heading, 7. * TAU / 256.);
+    assert_eq!(me.fam, 0xaccc18 as f64 / 16_777_215.);
+    let received = client.frame().received;
+    let row = received.snake("221").unwrap();
+    assert_eq!(row.heading.age_seconds, 0.);
+    assert_eq!(row.mass.age_seconds, 0.);
+    received.validate().unwrap();
+}
+
+#[test]
+fn clean_server_long_prey_silence_does_not_expire_or_reject_correction() {
+    let case = scheduler_witness("prey");
+    assert_eq!(case["serverGapMs"], 3044);
+    assert_eq!(case["interveningFrames"], 374);
+    let mut client = witness_client(&case);
+    let before = witness_pair(&mut client, &case);
+    let before = before.observation.unwrap();
+    let first = &before.prey[0];
+    let after = client.frame();
+    let last = &after.observation.as_ref().unwrap().prey[0];
+    assert_eq!(last.id, 27656);
+    assert_eq!(last.position.x - first.position.x, -861.);
+    assert_eq!(last.position.y - first.position.y, -432.);
+    assert_eq!(after.received.prey.age_seconds, 0.);
+    // A later silence retains the last received pose and reports its age.
+    let later = client.state.frame(client.time + 3.044).unwrap();
+    assert_eq!(later.observation.unwrap().prey[0].position, last.position);
+    assert!(close(later.received.prey.age_seconds, 3.044, 1e-12));
+}
+
 fn point(value: &Value) -> Point {
     pt(value[0].as_f64().unwrap(), value[1].as_f64().unwrap())
 }

@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import local_capture
 import transport_parity as tp
@@ -192,6 +193,34 @@ class TransportParityTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 local_capture.run(config, root / "output", 60, root / "missing.json", tp.DEFAULT_TOLERANCES)
             self.assertFalse((root / "output").exists())
+
+    def test_local_default_uses_clean_server_reference_and_allows_home_override(self):
+        with patch.object(local_capture, "run", return_value=0) as run:
+            self.assertEqual(local_capture.main(["--config", "host.json", "--out", "new"]), 0)
+            self.assertEqual(run.call_args.args[3], tp.DEFAULT_REFERENCE)
+            self.assertEqual(tp.DEFAULT_REFERENCE.name, "transport-official-near-server.json")
+            home = "tests/fixtures/transport-official-reference.json"
+            local_capture.main(["--config", "host.json", "--out", "new", "--reference", home])
+            self.assertEqual(run.call_args.args[3], Path(home))
+
+    def test_clean_selection_never_bridges_a_mask_or_changes_baseline_context(self):
+        epoch = tp.Epoch(1, 1, 0)
+        epoch.frames = [(0, 0), (10, 10), (30, 20), (40, 30)]
+        # Mask [15, 35]: only the original 0->10 gap survives. Removing masked
+        # receipts first would fabricate a 30 ms gap and alter the delay floor.
+        samples = epoch.finish(lambda a, b: b < 15 or a > 35)
+        self.assertEqual(samples.frames, 1)
+        self.assertEqual(samples.gaps["server"], [10])
+        self.assertEqual(samples.durations["receipt"], 10)
+        self.assertEqual(samples.delays, [0])
+
+    def test_clean_anchor_requires_the_whole_estimation_window(self):
+        epoch = tp.Epoch(1, 1, 0)
+        epoch.frames = [(i*224, i*224) for i in range(11)]
+        epoch.anchors[(1, 1)] = [(i*224, i*224, 6, 100) for i in range(10)]
+        samples = epoch.finish(lambda a, b: not a <= 1000 <= b)
+        self.assertEqual(samples.anchors["receipt"]["all"], [])
+        self.assertEqual(samples.skipped["selection"], 1)
 
     def test_invalid_deflate_is_recorded_as_an_exclusion(self):
         valid = self.archive(self.anchors())

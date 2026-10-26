@@ -141,6 +141,19 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assertEqual(fixture["preyUpdateGapsMs"]["n"], 144)
         self.assertEqual(fixture["leaderboardGapsMs"]["n"], 27)
 
+    def test_clean_server_cadence_and_scheduler_labels(self):
+        for name, contract in (("client-reporting-cadence-near-server.json", None),
+                               ("scheduler-near-server-witnesses.json", "slither-client-v2")):
+            entry, fixture = self.fixture("tests/fixtures/" + name)
+            self.assertEqual(fixture["wireProtocol"], entry["wireProtocol"])
+            self.assertEqual(fixture["clientContract"], contract)
+            self.assertEqual(entry["clientContract"], contract)
+            self.assertEqual(fixture["dataOrigin"], "captured")
+            self.assertEqual(len(fixture["provenance"]["decoderSha256"]), 64)
+        for case in fixture["cases"]:
+            self.assert_protocol19_setup(entry, case["setupHex"])
+            self.assertEqual(len(case["source"]["archiveSha256"]), 64)
+
 
 if __name__ == "__main__":
     unittest.main()

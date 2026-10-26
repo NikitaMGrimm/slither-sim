@@ -1,26 +1,27 @@
 {
   "minimumSamples": 100,
-  "comment": "One-sided exploratory gates. Each limit is the maximum eligible official per-capture quantile plus spreadAllowance times the observed max-minus-min spread. Zero allowance uses the complete observed envelope without tuning against a local host. At least 100 samples per metric avoids calibrating on smoke captures. Lower correction, delay and frame gaps are permitted. This is not a confidence interval or a claim of renderer equivalence.",
+  "comment": "One-sided exploratory gates on all six completed unfiltered near-server captures, measured identically to candidates. Limit = max + spreadAllowance * max(max-minus-min spread, spreadFloor or 0). The fixed report rule selects the smallest common allowance in {0.5, 1, 2} passing every official capture against the other five: 1. False-reject control is only that LOO check over six captures; batch drift was observed. No population error-rate guarantee, independent held-out validation, confidence interval or renderer equivalence. At least 100 samples per metric; lower values permitted. See research/fidelity/2026-10-26-server-timing-references/REPORT.md.",
   "metrics": {
     "anchor_receipt_p50": {
       "path": "anchors.receipt.all.abs.p50",
-      "spreadAllowance": 0,
-      "comment": "Typical stock-client interpolation reset correction, in world units. Includes network and collector timing. Use all eligible official captures, including slower sessions."
+      "spreadAllowance": 1,
+      "comment": "Typical stock-client interpolation reset correction, in world units. Includes network and collector timing. Use every eligible unfiltered capture in the default six-batch corpus; receipt-derived values have no header-resolution spread floor."
     },
     "anchor_receipt_p95": {
       "path": "anchors.receipt.all.abs.p95",
-      "spreadAllowance": 0,
-      "comment": "Tail correction magnitude; the observed official envelope is the initial tolerance. Correlated anchor windows are not independent trials."
+      "spreadAllowance": 1,
+      "comment": "Tail correction magnitude with the common LOO-selected spread allowance, without a spread floor. Correlated anchor windows are not independent trials; false-reject control is only the six-capture LOO check with observed batch drift."
     },
     "frame_server_p50": {
       "path": "frameGapsMs.server.p50",
-      "spreadAllowance": 0,
-      "comment": "Median elapsed-ms header interval. Detects delayed server batching independently of receipt jitter; sparse official captures widen this envelope."
+      "spreadAllowance": 1,
+      "spreadFloor": 1,
+      "comment": "Median elapsed-ms header interval. Only this metric uses a 1 ms spread floor: the server header has 1 ms resolution, so its integer quantile cannot express spread finer than one header unit. Without it the five 7 ms medians reject the sole 8 ms capture at every multiplier. The floor does not apply to receipt-derived metrics."
     },
     "delay_p90": {
       "path": "excessDelayMs.p90",
-      "spreadAllowance": 0,
-      "comment": "Receipt-minus-server excess over a centered +/-600-frame minimum. The full official envelope includes collector stalls; no absolute latency inference."
+      "spreadAllowance": 1,
+      "comment": "Receipt-minus-server excess over a centered +/-600-frame minimum, unfiltered for both reference and candidate. Later batch-3 delay quantiles exceed batches 1-2; false-reject control is only the six-capture LOO check. Masked development/held-out summaries remain server characterization, not the default gate. No spread floor or absolute latency inference."
     }
   }
 }

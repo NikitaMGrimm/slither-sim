@@ -954,9 +954,11 @@ fn unchanged_prey_positions_still_correct_client_prediction() {
     assert_eq!(reports.len(), 3);
     assert!(reports.iter().all(|p| p.len() == 7));
     let evidence: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/client-reporting-cadence.json"
+        "../../../tests/fixtures/client-reporting-cadence-near-server.json"
     ))
     .unwrap();
+    // A nominal model interval inside the clean observed range, not a universal
+    // deadline: scheduler-near-server-witnesses.json retains a 3044 ms gap.
     let measured = &evidence["preyUpdateGapsMs"];
     for pair in report_times.windows(2) {
         let gap_ms = (pair[1] - pair[0]) * 1000.;
@@ -964,9 +966,29 @@ fn unchanged_prey_positions_still_correct_client_prediction() {
             (measured["min"].as_f64().unwrap()..=measured["max"].as_f64().unwrap())
                 .contains(&gap_ms)
         );
+        assert!((gap_ms - measured["median"].as_f64().unwrap()).abs() <= sim.dt() * 1000.);
     }
     let received = remote.frame(&sim).observation.unwrap();
     assert!(received.prey[0].position.distance(position) < 12.);
+}
+
+#[test]
+fn nominal_hud_periods_match_clean_server_medians() {
+    let evidence: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/client-reporting-cadence-near-server.json"
+    ))
+    .unwrap();
+    let config = SimulationConfig::default();
+    // The model uses a shared fixed clock. Observed ranges in the fixture and
+    // scheduler witnesses remain counterexamples to exact universal cadences.
+    assert_eq!(
+        config.minimap_interval_seconds * 1000.,
+        evidence["minimapGapsMs"]["median"]
+    );
+    assert_eq!(
+        config.leaderboard_interval_seconds * 1000.,
+        evidence["leaderboardGapsMs"]["median"]
+    );
 }
 
 #[test]

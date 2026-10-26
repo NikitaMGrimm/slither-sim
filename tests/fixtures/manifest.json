@@ -42,6 +42,20 @@
       "clientContract": null,
       "dataOrigin": "captured",
       "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/client-reporting-cadence-near-server.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
+    },
+    {
+      "path": "tests/fixtures/scheduler-near-server-witnesses.json",
+      "wireProtocol": 19,
+      "clientContract": "slither-client-v2",
+      "dataOrigin": "captured",
+      "expectedOrigin": "reference-decoder"
     }
   ]
 }
