@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 1,
+  "wireVersion": 19,
+  "status": "complete",
+  "summaryOnly": true,
+  "toolSha256": "843b7e9ac36c61ed8049269639ba7ad93369a741cc04ae496131ffe020af0282",
+  "decoderSha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+  "censusSha256": "5a8604430478cf0b8e25c029d7b2c197847b2f1b5a5be55d1399a2cb51cb3d4e",
+  "captures": [
+    {
+      "path": "bots-500-r1-retry2/raw/bot0.jsonl.gz",
+      "sha256": "964274ff8b4a7bbd6cc876573a266a3f6e4191af5e4eb83f8007b0a8662c467b",
+      "scenario": "forage",
+      "collectorTiming": {
+        "events": 298,
+        "available": true,
+        "lateTicks": 0,
+        "maxTickGapMs": 27.056099999987055
+      },
+      "summary": {
+        "frames": 28160,
+        "durationMs": {
+          "receipt": 296946.5,
+          "server": 296989
+        },
+        "framesPerSecond": {
+          "receipt": 94.83189732830661,
+          "server": 94.81832660468906
+        },
+        "frameGapsMs": {
+          "receipt": {
+            "n": 28160,
+            "p10": 6.4579999999841675,
+            "p50": 7.463999999992666,
+            "p90": 20.295000000012806,
+            "p95": 21.44000000000233,
+            "p99": 34.5619999999999
+          },
+          "server": {
+            "n": 28160,
+            "p10": 7,
+            "p50": 7,
+            "p90": 14,
+            "p95": 21,
+            "p99": 35
+          }
+        },
+        "anchors": {
+          "receipt": {
+            "all": {
+              "n": 8018,
+              "rms": 0.7731319687984346,
+              "abs": {
+                "n": 8018,
+                "p10": 0.1254567931264745,
+                "p50": 0.5229447314047988,
+                "p90": 1.1483166409269643,
+                "p95": 1.4690757140695467,
+                "p99": 2.349058382566298
+              }
+            },
+            "big": {
+              "n": 0,
+              "rms": null,
+              "abs": {
+                "n": 0,
+                "p10": null,
+                "p50": null,
+                "p90": null,
+                "p95": null,
+                "p99": null
+              }
+            }
+          },
+          "server": {
+            "all": {
+              "n": 8018,
+              "rms": 0.6862757520841422,
+              "abs": {
+                "n": 8018,
+                "p10": 0.14093959731543748,
+                "p50": 0.5562913907284752,
+                "p90": 1.1016393442622956,
+                "p95": 1.2727272727272734,
+                "p99": 1.807947019867548
+              }
+            },
+            "big": {
+              "n": 0,
+              "rms": null,
+              "abs": {
+                "n": 0,
+                "p10": null,
+                "p50": null,
+                "p90": null,
+                "p95": null,
+                "p99": null
+              }
+            }
+          }
+        },
+        "anchorSkippedWindows": {
+          "speedVariation": 238
+        },
+        "motionGapsMs": {
+          "own": {
+            "n": 4689,
+            "p10": 42,
+            "p50": 42,
+            "p90": 84,
+            "p95": 196,
+            "p99": 462,
+            "snakeTracks": 2
+          },
+          "other": {
+            "n": 30470,
+            "p10": 42,
+            "p50": 42,
+            "p90": 84,
+            "p95": 168,
+            "p99": 462,
+            "snakeTracks": 196
+          }
+        },
+        "excessDelayMs": {
+          "n": 28160,
+          "p10": 0.28800000000046566,
+          "p50": 0.6820000000006985,
+          "p90": 1.146999999997206,
+          "p95": 1.3499999999985448,
+          "p99": 8.242999999994936
+        }
+      },
+      "connectionSetupEpochs": 2
+    },
+    {
+      "path": "bots-500-r2/raw/bot0.jsonl.gz",
+      "sha256": "678c511a3174652cd90a429b14e65db3ceac56977730874c12bb010ffb1cb903",
+      "scenario": "forage",
+      "collectorTiming": {
+        "events": 298,
+        "available": true,
+        "lateTicks": 0,
+        "maxTickGapMs": 28.595463999998174
+      },
+      "summary": {
+        "frames": 22133,
+        "durationMs": {
+          "receipt": 296964.4359999999,
+          "server": 296989
+        },
+        "framesPerSecond": {
+          "receipt": 74.53081014724607,
+          "server": 74.52464569394826
+        },
+        "frameGapsMs": {
+          "receipt": {
+            "n": 22133,
+            "p10": 6.3640000000004875,
+            "p50": 12.581999999994878,
+            "p90": 26.729000000006636,
+            "p95": 28.99900000001071,
+            "p99": 42.1140000000014
+          },
+          "server": {
+            "n": 22133,
+            "p10": 7,
+            "p50": 14,
+            "p90": 21,
+            "p95": 28,
+            "p99": 42
+          }
+        },
+        "anchors": {
+          "receipt": {
+            "all": {
+              "n": 4560,
+              "rms": 0.7948506517645311,
+              "abs": {
+                "n": 4560,
+                "p10": 0.168025741118754,
+                "p50": 0.5653756462301516,
+                "p90": 1.1830757469952644,
+                "p95": 1.5432427846438443,
+                "p99": 2.181717676267091
+              }
+            },
+            "big": {
+              "n": 0,
+              "rms": null,
+              "abs": {
+                "n": 0,
+                "p10": null,
+                "p50": null,
+                "p90": null,
+                "p95": null,
+                "p99": null
+              }
+            }
+          },
+          "server": {
+            "all": {
+              "n": 4560,
+              "rms": 0.7230384092175285,
+              "abs": {
+                "n": 4560,
+                "p10": 0.14532871972318162,
+                "p50": 0.5581395348837219,
+                "p90": 1.1016393442622956,
+                "p95": 1.377049180327866,
+                "p99": 1.807947019867548
+              }
+            },
+            "big": {
+              "n": 0,
+              "rms": null,
+              "abs": {
+                "n": 0,
+                "p10": null,
+                "p50": null,
+                "p90": null,
+                "p95": null,
+                "p99": null
+              }
+            }
+          }
+        },
+        "anchorSkippedWindows": {
+          "speedVariation": 500
+        },
+        "motionGapsMs": {
+          "own": {
+            "n": 4729,
+            "p10": 42,
+            "p50": 42,
+            "p90": 42,
+            "p95": 154,
+            "p99": 504,
+            "snakeTracks": 2
+          },
+          "other": {
+            "n": 16014,
+            "p10": 42,
+            "p50": 42,
+            "p90": 84,
+            "p95": 168,
+            "p99": 462,
+            "snakeTracks": 98
+          }
+        },
+        "excessDelayMs": {
+          "n": 22133,
+          "p10": 0.1959999999962747,
+          "p50": 0.6900000000023283,
+          "p90": 1.1539999999804422,
+          "p95": 1.3109999999942374,
+          "p99": 8.585000000020955
+        }
+      },
+      "connectionSetupEpochs": 2
+    },
+    {
+      "path": "bots-500-r3/raw/bot0.jsonl.gz",
+      "sha256": "95dafab52a7eb8afbbb3ee228893d36b88ca7b8e5ef6a089c70193042db735fc",
+      "scenario": "forage",
+      "collectorTiming": {
+        "events": 298,
+        "available": true,
+        "lateTicks": 0,
+        "maxTickGapMs": 28.392548999981955
+      },
+      "summary": {
+        "frames": 26663,
+        "durationMs": {
+          "receipt": 299985.652,
+          "server": 300006
+        },
+        "framesPerSecond": {
+          "receipt": 88.8809175446831,
+          "server": 88.87488916888329
+        },
+        "frameGapsMs": {
+          "receipt": {
+            "n": 26663,
+            "p10": 6.445999999996275,
+            "p50": 7.51600000000326,
+            "p90": 21.256999999997788,
+            "p95": 21.522000000004482,
+            "p99": 35.15200000000186
+          },
+          "server": {
+            "n": 26663,
+            "p10": 7,
+            "p50": 7,
+            "p90": 21,
+            "p95": 21,
+            "p99": 35
+          }
+        },
+        "anchors": {
+          "receipt": {
+            "all": {
+              "n": 7196,
+              "rms": 0.7647338087817543,
+              "abs": {
+                "n": 7196,
+                "p10": 0.1408656544799598,
+                "p50": 0.5427642257897247,
+                "p90": 1.1128851358880212,
+                "p95": 1.4407294568794526,
+                "p99": 2.245160466498362
+              }
+            },
+            "big": {
+              "n": 0,
+              "rms": null,
+              "abs": {
+                "n": 0,
+                "p10": null,
+                "p50": null,
+                "p90": null,
+                "p95": null,
+                "p99": null
+              }
+            }
+          },
+          "server": {
+            "all": {
+              "n": 7196,
+              "rms": 0.6769378162513515,
+              "abs": {
+                "n": 7196,
+                "p10": 0.14093959731543748,
+                "p50": 0.5562913907284752,
+                "p90": 0.9832775919732413,
+                "p95": 1.2727272727272734,
+                "p99": 1.807947019867548
+              }
+            },
+            "big": {
+              "n": 0,
+              "rms": null,
+              "abs": {
+                "n": 0,
+                "p10": null,
+                "p50": null,
+                "p90": null,
+                "p95": null,
+                "p99": null
+              }
+            }
+          }
+        },
+        "anchorSkippedWindows": {
+          "speedVariation": 263
+        },
+        "motionGapsMs": {
+          "own": {
+            "n": 5042,
+            "p10": 42,
+            "p50": 42,
+            "p90": 63,
+            "p95": 168,
+            "p99": 399,
+            "snakeTracks": 1
+          },
+          "other": {
+            "n": 26773,
+            "p10": 42,
+            "p50": 42,
+            "p90": 84,
+            "p95": 168,
+            "p99": 420,
+            "snakeTracks": 151
+          }
+        },
+        "excessDelayMs": {
+          "n": 26663,
+          "p10": 0.2849999999998545,
+          "p50": 0.6710000000020955,
+          "p90": 1.2089999999952852,
+          "p95": 1.3510000000005675,
+          "p99": 8.684000000008382
+        }
+      },
+      "connectionSetupEpochs": 1
+    }
+  ],
+  "excluded": [],
+  "summary": {
+    "frames": 76956,
+    "durationMs": {
+      "receipt": 893896.588,
+      "server": 893984
+    },
+    "framesPerSecond": {
+      "receipt": 86.09049529116226,
+      "server": 86.08207753158894
+    },
+    "frameGapsMs": {
+      "receipt": {
+        "n": 76956,
+        "p10": 6.420999999972992,
+        "p50": 7.554999999993015,
+        "p90": 21.34399999998277,
+        "p95": 27.778999999994994,
+        "p99": 41.63499999999976
+      },
+      "server": {
+        "n": 76956,
+        "p10": 7,
+        "p50": 7,
+        "p90": 21,
+        "p95": 28,
+        "p99": 42
+      }
+    },
+    "anchors": {
+      "receipt": {
+        "all": {
+          "n": 19774,
+          "rms": 0.7751684961533083,
+          "abs": {
+            "n": 19774,
+            "p10": 0.142118673516606,
+            "p50": 0.543792825691888,
+            "p90": 1.1449834767146996,
+            "p95": 1.4755166229087777,
+            "p99": 2.255338562815723
+          }
+        },
+        "big": {
+          "n": 0,
+          "rms": null,
+          "abs": {
+            "n": 0,
+            "p10": null,
+            "p50": null,
+            "p90": null,
+            "p95": null,
+            "p99": null
+          }
+        }
+      },
+      "server": {
+        "all": {
+          "n": 19774,
+          "rms": 0.6915848974497201,
+          "abs": {
+            "n": 19774,
+            "p10": 0.14093959731543748,
+            "p50": 0.5562913907284752,
+            "p90": 1.0944625407166129,
+            "p95": 1.2727272727272734,
+            "p99": 1.807947019867548
+          }
+        },
+        "big": {
+          "n": 0,
+          "rms": null,
+          "abs": {
+            "n": 0,
+            "p10": null,
+            "p50": null,
+            "p90": null,
+            "p95": null,
+            "p99": null
+          }
+        }
+      }
+    },
+    "anchorSkippedWindows": {
+      "speedVariation": 1001
+    },
+    "motionGapsMs": {
+      "own": {
+        "n": 14460,
+        "p10": 42,
+        "p50": 42,
+        "p90": 63,
+        "p95": 175,
+        "p99": 455,
+        "snakeTracks": 5
+      },
+      "other": {
+        "n": 73257,
+        "p10": 42,
+        "p50": 42,
+        "p90": 84,
+        "p95": 168,
+        "p99": 462,
+        "snakeTracks": 445
+      }
+    },
+    "excessDelayMs": {
+      "n": 76956,
+      "p10": 0.25700000001234,
+      "p50": 0.6780000000144355,
+      "p90": 1.1680000000051223,
+      "p95": 1.3410000000003492,
+      "p99": 8.5
+    }
+  },
+  "definitions": {
+    "quantiles": "nearest rank, including p50",
+    "anchorSpacingWorldUnits": 42,
+    "big": "at least 100 body anchors at the measured anchor (not lifetime reports)",
+    "speed": "9 * 42 / span of 9 neighboring intervals; skip >15% reported speed spread",
+    "delay": "receipt minus server time, minus inclusive rolling minimum over +/-600 post-setup frames",
+    "cadence": "setup-to-last-frame duration; setup excluded from frame count and delay; gaps start at setup",
+    "families": "census command/length counts including setup, divided by setup-to-last duration",
+    "pooling": "pool raw samples within epochs/captures; never average quantiles",
+    "limits": "correlated samples; receipt includes network/collector stalls; no stock-renderer simulation"
+  }
+}

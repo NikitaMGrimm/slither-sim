@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "studyId": "host-transport-500-bots-cont2-20261026",
+  "title": "Continuation after detached launcher environment failure",
+  "kind": "exploratory",
+  "dataOrigin": "local-simulator",
+  "question": "Does the protocol-19 host with 500 background bots meet the unchanged near-server official transport gates?",
+  "hypotheses": [
+    "Both official-delivery arms meet all four existing one-sided gates with at least 100 samples per statistic."
+  ],
+  "method": "Frozen 2026-10-26T10:19:06.971993+00:00. Preserve original plan and continuation SHA256 300c0c4b52cfccc76e1985f7d1854bd13359ec5d968f24ea0bdcb4b09fd7169c. Original baseline r1 remains valid. First continuation launcher initially had CRLF shell line endings and stopped before any attempt; corrected shell bytes, then sudo secure_path removed cargo from PATH. Its first capture attempt exited2 before host startup with No such file or directory cargo. Preserve logs and failed ledgers. Run detached systemd service as ubuntu, set PATH inside launcher, no per-command sudo. Explicitly replace the no-capture environment failure once, then four original remaining captures. Same instance, physical cores, seed and duration schedule, unmodified gates and capture flow. First valid500 attempt named bots-500-r1-retry2, then bots-0-r2,bots-500-r2,bots-0-r3,bots-500-r3, ports8772..8776. Original hard120-minute shutdown still applies; completion schedules shutdown20minutes later. Seal development before heldout. No automatic replacements or changed metric thresholds. No new infrastructure.",
+  "sampling": {
+    "unit": "One complete five-minute host restart and headless forage capture.",
+    "attempts": 5,
+    "selection": "Five attempts only, plus retained original baseline capture and original failed acquisition. Three valid five-minute captures per arm if acquisition completes. Third repetitions held out. No automatic replacements.",
+    "independence": "Fresh host each capture and paired seeds, but one machine/region/date; overlapping anchor windows, frames and bot lives are correlated, not independent trials."
+  },
+  "exclusions": [
+    "No timing or telemetry masking. Invalid/interrupted captures retained and collection stops on acquisition exit2; grade valid captures only, report missing/ineligible arm as inconclusive. Gate exit1 never stops sequence."
+  ],
+  "validation": "Use unchanged minimumSamples100 and all four gate formulas/limits at full precision; lower values allowed. Report per-capture, development pool, heldout repetition and all-three pool by pooling raw samples, never quantiles. Seal development summaries with SHA256 after repetition2 before starting repetition3; no fitting or outcome-dependent changes. Run existing transport tests. Publish selected summaries, source/config/raw hashes, affinity verification, attempt outcomes and all failures. Raw access local-only outside Git. Verify own resources absent in eu-central-1,us-east-1,us-west-2,eu-west-1.",
+  "limitations": [
+    "Headless stock-style protocol client, not stock browser renderer; transport gates do not establish renderer parity, gameplay equivalence or training transfer.",
+    "One-sided exploratory limits calibrated by six-capture LOO; no population false-reject guarantee or independent reference holdout.",
+    "Zero physical-route latency; receipt timestamps include local collector/OS scheduling. Default seat-sized worlds differ between arms, so no isolated causal bot-CPU effect.",
+    "500 configured background seats do not imply 500 snakes alive at every instant; report observed in-game leaderboard population and retained deaths.",
+    "CPU qualification is outside this study; pinned cores reduce competition but do not eliminate shared-cache, VM steal or host effects."
+  ]
+}

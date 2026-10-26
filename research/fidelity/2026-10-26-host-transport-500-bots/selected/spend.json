@@ -1,0 +1,10 @@
+{
+  "estimateUtc": "2026-10-26T10:47:44.542025+00:00",
+  "runningMinutesUpperBound": 40.492367083333335,
+  "observedSpotUsdPerHour": 0.3719,
+  "computeUsdUpperBound": 0.25098518863819447,
+  "ancillaryAllowanceUsd": 0.1,
+  "totalEstimateUpperBoundUsd": 0.36,
+  "spendCapUsd": 8,
+  "billingStatus": "Usage-based conservative estimate; not a settled invoice; before credits and tax."
+}

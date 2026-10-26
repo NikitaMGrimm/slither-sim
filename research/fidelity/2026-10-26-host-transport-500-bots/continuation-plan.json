@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "studyId": "host-transport-500-bots-cont-20261026",
+  "title": "Continuation after localhost port reuse failure",
+  "kind": "exploratory",
+  "dataOrigin": "local-simulator",
+  "question": "Does the protocol-19 host with 500 background bots meet the unchanged near-server official transport gates?",
+  "hypotheses": [
+    "Both official-delivery arms meet all four existing one-sided gates with at least 100 samples per statistic."
+  ],
+  "method": "Frozen 2026-10-26T10:16:17.862723+00:00. Original plan SHA256 d5d87355c7d76455f57269c3d42be2f1ae39a1fd64b9e465bbb877cfba951b6c. Preserve completed baseline r1 and failed 500-r1 acquisition (Errno98 Address already in use from immediate port reuse in local_capture readiness probe). Initial runner stopped as required. One explicitly frozen replacement for this pre-acquisition failure, then the four unattempted captures, on five unique loopback ports8767..8771. Same instance, sources, seeds, 300s durations, cores, configs and unchanged gates. Original run.py and source-pins.json remain immutable. continue.py uses original affinity launcher. Exact schedule 500-r1-retry,0-r2,500-r2,0-r3,500-r3. No further replacement. Development seal after 500-r2, before either r3; no fitting or outcome-dependent changes. Hard original120-minute shutdown remains. End runner archives results then schedules own shutdown20minutes later. No additional resources or outside game servers.",
+  "sampling": {
+    "unit": "One complete five-minute host restart and headless forage capture.",
+    "attempts": 5,
+    "selection": "Five attempts only, plus retained original baseline capture and original failed acquisition. Three valid five-minute captures per arm if acquisition completes. Third repetitions held out. No automatic replacements.",
+    "independence": "Fresh host each capture and paired seeds, but one machine/region/date; overlapping anchor windows, frames and bot lives are correlated, not independent trials."
+  },
+  "exclusions": [
+    "No timing or telemetry masking. Invalid/interrupted captures retained and collection stops on acquisition exit2; grade valid captures only, report missing/ineligible arm as inconclusive. Gate exit1 never stops sequence."
+  ],
+  "validation": "Use unchanged minimumSamples100 and all four gate formulas/limits at full precision; lower values allowed. Report per-capture, development pool, heldout repetition and all-three pool by pooling raw samples, never quantiles. Seal development summaries with SHA256 after repetition2 before starting repetition3; no fitting or outcome-dependent changes. Run existing transport tests. Publish selected summaries, source/config/raw hashes, affinity verification, attempt outcomes and all failures. Raw access local-only outside Git. Verify own resources absent in eu-central-1,us-east-1,us-west-2,eu-west-1.",
+  "limitations": [
+    "Headless stock-style protocol client, not stock browser renderer; transport gates do not establish renderer parity, gameplay equivalence or training transfer.",
+    "One-sided exploratory limits calibrated by six-capture LOO; no population false-reject guarantee or independent reference holdout.",
+    "Zero physical-route latency; receipt timestamps include local collector/OS scheduling. Default seat-sized worlds differ between arms, so no isolated causal bot-CPU effect.",
+    "500 configured background seats do not imply 500 snakes alive at every instant; report observed in-game leaderboard population and retained deaths.",
+    "CPU qualification is outside this study; pinned cores reduce competition but do not eliminate shared-cache, VM steal or host effects."
+  ]
+}

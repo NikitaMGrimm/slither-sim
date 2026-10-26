@@ -1,0 +1,44 @@
+{
+  "dataOrigin": "local-simulator",
+  "access": "local-only",
+  "scientificStatus": "unreviewed",
+  "planSha256": "d5d87355c7d76455f57269c3d42be2f1ae39a1fd64b9e465bbb877cfba951b6c",
+  "files": [
+    {
+      "path": "bots-0-r1/raw/bot0.jsonl.gz",
+      "sha256": "ab2f241aff28d191d19d1a9e15f531f3b72f21e0f5c786fef7910aa3cb15e1a2",
+      "bytes": 195771,
+      "access": "local-only"
+    },
+    {
+      "path": "bots-0-r2/raw/bot0.jsonl.gz",
+      "sha256": "593beb8c9d073171744cb9a31e18193de132fc110e3bb89556ca146ffc3dccff",
+      "bytes": 198048,
+      "access": "local-only"
+    },
+    {
+      "path": "bots-0-r3/raw/bot0.jsonl.gz",
+      "sha256": "cf1ad3a7d1ef9355455c9ace6dfac370f47a17c6e0dc7d4138da327a1d5a01ca",
+      "bytes": 207467,
+      "access": "local-only"
+    },
+    {
+      "path": "bots-500-r1-retry2/raw/bot0.jsonl.gz",
+      "sha256": "964274ff8b4a7bbd6cc876573a266a3f6e4191af5e4eb83f8007b0a8662c467b",
+      "bytes": 752587,
+      "access": "local-only"
+    },
+    {
+      "path": "bots-500-r2/raw/bot0.jsonl.gz",
+      "sha256": "678c511a3174652cd90a429b14e65db3ceac56977730874c12bb010ffb1cb903",
+      "bytes": 593152,
+      "access": "local-only"
+    },
+    {
+      "path": "bots-500-r3/raw/bot0.jsonl.gz",
+      "sha256": "95dafab52a7eb8afbbb3ee228893d36b88ca7b8e5ef6a089c70193042db735fc",
+      "bytes": 745718,
+      "access": "local-only"
+    }
+  ]
+}

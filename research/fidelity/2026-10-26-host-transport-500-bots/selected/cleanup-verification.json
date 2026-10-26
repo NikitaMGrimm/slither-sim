@@ -1,0 +1,46 @@
+{
+  "verifiedUtc": "2026-10-26T10:49:12.549545+00:00",
+  "regions": {
+    "eu-central-1": {
+      "activeInstances": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0,
+      "addresses": 0,
+      "networkInterfaces": 0,
+      "snapshots": 0,
+      "activeSpotRequests": 0,
+      "recordedPrimaryInterfaces": 0
+    },
+    "us-east-1": {
+      "activeInstances": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0,
+      "addresses": 0,
+      "networkInterfaces": 0,
+      "snapshots": 0,
+      "activeSpotRequests": 0
+    },
+    "us-west-2": {
+      "activeInstances": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0,
+      "addresses": 0,
+      "networkInterfaces": 0,
+      "snapshots": 0,
+      "activeSpotRequests": 0
+    },
+    "eu-west-1": {
+      "activeInstances": 0,
+      "volumes": 0,
+      "securityGroups": 0,
+      "keyPairs": 0,
+      "addresses": 0,
+      "networkInterfaces": 0,
+      "snapshots": 0,
+      "activeSpotRequests": 0
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "measuredCommit": "1ba386f543422e1df9e1a60b0a1ce229d40055a8",
+  "currentMainCommit": "503ca4df8104321c7b0e5c28cc1f628c1dd6cc48",
+  "equivalentBuildAndMeasurementInputs": [
+    {
+      "path": "Cargo.toml",
+      "measuredObject": "85b90fc4c5ebdbf0b1bc87791df82e119ebea6cd",
+      "currentMainObject": "85b90fc4c5ebdbf0b1bc87791df82e119ebea6cd"
+    },
+    {
+      "path": "Cargo.lock",
+      "measuredObject": "65745d10292db2fe232220e41f488d65f8684911",
+      "currentMainObject": "65745d10292db2fe232220e41f488d65f8684911"
+    },
+    {
+      "path": "build.rs",
+      "measuredObject": "fa267a4fc09f9922e1de78e6ad8823ac7923b875",
+      "currentMainObject": "fa267a4fc09f9922e1de78e6ad8823ac7923b875"
+    },
+    {
+      "path": "src",
+      "measuredObject": "3637996ad60f232e03cbc808482c3dd083d6bf78",
+      "currentMainObject": "3637996ad60f232e03cbc808482c3dd083d6bf78"
+    },
+    {
+      "path": "tools",
+      "measuredObject": "09faf7191357a53ad80c5862e41950128822c58a",
+      "currentMainObject": "09faf7191357a53ad80c5862e41950128822c58a"
+    },
+    {
+      "path": "tests",
+      "measuredObject": "c5fb0448fd6705eb6a5ff979495e76a4ab750044",
+      "currentMainObject": "c5fb0448fd6705eb6a5ff979495e76a4ab750044"
+    },
+    {
+      "path": "schemas",
+      "measuredObject": "ae78813f819e1f0209e3d2a53effd27a590f7d9d",
+      "currentMainObject": "ae78813f819e1f0209e3d2a53effd27a590f7d9d"
+    },
+    {
+      "path": "pyproject.toml",
+      "measuredObject": "60a69c76b415888068b0b82ebcd9112dd290b9c8",
+      "currentMainObject": "60a69c76b415888068b0b82ebcd9112dd290b9c8"
+    },
+    {
+      "path": "uv.lock",
+      "measuredObject": "7af65ca1280790fa8738fa8440cc3527d691a8cf",
+      "currentMainObject": "7af65ca1280790fa8738fa8440cc3527d691a8cf"
+    }
+  ],
+  "interveningChanges": [
+    "research/README.md",
+    "research/performance/2026-10-26-500-bot-qualification/REPORT.md",
+    "research/performance/2026-10-26-500-bot-qualification/analyze.py",
+    "research/performance/2026-10-26-500-bot-qualification/attempt3-amendment.json",
+    "research/performance/2026-10-26-500-bot-qualification/attempt4-amendment.json",
+    "research/performance/2026-10-26-500-bot-qualification/attempt5-amendment.json",
+    "research/performance/2026-10-26-500-bot-qualification/autonomous_run.py",
+    "research/performance/2026-10-26-500-bot-qualification/aws_run.py",
+    "research/performance/2026-10-26-500-bot-qualification/cleanup-verification.json",
+    "research/performance/2026-10-26-500-bot-qualification/files.sha256",
+    "research/performance/2026-10-26-500-bot-qualification/harness-amendment.json",
+    "research/performance/2026-10-26-500-bot-qualification/host_qualification.rs",
+    "research/performance/2026-10-26-500-bot-qualification/plan-byte-normalization.json",
+    "research/performance/2026-10-26-500-bot-qualification/plan.json",
+    "research/performance/2026-10-26-500-bot-qualification/remote_job.py",
+    "research/performance/2026-10-26-500-bot-qualification/run_trial.py",
+    "research/performance/2026-10-26-500-bot-qualification/select_results.py",
+    "research/performance/2026-10-26-500-bot-qualification/selected-results.json",
+    "research/performance/2026-10-26-500-bot-qualification/source-pins.json",
+    "research/performance/2026-10-26-500-bot-qualification/test_analysis.py",
+    "research/performance/2026-10-26-500-bot-qualification/test_aws_runner.py",
+    "research/performance/2026-10-26-500-bot-qualification/verify_cleanup.py",
+    "research/performance/2026-10-26-500-bot-qualification/write_report.py"
+  ],
+  "interpretation": "Current main adds only another research study and its index row. All Rust/build, tool, schema and fixture inputs are byte-identical; no remeasurement needed for this documentation-only main advance."
+}

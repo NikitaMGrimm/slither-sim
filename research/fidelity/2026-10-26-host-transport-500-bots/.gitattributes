@@ -1,0 +1,4 @@
+# Preserve the exact pre-acquisition frozen bytes and their SHA-256 identities.
+*plan*.json -text whitespace=cr-at-eol
+*plan*.sha256 -text whitespace=cr-at-eol
+*source-pins.json -text whitespace=cr-at-eol
