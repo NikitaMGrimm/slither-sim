@@ -122,7 +122,8 @@ def metric_rows(base, candidate):
     for key in sorted(before.keys() | after.keys()):
         a, b = before.get(key), after.get(key)
         row = {"id": key, "baseline": a, "candidate": b, "reading": "Unavailable"}
-        if a and b and a["unit"] == b["unit"] and a["samples"] == b["samples"]:
+        if (a and b and a["unit"] == b["unit"] and a["samples"] == b["samples"]
+                and a.get("fixture") == b.get("fixture")):
             delta = b["value"] - a["value"]
             row["absolute_delta"] = delta
             row["reading"] = ("Unchanged" if math.isclose(a["value"], b["value"], rel_tol=1e-9, abs_tol=1e-12)
@@ -145,6 +146,14 @@ def percent(value):
     """Two decimals with a true minus sign; a value that rounds to zero has no sign."""
     text = f"{abs(value):.2f}%"
     return text if text == "0.00%" else ("−" if value < 0 else "+") + text
+
+
+def residual_value(metric):
+    if metric is None:
+        return "—"
+    value = metric["value"]
+    # Nutrition errors can be much smaller than one millionth of a growth unit.
+    return f"{value:.6g}" if 0 < value < 0.00001 else f"{value:.6f}"
 
 
 def change_cell(result):
@@ -194,9 +203,9 @@ def render(report):
     if not performance:
         lines.append("| — | — | — | — | ⚠️ Unavailable |")
     lines += ["", "### Regression and fidelity", "",
-              "RMSE: turns in rad/s; speed ramps in protocol speed/s.", "",
-              "| Measurement | Base | PR | Result | Cases |",
-              "| --- | ---: | ---: | --- | ---: |"]
+              "Fixture RMSEs; lower is closer to these observations. Cases are retained samples, not independent trials.", "",
+              "| Measurement | Base | PR | Unit | Cases | Fixture | Result |",
+              "| --- | ---: | ---: | --- | ---: | --- | --- |"]
     labels = {"turn-large-rmse": "Turn error · large snakes", "turn-small-rmse": "Turn error · small snakes",
               "speed-ramp-rmse:run3-large-radius-20260927": "Speed ramp · large radius",
               "speed-ramp-rmse:run3-single-20260927": "Speed ramp · single",
@@ -204,10 +213,9 @@ def render(report):
     for row in report.get("fidelity", []):
         a, b = row["baseline"], row["candidate"]
         ref = b or a
-        av = f"{a['value']:.6f}" if a else "—"
-        bv = f"{b['value']:.6f}" if b else "—"
-        label = labels.get(row["id"], f"{ref['label']} ({ref['unit']})")
-        lines.append(f"| {cell(label)} | {av} | {bv} | {status(row['reading'])} | {ref['samples']} |")
+        label = labels.get(row["id"], ref["label"])
+        fixture = f"`{cell(ref['fixture'])}`" if ref.get("fixture") else "—"
+        lines.append(f"| {cell(label)} | {residual_value(a)} | {residual_value(b)} | {cell(ref['unit'])} | {ref['samples']} | {fixture} | {status(row['reading'])} |")
     before, after = report.get("tests", {}).get("baseline", {}), report.get("tests", {}).get("candidate", {})
     names = sorted(set(report.get("expected_tests", [])) | before.keys() | after.keys())
     changes = {kind: sum(transition(before.get(n), after.get(n)) == kind for n in names)
@@ -232,12 +240,12 @@ def render(report):
             test_result = ["🟢 Passed"]
         else:
             test_result = ["⚪ Unchanged"]
-    lines.append(f"| Regression tests | {passed(before)} | {passed(after)} | {' · '.join(test_result)} | {len(names)} |")
+    lines += ["", f"Regression tests: Base {passed(before)} → PR {passed(after)} · {' · '.join(test_result)}."]
     traces = report.get("traces", [])
     equal = sum(row["reading"] == "Equal" for row in traces)
     trace_status = ("Unavailable" if not traces or any(t["reading"] == "Unavailable" for t in traces)
                     else "Equal" if equal == len(traces) else "Changed")
-    lines.append(f"| State traces | Reference | {equal}/{len(traces)} equal | {status(trace_status)} | {len(traces)} |")
+    lines += ["", f"State traces: {equal}/{len(traces)} equal · {status(trace_status)}." if traces else "State traces: ⚠️ Unavailable."]
     if report.get("errors") or changes["unavailable"]:
         lines += ["", "⚠️ **Incomplete report:** see details for missing results."]
     lines += ["", "<details><summary>Details</summary>", "",
@@ -253,7 +261,10 @@ def render(report):
               # Remove only after hosted calibration has run and been reviewed.
               "- Hosted model calibration is not established; performance labels are advisory and conditional on the timing model.",
               "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
-              "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior."]
+              "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior.",
+              "- Food nutrition uses isolated pickups; prospective death size gives each non-boundary death equal weight "
+              "(four boundary deaths have no pellet size). Prey displacement includes wire-grid and unknown tick-phase error; "
+              "flight speed includes its two calibrated endpoints. These residuals do not cover count omissions or scheduler inputs."]
     for row in performance:
         result = row.get("result") or {}
         if result.get("metric") == "cpuSeconds":

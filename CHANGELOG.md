@@ -7,6 +7,10 @@
 - Evidence for browser mods that use an older login: an official server answers
   it with protocol 13, which this server doesn't serve yet, and a tested mod
   can't play protocol 19 ([report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-legacy-login/REPORT.md)).
+- PR fidelity reports add fixture-backed food nutrition, death-pellet size and
+  prey residuals, show units and source fixtures, and summarize regression tests
+  in one pass/fail count line.
+
 - PR comparisons focus timing on two regression canaries, official workloads and
   500/80-client socket hosts, retain ten state traces, and run both runtimes with
   the head workload configuration. Manual calibration retains CPU/wall noise.

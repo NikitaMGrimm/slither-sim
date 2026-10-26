@@ -161,6 +161,9 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(pr_report.metric_rows(metric(2), None)[0]["reading"], "Unavailable")
         self.assertEqual(pr_report.metric_rows(metric(2), metric(1, samples=5))[0]["reading"], "Unavailable")
         self.assertEqual(pr_report.metric_rows(metric(2), metric(1, unit="different"))[0]["reading"], "Unavailable")
+        before, after = metric(2), metric(1)
+        before["metrics"][0]["fixture"], after["metrics"][0]["fixture"] = "old.json", "new.json"
+        self.assertEqual(pr_report.metric_rows(before, after)[0]["reading"], "Unavailable")
         self.assertEqual(pr_report.metric_rows(metric(0), metric(1))[0]["reading"], "Higher error")
         self.assertEqual(pr_report.metric_rows(metric(2), metric(1))[0]["reading"], "Lower error")
 
@@ -195,7 +198,7 @@ test same_name ... ok
                   "fidelity": pr_report.metric_rows(metric(1), None), "removed_tests": ["physics::removed"]}
         text = pr_report.render(report)
         self.assertIn("| ⚠️ Unavailable |", text)
-        self.assertIn("| 1.000000 | — | ⚠️ Unavailable | 6 |", text)
+        self.assertIn("| 1.000000 | — | rad/s | 6 | — | ⚠️ Unavailable |", text)
         self.assertNotIn("🟢 Passed", text)
         self.assertIn("removal is not counted as a fix", text)
         self.assertIn("**Incomplete:** release build unavailable", text)
@@ -204,6 +207,20 @@ test same_name ... ok
         self.assertNotIn("on behalf of", text)
         self.assertNotIn("do not block merging", text)
         self.assertEqual(pr_report.cell("a|b\nc`d"), "a\\|b c'd")
+
+    def test_fidelity_rows_show_units_fixture_and_tiny_errors_with_one_test_count_line(self):
+        metrics = metric(2e-8, unit="growth units")
+        metrics["metrics"][0]["fixture"] = "food-growth.json"
+        tests = {"physics::case": "ok"}
+        report = {"base": "a" * 40, "head": "b" * 40, "merge": "c" * 40,
+                  "run_url": "https://example.invalid/run", "platform": "synthetic",
+                  "fidelity": pr_report.metric_rows(metrics, metrics),
+                  "tests": {"baseline": tests, "candidate": tests}}
+        visible = pr_report.render(report).split("<details>", 1)[0]
+        self.assertIn("| 2e-08 | 2e-08 | growth units | 6 | `food-growth.json` |", visible)
+        self.assertEqual(visible.count("Regression tests:"), 1)
+        self.assertIn("Regression tests: Base 1/1 → PR 1/1 · 🟢 Passed.", visible)
+        self.assertNotIn("| Regression tests |", visible)
 
     def test_workflow_paths_cover_every_measured_input_and_skip_documentation(self):
         root = pr_report.ROOT
