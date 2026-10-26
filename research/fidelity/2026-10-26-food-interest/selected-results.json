@@ -1,0 +1,264 @@
+{
+  "studyId": "fg-20261026-03-food-lanes",
+  "scientificStatus": "exploratory, unreviewed",
+  "sourceRevision": "7580d53baffa35d776af4fc22a9926220d33c672",
+  "templateSha256": "50bc4ad5203114e016aeadb598dea5705e6fe1c5bc7c566f997ffcf1d9a5d954",
+  "boundPlanSha256": "37524f7a0b1086bc4d05524ec5c055047b3d007c4dfe055fa1db4f9be5b44eb2",
+  "studyAudit": {
+    "status": "incomplete",
+    "issues": [
+      "planned_attempts_missing"
+    ],
+    "attempts": 1,
+    "captures": 1
+  },
+  "batches": {
+    "planned": 6,
+    "started": 1,
+    "acquisitionCompleted": 1,
+    "quarantined": 0,
+    "notAttempted": 5,
+    "eligibleForMainAnalysis": 0
+  },
+  "pilotGate": {
+    "verdict": "fail",
+    "completedSlots": 3,
+    "requiredCompletedSlots": 4,
+    "observedCompletedLaneDirections": [
+      "A/positive",
+      "A/negative",
+      "B/positive"
+    ],
+    "knownSectorListingClearGate": {
+      "observedQualified": null,
+      "required": 10,
+      "status": "not evaluated after decisive slot failure"
+    },
+    "clearPositiveReintroductionGate": {
+      "observedQualified": null,
+      "required": 5,
+      "status": "not evaluated after decisive slot failure"
+    },
+    "queryGate": {
+      "eligible200msQueries": null,
+      "required": 20,
+      "status": "not evaluated after decisive slot failure"
+    },
+    "pilot2": "not attempted; frozen stop rule",
+    "development": "not attempted",
+    "heldout": "not attempted",
+    "candidateCount": 32,
+    "candidatesScored": 0,
+    "selectedModel": null,
+    "candidateErrors": null,
+    "replacementContrast": null,
+    "simulatorChangeRecommended": false
+  },
+  "route": {
+    "status": "aborted",
+    "reason": "avoidance",
+    "terminalJsonlLine": 4749,
+    "slots": [
+      {
+        "scheduledSlot": 1,
+        "lane": "A",
+        "direction": "positive",
+        "split": "calibration",
+        "status": "completed"
+      },
+      {
+        "scheduledSlot": 2,
+        "lane": "A",
+        "direction": "negative",
+        "split": "calibration",
+        "status": "completed"
+      },
+      {
+        "scheduledSlot": 3,
+        "lane": "B",
+        "direction": "positive",
+        "split": "calibration",
+        "status": "completed"
+      },
+      {
+        "scheduledSlot": 4,
+        "lane": "B",
+        "direction": "negative",
+        "split": "calibration",
+        "status": "aborted"
+      },
+      {
+        "scheduledSlot": 5,
+        "lane": "B",
+        "direction": "positive",
+        "split": "holdout",
+        "status": "missing"
+      },
+      {
+        "scheduledSlot": 6,
+        "lane": "B",
+        "direction": "negative",
+        "split": "holdout",
+        "status": "missing"
+      },
+      {
+        "scheduledSlot": 7,
+        "lane": "A",
+        "direction": "positive",
+        "split": "holdout",
+        "status": "missing"
+      },
+      {
+        "scheduledSlot": 8,
+        "lane": "A",
+        "direction": "negative",
+        "split": "holdout",
+        "status": "missing"
+      }
+    ],
+    "phases": [
+      {
+        "jsonlLine": 618,
+        "kind": "approach",
+        "scheduledSlot": null,
+        "lane": "A",
+        "direction": null,
+        "split": "excluded",
+        "reason": "endpoint_reached",
+        "completed": true,
+        "elapsedMs": 3750.7712999999994,
+        "endpointDistance": 44.49124900814291,
+        "maxCrossTrack": 0
+      },
+      {
+        "jsonlLine": 1688,
+        "kind": "pass",
+        "scheduledSlot": 1,
+        "lane": "A",
+        "direction": "positive",
+        "split": "calibration",
+        "reason": "endpoint_reached",
+        "completed": true,
+        "elapsedMs": 7471.901400000001,
+        "endpointDistance": 34.42227764789144,
+        "maxCrossTrack": 74.14542512283879
+      },
+      {
+        "jsonlLine": 2780,
+        "kind": "pass",
+        "scheduledSlot": 2,
+        "lane": "A",
+        "direction": "negative",
+        "split": "calibration",
+        "reason": "endpoint_reached",
+        "completed": true,
+        "elapsedMs": 7735.539699999999,
+        "endpointDistance": 41.30473299074746,
+        "maxCrossTrack": 90.56323211182826
+      },
+      {
+        "jsonlLine": 2855,
+        "kind": "transfer",
+        "scheduledSlot": null,
+        "lane": "B",
+        "direction": null,
+        "split": "excluded",
+        "reason": "endpoint_reached",
+        "completed": true,
+        "elapsedMs": 416.9314000000013,
+        "endpointDistance": 51.491453039029906,
+        "maxCrossTrack": 0
+      },
+      {
+        "jsonlLine": 4067,
+        "kind": "pass",
+        "scheduledSlot": 3,
+        "lane": "B",
+        "direction": "positive",
+        "split": "calibration",
+        "reason": "endpoint_reached",
+        "completed": true,
+        "elapsedMs": 7463.6293000000005,
+        "endpointDistance": 22.24333263371197,
+        "maxCrossTrack": 41.740883758808195
+      },
+      {
+        "jsonlLine": 4748,
+        "kind": "pass",
+        "scheduledSlot": 4,
+        "lane": "B",
+        "direction": "negative",
+        "split": "calibration",
+        "reason": "avoidance",
+        "completed": false,
+        "elapsedMs": 4844.1787,
+        "endpointDistance": 593.3149225609923,
+        "maxCrossTrack": 89.11136799347514
+      }
+    ]
+  },
+  "archive": {
+    "alias": "p3-pilot-1-member-1",
+    "sha256": "f4880da87e091d2a41e2add703ced56399aa236f9a63123a097832423c14ad19",
+    "status": "verified",
+    "issues": [],
+    "warnings": [],
+    "integrityVerified": true,
+    "completeGzip": true,
+    "connections": 1,
+    "joins": 1,
+    "counts": {
+      "i": {
+        "frames": 2117,
+        "bytes": 49542
+      },
+      "o": {
+        "frames": 188,
+        "bytes": 258
+      }
+    },
+    "jsonlLines": 4752,
+    "bytes": 206077
+  },
+  "diagnosticCommandOutcomes": [
+    {
+      "tool": "packet_census.py",
+      "operation": "census",
+      "exitCode": 0
+    },
+    {
+      "tool": "transport_parity.py",
+      "operation": "measure",
+      "exitCode": 0
+    },
+    {
+      "tool": "transport_parity.py",
+      "operation": "compare",
+      "exitCode": 1
+    }
+  ],
+  "descriptiveOnly": {
+    "foodPacketCounts": {
+      "F": 154,
+      "f": 120,
+      "b": 113,
+      "w": 97,
+      "c": 0,
+      "C": 84,
+      "<": 104
+    },
+    "foodEntriesInF": 1328,
+    "limits": "All phases included. These are delivery packets, not qualified exposures, physical births, or refill evidence.",
+    "joinedUntilRouteStopSeconds": 32.797537,
+    "connectToRouteStopSeconds": 33.052201,
+    "recordedAcquisitionSeconds": 33.369105,
+    "connectionTimeUpperBoundSeconds": 33.440911,
+    "connectionTimeLimit": "Whole durable invocation from before child spawn through child exit bounds its single socket, including connecting/closing. Actual socket-close time is unrecorded."
+  },
+  "limits": [
+    "Pilot data never enter fitting or validation.",
+    "The completed-slot gate fails independently of the remaining coverage gates; their qualified denominators are unassessed, not zero.",
+    "No phase estimate, candidate-boundary/uncertainty scoring, food-identity matching or local-replacement inference was performed.",
+    "One single-endpoint pilot is not an independent-server sample. Raw archives and endpoint provenance are local-only."
+  ]
+}

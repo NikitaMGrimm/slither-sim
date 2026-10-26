@@ -1,0 +1,18 @@
+{
+  "sourceRevision": "7580d53baffa35d776af4fc22a9926220d33c672",
+  "files": {
+    "tools/fidelity/collect.py": "19615f8890d05b5ca28cb83ca99788cfb3e22d086fd50231b059c760738e1b34",
+    "tools/fidelity/evidence.py": "d763503b29514639b5a011bfac1e986efa788fa1c247abb76cbadd952afc155b",
+    "tools/fidelity/capture_quality.py": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff",
+    "tools/fidelity/slither_protocol.py": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+    "tools/fidelity/slither-food-lanes.mjs": "850e941e591b8bd07d769ba9f2f81f65f499f07504cfcb6927e5a825a8fc04aa",
+    "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+    "tools/fidelity/packet_census.py": "5a8604430478cf0b8e25c029d7b2c197847b2f1b5a5be55d1399a2cb51cb3d4e",
+    "tools/fidelity/transport_parity.py": "843b7e9ac36c61ed8049269639ba7ad93369a741cc04ae496131ffe020af0282",
+    "schemas/study-plan-v1.schema.json": "889b80ee59b490fb3fc6bb549e918708c1f990d9226be7bc5bbb430b6b070650",
+    "schemas/attempt-event-v1.schema.json": "4fd960904585fdafa7ecc508af1b47fbdbf2206eb1415e4936812fad8708bb7d",
+    "schemas/evidence-bundle-v1.schema.json": "b4bdb08c357540df81d09c873b6bdc2e77f4ca4d8a06056ea147193d32a94300",
+    "pyproject.toml": "d7edadd0624cddd448ae44fa300bee18bd5b033124777d76476499589f66fde5",
+    "uv.lock": "b73541db469e2d1d20744a177642e2e0dbe05e1ffeeeafd469bc809092467559"
+  }
+}

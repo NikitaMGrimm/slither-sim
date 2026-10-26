@@ -1,0 +1,32 @@
+{
+  "access": "restricted, local-only; unavailable in this repository",
+  "archives": [
+    {
+      "alias": "p3-pilot-1-member-1",
+      "sha256": "f4880da87e091d2a41e2add703ced56399aa236f9a63123a097832423c14ad19",
+      "bytes": 206077,
+      "memberAudit": "verified"
+    },
+    {
+      "alias": "p3-stopped-study-bundle",
+      "sha256": "ee96d33f9aef1f2ef3cdf66267bb70a2259b5fc10a03c47512dd0a97c396ed35",
+      "bytes": 741968,
+      "verification": "manifest, members and hashes verified; scientific study incomplete",
+      "studyAudit": {
+        "status": "incomplete",
+        "issues": [
+          "planned_attempts_missing"
+        ],
+        "attempts": 1,
+        "captures": 1
+      }
+    }
+  ],
+  "cleanup": {
+    "taskProcessesRemaining": 0,
+    "endpointTcpSocketsRemaining": 0,
+    "containersCreated": 0,
+    "remoteProcessesCreated": 0
+  },
+  "limitation": "Hashes identify retained bytes; they do not grant access or validate a scientific claim."
+}
