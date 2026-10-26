@@ -84,7 +84,7 @@ interval. There is no network delay, automatic respawn, reward, victory
 condition or episode timeout. Use `reset` for new worlds.
 
 Returns `worlds`, one frame per world. Frame rows, counts and offsets are `u32`.
-Unrepresentable frames, pickup mass overflow and reply allocation failure end
+Unrepresentable frames, numeric overflow and reply allocation failure end
 the session after advancement, as described above.
 
 ### snapshot
@@ -223,9 +223,9 @@ Refill rates must be finite and nonnegative, small enough that one attempt
 interval still changes the refill clock, and large enough to represent the
 rescaled pending clock. Use the setter instead of directly
 editing `config.ambient_replenish_per_second` when changing a running world.
-Rejected operations leave the world unchanged. The exception is a pickup whose
-gain would overflow its eater's mass: that step completes its tick without the
-gain and returns an error, and every later step is rejected with it.
+Rejected operations leave the world unchanged. Numeric overflow during a tick
+(pickup mass or prey motion) completes that tick without the invalid update,
+returns an error, and every later step is rejected with it.
 
 ### In-process sessions
 

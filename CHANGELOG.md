@@ -130,6 +130,11 @@
   `add` rejects an initial ring body that would extend outside a small arena, and
   a refused hosted join now says the candidate search was exhausted rather than
   implying the arena is full.
+- Prey respawn is no longer capped at one per tick, and a replacement waits a
+  full `respawnSeconds` after the catch. With a coarse `dt`, pickup follows each
+  prey motion step instead of the straight line between endpoints, and prey
+  motion that overflows ends the world with an error instead of producing NaN
+  positions.
 - Kiosk shrinkage no longer deletes pending growth: it removes only mass the
   score shows, and a zero shrink rate changes nothing.
 - Native commands with processing delay apply in the tick they arrive instead of

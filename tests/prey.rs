@@ -625,3 +625,225 @@ fn invalid_prey_configuration_is_rejected() {
         );
     }
 }
+
+// Synthetic inputs pin local replenishment and numeric-error contracts, not
+// measured official population or coarse-timestep behavior.
+#[test]
+fn refill_consumes_all_due_intervals_and_discards_credit_at_target() {
+    for interval in [0.001, f64::MIN_POSITIVE] {
+        let mut w = Simulator::new(
+            1,
+            Config {
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                prey: PreyConfig {
+                    count: 10,
+                    respawn_seconds: interval,
+                    ..Default::default()
+                },
+                ..Config::sandbox()
+            },
+        )
+        .unwrap();
+        w.prey.clear();
+        w.step(&[]).unwrap();
+        assert_eq!(w.prey.len(), if interval == 0.001 { 7 } else { 10 });
+        w.step(&[]).unwrap();
+        assert_eq!(w.prey.len(), 10);
+        assert_eq!(serde_json::to_value(&w).unwrap()["prey_clock"], 0.);
+        w.prey.clear();
+        w.step(&[]).unwrap();
+        assert_eq!(w.prey.len(), if interval == 0.001 { 7 } else { 10 });
+    }
+}
+
+#[test]
+fn refill_waits_a_full_interval_after_the_catch_tick() {
+    let mut w = world();
+    w.config.ambient_replenish_per_second = 0.;
+    w.config.prey.count = 1;
+    w.config.prey.respawn_seconds = 4. * w.config.dt;
+    w.prey.push(entity(43., 0.));
+    w.step(&[Some(Action::default())]).unwrap();
+    assert!(w.prey.is_empty());
+    let caught = w.time;
+    w.snakes[0].alive = false;
+    for _ in 0..3 {
+        w.step(&[None]).unwrap();
+        assert!(w.prey.is_empty());
+    }
+    w.step(&[None]).unwrap();
+    assert_eq!(w.prey.len(), 1);
+    assert!((w.time - caught - w.config.prey.respawn_seconds).abs() < 1e-15);
+}
+
+#[test]
+fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
+    let mut w = Simulator::new(
+        1,
+        Config {
+            dt: 2.,
+            boundary_mode: BoundaryMode::Hard,
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            prey: PreyConfig {
+                count: 1,
+                cruise_speed: f64::MAX,
+                escape_speed: f64::MAX,
+                sprint_speed: f64::MAX,
+                turn_rate: 0.,
+                ..Default::default()
+            },
+            ..Config::sandbox()
+        },
+    )
+    .unwrap();
+    let error = w.step(&[]).unwrap_err();
+    assert!(
+        error.contains("Prey motion") && error.contains("cannot advance"),
+        "{error}"
+    );
+    assert!(w.prey.iter().all(|prey| prey.position.finite()));
+    let time = w.time;
+    assert_eq!(w.step(&[]).unwrap_err(), error);
+    assert_eq!(w.time, time);
+}
+
+#[test]
+fn batched_prey_pickup_sweeps_each_relative_substep() {
+    for count in [1, 512] {
+        let mut w = Simulator::new(
+            1,
+            Config {
+                dt: 0.028,
+                radius: 3000.,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                kiosk: KioskConfig {
+                    enabled: false,
+                    ..Default::default()
+                },
+                ..Config::sandbox()
+            },
+        )
+        .unwrap();
+        w.add("a", 0, 1).unwrap();
+        w.snakes[0].alive = false;
+        w.respawn(0, Point::default(), 0., 2).unwrap();
+        let mut projected = w.clone();
+        projected.step(&[Some(Action::default())]).unwrap();
+        let snake = &projected.snakes[0];
+        let (mouth, radius) =
+            physics::pickup_circle(snake.head, snake.heading, snake.speed, snake.segments);
+        let lead = Point {
+            x: mouth.x - snake.head.x,
+            y: mouth.y - snake.head.y,
+        };
+        let prey = Prey {
+            position: Point { x: -10., y: 20. },
+            target_heading: std::f64::consts::FRAC_PI_2,
+            ..entity(0., 2000.)
+        };
+        let mut moved = prey.clone();
+        let start = Point {
+            x: prey.position.x - lead.x,
+            y: prey.position.y - lead.y,
+        };
+        let mut prior = start;
+        let mut closest = f64::INFINITY;
+        for k in 1..=4 {
+            moved.advance_server_tick(20.);
+            let now = Point {
+                x: moved.position.x - lead.x - snake.head.x * k as f64 / 4.,
+                y: moved.position.y - lead.y - snake.head.y * k as f64 / 4.,
+            };
+            closest = closest.min(physics::segment_distance(Point::default(), prior, now));
+            prior = now;
+        }
+        assert!(closest < radius - 0.5);
+        assert!(physics::segment_distance(Point::default(), start, prior) > radius + 0.5);
+        w.config.prey.turn_rate = 20.;
+        w.config.prey.cruise_speed = 2000.;
+        w.config.prey.escape_speed = 2000.;
+        w.config.prey.sprint_speed = 2000.;
+        w.config.prey.flee_half_width = 1.;
+        for id in 0..count {
+            w.prey.push(Prey {
+                id,
+                position: if id == 0 {
+                    prey.position
+                } else {
+                    Point { x: 1000., y: 1000. }
+                },
+                ..prey.clone()
+            });
+        }
+        w.step(&[Some(Action::default())]).unwrap();
+        assert!(
+            !w.prey.iter().any(|prey| prey.id == 0),
+            "{count}: curved prey survived"
+        );
+        assert!(w.snakes[0].length > 2.);
+    }
+}
+
+#[test]
+fn indexed_prey_arc_can_leave_its_endpoint_bounds() {
+    for count in [1, 512] {
+        let mut w = Simulator::new(
+            1,
+            Config {
+                dt: 0.084,
+                radius: 3000.,
+                boundary_mode: BoundaryMode::Hard,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                kiosk: KioskConfig {
+                    enabled: false,
+                    ..Default::default()
+                },
+                ..Config::sandbox()
+            },
+        )
+        .unwrap();
+        w.add("a", 0, 1).unwrap();
+        w.snakes[0].alive = false;
+        w.respawn(0, Point::default(), 0., 2).unwrap();
+        w.config.prey = PreyConfig {
+            count: 0,
+            cruise_speed: 6000.,
+            escape_speed: 6000.,
+            sprint_speed: 6000.,
+            turn_rate: std::f64::consts::PI / (12. * physics::LOOP_SECONDS),
+            flee_half_width: 1.,
+            ..Default::default()
+        };
+        let prey = Prey {
+            position: Point { x: -100., y: -150. },
+            target_heading: std::f64::consts::PI,
+            ..entity(0., 6000.)
+        };
+        let mut moved = prey.clone();
+        let mut rightmost = prey.position.x;
+        for _ in 0..12 {
+            moved.advance_server_tick(w.config.prey.turn_rate);
+            rightmost = rightmost.max(moved.position.x);
+        }
+        // Both endpoints lie left of every mouth sweep, while the arc bends in.
+        assert!(prey.position.x <= -100. && moved.position.x <= -100.);
+        assert!(rightmost > 30.);
+        for id in 0..count {
+            w.prey.push(Prey {
+                id,
+                position: if id == 0 {
+                    prey.position
+                } else {
+                    Point { x: 1000., y: 1000. }
+                },
+                ..prey.clone()
+            });
+        }
+        w.step(&[Some(Action::default())]).unwrap();
+        assert!(!w.prey.iter().any(|p| p.id == 0), "{count}: arc survived");
+    }
+}

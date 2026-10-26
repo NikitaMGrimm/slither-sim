@@ -232,7 +232,9 @@ turn rate is radians/s; `cruiseSpeed ≤ escapeSpeed ≤ sprintSpeed` and
 `size ≤ maxSize`. The size range must contain a positive 0.2-grid value and
 remain finite when multiplied by 5, so spawned prey can respect both bounds.
 The largest catch, `size² × 0.0031535 × nutritionFactor`, added to a snake's
-mass must be finite.
+mass must be finite. Finite speeds can still overflow accumulated prey motion;
+that tick completes without the invalid motion and ends the world with an error
+([terminal errors](bot-api.md)).
 Protocol speed is divided by 0.032 to obtain world units/s; turn coefficients
 use an 8 ms reference. These conversion scales are separate from `world.dt`.
 
@@ -247,7 +249,7 @@ use an 8 ms reference. These conversion scales are separate from `world.dt`.
 | `size` | `6` | Lower spawned size. |
 | `maxSize` | `9.2` | Upper spawned size. |
 | `nutritionFactor` | `30` | Multiplier on ordinary food nutrition at the prey's size. |
-| `respawnSeconds` | `1` | Replenishment interval while below target. |
+| `respawnSeconds` | `1` | Replenishment interval while below target. Credit starts after the tick that drops below target; all due intervals are spent up to the deficit, and reaching target discards credit. |
 
 ### Food admission limits
 
