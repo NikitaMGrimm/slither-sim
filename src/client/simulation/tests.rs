@@ -2788,7 +2788,11 @@ fn rejected_departure_clock_check_leaves_every_side_unchanged() {
 
 #[test]
 fn native_capacity_failure_keeps_all_slots_retryable() {
-    for failure in ["departure records", "receipt and departure records", "uplink"] {
+    for failure in [
+        "departure records",
+        "receipt and departure records",
+        "uplink",
+    ] {
         let config = SimulationConfig {
             world: Config {
                 food_count: 0,
@@ -2818,10 +2822,10 @@ fn native_capacity_failure_keeps_all_slots_retryable() {
                 )
                 .unwrap();
                 if failure == "receipt and departure records" {
-                    sim.slots[slot].connection.downlink.push_back((
-                        at + 0.0005,
-                        encode::frame(0, &[encode::pong()]).unwrap(),
-                    ));
+                    sim.slots[slot]
+                        .connection
+                        .downlink
+                        .push_back((at + 0.0005, encode::frame(0, &[encode::pong()]).unwrap()));
                 }
             }
         }
@@ -2838,8 +2842,7 @@ fn native_capacity_failure_keeps_all_slots_retryable() {
             _ => {
                 // The combined case fits either the receipts or the two command
                 // records alone, so the preflight must charge them together.
-                backend.slots[1].record_bytes = MAX_RECORD_BYTES
-                    - 2 * (RECORD_OVERHEAD + 1)
+                backend.slots[1].record_bytes = MAX_RECORD_BYTES - 2 * (RECORD_OVERHEAD + 1)
                     + usize::from(failure == "departure records");
                 "Wire record buffer is full; drain records first"
             }
