@@ -61,52 +61,86 @@ snapping and unknown-Intent NaNs. It reads no authoritative state.
 
 ## Selected conformance data
 
-The [selected fixture](../../../tests/fixtures/forager-conformance.json) currently
-contains **44 prepared inputs and no oracle expectations**. It intentionally
-cannot pass conformance in this draft. Generation and execution are pending
-because the desktop's measurement lock prohibits local Rust builds and tests.
+The [shared inputs](../../../tests/fixtures/forager-conformance.json) contain 140
+full frames. Twelve records were selected at indices 0 and 17 from each of six
+private local/synthetic corpus groups, without inspecting policy outputs. Source
+record hashes identify private inputs, not downloadable public archives. A complete
+32-decision synthetic receipt tape covers RTT, empty/short/64/over-limit command
+histories, boost toggles, respawns/reconnections, missing observations, incompatible
+contracts, stale/missing receipts, reordered rows, dense/long bodies, prey, racing,
+rim and exit inputs. Another 96 frames record all four seats at every decision in
+a 24-decision current-main sequence using predetermined controls for playing slots.
+These are offline frame sequences, not outside-server captures or live life traces.
 
-Twelve full records were selected at indices 0 and 17 from each of six private
-local/synthetic corpus groups, without inspecting policy outputs. Their source
-record hashes identify private inputs, not downloadable public archives. The
-complete selected frames are committed. A complete 32-decision synthetic receipt
-tape adds RTT variation, empty/short/64/over-limit histories, boost toggles,
-respawns and reconnections, missing observations, incompatible contracts,
-stale/missing receipts, reordered opponent rows, dense/long bodies, prey, racing,
-rim and exit inputs. These are controlled frame sequences, not live world traces.
+All floating frame values are `{ "f64": "<16 hex digits>" }`; array order and
+signed zero survive decoding. Derived Timing/Intent values use raw hex bits,
+including unknown-Intent NaNs. Actions record presence, heading bits and boost.
+No public-mode guard is applied.
 
-All floating frame values are `{ "f64": "<16 hex digits>" }`; signed zero and
-array order survive decoding. Expected Timing and Intent values use raw hex bits,
-including unknown-Intent NaNs. Expected actions record presence, heading bits and
-boost. No public-mode guard is applied. The conformance test checks derived input
-bits before output bits, then replays forward/reverse with shared and fresh
-scratch and verifies input preservation. The allocation regression also exercises
-the immutable A1 and A4-mean parameter sets after warmup.
+The complete, independent untouched-kernel outputs are retained separately:
 
-Pending additions: all four seats at every decision in a 24-decision current-main
-sequence (96 full inputs), followed by original-kernel output generation on
-Windows x86-64 and Linux x86-64 under the same toolchain and debug flags. Compare
-both complete output files before marking `oracleStatus` complete. Any math
-difference must be reported by case/parameter set with raw bits; tolerances are
-not permitted. macOS CI is a further required check.
+- [Windows x86_64 MSVC](../../../tests/fixtures/forager-oracle-windows-x86_64-msvc.json).
+- [Linux x86_64 GNU](../../../tests/fixtures/forager-oracle-linux-x86_64-gnu.json).
+
+Each file came from its own oracle run, with all 140 inputs under both resolved
+parameter sets. Neither platform's expectations are derived from the other's.
+The test selects an oracle only for its exact OS/architecture/environment, checks
+that input frames match, compares every Timing/Intent bit before actions, and
+requires zero mismatches including heading bits. No tolerance is used.
+
+On every target, a separate test compares two fresh instances and one instance
+reused across interleaved slots, lives and connections, in forward and reverse
+order without resetting. It verifies exact action/derived bits, input preservation,
+action presence, boolean boost and finite headings. The warmed allocation regression
+also exercises both immutable parameter sets.
+
+**macOS conformance is unverified because no macOS oracle exists.** macOS and all
+other targets without an exact target oracle run determinism and structural
+invariants only. The test names and an explicit notice identify this limitation;
+passing those tests is not oracle equality.
+
+## Last-bit platform differences
+
+Complete original-kernel comparison found these four heading differences. They
+are last-bit differences between the platforms' math libraries; no individual
+function has been isolated. Timing/Intent bits, presence and boost all matched.
+Both versions of every differing case remain in the complete oracle files and
+[verification data](verification.json).
+
+| Policy | Case | Windows heading bits | Linux heading bits |
+| --- | --- | --- | --- |
+| A1 | `current-8-1` | `3feac74d32095f93` | `3feac74d32095f92` |
+| A4-mean | `selected-5-17` | `bfdff45ed8fb1661` | `bfdff45ed8fb1660` |
+| A4-mean | `current-17-0` | `bfec3a5c096a3b19` | `bfec3a5c096a3b18` |
+| A4-mean | `current-22-0` | `bfe5f095cfc48e54` | `bfe5f095cfc48e53` |
 
 ## Reproduction and verification
 
-[oracle.rs](oracle.rs) is a bounded standalone exporter, not a training harness.
-Build it in a separate Cargo project depending on the untouched be3a035 crate,
-with `serde_json`'s `float_roundtrip` feature. It takes three positional arguments:
-the bit-encoded selected fixture, `src/bot/data`, and a fresh output filename.
-It calls the original `ForagerBot::timing` and `Bot::decide`; intent extraction is
-copied verbatim from the original adapter. It never calls the port. Compare
-outputs on both platforms and retain the matching expectations in the fixture.
+[oracle.rs](oracle.rs) is a bounded standalone exporter. Build it in a separate
+Cargo project depending on untouched be3a035, with `serde_json`'s `float_roundtrip`
+feature. Its three arguments are shared bit-encoded inputs, `src/bot/data`, and a
+fresh output filename. It calls original `ForagerBot::timing`/`Bot::decide` and
+verbatim original intent extraction. It never calls the port. Each target must
+produce its own expectations; do not copy or normalize another target's headings.
 
-Local Rust execution, Windows/Linux conformance counts, package and WASM checks
-are **pending**, not passed. No cross-platform math identity has been established.
-The shared check runner now includes bot-only Clippy/tests, networking-only tests
-and bot-only WASM checking alongside the existing Rust/package groups. CI results
-and toolchain/build identifiers will be recorded after execution.
+Both oracle runs used Rust 1.99.0 (`b940084d7`, LLVM 23.1.1), dev profile, optimization
+level 0, debug information disabled, incremental compilation disabled and empty
+Rust flags. The dependency lock was shared between oracle builds. Exact hashes,
+compiler targets, resource limits and four differences are in [verification.json](verification.json).
+The original output arrays repeated identically on each platform after adding
+explicit exporter completeness/platform metadata.
+
+Windows and WSL Linux port conformance each passed all 140 A1 and 140 A4-mean cases
+with zero mismatches. Fresh/shared determinism also passed on both. Full Rust,
+package, WASM and CI results are pending completion at this revision of the note.
+
+Initial attempts are retained in the private execution record: the first build
+found the missing `Action` import; the frame generator initially sent a control to
+a non-playing slot; the first oracle attempts rejected an incomplete synthetic
+HUD object. These were corrected before the complete oracle runs. The initial
+cross-platform mismatch prompted an explicit owner decision to preserve separate
+exact oracle sets, not a tolerance or numerical kernel change.
 
 Host/native background wiring, examples, JSON bot stepping, headless forage,
 public-mode guards, outside-server captures, cost/strength gates and A4 adoption
-remain outside this PR. Raw-wire caller equivalence belongs to the later runtime
-and JSON integration changes.
+remain outside this PR. Raw-wire caller equivalence belongs to later integration.

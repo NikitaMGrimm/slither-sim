@@ -25,6 +25,8 @@ include = [
     "/examples/ffi_bot.py",
     "/tests/fixtures/forager-native-parity.json",
     "/tests/fixtures/forager-conformance.json",
+    "/tests/fixtures/forager-oracle-windows-x86_64-msvc.json",
+    "/tests/fixtures/forager-oracle-linux-x86_64-gnu.json",
     "/tests/fixtures/client-food-interest.json",
     "/tests/fixtures/client-hud-leaderboard.json",
     "/tests/fixtures/client-presentation.json",

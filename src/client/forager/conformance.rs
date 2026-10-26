@@ -55,35 +55,131 @@ fn derived(bot: &ForagerBot, frame: &crate::client::ClientFrame) -> Value {
     })
 }
 
-#[test]
-fn frozen_oracle_full_frames_match_before_and_after_scratch_reuse() {
+// Only the exact deployment targets on which the untouched kernel ran have
+// an equality oracle. In particular, macOS conformance is unverified because
+// no macOS oracle exists; macOS and other targets run determinism/invariants.
+#[cfg(all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"))]
+const PLATFORM_ORACLE: Option<&str> = Some(include_str!(
+    "../../../tests/fixtures/forager-oracle-windows-x86_64-msvc.json"
+));
+#[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]
+const PLATFORM_ORACLE: Option<&str> = Some(include_str!(
+    "../../../tests/fixtures/forager-oracle-linux-x86_64-gnu.json"
+));
+#[cfg(not(any(
+    all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
+    all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"),
+)))]
+const PLATFORM_ORACLE: Option<&str> = None;
+
+fn fixture() -> Value {
     let fixture: Value = serde_json::from_str(include_str!(
         "../../../tests/fixtures/forager-conformance.json"
     ))
     .unwrap();
     assert_eq!(fixture["clientContract"], "slither-client-v2");
     assert_eq!(fixture["wireProtocol"], 19);
-    assert_eq!(
-        fixture["oracleStatus"], "complete",
-        "requires verified Windows/Linux oracle outputs"
-    );
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 140);
+    fixture
+}
+
+fn make_bot(name: &str) -> ForagerBot {
+    let mut bot = ForagerBot::new(PolicyId::A1);
+    if name == "A4-mean" {
+        bot.policy = crate::bot::Forager::a4_mean_for_test();
+    }
+    bot
+}
+
+fn check_structure(frame: &crate::client::ClientFrame, result: Option<Action>) {
+    let playing = frame.contract == crate::client::CONTRACT
+        && frame.status == crate::client::ClientStatus::Playing
+        && frame.observation.is_some();
+    assert_eq!(result.is_some(), playing, "action presence");
+    if let Some(result) = result {
+        assert!(result.heading.is_finite(), "heading must be finite");
+        assert!(action(Some(result))["boost"].is_boolean(), "boolean boost");
+    }
+}
+
+#[test]
+fn full_frames_are_deterministic_with_fresh_and_interleaved_shared_instances() {
+    let fixture = fixture();
     let cases = fixture["cases"].as_array().unwrap();
-    assert!(!cases.is_empty());
     for name in ["A1", "A4-mean"] {
-        let make_bot = || {
-            let mut bot = ForagerBot::new(PolicyId::A1);
-            if name == "A4-mean" {
-                bot.policy = crate::bot::Forager::a4_mean_for_test();
-            }
-            bot
-        };
-        let mut shared = make_bot();
-        // Reverse replay also alternates slots/lives and crosses every lifecycle
-        // boundary in the opposite order; scratch never carries policy state.
+        let mut shared = make_bot(name);
+        // Both orders reuse one instance across interleaved slots, lives,
+        // connections and invalid frames, without resetting between decisions.
         for case in cases.iter().chain(cases.iter().rev()) {
             let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
             let before = serde_json::to_value(&frame).unwrap();
-            let expected = &case["expected"][name];
+            let mut first = make_bot(name);
+            let mut second = make_bot(name);
+            let inputs = derived(&first, &frame);
+            assert_eq!(
+                derived(&second, &frame),
+                inputs,
+                "{} {name}: fresh inputs",
+                case["id"]
+            );
+            assert_eq!(
+                derived(&shared, &frame),
+                inputs,
+                "{} {name}: shared inputs",
+                case["id"]
+            );
+            let first = first.decide(&frame);
+            let second = second.decide(&frame);
+            let reused = shared.decide(&frame);
+            for result in [first, second, reused] {
+                check_structure(&frame, result);
+            }
+            assert_eq!(
+                action(first),
+                action(second),
+                "{} {name}: fresh bits",
+                case["id"]
+            );
+            assert_eq!(
+                action(first),
+                action(reused),
+                "{} {name}: shared bits",
+                case["id"]
+            );
+            assert_eq!(
+                serde_json::to_value(&frame).unwrap(),
+                before,
+                "input mutated"
+            );
+        }
+    }
+}
+
+#[cfg(any(
+    all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
+    all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"),
+))]
+#[test]
+fn platform_oracle_equality_zero_mismatches() {
+    let raw = PLATFORM_ORACLE.expect("this exact target has a frozen-kernel oracle");
+    let oracle: Value = serde_json::from_str(raw).unwrap();
+    assert_eq!(oracle["oracleStatus"], "complete");
+    assert_eq!(oracle["oraclePlatform"]["os"], std::env::consts::OS);
+    assert_eq!(oracle["oraclePlatform"]["arch"], std::env::consts::ARCH);
+    let fixture = fixture();
+    let cases = fixture["cases"].as_array().unwrap();
+    let expected = oracle["cases"].as_array().unwrap();
+    assert_eq!(expected.len(), cases.len());
+    for name in ["A1", "A4-mean"] {
+        let mut shared = make_bot(name);
+        for (case, oracle_case) in cases.iter().zip(expected) {
+            for field in ["id", "slot", "decisionOrder", "frame"] {
+                assert_eq!(case[field], oracle_case[field], "oracle input {field}");
+            }
+            let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
+            let expected = &oracle_case["expected"][name];
+            // Compare every derived bit before any action, including all 64
+            // sent slots, truncation length and unknown-Intent NaN payloads.
             assert_eq!(
                 derived(&shared, &frame),
                 expected["derived"],
@@ -93,21 +189,21 @@ fn frozen_oracle_full_frames_match_before_and_after_scratch_reuse() {
             assert_eq!(
                 action(shared.decide(&frame)),
                 expected["action"],
-                "{} {name}: shared action",
+                "{} {name}: action bits",
                 case["id"]
-            );
-            assert_eq!(
-                action(make_bot().decide(&frame)),
-                expected["action"],
-                "{} {name}: fresh action",
-                case["id"]
-            );
-            shared.reset();
-            assert_eq!(
-                serde_json::to_value(&frame).unwrap(),
-                before,
-                "input mutated"
             );
         }
     }
+}
+
+#[cfg(not(any(
+    all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
+    all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"),
+)))]
+#[test]
+fn macos_and_other_targets_without_oracles_have_unverified_conformance() {
+    assert!(PLATFORM_ORACLE.is_none());
+    eprintln!(
+        "macOS conformance is unverified because no macOS oracle exists. This target runs fresh/shared determinism and structural invariants, not oracle equality."
+    );
 }

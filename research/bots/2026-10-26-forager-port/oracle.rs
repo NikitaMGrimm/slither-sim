@@ -509,5 +509,12 @@ fn main() {
             case["expected"][name] = json!({"derived": input, "action": output});
         }
     }
+    fixture["oracleStatus"] = json!("complete");
+    fixture["oraclePlatform"] = json!({
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+        "environment": if cfg!(target_env = "msvc") { "msvc" }
+            else if cfg!(target_env = "gnu") { "gnu" } else { "other" },
+    });
     fs::write(&args[3], serde_json::to_string(&fixture).unwrap() + "\n").unwrap();
 }
