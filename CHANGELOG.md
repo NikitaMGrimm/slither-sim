@@ -143,6 +143,8 @@
 
 - A host no longer drops a healthy client when a message near the 1 MiB limit
   follows a small one that is still waiting for its batch to fill.
+- Native recording failures leave pending decisions and client clocks intact,
+  and rejected sends no longer suppress a later boost change.
 - A new world starts at its configured radius instead of one population step
   smaller, so resetting with the returned config reproduces the first frame.
   `add` rejects an initial ring body that would extend outside a small arena, and

@@ -1526,10 +1526,15 @@ impl ClientState {
         }
     }
 
+    /// Validate a departure before the native backend commits any send state.
+    pub(super) fn check_sent(&self, at: f64) -> Result<(), String> {
+        self.require_connection()?;
+        self.local_clock(at)
+    }
+
     /// Record bytes actually sent. Only game commands are kept; handshake ignored.
     pub fn record_sent(&mut self, packet: &[u8], at: f64) -> Result<(), String> {
-        self.require_connection()?;
-        self.local_clock(at)?;
+        self.check_sent(at)?;
         self.local = Some(at);
         let session = &mut self.session;
         // Before setup, single bytes are pre-login negotiation such as [1], [2]

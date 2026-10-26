@@ -126,6 +126,24 @@ impl Slot {
         }
         Ok(())
     }
+    /// Include earlier receipts in the same budget as the pending departure.
+    pub(super) fn client_io_room(&self, until: f64) -> Result<(), String> {
+        let packets = match self.outbox {
+            Some((at, action, processing)) if at + processing <= until => {
+                protocol::action_packets(action, self.previous_boost)?
+            }
+            _ => Vec::new(),
+        };
+        self.room(
+            self.connection
+                .downlink
+                .iter()
+                .take_while(|(at, _)| *at <= until)
+                .map(|(_, bytes)| bytes.len())
+                .chain(packets.iter().map(Vec::len)),
+        )?;
+        self.uplink_room(packets.len())
+    }
     pub(super) fn record(
         &mut self,
         time: f64,
@@ -233,14 +251,29 @@ impl SimulatorBackend {
         // client's sent history, boost state and server control untouched.
         s.room(packets.iter().map(Vec::len))?;
         s.uplink_room(packets.len())?;
+        s.state.check_sent(at)?;
+        // Link scheduling can also reject: stage its draws without changing the
+        // live stream or shared RNG, preserving ordinary wire output on success.
+        let mut link = s.connection.link.clone();
+        let mut random = self.random.clone();
+        let arrivals = packets
+            .iter()
+            .map(|_| link.uplink(&self.config.latency, &mut random, at))
+            .collect::<Result<Vec<_>, _>>()?;
+        s.state.set_processing_seconds(processing)?;
+        for packet in &packets {
+            // All packets share the validated clock and connection.
+            s.state.record_sent(packet, at)?;
+        }
         s.outbox = None;
         s.previous_boost = Some(action.boost);
-        s.state.set_processing_seconds(processing)?;
-        for packet in packets {
-            let s = &mut self.slots[slot];
-            s.state.record_sent(&packet, at)?;
+        s.connection.link = link;
+        self.random = random;
+        for (packet, arrival) in packets.into_iter().zip(arrivals) {
             s.record(at, WireEvent::Send, &packet)?;
-            self.uplink(slot, at, Uplink::Message(packet))?;
+            s.connection
+                .uplink
+                .push_back((arrival, Uplink::Message(packet)));
         }
         Ok(())
     }

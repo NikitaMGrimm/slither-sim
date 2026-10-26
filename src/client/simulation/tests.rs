@@ -2736,6 +2736,197 @@ fn rejected_departure_leaves_every_side_unchanged() {
 }
 
 #[test]
+fn rejected_departure_clock_check_leaves_every_side_unchanged() {
+    let mut backend = SimulatorBackend::new(
+        1,
+        SimulationConfig {
+            record_wire: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    while backend.frame().unwrap().status != ClientStatus::Playing {
+        backend.advance_ticks(1).unwrap();
+    }
+    let at = backend.time();
+    let s = &mut backend.slots[0];
+    // Reproduce the future client clock left by a partial pre-tick failure.
+    s.state.record_sent(&[253], at + 0.001).unwrap();
+    s.previous_boost = Some(true);
+    s.control.boost = true;
+    s.outbox = Some((
+        at,
+        Action {
+            heading: 1.,
+            boost: false,
+        },
+        0.,
+    ));
+    let snapshot = |backend: &SimulatorBackend| {
+        let s = &backend.slots[0];
+        format!(
+            "{:?}",
+            (
+                &s.state,
+                &s.connection,
+                s.outbox,
+                s.previous_boost,
+                s.control,
+                &s.records,
+                s.record_bytes,
+                &backend.random,
+            )
+        )
+    };
+    let before = snapshot(&backend);
+    assert_eq!(
+        backend.client_io_until(0, at).unwrap_err(),
+        "Invalid local clock"
+    );
+    assert_eq!(snapshot(&backend), before);
+}
+
+#[test]
+fn native_capacity_failure_keeps_all_slots_retryable() {
+    for failure in ["departure records", "receipt and departure records", "uplink"] {
+        let config = SimulationConfig {
+            world: Config {
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::battledome()
+            },
+            agents: 2,
+            record_wire: true,
+            ..Default::default()
+        };
+        let mut backend = SimulatorBackend::new(1, config.clone()).unwrap();
+        let mut uninterrupted = SimulatorBackend::new(1, config).unwrap();
+        for sim in [&mut backend, &mut uninterrupted] {
+            while (0..2).any(|slot| sim.frame_for(slot).unwrap().status != ClientStatus::Playing) {
+                sim.advance_ticks(1).unwrap();
+            }
+            let at = sim.time();
+            for slot in 0..2 {
+                sim.drain_records(slot).unwrap();
+                sim.set_slot_processing_seconds(slot, 0.001).unwrap();
+                sim.send_to(
+                    slot,
+                    Action {
+                        heading: sim.slots[slot].control.heading,
+                        boost: true,
+                    },
+                )
+                .unwrap();
+                if failure == "receipt and departure records" {
+                    sim.slots[slot].connection.downlink.push_back((
+                        at + 0.0005,
+                        encode::frame(0, &[encode::pong()]).unwrap(),
+                    ));
+                }
+            }
+        }
+        let uplink_len = backend.slots[1].connection.uplink.len();
+        let expected_error = match failure {
+            "uplink" => {
+                // Synthetic queue pressure; these entries must not be ingested.
+                backend.slots[1].connection.uplink.resize(
+                    super::connection::MAX_IN_FLIGHT,
+                    (f64::MAX, super::connection::Uplink::Message(vec![0])),
+                );
+                "Uplink queue is full"
+            }
+            _ => {
+                // The combined case fits either the receipts or the two command
+                // records alone, so the preflight must charge them together.
+                backend.slots[1].record_bytes = MAX_RECORD_BYTES
+                    - 2 * (RECORD_OVERHEAD + 1)
+                    + usize::from(failure == "departure records");
+                "Wire record buffer is full; drain records first"
+            }
+        };
+        let snapshot = |sim: &SimulatorBackend| {
+            (
+                sim.time(),
+                serde_json::to_value(&sim.world).unwrap(),
+                format!("{:?}", sim.random),
+                (0..2)
+                    .map(|slot| {
+                        let s = &sim.slots[slot];
+                        (
+                            sim.frame_for(slot).unwrap(),
+                            format!(
+                                "{:?}",
+                                (
+                                    &s.state,
+                                    &s.connection,
+                                    s.outbox,
+                                    s.previous_boost,
+                                    s.control,
+                                    &s.records,
+                                    s.record_bytes,
+                                )
+                            ),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let before = snapshot(&backend);
+        assert_eq!(backend.advance_ticks(1).unwrap_err(), expected_error);
+        assert_eq!(snapshot(&backend), before, "{failure}");
+        for slot in 0..2 {
+            assert!(backend.decision_pending(slot).unwrap());
+        }
+        assert_eq!(
+            backend
+                .send_to(
+                    0,
+                    Action {
+                        heading: 1.,
+                        boost: false,
+                    },
+                )
+                .unwrap_err(),
+            "Slot is still processing its previous decision"
+        );
+        assert_eq!(snapshot(&backend), before);
+
+        backend.drain_records(1).unwrap();
+        if failure == "uplink" {
+            backend.slots[1].connection.uplink.truncate(uplink_len);
+        }
+        for sim in [&mut backend, &mut uninterrupted] {
+            sim.advance_ticks(1).unwrap();
+            for slot in 0..2 {
+                assert!(!sim.decision_pending(slot).unwrap());
+                assert!(sim.slots[slot].control.boost);
+            }
+            sim.set_slot_processing_seconds(0, 0.).unwrap();
+            sim.send_to(
+                0,
+                Action {
+                    heading: sim.slots[0].control.heading,
+                    boost: false,
+                },
+            )
+            .unwrap();
+            sim.advance_ticks(1).unwrap();
+            assert!(!sim.slots[0].control.boost);
+            assert_eq!(sim.slots[0].previous_boost, Some(false));
+        }
+        // Recovery preserves bytes, receipt/departure times and future RNG draws.
+        assert_eq!(snapshot(&backend), snapshot(&uninterrupted), "{failure}");
+        let records = backend.drain_records(0).unwrap();
+        assert!(
+            records
+                .iter()
+                .any(|r| r.event == WireEvent::Send && r.bytes == [254])
+        );
+        assert!(records.windows(2).all(|w| w[0].time <= w[1].time));
+    }
+}
+
+#[test]
 fn pending_native_commands_apply_in_their_arrival_tick() {
     for (processing, uplink) in [(0., 0.), (0.001, 0.), (0.007, 0.), (0.001, 0.007)] {
         let mut backend = SimulatorBackend::new(

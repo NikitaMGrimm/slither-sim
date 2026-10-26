@@ -178,6 +178,16 @@ impl SimulatorBackend {
         // before the tick began added a full tick to both. See section 10 of
         // the scheduler study linked from `MOTION_REPORT_TICKS`.
         let end = (self.tick + 1) as f64 * self.world.config.dt;
+        // A drainable capacity failure must not leave an earlier slot's client
+        // clock ahead of public time. Check every due departure and its earlier
+        // receipts before any client advances into this tick.
+        for slot in &self.slots {
+            if let Some((at, _, processing)) = slot.outbox
+                && at + processing <= end
+            {
+                slot.client_io_room(at + processing)?;
+            }
+        }
         for slot in 0..self.slots.len() {
             if let Some((at, _, processing)) = self.slots[slot].outbox
                 && at + processing <= end
