@@ -16,60 +16,43 @@ use std::f64::consts::TAU;
 const DT: f64 = physics::LOOP_SECONDS;
 
 #[test]
-fn delivery_defaults_and_explicit_overrides_resolve_before_world_presets() {
-    use serde::Deserialize;
+fn delivery_defaults_to_responsive_for_every_world_and_explicit_choices_win() {
+    use DeliveryProfile::{Official, Responsive};
 
     for (json, expected) in [
-        (r#"{}"#, DeliveryProfile::Official),
+        (r#"{}"#, Responsive),
+        (r#"{"world":{"preset":"official"}}"#, Responsive),
+        (r#"{"world":{"preset":"sandbox"}}"#, Responsive),
+        (r#"{"world":{"preset":"battledome"}}"#, Responsive),
         (
-            r#"{"world":{"preset":"official"}}"#,
-            DeliveryProfile::Official,
-        ),
-        (
-            r#"{"world":{"preset":"sandbox"}}"#,
-            DeliveryProfile::Official,
-        ),
-        (
-            r#"{"world":{"preset":"battledome"}}"#,
-            DeliveryProfile::Responsive,
+            r#"{"delivery":"official","world":{"preset":"official"}}"#,
+            Official,
         ),
         (
             r#"{"delivery":"official","world":{"preset":"battledome"}}"#,
-            DeliveryProfile::Official,
+            Official,
         ),
-        (
-            r#"{"delivery":"responsive","world":{"preset":"official"}}"#,
-            DeliveryProfile::Responsive,
-        ),
+        (r#"{"delivery":"responsive"}"#, Responsive),
     ] {
         let config: SimulationConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.delivery, expected);
-        let mut deserializer = serde_json::Deserializer::from_str(json);
-        let direct = SimulationConfig::deserialize(&mut deserializer).unwrap();
-        assert_eq!(direct.delivery, expected);
-        assert_eq!(
-            serde_json::to_value(&direct).unwrap(),
-            serde_json::to_value(&config).unwrap()
-        );
+        assert_eq!(config.delivery, expected, "{json}");
         let host: HostConfig =
             serde_json::from_str(&format!(r#"{{"simulation":{json}}}"#)).unwrap();
-        assert_eq!(host.simulation.delivery, expected);
+        assert_eq!(host.simulation.delivery, expected, "{json}");
+        // Resolved JSON names the profile, so it stays readable if the default moves.
         let resolved = serde_json::to_value(&config).unwrap();
         assert_eq!(
-            resolved.get("delivery").and_then(serde_json::Value::as_str),
-            (expected == DeliveryProfile::Responsive).then_some("responsive")
+            resolved["delivery"],
+            serde_json::to_value(expected).unwrap()
         );
         let roundtrip: SimulationConfig = serde_json::from_value(resolved).unwrap();
-        assert_eq!(roundtrip.delivery, expected);
+        assert_eq!(roundtrip.delivery, expected, "{json}");
     }
     for json in [r#"{"delivery":"fast"}"#, r#"{"delivery":null}"#] {
         assert!(serde_json::from_str::<SimulationConfig>(json).is_err());
     }
-    // Rust world construction carries no preset name: delivery is explicit.
-    assert_eq!(
-        SimulationConfig::default().delivery,
-        DeliveryProfile::Official
-    );
+    assert_eq!(SimulationConfig::default().delivery, Responsive);
+    assert_eq!(HostConfig::default().simulation.delivery, Responsive);
 }
 
 fn config(agents: usize, latency: LatencyConfig) -> SimulationConfig {

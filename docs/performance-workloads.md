@@ -50,7 +50,8 @@ cargo run --release --locked --example perf_baseline -- --list
   `SimulatorBackend` with wire recording and need the `networking` feature. Each
   timed decision includes `reconnect_slot` admission for dead clients plus
   `step_all`. The 500-agent row exercises the target host population.
-  - Battledome uses responsive delivery, as preset-based host configuration does.
+  - Battledome sets responsive delivery and the official row official delivery,
+    so default changes do not move either row.
     It warms for 600 decisions (25.2 virtual seconds), past the synthetic ring
     crash and into ongoing churn, then times 40 decisions. Check
     `population.depleted` and refusals for living counts.
