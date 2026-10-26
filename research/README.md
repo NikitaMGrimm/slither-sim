@@ -11,6 +11,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 | Performance | [Hosting resource samples](performance/2026-10-26-hosting-sizes/REPORT.md) | Three short loopback socket holds on one desktop core; CPU/RSS sizing only, with depleted Battledome admission and no VPS capacity claim. |
 | Bots | [A4 adoption](bots/2026-10-26-a4-adoption/REPORT.md) | A4-mean becomes the public default, with A1 selectable; selected private held-out gameplay and cost results, maintainer mean-cost gate and retained tail-limit failures. |
 | Bots | [Frozen Forager port](bots/2026-10-26-forager-port/REPORT.md) | Immutable A1 and test-only A4-mean parameters, selected decision conformance; runtime defaults unchanged. |
+| Battledome | [Crowded spawn capacity](battledome/2026-10-26-spawn-capacity/REPORT.md) | Fixed strict, fixed relaxation and proportional arena growth; loopback waits, early safety and admission CPU at 40/64/80 seats. |
 | Battledome | [Safe spawn band](battledome/2026-10-26-safe-spawn/REPORT.md) | Local 120-second sensitivity grid and retained initial attempt; cached admission, head-path/departure protection and socket-first waiting. |
 | Battledome | [Food balance](battledome/2026-10-25-food-balance/REPORT.md) | Offline custom-mode before/after runs at 32 and 64 slots; floor-aware death food and total-food refill. |
 | Fidelity | [Official baseline selection](fidelity/2026-10-23-official-defaults/REPORT.md) | Configuration choices and explicit model assumptions; no new measurements. |

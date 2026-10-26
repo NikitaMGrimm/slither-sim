@@ -1,4 +1,4 @@
-//! Immutable geometric rules, separate from limited observations and entity data.
+//! Effective geometric rules, separate from limited observations and entity data.
 use crate::{BoundaryMode, ErrorKind, SimError, Simulator};
 use serde::Serialize;
 
@@ -30,7 +30,7 @@ impl Simulator {
             free_boost_at_floor: config.min_score.is_some(),
             kill_score_seconds: config.kill_score_seconds,
             min_score: config.min_score,
-            pit_radius: config.pit.as_ref().map(|pit| pit.radius),
+            pit_radius: self.pit_radius(),
         }
     }
 

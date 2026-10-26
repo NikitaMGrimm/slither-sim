@@ -8,7 +8,7 @@ use std::{
 };
 
 pub const FORMAT: &str = "slither-sim-checkpoint-v2";
-pub const RULES_REVISION: &str = "slither-sim-rules-v2";
+pub const RULES_REVISION: &str = "slither-sim-rules-v3";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EventRecording {
@@ -726,20 +726,31 @@ impl State {
             Constraint::Ordering,
             "state.radiusUpdateIndex",
         )?;
+        // Host admission can grow a circular floor arena between ticks,
+        // including before tick one. The live radius is the saved allowance;
+        // no queued-request/controller state belongs in the core checkpoint.
+        let admission_growth =
+            config.dynamic_radius && config.spawn_radius.is_some() && config.min_score.is_some();
+        let admission_limit = (config.seat_radius(self.slots.len())
+            * if self.slots.len() > 32 { 2. } else { 1. })
+        .min(MAGNITUDE);
+        let grew_after = |radius: f64| {
+            admission_growth && self.radius > radius && self.radius <= radius.max(admission_limit)
+        };
         if let Some(update) = cursor.checked_sub(1).map(|i| &config.radius_updates[i]) {
             let this_tick = self.time == 0. || update.time > (self.time - config.dt).max(0.) + 1e-9;
             if !config.dynamic_radius || this_tick {
                 require(
-                    self.radius == update.radius,
+                    self.radius == update.radius || grew_after(update.radius),
                     Constraint::InconsistentState,
                     "state.radius",
                 )?;
             }
         } else if !config.dynamic_radius || self.time == 0. {
-            // Only the controller and recorded updates move the live radius,
-            // and the controller first runs in a step.
+            // Before tick one, only circular host admission may enlarge an
+            // arena without a recorded sample.
             require(
-                self.radius == config.radius,
+                self.radius == config.radius || grew_after(config.radius),
                 Constraint::InconsistentState,
                 "state.radius",
             )?;

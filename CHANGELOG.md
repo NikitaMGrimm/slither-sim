@@ -18,6 +18,19 @@
   500/80-client socket hosts, retain ten state traces, and run both runtimes with
   the head workload configuration. Manual calibration retains CPU/wall noise.
 
+### Changed
+
+- Battledome keeps strict spawn safety and grows its wall, pit and spawn band
+  above 32 seats, with extra space for requests waiting two/four seconds.
+  Further expansion leaves recent births their three-second departure window.
+  Admission still runs at most one bounded search per tick, sockets first.
+  The live-radius minimap keeps the pit's pixel size and player-marker alignment;
+  decorative food follows the live pit edge. The 16–32-seat geometry, floor,
+  scoring and one-way pit rule stay unchanged; growth passing over an outside
+  snake does not count as pit entry. Checkpoint rules become
+  `slither-sim-rules-v3` (v1/v2 rejected; format stays v2); no saved fields are
+  added ([configuration](docs/configuration.md#battledome)).
+
 ### Performance
 
 - Host broadcasts test prey against shared bounding boxes before the exact

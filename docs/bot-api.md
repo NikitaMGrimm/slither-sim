@@ -33,7 +33,7 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v2`), `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v3`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
@@ -150,7 +150,7 @@ indexes those rows.
 | `living` | Surviving snakes. |
 | `deaths` | Death events from this request: `time`, `victim` and `killer` slots, `reason` and dropped `food`. |
 | `radius`, `vision` | Live arena radius around the origin, and the vision radius. |
-| `rules` | One immutable world-rules object, shared by every slot in this frame; see below. |
+| `rules` | One world-rules object, shared by every slot in this frame; see below. |
 | `snakes` | One row per snake that some living slot sees, including each slot's own. |
 | `food`, `prey` | One row per item that some living slot sees. |
 | `views` | One entry per slot: `null` for dead slots, otherwise `self` (its own `snakes` row) and the `snakes`, `food` and `prey` rows it sees. |
@@ -164,9 +164,10 @@ Every frame includes `rules`, even with no living slots:
 `boundaryMode` is `sliding` or `hard`; the optional numbers are null when absent.
 `freeBoostAtFloor` is true when the configured permanent `minScore` floor makes
 boosting free at that floor. Overrides are reflected directly; a preset name
-is not a rules identity. Radius remains separate runtime state. These rules are
-immutable until the world is replaced. Portable received-state frames contain
-only received information and do not invent simulated pit/floor metadata.
+is not a rules identity. Radius remains separate runtime state;
+`rules.pitRadius` is the live pit radius and follows the wall in seat-following
+circular floor worlds. The other mode settings remain fixed until the world is replaced. Portable received-state
+frames contain only received information and do not invent simulated pit/floor metadata.
 
 Columns are arrays of equal length; row `r` is element `r` of each.
 
@@ -384,15 +385,17 @@ the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
 The envelope is `slither-sim-checkpoint-v2`, with
-`rulesRevision: "slither-sim-rules-v2"`, producer provenance, today's flat Config
+`rulesRevision: "slither-sim-rules-v3"`, producer provenance, today's flat Config
 and ordered slot/entity records. `config.radius` is the initial radius and
 `state.radius` is the live radius; loading preserves both. Config must pass the
 same validation as a new world's, and the live radius must equal `config.radius`
-until the dynamic controller or a recorded update could have moved it. Version 1 is rejected
-because it stored the live radius in Config and cannot recover the initial value.
-Rules v1 is rejected: the seat-following controller and live-area ecology change
-tick behavior. No controller state is added; occupancy uses living state and
-death timestamps, and refill retains fractional credit in initial-area seconds.
+until the dynamic controller, circular host admission or a recorded update
+could have moved it. Circular host admission may grow it before the first tick.
+Version 1 is rejected because it stored the live radius in Config and cannot recover the initial value.
+Rules v1/v2 are rejected: seat-following and live circular pit/spawn scaling
+change tick behavior. The host queue clock is not core checkpoint state. No
+controller state is added; occupancy uses living state and death timestamps,
+and refill retains fractional credit in initial-area seconds.
 The checkpoint includes RNG, timers and terminal causes;
 debug `snapshot` replies and old Simulator JSON are rejected. Unknown fields and
 missing companion records reject, as do radii, headings and one tick of snake

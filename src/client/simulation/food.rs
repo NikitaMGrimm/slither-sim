@@ -114,7 +114,9 @@ impl FoodIndex {
     }
 
     pub(super) fn add(&mut self, food: &Food, shown: bool, color: u8) {
-        self.count += 1;
+        // A pickup before the first rebuild can temporarily wrap the count;
+        // match remove() until the authoritative listing resynchronizes it.
+        self.count = self.count.wrapping_add(1);
         let Some((sector, offset)) = Self::sector(food) else {
             // Off the wire grid; listings never include it.
             return;
@@ -212,6 +214,16 @@ impl SimulatorBackend {
     /// shows its first shown pellet in world order. Only new and changed
     /// listings are rebuilt, from the index.
     pub(super) fn sync_food_sectors(&mut self) -> Result<(), String> {
+        // Rebuild only when the live pit moves. Normal sector diffs remove old
+        // markers and add new ones, including sectors with no physical food.
+        let pit = self.world.pit_radius();
+        let pit_changed = self
+            .pit_markers
+            .as_ref()
+            .is_some_and(|m| Some(m.radius()) != pit);
+        if pit_changed {
+            self.pit_markers = pit.map(super::markers::PitMarkers::new).transpose()?;
+        }
         // Taken so an early error drops a partly filled table.
         let mut buckets = std::mem::take(&mut self.food_buckets);
         buckets.resize(1 << 16, u32::MAX);
@@ -244,15 +256,22 @@ impl SimulatorBackend {
                 let run = self.food_index.listing(index);
                 if listing.as_ref().is_none_or(|old| old.0 != run) {
                     *listing = Some(Arc::new(SectorFood(run)));
-                    if let Some(markers) = &self.pit_markers {
-                        let physical = listing.as_ref().unwrap();
-                        self.decorated_food_sectors[usize::from(index)] = Some(
-                            markers
-                                .overlay(index, &physical.0)
-                                .map_or_else(|| physical.clone(), |run| Arc::new(SectorFood(run))),
-                        );
-                    }
                 }
+            }
+            if (pit_changed
+                || self
+                    .decorated_food_sectors
+                    .get(usize::from(index))
+                    .is_none_or(Option::is_none)
+                || self.food_index.dirty.contains(&index))
+                && let Some(markers) = &self.pit_markers
+            {
+                let physical = listing.as_ref().unwrap();
+                self.decorated_food_sectors[usize::from(index)] = Some(
+                    markers
+                        .overlay(index, &physical.0)
+                        .map_or_else(|| physical.clone(), |run| Arc::new(SectorFood(run))),
+                );
             }
         }
         // Unlisted sectors are built afresh when a connection subscribes.
@@ -337,16 +356,23 @@ fn sector_changes(
     eaters: &BTreeMap<(u64, u64), u16>,
 ) {
     let key = |offset: [u8; 2]| [sector[0], sector[1], offset[0], offset[1]];
+    // Decorations have no physical lifetime. Sub-cell pit motion is invisible
+    // on the wire; real pellets still distinguish exact pickup positions.
+    let unchanged = |before: Option<&KnownFood>, after: &KnownFood| {
+        before.is_some_and(|old| {
+            old == after || (old.decorative && after.decorative && old.style == after.style)
+        })
+    };
     for (offset, food) in &previous.0 {
         let eater = (!food.decorative)
             .then(|| eaters.get(&food_identity(food.point)).copied())
             .flatten();
-        if current.get(offset) != Some(food) || eater.is_some() {
+        if !unchanged(current.get(offset), food) || eater.is_some() {
             packets.push(encode::food_remove(key(*offset), eater));
         }
     }
     for (offset, food) in &current.0 {
-        if previous.get(offset) != Some(food)
+        if !unchanged(previous.get(offset), food)
             || previous.get(offset).is_some_and(|old| {
                 !old.decorative && eaters.contains_key(&food_identity(old.point))
             })
@@ -378,6 +404,106 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shrinking_markers_only_send_changes_to_their_wire_cells() {
+        let old = super::super::markers::PitMarkers::new(1784.).unwrap();
+        let next_radius = 1784. * ((3584. - 23.4375 * 0.007) / 3584.);
+        let next = super::super::markers::PitMarkers::new(next_radius).unwrap();
+        let mut unchanged = 0;
+        let mut moved = 0;
+        for sector in 0..=u16::MAX {
+            let previous = SectorFood(old.overlay(sector, &[]).unwrap_or_default());
+            let current = SectorFood(next.overlay(sector, &[]).unwrap_or_default());
+            if previous.0.is_empty() && current.0.is_empty() {
+                continue;
+            }
+            let sector = sector.to_be_bytes();
+            let mut packets = Vec::new();
+            sector_changes(&mut packets, sector, &previous, &current, &BTreeMap::new());
+            for (offset, food) in &previous.0 {
+                let key = [sector[0], sector[1], offset[0], offset[1]];
+                if let Some(now) = current.get(offset) {
+                    assert_eq!(food.style, now.style);
+                    if food.point != now.point {
+                        unchanged += 1;
+                    }
+                    assert!(
+                        !packets.iter().any(|p| p[1..5] == key),
+                        "unchanged encoded decoration was resent"
+                    );
+                } else {
+                    moved += 1;
+                    assert!(packets.contains(&encode::food_remove(key, None)));
+                }
+            }
+            for (offset, food) in &current.0 {
+                if previous.get(offset).is_none() {
+                    let key = [sector[0], sector[1], offset[0], offset[1]];
+                    assert!(packets.contains(&encode::food_add(key, food.style)));
+                }
+            }
+        }
+        assert!(unchanged > 0 && moved > 0);
+    }
+
+    #[test]
+    fn same_cell_physical_food_replacements_keep_their_lifetime_identity() {
+        let old = KnownFood {
+            point: Point { x: 0., y: 0. },
+            style: encode::FoodStyle {
+                color: 8,
+                size: 31,
+                snake_food: false,
+            },
+            decorative: false,
+        };
+        let next = KnownFood {
+            point: Point { x: 0.1, y: 0. },
+            ..old
+        };
+        let key = encode::food_key(old.point).unwrap();
+        assert_eq!(encode::food_key(next.point).unwrap(), key);
+        let previous = SectorFood(vec![([key[2], key[3]], old)]);
+        let current = SectorFood(vec![([key[2], key[3]], next)]);
+        let mut packets = Vec::new();
+        sector_changes(
+            &mut packets,
+            [key[0], key[1]],
+            &previous,
+            &current,
+            &BTreeMap::new(),
+        );
+        assert_eq!(
+            packets,
+            [
+                encode::food_remove(key, None),
+                encode::food_add(key, next.style)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_birth_after_an_unindexed_startup_pickup_waits_for_rebuild() {
+        let food = Food {
+            x: 0.,
+            y: 0.,
+            value: 1.,
+            size: Some(1.),
+            origin: None,
+        };
+        let mut index = FoodIndex::default();
+        index.remove(&food);
+        assert!(index.stale);
+        index.add(&food, false, 0);
+        assert_eq!(index.count, 0);
+        assert!(index.stale);
+        let mut presentation = FoodPresentation::new(7, 1);
+        presentation.sync(std::slice::from_ref(&food)).unwrap();
+        index.rebuild(std::slice::from_ref(&food), &presentation);
+        assert_eq!(index.count, 1);
+        assert!(!index.stale);
+    }
 
     #[test]
     fn retained_subscriptions_keep_storage_and_update_only_changed_handles() {

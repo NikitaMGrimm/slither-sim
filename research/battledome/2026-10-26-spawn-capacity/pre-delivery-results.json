@@ -1,0 +1,2388 @@
+{
+  "dataOrigin": "local-simulator",
+  "base": "901b02e2e71144c6ffd35291ddb6603b2c6a1ca7",
+  "runs": [
+    {
+      "name": "protected-control-40-29",
+      "seats": 40,
+      "seed": 29,
+      "policy": "control",
+      "ticks": 8583,
+      "deferred": 0,
+      "busyMsPerTick": 2.1373347430968193,
+      "admissionCpuMsPerTick": 1.6456949784457648,
+      "admissionElapsedMsPerTick": 1.9804797040661775,
+      "searches": 4339,
+      "searchElapsedMs": [
+        3.8549,
+        4.9692,
+        16.0325
+      ],
+      "births": 94,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 87,
+      "followupCensored": {
+        "disconnect": 3,
+        "shutdown": 4
+      },
+      "allDeathCauses": {
+        "pit": 24
+      },
+      "pending": 7,
+      "pendingAges": [
+        0.3010000000055797,
+        0.9940000000053715,
+        3.059000000004751,
+        4.088000000004442,
+        6.706000000003655,
+        7.021000000003561,
+        9.009000000002963
+      ],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 30,
+      "queueWait": [
+        1.848,
+        31.787,
+        37.688
+      ],
+      "botWait": [
+        13.804,
+        33.614,
+        37.688
+      ],
+      "socketWait": [
+        0.6591973,
+        4.0668605,
+        4.9879111
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            5.054,
+            33.635,
+            37.688
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.77,
+            4.0600000000000005,
+            4.984
+          ],
+          "bot": [
+            14.392,
+            24.115000000000002,
+            25.417
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-control-40-47",
+      "seats": 40,
+      "seed": 47,
+      "policy": "control",
+      "ticks": 8584,
+      "deferred": 0,
+      "busyMsPerTick": 2.110944256756757,
+      "admissionCpuMsPerTick": 1.5326479496738117,
+      "admissionElapsedMsPerTick": 1.959833539142591,
+      "searches": 4341,
+      "searchElapsedMs": [
+        3.8632,
+        4.8607,
+        14.3504
+      ],
+      "births": 96,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 87,
+      "followupCensored": {
+        "shutdown": 5,
+        "disconnect": 4
+      },
+      "allDeathCauses": {
+        "pit": 29
+      },
+      "pending": 11,
+      "pendingAges": [
+        0.41300000000554604,
+        3.192000000004711,
+        3.542000000004606,
+        4.214000000004404,
+        4.417000000004343,
+        7.154000000003521,
+        8.904000000002995,
+        8.939000000002984,
+        9.324000000002869,
+        12.502000000001914,
+        12.831000000001815
+      ],
+      "socketPending": 1,
+      "socketErrors": [],
+      "lateLivingMean": 28.466666666666665,
+      "queueWait": [
+        2.205,
+        28.28,
+        38.451
+      ],
+      "botWait": [
+        13.475,
+        29.022000000000002,
+        38.451
+      ],
+      "socketWait": [
+        0.7024081,
+        3.1260337,
+        4.4670002
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            11.578,
+            31.745,
+            38.451
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.742,
+            3.122,
+            4.4590000000000005
+          ],
+          "bot": [
+            14.021,
+            20.3,
+            26.334
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-control-40-7",
+      "seats": 40,
+      "seed": 7,
+      "policy": "control",
+      "ticks": 8581,
+      "deferred": 0,
+      "busyMsPerTick": 2.309710674746533,
+      "admissionCpuMsPerTick": 1.6424367789301946,
+      "admissionElapsedMsPerTick": 2.1248896515557627,
+      "searches": 4341,
+      "searchElapsedMs": [
+        3.9306,
+        5.9684,
+        61.1196
+      ],
+      "births": 101,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 94,
+      "followupCensored": {
+        "shutdown": 5,
+        "disconnect": 2
+      },
+      "allDeathCauses": {
+        "pit": 30
+      },
+      "pending": 7,
+      "pendingAges": [
+        1.967000000005072,
+        3.381000000004647,
+        3.654000000004565,
+        4.473000000004319,
+        5.215000000004096,
+        6.510000000003707,
+        7.175000000003507
+      ],
+      "socketPending": 1,
+      "socketErrors": [],
+      "lateLivingMean": 30.233333333333334,
+      "queueWait": [
+        2.758,
+        27.342000000000002,
+        33.684
+      ],
+      "botWait": [
+        11.368,
+        31.388,
+        33.684
+      ],
+      "socketWait": [
+        0.721841,
+        2.3687407,
+        3.0498808
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            10.864,
+            31.395,
+            33.684
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.847,
+            2.359,
+            3.0380000000000003
+          ],
+          "bot": [
+            12.824,
+            22.295,
+            23.415
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-control-64-29",
+      "seats": 64,
+      "seed": 29,
+      "policy": "control",
+      "ticks": 8574,
+      "deferred": 0,
+      "busyMsPerTick": 2.2773043270352225,
+      "admissionCpuMsPerTick": 1.7494751574527643,
+      "admissionElapsedMsPerTick": 2.104340401212969,
+      "searches": 4333,
+      "searchElapsedMs": [
+        4.0759,
+        5.2947,
+        19.603
+      ],
+      "births": 92,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 87,
+      "followupCensored": {
+        "disconnect": 2,
+        "shutdown": 3
+      },
+      "allDeathCauses": {
+        "pit": 23
+      },
+      "pending": 31,
+      "pendingAges": [
+        0.11900000000561306,
+        3.0100000000047444,
+        4.592000000004269,
+        5.824000000003899,
+        8.540000000003083,
+        9.31700000000285,
+        11.249000000002269,
+        12.999000000001743,
+        14.364000000001333,
+        14.700000000001232,
+        15.820000000000896,
+        16.891000000000574,
+        17.122000000000504,
+        17.549000000000376,
+        20.950999999999354,
+        21.99399999999904,
+        24.835999999998187,
+        27.579999999997362,
+        29.154999999997464,
+        31.387999999997927,
+        32.65499999999819,
+        35.006999999998676,
+        36.539999999999,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018
+      ],
+      "socketPending": 1,
+      "socketErrors": [],
+      "lateLivingMean": 32.43333333333333,
+      "queueWait": [
+        2.7720000000000002,
+        52.983000000000004,
+        60.011
+      ],
+      "botWait": [
+        22.043,
+        55.734,
+        60.011
+      ],
+      "socketWait": [
+        0.5478409,
+        4.3380961,
+        6.1110012
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            22.043,
+            55.734,
+            60.011
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.595,
+            4.333,
+            6.097
+          ],
+          "bot": null
+        }
+      }
+    },
+    {
+      "name": "protected-control-64-47",
+      "seats": 64,
+      "seed": 47,
+      "policy": "control",
+      "ticks": 8582,
+      "deferred": 0,
+      "busyMsPerTick": 2.080644686553251,
+      "admissionCpuMsPerTick": 1.4274061990212072,
+      "admissionElapsedMsPerTick": 1.932970997436495,
+      "searches": 4337,
+      "searchElapsedMs": [
+        3.6947,
+        5.2576,
+        15.119
+      ],
+      "births": 90,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 83,
+      "followupCensored": {
+        "disconnect": 1,
+        "shutdown": 6
+      },
+      "allDeathCauses": {
+        "pit": 21
+      },
+      "pending": 31,
+      "pendingAges": [
+        1.0710000000053412,
+        1.148000000005318,
+        1.7220000000051456,
+        2.163000000005013,
+        6.03400000000385,
+        6.293000000003772,
+        12.334000000001957,
+        13.573000000001585,
+        14.02100000000145,
+        14.343000000001354,
+        16.940000000000573,
+        17.81500000000031,
+        18.830000000000005,
+        18.892999999999986,
+        20.88099999999939,
+        21.01399999999935,
+        21.790999999999116,
+        22.67999999999885,
+        29.742999999997572,
+        30.288999999997685,
+        38.96199999999948,
+        60.074,
+        60.074,
+        60.074,
+        60.074,
+        60.074,
+        60.074,
+        60.074,
+        60.074,
+        60.074,
+        60.074
+      ],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 29.566666666666666,
+      "queueWait": [
+        1.848,
+        58.219,
+        60.025
+      ],
+      "botWait": [
+        21.511,
+        60.011,
+        60.025
+      ],
+      "socketWait": [
+        0.9236916,
+        2.7449661,
+        4.1360337
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            21.511,
+            60.011,
+            60.025
+          ]
+        },
+        "respawn": {
+          "socket": [
+            1.0150000000000001,
+            2.737,
+            4.13
+          ],
+          "bot": null
+        }
+      }
+    },
+    {
+      "name": "protected-control-64-7",
+      "seats": 64,
+      "seed": 7,
+      "policy": "control",
+      "ticks": 8572,
+      "deferred": 0,
+      "busyMsPerTick": 2.15975947270182,
+      "admissionCpuMsPerTick": 1.553021465235651,
+      "admissionElapsedMsPerTick": 2.0064050163322444,
+      "searches": 4334,
+      "searchElapsedMs": [
+        3.8948,
+        5.0252,
+        19.4778
+      ],
+      "births": 95,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 89,
+      "followupCensored": {
+        "shutdown": 6
+      },
+      "allDeathCauses": {
+        "pit": 29
+      },
+      "pending": 36,
+      "pendingAges": [
+        0.028000000005633296,
+        0.5320000000054819,
+        0.7840000000054062,
+        4.6970000000042305,
+        4.73200000000422,
+        6.8670000000035785,
+        9.59000000000276,
+        11.179000000002283,
+        11.207000000002274,
+        11.69000000000213,
+        12.271000000001955,
+        12.376000000001923,
+        14.413000000001311,
+        14.74900000000121,
+        15.204000000001074,
+        16.47800000000069,
+        16.527000000000676,
+        16.793000000000596,
+        17.01000000000053,
+        17.28300000000045,
+        17.388000000000417,
+        18.662000000000035,
+        19.94299999999965,
+        25.808999999997887,
+        30.63199999999777,
+        36.588999999999004,
+        37.48499999999919,
+        41.45400000000001,
+        45.41600000000047,
+        60.004,
+        60.004,
+        60.004,
+        60.004,
+        60.004,
+        60.004,
+        60.004
+      ],
+      "socketPending": 0,
+      "socketErrors": [
+        "WebSocket protocol error: Connection reset without closing handshake"
+      ],
+      "lateLivingMean": 28.9,
+      "queueWait": [
+        2.184,
+        53.13,
+        58.415
+      ],
+      "botWait": [
+        27.272000000000002,
+        54.761,
+        58.415
+      ],
+      "socketWait": [
+        0.5885616,
+        2.5300329,
+        3.6013824
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            27.272000000000002,
+            54.761,
+            58.415
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.679,
+            2.52,
+            3.591
+          ],
+          "bot": null
+        }
+      }
+    },
+    {
+      "name": "protected-control-80-29",
+      "seats": 80,
+      "seed": 29,
+      "policy": "control",
+      "ticks": 8584,
+      "deferred": 0,
+      "busyMsPerTick": 2.1862326071761418,
+      "admissionCpuMsPerTick": 1.6382222739981362,
+      "admissionElapsedMsPerTick": 2.0275755009319663,
+      "searches": 4343,
+      "searchElapsedMs": [
+        3.9208,
+        5.4823,
+        19.2695
+      ],
+      "births": 100,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 92,
+      "followupCensored": {
+        "disconnect": 1,
+        "shutdown": 7
+      },
+      "allDeathCauses": {
+        "pit": 27
+      },
+      "pending": 44,
+      "pendingAges": [
+        1.6870000000051633,
+        2.051000000005054,
+        2.59700000000489,
+        4.438000000004337,
+        6.783000000003632,
+        7.959000000003279,
+        8.218000000003201,
+        9.044000000002953,
+        9.135000000002925,
+        12.25000000000199,
+        13.664000000001565,
+        15.00800000000116,
+        15.253000000001087,
+        15.484000000001018,
+        15.97400000000087,
+        16.51300000000071,
+        19.389999999999844,
+        20.83199999999941,
+        23.512999999998605,
+        23.69499999999855,
+        31.072999999997847,
+        32.84399999999822,
+        32.85799999999821,
+        36.756999999999024,
+        42.50400000000022,
+        43.72200000000046,
+        45.17100000000049,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088,
+        60.088
+      ],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 31.033333333333335,
+      "queueWait": [
+        2.751,
+        58.954,
+        60.025
+      ],
+      "botWait": [
+        30.275000000000002,
+        60.004,
+        60.025
+      ],
+      "socketWait": [
+        0.5720311,
+        2.7584337,
+        4.2265729
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            30.275000000000002,
+            60.004,
+            60.025
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.644,
+            2.751,
+            4.214
+          ],
+          "bot": null
+        }
+      }
+    },
+    {
+      "name": "protected-control-80-7",
+      "seats": 80,
+      "seed": 7,
+      "policy": "control",
+      "ticks": 8574,
+      "deferred": 0,
+      "busyMsPerTick": 2.3038078843013765,
+      "admissionCpuMsPerTick": 1.7895672964777234,
+      "admissionElapsedMsPerTick": 2.126994273384651,
+      "searches": 4336,
+      "searchElapsedMs": [
+        4.0466,
+        5.6189,
+        22.0602
+      ],
+      "births": 98,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 92,
+      "followupCensored": {
+        "shutdown": 4,
+        "disconnect": 2
+      },
+      "allDeathCauses": {
+        "pit": 27
+      },
+      "pending": 47,
+      "pendingAges": [
+        1.6590000000051504,
+        3.8710000000044857,
+        3.983000000004452,
+        5.208000000004084,
+        9.38000000000283,
+        10.199000000002584,
+        11.21400000000228,
+        12.992000000001745,
+        13.104000000001712,
+        13.335000000001642,
+        13.685000000001537,
+        15.533000000000982,
+        15.862000000000883,
+        16.317000000000746,
+        17.43700000000041,
+        17.983000000000246,
+        25.108999999998105,
+        26.263999999997758,
+        30.323999999997707,
+        32.227999999998104,
+        35.363999999998754,
+        36.154999999998914,
+        38.07299999999931,
+        39.33299999999957,
+        41.46100000000001,
+        45.682000000000464,
+        48.83200000000032,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018,
+        60.018
+      ],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 29.766666666666666,
+      "queueWait": [
+        2.072,
+        54.656,
+        60.011
+      ],
+      "botWait": [
+        23.275000000000002,
+        57.554,
+        60.011
+      ],
+      "socketWait": [
+        0.5601662,
+        2.2065123,
+        3.042532
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            23.275000000000002,
+            57.554,
+            60.011
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.588,
+            2.198,
+            3.031
+          ],
+          "bot": null
+        }
+      }
+    },
+    {
+      "name": "protected-growth-40-29",
+      "seats": 40,
+      "seed": 29,
+      "policy": "growth",
+      "ticks": 8585,
+      "deferred": 0,
+      "busyMsPerTick": 0.7330440302853815,
+      "admissionCpuMsPerTick": 0.06552125800815375,
+      "admissionElapsedMsPerTick": 0.06671721607454863,
+      "searches": 217,
+      "searchElapsedMs": [
+        3.9586,
+        4.6293,
+        5.5229
+      ],
+      "births": 87,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 87,
+      "followupCensored": {},
+      "allDeathCauses": {
+        "pit": 3
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 39.86666666666667,
+      "queueWait": [
+        0.007,
+        4.9350000000000005,
+        4.963
+      ],
+      "botWait": [
+        0.154,
+        4.949,
+        4.963
+      ],
+      "socketWait": [
+        0.0061299,
+        0.0149087,
+        0.0304871
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.28,
+            4.949,
+            4.963
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.007,
+            0.007
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-40-47",
+      "seats": 40,
+      "seed": 47,
+      "policy": "growth",
+      "ticks": 8583,
+      "deferred": 0,
+      "busyMsPerTick": 0.7854520563905395,
+      "admissionCpuMsPerTick": 0.06007514854945823,
+      "admissionElapsedMsPerTick": 0.06581563555866247,
+      "searches": 217,
+      "searchElapsedMs": [
+        3.8801,
+        4.3842,
+        5.1921
+      ],
+      "births": 87,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 86,
+      "followupCensored": {
+        "shutdown": 1
+      },
+      "allDeathCauses": {
+        "pit": 3
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 39.93333333333333,
+      "queueWait": [
+        0.007,
+        4.417,
+        4.445
+      ],
+      "botWait": [
+        0.56,
+        4.431,
+        4.445
+      ],
+      "socketWait": [
+        0.0063412,
+        0.0187997,
+        0.0291242
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.98,
+            4.431,
+            4.445
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.007,
+            0.014
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-40-7",
+      "seats": 40,
+      "seed": 7,
+      "policy": "growth",
+      "ticks": 8585,
+      "deferred": 0,
+      "busyMsPerTick": 0.7870021665695981,
+      "admissionCpuMsPerTick": 0.05642108328479907,
+      "admissionElapsedMsPerTick": 0.0680838322655795,
+      "searches": 219,
+      "searchElapsedMs": [
+        3.8127,
+        5.464,
+        5.8359
+      ],
+      "births": 89,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 88,
+      "followupCensored": {
+        "shutdown": 1
+      },
+      "allDeathCauses": {
+        "pit": 5
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 39.9,
+      "queueWait": [
+        0.007,
+        4.739,
+        4.767
+      ],
+      "botWait": [
+        0.189,
+        4.753,
+        4.767
+      ],
+      "socketWait": [
+        0.007691,
+        0.0158318,
+        0.0288524
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            1.246,
+            4.753,
+            4.767
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.007,
+            0.007
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-64-29",
+      "seats": 64,
+      "seed": 29,
+      "policy": "growth",
+      "ticks": 8581,
+      "deferred": 0,
+      "busyMsPerTick": 0.2959465446917609,
+      "admissionCpuMsPerTick": 0.052805617060948606,
+      "admissionElapsedMsPerTick": 0.06389474420230742,
+      "searches": 216,
+      "searchElapsedMs": [
+        3.4814,
+        5.0917,
+        5.945
+      ],
+      "births": 110,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 109,
+      "followupCensored": {
+        "shutdown": 1
+      },
+      "allDeathCauses": {
+        "pit": 2
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 63.93333333333333,
+      "queueWait": [
+        0.056,
+        1.288,
+        1.925
+      ],
+      "botWait": [
+        0.224,
+        1.442,
+        1.925
+      ],
+      "socketWait": [
+        0.0052283,
+        0.0162538,
+        0.0278529
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.23800000000000002,
+            1.442,
+            1.925
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.007,
+            0.007
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-64-47",
+      "seats": 64,
+      "seed": 47,
+      "policy": "growth",
+      "ticks": 8581,
+      "deferred": 0,
+      "busyMsPerTick": 0.2970094977275376,
+      "admissionCpuMsPerTick": 0.04734296702016082,
+      "admissionElapsedMsPerTick": 0.06043874839762266,
+      "searches": 226,
+      "searchElapsedMs": [
+        1.4822,
+        4.7012,
+        5.2394
+      ],
+      "births": 122,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 120,
+      "followupCensored": {
+        "shutdown": 2
+      },
+      "allDeathCauses": {
+        "pit": 14
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [
+        "WebSocket protocol error: Connection reset without closing handshake",
+        "WebSocket protocol error: Connection reset without closing handshake"
+      ],
+      "lateLivingMean": 63.93333333333333,
+      "queueWait": [
+        0.014,
+        1.169,
+        1.897
+      ],
+      "botWait": [
+        0.182,
+        1.575,
+        1.897
+      ],
+      "socketWait": [
+        0.0056982,
+        0.0189359,
+        0.0283937
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.23800000000000002,
+            1.722,
+            1.897
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.007,
+            0.014
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.007
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-64-7",
+      "seats": 64,
+      "seed": 7,
+      "policy": "growth",
+      "ticks": 8582,
+      "deferred": 0,
+      "busyMsPerTick": 0.30676485667676534,
+      "admissionCpuMsPerTick": 0.04733745047774412,
+      "admissionElapsedMsPerTick": 0.06475002330459101,
+      "searches": 228,
+      "searchElapsedMs": [
+        3.4657,
+        4.9173,
+        7.3588
+      ],
+      "births": 118,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 117,
+      "followupCensored": {
+        "shutdown": 1
+      },
+      "allDeathCauses": {
+        "pit": 10
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 63.93333333333333,
+      "queueWait": [
+        0.028,
+        1.113,
+        1.981
+      ],
+      "botWait": [
+        0.196,
+        1.372,
+        1.981
+      ],
+      "socketWait": [
+        0.0055013,
+        0.0163693,
+        0.0289143
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.23800000000000002,
+            1.372,
+            1.981
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.007,
+            0.007
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-80-29",
+      "seats": 80,
+      "seed": 29,
+      "policy": "growth",
+      "ticks": 8582,
+      "deferred": 0,
+      "busyMsPerTick": 0.29086440223724075,
+      "admissionCpuMsPerTick": 0.0018206711722209275,
+      "admissionElapsedMsPerTick": 0.005056164064320671,
+      "searches": 127,
+      "searchElapsedMs": [
+        0.2025,
+        0.7492,
+        5.1579
+      ],
+      "births": 126,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 126,
+      "followupCensored": {},
+      "allDeathCauses": {
+        "pit": 2
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [],
+      "lateLivingMean": 79.86666666666666,
+      "queueWait": [
+        0.112,
+        0.511,
+        0.5670000000000001
+      ],
+      "botWait": [
+        0.28,
+        0.525,
+        0.5670000000000001
+      ],
+      "socketWait": [
+        0.0056474,
+        0.0161594,
+        0.0291749
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.294,
+            0.525,
+            0.5670000000000001
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.0,
+            0.007
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "protected-growth-80-7",
+      "seats": 80,
+      "seed": 7,
+      "policy": "growth",
+      "ticks": 8577,
+      "deferred": 0,
+      "busyMsPerTick": 0.5998835023901132,
+      "admissionCpuMsPerTick": 0.005465197621545995,
+      "admissionElapsedMsPerTick": 0.008575166142007694,
+      "searches": 129,
+      "searchElapsedMs": [
+        0.3371,
+        1.8143,
+        7.4498
+      ],
+      "births": 128,
+      "strictIntrusions": 0,
+      "relaxedBirths": 0,
+      "earlyDeaths": {},
+      "qualified3s": 126,
+      "followupCensored": {
+        "shutdown": 2
+      },
+      "allDeathCauses": {
+        "pit": 4
+      },
+      "pending": 0,
+      "pendingAges": [],
+      "socketPending": 0,
+      "socketErrors": [
+        "WebSocket protocol error: Connection reset without closing handshake",
+        "WebSocket protocol error: Connection reset without closing handshake"
+      ],
+      "lateLivingMean": 79.93333333333334,
+      "queueWait": [
+        0.112,
+        0.511,
+        0.5670000000000001
+      ],
+      "botWait": [
+        0.28,
+        0.525,
+        0.5670000000000001
+      ],
+      "socketWait": [
+        0.0060481,
+        0.0170341,
+        0.0290391
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            0.294,
+            0.525,
+            0.5670000000000001
+          ]
+        },
+        "respawn": {
+          "socket": [
+            0.0,
+            0.0,
+            0.007
+          ],
+          "bot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "qualified-fixed-40-29",
+      "seats": 40,
+      "seed": 29,
+      "policy": "fixed",
+      "ticks": 8574,
+      "deferred": 0,
+      "busyMsPerTick": 2.9250106484721248,
+      "admissionCpuMsPerTick": 2.3745480522509914,
+      "admissionElapsedMsPerTick": 2.756073757872638,
+      "searches": 4338,
+      "searchElapsedMs": [
+        4.4215,
+        9.0843,
+        27.592
+      ],
+      "births": 115,
+      "strictIntrusions": 50,
+      "relaxedBirths": 66,
+      "earlyDeaths": {},
+      "qualified3s": 110,
+      "followupCensored": {
+        "disconnect": 1,
+        "shutdown": 4
+      },
+      "allDeathCauses": {
+        "pit": 45,
+        "body": 1
+      },
+      "pending": 3,
+      "pendingAges": [
+        2.9330000000047676,
+        3.8920000000044794,
+        4.144000000004404
+      ],
+      "socketPending": 1,
+      "socketErrors": [],
+      "lateLivingMean": 33.666666666666664,
+      "queueWait": [
+        3.549,
+        11.991,
+        14.224
+      ],
+      "botWait": [
+        4.095,
+        12.565,
+        14.224
+      ],
+      "socketWait": [
+        1.3835975999999999,
+        4.0300856,
+        4.2576474
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            4.018,
+            13.265,
+            14.224
+          ]
+        },
+        "respawn": {
+          "socket": [
+            1.491,
+            4.011,
+            4.242
+          ],
+          "bot": [
+            4.151,
+            5.824,
+            6.867
+          ]
+        }
+      }
+    },
+    {
+      "name": "qualified-fixed-40-7",
+      "seats": 40,
+      "seed": 7,
+      "policy": "fixed",
+      "ticks": 8583,
+      "deferred": 0,
+      "busyMsPerTick": 3.5188243504602124,
+      "admissionCpuMsPerTick": 2.783481882791565,
+      "admissionElapsedMsPerTick": 3.2982534545030875,
+      "searches": 4348,
+      "searchElapsedMs": [
+        5.866,
+        12.8278,
+        31.1878
+      ],
+      "births": 113,
+      "strictIntrusions": 51,
+      "relaxedBirths": 72,
+      "earlyDeaths": {},
+      "qualified3s": 106,
+      "followupCensored": {
+        "disconnect": 2,
+        "shutdown": 5
+      },
+      "allDeathCauses": {
+        "pit": 44
+      },
+      "pending": 4,
+      "pendingAges": [
+        0.8750000000054072,
+        1.5890000000051927,
+        1.771000000005138,
+        1.7990000000051296
+      ],
+      "socketPending": 2,
+      "socketErrors": [],
+      "lateLivingMean": 35.233333333333334,
+      "queueWait": [
+        3.0100000000000002,
+        11.193,
+        13.209
+      ],
+      "botWait": [
+        4.0040000000000004,
+        12.173,
+        13.209
+      ],
+      "socketWait": [
+        2.0909148,
+        3.0481232,
+        3.0768177
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            4.018,
+            13.153,
+            13.209
+          ]
+        },
+        "respawn": {
+          "socket": [
+            2.142,
+            3.017,
+            3.059
+          ],
+          "bot": [
+            3.9410000000000003,
+            5.285,
+            7.434
+          ]
+        }
+      }
+    },
+    {
+      "name": "qualified-fixed-64-29",
+      "seats": 64,
+      "seed": 29,
+      "policy": "fixed",
+      "ticks": 8575,
+      "deferred": 0,
+      "busyMsPerTick": 3.4802341574344027,
+      "admissionCpuMsPerTick": 2.928206997084548,
+      "admissionElapsedMsPerTick": 3.265526915451895,
+      "searches": 4346,
+      "searchElapsedMs": [
+        5.8638,
+        10.2822,
+        38.8964
+      ],
+      "births": 117,
+      "strictIntrusions": 67,
+      "relaxedBirths": 81,
+      "earlyDeaths": {},
+      "qualified3s": 109,
+      "followupCensored": {
+        "disconnect": 3,
+        "shutdown": 5
+      },
+      "allDeathCauses": {
+        "pit": 39
+      },
+      "pending": 17,
+      "pendingAges": [
+        0.20300000000558782,
+        0.7070000000054364,
+        1.0220000000053417,
+        1.540000000005186,
+        2.3310000000049484,
+        2.849000000004793,
+        3.4230000000046203,
+        4.473000000004305,
+        4.991000000004149,
+        5.075000000004124,
+        5.32000000000405,
+        5.726000000003928,
+        5.901000000003876,
+        6.622000000003659,
+        7.035000000003535,
+        8.239000000003173,
+        8.624000000003058
+      ],
+      "socketPending": 2,
+      "socketErrors": [],
+      "lateLivingMean": 48.4,
+      "queueWait": [
+        5.061,
+        34.237,
+        40.985
+      ],
+      "botWait": [
+        13.118,
+        34.741,
+        40.985
+      ],
+      "socketWait": [
+        2.4894363,
+        3.8662437,
+        4.0254806
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            12.404,
+            34.93,
+            40.985
+          ]
+        },
+        "respawn": {
+          "socket": [
+            2.541,
+            3.878,
+            4.011
+          ],
+          "bot": [
+            14.028,
+            23.87,
+            25.508
+          ]
+        }
+      }
+    },
+    {
+      "name": "qualified-fixed-64-7",
+      "seats": 64,
+      "seed": 7,
+      "policy": "fixed",
+      "ticks": 8573,
+      "deferred": 0,
+      "busyMsPerTick": 3.5345355301528056,
+      "admissionCpuMsPerTick": 2.8268254986585792,
+      "admissionElapsedMsPerTick": 3.3184057272833316,
+      "searches": 4350,
+      "searchElapsedMs": [
+        6.0252,
+        10.3416,
+        53.1002
+      ],
+      "births": 126,
+      "strictIntrusions": 71,
+      "relaxedBirths": 88,
+      "earlyDeaths": {},
+      "qualified3s": 120,
+      "followupCensored": {
+        "disconnect": 3,
+        "shutdown": 3
+      },
+      "allDeathCauses": {
+        "pit": 46
+      },
+      "pending": 16,
+      "pendingAges": [
+        0.6090000000054658,
+        0.6230000000054616,
+        0.8540000000053922,
+        2.688000000004841,
+        2.9890000000047507,
+        3.6890000000045404,
+        7.336000000003445,
+        7.854000000003289,
+        8.071000000003224,
+        8.38600000000313,
+        8.834000000002995,
+        10.68200000000244,
+        11.109000000002311,
+        11.298000000002254,
+        12.187000000001987,
+        13.006000000001741
+      ],
+      "socketPending": 1,
+      "socketErrors": [],
+      "lateLivingMean": 45.03333333333333,
+      "queueWait": [
+        8.218,
+        28.035,
+        33.411
+      ],
+      "botWait": [
+        15.113,
+        28.399,
+        33.411
+      ],
+      "socketWait": [
+        2.1636182,
+        4.025503,
+        4.0284006
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            11.158,
+            33.25,
+            33.411
+          ]
+        },
+        "respawn": {
+          "socket": [
+            2.261,
+            4.0040000000000004,
+            4.011
+          ],
+          "bot": [
+            16.177,
+            26.551000000000002,
+            27.3
+          ]
+        }
+      }
+    },
+    {
+      "name": "qualified-fixed-80-29",
+      "seats": 80,
+      "seed": 29,
+      "policy": "fixed",
+      "ticks": 8574,
+      "deferred": 0,
+      "busyMsPerTick": 3.5634207721017033,
+      "admissionCpuMsPerTick": 2.959528808024259,
+      "admissionElapsedMsPerTick": 3.3634055983205036,
+      "searches": 4343,
+      "searchElapsedMs": [
+        5.9311,
+        10.4845,
+        78.5392
+      ],
+      "births": 111,
+      "strictIntrusions": 62,
+      "relaxedBirths": 73,
+      "earlyDeaths": {},
+      "qualified3s": 105,
+      "followupCensored": {
+        "disconnect": 4,
+        "shutdown": 2
+      },
+      "allDeathCauses": {
+        "pit": 37
+      },
+      "pending": 38,
+      "pendingAges": [
+        0.5040000000054974,
+        0.9730000000053565,
+        2.037000000005037,
+        2.422000000004921,
+        2.8070000000048054,
+        3.521000000004591,
+        4.963000000004158,
+        5.257000000004069,
+        10.430000000002515,
+        10.668000000002444,
+        10.773000000002412,
+        10.801000000002404,
+        11.872000000002082,
+        14.182000000001388,
+        16.73700000000062,
+        17.920000000000265,
+        20.29299999999955,
+        20.684999999999434,
+        21.713999999999125,
+        22.09899999999901,
+        22.714999999998824,
+        23.75799999999851,
+        23.918999999998462,
+        24.19199999999838,
+        24.92699999999816,
+        27.65699999999734,
+        27.74799999999731,
+        28.02099999999723,
+        28.65099999999736,
+        29.735999999997585,
+        29.826999999997604,
+        31.282999999997905,
+        34.09699999999849,
+        34.66399999999861,
+        34.83899999999864,
+        35.23099999999872,
+        36.84799999999906,
+        60.018
+      ],
+      "socketPending": 1,
+      "socketErrors": [],
+      "lateLivingMean": 40.43333333333333,
+      "queueWait": [
+        4.025,
+        53.928000000000004,
+        60.018
+      ],
+      "botWait": [
+        19.145,
+        55.594,
+        60.018
+      ],
+      "socketWait": [
+        2.1159844,
+        4.0281186,
+        4.039496
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            19.145,
+            55.594,
+            60.018
+          ]
+        },
+        "respawn": {
+          "socket": [
+            2.366,
+            4.011,
+            4.011
+          ],
+          "bot": null
+        }
+      }
+    },
+    {
+      "name": "qualified-fixed-80-7",
+      "seats": 80,
+      "seed": 7,
+      "policy": "fixed",
+      "ticks": 8573,
+      "deferred": 0,
+      "busyMsPerTick": 3.783914522337571,
+      "admissionCpuMsPerTick": 3.187696838912866,
+      "admissionElapsedMsPerTick": 3.560874629651231,
+      "searches": 4349,
+      "searchElapsedMs": [
+        7.2794,
+        10.8999,
+        60.8646
+      ],
+      "births": 125,
+      "strictIntrusions": 65,
+      "relaxedBirths": 88,
+      "earlyDeaths": {},
+      "qualified3s": 121,
+      "followupCensored": {
+        "shutdown": 3,
+        "disconnect": 1
+      },
+      "allDeathCauses": {
+        "pit": 43,
+        "body": 1
+      },
+      "pending": 32,
+      "pendingAges": [
+        0.2450000000055752,
+        0.2520000000055731,
+        0.33600000000554786,
+        0.4900000000055016,
+        2.086000000005022,
+        2.6740000000048454,
+        2.961000000004759,
+        3.5350000000045867,
+        3.8780000000044836,
+        4.543000000004284,
+        6.041000000003834,
+        6.3280000000037475,
+        7.182000000003491,
+        7.6160000000033605,
+        8.176000000003192,
+        8.771000000003013,
+        10.57700000000247,
+        10.591000000002467,
+        10.871000000002383,
+        11.053000000002328,
+        11.998000000002044,
+        12.71200000000183,
+        14.000000000001442,
+        14.651000000001247,
+        15.953000000000856,
+        16.352000000000736,
+        17.283000000000456,
+        17.353000000000435,
+        20.817999999999394,
+        21.769999999999108,
+        24.667999999998237,
+        25.19299999999808
+      ],
+      "socketPending": 1,
+      "socketErrors": [
+        "WebSocket protocol error: Connection reset without closing handshake",
+        "WebSocket protocol error: Connection reset without closing handshake"
+      ],
+      "lateLivingMean": 48.6,
+      "queueWait": [
+        9.303,
+        46.487,
+        49.28
+      ],
+      "botWait": [
+        26.012,
+        46.501,
+        49.28
+      ],
+      "socketWait": [
+        2.0879468,
+        4.0342595,
+        4.4488245
+      ],
+      "byKind": {
+        "join": {
+          "socket": [
+            0.014,
+            0.021,
+            0.021
+          ],
+          "bot": [
+            18.466,
+            46.501,
+            49.28
+          ]
+        },
+        "respawn": {
+          "socket": [
+            2.142,
+            4.018,
+            4.431
+          ],
+          "bot": [
+            27.713,
+            37.002,
+            37.765
+          ]
+        }
+      }
+    }
+  ],
+  "summary": [
+    {
+      "seats": 40,
+      "policy": "control",
+      "runs": 3,
+      "queueWait": [
+        2.317,
+        29.022000000000002,
+        38.451
+      ],
+      "socketWait": [
+        0.7057456,
+        3.0503507,
+        4.9879111
+      ],
+      "botJoinWait": [
+        10.479000000000001,
+        33.635,
+        38.451
+      ],
+      "botRespawnWait": [
+        13.937000000000001,
+        23.415,
+        26.334
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 1.6424367789301946,
+        "range": [
+          1.5326479496738117,
+          1.6456949784457648
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 1.9804797040661775,
+        "range": [
+          1.959833539142591,
+          2.1248896515557627
+        ]
+      },
+      "meanLateLiving": 29.566666666666666,
+      "pending": 25,
+      "earlyDeaths": {},
+      "qualified3s": 268,
+      "strictIntrusions": 0,
+      "births": 291,
+      "errors": 0,
+      "deferred": 0
+    },
+    {
+      "seats": 40,
+      "policy": "fixed",
+      "runs": 2,
+      "queueWait": [
+        3.0380000000000003,
+        11.991,
+        14.224
+      ],
+      "socketWait": [
+        1.4202124999999999,
+        3.4481312,
+        4.2576474
+      ],
+      "botJoinWait": [
+        4.018,
+        13.209,
+        14.224
+      ],
+      "botRespawnWait": [
+        4.011,
+        5.824,
+        7.434
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 2.579014967521278,
+        "range": [
+          2.3745480522509914,
+          2.783481882791565
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 3.027163606187863,
+        "range": [
+          2.756073757872638,
+          3.2982534545030875
+        ]
+      },
+      "meanLateLiving": 34.45,
+      "pending": 7,
+      "earlyDeaths": {},
+      "qualified3s": 216,
+      "strictIntrusions": 101,
+      "births": 228,
+      "errors": 0,
+      "deferred": 0
+    },
+    {
+      "seats": 40,
+      "policy": "growth",
+      "runs": 3,
+      "queueWait": [
+        0.007,
+        4.767,
+        4.963
+      ],
+      "socketWait": [
+        0.0066962,
+        0.0171399,
+        0.0304871
+      ],
+      "botJoinWait": [
+        0.581,
+        4.928,
+        4.963
+      ],
+      "botRespawnWait": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 0.06007514854945823,
+        "range": [
+          0.05642108328479907,
+          0.06552125800815375
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 0.06671721607454863,
+        "range": [
+          0.06581563555866247,
+          0.0680838322655795
+        ]
+      },
+      "meanLateLiving": 39.9,
+      "pending": 0,
+      "earlyDeaths": {},
+      "qualified3s": 261,
+      "strictIntrusions": 0,
+      "births": 263,
+      "errors": 0,
+      "deferred": 0
+    },
+    {
+      "seats": 64,
+      "policy": "control",
+      "runs": 3,
+      "queueWait": [
+        2.072,
+        54.761,
+        60.025
+      ],
+      "socketWait": [
+        0.6148237,
+        3.2529052,
+        6.1110012
+      ],
+      "botJoinWait": [
+        26.047,
+        58.219,
+        60.025
+      ],
+      "botRespawnWait": null,
+      "admissionCpuMsPerTick": {
+        "median": 1.553021465235651,
+        "range": [
+          1.4274061990212072,
+          1.7494751574527643
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 2.0064050163322444,
+        "range": [
+          1.932970997436495,
+          2.104340401212969
+        ]
+      },
+      "meanLateLiving": 30.299999999999997,
+      "pending": 98,
+      "earlyDeaths": {},
+      "qualified3s": 259,
+      "strictIntrusions": 0,
+      "births": 277,
+      "errors": 1,
+      "deferred": 0
+    },
+    {
+      "seats": 64,
+      "policy": "fixed",
+      "runs": 2,
+      "queueWait": [
+        8.218,
+        33.257,
+        40.985
+      ],
+      "socketWait": [
+        2.284429,
+        4.0254806,
+        4.0284006
+      ],
+      "botJoinWait": [
+        11.515,
+        34.237,
+        40.985
+      ],
+      "botRespawnWait": [
+        15.659,
+        25.508,
+        27.3
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 2.8775162478715637,
+        "range": [
+          2.8268254986585792,
+          2.928206997084548
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 3.2919663213676134,
+        "range": [
+          3.265526915451895,
+          3.3184057272833316
+        ]
+      },
+      "meanLateLiving": 46.71666666666667,
+      "pending": 33,
+      "earlyDeaths": {},
+      "qualified3s": 229,
+      "strictIntrusions": 138,
+      "births": 243,
+      "errors": 0,
+      "deferred": 0
+    },
+    {
+      "seats": 64,
+      "policy": "growth",
+      "runs": 3,
+      "queueWait": [
+        0.035,
+        1.169,
+        1.981
+      ],
+      "socketWait": [
+        0.0055485,
+        0.0163693,
+        0.0289143
+      ],
+      "botJoinWait": [
+        0.23800000000000002,
+        1.449,
+        1.981
+      ],
+      "botRespawnWait": [
+        0.0,
+        0.0,
+        0.007
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 0.04734296702016082,
+        "range": [
+          0.04733745047774412,
+          0.052805617060948606
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 0.06389474420230742,
+        "range": [
+          0.06043874839762266,
+          0.06475002330459101
+        ]
+      },
+      "meanLateLiving": 63.93333333333333,
+      "pending": 0,
+      "earlyDeaths": {},
+      "qualified3s": 346,
+      "strictIntrusions": 0,
+      "births": 350,
+      "errors": 2,
+      "deferred": 0
+    },
+    {
+      "seats": 80,
+      "policy": "control",
+      "runs": 2,
+      "queueWait": [
+        2.198,
+        57.519,
+        60.025
+      ],
+      "socketWait": [
+        0.5641181,
+        2.7152473,
+        4.2265729
+      ],
+      "botJoinWait": [
+        27.902,
+        58.954,
+        60.025
+      ],
+      "botRespawnWait": null,
+      "admissionCpuMsPerTick": {
+        "median": 1.7138947852379298,
+        "range": [
+          1.6382222739981362,
+          1.7895672964777234
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 2.0772848871583087,
+        "range": [
+          2.0275755009319663,
+          2.126994273384651
+        ]
+      },
+      "meanLateLiving": 30.4,
+      "pending": 91,
+      "earlyDeaths": {},
+      "qualified3s": 184,
+      "strictIntrusions": 0,
+      "births": 198,
+      "errors": 0,
+      "deferred": 0
+    },
+    {
+      "seats": 80,
+      "policy": "fixed",
+      "runs": 2,
+      "queueWait": [
+        8.456,
+        49.266,
+        60.018
+      ],
+      "socketWait": [
+        2.1159844,
+        4.0349691,
+        4.4488245
+      ],
+      "botJoinWait": [
+        19.012,
+        53.914,
+        60.018
+      ],
+      "botRespawnWait": [
+        27.713,
+        37.002,
+        37.765
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 3.0736128234685625,
+        "range": [
+          2.959528808024259,
+          3.187696838912866
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 3.462140113985867,
+        "range": [
+          3.3634055983205036,
+          3.560874629651231
+        ]
+      },
+      "meanLateLiving": 44.516666666666666,
+      "pending": 70,
+      "earlyDeaths": {},
+      "qualified3s": 226,
+      "strictIntrusions": 127,
+      "births": 236,
+      "errors": 2,
+      "deferred": 0
+    },
+    {
+      "seats": 80,
+      "policy": "growth",
+      "runs": 2,
+      "queueWait": [
+        0.112,
+        0.511,
+        0.5670000000000001
+      ],
+      "socketWait": [
+        0.0057865,
+        0.0169036,
+        0.0291749
+      ],
+      "botJoinWait": [
+        0.294,
+        0.525,
+        0.5670000000000001
+      ],
+      "botRespawnWait": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "admissionCpuMsPerTick": {
+        "median": 0.0036429343968834614,
+        "range": [
+          0.0018206711722209275,
+          0.005465197621545995
+        ]
+      },
+      "admissionElapsedMsPerTick": {
+        "median": 0.006815665103164182,
+        "range": [
+          0.005056164064320671,
+          0.008575166142007694
+        ]
+      },
+      "meanLateLiving": 79.9,
+      "pending": 0,
+      "earlyDeaths": {},
+      "qualified3s": 252,
+      "strictIntrusions": 0,
+      "births": 254,
+      "errors": 2,
+      "deferred": 0
+    }
+  ],
+  "qualification": "16 complete protected search-only holds on249 plus six retained qualified-fixed holds; stopped for full-admission timing and integrated-source confirmation; every mask verified0x30; interrupted next hold remains local"
+}

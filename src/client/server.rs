@@ -459,6 +459,7 @@ impl Host {
             generations: vec![0; agents],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            last_spawn_tick: None,
             shared,
             ticks: 0,
             deferred: 0,
@@ -586,6 +587,9 @@ struct Simulation {
     generations: Vec<u64>,
     waiting: VecDeque<PendingJoin>,
     next_spawn_tick: u64,
+    /// Host queue state, not core checkpoint state. Expanding the pit must
+    /// leave the last newborn its existing departure window before it moves.
+    last_spawn_tick: Option<u64>,
     shared: Arc<Shared>,
     ticks: u64,
     deferred: u64,
@@ -597,6 +601,7 @@ struct PendingJoin {
     appearance: PlayerAppearance,
     session_id: bool,
     physical_food: bool,
+    requested_tick: u64,
 }
 
 impl Simulation {
@@ -684,6 +689,22 @@ impl Simulation {
             .iter()
             .position(|join| join.slot < self.max_clients)
             .unwrap_or(0);
+        let waited = self
+            .ticks
+            .saturating_sub(self.waiting[first].requested_tick) as f64
+            * self.world.dt();
+        let protected_until = self.last_spawn_tick.map_or(0, |tick| {
+            tick.saturating_add((crate::spawn::DEPARTURE_SECONDS / self.world.dt()).ceil() as u64)
+        });
+        if !self
+            .world
+            .grow_for_waiters(self.waiting.len(), waited, self.ticks >= protected_until)
+        {
+            // Stop admissions too, so fresh births cannot postpone expansion
+            // indefinitely. No search work is spent during this bounded hold.
+            self.next_spawn_tick = protected_until;
+            return Ok(());
+        }
         let join = self.waiting.remove(first).unwrap();
         if !self.join(&join)? {
             self.waiting.insert(first, join);
@@ -698,6 +719,7 @@ impl Simulation {
         match self.world.connect(slot, join.appearance.clone()) {
             Ok(false) => return Ok(false),
             Ok(true) => {
+                self.last_spawn_tick = Some(self.ticks);
                 if join.physical_food {
                     self.world.physical_food(slot);
                 }
@@ -733,6 +755,7 @@ impl Simulation {
                     appearance,
                     session_id,
                     physical_food,
+                    requested_tick: self.ticks,
                 };
                 if self.world.waits_for_spawn() {
                     // A bot has reset its decoder for this generation. Retire
@@ -2215,7 +2238,7 @@ mod tests {
     #[test]
     fn custom_host_worlds_opt_out_of_seat_sizing_and_round_trip() {
         for world in [
-            r#"{"preset":"battledome"}"#,
+            r#"{"preset":"battledome","dynamicRadius":false}"#,
             r#"{"preset":"sandbox"}"#,
             r#"{"radius":900,"dynamicRadius":false}"#,
             r#"{"preset":"official","radius":900}"#,
@@ -2301,6 +2324,7 @@ mod tests {
             generations: vec![0],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            last_spawn_tick: None,
             shared: shared(dt, 1),
             ticks: 0,
             deferred,
@@ -2447,6 +2471,7 @@ mod tests {
             generations: vec![0, 0],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            last_spawn_tick: None,
             shared: shared(dt, 1),
             ticks: 0,
             deferred: 0,
@@ -2530,6 +2555,58 @@ mod tests {
             received.try_recv().unwrap(),
             Command::Connect { generation: 4, .. }
         ));
+    }
+
+    #[test]
+    fn queued_expansion_leaves_recent_births_their_departure_window() {
+        let (mut simulation, _gate, _deliveries) = connected(LatencyConfig::default(), 0);
+        let mut world = crate::Config::battledome();
+        world.food_count = 0;
+        world.ambient_replenish_per_second = 0.;
+        simulation.world = RawSimulator::new(
+            7,
+            SimulationConfig {
+                agents: 40,
+                world,
+                ..Default::default()
+            },
+            40,
+        )
+        .unwrap();
+        simulation.ticks = 0;
+        simulation.next_spawn_tick = 0;
+        simulation.last_spawn_tick = None;
+        simulation.generations = vec![1; 40];
+        let request = |slot, requested_tick| PendingJoin {
+            slot,
+            requested_tick,
+            generation: 1,
+            appearance: PlayerAppearance::default(),
+            session_id: false,
+            physical_food: true,
+        };
+        simulation.waiting.push_back(request(0, 0));
+        simulation.admit_waiting().unwrap();
+        assert_eq!(simulation.last_spawn_tick, Some(0));
+        for _ in 0..100 {
+            step(&mut simulation);
+        }
+        for slot in 1..40 {
+            simulation
+                .waiting
+                .push_back(request(slot, simulation.ticks));
+        }
+        simulation.admit_waiting().unwrap();
+        let ready = (crate::spawn::DEPARTURE_SECONDS / simulation.world.dt()).ceil() as u64;
+        assert_eq!(simulation.next_spawn_tick, ready);
+        assert_eq!(simulation.waiting.len(), 39);
+        while simulation.ticks < ready {
+            step(&mut simulation);
+            assert_eq!(simulation.waiting.len(), 39);
+        }
+        simulation.admit_waiting().unwrap();
+        assert_eq!(simulation.waiting.len(), 38);
+        assert_eq!(simulation.last_spawn_tick, Some(ready));
     }
 
     #[test]
@@ -2771,6 +2848,7 @@ mod tests {
             generations: vec![0],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            last_spawn_tick: None,
             shared,
             ticks: 0,
             deferred: 0,

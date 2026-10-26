@@ -5,7 +5,7 @@ use slither_sim::{
 };
 
 #[test]
-fn rules_are_world_metadata_and_stay_fixed_across_runtime_edits() {
+fn rules_keep_mode_settings_and_follow_the_live_circular_pit() {
     let config = Config {
         boundary_mode: BoundaryMode::Hard,
         pit: Some(slither_sim::PitConfig { radius: 550. }),
@@ -39,6 +39,10 @@ fn rules_are_world_metadata_and_stay_fixed_across_runtime_edits() {
     world.set_ambient_rate(7.).unwrap();
     world.step(&[None]).unwrap();
     assert_eq!(world.radius(), 3000.);
+    let expected = WorldRules {
+        pit_radius: Some(550. * (3000. / 3584.)),
+        ..expected
+    };
     assert_eq!(world.rules(), expected);
     let restored = Simulator::from_checkpoint(
         &serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
@@ -126,7 +130,7 @@ fn every_frame_has_custom_rules_and_absent_values_are_null() {
         json!({"boundaryMode":"sliding","pitRadius":null,"minScore":null,"killScoreSeconds":null,"freeBoostAtFloor":false})
     );
     let info: Value = serde_json::from_slice(&session.request(br#"{"op":"info"}"#)).unwrap();
-    assert_eq!(info["result"]["rulesRevision"], "slither-sim-rules-v2");
+    assert_eq!(info["result"]["rulesRevision"], "slither-sim-rules-v3");
 }
 
 #[test]
