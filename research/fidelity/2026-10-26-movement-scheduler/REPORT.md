@@ -1,24 +1,25 @@
 # Official movement scheduler, 2026-10-26
 
-Six frozen 600-second invocations completed with one client on one official
-protocol-19 endpoint. All six archives verified, both coverage gates passed
-(three development, three held-out), and all 24 unfiltered transport gates passed.
-There were no replacements, quarantined analyzed archives or unexpected lifecycle
-events. These are temporal replicates on one endpoint, not independent servers.
-Status: **exploratory and unreviewed**.
+**Official report gaps are not hard floors, and the exact scheduler remains
+unidentified.** Six frozen 600-second runs on one official endpoint found
+**791 motion gaps under 35 ms and 193 standalone `h` gaps under 100 ms**,
+including **451 and 107** in the three held-out runs. **No replacement scheduler
+is selected:** clients never observe when state becomes dirty or when an input
+applies, so the frozen prediction metrics are undefined. That is missing
+identification, not a rejection of every internal scheduler. No rule, release
+model or runtime code changes.
 
-The observed wire gaps contradict literal report floors: **791 motion gaps
-below 35 ms and 193 standalone `h` gaps below 100 ms**, including **451 and 107**
-in held-out ordinals 4–6. **No replacement scheduler was selected**: authoritative
-dirty and input-application instants are unobserved, so the frozen prediction
-metrics are undefined. This is missing identification, not rejection of all
-internal schedulers. No rule, release model or runtime code changes.
+All six archives verified. Both coverage gates passed (three development and
+three held-out runs), and so did all 24 unfiltered transport gates. There were
+no replacements, quarantined archives or unexpected lifecycle events. The runs
+are temporal replicates on one endpoint, not independent servers. Status:
+**exploratory and unreviewed**.
 
-Collection used revision `7580d53baffa35d776af4fc22a9926220d33c672` and the
-unchanged standard movement controls. The prior
-[visibility pilot](../2026-10-26-visibility-pilot/REPORT.md) failed its frozen gate;
-the protocol then switched to this separately authorized P2 study. Publication
-was entirely offline, without new captures or game-server connections.
+Collection used revision `7580d53baffa35d776af4fc22a9926220d33c672` with the
+unchanged standard movement controls. It followed the failed
+[visibility pilot](../2026-10-26-visibility-pilot/REPORT.md), as the frozen
+protocol required. This publication is offline: no new captures or game-server
+connections.
 
 ## Per-invocation coverage
 
