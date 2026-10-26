@@ -374,6 +374,20 @@ class ErrorTests(unittest.TestCase):
         self.assertEqual((typed.worlds, typed.agents), (1, 4))
         self.assertEqual(fingerprint(typed), reply["result"]["worlds"])
 
+    def test_typed_admission_matches_json_and_failure_keeps_frames(self):
+        typed, encoded = Session(), Session()
+        placement = {"kind": "admitted", "attempts": 64, "preferredClearance": 300}
+        options = {"seed": 7, "agents": 4, "config": {"preset": "sandbox"}, "placement": placement}
+        typed.reset(**options)
+        reply = encoded.request({"op": "reset", **options})
+        self.assertEqual(fingerprint(typed), reply["result"]["worlds"])
+        before = fingerprint(typed)
+        for bad in [{"kind": "admitted", "attempts": 0},
+                    {"kind": "admitted", "preferredClearance": -1}]:
+            with self.subTest(bad), self.assertRaises(ValueError):
+                typed.reset(placement=bad)
+            self.assertEqual(fingerprint(typed), before)
+
     def test_rejected_steps_change_no_world(self):
         session, control = Session(), Session()
         reset(session)

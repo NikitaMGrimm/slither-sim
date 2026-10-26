@@ -32,5 +32,6 @@ pub use prey::{Prey, PreyConfig, PreyMode};
 pub use simulator::checkpoint::{Checkpoint, EventRecording, RestoreOptions};
 pub use simulator::{
     AmbientFoodConfig, BoostAccounting, BoostFoodConfig, Config, DeathFoodConfig, FoodSpawnEvent,
-    PickupEvent, PickupItem, PitConfig, Preset, Simulator,
+    InitialPopulation, InitialSpeed, PickupEvent, PickupItem, PitConfig, Placement, Preset,
+    ReplayLife, ReplayPrey, Scenario, Simulator, WorldOptions,
 };

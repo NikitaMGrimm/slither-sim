@@ -64,6 +64,15 @@ Snakes start on a deterministic ring halfway to the boundary, facing inward:
 a synthetic test setup. With `config.spawnRadius`, they instead lie and head
 counterclockwise along that ring; with `config.minScore`, they start at its floor.
 
+Optional `placement` defaults to `{"kind":"testRing"}`. This checks containment
+but makes no neighbor-clearance promise. `{"kind":"admitted"}` instead tries
+64 sampled poses per slot with preferred clearance 600; override these with
+`attempts` (positive u32) and `preferredClearance` (finite, nonnegative).
+It selects the first pose meeting that clearance, otherwise the first best
+positive contact-margin pose. Exhaustion rejects the entire reset. Placement
+uses a separate seed stream (`seed ^ 0x706c6163`), leaving food/prey draws intact.
+This bounded core policy does not change host admission or retry behavior.
+
 The same build, config, seed and actions produce the same worlds. Cross-platform
 bitwise floating-point equivalence is not promised; retain these inputs and the
 commit when recording results.
@@ -173,9 +182,48 @@ coverage, prediction, receipt ages or network latency. Use the
 
 ## Rust library
 
-`Simulator::new`, `add`, `step`, `observe` and `observe_all` provide direct access;
-see [the basic example](../examples/basic.rs). Rust callers can build their own
-admission, respawn and match rules around the core.
+`Simulator::new(WorldOptions { seed, config, population })` initializes a world;
+see [the basic example](../examples/basic.rs). `InitialPopulation` selects
+`Empty`, `Dormant { ids }`, or `Placed { ids, placement }`. IDs are unique,
+ordered, stable slots. Dormant slots are inactive and have no death timestamp.
+`Placement::default()` is `TestRing`; `Admitted` uses the bounded search above.
+Generated ecology is independent of the initial snake population. Configure
+`Config::official(n)` explicitly when its ecology should be sized for n snakes.
+
+Simulator fields are private. `config()`, `snakes()`, `food()`, `prey()`,
+`deaths()`, `pickup_events()` and `food_spawn_events()` borrow existing storage;
+`radius()` and `time()` return scalars. Config retains its existing flat keys
+and currently carries the live radius. No mutable slices or config setters are
+exposed. Detached `Snake`, `Food` and `Prey` values remain editable.
+
+Use `append_dormant`, `spawn`, `retire` and the existing respawn methods for
+slot lifecycle. `spawn(id, body, heading)` validates geometry, mass floor and
+containment before appending every companion together. `retire(slot)` marks a
+slot inactive without death food or a fabricated death event; slots never move.
+Respawn and new replay lives clear per-life boost, speed, kiosk, pit and death
+state and assign new join order, retaining rolling kill history.
+
+`import_life(slot, ReplayLife)` installs a checked new replay life atomically,
+including `InitialSpeed::Infer(observed_speed)` or `Known(SpeedState)`.
+`ReplayLife::from_observed` takes a detached snake and explicit speed choice;
+body length supplies segment count, and mass supplies display values. The old
+`add`, live `update_mass`, and two-call `initialize_speed_state` are removed.
+`correct_mass(slot, body, fam)` and `correct_pose(slot, head, body, heading)`
+preserve speed/progress, boost, kiosk credit/timers, join order, kills and pit
+history. Pose correction retains segment count. Replay corrections allow finite
+overlaps and out-of-arena geometry within the checkpoint continuation envelope
+(coordinates and snake speed × dt at most 1e150 in magnitude); the 430-segment
+spawn limit is not a replay cap.
+
+`from_scenario(seed, config, Scenario { snakes, food, prey })` installs ordered
+`(id, ReplayLife)` slots and `ReplayPrey { prey, mode }` at time zero without
+generated ecology or placement draws. It labels supplied state; exact historical
+continuation uses checkpoints. Checked `replace_food`, `insert_food` and
+`remove_food` preserve order and invalidate occupancy caches; indices are immediate
+positions, not durable identities. The corresponding prey operations enforce
+unique IDs and synchronize modes/decision state. `record_events(EventRecording)`
+enables step-local pickup/birth telemetry, retaining capacity when already enabled.
+`deaths()` remains cumulative history for cursor-based consumers.
 
 Use `observe_all_into` or `observe_selected_into` to reuse a buffer's vectors
 and avoid most per-call allocation, with the same observations as `observe_all`
@@ -278,7 +326,7 @@ Use `serde_json::to_vec(&world.checkpoint()?)` for exact core continuation;
 `Simulator` and its runtime controls no longer implement serde. Load with
 `Simulator::from_checkpoint(&bytes, RestoreOptions::default())`, or use
 `world.restore(&bytes, options)` to validate a complete candidate before replacing
-the current world. Export also validates public state. Load errors carry
+the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
 The envelope is `slither-sim-checkpoint-v1`, with
@@ -304,6 +352,9 @@ requests and typed steps act on the same worlds and may be mixed.
 | Method | Purpose |
 | --- | --- |
 | `Session::new()` | An empty session; reset it before stepping. |
+| `reset(ResetOptions)` | Prepare and atomically commit fully initialized worlds and frames, returning `ResetSummary`. |
+| `Session::prepare_reset(options)` | Build an opaque `PreparedReset` without changing any session; inspect `summary()` before committing. |
+| `commit_reset(prepared)` | Install prepared worlds and frames without failure or allocation, returning the summary. |
 | `request(line)` | Answers one JSON request line with exactly the reply line `serve` writes, both without the newline. Errors become error replies. |
 | `step(&headings, &boosts)` | Steps every world like a JSON `step` without writing JSON. Both slices hold `worlds × agents` entries, world-major: slot `s` of world `w` is entry `w × agents + s`. |
 | `frame(w)` | World `w`'s current frame as a `FrameRef` of read-only columns, after any reset or step; `None` before reset or for unknown worlds. |

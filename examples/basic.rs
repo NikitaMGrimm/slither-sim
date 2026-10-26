@@ -1,10 +1,14 @@
 use slither_sim::{Action, Config, Simulator};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut world = Simulator::new(7, Config::default())?;
-    for slot in 0..4 {
-        world.add(slot.to_string(), slot, 4)?;
-    }
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config::default(),
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..4).map(|slot| slot.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })?;
     // One buffer for every decision: `observe_all_into` refills its vectors.
     let mut observations = Vec::new();
     for _ in 0..300 {
@@ -33,6 +37,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
         world.step(&actions)?;
     }
-    println!("time={:.3}s living={}", world.time, world.living());
+    println!("time={:.3}s living={}", world.time(), world.living());
     Ok(())
 }

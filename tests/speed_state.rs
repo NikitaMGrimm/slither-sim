@@ -1,18 +1,23 @@
+mod support;
 use slither_sim::{physics::*, *};
 
 fn world() -> Simulator {
-    let mut world = Simulator::new(
-        42,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             radius: 100_000.,
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["test".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    world.add("test", 0, 1).unwrap();
-    let snake = &mut world.snakes[0];
+    let mut detached_snake = world.snakes()[0].clone();
+    let snake = &mut detached_snake;
     snake.head = Point::default();
     snake.heading = 0.;
     snake.segments = 37;
@@ -24,12 +29,18 @@ fn world() -> Simulator {
         })
         .collect();
     world
+        .correct_mass(0, snake.body.clone(), snake.fam)
+        .unwrap();
+    world
+        .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+        .unwrap();
+    world
 }
 
 fn steps(world: &mut Simulator, count: usize, boost: bool) {
     for _ in 0..count {
         world.step(&[Some(Action { heading: 0., boost })]).unwrap();
-        assert!(world.snakes[0].alive);
+        assert!(world.snakes()[0].alive);
     }
 }
 
@@ -67,11 +78,11 @@ fn recorded_same_size_pair_retains_idle_speed_then_refreshes_after_boost() {
         .collect();
     let mut world = world();
     steps(&mut world, 350, false);
-    assert!((world.snakes[0].speed * 0.032 - measured[0]).abs() < 0.01);
+    assert!((world.snakes()[0].speed * 0.032 - measured[0]).abs() < 0.01);
     steps(&mut world, 122, true);
     steps(&mut world, 400, false);
-    assert_eq!(world.snakes[0].segments, 37);
-    assert!((world.snakes[0].speed * 0.032 - measured[1]).abs() < 0.01);
+    assert_eq!(world.snakes()[0].segments, 37);
+    assert!((world.snakes()[0].speed * 0.032 - measured[1]).abs() < 0.01);
 }
 
 #[test]
@@ -102,23 +113,29 @@ fn fixed_size_ramps_preserve_validated_slope_and_partial_reactivation() {
 #[test]
 fn actual_pickup_retains_idle_cruise_and_direct_toggle_restores_old_law() {
     let mut retained = world();
-    let speed = retained.snakes[0].speed;
-    let (center, _) = pickup_circle(retained.snakes[0].head, 0.0, speed, 37);
-    retained.food.push(Food {
-        x: center.x,
-        y: center.y,
-        value: 1.0,
-        size: Some(10.0),
-        origin: Some(Origin::Death),
-    });
+    let speed = retained.snakes()[0].speed;
+    let (center, _) = pickup_circle(retained.snakes()[0].head, 0.0, speed, 37);
+    retained
+        .insert_food(Food {
+            x: center.x,
+            y: center.y,
+            value: 1.0,
+            size: Some(10.0),
+            origin: Some(Origin::Death),
+        })
+        .unwrap();
     let mut direct = retained.clone();
-    direct.config.speed_model = SpeedModel::DirectSpeed;
+    {
+        let mut config = direct.config().clone();
+        config.speed_model = SpeedModel::DirectSpeed;
+        support::reconfigure(&mut direct, config);
+    }
     steps(&mut retained, 100, false);
     steps(&mut direct, 100, false);
-    assert!(retained.food.is_empty());
-    assert!(retained.snakes[0].segments > 37);
-    assert_eq!(retained.snakes[0].speed, speed);
-    assert!((direct.snakes[0].speed - base_speed(direct.snakes[0].segments)).abs() < 1e-10);
+    assert!(retained.food().is_empty());
+    assert!(retained.snakes()[0].segments > 37);
+    assert_eq!(retained.snakes()[0].speed, speed);
+    assert!((direct.snakes()[0].speed - base_speed(direct.snakes()[0].segments)).abs() < 1e-10);
 }
 
 #[test]
@@ -126,49 +143,81 @@ fn candidate_progress_survives_mass_only_change_and_clone() {
     // This is candidate-model continuity, not evidence for online within-ramp growth.
     let mut world = world();
     steps(&mut world, 20, true);
-    let old = world.snakes[0].speed;
+    let old = world.snakes()[0].speed;
     let q = (old - base_speed(37)) / (BOOST_SPEED - base_speed(37));
-    world.snakes[0].segments = 100;
-    let expected_q = q + (0.015 / 0.008) * world.config.dt / (1.0 + 0.305 * (scale(100) - 1.0));
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.segments = 100;
+        snake
+            .body
+            .resize(snake.segments, *snake.body.last().unwrap());
+        world
+            .correct_mass(0, snake.body.clone(), snake.fam)
+            .unwrap();
+    }
+    let expected_q = q + (0.015 / 0.008) * world.config().dt / (1.0 + 0.305 * (scale(100) - 1.0));
     let expected = base_speed(100) + (BOOST_SPEED - base_speed(100)) * expected_q;
     let mut cloned = world.clone();
     steps(&mut world, 1, true);
     steps(&mut cloned, 1, true);
-    assert!((world.snakes[0].speed - expected).abs() < 1e-10);
-    assert_eq!(world.snakes, cloned.snakes);
+    assert!((world.snakes()[0].speed - expected).abs() < 1e-10);
+    assert_eq!(world.snakes(), cloned.snakes());
     steps(&mut world, 30, false);
     steps(&mut cloned, 30, false);
-    assert_eq!(world.snakes, cloned.snakes);
+    assert_eq!(world.snakes(), cloned.snakes());
 }
 
 #[test]
-fn snapshot_imports_and_public_speed_edits_infer_ramps_but_can_mark_idle() {
+fn checked_life_imports_infer_ramps_or_preserve_explicit_idle_speed() {
     let mut world = world();
-    world.snakes[0].speed = 300.0;
-    world.initialize_speed_state(0, None).unwrap();
+    let life =
+        |world: &Simulator, speed| ReplayLife::from_observed(world.snakes()[0].clone(), speed);
+    world
+        .import_life(0, life(&world, InitialSpeed::Infer(300.)))
+        .unwrap();
     steps(&mut world, 1, false);
-    assert!(world.snakes[0].speed < 300.0);
-    // Equal public speed is not enough to detect replacement; explicit import resets q.
-    let speed = world.snakes[0].speed;
-    world.initialize_speed_state(0, Some(0.0)).unwrap();
+    assert!(world.snakes()[0].speed < 300.);
+    let speed = world.snakes()[0].speed;
+    world
+        .import_life(
+            0,
+            life(&world, InitialSpeed::Known(SpeedState::idle(speed))),
+        )
+        .unwrap();
     steps(&mut world, 3, false);
-    assert_eq!(world.snakes[0].speed, speed);
-    world.snakes[0].speed = 320.0;
+    assert_eq!(world.snakes()[0].speed, speed);
+    world
+        .import_life(0, life(&world, InitialSpeed::Infer(320.)))
+        .unwrap();
     steps(&mut world, 1, false);
-    assert!(world.snakes[0].speed < 320.0);
-    assert!(world.initialize_speed_state(0, Some(f64::NAN)).is_err());
-    assert!(world.initialize_speed_state(0, Some(1.1)).is_err());
-    assert!(world.initialize_speed_state(5, None).is_err());
+    assert!(world.snakes()[0].speed < 320.);
+    let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
+    assert!(
+        world
+            .import_life(0, life(&world, InitialSpeed::Infer(f64::NAN)))
+            .is_err()
+    );
+    assert!(SpeedState::with_progress(speed, f64::NAN).is_err());
+    assert!(SpeedState::with_progress(speed, 1.1).is_err());
+    assert!(
+        world
+            .import_life(5, life(&world, InitialSpeed::Infer(speed)))
+            .is_err()
+    );
+    assert_eq!(
+        serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+        before
+    );
 }
 
 #[test]
 fn respawn_discards_progress_and_uses_spawn_cruise() {
     let mut world = world();
     steps(&mut world, 25, true);
-    world.snakes[0].alive = false;
+    world.retire(0).unwrap();
     world.respawn(0, Point::default(), 0.0, 15).unwrap();
     steps(&mut world, 20, false);
-    assert_eq!(world.snakes[0].speed, base_speed(15));
+    assert_eq!(world.snakes()[0].speed, base_speed(15));
     assert!(!world.is_boosting(0));
 }
 

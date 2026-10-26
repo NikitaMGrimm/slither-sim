@@ -281,16 +281,16 @@ impl Frame {
         deaths: &[DeathEvent],
     ) -> Result<(), SimError> {
         world.sight_all_into(&mut self.sightings, &mut self.marks);
-        self.time = world.time;
+        self.time = world.time();
         self.ticks = count(ticks, "tick")?;
         self.living = count(world.living(), "living snake")?;
-        self.radius = world.config.radius;
-        self.vision = world.config.vision;
+        self.radius = world.config().radius;
+        self.vision = world.config().vision;
         self.collect_snakes(world)?;
         self.collect_food(world)?;
         self.collect_prey(world)?;
         self.collect_views()?;
-        let slot_of = |id: &str| world.snakes.iter().position(|s| s.id == id);
+        let slot_of = |id: &str| world.snakes().iter().position(|s| s.id == id);
         let d = &mut self.deaths;
         d.food.clear();
         d.killer.clear();
@@ -391,7 +391,7 @@ impl Frame {
 
     fn collect_snakes(&mut self, world: &Simulator) -> Result<(), SimError> {
         self.snake_row.clear();
-        self.snake_row.resize(world.snakes.len(), UNSEEN);
+        self.snake_row.resize(world.snakes().len(), UNSEEN);
         for (slot, sighting) in self.sightings.iter().enumerate() {
             if let Some(sighting) = sighting {
                 self.snake_row[slot] = 0;
@@ -424,7 +424,7 @@ impl Frame {
         ] {
             column.clear();
         }
-        for (slot, s) in world.snakes.iter().enumerate() {
+        for (slot, s) in world.snakes().iter().enumerate() {
             if self.snake_row[slot] == UNSEEN {
                 continue;
             }
@@ -456,13 +456,13 @@ impl Frame {
 
     fn collect_food(&mut self, world: &Simulator) -> Result<(), SimError> {
         self.food_seen.clear();
-        self.food_seen.resize(world.food.len().div_ceil(64), 0);
+        self.food_seen.resize(world.food().len().div_ceil(64), 0);
         for sighting in self.sightings.iter().flatten() {
             for &i in &sighting.food {
                 self.food_seen[i / 64] |= 1 << (i % 64);
             }
         }
-        self.food_row.resize(world.food.len(), UNSEEN);
+        self.food_row.resize(world.food().len(), UNSEEN);
         let c = &mut self.food;
         c.origin.clear();
         c.size.clear();
@@ -474,7 +474,7 @@ impl Frame {
             while bits != 0 {
                 let i = word * 64 + bits.trailing_zeros() as usize;
                 bits &= bits - 1;
-                let f = &world.food[i];
+                let f = &world.food()[i];
                 self.food_row[i] = row(c.x.len(), "food row")?;
                 c.origin.push(origin_code(f.origin));
                 c.size.push(f.size.unwrap_or(f64::NAN));
@@ -488,7 +488,7 @@ impl Frame {
 
     fn collect_prey(&mut self, world: &Simulator) -> Result<(), SimError> {
         self.prey_row.clear();
-        self.prey_row.resize(world.prey.len(), UNSEEN);
+        self.prey_row.resize(world.prey().len(), UNSEEN);
         for sighting in self.sightings.iter().flatten() {
             for &i in &sighting.prey {
                 self.prey_row[i] = 0;
@@ -506,7 +506,7 @@ impl Frame {
             column.clear();
         }
         c.id.clear();
-        for (i, p) in world.prey.iter().enumerate() {
+        for (i, p) in world.prey().iter().enumerate() {
             if self.prey_row[i] == UNSEEN {
                 continue;
             }

@@ -198,3 +198,6 @@ impl<B: Backend> BotRunner<B> {
         Ok(frame)
     }
 }
+
+#[cfg(test)]
+pub(crate) mod test_support;

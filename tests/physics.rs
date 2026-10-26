@@ -1,3 +1,4 @@
+mod support;
 use serde::Deserialize;
 use slither_sim::{physics::*, *};
 use std::f64::consts::{FRAC_PI_2, PI};
@@ -102,19 +103,38 @@ fn anchor_projects_current_head_ray_after_curved_crossing() {
 }
 
 fn scene() -> Simulator {
-    let mut s = Simulator::new(
-        42,
-        Config {
+    let mut s = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             food_count: 0,
             radius: 10000.0,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["0".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    s.add("0", 0, 1).unwrap();
-    s.snakes[0].head = Point::default();
-    s.snakes[0].body = vec![Point::default(), Point { x: -42.0, y: 0.0 }];
-    s.snakes[0].heading = 0.0;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.head = Point::default();
+        s.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.body = vec![Point::default(), Point { x: -42.0, y: 0.0 }];
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        s.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.heading = 0.0;
+        s.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     s
 }
 
@@ -124,16 +144,20 @@ fn growth_mass(s: &Snake) -> f64 {
 #[test]
 fn growth_waits_for_anchor() {
     let mut s = scene();
-    s.snakes[0].fam = 1.25;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 1.25;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     let a = [Some(Action::default())];
     s.step(&a).unwrap();
-    assert_eq!(s.snakes[0].segments, 2);
-    while s.snakes[0].head.x < 43.0 {
+    assert_eq!(s.snakes()[0].segments, 2);
+    while s.snakes()[0].head.x < 43.0 {
         s.step(&a).unwrap();
     }
-    assert_eq!(s.snakes[0].segments, 3);
-    assert_eq!(s.snakes[0].fam, 0.25);
-    assert_eq!(s.snakes[0].body.len(), 3);
+    assert_eq!(s.snakes()[0].segments, 3);
+    assert_eq!(s.snakes()[0].fam, 0.25);
+    assert_eq!(s.snakes()[0].body.len(), 3);
 }
 #[test]
 fn boost_follows_held_request_and_minimum_mass() {
@@ -144,39 +168,48 @@ fn boost_follows_held_request_and_minimum_mass() {
     })];
     s.step(&on).unwrap();
     assert!(!s.is_boosting(0)); // No mass above the two-segment minimum.
-    assert_eq!(s.snakes[0].speed, base_speed(2));
+    assert_eq!(s.snakes()[0].speed, base_speed(2));
     // The held request starts boosting as soon as mass is available and drops a pellet at once.
-    s.snakes[0].fam = 0.6;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.6;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     s.step(&on).unwrap();
     assert!(s.is_boosting(0));
-    assert!(s.snakes[0].fam < 0.6);
-    assert!(s.food.iter().any(|f| f.origin == Some(Origin::Boost)));
+    assert!(s.snakes()[0].fam < 0.6);
+    assert!(s.food().iter().any(|f| f.origin == Some(Origin::Boost)));
     for _ in 0..2000 {
         s.step(&on).unwrap();
     }
-    assert_eq!(s.snakes[0].segments, 2);
-    assert_eq!(s.snakes[0].fam, 0.0);
+    assert_eq!(s.snakes()[0].segments, 2);
+    assert_eq!(s.snakes()[0].fam, 0.0);
     assert!(!s.is_boosting(0));
-    assert_eq!(s.snakes[0].speed, base_speed(2));
+    assert_eq!(s.snakes()[0].speed, base_speed(2));
 }
 #[test]
 fn exhausted_boost_waits_for_release_even_if_food_is_eaten_in_the_same_tick() {
     let mut s = scene();
-    s.snakes[0].fam = 0.02;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.02;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     let on = [Some(Action {
         heading: 0.0,
         boost: true,
     })];
     // Eat after the final boost debit in the same simulation step.
-    s.food.push(Food {
+    s.insert_food(Food {
         x: 45.0,
         y: 0.0,
         size: Some(8.0),
         value: 0.0,
         origin: Some(Origin::Ambient),
-    });
+    })
+    .unwrap();
     s.step(&on).unwrap();
-    assert!(s.snakes[0].fam > 0.02);
+    assert!(s.snakes()[0].fam > 0.02);
     assert!(!s.is_boosting(0));
     let spent = s.boost_accounting(0).unwrap();
     for _ in 0..100 {
@@ -189,13 +222,21 @@ fn exhausted_boost_waits_for_release_even_if_food_is_eaten_in_the_same_tick() {
     assert!(s.is_boosting(0));
     assert!(s.boost_accounting(0).unwrap().boost_mass_spent > spent.boost_mass_spent);
     // A respawn clears the exhausted state along with the rest of the life state.
-    s.snakes[0].fam = 0.001;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.001;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     for _ in 0..30 {
         s.step(&on).unwrap();
     }
-    s.snakes[0].alive = false;
+    s.retire(0).unwrap();
     s.respawn(0, Point::default(), 0.0, 2).unwrap();
-    s.snakes[0].fam = 0.6;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.6;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     s.step(&on).unwrap();
     assert!(s.is_boosting(0));
 }
@@ -203,24 +244,28 @@ fn exhausted_boost_waits_for_release_even_if_food_is_eaten_in_the_same_tick() {
 #[test]
 fn boost_drops_follow_the_measured_schedule_and_cost() {
     let mut s = scene();
-    s.snakes[0].fam = 0.9;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.9;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     let on = [Some(Action {
         heading: 0.0,
         boost: true,
     })];
     let mut drops = vec![];
     for tick in 0..400 {
-        let before = s.snakes[0].fam;
+        let before = s.snakes()[0].fam;
         s.step(&on).unwrap();
         // The final drop is capped by the remaining growth mass.
-        if s.snakes[0].fam < before && before > 0.1 {
-            drops.push((tick, before - s.snakes[0].fam));
+        if s.snakes()[0].fam < before && before > 0.1 {
+            drops.push((tick, before - s.snakes()[0].fam));
         }
     }
     assert!(drops.len() >= 10);
     for w in drops.windows(2) {
-        let gap = (w[1].0 - w[0].0) as f64 * s.config.dt;
-        assert!((gap - BOOST_DROP_SECONDS).abs() <= s.config.dt + 1e-9);
+        let gap = (w[1].0 - w[0].0) as f64 * s.config().dt;
+        assert!((gap - BOOST_DROP_SECONDS).abs() <= s.config().dt + 1e-9);
     }
     for (_, cost) in &drops {
         assert!((0.94 * boost_cost(2)..=1.08 * boost_cost(2)).contains(cost));
@@ -310,8 +355,12 @@ fn steering_uses_the_one_byte_heading() {
 #[test]
 fn boost_accounting_counts_active_ticks_and_exact_growth_mass() {
     let mut s = scene();
-    s.snakes[0].fam = 0.6;
-    let initial_mass = growth_mass(&s.snakes[0]);
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.6;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
+    let initial_mass = growth_mass(&s.snakes()[0]);
     let on = [Some(Action {
         heading: 0.0,
         boost: true,
@@ -320,17 +369,21 @@ fn boost_accounting_counts_active_ticks_and_exact_growth_mass() {
     s.step(&on).unwrap();
 
     let accounting = s.boost_accounting(0).unwrap();
-    assert_eq!(accounting.active_boost_seconds, s.config.dt);
+    assert_eq!(accounting.active_boost_seconds, s.config().dt);
     assert!(accounting.boost_mass_spent > 0.0);
     assert!(
-        (accounting.boost_mass_spent - (initial_mass - growth_mass(&s.snakes[0]))).abs() < 1e-12
+        (accounting.boost_mass_spent - (initial_mass - growth_mass(&s.snakes()[0]))).abs() < 1e-12
     );
 }
 
 #[test]
 fn boost_release_stops_further_accounting() {
     let mut s = scene();
-    s.snakes[0].fam = 0.6;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.6;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
     let on = [Some(Action {
         heading: 0.0,
         boost: true,
@@ -350,8 +403,12 @@ fn boost_release_stops_further_accounting() {
 #[test]
 fn boost_exhaustion_counts_the_final_active_tick_and_respawn_resets_it() {
     let mut s = scene();
-    s.snakes[0].fam = 0.02;
-    let initial_mass = growth_mass(&s.snakes[0]);
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.fam = 0.02;
+        s.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+    }
+    let initial_mass = growth_mass(&s.snakes()[0]);
     let on = [Some(Action {
         heading: 0.0,
         boost: true,
@@ -360,19 +417,19 @@ fn boost_exhaustion_counts_the_final_active_tick_and_respawn_resets_it() {
     s.step(&on).unwrap();
 
     let accounting = s.boost_accounting(0).unwrap();
-    assert_eq!(accounting.active_boost_seconds, s.config.dt);
+    assert_eq!(accounting.active_boost_seconds, s.config().dt);
     assert_eq!(accounting.boost_mass_spent, initial_mass);
-    assert_eq!(growth_mass(&s.snakes[0]), 0.0);
+    assert_eq!(growth_mass(&s.snakes()[0]), 0.0);
     assert!(!s.is_boosting(0));
 
-    s.snakes[0].alive = false;
+    s.retire(0).unwrap();
     s.respawn(0, Point::default(), 0.0, 2).unwrap();
     assert_eq!(s.boost_accounting(0).unwrap(), BoostAccounting::default());
 }
 #[test]
 fn invalid_batches_do_not_mutate_and_observations_are_detached() {
     let mut s = scene();
-    let before = s.snakes.clone();
+    let before = s.snakes().to_vec();
     assert!(s.step(&[]).is_err());
     assert!(
         s.step(&[Some(Action {
@@ -381,66 +438,122 @@ fn invalid_batches_do_not_mutate_and_observations_are_detached() {
         })])
         .is_err()
     );
-    assert_eq!(s.snakes, before);
-    assert_eq!(s.time, 0.0);
+    assert_eq!(s.snakes(), before);
+    assert_eq!(s.time(), 0.0);
     let mut observation = s.observe(0).unwrap();
     observation.me.body[0].x = 12345.0;
-    assert_eq!(s.snakes, before);
+    assert_eq!(s.snakes(), before);
 }
 #[test]
 fn collision_death_kill_and_food_ties() {
     let mut s = scene();
-    s.add("1", 0, 1).unwrap();
-    s.snakes[1].head = Point { x: 210.0, y: 20.0 };
-    s.snakes[1].heading = 0.0;
-    s.snakes[1].segments = 7;
-    s.snakes[1].head.y = 35.0;
-    s.snakes[1].body = [210.0, 168.0, 126.0, 84.0, 42.0, 0.0, -42.0]
-        .map(|x| Point { x, y: 35.0 })
-        .to_vec();
+    support::ring_slot(&mut s, "1", 0, 1).unwrap();
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.head = Point { x: 210.0, y: 20.0 };
+        s.correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.heading = 0.0;
+        s.correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.segments = 7;
+        snake
+            .body
+            .resize(snake.segments, *snake.body.last().unwrap());
+        s.correct_mass(1, snake.body.clone(), snake.fam).unwrap();
+    }
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.head.y = 35.0;
+        s.correct_pose(1, snake.head, snake.body, snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.body = [210.0, 168.0, 126.0, 84.0, 42.0, 0.0, -42.0]
+            .map(|x| Point { x, y: 35.0 })
+            .to_vec();
+        s.correct_mass(1, snake.body.clone(), snake.fam).unwrap();
+        s.correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     let a = [Some(Action::default()); 2];
     s.step(&a).unwrap();
-    assert!(s.snakes[0].alive);
+    assert!(s.snakes()[0].alive);
     // Alongside the body, 25 apart center to center: overlapping but harmless.
-    s.snakes[0].head.y = 10.0;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.head.y = 10.0;
+        s.correct_pose(0, snake.head, snake.body, snake.heading)
+            .unwrap();
+    }
     s.step(&a).unwrap();
-    assert!(s.snakes[0].alive);
+    assert!(s.snakes()[0].alive);
     // Turned into the body, the head's tip strikes it.
-    s.snakes[0].heading = FRAC_PI_2;
+    {
+        let mut snake = s.snakes()[0].clone();
+        snake.heading = FRAC_PI_2;
+        s.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     let up = Action {
         heading: FRAC_PI_2,
         boost: false,
     };
     s.step(&[Some(up), Some(Action::default())]).unwrap();
-    assert!(!s.snakes[0].alive);
-    assert_eq!(s.snakes[1].kills, 1);
-    assert_eq!(s.deaths[0].killer.as_deref(), Some("1"));
-    assert!(s.food.iter().any(|f| f.origin == Some(Origin::Death)));
-    let mut s = Simulator::new(
-        1,
-        Config {
+    assert!(!s.snakes()[0].alive);
+    assert_eq!(s.snakes()[1].kills, 1);
+    assert_eq!(s.deaths()[0].killer.as_deref(), Some("1"));
+    assert!(s.food().iter().any(|f| f.origin == Some(Origin::Death)));
+    let mut s = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
             food_count: 0,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     for (id, y) in [("b", -20.0), ("a", 20.0)] {
-        let i = s.add(id, 0, 1).unwrap();
-        s.snakes[i].head = Point { x: 0.0, y };
-        s.snakes[i].body = vec![Point { x: 0.0, y }, Point { x: -42.0, y }];
-        s.snakes[i].heading = 0.0;
+        let i = support::ring_slot(&mut s, id, 0, 1).unwrap();
+        {
+            let mut snake = s.snakes()[i].clone();
+            snake.head = Point { x: 0.0, y };
+            s.correct_pose(i, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = s.snakes()[i].clone();
+            snake.body = vec![Point { x: 0.0, y }, Point { x: -42.0, y }];
+            s.correct_mass(i, snake.body.clone(), snake.fam).unwrap();
+            s.correct_pose(i, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = s.snakes()[i].clone();
+            snake.heading = 0.0;
+            s.correct_pose(i, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
     }
-    s.food.push(Food {
+    s.insert_food(Food {
         // Equidistant from both pickup circles, which lead the heads by ~43 units.
         x: base_speed(2) * 0.032 * 7.4,
         y: 0.0,
         size: Some(5.0),
         value: 0.0,
         origin: None,
-    });
+    })
+    .unwrap();
     s.step(&a).unwrap();
-    assert_eq!(s.snakes[0].fam, 0.0);
-    assert!(s.snakes[1].fam > 0.0);
+    assert_eq!(s.snakes()[0].fam, 0.0);
+    assert!(s.snakes()[1].fam > 0.0);
 }
 
 #[derive(Deserialize)]
@@ -480,14 +593,30 @@ fn official_collision_geometry_spares_side_contact() {
 /// Two small snakes meet head on; returns the victims and killers.
 fn head_on(respawn_first: bool) -> Vec<(String, Option<String>)> {
     let mut s = scene();
-    s.add("1", 0, 1).unwrap();
+    support::ring_slot(&mut s, "1", 0, 1).unwrap();
     if respawn_first {
-        s.snakes[0].alive = false;
+        s.retire(0).unwrap();
         s.respawn(0, Point::default(), 0.0, 2).unwrap();
     }
-    s.snakes[1].head = Point { x: 60.0, y: 1.0 };
-    s.snakes[1].body = vec![Point { x: 60.0, y: 1.0 }, Point { x: 102.0, y: 1.0 }];
-    s.snakes[1].heading = PI;
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.head = Point { x: 60.0, y: 1.0 };
+        s.correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.body = vec![Point { x: 60.0, y: 1.0 }, Point { x: 102.0, y: 1.0 }];
+        s.correct_mass(1, snake.body.clone(), snake.fam).unwrap();
+        s.correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = s.snakes()[1].clone();
+        snake.heading = PI;
+        s.correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     let a = [
         Some(Action::default()),
         Some(Action {
@@ -495,10 +624,10 @@ fn head_on(respawn_first: bool) -> Vec<(String, Option<String>)> {
             boost: false,
         }),
     ];
-    while s.deaths.is_empty() {
+    while s.deaths().is_empty() {
         s.step(&a).unwrap();
     }
-    s.deaths
+    s.deaths()
         .iter()
         .map(|d| (d.victim.clone(), d.killer.clone()))
         .collect()
@@ -515,16 +644,37 @@ fn head_on_contact_kills_only_the_earlier_joined_snake() {
 fn collision_bounds_follow_sparse_slots_and_respawn_join_order() {
     for respawn_first in [false, true] {
         let mut world = scene();
-        world.add("unused", 0, 1).unwrap();
-        world.add("2", 0, 1).unwrap();
-        world.snakes[1].alive = false;
+        support::ring_slot(&mut world, "unused", 0, 1).unwrap();
+        support::ring_slot(&mut world, "2", 0, 1).unwrap();
+        world.retire(1).unwrap();
         if respawn_first {
-            world.snakes[0].alive = false;
+            world.retire(0).unwrap();
             world.respawn(0, Point::default(), 0.0, 2).unwrap();
         }
-        world.snakes[2].head = Point { x: 60.0, y: 1.0 };
-        world.snakes[2].body = vec![Point { x: 60.0, y: 1.0 }, Point { x: 102.0, y: 1.0 }];
-        world.snakes[2].heading = PI;
+        {
+            let mut snake = world.snakes()[2].clone();
+            snake.head = Point { x: 60.0, y: 1.0 };
+            world
+                .correct_pose(2, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[2].clone();
+            snake.body = vec![Point { x: 60.0, y: 1.0 }, Point { x: 102.0, y: 1.0 }];
+            world
+                .correct_mass(2, snake.body.clone(), snake.fam)
+                .unwrap();
+            world
+                .correct_pose(2, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[2].clone();
+            snake.heading = PI;
+            world
+                .correct_pose(2, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
         let actions = [
             Some(Action::default()),
             None,
@@ -535,7 +685,7 @@ fn collision_bounds_follow_sparse_slots_and_respawn_join_order() {
         ];
         for _ in 0..100 {
             world.step(&actions).unwrap();
-            if !world.deaths.is_empty() {
+            if !world.deaths().is_empty() {
                 break;
             }
         }
@@ -544,8 +694,8 @@ fn collision_bounds_follow_sparse_slots_and_respawn_join_order() {
         } else {
             ("0", "2")
         };
-        assert_eq!(world.deaths.len(), 1);
-        assert_eq!(world.deaths[0].victim, expected.0);
-        assert_eq!(world.deaths[0].killer.as_deref(), Some(expected.1));
+        assert_eq!(world.deaths().len(), 1);
+        assert_eq!(world.deaths()[0].victim, expected.0);
+        assert_eq!(world.deaths()[0].killer.as_deref(), Some(expected.1));
     }
 }

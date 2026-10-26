@@ -43,6 +43,7 @@ class Session:
         agents: int = 4,
         decision_ticks: int = 6,
         config: dict[str, Any] | None = None,
+        placement: dict[str, Any] | None = None,
     ) -> None:
         """Replace the worlds like a JSON reset; raise ValueError on rejection, keeping the old ones.
 

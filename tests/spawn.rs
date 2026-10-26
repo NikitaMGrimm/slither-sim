@@ -1,20 +1,24 @@
+mod support;
 use slither_sim::{Action, Config, Point, Simulator};
 use slither_sim::{Constraint, ErrorKind};
 
 fn world() -> Simulator {
-    let mut world = Simulator::new(
-        1,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
             radius: 3000.,
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Default::default()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..2).map(|i| i.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
     for i in 0..2 {
-        world.add(i.to_string(), i, 2).unwrap();
-        world.snakes[i].alive = false;
+        world.retire(i).unwrap();
     }
     world.respawn(0, Point::default(), 0., 2).unwrap();
     world
@@ -51,22 +55,33 @@ fn exclusion_checks_new_tail_existing_body_and_boundary() {
     let mut w = world();
     // Head is far away, but the new long tail would appear directly ahead.
     assert!(!w.spawn_is_clear(Point { x: 900., y: 0. }, 0., 22, 600.));
-    w.snakes[0].head = Point { x: 1200., y: 1200. };
-    w.snakes[0].body = vec![
-        Point {
-            x: -1200.,
-            y: 1200.,
-        },
-        Point {
-            x: -1200.,
-            y: -1200.,
-        },
-    ];
+    {
+        let mut snake = w.snakes()[0].clone();
+        snake.head = Point { x: 1200., y: 1200. };
+        w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = w.snakes()[0].clone();
+        snake.body = vec![
+            Point {
+                x: -1200.,
+                y: 1200.,
+            },
+            Point {
+                x: -1200.,
+                y: -1200.,
+            },
+        ];
+        w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     assert!(!w.spawn_is_clear(Point { x: -1100., y: 0. }, 0., 2, 600.));
     assert!(w.spawn_is_clear(Point::default(), 0., 2, 600.));
     assert!(!w.spawn_is_clear(Point { x: 2950., y: 0. }, 0., 2, 600.));
     assert!(!w.spawn_is_clear(Point::default(), 0., 2, f64::NAN));
-    w.snakes[0].alive = false;
+    w.retire(0).unwrap();
     assert!(w.spawn_is_clear(Point { x: -1100., y: 0. }, 0., 2, 600.));
 }
 #[test]
@@ -104,20 +119,23 @@ fn tiny_custom_arena_without_a_spawn_band_uses_its_center() {
 }
 
 #[test]
-fn initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
+fn initial_ring_and_checked_spawn_reject_outside_tails() {
     for radius in [50., 84.] {
-        let mut world = Simulator::new(
-            1,
-            Config {
-                radius,
-                food_count: 0,
-                ambient_replenish_per_second: 0.,
-                ..Config::sandbox()
+        let config = Config {
+            radius,
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            ..Config::sandbox()
+        };
+        let error = Simulator::new(slither_sim::WorldOptions {
+            seed: 1,
+            config: config.clone(),
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["a".into()],
+                placement: slither_sim::Placement::TestRing,
             },
-        )
-        .unwrap();
-        let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
-        let error = world.add("a", 0, 1).unwrap_err();
+        })
+        .unwrap_err();
         assert_eq!(
             error.kind,
             ErrorKind::InvalidState {
@@ -126,12 +144,71 @@ fn initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
         );
         assert_eq!(error.slot, Some(0));
         assert_eq!(error.field.as_deref(), Some("body"));
+        let mut world = Simulator::new(slither_sim::WorldOptions {
+            seed: 1,
+            config,
+            population: slither_sim::InitialPopulation::Empty,
+        })
+        .unwrap();
+        let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
+        let body = vec![
+            Point {
+                x: radius * 0.5,
+                y: 0.,
+            },
+            Point {
+                x: radius * 0.5 + 42.,
+                y: 0.,
+            },
+        ];
+        let error = world
+            .spawn("a".into(), body, std::f64::consts::PI)
+            .unwrap_err();
+        assert_eq!(
+            error.kind,
+            ErrorKind::InvalidState {
+                rule: Constraint::OutsideArena
+            }
+        );
         assert_eq!(
             serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
             before
         );
-        // The same ring remains available once the arena contains its tail.
-        world.config.radius = 85.;
-        assert_eq!(world.add("a", 0, 1).unwrap(), 0);
     }
+    let world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
+            radius: 85.,
+            food_count: 0,
+            ..Config::sandbox()
+        },
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    assert_eq!(world.snakes().len(), 1);
+}
+
+#[test]
+fn duplicate_checked_appends_preserve_every_slot_and_random_stream() {
+    let mut world = world();
+    let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
+    let body = vec![Point::default(), Point { x: -42., y: 0. }];
+    assert_eq!(
+        world.spawn("0".into(), body, 0.).unwrap_err().kind,
+        ErrorKind::DuplicateId
+    );
+    assert_eq!(
+        world.append_dormant("0".into()).unwrap_err().kind,
+        ErrorKind::DuplicateId
+    );
+    assert_eq!(
+        serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+        before
+    );
+    assert_eq!(world.append_dormant("new".into()).unwrap(), 2);
+    assert!(!world.snakes()[2].alive);
+    assert_eq!(world.death_time(2), None);
 }

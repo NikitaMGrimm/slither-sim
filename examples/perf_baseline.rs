@@ -3,6 +3,12 @@
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
 //! No additional dependencies, sockets, files, or wall-clock bot processing samples.
+#[path = "support/runtime.rs"]
+mod runtime;
+#[cfg(not(slither_private_state))]
+#[allow(unused_imports)]
+use runtime::LegacyState;
+
 #[path = "support/state.rs"]
 mod checkpoint_state;
 use serde_json::{Value, json};
@@ -636,14 +642,14 @@ impl Progress {
             episode_ticks: 0,
             resets: 0,
             min_living: world.living(),
-            min_food: world.food.len(),
+            min_food: world.food().len(),
             deaths: 0,
-            previous_deaths: world.deaths.len(),
+            previous_deaths: world.deaths().len(),
         }
     }
 
     fn needs_reset(&self, world: &Simulator, next_ticks: usize) -> bool {
-        self.episode_ticks + next_ticks > EPISODE_TICKS || world.living() < world.snakes.len()
+        self.episode_ticks + next_ticks > EPISODE_TICKS || world.living() < world.snakes().len()
     }
 
     fn reset(&mut self) {
@@ -656,9 +662,9 @@ impl Progress {
         self.ticks += ticks;
         self.episode_ticks += ticks;
         self.min_living = self.min_living.min(world.living());
-        self.min_food = self.min_food.min(world.food.len());
-        self.deaths += world.deaths.len() - self.previous_deaths;
-        self.previous_deaths = world.deaths.len();
+        self.min_food = self.min_food.min(world.food().len());
+        self.deaths += world.deaths().len() - self.previous_deaths;
+        self.previous_deaths = world.deaths().len();
     }
 
     fn report(&self) -> Value {
@@ -674,7 +680,7 @@ impl Progress {
 
 fn controls(world: &Simulator, centers: &[Point], orbit: f64, tick: usize) -> Vec<Option<Action>> {
     world
-        .snakes
+        .snakes()
         .iter()
         .zip(centers)
         .map(|(snake, center)| {
@@ -720,19 +726,17 @@ fn core_config(case: &str) -> Result<(usize, Config), String> {
 
 fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
     let (agents, config) = core_config(case)?;
-    let mut world = Simulator::new(SEED, config).map_err(|error| error.to_string())?;
+    let mut world = runtime::ring(SEED, config, agents)?;
     let mut centers = vec![Point::default(); agents];
     let orbit = if case == "step-body" {
         400.0
     } else {
-        world.config.radius * 0.5
+        world.config().radius * 0.5
     };
+    let mut snakes = world.snakes().to_vec();
     for (slot, center) in centers.iter_mut().enumerate() {
-        world
-            .add(slot.to_string(), slot, agents)
-            .map_err(|error| error.to_string())?;
         if case == "step-body" || case == "observe" {
-            let snake = &mut world.snakes[slot];
+            let snake = &mut snakes[slot];
             if case == "step-body" {
                 let origin = Point {
                     x: (slot % 8) as f64 * 2100.0 - 7350.0,
@@ -776,16 +780,12 @@ fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
             snake.segments = snake.body.len();
             snake.fam = 0.75;
             snake.speed = physics::base_speed(snake.segments);
-            Simulator::update_mass(snake);
-            world
-                .initialize_speed_state(slot, Some(0.0))
-                .map_err(|error| error.to_string())?;
         }
     }
+    runtime::initial_snakes(&mut world, snakes)?;
     // Keep timing and trace workloads on the same telemetry path. Events are
     // explicitly included in traces because Simulator's serde representation skips them.
-    world.pickup_events = Some(Vec::new());
-    world.food_spawn_events = Some(Vec::new());
+    runtime::record_events(&mut world);
     Ok((world, centers, orbit))
 }
 
@@ -804,7 +804,7 @@ fn canonical(value: Value) -> Value {
 }
 
 fn pickups(world: &Simulator) -> Option<Vec<Value>> {
-    world.pickup_events.as_ref().map(|events| {
+    world.pickup_events().as_ref().map(|events| {
         events
             .iter()
             .map(|event| {
@@ -819,7 +819,7 @@ fn pickups(world: &Simulator) -> Option<Vec<Value>> {
 }
 
 fn births(world: &Simulator) -> Option<Vec<Value>> {
-    world.food_spawn_events.as_ref().map(|events| {
+    world.food_spawn_events().as_ref().map(|events| {
         events
             .iter()
             .map(|event| json!({"source": event.source, "food": event.food}))
@@ -951,7 +951,7 @@ fn run_core(args: &Args, out: &mut impl Write) -> Result<Value, String> {
         },
         json!({
             "initial": initial, "final": WorldStats::from_world(&world), "progress": progress.report(),
-            "config": world.config, "eventBuffersEnabled": true,
+            "config": world.config(), "eventBuffersEnabled": true,
             "control": "own-head tangent with radial correction; boost held for 16 of 128 episode ticks",
             "bodyShape": if args.case == "step-body" { "64 separated 128-anchor serpentine bodies; local 400-unit orbits" } else if observe { "32 radial 32-anchor bodies and eight prey; immutable world" } else { "Simulator::add ring starts" },
             "profile": if args.profile { Some(profile) } else { None },
@@ -987,7 +987,7 @@ mod portable {
     #[test]
     fn client_workload_retains_the_compact_fixture() {
         let backend = backend(false).unwrap();
-        let world = &backend.world().config;
+        let world = &backend.world().config();
         assert_eq!(world.radius, 1000.);
         assert!(!world.dynamic_radius);
         assert_eq!(world.food_count, 350);
@@ -1010,7 +1010,7 @@ mod portable {
         let mut actions = controls(
             backend.world(),
             &centers,
-            backend.world().config.radius * 0.5,
+            backend.world().config().radius * 0.5,
             tick,
         );
         for (action, frame) in actions.iter_mut().zip(frames) {
@@ -1377,9 +1377,9 @@ mod portable {
         let simulation = client_simulation(client);
         let decision_ticks = simulation.decision_ticks;
         let mut backend = SimulatorBackend::new(SEED, simulation)?;
-        let death_food =
-            backend.world().config.death_food.enabled && backend.world().config.min_score.is_none();
-        let mut cursor = backend.world().deaths.len();
+        let death_food = backend.world().config().death_food.enabled
+            && backend.world().config().min_score.is_none();
+        let mut cursor = backend.world().deaths().len();
         let mut current_frames = frames(&backend)?;
         let initial = WorldStats::from_world(backend.world());
         let wire = records(&mut backend)?;
@@ -1471,8 +1471,8 @@ mod portable {
             let wire = records(&mut backend)?;
             black_box(&wire);
             let world = backend.world();
-            let deaths = world.deaths[cursor..].to_vec();
-            cursor = world.deaths.len();
+            let deaths = world.deaths()[cursor..].to_vec();
+            cursor = world.deaths().len();
             let counts = if measured { &mut lifecycle } else { &mut warm };
             counts.deaths(&deaths);
             counts.respawns += reconnects.len();
@@ -1604,11 +1604,11 @@ impl Controller {
 }
 
 fn wander(world: &Simulator, tick: usize) -> Vec<Option<Action>> {
-    let radius = world.config.radius;
+    let radius = world.config().radius;
     let margin = (radius * 0.12).max(300.0);
-    let count = world.snakes.len();
+    let count = world.snakes().len();
     world
-        .snakes
+        .snakes()
         .iter()
         .enumerate()
         .map(|(slot, snake)| {
@@ -1621,8 +1621,8 @@ fn wander(world: &Simulator, tick: usize) -> Vec<Option<Action>> {
                 let target = (hash >> 8) as usize % count;
                 let heading = if x.hypot(y) > radius - margin {
                     (-y).atan2(-x) + jitter
-                } else if hash.is_multiple_of(4) && target != slot && world.snakes[target].alive {
-                    let other = &world.snakes[target];
+                } else if hash.is_multiple_of(4) && target != slot && world.snakes()[target].alive {
+                    let other = &world.snakes()[target];
                     (other.head.y + other.heading.sin() * CHASE_LEAD - y)
                         .atan2(other.head.x + other.heading.cos() * CHASE_LEAD - x)
                 } else {
@@ -1739,7 +1739,7 @@ impl PopulationStats {
     fn record(&mut self, world: &Simulator) {
         let living = world.living();
         let anchors = world
-            .snakes
+            .snakes()
             .iter()
             .filter(|snake| snake.alive)
             .map(|snake| snake.body.len())
@@ -1769,7 +1769,7 @@ impl PopulationStats {
 struct Scene {
     world: Simulator,
     random: HarnessRandom,
-    /// Deaths are read through this cursor; `world.deaths` stays untouched.
+    /// Deaths are read through this cursor; `world.deaths()` stays untouched.
     cursor: usize,
     /// Dead slots with their drawn segment counts and due ticks, in death order.
     queue: VecDeque<(usize, usize, usize)>,
@@ -1799,20 +1799,14 @@ impl Boundary {
 
 impl Scene {
     fn place(scenario: &Scenario) -> Result<Self, String> {
-        let mut world =
-            Simulator::new(SEED, scenario.world.config()).map_err(|error| error.to_string())?;
-        world.pickup_events = Some(Vec::new());
-        world.food_spawn_events = Some(Vec::new());
+        let mut world = runtime::ring(SEED, scenario.world.config(), scenario.population)?;
+        runtime::record_events(&mut world);
+        // Initial lives enter through the respawn path, retaining the historical
+        // ring pose for slots waiting for admission.
         for slot in 0..scenario.population {
-            world
-                .add(slot.to_string(), slot, scenario.population)
-                .map_err(|error| error.to_string())?;
+            runtime::retire(&mut world, slot)?;
         }
-        // Initial lives enter through the respawn path, so they share its spawn rules.
-        for snake in &mut world.snakes {
-            snake.alive = false;
-        }
-        let retry_ticks = if world.config.spawn_radius.is_some() {
+        let retry_ticks = if world.config().spawn_radius.is_some() {
             RING_RESPAWN_RETRY_TICKS
         } else {
             RESPAWN_RETRY_TICKS
@@ -1828,14 +1822,14 @@ impl Scene {
         };
         for slot in 0..scenario.population {
             let segments = scene.draw_segments();
-            let attempts = if scene.world.config.spawn_radius.is_some() {
+            let attempts = if scene.world.config().spawn_radius.is_some() {
                 RESPAWN_ATTEMPTS
             } else {
                 PLACEMENT_ATTEMPTS
             };
             match scene.pose(segments, attempts) {
                 Some((head, heading)) => scene.respawn(slot, head, heading, segments)?,
-                None if scene.world.config.spawn_radius.is_some() => {
+                None if scene.world.config().spawn_radius.is_some() => {
                     // Newborn ring capacity is smaller than the eventual living population.
                     scene.queue.push_back((slot, segments, scene.retry_ticks));
                 }
@@ -1847,7 +1841,7 @@ impl Scene {
                 }
             }
         }
-        scene.cursor = scene.world.deaths.len();
+        scene.cursor = scene.world.deaths().len();
         Ok(scene)
     }
 
@@ -1858,14 +1852,14 @@ impl Scene {
 
     fn pose(&mut self, segments: usize, attempts: usize) -> Option<(Point, f64)> {
         for _ in 0..attempts {
-            let distance = spawn::spawn_distance(&self.world.config, self.random.unit());
+            let distance = spawn::spawn_distance(self.world.config(), self.random.unit());
             let angle = self.random.unit() * TAU;
             let heading = self.random.unit() * TAU;
             let head = Point {
                 x: angle.cos() * distance,
                 y: angle.sin() * distance,
             };
-            let clear = if self.world.config.spawn_radius.is_some() {
+            let clear = if self.world.config().spawn_radius.is_some() {
                 let (body, _) = self.world.spawn_body(head, heading).ok()?;
                 self.world.body_is_clear(&body, self.clearance)
             } else {
@@ -1886,7 +1880,7 @@ impl Scene {
         heading: f64,
         segments: usize,
     ) -> Result<(), String> {
-        if self.world.config.spawn_radius.is_some() {
+        if self.world.config().spawn_radius.is_some() {
             let (body, heading) = self
                 .world
                 .spawn_body(head, heading)
@@ -1917,8 +1911,8 @@ impl Scene {
 
     /// Untimed work between operations: queue new deaths and respawn due slots.
     fn boundary(&mut self, tick: usize, lifecycle: &mut Lifecycle) -> Result<Boundary, String> {
-        let deaths = self.world.deaths[self.cursor..].to_vec();
-        self.cursor = self.world.deaths.len();
+        let deaths = self.world.deaths()[self.cursor..].to_vec();
+        self.cursor = self.world.deaths().len();
         lifecycle.deaths(&deaths);
         for death in &deaths {
             let slot = death
@@ -1938,7 +1932,7 @@ impl Scene {
             match self.pose(segments, RESPAWN_ATTEMPTS) {
                 Some((head, heading)) => {
                     self.respawn(slot, head, heading, segments)?;
-                    let snake = &self.world.snakes[slot];
+                    let snake = &self.world.snakes()[slot];
                     respawns.push((slot, snake.head, snake.heading, snake.segments));
                 }
                 None => {
@@ -1981,7 +1975,7 @@ fn run_scenario(
     let mut scene = Scene::place(scenario)?;
     set_parallel(&mut scene.world, args);
     let death_food =
-        scene.world.config.death_food.enabled && scene.world.config.min_score.is_none();
+        scene.world.config().death_food.enabled && scene.world.config().min_score.is_none();
     let initial = WorldStats::from_world(&scene.world);
     let initial_queued = scene.queue.len();
     if args.trace {
@@ -2330,10 +2324,10 @@ mod tests {
                     "{}",
                     scenario.id
                 );
-                if scene.world.config.spawn_radius.is_none() {
+                if scene.world.config().spawn_radius.is_none() {
                     assert!(scene.queue.is_empty());
                 }
-                assert!(scene.world.deaths.is_empty());
+                assert!(scene.world.deaths().is_empty());
             }
         }
     }
@@ -2351,14 +2345,14 @@ mod tests {
             .unwrap();
         let mut scene = Scene::place(scenario).unwrap();
         assert_eq!(
-            serde_json::to_value(&scene.world.config).unwrap(),
+            serde_json::to_value(scene.world.config()).unwrap(),
             serde_json::to_value(Config::battledome()).unwrap()
         );
         let check = |world: &Simulator, slot: usize| {
-            let snake = &world.snakes[slot];
+            let snake = &world.snakes()[slot];
             let ring = snake.head.distance(Point::default());
-            assert!(ring >= world.config.spawn_radius.unwrap() - 1e-9);
-            assert!(ring <= world.config.spawn_radius_max.unwrap() + 1e-9);
+            assert!(ring >= world.config().spawn_radius.unwrap() - 1e-9);
+            assert!(ring <= world.config().spawn_radius_max.unwrap() + 1e-9);
             let (body, heading) = world.spawn_body(snake.head, snake.heading).unwrap();
             assert_eq!(snake.body, body);
             assert!((snake.heading - heading).abs() < 1e-12);
@@ -2374,7 +2368,7 @@ mod tests {
         for slot in 0..scenario.population {
             check(&scene.world, slot);
         }
-        scene.world.snakes[0].alive = false;
+        runtime::retire(&mut scene.world, 0).unwrap();
         let (head, heading) = scene.pose(26, PLACEMENT_ATTEMPTS).unwrap();
         scene.respawn(0, head, heading, 26).unwrap();
         check(&scene.world, 0);
@@ -2383,8 +2377,8 @@ mod tests {
         let queued = 0;
         scene.queue.clear();
         scene.queue.push_back((queued, 26, scene.retry_ticks));
-        for snake in &mut scene.world.snakes {
-            snake.alive = false;
+        for slot in 0..scene.world.snakes().len() {
+            runtime::retire(&mut scene.world, slot).unwrap();
         }
         let boundary = scene
             .boundary(scene.retry_ticks, &mut Lifecycle::default())
@@ -2480,15 +2474,24 @@ mod tests {
         for tick in 0..2000 {
             let actions = SMALL.controller.actions(&scene.world, tick);
             scene.step(&actions, None).unwrap();
-            if let Some(death) = scene.world.deaths.get(scene.cursor) {
+            if let Some(death) = scene.world.deaths().get(scene.cursor) {
                 let victim: usize = death.victim.parse().unwrap();
                 let mut changed = scene.clone();
-                changed.world.snakes[victim].heading += 1.0;
+                let snake = changed.world.snakes()[victim].clone();
+                #[cfg(slither_private_state)]
+                changed
+                    .world
+                    .correct_pose(victim, snake.head, snake.body, snake.heading + 1.)
+                    .unwrap();
+                #[cfg(not(slither_private_state))]
+                {
+                    changed.world.snakes[victim].heading += 1.0;
+                }
                 let record = |scene: &mut Scene| {
                     let (snapshot, boundary) =
                         settle(scene, tick + 1, &mut Lifecycle::default(), world_events).unwrap();
                     assert!(boundary.respawns.iter().any(|r| r.0 == victim));
-                    (snapshot, scene.world.snakes[victim].heading)
+                    (snapshot, scene.world.snakes()[victim].heading)
                 };
                 let (original, respawned) = record(&mut scene);
                 let (mutated, respawned_after_change) = record(&mut changed);

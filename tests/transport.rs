@@ -122,18 +122,23 @@ fn view(frame: &Value, slot: usize) -> Value {
 
 fn world(seed: u32, agents: usize, config: Value) -> Simulator {
     let config: Config = serde_json::from_value(config).unwrap();
-    let mut world = Simulator::new(seed, config).unwrap();
-    for slot in 0..agents {
-        world.add(slot.to_string(), slot, agents).unwrap();
-    }
+    let world = Simulator::new(slither_sim::WorldOptions {
+        seed,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..agents).map(|slot| slot.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     world
 }
 
 fn assert_frame_matches(frame: &Value, world: &Simulator) {
-    assert_eq!(frame["time"], json!(world.time));
+    assert_eq!(frame["time"], json!(world.time()));
     assert_eq!(frame["living"], world.living());
-    assert_eq!(frame["radius"], json!(world.config.radius));
-    assert_eq!(frame["vision"], json!(world.config.vision));
+    assert_eq!(frame["radius"], json!(world.radius()));
+    assert_eq!(frame["vision"], json!(world.config().vision));
     for (slot, observation) in world.observe_all().iter().enumerate() {
         match observation {
             Some(observation) => assert_eq!(view(frame, slot), expected(observation, slot)),
@@ -323,8 +328,8 @@ fn snapshots_exclude_hidden_state() {
         assert!(!snapshot.contains_key(hidden));
     }
     let core = world(9, 2, replies[1]["result"]["config"].clone());
-    assert_eq!(snapshot["snakes"], json!(core.snakes));
-    assert_eq!(snapshot["food"], json!(core.food));
+    assert_eq!(snapshot["snakes"], json!(core.snakes()));
+    assert_eq!(snapshot["food"], json!(core.food()));
 }
 
 #[test]

@@ -7,12 +7,28 @@ use std::error::Error;
 fn rejected_batches_and_headings_preserve_exact_state() {
     use slither_sim::{Action, Config, Simulator, WorldStatus, profiling::StepProfile};
     for profiled in [false, true] {
-        let mut world = Simulator::new(7, Config::sandbox()).unwrap();
-        world.add("a", 0, 1).unwrap();
-        world.pickup_events = Some(Vec::new());
-        world.food_spawn_events = Some(Vec::new());
+        let mut world = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["a".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        world.record_events(slither_sim::EventRecording {
+            pickups: true,
+            food_births: world.food_spawn_events().is_some(),
+        });
+        world.record_events(slither_sim::EventRecording {
+            food_births: true,
+            pickups: world.pickup_events().is_some(),
+        });
         let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
-        let events = (world.pickup_events.clone(), world.food_spawn_events.clone());
+        let events = (
+            world.pickup_events().map(<[_]>::to_vec),
+            world.food_spawn_events().map(<[_]>::to_vec),
+        );
         let mut profile = StepProfile::default();
         for (actions, kind) in [
             (
@@ -67,7 +83,7 @@ fn rejected_batches_and_headings_preserve_exact_state() {
                 before
             );
             assert_eq!(
-                (&world.pickup_events, &world.food_spawn_events),
+                (&world.pickup_events(), &world.food_spawn_events()),
                 (&events.0, &events.1)
             );
             assert_eq!(profile.ticks, 0);
@@ -83,31 +99,42 @@ fn food_overflow_completes_one_tick_and_retries_preserve_all_state() {
     };
     let mut reference = None;
     for profiled in [false, true] {
-        let mut world = Simulator::new(
-            7,
-            Config {
+        let mut world = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config {
                 food_count: 0,
                 ambient_replenish_per_second: 0.,
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["a".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
         .unwrap();
-        world.add("a", 0, 1).unwrap();
-        world.pickup_events = Some(Vec::new());
-        world.food_spawn_events = Some(Vec::new());
-        let snake = &world.snakes[0];
+        world.record_events(slither_sim::EventRecording {
+            pickups: true,
+            food_births: world.food_spawn_events().is_some(),
+        });
+        world.record_events(slither_sim::EventRecording {
+            food_births: true,
+            pickups: world.pickup_events().is_some(),
+        });
+        let snake = &world.snakes()[0];
         let heading = snake.heading;
         let (point, _) = physics::pickup_circle(snake.head, heading, snake.speed, snake.segments);
-        world.food = vec![
-            Food {
-                x: point.x,
-                y: point.y,
-                value: f64::MAX,
-                origin: None,
-                size: None
-            };
-            2
-        ];
+        world
+            .replace_food(vec![
+                Food {
+                    x: point.x,
+                    y: point.y,
+                    value: f64::MAX,
+                    origin: None,
+                    size: None
+                };
+                2
+            ])
+            .unwrap();
         let actions = [Some(Action {
             heading,
             boost: false,
@@ -124,12 +151,15 @@ fn food_overflow_completes_one_tick_and_retries_preserve_all_state() {
         assert_eq!(cause.kind, ErrorKind::NumericOverflow);
         assert_eq!((cause.slot, cause.field.as_deref()), (Some(0), Some("fam")));
         assert_eq!(world.status(), WorldStatus::Stopped(&cause));
-        assert_eq!(world.time, world.config.dt);
-        assert_eq!(world.snakes[0].fam, f64::MAX);
-        assert!(world.food.is_empty());
-        assert_eq!(world.pickup_events.as_ref().unwrap().len(), 2);
+        assert_eq!(world.time(), world.config().dt);
+        assert_eq!(world.snakes()[0].fam, f64::MAX);
+        assert!(world.food().is_empty());
+        assert_eq!(world.pickup_events().unwrap().len(), 2);
         let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
-        let events = (world.pickup_events.clone(), world.food_spawn_events.clone());
+        let events = (
+            world.pickup_events().map(<[_]>::to_vec),
+            world.food_spawn_events().map(<[_]>::to_vec),
+        );
         let ticks = profile.ticks;
         let result = if profiled {
             world.step_profiled(&actions, &mut profile)
@@ -145,7 +175,10 @@ fn food_overflow_completes_one_tick_and_retries_preserve_all_state() {
             before
         );
         assert_eq!(
-            (world.pickup_events.clone(), world.food_spawn_events.clone()),
+            (
+                world.pickup_events().map(<[_]>::to_vec),
+                world.food_spawn_events().map(<[_]>::to_vec)
+            ),
             events
         );
         assert_eq!(profile.ticks, ticks);

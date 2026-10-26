@@ -1232,8 +1232,13 @@ mod tests {
 
     #[test]
     fn export_rejects_each_short_runtime_companion_before_indexing() {
-        let mut source = Simulator::new(7, Config::sandbox()).unwrap();
-        source.add("a", 0, 1).unwrap();
+        let mut source = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
+        source.push_ring("a".into(), 0, 1).unwrap();
         for shorten in [
             (|w: &mut Simulator| w.boosts.clear()) as fn(&mut Simulator),
             |w| w.speeds.clear(),

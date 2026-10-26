@@ -1,3 +1,4 @@
+mod support;
 use slither_sim::*;
 
 fn prey(position: Point) -> Prey {
@@ -12,19 +13,22 @@ fn prey(position: Point) -> Prey {
 }
 
 fn world() -> Simulator {
-    Simulator::new(
-        42,
-        Config {
+    Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             food_count: 0,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap()
 }
 
 fn add_snake(w: &mut Simulator, head: Point, boost: bool) {
-    let index = w.add(format!("threat{}", w.snakes.len()), 0, 1).unwrap();
-    let snake = &mut w.snakes[index];
+    let id = format!("threat{}", w.snakes().len());
+    let index = support::ring_slot(w, id, 0, 1).unwrap();
+    let mut detached_snake = w.snakes()[index].clone();
+    let snake = &mut detached_snake;
     snake.head = head;
     snake.heading = std::f64::consts::PI;
     snake.body = vec![
@@ -36,23 +40,35 @@ fn add_snake(w: &mut Simulator, head: Point, boost: bool) {
     ];
     if boost {
         snake.segments = 10;
+        snake.body.resize(10, *snake.body.last().unwrap());
         snake.fam = 0.5;
-        Simulator::update_mass(snake);
         snake.speed = physics::BOOST_SPEED;
     }
+    w.import_life(
+        index,
+        slither_sim::ReplayLife::from_observed(
+            snake.clone(),
+            slither_sim::InitialSpeed::Infer(snake.speed),
+        ),
+    )
+    .unwrap();
 }
 
 #[test]
 fn diagonal_prey_activates_inside_the_recorded_square() {
     let mut w = world();
     add_snake(&mut w, Point::default(), false);
-    w.prey.push(prey(Point { x: 280., y: 280. }));
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: prey(Point { x: 280., y: 280. }),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[Some(Action {
         heading: std::f64::consts::PI,
         boost: false,
     })])
     .unwrap();
-    assert_eq!(w.prey[0].speed, w.config.prey.escape_speed);
+    assert_eq!(w.prey()[0].speed, w.config().prey.escape_speed);
 }
 
 #[test]
@@ -60,7 +76,11 @@ fn nearer_snake_outside_square_does_not_hide_an_eligible_diagonal_threat() {
     let mut w = world();
     add_snake(&mut w, Point { x: -330., y: 0. }, false);
     add_snake(&mut w, Point { x: -290., y: -290. }, true);
-    w.prey.push(prey(Point::default()));
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: prey(Point::default()),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[
         Some(Action {
             heading: std::f64::consts::PI,
@@ -72,18 +92,22 @@ fn nearer_snake_outside_square_does_not_hide_an_eligible_diagonal_threat() {
         }),
     ])
     .unwrap();
-    assert_eq!(w.prey[0].speed, w.config.prey.sprint_speed);
+    assert_eq!(w.prey()[0].speed, w.config().prey.sprint_speed);
 }
 
 #[test]
 fn axial_prey_beyond_square_stays_at_rest() {
     let mut w = world();
     add_snake(&mut w, Point::default(), false);
-    w.prey.push(prey(Point { x: 340., y: 0. }));
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: prey(Point { x: 340., y: 0. }),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[Some(Action {
         heading: std::f64::consts::PI,
         boost: false,
     })])
     .unwrap();
-    assert_eq!(w.prey[0].speed, w.config.prey.cruise_speed);
+    assert_eq!(w.prey()[0].speed, w.config().prey.cruise_speed);
 }

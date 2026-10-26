@@ -1,10 +1,18 @@
+mod support;
 use slither_sim::{physics::*, *};
 
 #[test]
 fn death_density_settings_validate_and_round_trip() {
     let mut config = Config::sandbox();
     config.death_food.cell_size = 0.0;
-    assert!(Simulator::new(1, config).is_err());
+    assert!(
+        Simulator::new(slither_sim::WorldOptions {
+            seed: 1,
+            config,
+            population: slither_sim::InitialPopulation::Empty
+        })
+        .is_err()
+    );
 
     let mut old = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("deathFood");
@@ -15,7 +23,8 @@ fn death_density_settings_validate_and_round_trip() {
 /// A vertical snake at `x` whose body spans y = -100..300 and whose head, far from
 /// the origin, moves away along +y.
 fn lay_across(world: &mut Simulator, index: usize, x: f64) {
-    let s = &mut world.snakes[index];
+    let mut detached_s = world.snakes()[index].clone();
+    let s = &mut detached_s;
     s.head = Point { x, y: 342. };
     s.heading = std::f64::consts::FRAC_PI_2;
     s.body = (0..11)
@@ -25,15 +34,18 @@ fn lay_across(world: &mut Simulator, index: usize, x: f64) {
         })
         .collect();
     s.segments = s.body.len();
-    Simulator::update_mass(s);
+    world.correct_mass(index, s.body.clone(), s.fam).unwrap();
+    world
+        .correct_pose(index, s.head, s.body.clone(), s.heading)
+        .unwrap();
 }
 
 #[test]
 fn collision_reports_actual_retained_food_for_default_tuned_and_disabled_limits() {
     for (enabled, capacity, expected) in [(true, 22, 22), (true, 7, 7), (false, 22, 61)] {
-        let mut world = Simulator::new(
-            7,
-            Config {
+        let mut world = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config {
                 food_count: 0,
                 ambient_replenish_per_second: 0.,
                 death_food: DeathFoodConfig {
@@ -43,25 +55,51 @@ fn collision_reports_actual_retained_food_for_default_tuned_and_disabled_limits(
                 },
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["victim".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
         .unwrap();
-        world.add("victim", 0, 1).unwrap();
-        world.add("obstacle", 0, 1).unwrap();
+        support::ring_slot(&mut world, "obstacle", 0, 1).unwrap();
         let center = Point { x: 37.5, y: 37.5 };
-        world.snakes[0].head = center;
-        world.snakes[0].body = vec![center; 30];
-        world.snakes[0].segments = 30;
-        Simulator::update_mass(&mut world.snakes[0]);
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.head = center;
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.body = vec![center; 30];
+            world
+                .correct_mass(0, snake.body.clone(), snake.fam)
+                .unwrap();
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.segments = 30;
+            snake
+                .body
+                .resize(snake.segments, *snake.body.last().unwrap());
+            world
+                .correct_mass(0, snake.body.clone(), snake.fam)
+                .unwrap();
+        }
         // The victim faces -x; a long body crosses just ahead of its tip.
         lay_across(&mut world, 1, center.x - 25.);
         world
             .step(&[Some(Action::default()), Some(Action::default())])
             .unwrap();
-        assert!(!world.snakes[0].alive);
-        assert!(world.snakes[1].alive);
-        assert_eq!(world.deaths.len(), 1);
-        assert_eq!(world.deaths[0].food, expected);
-        assert_eq!(world.food.len(), expected);
+        assert!(!world.snakes()[0].alive);
+        assert!(world.snakes()[1].alive);
+        assert_eq!(world.deaths().len(), 1);
+        assert_eq!(world.deaths()[0].food, expected);
+        assert_eq!(world.food().len(), expected);
     }
 }
 
@@ -69,20 +107,44 @@ fn collision_reports_actual_retained_food_for_default_tuned_and_disabled_limits(
 fn death_scatter_matches_recorded_square_support_and_tail_first_order() {
     let mut corner_count = 0;
     for seed in 0..128 {
-        let mut world = Simulator::new(
+        let mut world = Simulator::new(slither_sim::WorldOptions {
             seed,
-            Config {
+            config: Config {
                 food_count: 0,
                 ambient_replenish_per_second: 0.,
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["victim".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
         .unwrap();
-        world.add("victim", 0, 1).unwrap();
-        world.add("obstacle", 0, 1).unwrap();
-        world.snakes[0].head = Point::default();
-        world.snakes[0].heading = 0.;
-        world.snakes[0].body = vec![Point::default(), Point { x: -42., y: 0. }];
+        support::ring_slot(&mut world, "obstacle", 0, 1).unwrap();
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.head = Point::default();
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.heading = 0.;
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.body = vec![Point::default(), Point { x: -42., y: 0. }];
+            world
+                .correct_mass(0, snake.body.clone(), snake.fam)
+                .unwrap();
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
         // A long body crosses just ahead of the victim's tip.
         lay_across(&mut world, 1, 25.);
         let mut cloned = world.clone();
@@ -92,15 +154,15 @@ fn death_scatter_matches_recorded_square_support_and_tail_first_order() {
         cloned
             .step(&[Some(Action::default()), Some(Action::default())])
             .unwrap();
-        assert_eq!(world.food, cloned.food);
-        assert!(!world.snakes[0].alive);
-        assert!(world.snakes[1].alive);
-        let victim = &world.snakes[0];
+        assert_eq!(world.food(), cloned.food());
+        assert!(!world.snakes()[0].alive);
+        assert!(world.snakes()[1].alive);
+        let victim = &world.snakes()[0];
         let mut sites: Vec<_> = death_food_sites(&victim.body, victim.head).collect();
         sites.reverse();
-        assert_eq!(world.food.len(), sites.len());
+        assert_eq!(world.food().len(), sites.len());
         let sc = scale(victim.segments);
-        for (pellet, site) in world.food.iter().zip(sites) {
+        for (pellet, site) in world.food().iter().zip(sites) {
             let dx = (pellet.x + 300. / 512. - site.x) / sc;
             let dy = (pellet.y + 300. / 512. - site.y) / sc;
             assert!(dx.abs().max(dy.abs()) <= 15. + 300. / 256. / sc);

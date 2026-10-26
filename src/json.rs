@@ -670,13 +670,18 @@ mod tests {
     #[test]
     fn writer_matches_value_bytes_for_worlds() {
         for (config, agents) in [(Config::sandbox(), 6), (Config::official(40), 40)] {
-            let mut world = Simulator::new(3, config).unwrap();
-            for slot in 0..agents {
-                world.add(slot.to_string(), slot, agents).unwrap();
-            }
+            let mut world = Simulator::new(crate::WorldOptions {
+                seed: 3,
+                config,
+                population: crate::InitialPopulation::Placed {
+                    ids: (0..agents).map(|s| s.to_string()).collect(),
+                    placement: crate::Placement::default(),
+                },
+            })
+            .unwrap();
             for tick in 0..400 {
                 let actions: Vec<_> = world
-                    .snakes
+                    .snakes()
                     .iter()
                     .enumerate()
                     .map(|(i, s)| {
@@ -689,11 +694,11 @@ mod tests {
                 world.step(&actions).unwrap();
             }
             same(&world.observe_all());
-            same(&world.deaths);
-            same(&world.config);
-            same(&world.prey);
-            same(&world.food);
-            same(&world.snakes);
+            same(&world.deaths());
+            same(&world.config());
+            same(&world.prey());
+            same(&world.food());
+            same(&world.snakes());
         }
     }
 }

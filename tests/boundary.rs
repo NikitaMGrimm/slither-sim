@@ -1,3 +1,4 @@
+mod support;
 use slither_sim::*;
 use slither_sim::{Constraint, ErrorKind};
 
@@ -66,19 +67,20 @@ fn steep_contacts_die_and_contact_is_rotation_and_reflection_invariant() {
 
 #[test]
 fn sliding_does_not_skip_snake_body_collisions() {
-    let mut w = Simulator::new(
-        7,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             radius: 8000.,
             food_count: 0,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    w.add("rider", 0, 2).unwrap();
-    w.add("obstacle", 1, 2).unwrap();
-    for s in &mut w.snakes {
-        s.alive = false;
+    support::ring_slot(&mut w, "rider", 0, 2).unwrap();
+    support::ring_slot(&mut w, "obstacle", 1, 2).unwrap();
+    for slot in 0..w.snakes().len() {
+        w.retire(slot).unwrap();
     }
     w.respawn(
         0,
@@ -91,22 +93,22 @@ fn sliding_does_not_skip_snake_body_collisions() {
     w.respawn(1, Point { x: 7985., y: 18. }, 0., 2).unwrap();
     w.step(&[
         Some(Action {
-            heading: w.snakes[0].heading,
+            heading: w.snakes()[0].heading,
             boost: false,
         }),
         Some(Action {
-            heading: w.snakes[1].heading,
+            heading: w.snakes()[1].heading,
             boost: false,
         }),
     ])
     .unwrap();
     assert!(
-        w.deaths
+        w.deaths()
             .iter()
             .any(|d| d.victim == "rider" && d.reason == DeathReason::Body)
     );
     assert!(
-        w.deaths
+        w.deaths()
             .iter()
             .filter(|d| d.reason == DeathReason::Body)
             .all(|d| d.food > 0)
@@ -116,21 +118,22 @@ fn sliding_does_not_skip_snake_body_collisions() {
 #[test]
 fn boundary_deaths_drop_no_food_even_with_the_body_inside() {
     for mode in [BoundaryMode::Sliding, BoundaryMode::Hard] {
-        let mut w = Simulator::new(
-            7,
-            Config {
+        let mut w = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config {
                 radius: 8000.,
                 food_count: 0,
                 boundary_mode: mode,
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Empty,
+        })
         .unwrap();
-        w.add("outward", 0, 8).unwrap();
-        w.snakes[0].alive = false;
+        support::ring_slot(&mut w, "outward", 0, 8).unwrap();
+        w.retire(0).unwrap();
         w.respawn(0, Point { x: 7998., y: 0. }, 0., 8).unwrap();
         assert!(
-            w.snakes[0]
+            w.snakes()[0]
                 .body
                 .iter()
                 .all(|p| p.distance(Point::default()) < 8000.)
@@ -142,34 +145,36 @@ fn boundary_deaths_drop_no_food_even_with_the_body_inside() {
             })])
             .unwrap();
         }
-        assert_eq!(w.deaths.len(), 1);
-        assert_eq!(w.deaths[0].reason, DeathReason::Boundary);
-        assert_eq!(w.deaths[0].food, 0);
-        assert!(w.food.is_empty());
+        assert_eq!(w.deaths().len(), 1);
+        assert_eq!(w.deaths()[0].reason, DeathReason::Boundary);
+        assert_eq!(w.deaths()[0].food, 0);
+        assert!(w.food().is_empty());
     }
 }
 
 #[test]
 fn boundary_modes_share_interior_motion() {
-    let mut a = Simulator::new(
-        9,
-        Config {
+    let mut a = Simulator::new(slither_sim::WorldOptions {
+        seed: 9,
+        config: Config {
             radius: 8000.,
             food_count: 100,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    let mut b = Simulator::new(
-        9,
-        Config {
+    let mut b = Simulator::new(slither_sim::WorldOptions {
+        seed: 9,
+        config: Config {
             boundary_mode: BoundaryMode::Hard,
-            ..a.config.clone()
+            ..a.config().clone()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    a.add("s", 0, 1).unwrap();
-    b.add("s", 0, 1).unwrap();
+    support::ring_slot(&mut a, "s", 0, 1).unwrap();
+    support::ring_slot(&mut b, "s", 0, 1).unwrap();
     for _ in 0..100 {
         let actions = [Some(Action {
             heading: 1.,
@@ -178,12 +183,12 @@ fn boundary_modes_share_interior_motion() {
         a.step(&actions).unwrap();
         b.step(&actions).unwrap();
         assert_eq!(
-            serde_json::to_value(&a.snakes).unwrap(),
-            serde_json::to_value(&b.snakes).unwrap()
+            serde_json::to_value(a.snakes()).unwrap(),
+            serde_json::to_value(b.snakes()).unwrap()
         );
         assert_eq!(
-            serde_json::to_value(&a.food).unwrap(),
-            serde_json::to_value(&b.food).unwrap()
+            serde_json::to_value(a.food()).unwrap(),
+            serde_json::to_value(b.food()).unwrap()
         );
     }
     assert!(boundary::constrain(Point { x: 8001., y: 0. }, 1., 1., 8000., BoundaryMode::Hard).1);
@@ -212,9 +217,9 @@ fn forward_contact_offset_matches_received_anchor_samples() {
 
 #[test]
 fn radius_trace_changes_boundary_and_raw_observations_at_tick_end() {
-    let mut w = Simulator::new(
-        1,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
             radius: 1000.,
             food_count: 0,
             radius_updates: vec![
@@ -229,33 +234,35 @@ fn radius_trace_changes_boundary_and_raw_observations_at_tick_end() {
             ],
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    assert_eq!(w.config.radius, 800.);
-    w.add("s", 0, 1).unwrap();
-    w.food.push(Food {
+    assert_eq!(w.radius(), 800.);
+    support::ring_slot(&mut w, "s", 0, 1).unwrap();
+    w.insert_food(Food {
         x: 300.,
         y: 0.,
         value: 1.,
         size: None,
         origin: None,
-    });
+    })
+    .unwrap();
     w.step(&[Some(Action {
         heading: std::f64::consts::PI,
         boost: false,
     })])
     .unwrap();
-    assert!(w.snakes[0].alive);
+    assert!(w.snakes()[0].alive);
     assert_eq!(w.observe(0).unwrap().arena.radius, 800.);
     w.step(&[Some(Action {
         heading: std::f64::consts::PI,
         boost: false,
     })])
     .unwrap();
-    assert!(!w.snakes[0].alive);
-    assert_eq!(w.deaths[0].reason, DeathReason::Boundary);
+    assert!(!w.snakes()[0].alive);
+    assert_eq!(w.deaths()[0].reason, DeathReason::Boundary);
     assert_eq!(w.observe(0).unwrap().arena.radius, 200.);
-    assert!(w.food.iter().any(|f| f.x == 300. && f.y == 0.)); // No invented expiry.
+    assert!(w.food().iter().any(|f| f.x == 300. && f.y == 0.)); // No invented expiry.
 }
 #[test]
 fn malformed_radius_updates_fail_before_world_creation() {
@@ -276,13 +283,14 @@ fn malformed_radius_updates_fail_before_world_creation() {
         ],
     ] {
         assert!(
-            Simulator::new(
-                1,
-                Config {
+            Simulator::new(slither_sim::WorldOptions {
+                seed: 1,
+                config: Config {
                     radius_updates: updates,
                     ..Config::sandbox()
-                }
-            )
+                },
+                population: slither_sim::InitialPopulation::Empty
+            })
             .is_err()
         );
     }
@@ -296,21 +304,22 @@ fn original_received_radius_trace_replays_without_moving_the_center() {
     assert_eq!(updates.len(), 790);
     let initial_radius = fixture["initial_radius"].as_f64().unwrap();
     let last = *updates.last().unwrap();
-    let mut w = Simulator::new(
-        1,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
             food_count: 0,
             radius: initial_radius,
             radius_updates: updates,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    while w.time < last.time {
+    while w.time() < last.time {
         w.step(&[]).unwrap();
     }
-    assert_eq!(w.config.radius, last.radius);
-    w.add("center-check", 0, 1).unwrap();
+    assert_eq!(w.radius(), last.radius);
+    support::ring_slot(&mut w, "center-check", 0, 1).unwrap();
     assert_eq!(w.observe(0).unwrap().arena.center, Point::default());
 }
 #[test]
@@ -407,10 +416,17 @@ fn hard_steps_are_bounded_by_exact_tick_counts() {
     assert_eq!(error.field.as_deref(), Some("dt"));
     assert!(long_config(limit * 1.001).validate().is_err());
     // One tick just inside the bound keeps the head finite.
-    let mut world = Simulator::new(1, long_config(limit * 0.999)).unwrap();
-    world.add("a", 0, 1).unwrap();
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: long_config(limit * 0.999),
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     world.step(&[Some(Action::default())]).unwrap();
-    let head = world.snakes[0].head;
+    let head = world.snakes()[0].head;
     assert!(head.x.is_finite() && head.y.is_finite());
     assert!(head.distance(Point::default()) > 1e15);
 }
@@ -434,9 +450,16 @@ fn boosted(dt: f64, segments: usize) -> Simulator {
     let mut config = long_config(dt);
     config.radius = 1e6;
     config.boost_food.enabled = false;
-    let mut world = Simulator::new(1, config).unwrap();
-    world.add("a", 0, 1).unwrap();
-    world.snakes[0].alive = false;
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    world.retire(0).unwrap();
     world
         .respawn_body(0, vec![Point::default(); segments], 0.)
         .unwrap();
@@ -462,11 +485,11 @@ fn long_boost_steps_count_their_drops() {
     );
     assert_eq!(error.field.as_deref(), Some("dt"));
     let world = boosted(100., 430);
-    assert!(world.time == 100.);
+    assert!(world.time() == 100.);
     // A drop is due at once and then every 0.155 s: floor((0.155 + 1) / 0.155).
     let world = boosted(1., 100);
     let drops = world
-        .food
+        .food()
         .iter()
         .filter(|food| food.origin == Some(Origin::Boost))
         .count();
@@ -482,18 +505,23 @@ fn construction_keeps_the_configured_population_radius_until_a_tick() {
         ..Config::official(500)
     };
     let radius = config.radius;
-    let mut world = Simulator::new(1, config).unwrap();
-    assert_eq!(world.time, 0.);
-    assert_eq!(world.config.radius, radius);
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config,
+        population: slither_sim::InitialPopulation::Empty,
+    })
+    .unwrap();
+    assert_eq!(world.time(), 0.);
+    assert_eq!(world.radius(), radius);
     world.step(&[]).unwrap();
-    assert!(world.config.radius < radius);
+    assert!(world.radius() < radius);
 }
 
 #[test]
 fn construction_does_not_apply_a_recorded_radius_from_the_near_future() {
-    let mut world = Simulator::new(
-        1,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
             radius: 1000.,
             dynamic_radius: true,
             food_count: 0,
@@ -510,10 +538,11 @@ fn construction_does_not_apply_a_recorded_radius_from_the_near_future() {
             ],
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    assert_eq!(world.time, 0.);
-    assert_eq!(world.config.radius, 800.);
+    assert_eq!(world.time(), 0.);
+    assert_eq!(world.radius(), 800.);
     world.step(&[]).unwrap();
-    assert_eq!(world.config.radius, 900.);
+    assert_eq!(world.radius(), 900.);
 }

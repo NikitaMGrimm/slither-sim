@@ -1,3 +1,4 @@
+mod support;
 use slither_sim::{Constraint, CoreStepError, ErrorKind, WorldStatus};
 use slither_sim::{profiling::StepProfile, *};
 
@@ -12,18 +13,37 @@ fn entity(x: f64, speed: f64) -> Prey {
     }
 }
 fn world() -> Simulator {
-    let mut w = Simulator::new(
-        42,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             food_count: 0,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["snake".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    w.add("snake", 0, 1).unwrap();
-    w.snakes[0].head = Point::default();
-    w.snakes[0].heading = 0.;
-    w.snakes[0].body = vec![Point::default(), Point { x: -42., y: 0. }];
+    {
+        let mut snake = w.snakes()[0].clone();
+        snake.head = Point::default();
+        w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = w.snakes()[0].clone();
+        snake.heading = 0.;
+        w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = w.snakes()[0].clone();
+        snake.body = vec![Point::default(), Point { x: -42., y: 0. }];
+        w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     w
 }
 /// Synthetic prey speeds, distinct from the measured defaults, so mechanism tests
@@ -45,9 +65,9 @@ fn spawned_prey_respect_positive_representable_size_bounds() {
         (6.6000000000000005, 6.8),
         (6.2, 6.599999999999999),
     ] {
-        let world = Simulator::new(
-            7,
-            Config {
+        let world = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config {
                 food_count: 0,
                 prey: PreyConfig {
                     count: 100,
@@ -57,10 +77,11 @@ fn spawned_prey_respect_positive_representable_size_bounds() {
                 },
                 ..Default::default()
             },
-        )
+            population: slither_sim::InitialPopulation::Empty,
+        })
         .unwrap();
-        assert_eq!(world.prey.len(), 100);
-        for prey in world.prey {
+        assert_eq!(world.prey().len(), 100);
+        for prey in world.prey() {
             assert!(prey.size >= size && prey.size <= max_size && prey.size > 0.0);
             assert!((prey.size * 5.0 - (prey.size * 5.0).round()).abs() < 1e-12);
         }
@@ -73,17 +94,18 @@ fn spawned_prey_respect_positive_representable_size_bounds() {
         (6.6000000000000005, 6.6000000000000005),
     ] {
         assert!(
-            Simulator::new(
-                7,
-                Config {
+            Simulator::new(slither_sim::WorldOptions {
+                seed: 7,
+                config: Config {
                     prey: PreyConfig {
                         size,
                         max_size,
                         ..Default::default()
                     },
                     ..Default::default()
-                }
-            )
+                },
+                population: slither_sim::InitialPopulation::Empty
+            })
             .is_err()
         );
     }
@@ -141,27 +163,39 @@ fn accumulated_prey_mass_that_overflows_stops_the_world() {
         ..PreyConfig::default()
     };
     config.validate().unwrap();
-    let mut world = Simulator::new(1, config).unwrap();
-    world.add("a", 0, 1).unwrap();
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     let catch = |world: &mut Simulator, id| {
-        let snake = &world.snakes[0];
+        let snake = &world.snakes()[0];
         let (position, _) =
             physics::pickup_circle(snake.head, snake.heading, snake.speed, snake.segments);
-        world.prey.push(Prey {
-            id,
-            position,
-            size,
-            ..entity(0., 0.)
-        });
-        let heading = world.snakes[0].heading;
+        world
+            .insert_prey(slither_sim::ReplayPrey {
+                prey: Prey {
+                    id,
+                    position,
+                    size,
+                    ..entity(0., 0.)
+                },
+                mode: slither_sim::PreyMode::Roaming,
+            })
+            .unwrap();
+        let heading = world.snakes()[0].heading;
         world.step(&[Some(Action {
             heading,
             boost: false,
         })])
     };
     catch(&mut world, 0).unwrap();
-    assert!(world.prey.is_empty());
-    let fam = world.snakes[0].fam;
+    assert!(world.prey().is_empty());
+    let fam = world.snakes()[0].fam;
     assert!(fam.is_finite() && fam > 1e308);
     let error = catch(&mut world, 1).unwrap_err();
     let CoreStepError::Stopped(cause) = &error else {
@@ -172,15 +206,15 @@ fn accumulated_prey_mass_that_overflows_stops_the_world() {
     assert_eq!(cause.field.as_deref(), Some("fam"));
     assert_eq!(world.status(), WorldStatus::Stopped(cause));
     // The tick completed without the overflowing gain.
-    assert!(world.prey.is_empty());
-    assert_eq!(world.snakes[0].fam, fam);
-    assert!(world.snakes[0].length.is_finite());
-    let time = world.time;
+    assert!(world.prey().is_empty());
+    assert_eq!(world.snakes()[0].fam, fam);
+    assert!(world.snakes()[0].length.is_finite());
+    let time = world.time();
     assert!(
         matches!(catch(&mut world, 2), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
     );
     assert_eq!(world.status(), WorldStatus::Stopped(cause));
-    assert_eq!(world.time, time);
+    assert_eq!(world.time(), time);
 
     let encoded = serde_json::to_string(&world.checkpoint().unwrap()).unwrap();
     let mut restored = Simulator::from_checkpoint(encoded.as_bytes(), Default::default()).unwrap();
@@ -188,8 +222,8 @@ fn accumulated_prey_mass_that_overflows_stops_the_world() {
         matches!(restored.step(&[None]), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
     );
     assert_eq!(restored.status(), WorldStatus::Stopped(cause));
-    assert_eq!(restored.time, time);
-    assert_eq!(restored.snakes[0].fam, fam);
+    assert_eq!(restored.time(), time);
+    assert_eq!(restored.snakes()[0].fam, fam);
 }
 
 #[test]
@@ -207,113 +241,120 @@ fn client_prey_units_and_turn_limit() {
 }
 
 #[test]
-fn invalid_runtime_prey_ranges_reject_steps_without_mutation() {
-    for profiled in [false, true] {
-        let config = Config {
-            food_count: 0,
-            dt: 0.01,
-            prey: PreyConfig {
-                count: 1,
-                respawn_seconds: 0.01,
-                ..Default::default()
-            },
+fn invalid_checkpoint_prey_ranges_reject_without_mutation() {
+    let config = Config {
+        food_count: 0,
+        dt: 0.01,
+        prey: PreyConfig {
+            count: 1,
+            respawn_seconds: 0.01,
             ..Default::default()
-        };
-        let mut world = Simulator::new(7, config.clone()).unwrap();
-        let mut reference = Simulator::new(7, config.clone()).unwrap();
-        world.prey.clear();
-        reference.prey.clear();
-        world.config.prey.size = 9.21;
-        world.config.prey.max_size = 9.39;
-        let before = format!("{world:?}");
-        assert!(matches!(
-            world.checkpoint().unwrap_err().kind,
-            ErrorKind::InvalidCheckpoint {
-                rule: Constraint::OutOfRange
-            }
-        ));
-        assert!(world.validate_actions(&[]).is_err());
-        let mut profile = StepProfile::default();
-        let result = if profiled {
-            world.step_profiled(&[], &mut profile)
-        } else {
-            world.step(&[])
-        };
-        let CoreStepError::Rejected(cause) = result.unwrap_err() else {
-            panic!("expected rejection")
-        };
-        assert_eq!(
-            cause.kind,
-            ErrorKind::InvalidConfig {
-                rule: Constraint::OutOfRange
-            }
-        );
-        assert_eq!(cause.field.as_deref(), Some("prey.size"));
-        assert_eq!(format!("{world:?}"), before);
-        assert_eq!(profile.ticks, 0);
-
-        world.config.prey = config.prey;
-        world.step(&[]).unwrap();
-        reference.step(&[]).unwrap();
-        assert_eq!(world.prey.len(), 1);
-        assert_eq!(
-            serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
-            serde_json::to_value(reference.checkpoint().unwrap()).unwrap()
-        );
-    }
+        },
+        ..Default::default()
+    };
+    let mut world = Simulator::new(WorldOptions {
+        seed: 7,
+        config,
+        population: InitialPopulation::Empty,
+    })
+    .unwrap();
+    world.replace_prey(Vec::new()).unwrap();
+    let mut reference = world.clone();
+    let before = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
+    let mut invalid = before.clone();
+    invalid["config"]["prey"]["size"] = serde_json::json!(9.21);
+    invalid["config"]["prey"]["maxSize"] = serde_json::json!(9.39);
+    let cause = world
+        .restore(&serde_json::to_vec(&invalid).unwrap(), Default::default())
+        .unwrap_err();
+    assert!(matches!(
+        cause.kind,
+        ErrorKind::InvalidCheckpoint {
+            rule: Constraint::OutOfRange
+        }
+    ));
+    assert_eq!(
+        serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+        before
+    );
+    world.step(&[]).unwrap();
+    reference.step(&[]).unwrap();
+    assert_eq!(world.prey().len(), 1);
+    assert_eq!(
+        serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+        serde_json::to_value(reference.checkpoint().unwrap()).unwrap()
+    );
 }
 
 #[test]
 fn authoritative_prey_rounds_coordinates_down_on_each_server_tick() {
-    let mut w = Simulator::new(
-        42,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             radius: 10000.,
             food_count: 0,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     let mut p = entity(100.4, 3.8 / 0.032);
     p.position.y = 300.2;
     p.heading = 0.25;
     p.target_heading = 0.25;
-    w.prey.push(p);
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: p,
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     for _ in 0..14 {
         w.step(&[]).unwrap();
     }
     // Both positive increments are below one unit. Wire prey can remain here
     // while still advertising speed 3.8 to the stock client's predictor.
-    assert_eq!(w.prey[0].position, Point { x: 101., y: 300. });
-    w.prey[0].heading += std::f64::consts::PI;
-    w.prey[0].target_heading = w.prey[0].heading;
+    assert_eq!(w.prey()[0].position, Point { x: 101., y: 300. });
+    {
+        let mut prey = w.prey()[0].clone();
+        prey.heading += std::f64::consts::PI;
+        support::restore_prey(&mut w, 0, prey);
+    }
+    {
+        let mut prey = w.prey()[0].clone();
+        prey.target_heading = prey.heading;
+        support::restore_prey(&mut w, 0, prey);
+    }
     for _ in 0..14 {
         w.step(&[]).unwrap();
     }
-    assert_eq!(w.prey[0].position, Point { x: 87., y: 286. });
+    assert_eq!(w.prey()[0].position, Point { x: 87., y: 286. });
 }
 
 #[test]
 fn coarse_simulation_steps_preserve_prey_coordinate_quantization() {
     let run = |dt, steps| {
-        let mut w = Simulator::new(
-            42,
-            Config {
+        let mut w = Simulator::new(slither_sim::WorldOptions {
+            seed: 42,
+            config: Config {
                 radius: 10000.,
                 food_count: 0,
                 dt,
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Empty,
+        })
         .unwrap();
         let mut p = entity(100., 3.8 / 0.032);
         p.heading = std::f64::consts::PI + 0.25;
         p.target_heading = p.heading;
-        w.prey.push(p);
+        w.insert_prey(slither_sim::ReplayPrey {
+            prey: p,
+            mode: slither_sim::PreyMode::Roaming,
+        })
+        .unwrap();
         for _ in 0..steps {
             w.step(&[]).unwrap();
         }
-        w.prey[0].position
+        w.prey()[0].position
     };
     assert_eq!(run(0.007, 32), Point { x: 68., y: -32. });
     assert_eq!(run(0.014, 16), run(0.007, 32));
@@ -363,49 +404,62 @@ fn authoritative_prey_motion_matches_recorded_packet_intervals() {
 }
 #[test]
 fn later_prey_injection_keeps_the_server_tick_phase() {
-    let mut w = Simulator::new(
-        42,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             radius: 10000.,
             food_count: 0,
             dt: 0.005,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     w.step(&[]).unwrap(); // No prey during the first 5 ms.
     let mut p = entity(100., 3.8 / 0.032);
     p.heading = std::f64::consts::PI + 0.25;
     p.target_heading = p.heading;
-    w.prey.push(p);
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: p,
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[]).unwrap(); // The global 7 ms tick falls within this step.
-    assert_eq!(w.prey[0].position, Point { x: 99., y: -1. });
+    assert_eq!(w.prey()[0].position, Point { x: 99., y: -1. });
     w.step(&[]).unwrap(); // The next tick is at 14 ms.
-    assert_eq!(w.prey[0].position, Point { x: 98., y: -2. });
+    assert_eq!(w.prey()[0].position, Point { x: 98., y: -2. });
     w.step(&[]).unwrap(); // No tick in (15, 20] ms.
-    assert_eq!(w.prey[0].position, Point { x: 98., y: -2. });
+    assert_eq!(w.prey()[0].position, Point { x: 98., y: -2. });
 }
 
 #[test]
 fn capture_is_once_only_adds_nutrition_and_waits_for_respawn() {
     let mut w = world();
-    w.config.prey.count = 1;
+    {
+        let mut config = w.config().clone();
+        config.prey.count = 1;
+        support::reconfigure(&mut w, config);
+    }
     // Captures happen in the pickup circle ~43 units ahead of a small snake's head.
-    w.prey.push(entity(43., 120.));
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: entity(43., 120.),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[Some(Action::default())]).unwrap();
-    assert!(w.prey.is_empty());
-    assert!(w.food.is_empty());
+    assert!(w.prey().is_empty());
+    assert!(w.food().is_empty());
     assert!(
-        (w.snakes[0].fam - physics::nutrition(6., 2.0) * w.config.prey.nutrition_factor).abs()
+        (w.snakes()[0].fam - physics::nutrition(6., 2.0) * w.config().prey.nutrition_factor).abs()
             < 1e-12
     );
-    w.snakes[0].alive = false;
+    w.retire(0).unwrap();
     // Respawn waits one simulated second.
     for _ in 0..150 {
         w.step(&[None]).unwrap();
     }
-    assert_eq!(w.prey.len(), 1);
-    assert_ne!(w.prey[0].id, 100);
+    assert_eq!(w.prey().len(), 1);
+    assert_ne!(w.prey()[0].id, 100);
 }
 #[test]
 fn measured_prey_nutrition_matches_clean_catch_and_nonboost_food_controls() {
@@ -415,21 +469,41 @@ fn measured_prey_nutrition_matches_clean_catch_and_nonboost_food_controls() {
         let n = case["segments"].as_u64().unwrap() as usize;
         let fam = case["fraction"].as_f64().unwrap();
         let mut w = world();
-        w.snakes[0].segments = n;
-        w.snakes[0].fam = fam;
-        w.snakes[0].body = (0..n)
-            .map(|i| Point {
-                x: -(i as f64) * 42.,
-                y: 0.,
-            })
-            .collect();
-        Simulator::update_mass(&mut w.snakes[0]);
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.segments = n;
+            snake
+                .body
+                .resize(snake.segments, *snake.body.last().unwrap());
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.fam = fam;
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.body = (0..n)
+                .map(|i| Point {
+                    x: -(i as f64) * 42.,
+                    y: 0.,
+                })
+                .collect();
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+            w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
         let mut p = entity(43., 120.);
         p.size = case["size"].as_f64().unwrap();
-        w.prey.push(p);
+        w.insert_prey(slither_sim::ReplayPrey {
+            prey: p,
+            mode: slither_sim::PreyMode::Roaming,
+        })
+        .unwrap();
         w.step(&[Some(Action::default())]).unwrap();
-        assert!(w.prey.is_empty());
-        let prey_gain = w.snakes[0].segments as f64 + w.snakes[0].fam - n as f64 - fam;
+        assert!(w.prey().is_empty());
+        let prey_gain = w.snakes()[0].segments as f64 + w.snakes()[0].fam - n as f64 - fam;
         // Concurrent food is only an estimate at initial mass, not an exact replay.
         let food_estimate: f64 = case["food_sizes"]
             .as_array()
@@ -445,35 +519,61 @@ fn measured_prey_nutrition_matches_clean_catch_and_nonboost_food_controls() {
 #[test]
 fn relative_sweep_catches_fast_crossing_and_dead_snakes_cannot_eat() {
     let mut w = world();
-    w.config.prey.flee_half_width = 1.; // Isolate capture from evasive turning.
-    w.config.prey.cruise_speed = 20000.;
-    w.config.prey.escape_speed = 20000.;
-    w.config.prey.sprint_speed = 20000.;
-    w.prey.push(entity(-80., 20000.));
+    {
+        let mut config = w.config().clone();
+        config.prey.flee_half_width = 1.;
+        support::reconfigure(&mut w, config);
+    } // Isolate capture from evasive turning.
+    {
+        let mut config = w.config().clone();
+        config.prey.cruise_speed = 20000.;
+
+        config.prey.escape_speed = 20000.;
+
+        config.prey.sprint_speed = 20000.;
+        support::reconfigure(&mut w, config);
+    }
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: entity(-80., 20000.),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[Some(Action::default())]).unwrap();
-    assert!(w.prey.is_empty());
-    w.snakes[0].alive = false;
-    w.prey.push(entity(w.snakes[0].head.x, 120.));
+    assert!(w.prey().is_empty());
+    w.retire(0).unwrap();
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: entity(w.snakes()[0].head.x, 120.),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[None]).unwrap();
-    assert_eq!(w.prey.len(), 1);
+    assert_eq!(w.prey().len(), 1);
 }
 #[test]
 fn threats_set_prey_flight_speed_and_unthreatened_prey_wanders_deterministically() {
     let mut w = world();
-    w.config.prey = synthetic_prey();
-    w.prey.push(entity(200., 120.));
+    {
+        let mut config = w.config().clone();
+        config.prey = synthetic_prey();
+        support::reconfigure(&mut w, config);
+    }
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: entity(200., 120.),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[Some(Action::default())]).unwrap();
-    assert_eq!(w.prey[0].speed, w.config.prey.escape_speed);
-    assert_eq!(w.prey[0].position.x, 201.);
-    w.snakes[0].alive = false;
+    assert_eq!(w.prey()[0].speed, w.config().prey.escape_speed);
+    assert_eq!(w.prey()[0].position.x, 201.);
+    w.retire(0).unwrap();
     let mut other = w.clone();
     for _ in 0..1000 {
         w.step(&[None]).unwrap();
         other.step(&[None]).unwrap();
     }
-    assert_eq!(w.prey, other.prey);
-    assert!(w.prey[0].heading.abs() > 0.01);
-    assert!(w.prey[0].position.distance(Point::default()) < w.config.radius);
+    assert_eq!(w.prey(), other.prey());
+    assert!(w.prey()[0].heading.abs() > 0.01);
+    assert!(w.prey()[0].position.distance(Point::default()) < w.radius());
 }
 #[test]
 fn prey_speed_modes_apply_before_the_next_motion_tick() {
@@ -486,21 +586,61 @@ fn prey_speed_modes_apply_before_the_next_motion_tick() {
         (p.sprint_speed, false, false, p.cruise_speed, 0.),
     ] {
         let mut w = world();
-        w.config.prey = p.clone();
-        w.snakes[0].alive = live_threat;
-        w.snakes[0].segments = if boosting { 50 } else { 2 };
-        w.snakes[0].fam = 0.5;
-        Simulator::update_mass(&mut w.snakes[0]);
-        w.snakes[0].speed = if boosting { 14. / 0.032 } else { 5.79 / 0.032 };
-        w.prey.push(entity(200., old_speed));
+        {
+            let mut config = w.config().clone();
+            config.prey = p.clone();
+            support::reconfigure(&mut w, config);
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.alive = live_threat;
+            w.import_life(
+                0,
+                slither_sim::ReplayLife::from_observed(
+                    snake.clone(),
+                    slither_sim::InitialSpeed::Infer(snake.speed),
+                ),
+            )
+            .unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.segments = if boosting { 50 } else { 2 };
+            snake
+                .body
+                .resize(snake.segments, *snake.body.last().unwrap());
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.fam = 0.5;
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.speed = if boosting { 14. / 0.032 } else { 5.79 / 0.032 };
+            w.import_life(
+                0,
+                slither_sim::ReplayLife::from_observed(
+                    snake.clone(),
+                    slither_sim::InitialSpeed::Infer(snake.speed),
+                ),
+            )
+            .unwrap();
+        }
+        w.insert_prey(slither_sim::ReplayPrey {
+            prey: entity(200., old_speed),
+            mode: slither_sim::PreyMode::Roaming,
+        })
+        .unwrap();
         w.step(&[Some(Action {
             heading: 0.,
             boost: boosting,
         })])
         .unwrap();
-        assert_eq!(w.prey.len(), 1);
-        assert_eq!(w.prey[0].speed, expected_speed);
-        assert_eq!(w.prey[0].position.x, 200. + expected_dx);
+        assert_eq!(w.prey().len(), 1);
+        assert_eq!(w.prey()[0].speed, expected_speed);
+        assert_eq!(w.prey()[0].position.x, 200. + expected_dx);
     }
 }
 
@@ -512,20 +652,67 @@ fn prey_flights_use_ordinary_speed_unless_the_threat_is_boosting() {
     };
     let run = |boost, cruise: f64| {
         let mut w = world();
-        w.config.prey = p.clone();
-        w.snakes[0].segments = 50;
-        w.snakes[0].fam = 0.5;
-        w.snakes[0].speed = cruise;
-        w.initialize_speed_state(0, Some(0.0)).unwrap();
-        w.snakes[0].body = (0..50)
-            .map(|i| Point {
-                x: i as f64 * 42.,
-                y: 0.,
-            })
-            .collect();
-        w.snakes[0].heading = std::f64::consts::PI;
-        Simulator::update_mass(&mut w.snakes[0]);
-        w.prey.push(entity(200., p.cruise_speed));
+        {
+            let mut config = w.config().clone();
+            config.prey = p.clone();
+            support::reconfigure(&mut w, config);
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.segments = 50;
+            snake
+                .body
+                .resize(snake.segments, *snake.body.last().unwrap());
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.fam = 0.5;
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.speed = cruise;
+            w.import_life(
+                0,
+                slither_sim::ReplayLife::from_observed(
+                    snake.clone(),
+                    slither_sim::InitialSpeed::Infer(snake.speed),
+                ),
+            )
+            .unwrap();
+        }
+        w.import_life(
+            0,
+            ReplayLife::from_observed(
+                w.snakes()[0].clone(),
+                InitialSpeed::Known(physics::SpeedState::idle(cruise)),
+            ),
+        )
+        .unwrap();
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.body = (0..50)
+                .map(|i| Point {
+                    x: i as f64 * 42.,
+                    y: 0.,
+                })
+                .collect();
+            w.correct_mass(0, snake.body.clone(), snake.fam).unwrap();
+            w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = w.snakes()[0].clone();
+            snake.heading = std::f64::consts::PI;
+            w.correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        w.insert_prey(slither_sim::ReplayPrey {
+            prey: entity(200., p.cruise_speed),
+            mode: slither_sim::PreyMode::Roaming,
+        })
+        .unwrap();
         for _ in 0..200 {
             w.step(&[Some(Action {
                 heading: std::f64::consts::PI,
@@ -533,8 +720,8 @@ fn prey_flights_use_ordinary_speed_unless_the_threat_is_boosting() {
             })])
             .unwrap();
         }
-        assert_eq!(w.prey.len(), 1);
-        w.prey[0].speed
+        assert_eq!(w.prey().len(), 1);
+        w.prey()[0].speed
     };
     assert!(
         (run(false, physics::base_speed(50)) - p.flight_speed(physics::base_speed(50))).abs()
@@ -593,35 +780,55 @@ fn interpolated_flight_speed_matches_raw_official_packet_fixture() {
 #[test]
 fn raw_visibility_keeps_moving_entities_separate_from_food() {
     let mut w = world();
-    w.config.vision = 500.;
-    w.prey.extend([entity(100., 120.), entity(600., 120.)]);
+    {
+        let mut config = w.config().clone();
+        config.vision = 500.;
+        support::reconfigure(&mut w, config);
+    }
+    for (id, mut prey) in [entity(100., 120.), entity(600., 120.)]
+        .into_iter()
+        .enumerate()
+    {
+        prey.id = id as u64;
+        w.insert_prey(ReplayPrey {
+            prey,
+            mode: PreyMode::Roaming,
+        })
+        .unwrap();
+    }
     let o = w.observe(0).unwrap();
     assert_eq!(o.prey.len(), 1);
     assert!(o.food.is_empty());
 }
 #[test]
 fn prey_randomness_does_not_perturb_ambient_food_and_profile_is_passive() {
-    let plain = Simulator::new(21, Config::sandbox()).unwrap();
-    let mut enabled = Simulator::new(
-        21,
-        Config {
+    let plain = Simulator::new(slither_sim::WorldOptions {
+        seed: 21,
+        config: Config::sandbox(),
+        population: slither_sim::InitialPopulation::Empty,
+    })
+    .unwrap();
+    let mut enabled = Simulator::new(slither_sim::WorldOptions {
+        seed: 21,
+        config: Config {
             prey: PreyConfig {
                 count: 3,
                 ..PreyConfig::default()
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    assert_eq!(plain.food, enabled.food);
+    assert_eq!(plain.food(), enabled.food());
     let mut copy = enabled.clone();
     let mut profile = StepProfile::default();
     for _ in 0..200 {
         enabled.step_profiled(&[], &mut profile).unwrap();
         copy.step(&[]).unwrap();
     }
-    assert_eq!(enabled.prey, copy.prey);
-    assert_eq!(enabled.food, copy.food);
+    assert_eq!(enabled.prey(), copy.prey());
+    assert_eq!(enabled.food(), copy.food());
     assert!(profile.prey_seconds > 0.);
 }
 #[test]
@@ -645,13 +852,14 @@ fn invalid_prey_configuration_is_rejected() {
         },
     ] {
         assert!(
-            Simulator::new(
-                1,
-                Config {
+            Simulator::new(slither_sim::WorldOptions {
+                seed: 1,
+                config: Config {
                     prey: p,
                     ..Config::sandbox()
-                }
-            )
+                },
+                population: slither_sim::InitialPopulation::Empty
+            })
             .is_err()
         );
     }
@@ -662,9 +870,9 @@ fn invalid_prey_configuration_is_rejected() {
 #[test]
 fn refill_consumes_all_due_intervals_and_discards_credit_at_target() {
     for interval in [0.001, f64::MIN_POSITIVE] {
-        let mut w = Simulator::new(
-            1,
-            Config {
+        let mut w = Simulator::new(slither_sim::WorldOptions {
+            seed: 1,
+            config: Config {
                 food_count: 0,
                 ambient_replenish_per_second: 0.,
                 prey: PreyConfig {
@@ -674,48 +882,59 @@ fn refill_consumes_all_due_intervals_and_discards_credit_at_target() {
                 },
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Empty,
+        })
         .unwrap();
-        w.prey.clear();
+        w.replace_prey(Vec::new()).unwrap();
         w.step(&[]).unwrap();
-        assert_eq!(w.prey.len(), if interval == 0.001 { 7 } else { 10 });
+        assert_eq!(w.prey().len(), if interval == 0.001 { 7 } else { 10 });
         w.step(&[]).unwrap();
-        assert_eq!(w.prey.len(), 10);
+        assert_eq!(w.prey().len(), 10);
         assert_eq!(
             serde_json::to_value(w.checkpoint().unwrap()).unwrap()["state"]["preyClock"],
             0.
         );
-        w.prey.clear();
+        w.replace_prey(Vec::new()).unwrap();
         w.step(&[]).unwrap();
-        assert_eq!(w.prey.len(), if interval == 0.001 { 7 } else { 10 });
+        assert_eq!(w.prey().len(), if interval == 0.001 { 7 } else { 10 });
     }
 }
 
 #[test]
 fn refill_waits_a_full_interval_after_the_catch_tick() {
     let mut w = world();
-    w.config.ambient_replenish_per_second = 0.;
-    w.config.prey.count = 1;
-    w.config.prey.respawn_seconds = 4. * w.config.dt;
-    w.prey.push(entity(43., 0.));
+    {
+        let mut config = w.config().clone();
+        config.ambient_replenish_per_second = 0.;
+
+        config.prey.count = 1;
+
+        config.prey.respawn_seconds = 4. * w.config().dt;
+        support::reconfigure(&mut w, config);
+    }
+    w.insert_prey(slither_sim::ReplayPrey {
+        prey: entity(43., 0.),
+        mode: slither_sim::PreyMode::Roaming,
+    })
+    .unwrap();
     w.step(&[Some(Action::default())]).unwrap();
-    assert!(w.prey.is_empty());
-    let caught = w.time;
-    w.snakes[0].alive = false;
+    assert!(w.prey().is_empty());
+    let caught = w.time();
+    w.retire(0).unwrap();
     for _ in 0..3 {
         w.step(&[None]).unwrap();
-        assert!(w.prey.is_empty());
+        assert!(w.prey().is_empty());
     }
     w.step(&[None]).unwrap();
-    assert_eq!(w.prey.len(), 1);
-    assert!((w.time - caught - w.config.prey.respawn_seconds).abs() < 1e-15);
+    assert_eq!(w.prey().len(), 1);
+    assert!((w.time() - caught - w.config().prey.respawn_seconds).abs() < 1e-15);
 }
 
 #[test]
 fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
-    let mut w = Simulator::new(
-        1,
-        Config {
+    let mut w = Simulator::new(slither_sim::WorldOptions {
+        seed: 1,
+        config: Config {
             dt: 2.,
             boundary_mode: BoundaryMode::Hard,
             food_count: 0,
@@ -730,7 +949,8 @@ fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     let error = w.step(&[]).unwrap_err();
     let CoreStepError::Stopped(cause) = &error else {
@@ -739,9 +959,9 @@ fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
     assert_eq!(cause.kind, ErrorKind::NumericOverflow);
     assert_eq!(cause.field.as_deref(), Some("prey.position"));
     assert_eq!(w.status(), WorldStatus::Stopped(cause));
-    assert_eq!(w.time, 2.);
-    assert!(w.prey.iter().all(|prey| prey.position.finite()));
-    let time = w.time;
+    assert_eq!(w.time(), 2.);
+    assert!(w.prey().iter().all(|prey| prey.position.finite()));
+    let time = w.time();
     let before = serde_json::to_value(w.checkpoint().unwrap()).unwrap();
     assert!(
         matches!(w.step(&[]), Err(CoreStepError::Rejected(ref e)) if e.kind == ErrorKind::WorldStopped)
@@ -751,15 +971,15 @@ fn nonfinite_prey_motion_ends_the_world_without_poisoning_positions() {
         before
     );
     assert_eq!(w.status(), WorldStatus::Stopped(cause));
-    assert_eq!(w.time, time);
+    assert_eq!(w.time(), time);
 }
 
 #[test]
 fn batched_prey_pickup_sweeps_each_relative_substep() {
     for count in [1, 512] {
-        let mut w = Simulator::new(
-            1,
-            Config {
+        let mut w = Simulator::new(slither_sim::WorldOptions {
+            seed: 1,
+            config: Config {
                 dt: 0.028,
                 radius: 3000.,
                 food_count: 0,
@@ -770,14 +990,17 @@ fn batched_prey_pickup_sweeps_each_relative_substep() {
                 },
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["a".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
         .unwrap();
-        w.add("a", 0, 1).unwrap();
-        w.snakes[0].alive = false;
+        w.retire(0).unwrap();
         w.respawn(0, Point::default(), 0., 2).unwrap();
         let mut projected = w.clone();
         projected.step(&[Some(Action::default())]).unwrap();
-        let snake = &projected.snakes[0];
+        let snake = &projected.snakes()[0];
         let (mouth, radius) =
             physics::pickup_circle(snake.head, snake.heading, snake.speed, snake.segments);
         let lead = Point {
@@ -807,37 +1030,49 @@ fn batched_prey_pickup_sweeps_each_relative_substep() {
         }
         assert!(closest < radius - 0.5);
         assert!(physics::segment_distance(Point::default(), start, prior) > radius + 0.5);
-        w.config.prey.turn_rate = 20.;
-        w.config.prey.cruise_speed = 2000.;
-        w.config.prey.escape_speed = 2000.;
-        w.config.prey.sprint_speed = 2000.;
-        w.config.prey.flee_half_width = 1.;
+        {
+            let mut config = w.config().clone();
+            config.prey.turn_rate = 20.;
+
+            config.prey.cruise_speed = 2000.;
+
+            config.prey.escape_speed = 2000.;
+
+            config.prey.sprint_speed = 2000.;
+
+            config.prey.flee_half_width = 1.;
+            support::reconfigure(&mut w, config);
+        }
         for id in 0..count {
-            w.prey.push(Prey {
-                id,
-                position: if id == 0 {
-                    prey.position
-                } else {
-                    Point { x: 1000., y: 1000. }
+            w.insert_prey(slither_sim::ReplayPrey {
+                prey: Prey {
+                    id,
+                    position: if id == 0 {
+                        prey.position
+                    } else {
+                        Point { x: 1000., y: 1000. }
+                    },
+                    ..prey.clone()
                 },
-                ..prey.clone()
-            });
+                mode: slither_sim::PreyMode::Roaming,
+            })
+            .unwrap();
         }
         w.step(&[Some(Action::default())]).unwrap();
         assert!(
-            !w.prey.iter().any(|prey| prey.id == 0),
+            !w.prey().iter().any(|prey| prey.id == 0),
             "{count}: curved prey survived"
         );
-        assert!(w.snakes[0].length > 2.);
+        assert!(w.snakes()[0].length > 2.);
     }
 }
 
 #[test]
 fn indexed_prey_arc_can_leave_its_endpoint_bounds() {
     for count in [1, 512] {
-        let mut w = Simulator::new(
-            1,
-            Config {
+        let mut w = Simulator::new(slither_sim::WorldOptions {
+            seed: 1,
+            config: Config {
                 dt: 0.084,
                 radius: 3000.,
                 boundary_mode: BoundaryMode::Hard,
@@ -849,20 +1084,27 @@ fn indexed_prey_arc_can_leave_its_endpoint_bounds() {
                 },
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["a".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
         .unwrap();
-        w.add("a", 0, 1).unwrap();
-        w.snakes[0].alive = false;
+        w.retire(0).unwrap();
         w.respawn(0, Point::default(), 0., 2).unwrap();
-        w.config.prey = PreyConfig {
-            count: 0,
-            cruise_speed: 6000.,
-            escape_speed: 6000.,
-            sprint_speed: 6000.,
-            turn_rate: std::f64::consts::PI / (12. * physics::LOOP_SECONDS),
-            flee_half_width: 1.,
-            ..Default::default()
-        };
+        {
+            let mut config = w.config().clone();
+            config.prey = PreyConfig {
+                count: 0,
+                cruise_speed: 6000.,
+                escape_speed: 6000.,
+                sprint_speed: 6000.,
+                turn_rate: std::f64::consts::PI / (12. * physics::LOOP_SECONDS),
+                flee_half_width: 1.,
+                ..Default::default()
+            };
+            support::reconfigure(&mut w, config);
+        }
         let prey = Prey {
             position: Point { x: -100., y: -150. },
             target_heading: std::f64::consts::PI,
@@ -871,24 +1113,28 @@ fn indexed_prey_arc_can_leave_its_endpoint_bounds() {
         let mut moved = prey.clone();
         let mut rightmost = prey.position.x;
         for _ in 0..12 {
-            moved.advance_server_tick(w.config.prey.turn_rate);
+            moved.advance_server_tick(w.config().prey.turn_rate);
             rightmost = rightmost.max(moved.position.x);
         }
         // Both endpoints lie left of every mouth sweep, while the arc bends in.
         assert!(prey.position.x <= -100. && moved.position.x <= -100.);
         assert!(rightmost > 30.);
         for id in 0..count {
-            w.prey.push(Prey {
-                id,
-                position: if id == 0 {
-                    prey.position
-                } else {
-                    Point { x: 1000., y: 1000. }
+            w.insert_prey(slither_sim::ReplayPrey {
+                prey: Prey {
+                    id,
+                    position: if id == 0 {
+                        prey.position
+                    } else {
+                        Point { x: 1000., y: 1000. }
+                    },
+                    ..prey.clone()
                 },
-                ..prey.clone()
-            });
+                mode: slither_sim::PreyMode::Roaming,
+            })
+            .unwrap();
         }
         w.step(&[Some(Action::default())]).unwrap();
-        assert!(!w.prey.iter().any(|p| p.id == 0), "{count}: arc survived");
+        assert!(!w.prey().iter().any(|p| p.id == 0), "{count}: arc survived");
     }
 }

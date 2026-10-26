@@ -421,17 +421,31 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
     config.ambient_food.enabled = false;
     config.boost_food.enabled = false;
     config.emit_boost_food = matches!(f.options.boost_drops, DropMode::Simulated);
-    let mut world = Simulator::new(f.seed, config)?;
-    world.add(f.initial.snake.id.clone(), 0, 1)?;
-    world.snakes[0] = f.initial.snake;
-    world.initialize_speed_state(0, None)?;
-    world.food = f
-        .initial
-        .food
-        .iter()
-        .map(|named| named.food.clone())
-        .collect();
-    world.pickup_events = Some(Vec::new());
+    let speed = f.initial.snake.speed;
+    let mut world = Simulator::from_scenario(
+        f.seed,
+        config,
+        slither_sim::Scenario {
+            snakes: vec![(
+                f.initial.snake.id.clone(),
+                slither_sim::ReplayLife::from_observed(
+                    f.initial.snake,
+                    slither_sim::InitialSpeed::Infer(speed),
+                ),
+            )],
+            food: f
+                .initial
+                .food
+                .iter()
+                .map(|named| named.food.clone())
+                .collect(),
+            prey: Vec::new(),
+        },
+    )?;
+    world.record_events(slither_sim::EventRecording {
+        pickups: true,
+        food_births: false,
+    });
 
     write(
         &mut out,
@@ -469,14 +483,14 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
     let mut external_food_events = 0usize;
     let offset = f.options.input_time_offset_ms / 1000.0;
 
-    while world.time + EPS < f.duration_seconds && world.snakes[0].alive {
+    while world.time() + EPS < f.duration_seconds && world.snakes()[0].alive {
         while control_i < f.controls.len()
-            && f.controls[control_i].time + offset <= world.time + EPS
+            && f.controls[control_i].time + offset <= world.time() + EPS
         {
             action = f.controls[control_i].action;
             control_i += 1;
         }
-        while food_i < f.food_events.len() && f.food_events[food_i].time <= world.time + EPS {
+        while food_i < f.food_events.len() && f.food_events[food_i].time <= world.time() + EPS {
             let event = &f.food_events[food_i];
             match event.kind {
                 FoodEventKind::Add => {
@@ -487,20 +501,20 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                     if !food.point().finite() {
                         return Err(fail("invalid added food position"));
                     }
-                    world.food.push(food.clone());
+                    world.insert_food(food.clone())?;
                     known.push((event.id.clone(), food));
                     write(
                         &mut out,
-                        json!({"kind":"food_event","time":world.time,"event":"add","id":event.id,"reason":event.reason}),
+                        json!({"kind":"food_event","time":world.time(),"event":"add","id":event.id,"reason":event.reason}),
                     )?;
                 }
                 FoodEventKind::Remove => {
                     if let Some(index) = known.iter().position(|(id, _)| id == &event.id) {
                         let (_, food) = known.remove(index);
                         if let Some(index) =
-                            world.food.iter().position(|candidate| *candidate == food)
+                            world.food().iter().position(|candidate| *candidate == food)
                         {
-                            world.food.remove(index);
+                            world.remove_food(index)?;
                         } else {
                             return Err(fail(format!(
                                 "food ID present in sidecar but not simulator: {}",
@@ -509,12 +523,12 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                         }
                         write(
                             &mut out,
-                            json!({"kind":"food_event","time":world.time,"event":"remove","id":event.id,"reason":event.reason}),
+                            json!({"kind":"food_event","time":world.time(),"event":"remove","id":event.id,"reason":event.reason}),
                         )?;
                     } else {
                         write(
                             &mut out,
-                            json!({"kind":"food_event","time":world.time,"event":"remove_missing","id":event.id,"reason":event.reason}),
+                            json!({"kind":"food_event","time":world.time(),"event":"remove_missing","id":event.id,"reason":event.reason}),
                         )?;
                     }
                 }
@@ -523,29 +537,31 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
             food_i += 1;
         }
         if mode == "motion_only" {
-            while mass_i < f.mass_events.len() && f.mass_events[mass_i].time <= world.time + EPS {
+            while mass_i < f.mass_events.len() && f.mass_events[mass_i].time <= world.time() + EPS {
                 let event = &f.mass_events[mass_i];
-                world.snakes[0].segments = event.segments;
-                world.snakes[0].fam = event.fam;
-                let tail_anchors_synthesized = align_tail_to_segments(&mut world.snakes[0]);
+                let mut corrected = world.snakes()[0].clone();
+                corrected.segments = event.segments;
+                corrected.fam = event.fam;
+                let tail_anchors_synthesized = align_tail_to_segments(&mut corrected);
+                world.correct_mass(0, corrected.body, corrected.fam)?;
                 write(
                     &mut out,
-                    json!({"kind":"intervention","time":world.time,
+                    json!({"kind":"intervention","time":world.time(),
                     "source_time":event.time,"field":"mass","segments":event.segments,
                     "fam":event.fam,"tail_anchors_synthesized":tail_anchors_synthesized}),
                 )?;
                 mass_i += 1;
             }
         }
-        let previous_anchor = world.snakes[0].body[0];
+        let previous_anchor = world.snakes()[0].body[0];
         let before = std::mem::take(&mut known);
         world.step(&[Some(action)])?;
-        if world.snakes[0].body[0] != previous_anchor {
+        if world.snakes()[0].body[0] != previous_anchor {
             anchor_index += 1;
             let event = AnchorEvent {
                 index: anchor_index,
-                time: world.time,
-                point: world.snakes[0].body[0],
+                time: world.time(),
+                point: world.snakes()[0].body[0],
             };
             write(
                 &mut out,
@@ -557,8 +573,7 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
         // A sidecar tracks wire food IDs without changing production physics. Exact
         // duplicate pellets cannot be uniquely identified, so mark those ambiguous.
         let ambiguous_pickup_values: Vec<Food> = world
-            .pickup_events
-            .as_ref()
+            .pickup_events()
             .expect("enabled pickup events")
             .iter()
             .filter_map(|event| match &event.item {
@@ -567,12 +582,12 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
             })
             .filter(|food| {
                 before.iter().filter(|(_, prior)| prior == *food).count() > 1
-                    || world.food.iter().any(|remaining| remaining == *food)
+                    || world.food().iter().any(|remaining| remaining == *food)
             })
             .cloned()
             .collect();
         let mut used = vec![false; before.len()];
-        for food in &world.food {
+        for food in world.food() {
             if let Some(index) = before
                 .iter()
                 .enumerate()
@@ -590,7 +605,7 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
             .enumerate()
             .filter_map(|(index, entry)| (!used[index]).then_some(entry))
             .collect();
-        for pickup in world.pickup_events.as_ref().expect("enabled pickup events") {
+        for pickup in world.pickup_events().expect("enabled pickup events") {
             if let PickupItem::Food(food) = &pickup.item {
                 let matching: Vec<_> = eaten_before
                     .iter()
@@ -606,12 +621,12 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                 };
                 write(
                     &mut out,
-                    json!({"kind":"pickup","time":world.time,"id":id,"food":food,
+                    json!({"kind":"pickup","time":world.time(),"id":id,"food":food,
                     "eater":pickup.eater,"id_ambiguous":ambiguous}),
                 )?;
                 if pickup.eater == 0 {
                     simulated_eats.push(EatEvent {
-                        time: world.time,
+                        time: world.time(),
                         id,
                     });
                 }
@@ -624,10 +639,10 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
         }
 
         while observation_i < f.observations.len()
-            && f.observations[observation_i].time <= world.time + EPS
+            && f.observations[observation_i].time <= world.time() + EPS
         {
             let o = &f.observations[observation_i];
-            let s = &world.snakes[0];
+            let s = &world.snakes()[0];
             let head_error = o.head.map(|point| s.head.distance(point));
             let speed_error = o.speed.map(|speed| (s.speed - speed).abs());
             let mass_error = (mode == "free")
@@ -663,7 +678,7 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
             }
             write(
                 &mut out,
-                json!({"kind":"observation","time":o.time,"sampled_sim_time":world.time,
+                json!({"kind":"observation","time":o.time,"sampled_sim_time":world.time(),
                 "head_error":head_error,"speed_error":speed_error,"mass_error":mass_error,
                 "mass_comparison_intervened":mode == "motion_only",
                 "heading_error_diagnostic":heading_error,"heading_source":o.heading_source,
@@ -671,14 +686,14 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
             )?;
             observation_i += 1;
         }
-        if world.time + EPS >= next_sample {
-            let s = &world.snakes[0];
+        if world.time() + EPS >= next_sample {
+            let s = &world.snakes()[0];
             write(
                 &mut out,
-                json!({"kind":"sample","time":world.time,"head":s.head,
+                json!({"kind":"sample","time":world.time(),"head":s.head,
                 "heading":s.heading,"speed":s.speed,"segments":s.segments,"fam":s.fam,
                 "score":s.score,"body":s.body,"boosting":world.is_boosting(0),
-                "action":action,"food_count":world.food.len()}),
+                "action":action,"food_count":world.food().len()}),
             )?;
             next_sample += f.options.sample_interval_seconds;
         }
@@ -742,9 +757,9 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                     && (eat.time - observed.time).abs() <= f.options.pickup_time_tolerance
             })
             .min_by(|(_, a), (_, b)| {
-                (a.time - observed.time)
+                (a.time() - observed.time)
                     .abs()
-                    .total_cmp(&(b.time - observed.time).abs())
+                    .total_cmp(&(b.time() - observed.time).abs())
             });
         if let Some((index, _)) = candidate {
             matched.insert(index);
@@ -780,8 +795,8 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
         .then(|| anchor_errors.iter().sum::<f64>() / anchor_errors.len() as f64);
     write(
         &mut out,
-        json!({"kind":"summary","mode":mode,"replayed_seconds":world.time,
-        "ended_alive":world.snakes[0].alive,"anchor_events_observed":observed_anchors.len(),
+        json!({"kind":"summary","mode":mode,"replayed_seconds":world.time(),
+        "ended_alive":world.snakes()[0].alive,"anchor_events_observed":observed_anchors.len(),
         "anchor_events_simulated":simulated_anchors.len(),"anchor_mean_error":anchor_mean_error,
         "observed_pickups":observed_eats.len(),"simulated_pickups":simulated_eats.len(),
         "missed_pickups":missed_pickups,"extra_pickups":extra_pickups,

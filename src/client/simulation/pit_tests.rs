@@ -50,7 +50,7 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
         sim.connect(slot, PlayerAppearance::default()).unwrap();
         reader.new_connection(0.).unwrap();
         // Synthetic, separated poses give both readers the same pit sectors.
-        sim.backend.world.snakes[slot].alive = false;
+        sim.backend.world.retire(slot).unwrap();
         sim.backend
             .world
             .respawn(
@@ -82,7 +82,7 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
         ..marker.clone()
     };
     let key = encode::food_key(real.point()).unwrap();
-    sim.backend.world.food.push(real.clone());
+    sim.backend.world.insert_food(real.clone()).unwrap();
     sim.backend.broadcast().unwrap();
     let browser_birth = pump_for(&mut sim, &mut readers[0], 0);
     let bot_birth = pump_for(&mut sim, &mut readers[1], 1);
@@ -101,10 +101,10 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
     // Put the bot's pickup circle over the real pellet, then let physics eat it.
     // The readers stay connected; no pickup event or wire delta is fabricated.
     let heading = std::f64::consts::FRAC_PI_2;
-    let snake = &sim.backend.world.snakes[1];
+    let snake = &sim.backend.world.snakes()[1];
     let (lead, _) =
         crate::physics::pickup_circle(Point::default(), heading, snake.speed, snake.segments);
-    sim.backend.world.snakes[1].alive = false;
+    sim.backend.world.retire(1).unwrap();
     sim.backend
         .world
         .respawn(
@@ -119,9 +119,9 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
         .unwrap();
     sim.backend.slots[1].control.heading = heading;
     sim.advance_ticks(1).unwrap();
-    assert!(sim.backend.world.snakes.iter().all(|s| s.alive));
-    assert!(sim.backend.world.food.is_empty());
-    let events = sim.backend.world.pickup_events.as_ref().unwrap();
+    assert!(sim.backend.world.snakes().iter().all(|s| s.alive));
+    assert!(sim.backend.world.food().is_empty());
+    let events = sim.backend.world.pickup_events().unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].eater, 1);
     assert_eq!(events[0].item, crate::simulator::PickupItem::Food(real));
@@ -152,23 +152,44 @@ fn pit_markers_join_sector_exit_reentry_and_reconnect() {
         !food(&state, sim.time()).is_empty(),
         "join must list markers"
     );
-    assert!(sim.backend.world.food.is_empty());
+    assert!(sim.backend.world.food().is_empty());
 
     // Synthetic pose and clock jumps isolate food subscriptions from movement
     // and pit death. Normal sector retention/cleanup still runs in broadcast.
-    sim.backend.world.snakes[0].head = Point { x: 2700., y: 0. };
+    {
+        let mut snake = sim.backend.world.snakes()[0].clone();
+        snake.head = Point { x: 2700., y: 0. };
+        sim.backend
+            .world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     sim.backend.tick += 500;
     sim.backend.broadcast().unwrap();
     pump(&mut sim, &mut state);
     let near = food(&state, sim.time());
     assert!(near.iter().any(|f| f.x > 1780.));
-    sim.backend.world.snakes[0].head = Point { x: -2700., y: 0. };
+    {
+        let mut snake = sim.backend.world.snakes()[0].clone();
+        snake.head = Point { x: -2700., y: 0. };
+        sim.backend
+            .world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     sim.backend.tick += 500;
     sim.backend.broadcast().unwrap();
     let packets = pump(&mut sim, &mut state);
     assert!(packets.iter().any(|p| p[0] == b'w'));
     assert!(!food(&state, sim.time()).iter().any(|f| f.x > 1780.));
-    sim.backend.world.snakes[0].head = Point { x: 2700., y: 0. };
+    {
+        let mut snake = sim.backend.world.snakes()[0].clone();
+        snake.head = Point { x: 2700., y: 0. };
+        sim.backend
+            .world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     sim.backend.tick += 500;
     sim.backend.broadcast().unwrap();
     let packets = pump(&mut sim, &mut state);
@@ -194,7 +215,7 @@ fn pit_markers_reserve_browser_keys_but_bots_keep_colliding_real_food() {
         ..marker.clone()
     };
     let key = encode::food_key(real.point()).unwrap();
-    sim.backend.world.food.push(real.clone());
+    sim.backend.world.insert_food(real.clone()).unwrap();
     sim.backend.broadcast().unwrap();
     let packets = pump(&mut sim, &mut state);
     assert!(
@@ -207,7 +228,14 @@ fn pit_markers_reserve_browser_keys_but_bots_keep_colliding_real_food() {
     // A bot connection gets the physical listing, including this reserved key.
     sim.connect(0, PlayerAppearance::default()).unwrap();
     sim.physical_food(0);
-    sim.backend.world.snakes[0].head = marker.point();
+    {
+        let mut snake = sim.backend.world.snakes()[0].clone();
+        snake.head = marker.point();
+        sim.backend
+            .world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     let mut bot = ClientState::new();
     bot.new_connection(sim.time()).unwrap();
     sim.backend.ingest(0, sim.time()).unwrap();
@@ -222,12 +250,19 @@ fn pit_markers_reserve_browser_keys_but_bots_keep_colliding_real_food() {
     // point. No removal/animation may erase the decoration, even on an equal
     // cached listing or when the physical pellet has been replaced in-place.
     let mut state = browser(&mut sim);
-    sim.backend.world.snakes[0].head = marker.point();
+    {
+        let mut snake = sim.backend.world.snakes()[0].clone();
+        snake.head = marker.point();
+        sim.backend
+            .world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     sim.backend.broadcast().unwrap();
     pump(&mut sim, &mut state);
     for remove in [false, true] {
         if remove {
-            sim.backend.world.food.clear();
+            sim.backend.world.replace_food(Vec::new()).unwrap();
         }
         sim.backend
             .food_eaters
@@ -267,10 +302,10 @@ fn pit_markers_preserve_physics_rng_and_native_bot_frames() {
                 serde_json::to_vec(&marked.world().checkpoint().unwrap()).unwrap(),
                 serde_json::to_vec(&plain.world().checkpoint().unwrap()).unwrap()
             );
-            assert_eq!(marked.world.pickup_events, plain.world.pickup_events);
+            assert_eq!(marked.world.pickup_events(), plain.world.pickup_events());
             assert_eq!(
-                marked.world.food_spawn_events,
-                plain.world.food_spawn_events
+                marked.world.food_spawn_events(),
+                plain.world.food_spawn_events()
             );
             assert_eq!(
                 format!("{:?}", marked.spawn_random),

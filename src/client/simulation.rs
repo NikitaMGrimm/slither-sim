@@ -150,18 +150,25 @@ impl SimulatorBackend {
         // Validate the world that will run, as the host and resets do.
         config.world.size_for_population(config.agents);
         config.validate()?;
-        let mut world =
-            Simulator::new(seed, config.world.clone()).map_err(|error| error.to_string())?;
-        world.food_spawn_events = Some(Vec::new());
-        world.pickup_events = Some(Vec::new());
-        world
-            .add_slots(config.agents)
-            .map_err(|error| error.to_string())?;
-        for snake in &mut world.snakes {
-            // Native experiments retain their synthetic ring initialization.
-            // Hosted lives enter through the same admission rule as rejoins.
-            snake.alive = remote == 0;
+        let ids = (0..config.agents).map(|slot| slot.to_string()).collect();
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed,
+            config: config.world.clone(),
+            population: crate::InitialPopulation::Placed {
+                ids,
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .map_err(|error| error.to_string())?;
+        if remote > 0 {
+            for slot in 0..config.agents {
+                world.retire(slot).map_err(|error| error.to_string())?;
+            }
         }
+        world.record_events(crate::EventRecording {
+            pickups: true,
+            food_births: true,
+        });
         let mut backend = Self {
             random: Random::new(u64::from(seed) ^ 0x6c61_7465_6e63_7900),
             spawn_random: Random::new(u64::from(seed) ^ 0x7370_6177_6e00),
@@ -197,9 +204,9 @@ impl SimulatorBackend {
             connections: 0,
             session_key: seed.rotate_left(16) ^ 0x5e55_1d00,
         };
-        backend.food_presentation.sync(&backend.world.food)?;
+        backend.food_presentation.sync(backend.world.food())?;
         for slot in 0..backend.config.agents {
-            let heading = backend.world.snakes[slot].heading;
+            let heading = backend.world.snakes()[slot].heading;
             let remote = slot < remote;
             backend.slots.push(Slot {
                 state: ClientState::new(),
@@ -243,7 +250,7 @@ impl SimulatorBackend {
     }
     /// Local and server virtual time in seconds.
     pub fn time(&self) -> f64 {
-        self.tick as f64 * self.world.config.dt
+        self.tick as f64 * self.world.config().dt
     }
     pub fn slots(&self) -> usize {
         self.slots.len()
@@ -396,7 +403,7 @@ impl SimulatorBackend {
         s.state.disconnect();
         s.record(now, WireEvent::Disconnect, &[])?;
         s.living = None;
-        self.world.snakes[slot].alive = false;
+        self.world.retire(slot).map_err(|error| error.to_string())?;
         self.world
             .respawn_body(slot, body, heading)
             .map_err(|error| error.to_string())?;
@@ -426,75 +433,78 @@ impl SimulatorBackend {
     /// Evidence:
     /// research/fidelity/2026-10-25-spawn-admission/REPORT.md.
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
-        let alive = self.world.snakes[slot].alive;
-        self.world.snakes[slot].alive = false;
-        let pose = (|| {
-            let circular = self.world.config.spawn_radius.is_some();
-            let mut safety = None;
-            let mut open: Option<(f64, Vec<Point>, f64)> = None;
-            let attempts = if circular {
-                spawn::CIRCULAR_ATTEMPTS
-            } else {
-                SPAWN_ATTEMPTS
+        let circular = self.world.config().spawn_radius.is_some();
+        let mut safety = None;
+        let mut open: Option<(f64, Vec<Point>, f64)> = None;
+        let attempts = if circular {
+            spawn::CIRCULAR_ATTEMPTS
+        } else {
+            SPAWN_ATTEMPTS
+        };
+        for _ in 0..attempts {
+            let distance = spawn::spawn_distance(self.world.config(), self.spawn_random.unit());
+            let angle = self.spawn_random.unit() * TAU;
+            let heading = self.spawn_random.unit() * TAU;
+            let head = Point {
+                x: angle.cos() * distance,
+                y: angle.sin() * distance,
             };
-            for _ in 0..attempts {
-                let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
-                let angle = self.spawn_random.unit() * TAU;
-                let heading = self.spawn_random.unit() * TAU;
-                let head = Point {
-                    x: angle.cos() * distance,
-                    y: angle.sin() * distance,
-                };
-                // Local policy: official joins keep a median 925 units from
-                // visible bodies, but three came within 550-600.
-                let (body, heading) = self
-                    .world
-                    .spawn_body(head, heading)
-                    .map_err(|error| error.to_string())?;
-                let clear = if circular {
-                    safety
-                        .get_or_insert_with(|| {
-                            spawn::Safety::new(
-                                &self.world,
-                                body.len(),
-                                spawn::CIRCULAR_CLEARANCE,
-                                spawn::HEAD_PATH_SECONDS,
-                            )
-                        })
-                        .clears(&body)
-                } else {
-                    self.world.body_is_clear(&body, spawn::CLEARANCE)
-                };
-                if clear
-                    && (!circular || safety.as_ref().unwrap().clears_departures(body[0], heading))
-                {
-                    return Ok((body, heading));
-                }
-                if circular {
-                    continue;
-                }
-                // A candidate's margin only decreases while scanning neighbors.
-                // Stop once it cannot beat zero (admission) or the incumbent;
-                // keep strict ties and all random draws unchanged. See:
-                // research/performance/2026-10-25-battledome-spawn-cost/REPORT.md.
-                let best = open.as_ref().map_or(0., |(best, ..)| best.max(0.));
-                if let Some(margin) = self.world.spawn_margin_bounded(&body, best)
-                    && open.as_ref().is_none_or(|(best, ..)| margin > *best)
-                {
-                    open = Some((margin, body, heading));
-                }
+            // Local policy: official joins keep a median 925 units from
+            // visible bodies, but three came within 550-600.
+            let (body, heading) = self
+                .world
+                .spawn_body(head, heading)
+                .map_err(|error| error.to_string())?;
+            let clear = if circular {
+                safety
+                    .get_or_insert_with(|| {
+                        spawn::Safety::new_excluding(
+                            &self.world,
+                            Some(slot),
+                            body.len(),
+                            spawn::CIRCULAR_CLEARANCE,
+                            spawn::HEAD_PATH_SECONDS,
+                        )
+                    })
+                    .clears(&body)
+            } else {
+                self.world
+                    .body_is_clear_excluding(&body, spawn::CLEARANCE, Some(slot))
+            };
+            if clear && (!circular || safety.as_ref().unwrap().clears_departures(body[0], heading))
+            {
+                return Ok((body, heading));
             }
             if circular {
-                return Err(spawn::WAITING.into());
+                continue;
             }
-            match open {
-                Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
-                Some(_) => Err("Spawn candidate search exhausted: no sampled position is clear of other snakes".into()),
-                None => Err("Spawn candidate search exhausted: no sampled position fits inside the arena".into()),
+            // A candidate's margin only decreases while scanning neighbors.
+            // Stop once it cannot beat zero (admission) or the incumbent;
+            // keep strict ties and all random draws unchanged. See:
+            // research/performance/2026-10-25-battledome-spawn-cost/REPORT.md.
+            let best = open.as_ref().map_or(0., |(best, ..)| best.max(0.));
+            if let Some(margin) = self
+                .world
+                .spawn_margin_bounded_excluding(&body, best, Some(slot))
+                && open.as_ref().is_none_or(|(best, ..)| margin > *best)
+            {
+                open = Some((margin, body, heading));
             }
-        })();
-        self.world.snakes[slot].alive = alive;
-        pose
+        }
+        if circular {
+            return Err(spawn::WAITING.into());
+        }
+        match open {
+            Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
+            Some(_) => Err(
+                "Spawn candidate search exhausted: no sampled position is clear of other snakes"
+                    .into(),
+            ),
+            None => Err(
+                "Spawn candidate search exhausted: no sampled position fits inside the arena"
+                    .into(),
+            ),
+        }
     }
 
     /// Drive non-controlled slots with the shared policy over their own frames.

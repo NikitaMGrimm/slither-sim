@@ -47,10 +47,10 @@ impl RawSimulator {
         self.backend.time()
     }
     pub(crate) fn dt(&self) -> f64 {
-        self.backend.world.config.dt
+        self.backend.world.config().dt
     }
     pub(crate) fn waits_for_spawn(&self) -> bool {
-        self.backend.world.config.spawn_radius.is_some()
+        self.backend.world.config().spawn_radius.is_some()
     }
 
     fn remote(&self, slot: usize) -> Result<(), String> {
@@ -89,7 +89,7 @@ impl RawSimulator {
             Err(reason) => return Err(reason),
         };
         b.slots[slot].living = None;
-        b.world.snakes[slot].alive = false;
+        b.world.retire(slot).map_err(|error| error.to_string())?;
         b.world
             .respawn_body(slot, body, heading)
             .map_err(|error| error.to_string())?;
@@ -175,7 +175,7 @@ impl RawSimulator {
         self.remote(slot)?;
         let b = &mut self.backend;
         b.slots[slot].living = None;
-        b.world.snakes[slot].alive = false;
+        b.world.retire(slot).map_err(|error| error.to_string())?;
         b.slots[slot].connection = Connection::default();
         Ok(())
     }
@@ -241,7 +241,7 @@ impl RawSimulator {
             return Err("Early slots must be remote".into());
         }
         let b = &mut self.backend;
-        if b.tick.is_multiple_of(b.config.decision_ticks as u64) {
+        if b.tick.is_multiple_of(b.config().decision_ticks as u64) {
             b.drive_background()?;
         }
         b.advance_with(early, hand_over)

@@ -15,6 +15,15 @@
   the official prey density (68 prey for 484 seats instead of 1), while explicit
   fixed radii, sandbox and Battledome stay unchanged
   ([configuration](docs/configuration.md#population-sizing)).
+- Rust `Simulator` state is private, with borrowed read accessors and checked
+  lifecycle, replay and food/prey edits. `WorldOptions` selects empty, dormant or
+  placed initial populations; `Placement` defaults to the existing test ring.
+  Typed `Session::prepare_reset`/`commit_reset` keeps rejected resets atomic;
+  Python reset uses it without a full-frame JSON round trip. `add`, public
+  `update_mass` and the two-call speed import are removed. Flat config keys,
+  default wire replies and contract IDs remain unchanged
+  ([Rust API](docs/bot-api.md#rust-library)).
+
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
   and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
   use `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot
