@@ -196,3 +196,9 @@ These short pilots establish tooling feasibility and describe their samples;
 they do not qualify sustained 500-player capacity or validate the timing model.
 Routine PRs use the fixed metric without a pilot. Recalibration remains a manual
 `Host` workflow group, avoiding repeated calibration cost on every PR.
+
+The [post-#168 PR run](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40382784368)
+at `41fe897ef2232ad5cb49d4319eed0324b967df79` also completed without report errors:
+all six timing rows resolved Within ±5%, ten of ten deterministic traces matched,
+and sampling took 189.50 seconds without a per-PR pilot. This verifies the new
+rows on the inherited host optimization; it is not a sustained-capacity claim.

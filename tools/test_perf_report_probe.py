@@ -60,19 +60,20 @@ class ProbeTests(unittest.TestCase):
     def test_changed_definition_retains_head_value_without_a_comparison_claim(self):
         listed = catalog([row("changed")])
         old = catalog([row("changed", definition={"config": {"radius": 2000}})])
-        suites = {"candidate": listed.select(), "baseline": old.select()}
-        report = {"errors": [], "phases_seconds_after_job_start": {}}
-        with tempfile.TemporaryDirectory() as temporary, \
-                patch("perf_baseline.native", return_value={"workload": {"kind": "report", "case": "changed", "mode": "timing",
-                         "iterations": 100, "timing": {"operations": 100, "wallSeconds": .25}}}), \
-                patch.object(perf_compare, "sequential", return_value={}), patch.object(pr_report, "digest", return_value="d" * 64):
-            pr_report.measure(report, {"candidate": Path("synthetic")}, {},
-                              {"candidate": listed, "baseline": old}, suites, Path(temporary) / "performance", time.monotonic())
-        result = report["performance"][0]
-        self.assertEqual(result["label"], "Redefined")
-        self.assertIsNone(result["result"])
-        self.assertEqual(result["head_ms_per_operation"], 2.5)
-        self.assertFalse(report["errors"])
+        for baseline in (old.select(), ()):
+            suites = {"candidate": listed.select(), "baseline": baseline}
+            report = {"errors": [], "phases_seconds_after_job_start": {}}
+            with tempfile.TemporaryDirectory() as temporary, \
+                    patch("perf_baseline.native", return_value={"workload": {"kind": "report", "case": "changed", "mode": "timing",
+                             "iterations": 100, "timing": {"operations": 100, "wallSeconds": .25}}}), \
+                    patch.object(perf_compare, "sequential", return_value={}), patch.object(pr_report, "digest", return_value="d" * 64):
+                pr_report.measure(report, {"candidate": Path("synthetic")}, {},
+                                  {"candidate": listed, "baseline": old}, suites, Path(temporary) / "performance", time.monotonic())
+            result = report["performance"][0]
+            self.assertEqual(result["label"], "Redefined")
+            self.assertIsNone(result["result"])
+            self.assertEqual(result["head_ms_per_operation"], 2.5)
+            self.assertFalse(report["errors"])
 
     def test_socket_local_suite_does_not_attempt_a_nondeterministic_trace(self):
         listed = catalog([row("socket", mode="socket-host")])

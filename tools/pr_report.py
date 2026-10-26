@@ -436,7 +436,7 @@ def measure(report, binaries, hashes, catalogs, suites, output, job_start):
     for w in suites["candidate"]:
         if w in matched:
             continue
-        reason = "runtime resolves a different definition even with the head Config; comparison withheld"
+        reason = "baseline cannot use the same head workload definition; comparison withheld"
         try:
             from perf_baseline import native
             result = native(binaries["candidate"], w.name, w.iterations, output.parent / f"{w.name}-redefined-stderr.txt", deadline=deadline)
