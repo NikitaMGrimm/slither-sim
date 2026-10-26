@@ -24,7 +24,7 @@ pub struct SimulationConfig {
     pub world: Config,
     /// When visible state is sent; independent of `latency`.
     pub delivery: DeliveryProfile,
-    /// Snakes joined at start on the deterministic test ring of `Simulator::add`.
+    /// Snakes joined at start on the deterministic `Placement::TestRing`.
     pub agents: usize,
     pub controlled_slot: usize,
     /// Physics ticks between `next_frame`/`step_all` decisions.

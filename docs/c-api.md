@@ -91,6 +91,6 @@ separate threads. Steps advance several worlds in parallel on the library's
 
 `slither-sim-abi-v2` covers function signatures, `slither_frame` layout, codes
 and column meanings. Incompatible changes need a new identifier and
-`SLITHER_ABI_VERSION`. Rebuild v1 callers; see [migration notes](../CHANGELOG.md#unreleased).
+`SLITHER_ABI_VERSION`. Rebuild v1 callers; see [migration notes](../CHANGELOG.md#050---2026-10-26).
 Requests and replies follow `slither-sim-json-v3`; check `protocol` and record
 the commit for reproducibility.

@@ -85,8 +85,9 @@ timing and retains actions, frames and wire records in order.
 
 Existing `-bot` rows still mean scripted wander plus step and observation; they
 do not time Forager. Legacy and client-admission rows retain their controllers
-and workload identities. The new row is a bounded integration workload, not the
-500-bot host cost gate or evidence of playing strength. Those checks remain pending.
+and workload identities. The new row is a bounded integration workload, not a
+host capacity or playing-strength measurement; host capacity comes from the
+[500-bot host qualification](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-500-bot-qualification/REPORT.md).
 
 ## Steady-state lifecycle
 

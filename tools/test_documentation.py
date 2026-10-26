@@ -32,6 +32,8 @@ def anchors(text):
     found = set(re.findall(r'<a\s+(?:id|name)="([^"]+)"', text))
     counts = {}
     for heading in re.findall(r"^#+ (.+)$", text, re.MULTILINE):
+        # GitHub slugs a linked heading from its rendered link text.
+        heading = re.sub(r"\[([^\]\n]*)\]\([^)\n]*\)", r"\1", heading)
         slug = re.sub(r"[^\w -]", "", heading.lower()).replace(" ", "-")
         count = counts.get(slug, 0)
         counts[slug] = count + 1
@@ -132,6 +134,8 @@ class DocumentationTests(unittest.TestCase):
                          [("notes here.md", "section"), ("", "here")])
         self.assertEqual(anchors('# Same\n# Same\n<a id="old-link"></a>\n'),
                          {"same", "same-1", "old-link"})
+        self.assertEqual(anchors("## [0.5.0](https://example.com/v0.4.0...v0.5.0) - 2026-10-26\n"),
+                         {"050---2026-10-26"})
 
     def test_include_globs_stay_within_one_segment(self):
         includes = ["/src", "/docs/*.md", "/README.md"]
