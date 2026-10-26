@@ -24,7 +24,7 @@ TESTS = ("movement_turns", "physics")
 # runtimes run identical harness sources. The harness must compile against the base API.
 HARNESS = ("build.rs", "examples/support/state.rs", "examples/support/runtime.rs", "examples/perf_baseline.rs",
            "examples/perf_observation.rs", "examples/perf_client_retained.rs", "examples/perf_session.rs", "examples/perf_radius.rs",
-           "examples/fidelity_metrics.rs", "tests/support/mod.rs", *(f"tests/{name}.rs" for name in TESTS))
+           "examples/fidelity_metrics.rs", "examples/host_load.rs", "tests/support/mod.rs", *(f"tests/{name}.rs" for name in TESTS))
 FIXTURES = "tests/fixtures"
 GIT_TIMEOUT_SECONDS = 120
 SUFFIX = ".exe" if os.name == "nt" else ""

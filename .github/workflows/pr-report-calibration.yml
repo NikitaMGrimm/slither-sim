@@ -13,7 +13,7 @@ on:
       group:
         description: Workload group from the calibration plan
         type: choice
-        options: [A, B]
+        options: [A, B, Host]
 
 permissions:
   contents: read
@@ -54,7 +54,11 @@ jobs:
         run: |
           binary=target/release/examples/perf_baseline
           if [ "$RUNNER_OS" = Windows ]; then binary="$binary.exe"; fi
-          "$PYTHON" tools/perf_calibration.py --binary "$binary" --group "$GROUP" --output "$OUTPUT"
+          if [ "$GROUP" = Host ]; then
+            "$PYTHON" tools/perf_report_probe.py --binary "$binary" --output "$OUTPUT"
+          else
+            "$PYTHON" tools/perf_calibration.py --binary "$binary" --group "$GROUP" --output "$OUTPUT"
+          fi
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
