@@ -2,14 +2,7 @@
 
 ## Unreleased
 
-- Server transport checks now default to an unfiltered near-server reference from
-  existing #111 captures; nominal prey/HUD tests use its server-clock summaries.
-  Retained home-route fixtures and latency examples stay labeled. Selected
-  scheduler exceptions exercise decoder/client state; runtime defaults and
-  simulator cadence rules are unchanged. A six-capture leave-one-out check
-  selects the spread allowance, with a 1 ms header-resolution spread floor
-  only for frame-gap p50; masked characterization and the first attempt remain
-  ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
+
 
 ### Breaking
 
@@ -118,6 +111,15 @@
   avoiding walls and other snakes; the `portable_bot` examples are shorter.
 
 ### Changed
+
+- Transport checks now compare against timing recorded near the official
+  servers in #111 instead of the home captures, whose delay spikes came from the
+  home route. The home reference stays available and labeled. Each limit is the
+  six-session envelope widened until every session passes against the other
+  five. New fixtures cover rare server timing exceptions (motion reports 24 ms
+  apart, mass 84 ms apart, motion before mass in one frame, a 3 s prey gap);
+  simulator cadence rules and defaults are unchanged
+  ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
 
 - Gameplay updates go out every physics tick (7 ms by default) with measured
   per-family pacing: motion and standalone mass changes at least 6 and 15 ticks
