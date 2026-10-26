@@ -1,0 +1,39 @@
+--- a/loopback.py
++++ b/loopback.py
+@@ -14 +14 @@
+-    return (int(fields[11]) + int(fields[12])) / os.sysconf('SC_CLK_TCK')
++    return int(fields[11]) / os.sysconf('SC_CLK_TCK'), int(fields[12]) / os.sysconf('SC_CLK_TCK')
+@@ -40,2 +40,2 @@
+-        for shard in range(3):
+-            shard_count = count // 3 + (shard < count % 3)
++        for shard in range(1):
++            shard_count = count
+@@ -43 +43 @@
+-                       RAYON_NUM_THREADS='2')
++                       RAYON_NUM_THREADS='1')
+@@ -59 +59,2 @@
+-            samples.append({'unix': time.time(), 'cpuSeconds': cpu(host.pid)})
++            user, system = cpu(host.pid)
++            samples.append({'unix': time.time(), 'cpuSeconds': user+system, 'userSeconds': user, 'systemSeconds': system})
+@@ -68,0 +70,2 @@
++                  'userCpuMsPerTick': 1000*(samples[1]['userSeconds']-samples[0]['userSeconds'])/ticks,
++                  'systemCpuMsPerTick': 1000*(samples[1]['systemSeconds']-samples[0]['systemSeconds'])/ticks,
+@@ -71 +74 @@
+-                  'hostCpu': [0], 'loadCpus': [2, 4, 6], 'warmupSeconds': warmup, 'holdSeconds': hold,
++                  'hostCpu': [0], 'loadCpus': [2], 'warmupSeconds': warmup, 'holdSeconds': hold,
+@@ -73 +76 @@
+-                  'loads': [json.loads((output / f'load-{i}.json').read_text()) for i in range(3)]}
++                  'loads': [json.loads((output / f'load-{i}.json').read_text()) for i in range(1)]}
+--- a/instructions.py
++++ b/instructions.py
+@@ -22 +22 @@
+-        for index in range(-1, 3):
++        for index in range(-1, 5):
+--- a/battledome-catalog.patch
++++ b/battledome-catalog.patch
+@@ -12 +12 @@
+-+        operation: op(40, 4, Ci),
+++        operation: op(40, 4, Full),
+@@ -28 +28 @@
+-+        operation: op(40, 4, Ci),
+++        operation: op(40, 4, Full),
