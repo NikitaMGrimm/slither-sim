@@ -331,7 +331,7 @@ until their end; held frames arrive together.
 | `pauses.ratePerSecond` | `0` | Poisson pause starts per second and direction, at most 1000 (a processing bound; delivery cannot resolve finer pauses); zero disables pauses. |
 | `pauses.meanSeconds` | `0` | Mean exponential pause length. `ratePerSecond × meanSeconds` must be at most 1: merged pauses last `(e^(rate × mean) − 1) / rate` on average, so more covers nearly all time. |
 
-`LatencyConfig::measured_route()` is the retained low-RTT official route fitted
+`LatencyConfig::measured_route()` is the retained home-route/collector example fitted
 on training sessions and checked on held-out ones by the
 [network path study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-network-path/REPORT.md):
 
@@ -349,6 +349,14 @@ assumptions. Use only without a real path, for in-process bots or loopback playe
 A later [remote timing study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md)
 near the server saw almost none of these pauses, so they describe the fitted home
 route and collector, not the server.
+No near-server latency profile is added: receipt excess does not identify
+one-way propagation, uplink variation or direction coupling, and no replacement
+fit has development/held-out validation. Runtime latency defaults stay zero.
+Server transport checks instead use all six unfiltered near-server batches,
+measured like candidates, with the LOO-selected envelope described in the
+[reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md).
+The fixed motion/mass/prey release rules remain models; clean scheduler witnesses
+test that the decoder accepts their exceptions.
 
 ## NetworkConfig
 

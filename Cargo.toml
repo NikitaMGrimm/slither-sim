@@ -27,6 +27,7 @@ include = [
     "/tests/fixtures/client-hud-leaderboard.json",
     "/tests/fixtures/client-presentation.json",
     "/tests/fixtures/client-reporting-cadence.json",
+    "/tests/fixtures/client-reporting-cadence-near-server.json",
     "/docs/*.md",
     # CHANGELOG.md links this guide.
     "/docs/maintainers/releasing.md",

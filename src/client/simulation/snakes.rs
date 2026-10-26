@@ -20,9 +20,12 @@ pub(super) const FRESH_ANCHORS: usize = 4;
 /// gaps sit near 42 ms, a straight snake stays silent for seconds and one
 /// snake's reports share a phase across recipients. Changed mass follows its
 /// own ~105 ms opportunity. The exact comparators and rearm rules are not
-/// identified; these minimum gaps are inferences.
+/// identified; these minimum gaps are model choices. Clean [near-server data]
+/// includes 24 ms motion, 84 ms mass and motion-before-mass counterexamples;
+/// decoder regressions accept them without changing these release rules.
 ///
 /// [scheduler study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-packet-scheduler/REPORT.md
+/// [near-server data]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md
 pub(super) const MOTION_REPORT_TICKS: u64 = 6;
 pub(super) const FAM_REPORT_TICKS: u64 = 15;
 

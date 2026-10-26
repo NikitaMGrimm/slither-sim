@@ -1,0 +1,811 @@
+{
+  "schemaVersion": 1,
+  "rule": "Smallest common allowance in {0.5, 1, 2} passing all four gates for every capture against the other five; minimum 100 samples per metric; spread floor only for integer-header frame-gap p50.",
+  "limits": "False-reject control is only this LOO check over six captures; batch drift observed. No population error-rate guarantee or independent held-out validation.",
+  "selectedAllowance": 1,
+  "minimumSamples": 100,
+  "trials": [
+    {
+      "spreadAllowance": 0.5,
+      "allPassed": false,
+      "rows": [
+        {
+          "batch": "low-1",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8423917110865347,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8173700827906458,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.08461070124759118,
+              "upper": 0.8596754334144414,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3803481301824547,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.441847351207336,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 8.5,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.09699999995064,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.158000000010361,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-1",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7890068427621983,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.8972078758582747,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3467519188694936,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.441847351207336,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 8.5,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0829999999841675,
+              "referenceMin": 1.0869999999995343,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.046000000002095476,
+              "upper": 1.1560000000026776,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "low-2",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7327593815430546,
+              "referenceMin": 0.7890068427621983,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.05338486832433631,
+              "upper": 0.8690841452487028,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.28509703735277,
+              "referenceMin": 2.3038827171310103,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.08571452945813718,
+              "upper": 2.432454511318216,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 8,
+              "referenceMin": 7,
+              "referenceMax": 7,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 7.5,
+              "passed": false
+            },
+            "delay_p90": {
+              "candidate": 1.0910000000149012,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.158000000010361,
+              "passed": true
+            }
+          },
+          "allPassed": false
+        },
+        {
+          "batch": "second-2",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8067295722202985,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.8972078758582747,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.383582751082862,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.441847351207336,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 8.5,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0869999999995343,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.158000000010361,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "low-3",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7895033320709146,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.8972078758582747,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3038827171310103,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.441847351207336,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 8.5,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.1159999999999854,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.158000000010361,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-3",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8173700827906458,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.8972078758582747,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3895972465891475,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.383582751082862,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.09848571373009207,
+              "upper": 2.4328256079479083,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 8.5,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.1330000000016298,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1159999999999854,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.03300000001581793,
+              "upper": 1.1325000000078944,
+              "passed": false
+            }
+          },
+          "allPassed": false
+        }
+      ]
+    },
+    {
+      "spreadAllowance": 1,
+      "allPassed": true,
+      "rows": [
+        {
+          "batch": "low-1",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8423917110865347,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8173700827906458,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.08461070124759118,
+              "upper": 0.901980784038237,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3803481301824547,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.494097455825525,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 9,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.09699999995064,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.1830000000190921,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-1",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7890068427621983,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.9520240406300147,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3467519188694936,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.494097455825525,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 9,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0829999999841675,
+              "referenceMin": 1.0869999999995343,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.046000000002095476,
+              "upper": 1.1790000000037253,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "low-2",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7327593815430546,
+              "referenceMin": 0.7890068427621983,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.05338486832433631,
+              "upper": 0.895776579410871,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.28509703735277,
+              "referenceMin": 2.3038827171310103,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.08571452945813718,
+              "upper": 2.4753117760472847,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 8,
+              "referenceMin": 7,
+              "referenceMax": 7,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 8,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0910000000149012,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.1830000000190921,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-2",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8067295722202985,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.9520240406300147,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.383582751082862,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.494097455825525,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 9,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0869999999995343,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.1830000000190921,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "low-3",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7895033320709146,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.9520240406300147,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3038827171310103,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.494097455825525,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 9,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.1159999999999854,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.1830000000190921,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-3",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8173700827906458,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 0.9520240406300147,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3895972465891475,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.383582751082862,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.09848571373009207,
+              "upper": 2.4820684648129543,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 9,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.1330000000016298,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1159999999999854,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.03300000001581793,
+              "upper": 1.1490000000158034,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        }
+      ]
+    },
+    {
+      "spreadAllowance": 2,
+      "allPassed": true,
+      "rows": [
+        {
+          "batch": "low-1",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8423917110865347,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8173700827906458,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.08461070124759118,
+              "upper": 0.9865914852858282,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3803481301824547,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.5985976650619023,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 10,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.09699999995064,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.2330000000365544,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-1",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7890068427621983,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 1.0616563701734947,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3467519188694936,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.5985976650619023,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 10,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0829999999841675,
+              "referenceMin": 1.0869999999995343,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.046000000002095476,
+              "upper": 1.2250000000058208,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "low-2",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7327593815430546,
+              "referenceMin": 0.7890068427621983,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.05338486832433631,
+              "upper": 0.9491614477352073,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.28509703735277,
+              "referenceMin": 2.3038827171310103,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.08571452945813718,
+              "upper": 2.561026305505422,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 8,
+              "referenceMin": 7,
+              "referenceMax": 7,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 9,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0910000000149012,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.2330000000365544,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-2",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8067295722202985,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 1.0616563701734947,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.383582751082862,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.5985976650619023,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 10,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.0869999999995343,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.2330000000365544,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "low-3",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.7895033320709146,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 1.0616563701734947,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3038827171310103,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.3895972465891475,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10450020923637737,
+              "upper": 2.5985976650619023,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 10,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.1159999999999854,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1330000000016298,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.0500000000174623,
+              "upper": 1.2330000000365544,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        },
+        {
+          "batch": "second-3",
+          "metrics": {
+            "anchor_receipt_p50": {
+              "candidate": 0.8173700827906458,
+              "referenceMin": 0.7327593815430546,
+              "referenceMax": 0.8423917110865347,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.10963232954348001,
+              "upper": 1.0616563701734947,
+              "passed": true
+            },
+            "anchor_receipt_p95": {
+              "candidate": 2.3895972465891475,
+              "referenceMin": 2.28509703735277,
+              "referenceMax": 2.383582751082862,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.09848571373009207,
+              "upper": 2.5805541785430464,
+              "passed": true
+            },
+            "frame_server_p50": {
+              "candidate": 7,
+              "referenceMin": 7,
+              "referenceMax": 8,
+              "spreadFloor": 1,
+              "effectiveSpread": 1,
+              "upper": 10,
+              "passed": true
+            },
+            "delay_p90": {
+              "candidate": 1.1330000000016298,
+              "referenceMin": 1.0829999999841675,
+              "referenceMax": 1.1159999999999854,
+              "spreadFloor": 0,
+              "effectiveSpread": 0.03300000001581793,
+              "upper": 1.1820000000316213,
+              "passed": true
+            }
+          },
+          "allPassed": true
+        }
+      ]
+    }
+  ],
+  "finalLimits": {
+    "anchor_receipt_p50": {
+      "min": 0.7327593815430546,
+      "max": 0.8423917110865347,
+      "spreadFloor": 0,
+      "upper": 0.9520240406300147
+    },
+    "anchor_receipt_p95": {
+      "min": 2.28509703735277,
+      "max": 2.3895972465891475,
+      "spreadFloor": 0,
+      "upper": 2.494097455825525
+    },
+    "frame_server_p50": {
+      "min": 7,
+      "max": 8,
+      "spreadFloor": 1,
+      "upper": 9
+    },
+    "delay_p90": {
+      "min": 1.0829999999841675,
+      "max": 1.1330000000016298,
+      "spreadFloor": 0,
+      "upper": 1.1830000000190921
+    }
+  },
+  "referenceSha256": "2b8beddc67962f62580705c8d1d8749d024285e6dffd3702a9e5ab2dd8b7f6ac",
+  "calibratorSha256": "4d28f4744ecdfb786a4f82c9cc76104cb150c826b91fed60a8c8b2b14bc8dc38"
+}

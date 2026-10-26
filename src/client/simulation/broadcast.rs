@@ -451,7 +451,10 @@ impl SimulatorBackend {
 
     /// Advance every living prey's correction clock. Ordinary corrections
     /// recur near one third second; the 210 ms pulse guard is an engineering
-    /// choice, not a universal receipt bound. See docs/server-rules.md.
+    /// choice, not a universal receipt bound. Clean #111 data retains a 3044 ms
+    /// repeat gap and fast reports outside exact speed 11; no replacement rearm
+    /// law was identified. See docs/server-rules.md and
+    /// https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md
     fn update_prey_clocks(&mut self) -> Result<(), String> {
         let now = self.time();
         let mut clocks = BTreeMap::new();

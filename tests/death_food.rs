@@ -114,6 +114,8 @@ fn death_scatter_matches_recorded_square_support_and_tail_first_order() {
 
 #[test]
 fn raw_death_fixture_contains_square_corners_beyond_the_former_disk() {
+    // "Jitter" here is spatial death-food scatter, not delivery latency. Retain
+    // this historical geometry witness when adding clean timing references.
     let fixture: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/death-jitter-fresh.json")).unwrap();
     let sc = scale(fixture["segments"].as_u64().unwrap() as usize);

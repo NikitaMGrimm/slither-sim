@@ -110,6 +110,15 @@
 
 ### Changed
 
+- Transport checks now compare against timing recorded near the official
+  servers in #111 instead of the home captures, whose delay spikes came from the
+  home route. The home reference stays available and labeled. Each limit is the
+  six-session envelope widened until every session passes against the other
+  five. New fixtures cover rare server timing exceptions (motion reports 24 ms
+  apart, mass 84 ms apart, motion before mass in one frame, a 3 s prey gap);
+  simulator cadence rules and defaults are unchanged
+  ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
+
 - Gameplay updates go out every physics tick (7 ms by default) with measured
   per-family pacing: motion and standalone mass changes at least 6 and 15 ticks
   apart per snake, anchors at once, ambient food on the shared 504 ms maintenance cycle and
