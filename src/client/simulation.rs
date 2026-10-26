@@ -96,6 +96,8 @@ pub struct SimulatorBackend {
     /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
     /// so a connection already holding it can skip the comparison.
     food_sectors: Vec<Option<Arc<SectorFood>>>,
+    /// Identity of the latest shared food snapshot, including failed broadcasts.
+    food_revision: Arc<()>,
     /// Socket presentation only; native clients keep the physical listings.
     decorated_food_sectors: Vec<Option<Arc<SectorFood>>>,
     pit_markers: Option<markers::PitMarkers>,
@@ -179,6 +181,7 @@ impl SimulatorBackend {
             prey_eaters: BTreeMap::new(),
             prey_wire: BTreeMap::new(),
             food_sectors: Vec::new(),
+            food_revision: Arc::default(),
             decorated_food_sectors: Vec::new(),
             pit_markers: config
                 .world

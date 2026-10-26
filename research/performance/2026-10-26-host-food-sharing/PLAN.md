@@ -14,6 +14,11 @@ Keep the original dense scan as fallback and all original encoders/order.
 Physical and decorated streams must use their own held listings. No persistent
 packet cache or mechanics/default changes.
 
+Before measurement, review identified interrupted broadcasts as a counterexample
+to membership-only eligibility. Require the recipient's previous food snapshot
+identity as well; a missed transition takes the full diff. Cover interruption
+and recovery without another sector change, for physical and decorated streams.
+
 At most two logical CPUs: host threads CPU 0, one generator CPU 2. Build jobs,
 Rayon and test threads: one. Rust 1.99.0, locked release, thin LTO, one codegen
 unit, debug level 1; independently built targets and immutable copied binaries.

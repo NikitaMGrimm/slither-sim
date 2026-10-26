@@ -47,7 +47,8 @@ impl std::ops::Index<&[u8; 2]> for SectorFood {
 #[derive(Clone, Debug, Default)]
 pub(super) struct KnownSectors {
     entries: Vec<([u8; 2], Arc<SectorFood>)>,
-    revision: Option<Arc<()>>,
+    subscription_revision: Option<Arc<()>>,
+    food_revision: Option<Arc<()>>,
 }
 #[cfg(test)]
 impl KnownSectors {
@@ -70,6 +71,10 @@ pub(super) struct FoodChanges {
     /// Changed listing handles plus every sector touched by a pickup.
     pub(super) changed: BTreeSet<[u8; 2]>,
     pub(super) eaten: BTreeSet<[u8; 2]>,
+    // Sparse hints cover just this transition. A recipient skipped by an early
+    // broadcast error must fall back to the full diff against its older view.
+    pub(super) previous: Arc<()>,
+    pub(super) current: Arc<()>,
 }
 #[cfg(test)]
 impl std::ops::Index<&[u8; 2]> for KnownSectors {
@@ -283,7 +288,14 @@ impl SimulatorBackend {
         }
         self.food_buckets = buckets;
         self.listed = sectors;
-        Ok(FoodChanges { changed, eaten })
+        let current = Arc::new(());
+        let previous = std::mem::replace(&mut self.food_revision, current.clone());
+        Ok(FoodChanges {
+            changed,
+            eaten,
+            previous,
+            current,
+        })
     }
 }
 
@@ -300,9 +312,13 @@ pub(super) fn food_updates(
 ) {
     let subscribed = interest.subscribed();
     if known
-        .revision
+        .subscription_revision
         .as_ref()
         .is_some_and(|revision| Arc::ptr_eq(revision, interest.revision()))
+        && known
+            .food_revision
+            .as_ref()
+            .is_some_and(|revision| Arc::ptr_eq(revision, &changes.previous))
     {
         let mut update = |sector, previous: &mut Arc<SectorFood>| {
             let current = sectors[usize::from(u16::from_be_bytes(sector))]
@@ -328,6 +344,7 @@ pub(super) fn food_updates(
                 update(*sector, previous);
             }
         }
+        known.food_revision = Some(changes.current.clone());
         return;
     }
     let held = std::mem::take(&mut known.entries);
@@ -364,7 +381,8 @@ pub(super) fn food_updates(
         }
         known.entries.push((sector, current.clone()));
     }
-    known.revision = Some(interest.revision().clone());
+    known.subscription_revision = Some(interest.revision().clone());
+    known.food_revision = Some(changes.current.clone());
 }
 
 fn sector_changes(
@@ -474,8 +492,13 @@ mod tests {
         let mut reference = BTreeMap::new();
         let mut shown_reference = BTreeMap::new();
         let mut interest = SectorInterest::default();
+        let mut revision = Arc::default();
         for step in 0..48 {
-            let mut changes = FoodChanges::default();
+            let mut changes = FoodChanges {
+                previous: revision,
+                ..Default::default()
+            };
+            revision = changes.current.clone();
             let updated: Vec<u8> = if step % 8 == 0 {
                 (0..32).collect()
             } else if step % 7 == 0 {
@@ -514,10 +537,16 @@ mod tests {
             };
             changes.eaten = eaten_sectors(&eaters);
             changes.changed.extend(changes.eaten.iter().copied());
-            for (held, oracle, table) in [
+            for (stream, (held, oracle, table)) in [
                 (&mut known, &mut reference, &physical),
                 (&mut shown, &mut shown_reference, &decorated),
-            ] {
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if step == 12 && stream == 1 {
+                    continue; // This stream must catch up from an older snapshot.
+                }
                 let mut actual = Vec::new();
                 let mut expected = Vec::new();
                 food_updates(&mut actual, held, &interest, table, &changes, &eaters);
@@ -553,12 +582,13 @@ mod tests {
         let mut known = KnownSectors::default();
         let mut packets = Vec::new();
         let eaters = BTreeMap::new();
+        let initial = FoodChanges::default();
         food_updates(
             &mut packets,
             &mut known,
             &interest,
             &sectors,
-            &FoodChanges::default(),
+            &initial,
             &eaters,
         );
         let storage = known.entries.as_ptr();
@@ -571,6 +601,7 @@ mod tests {
             &sectors,
             &FoodChanges {
                 changed: BTreeSet::from([[0, 1]]),
+                previous: initial.current.clone(),
                 ..Default::default()
             },
             &eaters,
