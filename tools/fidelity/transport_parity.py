@@ -14,6 +14,7 @@ import zlib
 
 import packet_census as pc
 import slither_protocol as sp
+import transport_views as tv
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -113,13 +114,16 @@ class Epoch:
         self.incarnations = Counter()
         self.samples = Samples()
         self.frames = []
+        self.view = tv.ViewEpoch()
 
     def feed(self, frame):
         self.frames.append((frame.t, frame.server))
+        was_active, counts = self.view.active, Counter()
         for packet in frame.packets:
             if not packet:
                 raise ValueError("empty logical packet")
             self.world.feed(packet, frame.server)
+            self.view.packet(packet, self.world, self.world.events, counts)
             # Consume immediately: later packets in a bundle may change the speed,
             # remove the snake or reuse its ID.
             for event in self.world.events:
@@ -136,6 +140,7 @@ class Epoch:
                     group = "own" if sid == self.world.self_id else "other"
                     self.motion[(group, key)].append((frame.t, frame.server))
             self.world.events.clear()
+        self.view.frame(frame, self.world, was_active, counts)
         # Only body/motion state is used; avoid retaining food and prey histories.
         self.world.foods.clear()
         self.world.prey.clear()
@@ -197,6 +202,7 @@ def measure_capture(source, selection=None):
     if any(segment["framing"] != "elapsed_header" for segment in census["connections"]):
         raise ValueError("elapsed-ms framing required")
     epochs, total, epoch, setup_index = [], Samples(), None, 0
+    views = tv.ViewSamples()
     connection = None
     header, terminal, collector = {}, {}, []
     servers = set()
@@ -204,7 +210,9 @@ def measure_capture(source, selection=None):
     def finish():
         nonlocal epoch
         if epoch is not None:
-            samples = epoch.finish(selection(epoch) if selection else None)
+            interval = selection(epoch) if selection else None
+            samples = epoch.finish(interval)
+            views.merge(epoch.view.finish(interval or (lambda a, b: True)))
             total.merge(samples)
             epochs.append(dict(connection=epoch.connection, setupIndex=epoch.setup_index,
                                setupReceiptMs=epoch.setup_receipt, summary=samples.summary()))
@@ -251,7 +259,7 @@ def measure_capture(source, selection=None):
                 collectorTiming=dict(events=len(collector), available=bool(timing),
                                      lateTicks=max((row.get("lateTicks", 0) for row in timing), default=None),
                                      maxTickGapMs=max((row.get("maxTickGapMs", 0) for row in timing), default=None)),
-                summary=total.summary()), total
+                summary=total.summary(), viewStrata=views.summary(quantiles)), total
 
 
 def measure(paths, skip_invalid=False, summary_only=False, relative_to=None):
@@ -283,6 +291,7 @@ def measure(paths, skip_invalid=False, summary_only=False, relative_to=None):
         summary.pop("headerDeltaHistogramMs")
     return dict(schemaVersion=1, wireVersion=19, status="complete", summaryOnly=summary_only,
                 toolSha256=pc.sha256(Path(__file__)), decoderSha256=pc.sha256(Path(sp.__file__)),
+                viewToolSha256=pc.sha256(Path(tv.__file__)),
                 censusSha256=pc.sha256(Path(pc.__file__)), captures=captures, excluded=excluded, summary=summary,
                 definitions=dict(quantiles="nearest rank, including p50", anchorSpacingWorldUnits=42,
                                  big="at least 100 body anchors at the measured anchor (not lifetime reports)",
@@ -291,6 +300,7 @@ def measure(paths, skip_invalid=False, summary_only=False, relative_to=None):
                                  cadence="setup-to-last-frame duration; setup excluded from frame count and delay; gaps start at setup",
                                  families="census command/length counts including setup, divided by setup-to-last duration",
                                  pooling="pool raw samples within epochs/captures; never average quantiles",
+                                 viewStrata="transport-view-v1: active-to-active gaps by preceding cache peers; time-weighted state; complete stable server-second windows including silence; see docs/research-workflow.md#transport-parity",
                                  limits="correlated samples; receipt includes network/collector stalls; no stock-renderer simulation"))
 
 
@@ -339,6 +349,121 @@ def compare(reference, candidate, tolerances):
     return int(failed)
 
 
+def compare_views(reference, candidate, tolerances):
+    """Independent opt-in workload/rate gate; never changes the pooled gates."""
+    for report in (reference, candidate):
+        if report.get("schemaVersion") != 1 or report.get("wireVersion") != 19 or report.get("status") != "complete":
+            raise ValueError("expected complete transport-parity schema 1, wire 19 report")
+        if not report.get("captures"):
+            raise ValueError("view comparison requires captures")
+    for name, report in (("reference", reference), ("candidate", candidate)):
+        if any("viewStrata" not in capture for capture in report["captures"]):
+            print(f"INCONCLUSIVE: {name} lacks view bins")
+            return 3
+        if any(not isinstance(capture["viewStrata"], dict) for capture in report["captures"]):
+            raise ValueError(f"{name} viewStrata must be an object")
+        if any(capture["viewStrata"].get("contract") != tv.CONTRACT for capture in report["captures"]):
+            raise ValueError(f"unsupported {name} view contract")
+    limits = tolerances["viewMatched"]
+    minimum = limits["minimumSeconds"]["value"]
+    minimum_windows = limits["minimumWholeWindows"]["value"]
+    if (not math.isfinite(minimum) or minimum <= 0 or not math.isfinite(minimum_windows)
+            or minimum_windows < 1 or minimum_windows != int(minimum_windows)):
+        raise ValueError("positive view exposure and whole-window minima required")
+
+    def bound(rule, reference_value):
+        absolute, relative = rule["absolute"], rule["relative"]
+        if any(not math.isfinite(x) or x < 0 for x in (absolute, relative)):
+            raise ValueError("view bounds must be finite and nonnegative")
+        return max(absolute, relative * abs(reference_value))
+
+    def number(value):
+        return isinstance(value, (float, int)) and math.isfinite(value)
+
+    for rule in (limits["emissionRate"], *limits["activity"].values()):
+        bound(rule, 0)  # Validate configuration even when no bin is eligible.
+
+    def fmt(value):
+        return f"{value:.3f}" if number(value) else "missing"
+
+    def validate(data):
+        if set(data) != set(tv.BINS):
+            raise ValueError("view bins do not match transport-view-v1")
+        for row in data.values():
+            for value in (row["seconds"], row["frames"], row["wholeWindows"]["seconds"], row["wholeWindows"]["frames"]):
+                if not number(value) or value < 0:
+                    raise ValueError("invalid view exposure/count")
+
+    print("View contract: transport-view-v1. Mixture: each candidate capture's active exposure weights, fixed across all reference captures; no support renormalization.")
+    print(f"Admission per bin/capture: >= {minimum} active seconds and >= {minimum_windows} whole seconds. Emission-rate bound: max({limits['emissionRate']['absolute']} frames/s, {limits['emissionRate']['relative']:.0%} of reference).")
+    print("Each candidate/reference capture pair is validated separately. Activity differences use max(absolute, relative * reference). <=9 ms remains diagnostic only.")
+    for prefix, report in (("c", candidate), ("r", reference)):
+        for index, capture in enumerate(report["captures"], 1):
+            print(f"{prefix}{index} capture SHA-256: {capture.get('sha256', 'unspecified')}")
+    print("| Candidate / reference | Peers | Exposure s (candidate/reference) | Whole seconds (candidate/reference) | Frames/s (candidate/reference) | <=9 ms fraction (candidate/reference) | Weight | Result / activity mismatches |")
+    print("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |")
+    failed, inconclusive = False, False
+    for ci, capture in enumerate(candidate["captures"], 1):
+        cbins = capture["viewStrata"]["bins"]
+        validate(cbins)
+        exposure = sum(row["seconds"] for row in cbins.values())
+        if not exposure:
+            inconclusive = True
+        for ri, official in enumerate(reference["captures"], 1):
+            rbins = official["viewStrata"]["bins"]
+            validate(rbins)
+            support, weighted_candidate, weighted_reference = 0, 0, 0
+            pair_failed, pair_inconclusive = False, not bool(exposure)
+            for label in tv.BINS:
+                c, r = cbins[label], rbins[label]
+                cw, rw = c["wholeWindows"], r["wholeWindows"]
+                weight = c["seconds"] / exposure if exposure else 0
+                eligible = (c["seconds"] >= minimum and r["seconds"] >= minimum and
+                            cw["seconds"] >= minimum_windows and rw["seconds"] >= minimum_windows)
+                mismatches = []
+                if not eligible:
+                    status = "INCONCLUSIVE (minimum exposure/windows)"
+                    pair_inconclusive |= weight > 0
+                else:
+                    for key, rule in limits["activity"].items():
+                        cv, rv = c["activity"].get(key), r["activity"].get(key)
+                        # No peer state exists in the zero-peer bin; both missing
+                        # is structural only there, never a general missing-data pass.
+                        if label == "0" and key.startswith("peer") and cv is None and rv is None:
+                            continue
+                        if not number(cv) or not number(rv):
+                            mismatches.append(key + "=missing")
+                        elif abs(cv-rv) > bound(rule, rv):
+                            mismatches.append(f"{key}={cv:.3f}/{rv:.3f} (bound {bound(rule, rv):.3f})")
+                    cr, rr = cw["framesPerSecond"], rw["framesPerSecond"]
+                    if not number(cr) or not number(rr):
+                        status = "INCONCLUSIVE (missing emission rate)"
+                        pair_inconclusive = True
+                    elif mismatches:
+                        status = "NOT ACTIVITY-MATCHED"
+                        pair_inconclusive = True
+                    else:
+                        support += weight
+                        weighted_candidate += weight * cr
+                        weighted_reference += weight * rr
+                        ok = abs(cr-rr) <= bound(limits["emissionRate"], rr)
+                        status = "PASS" if ok else "FAIL (emission rate)"
+                        pair_failed |= not ok
+                print(f"| c{ci}/r{ri} | {label} | {c['seconds']:.3f}/{r['seconds']:.3f} | {cw['seconds']}/{rw['seconds']} | {fmt(cw['framesPerSecond'])}/{fmt(rw['framesPerSecond'])} | {fmt(c['le9Fraction'])}/{fmt(r['le9Fraction'])} | {weight:.4f} | {status}" + (": " + "; ".join(mismatches) if mismatches else "") + " |")
+            # Full support only: a sparse or unmatched bin never disappears from
+            # the candidate mixture, and averaging cannot rescue a failed bin.
+            status = "FAIL" if pair_failed else "INCONCLUSIVE" if pair_inconclusive else "PASS"
+            if not pair_inconclusive:
+                ok = abs(weighted_candidate-weighted_reference) <= bound(limits["emissionRate"], weighted_reference)
+                pair_failed |= not ok
+                status = "FAIL" if pair_failed else "PASS"
+            print(f"c{ci}/r{ri} mixture: {status}; activity-matched exposure weight={support:.4f}; weighted frames/s={weighted_candidate:.3f}/{weighted_reference:.3f} (partial sums when inconclusive).")
+            failed |= pair_failed
+            inconclusive |= pair_inconclusive
+    print("View result: " + ("FAIL" if failed else "INCONCLUSIVE" if inconclusive else "PASS"))
+    return 1 if failed else 3 if inconclusive else 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -352,6 +477,7 @@ def main(argv=None):
     comparison.add_argument("reference", type=Path)
     comparison.add_argument("candidate", type=Path)
     comparison.add_argument("--tolerances", type=Path, default=DEFAULT_TOLERANCES)
+    comparison.add_argument("--view-matched", action="store_true", help="independent per-capture view/activity gate: 0 pass, 1 rate failure, 2 invalid, 3 inconclusive")
     args = parser.parse_args(argv)
     try:
         if args.command == "measure":
@@ -362,8 +488,9 @@ def main(argv=None):
                 json.dump(report, stream, indent=2, allow_nan=False)
                 stream.write("\n")
             return 0
-        return compare(*(json.loads(path.read_text(encoding="utf-8"))
-                         for path in (args.reference, args.candidate, args.tolerances)))
+        comparator = compare_views if args.view_matched else compare
+        return comparator(*(json.loads(path.read_text(encoding="utf-8"))
+                            for path in (args.reference, args.candidate, args.tolerances)))
     except MEASUREMENT_ERRORS as error:
         print(f"transport parity failed: {error}", file=sys.stderr)
         return 2

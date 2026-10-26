@@ -333,6 +333,37 @@ raw inputs require local access. `local_capture.py` defaults to this near-server
 `--reference tests/fixtures/transport-official-reference.json` option retains the
 older home-route/collector envelope with its original labels and selection.
 
+`measure` also records per-capture `viewStrata` (`transport-view-v1`) without
+changing the existing statistics. Frames are binned by cached peers, excluding
+self: 0, 1–2, 3–5, 6–10, 11–20 and 21+. Each bin reports exposure, active-to-active
+gaps, whole-second emission rates and workload proxies: time-weighted own and
+peer speed, high-speed (>9) and near-boost (≥13.9) fractions, turning and size,
+plus rates of anchor, mass, wanted-angle, food/prey and pong packets. Setup,
+appearance/death and connection boundaries are censored. Wire turn direction is
+not available.
+
+`--view-matched` adds an opt-in gate beside the four pooled gates:
+
+```sh
+uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-near-server.json outputs/transport.json --view-matched
+```
+
+It compares each candidate capture with each reference capture separately. A
+bin qualifies with at least 30 active seconds and 20 complete server-second
+windows in both. A qualifying bin must first match activity within the bounds in
+`transport_tolerances.json`, or it is `NOT ACTIVITY-MATCHED`. Matched bins then
+compare frames per second within max(2 frames/s, 20%). The mixture weights bins
+by the candidate's own exposure, and every bin the candidate occupies must
+qualify; nothing is renormalized away. The thresholds are engineering choices
+declared before replaying #144, not calibrated error rates. The ≤9 ms fraction
+stays a diagnostic.
+
+Exit codes: **0** pass against every reference capture; **1** an
+activity-matched rate failure; **2** invalid input; **3** inconclusive
+(insufficient exposure, activity mismatch, or a report without view bins). The
+pooled command keeps its own decisions, and sparse views do not waive #144's
+cadence or delay failures.
+
 Frame cadence and the header-delta histogram expose batching. Anchor correction
 is `v_local * gap - 42` world units: local speed is nine anchor spacings divided
 by their duration, centered on the measured interval (four neighboring intervals

@@ -14,6 +14,10 @@
 
 ### Added
 
+- `transport_parity.py measure` records view strata (peer-count bins with
+  workload proxies), and `compare --view-matched` adds an opt-in per-capture
+  gate that reports thin bins and workload mismatches as inconclusive
+  ([transport parity](docs/research-workflow.md#transport-parity)).
 - A retained [official food-interest pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-food-interest/REPORT.md):
   one avoidance abort ended the route after three completed slots, failing the
   frozen feasibility gate; no food-model change.
