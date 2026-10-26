@@ -52,8 +52,8 @@ Copy [the movement plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/e
 - Sampling unit, attempt budget, exclusions and held-out validation.
 - Operator-supplied protocol-19 IP/port and actual `dataOrigin`: `local-simulator`
   for the template's loopback `127.0.0.1:8766` at `/slither`, or `community-server`
-  for another compatible server. Set HTTP(S) `capture.origin` only if required
-  by the endpoint.
+  for another compatible server. Set HTTP(S) `capture.origin` when the endpoint
+  requires it; official servers close handshakes without `http://slither.io`.
 
 Freeze confirmatory predictions and selection rules before collection; label
 exploratory results. A plan hash cannot prove when or why it was written.

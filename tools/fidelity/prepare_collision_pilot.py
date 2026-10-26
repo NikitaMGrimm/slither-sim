@@ -10,6 +10,10 @@ import evidence
 
 
 TEMPLATE = evidence.ROOT / "research/fidelity/2026-10-26-collision-pilot/plan.json"
+# Official servers close Origin-less handshakes before any frame: all five
+# 2026-10-26 scouts without one closed with 1006, while the P1/P2 collectors
+# with this Origin joined from the same host that day.
+OFFICIAL_ORIGIN = "http://slither.io"
 
 
 def select(selection):
@@ -37,13 +41,12 @@ def select(selection):
     return min(eligible, key=lambda row: (row["population"], row["listedIndex"]))["server"]
 
 
-def prepare(selection_path, output, origin=None):
+def prepare(selection_path, output, origin=OFFICIAL_ORIGIN):
     selection = evidence.read_json(selection_path)
     server = select(selection)
     plan = evidence.read_json(TEMPLATE)
-    plan["capture"] = {"server": server, "scenario": "paired-collision", "seconds": 600, "bots": 2}
-    if origin is not None:
-        plan["capture"]["origin"] = origin
+    plan["capture"] = {"server": server, "scenario": "paired-collision", "seconds": 600, "bots": 2,
+                       "origin": origin}
     evidence.validate(plan, "study-plan")
     with tempfile.TemporaryDirectory() as temporary:
         source = Path(temporary) / "plan.json"
@@ -58,7 +61,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--selection", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--origin")
+    parser.add_argument("--origin", default=OFFICIAL_ORIGIN)
     args = parser.parse_args()
     try:
         print(json.dumps({"study": str(prepare(args.selection, args.output, args.origin)), "connected": False}))
