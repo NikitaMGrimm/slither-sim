@@ -172,6 +172,8 @@
 
 ### Fixed
 
+- The shared-A1 performance trace now emits the scenario framing its catalog
+  declares, so the normal collector validates complete decision and reset sequences.
 - A host no longer drops a healthy client when a message near the 1 MiB limit
   follows a small one that is still waiting for its batch to fill.
 - Native recording failures leave pending decisions and client clocks intact,

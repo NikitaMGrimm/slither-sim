@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -335,6 +336,30 @@ class BaseComparisons(unittest.TestCase):
             self.assertIsInstance(error, FileExistsError)
             prepare.assert_not_called()
             self.assertFalse((output / "failure.json").exists())
+
+
+class SharedPolicyTrace(unittest.TestCase):
+    def test_real_shared_policy_trace_matches_catalog_and_collector(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            log = root / "build.log"
+            code = perf_build.command(
+                ["cargo", "build", "--locked", "--example", "perf_baseline"],
+                perf_baseline.ROOT, log, dict(os.environ), timeout=180)
+            self.assertEqual(code, 0, log.read_text(encoding="utf-8", errors="replace"))
+            target = Path(os.environ.get("CARGO_TARGET_DIR", perf_baseline.ROOT / "target"))
+            if not target.is_absolute():
+                target = perf_baseline.ROOT / target
+            binary = target / "debug/examples" / ("perf_baseline" + perf_build.SUFFIX)
+            workload, = perf_baseline.load_catalog(binary).select(["shared-forager-a1-8"])
+            self.assertFalse(workload.legacy)
+            # Cross the 1000-tick episode limit with six-tick decisions, covering epoch framing too.
+            iterations = 167
+            trace = perf_baseline.capture_trace(
+                binary, workload.name, iterations, root, terminal=not workload.legacy)
+            self.assertEqual(trace["end"]["operations"], iterations)
+            with gzip.open(root / (workload.name + ".jsonl.gz"), "rb") as source:
+                self.assertTrue(any(json.loads(line).get("kind") == "epoch" for line in source))
 
 
 class ProcessFailures(unittest.TestCase):
