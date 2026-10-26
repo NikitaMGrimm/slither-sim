@@ -4,9 +4,8 @@
 
 ### Breaking
 
-- The A1 Forager policy is removed; A4-mean is the only optimized bot policy,
-  and `PolicyId` is gone (`Forager::new()` / `ForagerBot::new()`).
-
+- The A1 Forager policy is removed: A4-mean is the only bot policy, and
+  `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`).
 - Config `radius` now retains the initial, population-sized setting; the live
   boundary is runtime state exposed by `Simulator::radius()`, frames and a new
   snapshot `radius` field. Geometric JSON is `slither-sim-json-v4`; C ABI v2's
