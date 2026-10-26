@@ -112,10 +112,9 @@ The host binds loopback by default. Stop it with Ctrl+C.
 ## Defaults and fidelity
 
 The default world, [`Config::official(1)`](docs/configuration.md#official-and-sandbox),
-is sized for the initial occupancy, then follows occupied seats with a 3% dead
-zone: it grows at once and shrinks gradually. This product model does not
-reproduce official radius waves.
-It combines measured movement and protocol
+starts sized for its players, then grows at once when players join and shrinks
+gradually when they leave. This is our design; it does not reproduce official
+radius waves. It combines measured movement and protocol
 constants with provisional visibility, spawning and ecology models; it is not an
 exact official replica.
 [`Config::sandbox()`](docs/configuration.md#official-and-sandbox) uses the same

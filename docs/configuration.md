@@ -156,18 +156,18 @@ Both constructors return `Config`:
 retained boost speed and initial radius models rather than exact official rules;
 see [evidence limits](server-rules.md#defaults).
 
-`n` initializes radius, food and prey targets without spawning snakes. Occupied
-seats are living snakes plus dead snakes waiting to respawn. Death and respawn
-do not change occupancy; `retire` and inactive dormant slots do. The old
-living-count controller is removed. The 3% dead zone absorbs a single join or
-leave at 500 seats. Beyond the dead zone, growth jumps to the target in the next
-tick so joins do not wait for space; shrink moves at 23.4375 units/s. A host
-starting with 4 bots at radius 1340 can admit 30 players in a burst and grow to
-`670 × sqrt(34)` in one tick. The model grows at once and shrinks gradually.
-A 500→100 exodus
-stops after 344.512 s at radius about 6907.16, within 3% of its current radius
-from the 6700 target. Stopping short is intentional and stateless. Small worlds
-respond to a few seats. This is a product/feel model; no tested predictor
+`n` initializes radius, food and prey targets without spawning snakes. The
+arena then targets `670 × sqrt(occupied)`, where occupied seats are living
+snakes plus dead snakes waiting to respawn: deaths and respawns don't move it;
+joins, `retire` and dormant slots do. It moves only when the target differs from
+the current radius by more than 3%, so a single join or leave at 500 seats
+changes nothing while a few seats move a small world. Growth jumps to the target
+in the next tick, so joining players never wait for space: a host starting with
+4 bots at radius 1340 admits a burst of 30 players and grows to
+`670 × sqrt(34)` at once. Shrinking moves 23.4375 units/s, far slower than a
+snake. A 500→100 exodus takes 344.512 s and stops at radius 6907.16, inside the
+3% band around the 6700 target; stopping short is intentional and needs no
+saved state. This is our design, not an official law; no tested predictor
 reproduces official multi-minute waves
 ([radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md),
 [default decision](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md)).

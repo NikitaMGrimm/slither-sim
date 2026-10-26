@@ -19,15 +19,12 @@ The seat-following radius, food admission limits, prey population, kiosk penalty
 sliding are provisional. In particular:
 
 - For measured radius replay, use [recorded samples](configuration.md#world-config).
-- Default official/host worlds follow occupied seats, counting living and
-  waiting-to-respawn snakes: the arena grows at once and shrinks gradually,
-  at 23.4375 units/s, outside a 3% dead zone. Growth jumps to the target on the
-  next tick after admission, so joins do not wait for boundary motion. Deaths
-  and respawns leave the target unchanged; retirement vacates a seat. Ambient
-  target/refill and prey target follow live area, removing outside food and
-  surplus prey on shrink. This is a product/feel model, not an identified official
-  law or reproduction of multi-minute waves; see the
-  [decision and synthetic regression](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md).
+- Default official and host worlds follow occupied seats (living snakes and
+  those waiting to respawn), outside a 3% dead zone. The arena grows at once
+  when players join and shrinks at 23.4375 units/s when they leave; food and
+  prey targets follow its area. This is our design, not an identified official
+  law, and it does not reproduce official multi-minute waves; see the
+  [decision](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md).
 - [Food admission limits](configuration.md#food-admission-limits) count all origins
   toward occupancy, with origin-specific caps.
 - The [prey target](configuration.md#official-and-sandbox) is a density assumption,
