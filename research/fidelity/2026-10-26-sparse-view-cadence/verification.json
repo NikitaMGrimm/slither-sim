@@ -1,0 +1,174 @@
+{
+  "checks": [
+    {
+      "id": "official-low-1",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 69552,
+      "originalFrameGaps": {
+        "n": 70251,
+        "p10": 6,
+        "p50": 7,
+        "p90": 14,
+        "p95": 15,
+        "p99": 22
+      }
+    },
+    {
+      "id": "official-second-1",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 62542,
+      "originalFrameGaps": {
+        "n": 63346,
+        "p10": 7,
+        "p50": 7,
+        "p90": 14,
+        "p95": 21,
+        "p99": 35
+      }
+    },
+    {
+      "id": "official-low-2",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 60190,
+      "originalFrameGaps": {
+        "n": 61035,
+        "p10": 6,
+        "p50": 8,
+        "p90": 15,
+        "p95": 21,
+        "p99": 35
+      }
+    },
+    {
+      "id": "official-second-2",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 64213,
+      "originalFrameGaps": {
+        "n": 64713,
+        "p10": 7,
+        "p50": 7,
+        "p90": 14,
+        "p95": 21,
+        "p99": 34
+      }
+    },
+    {
+      "id": "official-low-3",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 64763,
+      "originalFrameGaps": {
+        "n": 65363,
+        "p10": 6,
+        "p50": 7,
+        "p90": 14,
+        "p95": 20,
+        "p99": 29
+      }
+    },
+    {
+      "id": "official-second-3",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 65631,
+      "originalFrameGaps": {
+        "n": 66005,
+        "p10": 6,
+        "p50": 7,
+        "p90": 14,
+        "p95": 20,
+        "p99": 29
+      }
+    },
+    {
+      "id": "bots-0-r1",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 8608,
+      "originalFrameGaps": {
+        "n": 8609,
+        "p10": 7,
+        "p50": 35,
+        "p90": 42,
+        "p95": 84,
+        "p99": 154
+      }
+    },
+    {
+      "id": "bots-0-r2",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 8713,
+      "originalFrameGaps": {
+        "n": 8714,
+        "p10": 7,
+        "p50": 35,
+        "p90": 42,
+        "p95": 77,
+        "p99": 147
+      }
+    },
+    {
+      "id": "bots-0-r3",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 8916,
+      "originalFrameGaps": {
+        "n": 8917,
+        "p10": 7,
+        "p50": 35,
+        "p90": 42,
+        "p95": 70,
+        "p99": 147
+      }
+    },
+    {
+      "id": "bots-500-r1-retry2",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 28049,
+      "originalFrameGaps": {
+        "n": 28160,
+        "p10": 7,
+        "p50": 7,
+        "p90": 14,
+        "p95": 21,
+        "p99": 35
+      }
+    },
+    {
+      "id": "bots-500-r2",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 22035,
+      "originalFrameGaps": {
+        "n": 22133,
+        "p10": 7,
+        "p50": 14,
+        "p90": 21,
+        "p95": 28,
+        "p99": 42
+      }
+    },
+    {
+      "id": "bots-500-r3",
+      "censusPacketCountsMatch": true,
+      "cacheAndClockInvariants": true,
+      "activeIntervals": 26662,
+      "originalFrameGaps": {
+        "n": 26663,
+        "p10": 7,
+        "p50": 7,
+        "p90": 21,
+        "p95": 21,
+        "p99": 35
+      }
+    }
+  ],
+  "syntheticWindowChecks": true,
+  "limits": "These are analysis consistency checks, not new protocol tests or scientific validation."
+}

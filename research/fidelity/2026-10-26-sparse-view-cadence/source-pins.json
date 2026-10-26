@@ -1,0 +1,27 @@
+{
+  "analysisBase": "503ca4df8104321c7b0e5c28cc1f628c1dd6cc48",
+  "publicationBase": "ccf7b0027cbcc4b4f4d377058771d963ce620c23",
+  "original": {
+    "base": "503ca4df8104321c7b0e5c28cc1f628c1dd6cc48",
+    "planSha256": "609100a10fee5ae2322a45d5a3e0816cd176f3b6a244b1c6992a8b55a9b8be64",
+    "scriptSha256": "2e13f07ef088a4e46fe4a576f3be0e3ab0dc5fec1cb12d12cc9dc0322a5d63b0",
+    "decoderSha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+  },
+  "originalArtifacts": {
+    "pooled.json": "dc4eb7384ed8afe27861d4965c758725420e17f619f134567e63d28d40471f8b",
+    "results.json": "62ce11a65ffd2af284c2bccb739372994a39342143112390a04ecda500941afb",
+    "older-results.json": "000d2e80de48f1288a8c794a2e875a1d8990b6a903991e5f6cd2d51816abd081",
+    "selected-witnesses.json": "ca0eed39835f14322f024f332807b36c613bc0bd9d8e22da857c46207de89f93",
+    "verification.json": "3be231b6adaf5a52111a1be6aa580bb9941eabfbc620965489cf714c6d9ea5fa",
+    "artifacts-manifest.json": "7d8fd63ab050d31b3165f4bf426113ce0878353633987990a1ee47c2fee05aec"
+  },
+  "access": "Raw archives, original full results, per-frame CSVs, windows and attempt notes remain local-only.",
+  "adaptation": "Portable CLI paths and bounded selections; no decoder, bins, eligibility, thresholds or numeric outcomes changed.",
+  "publicationScripts": {
+    "analyze.py": "ae5e5cbf1814ee0aa42b853cb3b347997fc5044b4aebcbcbe8152a8e29d4b11d",
+    "enrich_witnesses.py": "f64d89d87e35270bcbbb23f39e724234aa9a7efe78bded1a6c5e2ab963665531",
+    "select_results.py": "d1524c68447a21b7b632edb013dba40650b6304468a996a0a3666fa94e0c372f",
+    "summarize.py": "da4b9831bc88d536107831a3c5bcbfb3e41ff664f9ad8576ddf4840a4521dd74",
+    "verify.py": "a1540828fbfc59a7f8f5cbd352e39f9d2654b6b40c35405573564cd786391a94"
+  }
+}

@@ -1,0 +1,352 @@
+{
+  "maximum_primary_sparse_gap": {
+    "capture": "official-second-1",
+    "sourceSha256": "5ba8e7127f6b91ebabdda9c9900d19d9e4a1bc2029a4c1f26f16064c8fd1947b",
+    "epoch": "8",
+    "frame": "35145",
+    "conn": "4",
+    "server": "77017",
+    "receipt": "323120.491",
+    "active": "True",
+    "gap": "188",
+    "receiptGap": "188.173",
+    "before": "1",
+    "after": "1",
+    "leftBin": "1-2",
+    "endBin": "1-2",
+    "changed": "1",
+    "reported": "1",
+    "changedIds": "476",
+    "reportedIds": "476",
+    "visibleIds": "456;476",
+    "ownId": "456",
+    "ownState": "{\"angle\": 4.9823695990525625, \"wanted\": 5.473243451175968, \"speed\": 5.79, \"mass\": 0.9535318585355198, \"segments\": 28, \"head\": [29283.50071794014, 34941.269912195436], \"anchorServer\": 76829}",
+    "ownAnchorAgeMs": "188",
+    "ownChanged": "False",
+    "ownPresent": "True",
+    "foods": "487",
+    "prey": "0",
+    "foodActivity": "False",
+    "preyActivity": "False",
+    "families": "g",
+    "category": "entity_activity",
+    "noOtherChange": "False",
+    "noSnakeChange": "False",
+    "entityQuiet": "False",
+    "packetsHex": [
+      "6701dcacb2"
+    ],
+    "decodedValuesBefore": {
+      "476": [
+        4.196971435655114,
+        4.196971435655114,
+        5.79,
+        0.06967139659353475,
+        0,
+        0
+      ]
+    },
+    "decodedValuesAfter": {
+      "476": [
+        4.196971435655114,
+        4.196971435655114,
+        5.79,
+        0.06967139659353475,
+        0,
+        0
+      ]
+    },
+    "decodedEvents": [
+      [
+        "anchor",
+        77017,
+        476,
+        28281.13024442571,
+        34414.03235811062,
+        false,
+        "g"
+      ]
+    ]
+  },
+  "unchanged_mass_only": {
+    "capture": "official-low-1",
+    "sourceSha256": "d7e7e1e29464845c96e6c2ed56facb6c164624f4b54c7ef18cb8c9e2cb90a7c5",
+    "epoch": "2",
+    "frame": "1292",
+    "conn": "1",
+    "server": "12345",
+    "receipt": "12558.378",
+    "active": "True",
+    "gap": "8",
+    "receiptGap": "8.283",
+    "before": "7",
+    "after": "7",
+    "leftBin": "6-10",
+    "endBin": "6-10",
+    "changed": "0",
+    "reported": "1",
+    "changedIds": "",
+    "reportedIds": "241",
+    "visibleIds": "12;121;230;238;241;342;350;496",
+    "ownId": "12",
+    "ownState": "{\"angle\": 5.473243451175968, \"wanted\": 5.473243451175968, \"speed\": 5.79, \"mass\": 0.3838479747681603, \"segments\": 5, \"head\": [29827.438513927525, 35950.795804511006], \"anchorServer\": 12238}",
+    "ownAnchorAgeMs": "107",
+    "ownChanged": "False",
+    "ownPresent": "True",
+    "foods": "436",
+    "prey": "0",
+    "foodActivity": "False",
+    "preyActivity": "False",
+    "families": "h",
+    "category": "other_entity_quiet",
+    "noOtherChange": "True",
+    "noSnakeChange": "True",
+    "entityQuiet": "True",
+    "packetsHex": [
+      "6800f1ffffff"
+    ],
+    "decodedValuesBefore": {
+      "241": [
+        5.350524988145116,
+        5.350524988145116,
+        5.79,
+        1.0,
+        0,
+        0
+      ]
+    },
+    "decodedValuesAfter": {
+      "241": [
+        5.350524988145116,
+        5.350524988145116,
+        5.79,
+        1.0,
+        0,
+        0
+      ]
+    },
+    "decodedEvents": [
+      [
+        "fam",
+        12345,
+        241,
+        1.0,
+        1.0
+      ]
+    ]
+  },
+  "redundant_motion_only": {
+    "capture": "official-low-1",
+    "sourceSha256": "d7e7e1e29464845c96e6c2ed56facb6c164624f4b54c7ef18cb8c9e2cb90a7c5",
+    "epoch": "4",
+    "frame": "9276",
+    "conn": "2",
+    "server": "44367",
+    "receipt": "86533.552",
+    "active": "True",
+    "gap": "7",
+    "receiptGap": "5.399",
+    "before": "11",
+    "after": "11",
+    "leftBin": "11-20",
+    "endBin": "11-20",
+    "changed": "0",
+    "reported": "1",
+    "changedIds": "",
+    "reportedIds": "310",
+    "visibleIds": "1;59;106;121;214;216;229;230;263;280;300;310",
+    "ownId": "106",
+    "ownState": "{\"angle\": 1.7426021750380885, \"wanted\": 3.509748042682347, \"speed\": 5.79, \"mass\": 0.09815049756470308, \"segments\": 27, \"head\": [32286.50547822061, 35459.697469283536], \"anchorServer\": 44339}",
+    "ownAnchorAgeMs": "28",
+    "ownChanged": "False",
+    "ownPresent": "True",
+    "foods": "508",
+    "prey": "1",
+    "foodActivity": "False",
+    "preyActivity": "False",
+    "families": "e",
+    "category": "redundant_motion_only",
+    "noOtherChange": "True",
+    "noSnakeChange": "True",
+    "entityQuiet": "True",
+    "packetsHex": [
+      "650136d0"
+    ],
+    "decodedValuesBefore": {
+      "310": [
+        5.105088062083414,
+        5.105088062083414,
+        6.039,
+        0.5774672375599883,
+        0,
+        0
+      ]
+    },
+    "decodedValuesAfter": {
+      "310": [
+        5.105088062083414,
+        5.105088062083414,
+        6.039,
+        0.5774672375599883,
+        0,
+        0
+      ]
+    },
+    "decodedEvents": [
+      [
+        "rot",
+        44367,
+        310,
+        [
+          5.105088062083414,
+          5.105088062083414,
+          6.039
+        ],
+        [
+          5.105088062083414,
+          5.105088062083414,
+          6.039
+        ]
+      ]
+    ]
+  },
+  "sparse_long_gap": {
+    "capture": "official-second-1",
+    "sourceSha256": "5ba8e7127f6b91ebabdda9c9900d19d9e4a1bc2029a4c1f26f16064c8fd1947b",
+    "epoch": "8",
+    "frame": "35135",
+    "conn": "4",
+    "server": "76555",
+    "receipt": "322658.149",
+    "active": "True",
+    "gap": "126",
+    "receiptGap": "125.507",
+    "before": "1",
+    "after": "1",
+    "leftBin": "1-2",
+    "endBin": "1-2",
+    "changed": "1",
+    "reported": "1",
+    "changedIds": "476",
+    "reportedIds": "476",
+    "visibleIds": "456;476",
+    "ownId": "456",
+    "ownState": "{\"angle\": 5.448699758569798, \"wanted\": 5.080544369477243, \"speed\": 5.79, \"mass\": 0.8553689632039644, \"segments\": 28, \"head\": [29247.342043204888, 35016.36601352009], \"anchorServer\": 76352}",
+    "ownAnchorAgeMs": "203",
+    "ownChanged": "False",
+    "ownPresent": "True",
+    "foods": "571",
+    "prey": "0",
+    "foodActivity": "False",
+    "preyActivity": "False",
+    "families": "g",
+    "category": "entity_activity",
+    "noOtherChange": "False",
+    "noSnakeChange": "False",
+    "entityQuiet": "False",
+    "packetsHex": [
+      "6701dcabae"
+    ],
+    "decodedValuesBefore": {
+      "476": [
+        4.196971435655114,
+        4.196971435655114,
+        5.79,
+        0.06967139659353475,
+        0,
+        0
+      ]
+    },
+    "decodedValuesAfter": {
+      "476": [
+        4.196971435655114,
+        4.196971435655114,
+        5.79,
+        0.06967139659353475,
+        0,
+        0
+      ]
+    },
+    "decodedEvents": [
+      [
+        "anchor",
+        76555,
+        476,
+        28320.38318496378,
+        34488.28941587992,
+        false,
+        "g"
+      ]
+    ]
+  },
+  "maximum_older_zero_other_gap": {
+    "capture": "older-038",
+    "sourceSha256": "77cce972026da4cab77c5868c391fc046a1bb455ddf4e1ea86d6f875248e663f",
+    "epoch": "8",
+    "frame": "18532",
+    "conn": "4",
+    "server": "125702",
+    "receipt": "533510.8",
+    "active": "True",
+    "gap": "267",
+    "receiptGap": "268.12",
+    "before": "0",
+    "after": "0",
+    "leftBin": "0",
+    "endBin": "0",
+    "changed": "0",
+    "reported": "0",
+    "changedIds": "508",
+    "reportedIds": "508",
+    "visibleIds": "508",
+    "ownId": "508",
+    "ownState": "{\"angle\": 2.012582793705961, \"wanted\": 2.012582793705961, \"speed\": 5.777777777777778, \"mass\": 0.9336405356908164, \"segments\": 4, \"head\": [38370.63149619238, 41175.76919269184], \"anchorServer\": 125702}",
+    "ownAnchorAgeMs": "0",
+    "ownChanged": "True",
+    "ownPresent": "True",
+    "foods": "119",
+    "prey": "0",
+    "foodActivity": "False",
+    "preyActivity": "False",
+    "families": "pG",
+    "category": "entity_activity",
+    "noOtherChange": "True",
+    "noSnakeChange": "False",
+    "entityQuiet": "False",
+    "packetsHex": [
+      "70",
+      "4768a2"
+    ],
+    "decodedValuesBefore": {
+      "508": [
+        2.012582793705961,
+        2.012582793705961,
+        5.777777777777778,
+        0.9336405356908164,
+        0,
+        0
+      ]
+    },
+    "decodedValuesAfter": {
+      "508": [
+        2.012582793705961,
+        2.012582793705961,
+        5.777777777777778,
+        0.9336405356908164,
+        0,
+        0
+      ]
+    },
+    "decodedEvents": [
+      [
+        "anchor",
+        125702,
+        508,
+        38370.63149619238,
+        41175.76919269184,
+        false,
+        "G"
+      ]
+    ]
+  }
+}
