@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Performance | [Hosting resource samples](performance/2026-10-26-hosting-sizes/REPORT.md) | Three short loopback socket holds on one desktop core; CPU/RSS sizing only, with depleted Battledome admission and no VPS capacity claim. |
 | Bots | [A4 adoption](bots/2026-10-26-a4-adoption/REPORT.md) | A4-mean becomes the public default, with A1 selectable; selected private held-out gameplay and cost results, maintainer mean-cost gate and retained tail-limit failures. |
 | Bots | [Frozen Forager port](bots/2026-10-26-forager-port/REPORT.md) | Immutable A1 and test-only A4-mean parameters, selected decision conformance; runtime defaults unchanged. |
 | Battledome | [Safe spawn band](battledome/2026-10-26-safe-spawn/REPORT.md) | Local 120-second sensitivity grid and retained initial attempt; cached admission, head-path/departure protection and socket-first waiting. |

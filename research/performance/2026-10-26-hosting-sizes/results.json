@@ -1,0 +1,373 @@
+{
+  "sourceCommit": "249cdb217d83a234895bc7eee4d98c3636c1cd76",
+  "platform": "Linux x86-64 under WSL2, one desktop core for host, separate generator core, shared load",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "build": {
+    "profile": "release",
+    "features": "default",
+    "CARGO_BUILD_JOBS": 1,
+    "RAYON_NUM_THREADS": 1,
+    "lto": "thin",
+    "codegenUnits": 1
+  },
+  "warmupSeconds": 15,
+  "holdSeconds": 30,
+  "runsPerCase": 1,
+  "sourceArchiveSha256": "a4de4ebb00fbce629b37beefea6b71e364a83c46f3d1d5712f12f93b1aa1fc31",
+  "planSha256": "236b136d8d6774a5ec01839e0c2ed464056ced6d66da5bc337385b7745fdf9e1",
+  "executables": {
+    "slither-sim": "38e2f8ffd3d915c670263659df8fd7a8410b021e57388eeaee63a1f2902a371a",
+    "examples/host_probe": "66f8ba171cf8bc8cda3fdbb503301d8166330ba6efae07a567cb080ddef58ec4",
+    "examples/host_capacity_load": "cf3d8a07e989a020416b4af5e423482602f1b994bc4631383905b8d887db5fff",
+    "examples/host_load": "0cc6ced86ebb3d0dfd80347f982c7509b733dd2122698cc2ab435e8ee8bdbad0"
+  },
+  "harnessSources": {
+    "examples/host_load.rs": "27fe509d3e651a6d8307c45582ce8a2a9f462a65a65c6a0c3aa7edd334af5dac",
+    "research/performance/2026-10-26-host-capacity/host_probe.rs": "89fa27f8f9cdff6524f25f527eca04f0b289afbbe62b53efd7ae9cb87f643e84",
+    "research/performance/2026-10-26-host-capacity/host_capacity_load.rs": "0e05b2ffcd897f99b2ce6464f09cf63b338c1ff25c44e78e1d69905ca6dd1020"
+  },
+  "rawAccess": "local-only; full raw outputs retained outside Git",
+  "cases": [
+    {
+      "case": "battledome-80",
+      "requestedSockets": 80,
+      "sampleSeconds": 29.881096124649048,
+      "hostCpuPercent": 55.586983592273036,
+      "generatorCpuPercent": 9.303540902258822,
+      "hostPeakRssMiB": 9.46484375,
+      "clients": {
+        "final": {
+          "connecting": 0,
+          "dead": 0,
+          "idle": 37,
+          "login": 3,
+          "playing": 40,
+          "setup": 0
+        },
+        "timeWeightedMean": {
+          "connecting": 0.005,
+          "dead": 0.0,
+          "idle": 41.515,
+          "login": 2.994,
+          "playing": 35.486,
+          "setup": 0.0
+        }
+      },
+      "holdCounters": {
+        "admitted": 27,
+        "bytesIn": 2332585,
+        "bytesOut": 16549,
+        "connectAttempts": 27,
+        "controls": 10646,
+        "deaths": 16,
+        "framesIn": 122644,
+        "lifeStarts": 27,
+        "loginsSent": 27,
+        "messagesOut": 15015,
+        "opened": 27,
+        "rejoins": 4
+      },
+      "errors": {},
+      "closeReasons": {
+        "local: own death": 17,
+        "local: shutdown": 43
+      },
+      "traffic": {
+        "burstFrames": 22621,
+        "bytesIn": 2332585,
+        "bytesOut": 16549,
+        "frames": 122644,
+        "messagesOut": 15015,
+        "ownFrames": 35054,
+        "worldFrames": 121675
+      },
+      "hostTicks": 4285,
+      "hostDeferredTicks": 0,
+      "hostSimulationSeconds": 15.480153086000001,
+      "hostPlayerRange": [
+        32,
+        43
+      ],
+      "config": {
+        "bind": "127.0.0.1:18444",
+        "seed": 7,
+        "players": {
+          "max": 80
+        },
+        "bots": {
+          "count": 0,
+          "threads": 1
+        },
+        "simulation": {
+          "world": {
+            "preset": "battledome"
+          }
+        }
+      },
+      "generator": {
+        "busySeconds": 3.313,
+        "busySecondsInWindow": 2.491,
+        "connectCallMs": {
+          "count": 60,
+          "max": 39.927,
+          "mean": 2.415,
+          "min": 0.271,
+          "p50": 0.51,
+          "p99": 39.927
+        },
+        "controlLatenessMs": {
+          "count": 10646,
+          "max": 91.649,
+          "mean": 0.85,
+          "min": 0.0,
+          "p50": 0.564,
+          "p99": 5.4
+        },
+        "passes": 39744,
+        "pollIntervalMs": {
+          "count": 26189,
+          "max": 99.59,
+          "mean": 1.145,
+          "min": 0.725,
+          "p50": 1.066,
+          "p99": 2.81
+        },
+        "wallSeconds": 45.692
+      },
+      "rawFiles": {
+        "config.json": "a2c63ae133df03f1786d141ad0f0e5fc8c98115a5ab7f20554dc0c35e3b968db",
+        "summary.json": "e087f204ec966bede56a7a2e1507b7b5959a350872e6d04a7e0b307b7e665a82",
+        "load.json": "0bc26c5c111def38ae93cd13bf3a5adbf6172473fc6b0eca49cf565eb2e56ea9",
+        "load.telemetry.jsonl": "6dad64d50251f215c9206078e7516f349a990cbc9ab9ccbebb641961cd13f884",
+        "host.json": "16c89ca9675dfcc2ea806ed81fc0fc10363772d4862facd30ca7569384b48e7c",
+        "load.frames.csv": "b73126b4f62ccb4a2f1698e7248b1f76c2e75dc189d4d14f8be4e4341e48b9ed",
+        "load.intervals.csv": "f818e3b0bb1ef6d00d4cd17cc054fa6385fdf694f41c200b04aa05a689f1a3a9",
+        "load.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "telemetry.json": "d010f46752e0167c6975cf13ae4aa2f5e94d0dde12758a0e68d4558f459dfaef",
+        "host.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "official-250",
+      "requestedSockets": 250,
+      "sampleSeconds": 29.978464365005493,
+      "hostCpuPercent": 51.370209669501115,
+      "generatorCpuPercent": 44.43189563621785,
+      "hostPeakRssMiB": 21.6328125,
+      "clients": {
+        "final": {
+          "connecting": 0,
+          "dead": 0,
+          "idle": 0,
+          "login": 0,
+          "playing": 250,
+          "setup": 0
+        },
+        "timeWeightedMean": {
+          "connecting": 0.0,
+          "dead": 0.0,
+          "idle": 0.0,
+          "login": 0.0,
+          "playing": 250.0,
+          "setup": 0.0
+        }
+      },
+      "holdCounters": {
+        "bytesIn": 18444926,
+        "bytesOut": 104844,
+        "controls": 75000,
+        "framesIn": 927920,
+        "messagesOut": 104844
+      },
+      "errors": {},
+      "closeReasons": {
+        "local: shutdown": 250
+      },
+      "traffic": {
+        "burstFrames": 18089,
+        "bytesIn": 18444926,
+        "bytesOut": 104844,
+        "frames": 927920,
+        "messagesOut": 104844,
+        "ownFrames": 248934,
+        "worldFrames": 923292
+      },
+      "hostTicks": 4285,
+      "hostDeferredTicks": 0,
+      "hostSimulationSeconds": 6.068738238,
+      "hostPlayerRange": [
+        250,
+        250
+      ],
+      "config": {
+        "bind": "127.0.0.1:18444",
+        "seed": 7,
+        "players": {
+          "max": 250
+        },
+        "bots": {
+          "count": 0,
+          "threads": 1
+        },
+        "simulation": {
+          "world": {
+            "preset": "official"
+          }
+        }
+      },
+      "generator": {
+        "busySeconds": 20.118,
+        "busySecondsInWindow": 12.997,
+        "connectCallMs": {
+          "count": 250,
+          "max": 24.304,
+          "mean": 0.973,
+          "min": 0.17,
+          "p50": 0.365,
+          "p99": 7.552
+        },
+        "controlLatenessMs": {
+          "count": 75000,
+          "max": 85.021,
+          "mean": 1.018,
+          "min": 0.0,
+          "p50": 0.639,
+          "p99": 7.443
+        },
+        "passes": 36297,
+        "pollIntervalMs": {
+          "count": 24134,
+          "max": 69.131,
+          "mean": 1.243,
+          "min": 1.0,
+          "p50": 1.065,
+          "p99": 3.962
+        },
+        "wallSeconds": 45.695
+      },
+      "rawFiles": {
+        "config.json": "f8ccf74b058f2398546ec68a6b26e748d29b882fc8420c24a1db14d952c83cf3",
+        "summary.json": "008799a6a4951099a0483e949c1c537644cab5d428553f071b50364d4b1b87a9",
+        "load.json": "a29edc5c652a94d0e302c0bca7c07ed774956f284ed149a3b90dc474ac9c3e3c",
+        "load.telemetry.jsonl": "5534b118b0ed03a0bf4741d57869dfd85c00207d875a0caff07e43c9731b0145",
+        "host.json": "c0e3033fd832ae6b0f68b96d7837208df792ccfe214c10bee423c57a6e94ed46",
+        "load.frames.csv": "a42f545cb714c525f5768afeb2262f063f07691a0a9c2508586860497cc0a44c",
+        "load.intervals.csv": "30e0c9bc1607484677723cdefaac23722579fa3d3511c9419b6bcc6685929cf6",
+        "load.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "telemetry.json": "e63db83d4378ce89ffaebf8db29c5f0b8b82b95d085d81adf88d6787429b7015",
+        "host.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "official-500",
+      "requestedSockets": 500,
+      "sampleSeconds": 29.98378872871399,
+      "hostCpuPercent": 91.08255213206782,
+      "generatorCpuPercent": 85.17936219161525,
+      "hostPeakRssMiB": 44.1875,
+      "clients": {
+        "final": {
+          "connecting": 0,
+          "dead": 0,
+          "idle": 0,
+          "login": 0,
+          "playing": 500,
+          "setup": 0
+        },
+        "timeWeightedMean": {
+          "connecting": 0.0,
+          "dead": 0.0,
+          "idle": 0.0,
+          "login": 0.0,
+          "playing": 500.0,
+          "setup": 0.0
+        }
+      },
+      "holdCounters": {
+        "bytesIn": 38284950,
+        "bytesOut": 209633,
+        "controls": 150003,
+        "framesIn": 1833657,
+        "messagesOut": 209633
+      },
+      "errors": {},
+      "closeReasons": {
+        "local: shutdown": 500
+      },
+      "traffic": {
+        "burstFrames": 197962,
+        "bytesIn": 38284936,
+        "bytesOut": 209633,
+        "frames": 1833656,
+        "messagesOut": 209633,
+        "ownFrames": 496440,
+        "worldFrames": 1824497
+      },
+      "hostTicks": 4284,
+      "hostDeferredTicks": 0,
+      "hostSimulationSeconds": 18.896067087,
+      "hostPlayerRange": [
+        500,
+        500
+      ],
+      "config": {
+        "bind": "127.0.0.1:18444",
+        "seed": 7,
+        "players": {
+          "max": 500
+        },
+        "bots": {
+          "count": 0,
+          "threads": 1
+        },
+        "simulation": {
+          "world": {
+            "preset": "official"
+          }
+        }
+      },
+      "generator": {
+        "busySeconds": 36.893,
+        "busySecondsInWindow": 25.421,
+        "connectCallMs": {
+          "count": 500,
+          "max": 5.08,
+          "mean": 0.392,
+          "min": 0.117,
+          "p50": 0.244,
+          "p99": 3.513
+        },
+        "controlLatenessMs": {
+          "count": 150003,
+          "max": 23.703,
+          "mean": 1.481,
+          "min": 0.0,
+          "p50": 0.935,
+          "p99": 8.719
+        },
+        "passes": 27177,
+        "pollIntervalMs": {
+          "count": 16791,
+          "max": 21.585,
+          "mean": 1.787,
+          "min": 0.999,
+          "p50": 1.144,
+          "p99": 7.939
+        },
+        "wallSeconds": 45.698
+      },
+      "rawFiles": {
+        "config.json": "1f431117ef2ec09035ad5ada8a4da2f3615be2bb09ef306e166027db1828edb0",
+        "summary.json": "3fcfaaaedea9eaf5e59e8a2856df3e0a69ee72849d2e7f97a4dfedf29d62c623",
+        "load.json": "1fbb29ad4789f2f2df0fc962c73a07d6de768d859e815a654c21e439f4f6e361",
+        "load.telemetry.jsonl": "f693e40828367481bd49dfa497a9d75c49e33fd60f2b5589fd572f23ff36928e",
+        "host.json": "bbfaeedc4d7d7076f66e4ae12309b0d619cdace62b2751cde630e8f41dd2ad82",
+        "load.frames.csv": "f7fbdb863e164b2c8c906d50bcdf7751f0f1ebd4f1be77ab8774742cdbadd6d9",
+        "load.intervals.csv": "c5eadcc99bfdb352b813679419ca492a5724f0ca8a58b066b568e8fda7fcb404",
+        "load.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "telemetry.json": "4af96f11e85e1d5d289b53bccd71660e901e0f9a889d33c664a400b12070da44",
+        "host.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ]
+}
