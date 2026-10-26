@@ -6,16 +6,29 @@ mod safety;
 #[cfg(feature = "networking")]
 pub(crate) use safety::Safety;
 
-// Custom circular-spawn policy, not official evidence: keep two seconds of
-// straight travel plus the full 600-unit clearance around every living head.
-// This gives approaching players room without predicting their future turns.
+// Custom circular policy, not official evidence: retain the strict 600-unit,
+// two-second head-path zone; keep 400 from bodies plus a three-second normal
+// head runway and departure corridors. The 120-second grid rejected cheaper
+// safety settings; cached queries fund the larger candidate budget.
 // research/battledome/2026-10-26-safe-spawn/REPORT.md
 #[cfg(feature = "networking")]
 pub(crate) const CLEARANCE: f64 = 600.0;
 #[cfg(feature = "networking")]
 pub(crate) const HEAD_PATH_SECONDS: f64 = 2.0;
+// Circular admission spends more cheap cached queries so a failed random
+// search does not monopolize admission. Official admission keeps its 64 draws.
 #[cfg(feature = "networking")]
-pub(crate) const WAITING: &str = "No safe circular spawn position";
+pub(crate) const CIRCULAR_ATTEMPTS: usize = 4096;
+#[cfg(feature = "networking")]
+pub(crate) const CIRCULAR_CLEARANCE: f64 = 400.0;
+#[cfg(feature = "networking")]
+pub(crate) const RETRY_SECONDS: f64 = 0.014;
+#[cfg(feature = "networking")]
+pub(crate) const DEPARTURE_SECONDS: f64 = 3.0;
+#[cfg(feature = "networking")]
+pub(crate) const DEPARTURE_PATH_CLEARANCE: f64 = 400.0;
+#[cfg(feature = "networking")]
+pub(crate) const WAITING: &str = "Spawn candidate search exhausted: no safe circular pose sampled";
 
 /// Circular lives sample their configured band uniformly by area; a missing
 /// outer radius keeps a single circle. None keeps the official grid and stream.

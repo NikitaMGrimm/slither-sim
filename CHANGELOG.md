@@ -74,10 +74,10 @@
   arena with a one-way pit, a permanent 400-point size floor (boosting at it is
   free and drops nothing, and death food returns only mass above it), a
   15-minute rolling kill score and no prey; ambient refill counts all food
-  toward its target. Circular newborns use an outer 2,684–3,200-unit band,
-  full body and two-second head-path clearance, and wait for space; waiting
-  socket players precede background bots. Other rules follow the official
-  preset. World settings: `pit`, `spawnRadius`, `spawnRadiusMax`,
+  toward its target. Circular newborns use an outer 2,684–3,400-unit band,
+  body, head-path and departure clearance, and wait for space; cached admission
+  searches serve waiting socket players before background bots. Other rules
+  follow the official preset. World settings: `pit`, `spawnRadius`, `spawnRadiusMax`,
   `killScoreSeconds`, `minScore` and `ambientRefillCountsAllFood`.
 - World configs take `"preset": "official" | "sandbox" | "battledome"` in `serve`
   and Python resets and in `host` and `client` config files; explicit fields

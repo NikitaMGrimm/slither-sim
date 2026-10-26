@@ -17,8 +17,8 @@ use super::{
 use crate::{Action, Simulator, model::Point, spawn};
 use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
 
-/// Clear-pose draws per spawn before it is deferred. Placement policy: a clear
-/// pose may exist after this many failures.
+/// Official candidate budget. A failed random search does not prove that no
+/// legal pose exists; circular worlds use their larger cached-query budget.
 const SPAWN_ATTEMPTS: usize = 64;
 /// Undelivered messages per remote connection, counting both directions. Each
 /// uplink message yields at most one downlink frame (a pong), so this cap leaves
@@ -398,7 +398,12 @@ impl SimulatorBackend {
             let circular = self.world.config.spawn_radius.is_some();
             let mut safety = None;
             let mut open: Option<(f64, Vec<Point>, f64)> = None;
-            for _ in 0..SPAWN_ATTEMPTS {
+            let attempts = if circular {
+                spawn::CIRCULAR_ATTEMPTS
+            } else {
+                SPAWN_ATTEMPTS
+            };
+            for _ in 0..attempts {
                 let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
                 let angle = self.spawn_random.unit() * TAU;
                 let heading = self.spawn_random.unit() * TAU;
@@ -415,7 +420,7 @@ impl SimulatorBackend {
                             spawn::Safety::new(
                                 &self.world,
                                 body.len(),
-                                spawn::CLEARANCE,
+                                spawn::CIRCULAR_CLEARANCE,
                                 spawn::HEAD_PATH_SECONDS,
                             )
                         })

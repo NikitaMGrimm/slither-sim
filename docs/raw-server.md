@@ -87,9 +87,10 @@ Native and remote clients share the
 including hosted bot startup. The browser sends no viewport or zoom to the host.
 With `spawnRadius`, a login keeps its socket and seat while waiting for a safe
 body; setup and self appearance arrive on admission. Waiting sockets precede
-background bots. One failed 64-pose search delays all further admission searches
-by 250 ms of world time; disconnected waiters are removed. A crowded world can
-wait indefinitely. Worlds without `spawnRadius` keep the official fallback and
+background bots. One failed 4,096-pose search delays further admission searches
+by 14 ms of world time; at most one search runs per tick. Disconnected waiters
+are removed. A crowded world can wait indefinitely. Worlds without `spawnRadius`
+keep the official fallback and
 refusal behavior.
 A dynamic host arena starts sized for all seats (`maxClients` plus `bots`), with
 its food target and ambient rate scaled to the same density.

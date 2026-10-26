@@ -618,7 +618,7 @@ impl Simulation {
 
     /// Circular worlds wait for a safe pose. A waiting socket gets the next
     /// attempt before any bot, including bots whose commands arrived first.
-    /// One failed search per 250 ms of world time bounds total retry work,
+    /// One failed search per 14 ms of world time bounds total retry work,
     /// replacing per-bot refusal retries. Successful joins allow the next tick.
     /// research/battledome/2026-10-26-safe-spawn/REPORT.md
     fn admit_waiting(&mut self) -> Result<(), String> {
@@ -633,7 +633,8 @@ impl Simulation {
         let join = self.waiting.remove(first).unwrap();
         if !self.join(&join)? {
             self.waiting.insert(first, join);
-            self.next_spawn_tick = self.ticks + (0.25 / self.world.dt()).ceil() as u64;
+            self.next_spawn_tick =
+                self.ticks + (crate::spawn::RETRY_SECONDS / self.world.dt()).ceil() as u64;
         }
         Ok(())
     }

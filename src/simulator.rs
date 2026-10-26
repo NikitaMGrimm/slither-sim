@@ -277,7 +277,7 @@ fn reaches_center(a: Point, b: Point, radius: f64) -> bool {
     t > 0.0 && t < 1.0 && (ax + t * dx).hypot(ay + t * dy) * scale < radius
 }
 /// Distance every spawn anchor keeps from the wall.
-const SPAWN_WALL_MARGIN: f64 = 60.0;
+pub(crate) const SPAWN_WALL_MARGIN: f64 = 60.0;
 /// Protocol sector area used by the modeled official ecology below.
 const SECTOR_AREA: f64 = 300.0 * 300.0;
 /// Official food target and ambient attempts/s for an arena of `radius`:
@@ -369,11 +369,11 @@ impl Config {
             },
             pit: Some(PitConfig { radius: PIT }),
             spawn_radius: Some((PIT + RADIUS) / 2.0),
-            // Custom policy: sqrt((3584 - 60)^2 - 3200^2) / 437.5 = 3.37 s
+            // Custom policy: sqrt((3584 - 60)^2 - 3400^2) / 437.5 = 2.12 s
             // of straight tangent travel at maximum boost before the spawn wall
             // margin. Never place a life between the old ring and the middle.
             // research/battledome/2026-10-26-safe-spawn/REPORT.md
-            spawn_radius_max: Some(3200.0),
+            spawn_radius_max: Some(3400.0),
             kill_score_seconds: Some(900.0),
             min_score: Some(400),
             ..Self::official(1)

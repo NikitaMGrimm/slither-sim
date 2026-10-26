@@ -189,7 +189,7 @@ fn new_lives_start_on_the_configured_ring_outside_the_pit() {
     for unit in [0.0, 0.3, 0.999] {
         let radius = spawn::spawn_distance(&config, unit);
         assert!(
-            (radius * radius - (ring * ring + unit * (3200.0_f64.powi(2) - ring * ring))).abs()
+            (radius * radius - (ring * ring + unit * (3400.0_f64.powi(2) - ring * ring))).abs()
                 < 1e-8
         );
         assert_eq!(
@@ -245,7 +245,7 @@ fn hosted_lives_start_on_the_ring_at_varied_angles() {
         backend.reconnect_slot(slot).unwrap();
         let snake = &backend.world().snakes[slot];
         let radius = distance(snake.head);
-        assert!((2684.0..=3200.0).contains(&radius));
+        assert!((2684.0..=3400.0).contains(&radius));
         assert_on_ring(snake, radius, 26);
         angles.push(snake.head.y.atan2(snake.head.x));
     }
@@ -724,7 +724,10 @@ fn spawn_bands_reject_unordered_and_impossible_geometry() {
     let tangent_seconds =
         ((config.radius - 60.).powi(2) - config.spawn_radius_max.unwrap().powi(2)).sqrt()
             / slither_sim::physics::BOOST_SPEED;
-    assert!(tangent_seconds > 3.3);
+    assert!(tangent_seconds > 2.1);
+    let normal_seconds =
+        tangent_seconds * slither_sim::physics::BOOST_SPEED / slither_sim::physics::base_speed(26);
+    assert!(normal_seconds > 5.);
 }
 
 #[test]

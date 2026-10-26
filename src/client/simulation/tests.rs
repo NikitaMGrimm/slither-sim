@@ -164,7 +164,11 @@ fn circular_spawns_clear_bodies_and_two_seconds_of_forward_travel() {
         let (body, _) = backend.spawn_pose(slot).unwrap();
         let alive = backend.world.snakes[slot].alive;
         backend.world.snakes[slot].alive = false;
-        assert!(backend.world.body_is_clear(&body, 600.));
+        assert!(
+            backend
+                .world
+                .body_is_clear(&body, spawn::CIRCULAR_CLEARANCE)
+        );
         assert!(backend.world.body_clears_head_paths(&body));
         assert!(
             body.iter()

@@ -1301,6 +1301,7 @@ mod portable {
                                     | "Spawn candidate search exhausted: no sampled position is clear of other snakes"
                                     | "Spawn candidate search exhausted: no sampled position fits inside the arena"
                                     | "No safe circular spawn position"
+                                    | "Spawn candidate search exhausted: no safe circular pose sampled"
                             ) =>
                         {
                             deferred.push(slot);

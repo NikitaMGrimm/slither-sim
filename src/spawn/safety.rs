@@ -2,7 +2,7 @@
 //! admission; distant edge pairs only skip work. See the safe-spawn study.
 use crate::{
     Point, Simulator,
-    physics::{Bounds, base_speed, collision_distance, swept_distance},
+    physics::{Bounds, base_speed, collision_distance, segment_distance, swept_distance},
 };
 
 struct Edge {
@@ -29,6 +29,8 @@ struct Obstacle {
     path: Edge,
     path_width: f64,
     departure_width: f64,
+    departure_path_width: f64,
+    head_width: f64,
 }
 
 /// Immutable neighbors, with a reused candidate buffer. Built after excluding
@@ -87,16 +89,19 @@ impl Safety {
                     body_width: contact.max(clearance),
                     path,
                     path_width: contact.max(super::CLEARANCE),
-                    departure_width: contact.max(200.),
+                    departure_width: contact.max(super::CIRCULAR_CLEARANCE),
+                    departure_path_width: contact.max(super::DEPARTURE_PATH_CLEARANCE),
+                    head_width: (super::DEPARTURE_SECONDS * base_speed(segments) + contact)
+                        .max(clearance),
                 }
             })
             .collect();
         Self {
             obstacles,
             candidate: Vec::with_capacity(segments.saturating_sub(1)),
-            wall_limit: world.config.radius - 60.,
+            wall_limit: world.config.radius - crate::simulator::SPAWN_WALL_MARGIN,
             segments,
-            departure_distance: 3. * base_speed(segments),
+            departure_distance: super::DEPARTURE_SECONDS * base_speed(segments),
         }
     }
 
@@ -148,6 +153,23 @@ impl Safety {
     /// research/battledome/2026-10-26-safe-spawn/REPORT.md
     pub(crate) fn clears_departures(&self, head: Point, heading: f64) -> bool {
         let radius = head.distance(Point::default());
+        if !radius.is_finite() || radius <= 0. || !heading.is_finite() {
+            return false;
+        }
+        let head_bounds = Bounds::between(head, head);
+        // The head can travel this far in three seconds before steering is
+        // known. Keep that runway from old bodies while allowing the harmless
+        // trailing body to use the smaller whole-body clearance.
+        if self.obstacles.iter().any(|obstacle| {
+            !obstacle.valid
+                || (near(head_bounds, obstacle.bounds, obstacle.head_width)
+                    && obstacle
+                        .edges
+                        .iter()
+                        .any(|edge| segment_distance(head, edge.a, edge.b) <= obstacle.head_width))
+        }) {
+            return false;
+        }
         let end_inward = Point {
             x: head.x * (1. - self.departure_distance / radius),
             y: head.y * (1. - self.departure_distance / radius),
@@ -160,8 +182,9 @@ impl Safety {
             let query = Bounds::between(head, end);
             self.obstacles.iter().all(|obstacle| {
                 let width = obstacle.departure_width;
-                (!near(query, obstacle.path.bounds, width)
-                    || swept_distance(head, end, obstacle.path.a, obstacle.path.b) > width)
+                (!near(query, obstacle.path.bounds, obstacle.departure_path_width)
+                    || swept_distance(head, end, obstacle.path.a, obstacle.path.b)
+                        > obstacle.departure_path_width)
                     && (!near(query, obstacle.bounds, width)
                         || obstacle.edges.iter().all(|other| {
                             !near(query, other.bounds, width)
@@ -314,5 +337,24 @@ mod tests {
         world.snakes[0].heading = f64::NAN;
         let body = [Point { x: 800., y: 0. }, Point { x: 800., y: 42. }];
         assert!(!Safety::new(&world, 2, 400., 2.).clears(&body));
+    }
+
+    #[test]
+    fn the_newborn_head_keeps_normal_travel_room_even_off_the_departure_rays() {
+        let mut config = Config::battledome();
+        config.radius = 5000.;
+        config.food_count = 0;
+        let mut world = Simulator::new(7, config).unwrap();
+        world.add_slots(1).unwrap();
+        let other = &mut world.snakes[0];
+        other.head = Point { x: 3184., y: 2000. };
+        other.body = vec![other.head, Point { x: 3184., y: 0. }];
+        other.speed = 0.;
+        let (body, heading) = world
+            .spawn_body(Point { x: 2684., y: 0. }, std::f64::consts::FRAC_PI_2)
+            .unwrap();
+        let mut query = Safety::new(&world, 26, 400., 2.);
+        assert!(query.clears(&body));
+        assert!(!query.clears_departures(body[0], heading));
     }
 }
