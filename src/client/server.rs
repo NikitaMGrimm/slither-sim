@@ -77,6 +77,8 @@ const MAX_PENDING: usize = 32;
 /// the other connections.
 const MAX_ACCEPTS_PER_POLL: usize = 16;
 const MAX_READS_PER_POLL: usize = 32;
+const MAX_RAW_READ_BYTES: usize = 64 << 10;
+const MAX_RAW_READ_CALLS: usize = 32;
 /// Lifecycle deadlines from acceptance: upgrade, login and close handshakes.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(10);
@@ -538,9 +540,7 @@ impl Simulation {
             let due = self.due_ticks(Instant::now());
             if due == 0 {
                 let next = (self.ticks + self.deferred + 1) as f64 * dt;
-                self.shared
-                    .clock
-                    .sleep_until(next, Duration::from_secs_f64(dt));
+                self.shared.clock.sleep_until(next, MAX_IDLE);
                 continue;
             }
             let started = Instant::now();
@@ -846,8 +846,54 @@ impl Gate {
     }
 }
 
-struct Open {
-    socket: WebSocket<TcpStream>,
+/// Bound work below the parser: one message may contain arbitrarily many
+/// fragments. WouldBlock preserves its partial frame/message for the next poll.
+struct ReadBudget<S> {
+    inner: S,
+    bytes: usize,
+    calls: usize,
+}
+
+impl<S> ReadBudget<S> {
+    fn new(inner: S) -> Self {
+        Self {
+            inner,
+            bytes: MAX_RAW_READ_BYTES,
+            calls: MAX_RAW_READ_CALLS,
+        }
+    }
+
+    fn rearm(&mut self) {
+        self.bytes = MAX_RAW_READ_BYTES;
+        self.calls = MAX_RAW_READ_CALLS;
+    }
+}
+
+impl<S: io::Read> io::Read for ReadBudget<S> {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        if self.bytes == 0 || self.calls == 0 {
+            return Err(io::ErrorKind::WouldBlock.into());
+        }
+        self.calls -= 1;
+        let limit = bytes.len().min(self.bytes);
+        let read = self.inner.read(&mut bytes[..limit])?;
+        self.bytes -= read;
+        Ok(read)
+    }
+}
+
+impl<S: io::Write> io::Write for ReadBudget<S> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+struct Open<S = TcpStream> {
+    socket: WebSocket<ReadBudget<S>>,
     phase: Phase,
     framing: Framing,
     want_session_id: bool,
@@ -858,7 +904,7 @@ struct Open {
 }
 
 enum Stage {
-    Http(Box<MidHandshake<ServerHandshake<TcpStream, Upgrade>>>),
+    Http(Box<MidHandshake<ServerHandshake<ReadBudget<TcpStream>, Upgrade>>>),
     Open(Box<Open>),
     Closed,
 }
@@ -966,7 +1012,7 @@ impl Gateway {
             }
             let physical_food = Arc::new(AtomicBool::new(false));
             let stage = match tungstenite::accept_hdr_with_config(
-                stream,
+                ReadBudget::new(stream),
                 Upgrade(physical_food.clone()),
                 Some(socket_config()),
             ) {
@@ -995,14 +1041,17 @@ impl Session {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
-            Stage::Http(mid) => match mid.handshake() {
-                Ok(socket) => Stage::Open(Box::new(Open::new(
-                    socket,
-                    self.physical_food.load(Ordering::Relaxed),
-                ))),
-                Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
-            },
+            Stage::Http(mut mid) => {
+                mid.get_mut().get_mut().rearm();
+                match mid.handshake() {
+                    Ok(socket) => Stage::Open(Box::new(Open::new(
+                        socket,
+                        self.physical_food.load(Ordering::Relaxed),
+                    ))),
+                    Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
+                    Err(HandshakeError::Failure(_)) => Stage::Closed,
+                }
+            }
             Stage::Open(mut open) => {
                 if open.service(gate, now, wall, age)? {
                     Stage::Open(open)
@@ -1016,8 +1065,8 @@ impl Session {
     }
 }
 
-impl Open {
-    fn new(socket: WebSocket<TcpStream>, physical_food: bool) -> Self {
+impl<S: io::Read + io::Write> Open<S> {
+    fn new(socket: WebSocket<ReadBudget<S>>, physical_food: bool) -> Self {
         Self {
             socket,
             phase: Phase::Hello { framed: false },
@@ -1037,6 +1086,7 @@ impl Open {
         wall: f64,
         age: Duration,
     ) -> Result<bool, String> {
+        self.socket.get_mut().rearm();
         if let Phase::Closing(deadline) = self.phase {
             return Ok(now < deadline && self.drain_close());
         }
@@ -1410,7 +1460,15 @@ impl Seat {
             let at = self.tick(first);
             if frame == first {
                 let (_, bytes) = self.frames.pop_front().unwrap();
-                self.state.receive_frame(&bytes, at)?;
+                if self.state.receive_frame(&bytes, at).is_err() {
+                    // Decoder capacity and malformed frames are this client's
+                    // failure, just like its delivery-queue overflow.
+                    let _ = commands.send(Command::Disconnect {
+                        slot: self.slot,
+                        generation: self.generation,
+                    });
+                    self.close(at);
+                }
             } else if leave == first {
                 self.transmit(at, commands)?;
             } else {
@@ -1551,6 +1609,202 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Finite, always-readable input until its selected bytes have been read.
+    struct Readable {
+        bytes: VecDeque<u8>,
+        read: usize,
+    }
+
+    impl io::Read for Readable {
+        fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+            if self.bytes.is_empty() {
+                return Err(io::ErrorKind::WouldBlock.into());
+            }
+            let n = bytes.len().min(self.bytes.len());
+            for byte in &mut bytes[..n] {
+                *byte = self.bytes.pop_front().unwrap();
+            }
+            self.read += n;
+            Ok(n)
+        }
+    }
+
+    impl io::Write for Readable {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn fragmented_input_yields_and_resumes_within_raw_read_budget() {
+        let (mut gateway, _simulation) = pit_gateway();
+        let mut bytes = vec![2, 128, 0, 0, 0, 0];
+        for _ in 0..100_000 {
+            bytes.extend([0, 128, 0, 0, 0, 0]);
+        }
+        // Complete a framing request only after all the empty continuations.
+        bytes.extend([128, 129, 0, 0, 0, 0, 1]);
+        let socket = WebSocket::from_raw_socket(
+            ReadBudget::new(Readable {
+                bytes: bytes.into(),
+                read: 0,
+            }),
+            tungstenite::protocol::Role::Server,
+            Some(socket_config()),
+        );
+        let mut open = Open::new(socket, false);
+        let now = Instant::now();
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+            .unwrap();
+        assert!(open.socket.get_ref().inner.read <= 64 << 10);
+        assert_eq!(open.phase, Phase::Hello { framed: false });
+        for _ in 0..32 {
+            if open.phase == (Phase::Hello { framed: true }) {
+                break;
+            }
+            open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+                .unwrap();
+        }
+        assert_eq!(open.phase, Phase::Hello { framed: true });
+        assert_eq!(open.framing, Framing::Bare);
+        // Deadlines still apply with a partial fragmented message.
+        open.service(&mut gateway.gate, now, 0., LOGIN_TIMEOUT)
+            .unwrap();
+        assert!(matches!(open.phase, Phase::Closing(_)));
+    }
+
+    #[test]
+    fn bot_decode_failure_disconnects_only_its_generation_and_rejoins() {
+        let (commands, received) = mpsc::channel();
+        let latency = LatencyConfig::default();
+        let mut random = Random::new(1);
+        let mut seat = Seat::new(4, 1.);
+        seat.join(0., &commands, &latency, &mut random).unwrap();
+        let _ = received.recv().unwrap();
+        seat.decide_at = 1.;
+        let mut world = crate::Simulator::new(1, crate::Config::sandbox()).unwrap();
+        world.add("large", 0, 1).unwrap();
+        let snake = &mut world.snakes[0];
+        snake.body = vec![crate::Point::default(); 430];
+        let mut packets = vec![super::super::encode::setup(32000., 0.029).unwrap()];
+        for id in 1..=152 {
+            packets.push(
+                super::super::encode::appearance(id, snake, 0., &PlayerAppearance::default())
+                    .unwrap(),
+            );
+        }
+        let full = super::super::encode::frame(0, &packets).unwrap();
+        seat.frames.push_back((0., full));
+        let overflow = super::super::encode::frame(
+            0,
+            &[
+                super::super::encode::appearance(153, snake, 0., &PlayerAppearance::default())
+                    .unwrap(),
+            ],
+        )
+        .unwrap();
+        let mut probe = ClientState::new();
+        probe.new_connection(0.).unwrap();
+        probe.receive_frame(&seat.frames[0].1, 0.).unwrap();
+        assert!(
+            probe
+                .receive_frame(&overflow, 0.1)
+                .unwrap_err()
+                .contains("total body limit")
+        );
+        seat.frames.push_back((0.1, overflow));
+        seat.outbox = Some((0., Action::default(), 0.2));
+        seat.run(0.1, &commands, &latency, &mut random, 1.).unwrap();
+        assert!(seat.closed && seat.frames.is_empty() && seat.outbox.is_none());
+        assert!(matches!(
+            received.recv().unwrap(),
+            Command::Disconnect {
+                slot: 4,
+                generation: 1
+            }
+        ));
+        // A different seat on the same worker still runs normally.
+        let mut healthy = Seat::new(5, 1.);
+        healthy.join(0.1, &commands, &latency, &mut random).unwrap();
+        healthy
+            .run(0.1, &commands, &latency, &mut random, 1.)
+            .unwrap();
+        seat.run(1., &commands, &latency, &mut random, 1.).unwrap();
+        assert!(!seat.closed);
+        assert_eq!(seat.generation, 2);
+        assert!(received.try_iter().any(|command| matches!(
+            command,
+            Command::Connect {
+                slot: 4,
+                generation: 2,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn long_tick_shutdown_is_prompt() {
+        const CHILD: &str = "SLITHER_LONG_TICK_SHUTDOWN_CHILD";
+        if let Ok(mode) = std::env::var(CHILD) {
+            let mut config = HostConfig {
+                bind: "127.0.0.1:0".parse().unwrap(),
+                max_clients: 1,
+                bots: 0,
+                ..Default::default()
+            };
+            config.simulation.world = crate::Config::sandbox();
+            config.simulation.world.dt = 60.;
+            config.simulation.world.boundary_mode = crate::BoundaryMode::Hard;
+            config.simulation.world.food_count = 0;
+            config.simulation.world.ambient_replenish_per_second = 0.;
+            let host = Host::bind(config).unwrap().start().unwrap();
+            thread::sleep(Duration::from_millis(100));
+            assert_eq!(host.ticks(), 0);
+            match mode.as_str() {
+                "stop" => host.stop().unwrap(),
+                "drop" => drop(host),
+                "failure" => {
+                    host.shared
+                        .failure
+                        .lock()
+                        .unwrap()
+                        .replace("synthetic worker failure".into());
+                    drop(StopOnExit(host.shared.clone()));
+                    assert_eq!(host.wait().unwrap_err(), "synthetic worker failure");
+                }
+                _ => panic!("unknown shutdown mode"),
+            }
+            return;
+        }
+        for mode in ["stop", "drop", "failure"] {
+            let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "client::server::tests::long_tick_shutdown_is_prompt",
+                    "--nocapture",
+                ])
+                .env(CHILD, mode)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(3);
+            loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    assert!(status.success(), "{mode}: {status}");
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    child.wait().unwrap();
+                    panic!("{mode} did not stop within the watchdog deadline");
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
 
     #[test]
     fn an_infinite_deadline_sleeps_for_the_limit() {
@@ -2098,7 +2352,11 @@ mod tests {
             server.set_nonblocking(true).unwrap();
             let mut client = WebSocket::from_raw_socket(client, Role::Client, None);
             let mut open = Open::new(
-                WebSocket::from_raw_socket(server, Role::Server, Some(socket_config())),
+                WebSocket::from_raw_socket(
+                    ReadBudget::new(server),
+                    Role::Server,
+                    Some(socket_config()),
+                ),
                 physical_food,
             );
             open.join(
