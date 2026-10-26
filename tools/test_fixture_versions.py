@@ -86,6 +86,15 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assert_protocol19_setup(entry, setup["setupPrefixHex"])
         self.assertEqual(setup["expected"]["protocolVersion"], entry["wireProtocol"])
 
+    def test_official_catalog_derivatives_keep_both_wire_labels(self):
+        for version in (13, 19):
+            entry, fixture = self.fixture(f"tests/fixtures/protocol-catalog-{version}.json")
+            self.assertEqual(entry["wireProtocol"], version)
+            self.assertEqual(fixture["wireProtocol"], version)
+            self.assertIn("Derived captured", fixture["transformation"])
+            self.assertTrue(fixture["sources"])
+            self.assertTrue(fixture["records"])
+
     def test_captured_legacy_login_pins_unsupported_protocol13(self):
         entry, fixture = self.fixture("tests/fixtures/client-legacy-login.json")
         self.assertEqual(entry["wireProtocol"], 13)
