@@ -2159,8 +2159,9 @@ fn search(
         // The minimum can only decrease, so this exact cost expression can
         // only increase. Equal costs keep the earlier arc. A stopped arc
         // therefore cannot replace best (including its exact clearance).
-        let loses =
-            |clearance: f64| offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight >= best.0;
+        let loses = |clearance: f64| {
+            offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight >= best.0
+        };
         let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp, loses);
         let mut cost = offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight;
         // The exit cost only adds, so skip it where the arc already loses.
