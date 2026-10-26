@@ -1,0 +1,374 @@
+{
+  "metric": "host process user+system CPU ms per executed physics tick",
+  "platform": "shared WSL2 Linux x86-64; 1 host and 3 generator logical CPUs",
+  "populationSummary": "arm medians/ranges of hold time-weighted populations; peers are control-observation-weighted hold means",
+  "measuredPairs": 5,
+  "warmupSeconds": 15,
+  "holdSeconds": 45,
+  "workloads": {
+    "official-500": {
+      "pairedRatios": [
+        1.0038205623137546,
+        0.9693250153044028,
+        1.000837494819362,
+        1.0667490913959077,
+        0.9728177260175945
+      ],
+      "medianPairedRatio": 1.000837494819362,
+      "pairedRatioRange": [
+        0.9693250153044028,
+        1.0667490913959077
+      ],
+      "base": {
+        "medianCpuMsPerTick": 6.527559055118109,
+        "cpuMsPerTickRange": [
+          6.295892968263845,
+          6.546616775802931
+        ],
+        "aliveMedian": 499.993,
+        "waitingMedian": 0,
+        "aliveRange": [
+          499.978,
+          500.0
+        ],
+        "waitingRange": [
+          0,
+          0
+        ],
+        "visiblePeersMeanMedian": null,
+        "visiblePeersMeanRange": null,
+        "deferredTicksTotal": 50,
+        "frameExcessMs": {
+          "p50": 9.68720200000098,
+          "p99": 249.90138099999967
+        },
+        "generatorBusyPercentMax": 35.19777777777778
+      },
+      "candidate": {
+        "medianCpuMsPerTick": 6.498984533666615,
+        "cpuMsPerTickRange": [
+          6.331673926571251,
+          6.716138103421341
+        ],
+        "aliveMedian": 499.994,
+        "waitingMedian": 0,
+        "aliveRange": [
+          499.936,
+          500.0
+        ],
+        "waitingRange": [
+          0,
+          0
+        ],
+        "visiblePeersMeanMedian": null,
+        "visiblePeersMeanRange": null,
+        "deferredTicksTotal": 55,
+        "frameExcessMs": {
+          "p50": 9.278416000001016,
+          "p99": 201.05390499999703
+        },
+        "generatorBusyPercentMax": 35.120000000000005
+      }
+    },
+    "dome-40": {
+      "pairedRatios": [
+        1.1167971101745937,
+        1.104956307756121,
+        1.3074027603513174,
+        0.962844042982051,
+        0.9926585332881007
+      ],
+      "medianPairedRatio": 1.104956307756121,
+      "pairedRatioRange": [
+        0.962844042982051,
+        1.3074027603513174
+      ],
+      "base": {
+        "medianCpuMsPerTick": 2.8464769015398974,
+        "cpuMsPerTickRange": [
+          2.479775980087119,
+          3.0336029869321717
+        ],
+        "aliveMedian": 35.182,
+        "waitingMedian": 4.493,
+        "aliveRange": [
+          32.746,
+          37.119
+        ],
+        "waitingRange": [
+          2.5380000000000003,
+          6.93
+        ],
+        "visiblePeersMeanMedian": 5.742542595516262,
+        "visiblePeersMeanRange": [
+          5.527009702809065,
+          6.270990957000838
+        ],
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.8171370000018214,
+          "p99": 13.986129999997502
+        },
+        "generatorBusyPercentMax": 2.6311111111111107,
+        "waitingFinalMedian": 7,
+        "completedWaitMs": {
+          "p50": 3738.3795630000022,
+          "p99": 19140.144017000002,
+          "max": 19994.963778,
+          "countTotal": 289,
+          "nonemptyHolds": 5
+        },
+        "censoredWaitMs": {
+          "p50": 3095.807991000001,
+          "p99": 3439.2503700000034,
+          "max": 4802.567034000006,
+          "countTotal": 33,
+          "nonemptyHolds": 5
+        }
+      },
+      "candidate": {
+        "medianCpuMsPerTick": 2.8900295535853164,
+        "cpuMsPerTickRange": [
+          2.825579586121052,
+          3.351998755638513
+        ],
+        "aliveMedian": 35.161,
+        "waitingMedian": 4.52,
+        "aliveRange": [
+          33.476,
+          35.781
+        ],
+        "waitingRange": [
+          3.883,
+          6.205
+        ],
+        "visiblePeersMeanMedian": 5.681962899759828,
+        "visiblePeersMeanRange": [
+          5.477395128103013,
+          5.9595895053979415
+        ],
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.788560000000871,
+          "p99": 12.991541000003053
+        },
+        "generatorBusyPercentMax": 2.6133333333333333,
+        "waitingFinalMedian": 6,
+        "completedWaitMs": {
+          "p50": 3367.2142710000016,
+          "p99": 16726.177674,
+          "max": 18723.147299,
+          "countTotal": 296,
+          "nonemptyHolds": 5
+        },
+        "censoredWaitMs": {
+          "p50": 2289.776768000003,
+          "p99": 5070.462458000002,
+          "max": 6885.279263999998,
+          "countTotal": 32,
+          "nonemptyHolds": 5
+        }
+      }
+    },
+    "dome-64": {
+      "pairedRatios": [
+        0.9802467628692308,
+        0.9852380632319687,
+        0.9609237920825883,
+        1.1634199134199135,
+        1.0043180317931575
+      ],
+      "medianPairedRatio": 0.9852380632319687,
+      "pairedRatioRange": [
+        0.9609237920825883,
+        1.1634199134199135
+      ],
+      "base": {
+        "medianCpuMsPerTick": 2.96935759838233,
+        "cpuMsPerTickRange": [
+          2.7815805849408837,
+          3.0533519987556383
+        ],
+        "aliveMedian": 33.723,
+        "waitingMedian": 29.938000000000002,
+        "aliveRange": [
+          32.081,
+          36.921
+        ],
+        "waitingRange": [
+          26.779,
+          31.618000000000002
+        ],
+        "visiblePeersMeanMedian": 5.574603716394307,
+        "visiblePeersMeanRange": [
+          5.13690093522688,
+          6.1393936439147705
+        ],
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.887634999999136,
+          "p99": 14.076025000002119
+        },
+        "generatorBusyPercentMax": 2.9355555555555553,
+        "waitingFinalMedian": 31,
+        "completedWaitMs": {
+          "p50": 23918.452134000003,
+          "p99": 37931.450143999995,
+          "max": 40975.652711,
+          "countTotal": 268,
+          "nonemptyHolds": 5
+        },
+        "censoredWaitMs": {
+          "p50": 14576.612747,
+          "p99": 26130.092741,
+          "max": 28572.421483,
+          "countTotal": 145,
+          "nonemptyHolds": 5
+        }
+      },
+      "candidate": {
+        "medianCpuMsPerTick": 2.9340385812072185,
+        "cpuMsPerTickRange": [
+          2.793591538341888,
+          3.344221496344688
+        ],
+        "aliveMedian": 34.351,
+        "waitingMedian": 29.3,
+        "aliveRange": [
+          32.507999999999996,
+          36.097
+        ],
+        "waitingRange": [
+          27.602,
+          31.165
+        ],
+        "visiblePeersMeanMedian": 5.757476266837717,
+        "visiblePeersMeanRange": [
+          5.282890370674326,
+          5.859974649162517
+        ],
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.7980420000021695,
+          "p99": 11.311127999997552
+        },
+        "generatorBusyPercentMax": 3.026666666666667,
+        "waitingFinalMedian": 28,
+        "completedWaitMs": {
+          "p50": 23410.39785,
+          "p99": 37104.379553,
+          "max": 38609.832503,
+          "countTotal": 291,
+          "nonemptyHolds": 5
+        },
+        "censoredWaitMs": {
+          "p50": 10816.127388000004,
+          "p99": 22306.076524999993,
+          "max": 27072.858411999994,
+          "countTotal": 150,
+          "nonemptyHolds": 5
+        }
+      }
+    },
+    "dome-80": {
+      "pairedRatios": [
+        0.8479935143899474,
+        0.7527546211633939,
+        0.8584553785364332,
+        1.0062035681568482,
+        1.055469155002592
+      ],
+      "medianPairedRatio": 0.8584553785364332,
+      "pairedRatioRange": [
+        0.7527546211633939,
+        1.055469155002592
+      ],
+      "base": {
+        "medianCpuMsPerTick": 3.3919129082426127,
+        "cpuMsPerTickRange": [
+          3.0009334163036714,
+          4.107896794370602
+        ],
+        "aliveMedian": 33.493,
+        "waitingMedian": 46.223,
+        "aliveRange": [
+          33.268,
+          36.138
+        ],
+        "waitingRange": [
+          43.514,
+          46.424
+        ],
+        "visiblePeersMeanMedian": 5.387805922132493,
+        "visiblePeersMeanRange": [
+          5.373701764861995,
+          5.958374100719425
+        ],
+        "deferredTicksTotal": 34,
+        "frameExcessMs": {
+          "p50": 4.470055000005232,
+          "p99": 31.16845900000044
+        },
+        "generatorBusyPercentMax": 3.804444444444444,
+        "waitingFinalMedian": 44,
+        "completedWaitMs": {
+          "p50": 34048.961823,
+          "p99": 48233.981694999995,
+          "max": 51751.107272,
+          "countTotal": 294,
+          "nonemptyHolds": 5
+        },
+        "censoredWaitMs": {
+          "p50": 17667.630787000002,
+          "p99": 33085.509949,
+          "max": 37378.346496,
+          "countTotal": 223,
+          "nonemptyHolds": 5
+        }
+      },
+      "candidate": {
+        "medianCpuMsPerTick": 3.167392657125078,
+        "cpuMsPerTickRange": [
+          2.911805879608026,
+          3.25400528853632
+        ],
+        "aliveMedian": 33.912,
+        "waitingMedian": 45.775999999999996,
+        "aliveRange": [
+          32.903,
+          38.248000000000005
+        ],
+        "waitingRange": [
+          41.433,
+          46.772999999999996
+        ],
+        "visiblePeersMeanMedian": 5.636511234850966,
+        "visiblePeersMeanRange": [
+          5.11937633104192,
+          6.302699628166396
+        ],
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 4.129842999995162,
+          "p99": 15.326743000001443
+        },
+        "generatorBusyPercentMax": 3.215555555555556,
+        "waitingFinalMedian": 44,
+        "completedWaitMs": {
+          "p50": 34577.98329,
+          "p99": 46745.270931,
+          "max": 58860.021574,
+          "countTotal": 273,
+          "nonemptyHolds": 5
+        },
+        "censoredWaitMs": {
+          "p50": 20981.870203999995,
+          "p99": 34766.568077,
+          "max": 44557.867448,
+          "countTotal": 228,
+          "nonemptyHolds": 5
+        }
+      }
+    }
+  }
+}

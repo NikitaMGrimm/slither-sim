@@ -1,0 +1,68 @@
+{
+  "baseCommit": "249cdb217d83a234895bc7eee4d98c3636c1cd76",
+  "candidateRuntimeCommit": "fde812bb4c5c6dea52ebb32a8341d98fe45ea76b",
+  "binaries": {
+    "base/host_probe": "992a3b31d3b6d4e3974ec07f2f686098e9a23a516f71a3d5aeee02427eac64c6",
+    "candidate/host_probe": "d6d0db222c9851c9a06705f3dda7f07db8ec69a307237d429b2b7d71dc260e0d",
+    "base/host_capacity_load": "d3fa0df04a8f064d58143f9b0881b7d0a62d768843375cc41655a3b37a651c63",
+    "candidate/host_capacity_load": "09fb2003dce5909af9f356be848ebc11e74ad9e1ab1cb7eedf4bd9b2060cc0dc",
+    "base/host_players": "db02c149c75fd5112bb8bfb77a8d039b87e8de8c494d31a44de85c3d96ba2396",
+    "candidate/host_players": "14655ad0cd05aec3b60fd80a35383d5cac92bad5159615d7aa27065f42b792a9",
+    "base/perf_baseline": "b23021fcb2025d372dffc017cb74d8ea46d86834c9897ac0b222dd9834df0411",
+    "candidate/perf_baseline": "a65a229951e8e998e63d89610d7437d59987552a39b131cd4909552db434feea",
+    "base/perf_battledome": "14e8cca29aacba28a37d6dc6750de6e43ab3928b99cf025b4e8cb048925a1c18",
+    "candidate/perf_battledome": "7cff8f70d1ca883132a48a529354bb44438993396c14c400c3b72769333344ea",
+    "base/perf_client_retained": "aaa41efcc7c70006ab7154c94853ff75e219295d750332b4db30ea247226522f",
+    "candidate/perf_client_retained": "441f8b65f18dc416473968397609770cd32a9d388185f6031f36d00f3168607e"
+  },
+  "toolchain": "Rust 1.99.0",
+  "release": {
+    "lto": "thin",
+    "codegenUnits": 1,
+    "debug": 1,
+    "jobs": 2
+  },
+  "access": "Full samples, profiles, raw stacks, binaries, traces and failed attempts local-only in scratch.",
+  "harnessCommit": "489a6b0edfe0ff3891a7a04ce5fbfe7c4308b726",
+  "artifacts": {
+    "base-archive": "a4de4ebb00fbce629b37beefea6b71e364a83c46f3d1d5712f12f93b1aa1fc31",
+    "base-build.log": "c1c4f5ca551fdad56b079d3f3093782db8a56b14cded5006e0a4fc069e3f5d17",
+    "candidate-archive": "4db57176b954f807bd83730468a3ccc16186c8f99dc65c7d9237d4643e19b406",
+    "candidate-build.log": "970171c643451d4bc4d5e79e74278e786eb1337c77440ce69755dddfc337eeec",
+    "profile-official-500-base/perf.data": "4585b1314fad98524e2faca6ea7b4d2dd2d73d7a18f8c4cef3920627d7bf763d",
+    "profile-official-500-candidate/perf.data": "fa3e4e1879217651b5d78b616733ae6a588463a3f95d25dbea64c0b58a0bdd9f",
+    "profile-dome-40-base/perf.data": "44da38e2b3128b10354109f5d0035461b7d01010f2ab5113a759ef0ee56118e5",
+    "profile-dome-40-candidate/perf.data": "539b29408dd08a47247d1f7fc99d9213bedea1fd97d297a668e50902b60d9bc2",
+    "profile-dome-64-base/perf.data": "df22ce42a29e2e0ae2f6d4edf3081065dd676c81fac2b5ca581af6c782a38cfc",
+    "profile-dome-64-candidate/perf.data": "d1e9bb2bd4804696346c0f3a12803a6557dbc3653b33d4165d7c5f045f1ec867",
+    "profile-dome-80-base/perf.data": "d2c656662a3381a0cecdca0ee91d890e69b434b9ed27f21a9dd1a6355c92aaf0",
+    "profile-dome-80-candidate/perf.data": "236a2aaa4b14fb8fdd47590f783862fb57ecd6b6f3c6816e5556106e30fd33bc",
+    "checks.log": "4e05caa281a5b322a75cc824e414022e50a8e40c79a9b43a6b8a4f49bc88cae2",
+    "parity.log": "b94babe84317d06c44e750303dca14f90fed89fe7eeb5a7bf44dd6dd9a1fd6db",
+    "series.log": "c091874b108f0dca2e56c54b0e844af06bd9567a716cb660b84724a4eaa28dd1",
+    "screen.log": "f00c5a474da3fc5a24becc823e4bded6dcbd98b455dfeb69100ccff8947c14a7"
+  },
+  "harnessSha256": {
+    "loopback.py": "e75d1127127f4fe3957cf8548100431df61fba2ac8c180b1bab4342438e43251",
+    "paired.py": "6e581e4695db4bf163712bec321f9ea9ebd5d90a19855c45d0c84e3b70c90304",
+    "trace_compare.py": "478c499f1dbb9fa7565168b77a8b86702310cf7add3149ddfd022ccb7caa3a6b",
+    "instructions.py": "e3b313038bd81b02e9b9771046faf38afa2c0d4c12093e2772c1fe0fb63e86c2",
+    "host-players.patch": "5d4db7cf1b62da42f167cd5c455d912de1423fd963c22822bd21e3d4f09be3c2",
+    "battledome-catalog.patch": "352260c2288395839db41bc6314187033229ba985604a381f6b3e1b6d1e106d5"
+  },
+  "rejectedGrid": {
+    "runtimeCommit": "3f54b249c6b7c741580b10b1c571f95346720a33",
+    "patchSha256": "6888fc7f08736217ed2ae5c3fa9531111b837cc446ccdd435a24c2a596e8d61e",
+    "originalPatchSha256": "3171497de21dde501b3b57a10d0e91f26e55c4c393ce29fb141d19c75f55fd84",
+    "officialPairsSha256": "f65f0b01c2856e4df2a3fe61693308ff43a4a365e33116514eca4ee91c31514d",
+    "seriesLogSha256": "71e9e27970f51fc00e8ad9db07a5b6da68e62d9e48c1287c3598618cc5d6be99",
+    "access": "patch retained in study; full raw evidence local-only; interrupted Battledome warmup not completed"
+  },
+  "sourceSha256": {
+    "src/client/simulation.rs": "011dafe7f6773d674a4e4bc5d6cf0fe00e4250aadccf081fca0ab25d093f25a6",
+    "src/client/simulation/broadcast.rs": "0e382938802a8306f456f2efa1020b915018cca68a5f9ceb9c460af633b663a9",
+    "src/client/simulation/prey_visibility.rs": "a65c8667a152c9908e9737c7d0317c0aa596a5460868c58e87e2b22161814c7f"
+  },
+  "integrationBaseCommit": "c012a723ae9180477af0b6d33447ca93485629b2",
+  "integrationLimit": "timings and traces are at the frozen runtime pins; the later main integration is not retimed; prey source hashes unchanged"
+}

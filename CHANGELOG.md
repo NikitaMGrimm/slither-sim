@@ -8,6 +8,12 @@
   as a new camelCase dict, matching a JSON reset reply's `config`
   ([Python](docs/python.md#api)).
 
+### Changed
+
+- Host broadcasts share conservative prey visibility bounds across recipients,
+  retaining the original distance check and packet order
+  ([local measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-prey-visibility/REPORT.md)).
+
 ## [0.6.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.5.0...v0.6.0) - 2026-10-26
 
 ### Breaking

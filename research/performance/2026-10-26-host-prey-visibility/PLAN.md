@@ -56,3 +56,8 @@ slack. Scan these cheap bounds and retain the original hypot comparison for
 survivors. No hash maps, cell memberships, small-batch threshold or persistent
 state. This second candidate uses the same pinned baseline and starts a fresh
 full parity/check/measurement series with the same four workloads/protocol.
+
+The second candidate's single 25-decision screen retired 8,628,984,992 user
+instructions versus a fresh baseline's 8,969,555,316 (100% scheduled). This
+screen is not a repeated result or CPU-speed claim. Candidate runtime pin:
+`fde812bb4c5c6dea52ebb32a8341d98fe45ea76b` (source unchanged during timing).

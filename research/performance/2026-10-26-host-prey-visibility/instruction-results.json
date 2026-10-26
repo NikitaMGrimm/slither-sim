@@ -1,0 +1,86 @@
+{
+  "metric": "whole-process instructions:u, 100 decisions including internal warmup, no sockets/kernel",
+  "pairs": 3,
+  "workloads": {
+    "client-official-500": {
+      "medianPairedRatio": 0.9540358441104343,
+      "minPairedRatio": 0.9539800616698497,
+      "maxPairedRatio": 0.9540511467207066,
+      "baseMedian": 24338816766,
+      "candidateMedian": 23220078247,
+      "baseRange": [
+        24338101110,
+        24340213365
+      ],
+      "candidateRange": [
+        23219793273,
+        23220103598
+      ],
+      "pairedRatios": [
+        0.9540358441104343,
+        0.9539800616698497,
+        0.9540511467207066
+      ]
+    },
+    "client-battledome-40": {
+      "medianPairedRatio": 0.9995219801371843,
+      "minPairedRatio": 0.999514013044513,
+      "maxPairedRatio": 0.9995375809728204,
+      "baseMedian": 36544215751,
+      "candidateMedian": 36526642580,
+      "baseRange": [
+        36543284352,
+        36544402683
+      ],
+      "candidateRange": [
+        36526386042,
+        36526746890
+      ],
+      "pairedRatios": [
+        0.999514013044513,
+        0.9995375809728204,
+        0.9995219801371843
+      ]
+    },
+    "client-battledome-64": {
+      "medianPairedRatio": 0.9996887277016147,
+      "minPairedRatio": 0.9996744038157998,
+      "maxPairedRatio": 0.9996998229127696,
+      "baseMedian": 80770198764,
+      "candidateMedian": 80744596659,
+      "baseRange": [
+        80769738041,
+        80770406031
+      ],
+      "candidateRange": [
+        80744107495,
+        80745953401
+      ],
+      "pairedRatios": [
+        0.9996998229127696,
+        0.9996744038157998,
+        0.9996887277016147
+      ]
+    },
+    "client-battledome-80": {
+      "medianPairedRatio": 0.9997131992808335,
+      "minPairedRatio": 0.9997108825886739,
+      "maxPairedRatio": 0.9997304390675807,
+      "baseMedian": 109320911367,
+      "candidateMedian": 109289637089,
+      "baseRange": [
+        109320351935,
+        109321243764
+      ],
+      "candidateRange": [
+        109289558051,
+        109290883439
+      ],
+      "pairedRatios": [
+        0.9997108825886739,
+        0.9997304390675807,
+        0.9997131992808335
+      ]
+    }
+  }
+}
