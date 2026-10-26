@@ -351,7 +351,7 @@ class SharedPolicyTrace(unittest.TestCase):
             if not target.is_absolute():
                 target = perf_baseline.ROOT / target
             binary = target / "debug/examples" / ("perf_baseline" + perf_build.SUFFIX)
-            workload, = perf_baseline.load_catalog(binary).select(["shared-forager-a1-8"])
+            workload, = perf_baseline.load_catalog(binary).select(["shared-forager-a4-mean-8"])
             self.assertFalse(workload.legacy)
             # Cross the 1000-tick episode limit with six-tick decisions, covering epoch framing too.
             iterations = 167

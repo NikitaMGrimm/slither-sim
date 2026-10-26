@@ -20,7 +20,7 @@ explicit. Runtime releases never resolve against evolving defaults.
 
 Original override files are retained byte for byte:
 
-- [A1](../../../src/bot/data/a1-overrides.json): SHA256
+- [A1](https://github.com/NikitaMGrimm/slither-sim/blob/f069d9a073d72e7913f6ba297d2d956b833a141d/src/bot/data/a1-overrides.json): SHA256
   `0aa7682bd5989828b58fdcfc74c3db2332d1f0d617d28a76252ca6ab652f5471`.
 - [A4-mean](../../../src/bot/data/a4-mean-overrides.json): SHA256
   `0c5f57ea712ce86e796bff079bb5911b9cd1c2217fb9d8d808bb9f061bd2719a`.

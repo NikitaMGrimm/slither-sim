@@ -5,7 +5,7 @@ use slither_sim::client::{
 };
 fn run(backend: impl Backend, steps: usize, lives: u64) -> Result<(), String> {
     let mut runner = BotRunner::new(backend);
-    let mut bot = ForagerBot::new(slither_sim::bot::PolicyId::default());
+    let mut bot = ForagerBot::new();
     let mut ended = 0;
     for step in 1..=steps {
         let frame = runner.step(&mut bot)?; // Observe, decide, then send the action.

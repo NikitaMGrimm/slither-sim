@@ -1,6 +1,6 @@
 use crate::{
     Config,
-    bot::{self as forager, Forager, PolicyId},
+    bot::{self as forager, Forager},
     client::{
         Bot, CONTRACT, ClientStatus, ForagerBot, LatencyConfig, SimulationConfig, SimulatorBackend,
     },
@@ -22,7 +22,7 @@ fn backend(round_trip: f64) -> SimulatorBackend {
 #[test]
 fn adapter_checks_lifecycle_and_keeps_no_state_between_decisions() {
     let mut backend = backend(0.1);
-    let mut bots: Vec<_> = (0..4).map(|_| ForagerBot::new(PolicyId::A1)).collect();
+    let mut bots: Vec<_> = (0..4).map(|_| ForagerBot::new()).collect();
     let mut playing = 0;
     for _ in 0..120 {
         let frames: Vec<_> = (0..4).map(|s| backend.frame_for(s).unwrap()).collect();
@@ -33,12 +33,12 @@ fn adapter_checks_lifecycle_and_keeps_no_state_between_decisions() {
             .collect();
         for (frame, action) in frames.iter().zip(&actions) {
             // A fresh bot decides identically: history never changes a decision.
-            assert_eq!(*action, ForagerBot::new(PolicyId::A1).decide(frame));
+            assert_eq!(*action, ForagerBot::new().decide(frame));
             if let Some(o) = &frame.observation {
                 playing += 1;
                 let timing = bots[0].timing(frame);
-                // A1 ignores opponent intents.
-                let expected = Forager::new(PolicyId::A1).decide(o, &timing, &[]);
+                // A4 ignores opponent intents (its intent weight is zero).
+                let expected = Forager::new().decide(o, &timing, &[]);
                 assert_eq!(*action, Some(expected));
             }
         }
@@ -47,7 +47,7 @@ fn adapter_checks_lifecycle_and_keeps_no_state_between_decisions() {
     assert!(playing > 300);
 
     let mut frame = backend.frame_for(0).unwrap();
-    let mut bot = ForagerBot::new(PolicyId::A1);
+    let mut bot = ForagerBot::new();
     for status in [
         ClientStatus::Waiting,
         ClientStatus::Dead,
@@ -67,14 +67,14 @@ fn adapter_checks_lifecycle_and_keeps_no_state_between_decisions() {
 #[test]
 fn timing_splits_the_measured_ping_and_ages_by_the_latest_receipt() {
     let mut backend = backend(0.1);
-    let mut bot = ForagerBot::new(PolicyId::A1);
+    let mut bot = ForagerBot::new();
     let mut receipts = Vec::new();
     for step in 0..200 {
         let frame = backend.frame_for(0).unwrap();
         let action = bot.decide(&frame);
         if let (Some(ping), Some(_)) = (frame.timing.ping_seconds, &frame.observation) {
             let timing = bot.timing(&frame);
-            let uplink = crate::bot::Forager::new(PolicyId::A1).uplink_share();
+            let uplink = crate::bot::Forager::new().uplink_share();
             let receipt = timing.observation_age - ping * (1.0 - uplink);
             assert!(receipt >= 0.0, "{receipt}");
             assert_eq!(timing.command_delay, ping * uplink);

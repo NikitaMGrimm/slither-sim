@@ -536,7 +536,7 @@ fn steady_decisions_do_not_allocate_or_mutate_the_observation() {
             heading_age: 0.05,
         })
         .collect();
-    for params in [params, super::params::A1, super::params::A4_MEAN] {
+    for params in [params, super::params::A4_MEAN] {
         let mut scratch = Scratch::default();
         // Warm once: buffers reserve their working capacity.
         forager::decide(&observation, &timing, &intents, &params, &mut scratch);
@@ -1230,15 +1230,13 @@ fn racing_boosts_for_a_rich_cell_a_rival_would_reach_first() {
 }
 
 #[test]
-fn immutable_releases_match_every_manifest_field() {
-    use super::{Forager, PolicyId};
-
-    assert_eq!(PolicyId::default(), PolicyId::A4);
+fn immutable_a4_matches_every_manifest_field() {
+    use super::Forager;
     let manifest: serde_json::Value =
         serde_json::from_str(include_str!("data/resolved.json")).unwrap();
+    assert_eq!(manifest["policies"].as_object().unwrap().len(), 1);
     for (name, params) in [
-        ("A1", Forager::new(PolicyId::A1).params),
-        ("A4-mean", Forager::new(PolicyId::A4).params),
+        ("A4-mean", Forager::new().params),
         ("A4-mean", Forager::default().params),
     ] {
         params.validate().unwrap();

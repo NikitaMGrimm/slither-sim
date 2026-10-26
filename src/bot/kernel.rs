@@ -2467,11 +2467,7 @@ mod tests {
     #[test]
     fn pruned_search_matches_exhaustive_fan_costs_bit_for_bit() {
         let mut seed = 0xd8a4_2910_32cf_765b;
-        for p in [
-            Params::default(),
-            crate::bot::params::A1,
-            crate::bot::params::A4_MEAN,
-        ] {
+        for p in [Params::default(), crate::bot::params::A4_MEAN] {
             for case in 0..128 {
                 let mut o = lone();
                 o.me.head.x = lcg(&mut seed) * 3000.0;

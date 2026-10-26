@@ -1,5 +1,5 @@
 use super::{ForagerBot, fill_intents};
-use crate::{Action, bot::PolicyId, client::Bot};
+use crate::{Action, client::Bot};
 use serde_json::{Value, json};
 #[cfg(any(
     all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
@@ -106,14 +106,6 @@ fn fixture() -> Value {
     fixture
 }
 
-fn make_bot(name: &str) -> ForagerBot {
-    ForagerBot::new(match name {
-        "A1" => PolicyId::A1,
-        "A4-mean" => PolicyId::A4,
-        _ => panic!("unknown fixture policy: {name}"),
-    })
-}
-
 /// Opt-in, offline replay timing. Decode and allocate before warm-up; keep file
 /// I/O outside the timed loop. Run only on a quiet, pinned measurement host.
 #[test]
@@ -122,8 +114,7 @@ fn replay_benchmark() {
     use std::{hint::black_box, io::Write, time::Instant};
 
     let output = std::env::var("FORAGER_REPLAY_OUTPUT").expect("fresh CSV output path");
-    let policy = std::env::var("FORAGER_REPLAY_POLICY").unwrap_or_else(|_| "A1".into());
-    assert!(["A1", "A4-mean"].contains(&policy.as_str()));
+    let policy = "A4-mean";
     let suite = std::env::var("FORAGER_REPLAY_SUITE").unwrap_or_else(|_| "all".into());
     assert!(["all", "dense"].contains(&suite.as_str()));
     let rounds: usize = std::env::var("FORAGER_REPLAY_ROUNDS")
@@ -159,7 +150,7 @@ fn replay_benchmark() {
             .open(output)
             .unwrap(),
     );
-    let mut bot = make_bot(&policy);
+    let mut bot = ForagerBot::new();
     let mut samples = Vec::with_capacity(rounds.checked_mul(frames.len()).unwrap());
     for _ in 0..200 {
         for (_, frame) in &frames {
@@ -203,52 +194,51 @@ fn check_structure(frame: &crate::client::ClientFrame, result: Option<Action>) {
 fn full_frames_are_deterministic_with_fresh_and_interleaved_shared_instances() {
     let fixture = fixture();
     let cases = fixture["cases"].as_array().unwrap();
-    for name in ["A1", "A4-mean"] {
-        let mut shared = make_bot(name);
-        // Both orders reuse one instance across interleaved slots, lives,
-        // connections and invalid frames, without resetting between decisions.
-        for case in cases.iter().chain(cases.iter().rev()) {
-            let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
-            let before = serde_json::to_value(&frame).unwrap();
-            let mut first = make_bot(name);
-            let mut second = make_bot(name);
-            let inputs = derived(&first, &frame);
-            assert_eq!(
-                derived(&second, &frame),
-                inputs,
-                "{} {name}: fresh inputs",
-                case["id"]
-            );
-            assert_eq!(
-                derived(&shared, &frame),
-                inputs,
-                "{} {name}: shared inputs",
-                case["id"]
-            );
-            let first = first.decide(&frame);
-            let second = second.decide(&frame);
-            let reused = shared.decide(&frame);
-            for result in [first, second, reused] {
-                check_structure(&frame, result);
-            }
-            assert_eq!(
-                action(first),
-                action(second),
-                "{} {name}: fresh bits",
-                case["id"]
-            );
-            assert_eq!(
-                action(first),
-                action(reused),
-                "{} {name}: shared bits",
-                case["id"]
-            );
-            assert_eq!(
-                serde_json::to_value(&frame).unwrap(),
-                before,
-                "input mutated"
-            );
+    let name = "A4-mean";
+    let mut shared = ForagerBot::new();
+    // Both orders reuse one instance across interleaved slots, lives,
+    // connections and invalid frames, without resetting between decisions.
+    for case in cases.iter().chain(cases.iter().rev()) {
+        let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
+        let before = serde_json::to_value(&frame).unwrap();
+        let mut first = ForagerBot::new();
+        let mut second = ForagerBot::new();
+        let inputs = derived(&first, &frame);
+        assert_eq!(
+            derived(&second, &frame),
+            inputs,
+            "{} {name}: fresh inputs",
+            case["id"]
+        );
+        assert_eq!(
+            derived(&shared, &frame),
+            inputs,
+            "{} {name}: shared inputs",
+            case["id"]
+        );
+        let first = first.decide(&frame);
+        let second = second.decide(&frame);
+        let reused = shared.decide(&frame);
+        for result in [first, second, reused] {
+            check_structure(&frame, result);
         }
+        assert_eq!(
+            action(first),
+            action(second),
+            "{} {name}: fresh bits",
+            case["id"]
+        );
+        assert_eq!(
+            action(first),
+            action(reused),
+            "{} {name}: shared bits",
+            case["id"]
+        );
+        assert_eq!(
+            serde_json::to_value(&frame).unwrap(),
+            before,
+            "input mutated"
+        );
     }
 }
 
@@ -268,33 +258,32 @@ fn platform_oracle_equality_zero_mismatches() {
     let cases = fixture["cases"].as_array().unwrap();
     let expected = oracle["cases"].as_array().unwrap();
     assert_eq!(expected.len(), cases.len());
-    for name in ["A1", "A4-mean"] {
-        let mut shared = make_bot(name);
-        for (case, oracle_case) in cases.iter().zip(expected) {
-            assert_eq!(case["id"], oracle_case["id"], "oracle case ID");
-            assert_eq!(
-                input_sha256(&case["frame"]),
-                oracle_case["inputSha256"].as_str().unwrap(),
-                "{}: oracle input hash",
-                case["id"]
-            );
-            let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
-            let expected = &oracle_case["expected"][name];
-            // Compare every derived bit before any action, including all 64
-            // sent slots, truncation length and unknown-Intent NaN payloads.
-            assert_eq!(
-                derived(&shared, &frame),
-                expected["derived"],
-                "{} {name}: derived inputs",
-                case["id"]
-            );
-            assert_eq!(
-                action(shared.decide(&frame)),
-                expected["action"],
-                "{} {name}: action bits",
-                case["id"]
-            );
-        }
+    let name = "A4-mean";
+    let mut shared = ForagerBot::new();
+    for (case, oracle_case) in cases.iter().zip(expected) {
+        assert_eq!(case["id"], oracle_case["id"], "oracle case ID");
+        assert_eq!(
+            input_sha256(&case["frame"]),
+            oracle_case["inputSha256"].as_str().unwrap(),
+            "{}: oracle input hash",
+            case["id"]
+        );
+        let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
+        let expected = &oracle_case["expected"][name];
+        // Compare every derived bit before any action, including all 64
+        // sent slots, truncation length and unknown-Intent NaN payloads.
+        assert_eq!(
+            derived(&shared, &frame),
+            expected["derived"],
+            "{} {name}: derived inputs",
+            case["id"]
+        );
+        assert_eq!(
+            action(shared.decide(&frame)),
+            expected["action"],
+            "{} {name}: action bits",
+            case["id"]
+        );
     }
 }
 

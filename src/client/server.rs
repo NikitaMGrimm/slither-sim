@@ -425,7 +425,7 @@ impl Host {
                 .collect();
             let bots = Bots {
                 seats,
-                policy: ForagerBot::new(crate::bot::PolicyId::default()),
+                policy: ForagerBot::new(),
                 stride: self.bot_threads,
                 deliveries: receiver,
                 commands: commands.clone(),
@@ -1926,7 +1926,7 @@ mod tests {
         let (commands, received) = mpsc::channel();
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
-        let mut policy = ForagerBot::new(crate::bot::PolicyId::default());
+        let mut policy = ForagerBot::new();
         let mut seat = Seat::new(4, 1.);
         seat.join(0., &commands, &latency, &mut random).unwrap();
         let _ = received.recv().unwrap();
@@ -2503,7 +2503,7 @@ mod tests {
         let (commands, received) = mpsc::channel();
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
-        let mut policy = ForagerBot::new(crate::bot::PolicyId::default());
+        let mut policy = ForagerBot::new();
         let mut seat = Seat::new(4, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         assert!(matches!(
@@ -2672,7 +2672,7 @@ mod tests {
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         let mut bots = Bots {
             seats: vec![seat],
-            policy: ForagerBot::new(crate::bot::PolicyId::default()),
+            policy: ForagerBot::new(),
             stride: 1,
             deliveries,
             commands,
@@ -2709,7 +2709,7 @@ mod tests {
             ..Default::default()
         };
         let mut random = Random::new(1);
-        let mut policy = ForagerBot::new(crate::bot::PolicyId::default());
+        let mut policy = ForagerBot::new();
         let mut seat = Seat::new(0, 0.042);
         seat.join(0.5, &commands, &latency, &mut random).unwrap();
         // A world catching up on ticks stamps the setup before the join.

@@ -20,10 +20,10 @@ pub struct ForagerBot {
 }
 
 impl ForagerBot {
-    /// Construct the named policy's received-frame adapter.
-    pub fn new(policy: crate::bot::PolicyId) -> Self {
+    /// Construct the A4 policy's received-frame adapter.
+    pub fn new() -> Self {
         Self {
-            policy: crate::bot::Forager::new(policy),
+            policy: crate::bot::Forager::new(),
             intents: Vec::with_capacity(4096),
         }
     }
@@ -58,6 +58,12 @@ impl ForagerBot {
             result.push_sent(command.seconds_ago, command.action);
         }
         result
+    }
+}
+
+impl Default for ForagerBot {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
