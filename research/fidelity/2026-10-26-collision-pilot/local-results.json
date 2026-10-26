@@ -1,0 +1,416 @@
+{
+  "dataOrigin": "local-simulator",
+  "scientificStatus": "synthetic engineering validation; official pilot not executed",
+  "rawAccess": "local-only; complete archives retained outside Git and not published",
+  "baseCommit": "f8214ff1b4edfe4180a9b2cf892921aaea827f26",
+  "sourceSha256": {
+    "src/physics.rs": "ef4d1ccf9f68f7790cee0243132b8564afb02246e5db235a616e805615365c37",
+    "src/simulator.rs": "7f01f5578652e541033903a6e00818d3288405323c7857a01938d410f627e003",
+    "src/client/server.rs": "dda70b9c3bacfda1a0eb81ab9a72110ec05ec128b03003f9a22d4c064c8877cc",
+    "examples/collision_curve.rs": "56892f0dd5133f7036273cdf2745baa48da2558086e85de71f509893b56d2762",
+    "Cargo.lock": "32d7e3e1603e3511632297a53f496671e52d4289abf4d193e5e0befe1a2ee382"
+  },
+  "fixture": {
+    "seed": 7,
+    "segments": 7,
+    "dt": 0.007,
+    "radius": 10000,
+    "spawnRadius": 600,
+    "minScore": 100,
+    "foodCount": 0,
+    "backgroundBots": 0
+  },
+  "validation": {
+    "toolsGroup": "passed",
+    "nodeTests": 260,
+    "pythonToolingTests": 198,
+    "pythonFidelityTests": 237,
+    "wheelTests": 28,
+    "wheelSkipped": 1,
+    "oracle": "passed with default and no-default-features; clippy and fmt passed"
+  },
+  "primary": {
+    "schema": "headless-jsonl-gzip-v1 standalone local regression",
+    "dataOrigin": "local-simulator",
+    "collectorSha256": "8e6f5d85a0b26550d112072a44c92e30dc3f967c71511fb9f7952c30dfd11323",
+    "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+    "planSha256": "db1ef4d8c84bdc7bb249be8ce571b925c52dbdc8cf782726fd1e9404b62841bd",
+    "archiveSha256": [
+      "5e84ba2f75530c3eadb16fb16211049822aeb4c7aa214e1f44567ccf2e38ce26",
+      "7c2367035e34829b6b9873c9692d8710708d50d01625283d5b8a2ee96cad5821"
+    ],
+    "sourcesUnchanged": true,
+    "elapsedSeconds": 148.66288269999998,
+    "attempted": 12,
+    "qualified": 12,
+    "trials": [
+      {
+        "trial": 0,
+        "kind": "ladder",
+        "probe": 0,
+        "first": 0,
+        "factor": 1.3,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 19.245672169811325,
+        "achievedMinHeadOffset": 19.354788377552268,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          false
+        ],
+        "outcome": "survival",
+        "samples": 243
+      },
+      {
+        "trial": 1,
+        "kind": "ladder",
+        "probe": 0,
+        "first": 0,
+        "factor": 1.1,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 16.28479952830189,
+        "achievedMinHeadOffset": 16.154062739859988,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          false
+        ],
+        "outcome": "survival",
+        "samples": 236
+      },
+      {
+        "trial": 2,
+        "kind": "ladder",
+        "probe": 0,
+        "first": 0,
+        "factor": 0.9,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 13.323926886792455,
+        "achievedMinHeadOffset": 15.02463284310258,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          true,
+          false
+        ],
+        "outcome": "contact",
+        "samples": 192
+      },
+      {
+        "trial": 3,
+        "kind": "ladder",
+        "probe": 0,
+        "first": 0,
+        "factor": 0.7,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 10.36305424528302,
+        "achievedMinHeadOffset": 15.154856820680038,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          true,
+          false
+        ],
+        "outcome": "contact",
+        "samples": 146
+      },
+      {
+        "trial": 4,
+        "kind": "ladder",
+        "probe": 1,
+        "first": 1,
+        "factor": 1.3,
+        "sign": -1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": -19.245672169811325,
+        "achievedMinHeadOffset": 19.600398644395757,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          false
+        ],
+        "outcome": "survival",
+        "samples": 241
+      },
+      {
+        "trial": 5,
+        "kind": "ladder",
+        "probe": 1,
+        "first": 1,
+        "factor": 1.1,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 16.28479952830189,
+        "achievedMinHeadOffset": 16.35372970909218,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          false
+        ],
+        "outcome": "survival",
+        "samples": 228
+      },
+      {
+        "trial": 6,
+        "kind": "ladder",
+        "probe": 1,
+        "first": 1,
+        "factor": 0.9,
+        "sign": -1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": -13.323926886792455,
+        "achievedMinHeadOffset": 14.728050754963931,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          true
+        ],
+        "outcome": "contact",
+        "samples": 173
+      },
+      {
+        "trial": 7,
+        "kind": "ladder",
+        "probe": 1,
+        "first": 1,
+        "factor": 0.7,
+        "sign": -1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": -10.36305424528302,
+        "achievedMinHeadOffset": 14.303681941709783,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          true
+        ],
+        "outcome": "contact",
+        "samples": 175
+      },
+      {
+        "trial": 8,
+        "kind": "head-on",
+        "probe": 0,
+        "first": 0,
+        "factor": 0,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 0,
+        "achievedMinHeadOffset": 0.006002218275082072,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          true,
+          false
+        ],
+        "outcome": "contact",
+        "samples": 20
+      },
+      {
+        "trial": 9,
+        "kind": "head-on",
+        "probe": 1,
+        "first": 0,
+        "factor": 0,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 0,
+        "achievedMinHeadOffset": 0.015022377693799882,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          true,
+          false
+        ],
+        "outcome": "contact",
+        "samples": 34
+      },
+      {
+        "trial": 10,
+        "kind": "head-on",
+        "probe": 0,
+        "first": 1,
+        "factor": 0,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 0,
+        "achievedMinHeadOffset": 0.01971037652958607,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          true
+        ],
+        "outcome": "contact",
+        "samples": 32
+      },
+      {
+        "trial": 11,
+        "kind": "head-on",
+        "probe": 1,
+        "first": 1,
+        "factor": 0,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 0,
+        "achievedMinHeadOffset": 0.0039158969193984206,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          true
+        ],
+        "outcome": "contact",
+        "samples": 20
+      }
+    ]
+  },
+  "counterexample": {
+    "schema": "headless-jsonl-gzip-v1 standalone local regression",
+    "dataOrigin": "local-simulator",
+    "collectorSha256": "8e6f5d85a0b26550d112072a44c92e30dc3f967c71511fb9f7952c30dfd11323",
+    "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+    "planSha256": "db1ef4d8c84bdc7bb249be8ce571b925c52dbdc8cf782726fd1e9404b62841bd",
+    "archiveSha256": [
+      "202ed45348a0d02901d0ba59d5959f51d2ae3b7a9cf5d2900abee1546dd8ab2e",
+      "73157a1cf54109407e52a5282da306b1ecf0288747a675090d3d4b283398d174"
+    ],
+    "sourcesUnchanged": true,
+    "elapsedSeconds": 148.56585530000004,
+    "attempted": 12,
+    "qualified": 12,
+    "note": "A qualified wire crossing is not necessarily mutual contact. This newer-life death falsifies an overstrong initial test expectation, not the current rule.",
+    "trials": [
+      {
+        "trial": 11,
+        "kind": "head-on",
+        "probe": 1,
+        "first": 1,
+        "factor": 0,
+        "sign": 1,
+        "qualified": true,
+        "reasons": [],
+        "targetOffset": 0,
+        "achievedMinHeadOffset": 0.011111780243385994,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          true,
+          false
+        ],
+        "outcome": "contact",
+        "samples": 20
+      }
+    ]
+  },
+  "concurrentAborts": {
+    "schema": "headless-jsonl-gzip-v1 standalone local regression",
+    "dataOrigin": "local-simulator",
+    "collectorSha256": "8e6f5d85a0b26550d112072a44c92e30dc3f967c71511fb9f7952c30dfd11323",
+    "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+    "planSha256": "db1ef4d8c84bdc7bb249be8ce571b925c52dbdc8cf782726fd1e9404b62841bd",
+    "archiveSha256": [
+      "de0a4c57a369fef097821c2bbb426d49d1ffdad599e0d5adfc26aa7dd65dff97",
+      "b1dd4813960858d0e41ca557cd8776c12f7379bdce095d39c067c61aa4be4274"
+    ],
+    "sourcesUnchanged": true,
+    "elapsedSeconds": 174.1219541,
+    "attempted": 12,
+    "qualified": 10,
+    "note": "Initial all-qualified expectation failed. Every factor, both roles and all head-on cells still had qualified coverage; frozen driver gates were retained.",
+    "trials": [
+      {
+        "trial": 1,
+        "kind": "ladder",
+        "probe": 0,
+        "first": 0,
+        "factor": 1.1,
+        "sign": -1,
+        "qualified": false,
+        "reasons": [
+          "staging_timeout"
+        ],
+        "targetOffset": -16.28479952830189,
+        "achievedMinHeadOffset": null,
+        "segments": null,
+        "deaths": [
+          false,
+          false
+        ],
+        "outcome": "censored",
+        "samples": 0
+      },
+      {
+        "trial": 4,
+        "kind": "ladder",
+        "probe": 1,
+        "first": 1,
+        "factor": 1.3,
+        "sign": -1,
+        "qualified": false,
+        "reasons": [
+          "body_overlap_lost"
+        ],
+        "targetOffset": -19.245672169811325,
+        "achievedMinHeadOffset": 132.85066194336417,
+        "segments": [
+          7,
+          7
+        ],
+        "deaths": [
+          false,
+          false
+        ],
+        "outcome": "censored",
+        "samples": 3
+      }
+    ]
+  }
+}

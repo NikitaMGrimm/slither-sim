@@ -95,6 +95,9 @@
 
 ### Added
 
+- Paired collision capture tooling with a localhost outcome regression and a
+  frozen, unexecuted official pilot plan for hitbox and head-on join-order study.
+
 - A `bot` feature, on by default through `networking`, adds the frozen Forager
   policy (`bot::Forager`) and `client::ForagerBot`. The default policy is A4
   (A4-mean); A1 stays selectable. The [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)

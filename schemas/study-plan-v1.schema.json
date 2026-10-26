@@ -37,13 +37,17 @@
           "additionalProperties": false
         },
         "origin": {"type": "string", "pattern": "^https?://[^/?#\\s]+$"},
-        "scenario": {"enum": ["forage", "boost", "ownpellets", "spawn", "movement", "preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe", "paired-prey", "paired-snake", "food-lanes"]},
+        "scenario": {"enum": ["forage", "boost", "ownpellets", "spawn", "movement", "preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe", "paired-prey", "paired-snake", "paired-collision", "food-lanes"]},
         "seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600},
         "bots": {"type": "integer", "minimum": 1, "maximum": 3},
         "mode": {"enum": ["overlap", "crossing"]},
         "direction": {"enum": ["x", "y", "diagonal-positive", "diagonal-negative"]}
       },
       "allOf": [
+        {
+          "if": {"properties": {"scenario": {"const": "paired-collision"}}},
+          "then": {"properties": {"bots": {"const": 2}, "seconds": {"minimum": 1, "maximum": 600}}}
+        },
         {
           "if": {"properties": {"scenario": {"enum": ["paired-prey", "paired-snake"]}}},
           "then": {
