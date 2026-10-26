@@ -100,6 +100,26 @@ fn all_eleven_recorded_challenges_match_the_exact_outbound_bytes() {
 }
 
 #[test]
+fn recorded_legacy_request_received_the_existing_stock_challenge_format() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/client-legacy-login.json")).unwrap();
+    let session = &fixture["joinedSession"];
+    assert_eq!(session["request"]["hex"], "6304");
+    let hex = |value: &serde_json::Value| {
+        let text = value.as_str().unwrap();
+        (0..text.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&text[i..i + 2], 16).unwrap())
+            .collect::<Vec<_>>()
+    };
+    let challenge = hex(&session["challenge"]["hex"]);
+    assert_eq!(&challenge[..3], &[0, 0, b'6']);
+    let reply = hex(&session["reply"]["hex"]);
+    assert_eq!(reply.len(), 27);
+    assert_eq!(solve_challenge(&challenge[3..]).unwrap(), reply);
+}
+
+#[test]
 fn unknown_programs_are_rejected_including_host_constructor_access() {
     let accepted = b"var a = \"_k/T)\";a+=\"dr'Ay(^|``J9l@Bs'L{]JX\";for (var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}";
     assert_eq!(

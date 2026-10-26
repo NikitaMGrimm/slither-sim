@@ -6,10 +6,11 @@ Start new cases or changed expectations with
 [manifest.json](manifest.json) inventories wire/client protocol and client-frame
 contract fixtures, with repository-relative paths. Generic mechanics fixtures
 are excluded; never guess their protocol from the decoder default. Recorded
-login challenges are inline in `tests/client_challenge.rs`, not `login-challenges.json`.
+historical protocol-19 login challenges are inline in `tests/client_challenge.rs`,
+not `login-challenges.json`; the new legacy-login selection is described below.
 
 `schemaVersion` versions the inventory. Each entry pins
-`wireProtocol` (the actual binary wire version, currently literal `19`) and
+`wireProtocol` (the actual binary wire version; most cases are literal `19`) and
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
 The frame ID differs from the `slither-client-json-v2` request/reply
 envelope (also pinned with removed-field requests in `client-contract-v2.json`)
@@ -30,6 +31,16 @@ contract-example origins are `synthetic`; its protocol is example metadata, not
 captured wire evidence. The inventory does not duplicate source hashes.
 `client-food-interest.json` holds selected decoded receipt/pose witnesses with
 source identity and selection limits, rather than full raw frames.
+
+[`client-legacy-login.json`](client-legacy-login.json) retains a bounded official
+`[99, 4]` / selector-12 login observation: the existing stock challenge format
+was accepted with its 27-byte reply, then setup advertised **protocol 13**.
+The inventory pins 13, with no client-frame contract. The setup is a selected
+25-command-byte prefix excluding server identifiers; challenge/reply and tiny
+gameplay witnesses have archive hashes and record indices. The transmitted
+login is explicitly synthetic. Tests check the existing challenge solver and
+protocol-13 rejection; they do not enable protocol 13 or interpret its gameplay.
+See the [selection and stop decision](../../research/fidelity/2026-10-26-legacy-login/REPORT.md).
 
 [`transport-official-reference.json`](transport-official-reference.json) is a
 retained **home-route/collector** wire-19 measurement summary (`schemaVersion: 1`), outside the packet

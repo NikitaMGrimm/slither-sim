@@ -86,6 +86,31 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assert_protocol19_setup(entry, setup["setupPrefixHex"])
         self.assertEqual(setup["expected"]["protocolVersion"], entry["wireProtocol"])
 
+    def test_captured_legacy_login_pins_unsupported_protocol13(self):
+        entry, fixture = self.fixture("tests/fixtures/client-legacy-login.json")
+        self.assertEqual(entry["wireProtocol"], 13)
+        self.assertEqual(fixture["wireProtocol"], 13)
+        self.assertEqual(entry["dataOrigin"], "captured")
+        self.assertIsNone(entry["clientContract"])
+        session = fixture["joinedSession"]
+        self.assertEqual(session["request"]["hex"], "6304")
+        prefix = bytes.fromhex(session["setup"]["commandPrefixHex"])
+        self.assertEqual(len(prefix), 25)
+        self.assertEqual(prefix[0], ord("a"))
+        self.assertEqual(prefix[23], 13)
+        self.assertEqual(session["setup"]["expected"]["protocol"], prefix[23])
+        # The retained stock prefix is a separate observation, still tagged 19.
+        _, stock = self.fixture("tools/fidelity/fixtures/protocol19-setup.json")
+        stock_prefix = bytes.fromhex(stock["setupPrefixHex"])
+        self.assertEqual(stock_prefix[23], 19)
+        self.assertEqual(prefix[:23], stock_prefix[:23])
+        self.assertEqual(prefix[24], stock_prefix[24])
+        login = bytes.fromhex(session["login"]["hex"])
+        self.assertEqual(session["login"]["dataOrigin"], "synthetic")
+        self.assertEqual(login[:4], bytes([115, 12, 7, 11]))
+        self.assertEqual(login[4:15], b"CompatProbe")
+        self.assertEqual(login[15:], bytes([0, 255]))
+
     def test_protocol19_hud_capture(self):
         entry, fixture = self.fixture("tests/fixtures/client-hud-leaderboard.json")
         self.assertEqual(entry["dataOrigin"], "captured")
