@@ -878,23 +878,21 @@ fn ground_colors_are_shared_across_connections_and_reconnects() {
     let mut b = Remote::connect(&mut sim, 1, "New life");
     // Hold the observer location for this subscription/color regression;
     // random new spawn locations can legitimately see a different sector.
-    let mut detached_snake = sim.backend.world.snakes()[1].clone();
-    let snake = &mut detached_snake;
+    let mut snake = sim.backend.world.snakes()[1].clone();
     let delta = Point {
         x: previous_head.x - snake.head.x,
         y: previous_head.y - snake.head.y,
     };
-    snake.head = previous_head;
     for point in &mut snake.body {
         point.x += delta.x;
         point.y += delta.y;
     }
-    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 6);
-    assert_eq!(original, style(&sim, 1));
     sim.backend
         .world
-        .correct_pose(1, snake.head, snake.body.clone(), snake.heading)
+        .correct_pose(1, previous_head, snake.body, snake.heading)
         .unwrap();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 6);
+    assert_eq!(original, style(&sim, 1));
 }
 
 #[test]
@@ -2258,16 +2256,12 @@ fn standalone_mass_reports_wait_for_their_opportunity() {
     let mut seen = Vec::new();
     for _ in 0..120 {
         // Mass changes every tick without new segments.
-        let mut detached_snake = sim.backend.world.snakes()[1].clone();
-        let snake = &mut detached_snake;
-        snake.fam = (snake.fam + 0.003) % 1.;
+        let snake = sim.backend.world.snakes()[1].clone();
+        let fam = (snake.fam + 0.003) % 1.;
+        sim.backend.world.correct_mass(1, snake.body, fam).unwrap();
         sim.advance_ticks(1).unwrap();
         seen.push(a.pump(&mut sim, 0));
         mover.pump(&mut sim, 1);
-        sim.backend
-            .world
-            .correct_mass(1, snake.body.clone(), snake.fam)
-            .unwrap();
     }
     let reports: Vec<usize> = about(&seen, 1, b"h")
         .iter()
