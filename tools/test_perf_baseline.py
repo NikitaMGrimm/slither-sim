@@ -34,7 +34,7 @@ def catalog_line(rows=None, **fields):
         row("observe", iterations=1000, trace=32, legacy=True),
         row("official-100-step", iterations=50, trace=8, profile=True),
         row("sandbox-16-bot", suite="full", iterations=200, trace=16),
-        row("client-official-100", suite="full", available=False, trace=4)]
+        row("client-official-500", suite="full", available=False, trace=4)]
     value = {"format": perf_baseline.CATALOG_FORMAT, "kind": "catalog", "networking": False, "seed": 7,
              "workloads": rows, **fields}
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -48,7 +48,7 @@ class Catalogs(unittest.TestCase):
     def test_parse_keeps_registration_order_and_fingerprints_definitions(self):
         parsed = catalog()
         self.assertEqual([w.name for w in parsed.workloads],
-                         ["step-default", "observe", "official-100-step", "sandbox-16-bot", "client-official-100"])
+                         ["step-default", "observe", "official-100-step", "sandbox-16-bot", "client-official-500"])
         self.assertEqual(parsed.sha256, hashlib.sha256(catalog_line()).hexdigest())
         first = parsed.workloads[0]
         self.assertEqual((first.iterations, first.trace_iterations, first.legacy, first.profile),
@@ -93,7 +93,7 @@ class Catalogs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"unknown workload\(s\) step-bogus; `harness --list`"):
             parsed.select(["observe", "step-bogus"])
         with self.assertRaisesRegex(ValueError, "networking feature disabled"):
-            parsed.select(["client-official-100"])
+            parsed.select(["client-official-500"])
         with self.assertRaisesRegex(ValueError, "duplicate"):
             parsed.select(["observe", "observe"])
 
@@ -199,6 +199,14 @@ class Comparisons(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "perf_observation executables"):
                 perf_compare.resolve_plan({"baseline": "a", "candidate": "b"}, ["observe-wide", "observe"], "ci")
             load.assert_not_called()
+
+    def test_retired_or_added_names_fail_before_timing_copied_executables(self):
+        for rows in ([row("step-default"), row("dome-proxy-32-step")],
+                     [row("step-default"), row("client-battledome-64")]):
+            with self.subTest(names=[r["name"] for r in rows]):
+                with patch.object(perf_compare, "load_catalog", side_effect=[catalog(rows), catalog([row("step-default")])]):
+                    with self.assertRaisesRegex(ValueError, "workload plans differ"):
+                        perf_compare.resolve_plan({"baseline": "old", "candidate": "new"}, None, "ci")
 
     def copied(self, root, catalogs, *options):
         binary = root / "fixture.exe"

@@ -23,7 +23,9 @@ cargo run --release --locked --example perf_baseline -- --list
 - `suite`: `ci` rows are timed and traced by PR CI, which allows at most ten;
   `full` rows are local defaults only.
 - `iterations` and `traceIterations`: the default timed sample size and parity
-  window. Each window keeps an uncompressed trace near 64 MB or less.
+  window. Windows target an uncompressed trace near 64 MB or less; the 500-agent
+  client row uses the minimum one decision and is about 82 MB including initial
+  and warmed snapshots and all client frames.
 - `mode`, `operation`: informational labels such as `official` and `step+observe`.
 - `profile`: whether `--profile` is supported.
 - `available`: false when the row needs the `networking` feature and the harness
@@ -39,14 +41,34 @@ cargo run --release --locked --example perf_baseline -- --list
   `protocol` come first. Read their resolved definitions from the catalog.
 - **Sandbox and official:** `Config::sandbox()` and `Config::official(n)` at several
   populations, giving a scaling curve.
-- **Dome proxy:** a dense, fixed arena with sandbox mechanics, no prey and no
-  ambient food. Boost and death pellets are its only food. It stands in for
-  a dense custom world; it does not use [`Config::battledome()`](configuration.md#battledome)
-  or implement its pit, spawn ring, size floor or rolling kill score.
-- **Client:** `SimulatorBackend` lives on an official world, timed through
-  `step_all` with wire recording. These rows need the `networking` feature.
+- **Battledome:** `battledome-32-step` and `battledome-32-bot` use the unmodified
+  [`Config::battledome()`](configuration.md#battledome): pit, permanent size floor,
+  spawn ring, ambient food and rolling kill score. They replace the obsolete
+  sandbox-mechanics `dome-proxy-*` stand-ins.
+- **Client admission:** `client-battledome-64` and `client-official-500` run
+  `SimulatorBackend` with wire recording. Each timed decision includes
+  `reconnect_slot` admission for dead clients plus `step_all`. These rows need
+  the `networking` feature. The 500-agent row exercises the target host population;
+  the old harness-only 128-agent assertion was not a backend limit. Battledome uses
+  responsive delivery, matching preset-based host configuration. It warms for
+  600 decisions (25.2 virtual seconds), past the synthetic ring crash and into
+  ongoing churn, then times 40 decisions, sized on the bounded-admission runtime.
+  Refused clients wait 24 decisions (1.008 virtual seconds); successful lives
+  reconnect after their next reported death. This deterministic harness policy
+  mirrors the host's one-second refusal backoff in virtual time; it does not
+  measure the host's wall-clock scheduling. Both runtimes use the same policy.
+  This is 64 seats: inspect `population.depleted` and refusals for living counts.
+  Official uses eight warmup decisions, retaining its initial death/respawn burst
+  in the measured window.
 
-Sandbox, official and dome-proxy registrations expand into `<id>-step` (one
+CI keeps ten rows: the six legacy cases, `official-100-step`, `official-100-bot`,
+`battledome-32-step` and `client-battledome-64`. The two proxy CI slots become a real
+Battledome physics row and a crowded admission/client row. Battledome batch
+observation remains in the full suite; `official-100-bot` retains CI batch
+observation coverage. The full-suite `client-official-500` replaces
+`client-official-100` with a new name because both population and timed scope change.
+
+Sandbox, official and Battledome registrations expand into `<id>-step` (one
 `Simulator::step`) and `<id>-bot` (`step` then batch observation into a reused
 buffer). Observations use `observe_all_into`, falling back to `observe_all` when
 `perf_compare --base` targets an older API. Earlier `step+observe_all` definitions
@@ -60,7 +82,17 @@ respawns and grown bodies:
 - **Placement:** added slots are marked dead and enter through `Simulator::respawn`
   at poses passing `Simulator::spawn_is_clear`. Distances use
   `spawn::sample_spawn_distance`; lives start with straight bodies and segment
-  counts drawn from the registered range.
+  counts drawn from the registered range. Battledome instead samples the configured
+  ring and uses `Simulator::spawn_body`, `body_is_clear` and `respawn_body` for
+  floor-size, curved newborns. Its `synthetic` label discloses harness contact
+  clearance rather than host admission. Ring capacity limits simultaneous
+  newborns, not the eventual living population. Initial placement uses 64 attempts
+  per slot and queues blocked lives instead of failing construction. Refused ring
+  placements retry after 144 ticks (1.008 virtual seconds), allowing existing
+  lives to leave the ring before another bounded search. The 32-slot row warms
+  for 8,000 ticks before measurement; reports retain `initialQueued`, initial
+  living count and warmup/measurement population. Non-ring placement is unchanged.
+  The 64-agent client row separately stresses backend admission.
 - **Randomness:** harness-owned pose/length generation never consumes simulator
   RNG, preserving world randomness across lifecycle work.
 - **Control:** a stateless wander controller picks a heading per staggered window,
@@ -68,12 +100,25 @@ respawns and grown bodies:
   staggered window. Controls and lifecycle work are outside the timed interval.
 - **Respawn:** between operations, a cursor reads new deaths without modifying
   `world.deaths`. Slots queue in death order with bounded placement attempts;
-  blocked slots retry a few ticks later.
+  blocked non-ring slots retry a few ticks later; ring slots use the interval above.
 - **Warmup and epochs:** an untimed warmup runs first. Long samples restore the
   warmed scene every 4,096 operations, bounding death history and drift.
 - **Client rows:** a slot reconnects through `reconnect_slot` after its client
-  reports the death, as a bot would. Actions go only to slots that are playing and
-  not processing an earlier decision.
+  reports the death, as a bot would. Native backend initialization is a synthetic
+  ring start, not host admission; only subsequent reconnects exercise admission.
+  Actions go only to slots that are playing and not processing an earlier decision.
+  Admission and stepping use disjoint timed intervals summed into one operation;
+  controller calculation and wire draining remain untimed. `admissionCalls` counts
+  all measured reconnect attempts, including refused poses, and `admissionSeconds`
+  is their included interval (null in traces). `admissionSecondsPerDecision`
+  divides it by the measured decision count; `reconnectTimed` is true. Warmup is
+  excluded from operation timing. `windows` reports consecutive 100-decision
+  populations and lifecycles, split at warmup and sample boundaries. Lifecycles
+  include `refusalsPerDecision` and `respawnsPerDecision`, so the initial crash,
+  warmup tail and measured churn remain distinguishable. The default trace window
+  must itself include admission work. The four-decision Battledome parity window
+  includes refused admissions; the full 40-decision sample also includes deaths
+  and successful respawns.
 
 `--profile` replaces `step` with `step_profiled`. Profiled `-bot` rows also report
 `observeSeconds`, the time spent in the batch observation.
@@ -85,7 +130,10 @@ definition, lifecycle counts, population statistics and warmup results.
 
 Every mode checks warmup plus the default trace window, or the whole run if
 shorter. This deterministic prefix must include a body death, respawn and, when
-enabled, death-food pellet; otherwise the harness exits non-zero with counts.
+enabled without a size floor, death-food pellet; otherwise the harness exits
+non-zero with counts. Size-floor worlds do not require food from deaths, because
+a floor-size death correctly produces none. Pit deaths are reported separately
+when present.
 
 Population depletion is reported, not fatal. `population` gives minimum, mean
 and maximum living snakes, plus minimum and maximum total anchors at operation
@@ -128,7 +176,8 @@ lengths; client slots reconnect before the next decision.
 4. Keep at most ten `ci` rows. Run `cargo test --locked --example perf_baseline`.
 
 When changing a workload definition, use a new name so results stay comparable.
-No runner, workflow or table edit is needed for a new registration.
+No runner or workflow edit is needed for a new registration. The calibration
+pilot's explicit groups must also name available workloads when retiring a row.
 
 ## Observation workloads
 
