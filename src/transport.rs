@@ -703,6 +703,25 @@ mod reset_tests {
     use super::*;
 
     #[test]
+    fn maximum_config_radius_resets_and_checkpoints() {
+        let mut session = Session::new();
+        let reply: serde_json::Value = serde_json::from_slice(&session.request(
+            br#"{"op":"reset","agents":1,"config":{"preset":"sandbox","radius":1e150,"foodCount":0,"radiusUpdates":[{"time":0.007,"radius":1e150}]}}"#,
+        ))
+        .unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"]["config"]["radius"], json!(1e150));
+        let world = &session.current.as_ref().unwrap().worlds[0].world;
+        let saved = serde_json::to_vec(&world.checkpoint().unwrap()).unwrap();
+        let restored =
+            Simulator::from_checkpoint(&saved, crate::RestoreOptions::default()).unwrap();
+        assert_eq!(
+            serde_json::to_vec(&restored.checkpoint().unwrap()).unwrap(),
+            saved
+        );
+    }
+
+    #[test]
     fn typed_preparation_is_atomic_and_matches_json_defaults() {
         let mut session = Session::new();
         let summary = session.reset(ResetOptions::default()).unwrap();

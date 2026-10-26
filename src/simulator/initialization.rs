@@ -405,6 +405,13 @@ impl Simulator {
     }
     pub fn spawn(&mut self, id: String, body: Vec<Point>, heading: f64) -> Result<usize, SimError> {
         self.check_id(&id)?;
+        bounded(heading, MAGNITUDE, "heading")?;
+        // Match respawn without changing synthetic ring or replay representations.
+        let heading = if heading.abs() > TAU {
+            heading.sin().atan2(heading.cos())
+        } else {
+            heading
+        };
         self.push_spawn(id, body, heading)
     }
     pub(super) fn push_spawn(

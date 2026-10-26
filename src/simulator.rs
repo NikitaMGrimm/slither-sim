@@ -471,6 +471,19 @@ impl Config {
                 ));
             }
         }
+        let radius_limit_error = |field: &str| {
+            SimError::config(
+                Constraint::OutOfRange,
+                field,
+                format!(
+                    "{field} must be at most {:e} for checkpoint-safe continuation",
+                    checkpoint::MAGNITUDE
+                ),
+            )
+        };
+        if self.radius > checkpoint::MAGNITUDE {
+            return Err(radius_limit_error("radius"));
+        }
         check_ambient_rate(self.ambient_replenish_per_second, self.dt)?;
         // A slide leaves the head one contact lead behind the rim along its
         // heading. Moving at least that far in one tick puts a head that keeps
@@ -515,7 +528,17 @@ impl Config {
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
         self.validate_mode(placement)?;
-        crate::boundary::validate(&self.radius_updates)
+        crate::boundary::validate(&self.radius_updates)?;
+        if let Some(index) = self
+            .radius_updates
+            .iter()
+            .position(|update| update.radius > checkpoint::MAGNITUDE)
+        {
+            return Err(radius_limit_error(&format!(
+                "radiusUpdates[{index}].radius"
+            )));
+        }
+        Ok(())
     }
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
     fn validate_mode(&self, placement: bool) -> Result<(), SimError> {

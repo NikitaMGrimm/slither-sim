@@ -20,18 +20,22 @@ fn empty_world() -> Simulator {
 }
 
 #[test]
-fn large_respawn_headings_preserve_orientation_and_can_turn() {
-    for supplied_body in [false, true] {
+fn large_spawn_headings_preserve_orientation_and_can_turn() {
+    for operation in ["spawn", "respawn", "respawn_body"] {
         let mut world = empty_world();
-        support::ring_slot(&mut world, "self", 0, 1).unwrap();
-        world.retire(0).unwrap();
+        if operation != "spawn" {
+            support::ring_slot(&mut world, "self", 0, 1).unwrap();
+            world.retire(0).unwrap();
+        }
         let heading: f64 = 1e20;
-        if supplied_body {
-            world
-                .respawn_body(0, vec![Point::default(), Point { x: -42., y: 0. }], heading)
-                .unwrap();
-        } else {
-            world.respawn(0, Point::default(), heading, 2).unwrap();
+        let body = vec![Point::default(), Point { x: -42., y: 0. }];
+        match operation {
+            "spawn" => {
+                world.spawn("self".into(), body, heading).unwrap();
+            }
+            "respawn_body" => world.respawn_body(0, body, heading).unwrap(),
+            "respawn" => world.respawn(0, Point::default(), heading, 2).unwrap(),
+            _ => unreachable!(),
         }
         let before = world.snakes()[0].heading;
         assert!((before.cos() - heading.cos()).abs() < 1e-12);

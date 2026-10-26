@@ -3,6 +3,40 @@ use slither_sim::ErrorKind;
 use slither_sim::{Config, Simulator};
 
 #[test]
+fn radius_limit_rejections_name_the_config_field() {
+    use slither_sim::{Constraint, RadiusUpdate};
+    for (field, config) in [
+        (
+            "radius",
+            Config {
+                radius: 1e151,
+                ..Config::sandbox()
+            },
+        ),
+        (
+            "radiusUpdates[0].radius",
+            Config {
+                radius_updates: vec![RadiusUpdate {
+                    time: 0.007,
+                    radius: 1e151,
+                }],
+                ..Config::sandbox()
+            },
+        ),
+    ] {
+        let error = config.validate().unwrap_err();
+        assert_eq!(
+            error.kind,
+            ErrorKind::InvalidConfig {
+                rule: Constraint::OutOfRange
+            }
+        );
+        assert_eq!(error.field.as_deref(), Some(field));
+        assert!(error.to_string().contains(field));
+    }
+}
+
+#[test]
 fn omitted_world_settings_select_the_official_baseline() {
     let explicit = serde_json::to_value(Config::official(1)).unwrap();
     assert_eq!(serde_json::to_value(Config::default()).unwrap(), explicit);
