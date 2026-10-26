@@ -4,6 +4,8 @@
 
 ### Added
 
+- `slither-sim host --stats SECONDS` prints the tick rate, deferred ticks,
+  game-loop load and player count every SECONDS.
 - Evidence for browser mods that use an older login: an official server answers
   it with protocol 13, which this server doesn't serve yet, and a tested mod
   can't play protocol 19 ([report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-legacy-login/REPORT.md)).
