@@ -188,7 +188,9 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
-        "censored": 1,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
         "target": 2
       },
       {
@@ -200,7 +202,9 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
-        "censored": 1,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
         "target": 2
       },
       {
@@ -212,7 +216,9 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
-        "censored": 1,
+        "excluded": 1,
+        "exclusionReason": "arena_margin",
+        "censored": 0,
         "target": 2
       },
       {
@@ -224,7 +230,9 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
-        "censored": 1,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
         "target": 2
       },
       {
@@ -236,7 +244,9 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
-        "censored": 1,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
         "target": 2
       },
       {
@@ -248,7 +258,9 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
-        "censored": 1,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
         "target": 2
       },
       {
@@ -260,6 +272,7 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
+        "excluded": 0,
         "censored": 1,
         "target": 2
       },
@@ -272,6 +285,7 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
+        "excluded": 0,
         "censored": 0,
         "target": 2
       },
@@ -284,6 +298,7 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
+        "excluded": 0,
         "censored": 0,
         "target": 2
       },
@@ -296,6 +311,7 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
+        "excluded": 0,
         "censored": 0,
         "target": 2
       },
@@ -308,6 +324,7 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
+        "excluded": 0,
         "censored": 0,
         "target": 2
       },
@@ -320,6 +337,7 @@
         "qualified": 0,
         "contact": 0,
         "survival": 0,
+        "excluded": 0,
         "censored": 0,
         "target": 2
       }

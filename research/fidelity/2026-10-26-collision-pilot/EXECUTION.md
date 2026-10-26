@@ -34,23 +34,25 @@ No online collision rule, fitted threshold or join-order verdict follows.
 ## Encounter counts
 
 Probe is the controlled role; first is actual first-join identity. Targets are
-per cell across both originally planned invocations. The last attempted slot
-has no terminal encounter result and is counted as censored by the invocation.
+per cell across both originally planned invocations. As the plan defines,
+prelaunch aborts are exclusions (T: third party, A: arena margin); the raw
+ledger labels them censored outcomes. Only the last attempted slot, which has
+no terminal encounter result, is censored by the invocation's join timeout.
 
-| Cell | Attempted | Launched | Qualified | Contact | Survival | Censored | Target |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Ladder 1.3, probe 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 1.1, probe 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 0.9, probe 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 0.7, probe 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 1.3, probe 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 1.1, probe 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 0.9, probe 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2 |
-| Ladder 0.7, probe 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
-| Head-on, probe 0, first 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
-| Head-on, probe 1, first 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
-| Head-on, probe 0, first 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
-| Head-on, probe 1, first 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Cell | Attempted | Excluded | Launched | Qualified | Contact | Survival | Censored | Target |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Ladder 1.3, probe 0 | 1 | 1 T | 0 | 0 | 0 | 0 | 0 | 2 |
+| Ladder 1.1, probe 0 | 1 | 1 T | 0 | 0 | 0 | 0 | 0 | 2 |
+| Ladder 0.9, probe 0 | 1 | 1 A | 0 | 0 | 0 | 0 | 0 | 2 |
+| Ladder 0.7, probe 0 | 1 | 1 T | 0 | 0 | 0 | 0 | 0 | 2 |
+| Ladder 1.3, probe 1 | 1 | 1 T | 0 | 0 | 0 | 0 | 0 | 2 |
+| Ladder 1.1, probe 1 | 1 | 1 T | 0 | 0 | 0 | 0 | 0 | 2 |
+| Ladder 0.9, probe 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 2 |
+| Ladder 0.7, probe 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Head-on, probe 0, first 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Head-on, probe 1, first 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Head-on, probe 0, first 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Head-on, probe 1, first 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
 
 Qualified totals: **0/16 ladder, 0/8 head-on**. Acquisition completion and both
 nonzero-qualified gates failed. Third-party-aborted **launched** fraction is
