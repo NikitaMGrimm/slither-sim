@@ -2,9 +2,14 @@
 
 **P3 failed its frozen pilot gate: three completed slots against a minimum of
 four.** The single-client route completed A/positive, A/negative and B/positive,
-then aborted B/negative for avoidance. Slots 5–8 remain missing. The stop rule
-prohibited pilot 2 and all development/held-out invocations: one of six planned
-invocations ran, with no retry, replacement site or endpoint substitution.
+then aborted B/negative for avoidance. The frozen route allows no new site after
+an abort, so the collector ended there: one avoidance event used up the pilot
+after 33 of its 480 seconds. Slots 5–8 remain missing. The stop rule prohibited
+pilot 2 and all development/held-out invocations: one of six planned invocations
+ran, with no retry, replacement site or endpoint substitution. A later attempt
+would need a new frozen plan that restages after interference, as the
+[collision pilot](../2026-10-26-collision-pilot/EXECUTION.md#no-second-design-yet)
+also concluded.
 Status: **exploratory and unreviewed**. No food-interest model, retention rule or
 local-replacement effect was fitted; **no simulator change is recommended**.
 

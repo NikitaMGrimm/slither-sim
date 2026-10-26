@@ -15,7 +15,8 @@
 ### Added
 
 - A retained [official food-interest pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-food-interest/REPORT.md):
-  three completed slots failed the frozen feasibility gate; no food-model change.
+  one avoidance abort ended the route after three completed slots, failing the
+  frozen feasibility gate; no food-model change.
 - A two-client `paired-collision` collector and a frozen official pilot plan
   for measuring the collision hitbox and head-on resolution order
   ([research workflow](docs/research-workflow.md#paired-collision-trials)). The
