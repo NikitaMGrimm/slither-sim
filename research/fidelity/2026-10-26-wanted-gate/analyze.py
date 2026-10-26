@@ -333,8 +333,7 @@ def run_older(root, sp, form, rows, pins, checks):
         alias = f"older-{index:02d}"
         path = Path(inventory[name]["path"])
         if not path.is_file():
-            counts["missingArchives"] += 1
-            continue
+            raise FileNotFoundError(f"{alias}: older archive is missing")
         pins["archives"][alias] = sha(path)
         assert pins['archives'][alias] == manifest[name]
         raw = scan(path,sp,form)
