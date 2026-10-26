@@ -163,6 +163,10 @@ def sequential(binaries, hashes, workloads, output, deadline, plan, *, checkpoin
             row = native(binaries[label], workload.name, workload.iterations,
                          output / f"{workload.name}-{name}-{label}-stderr.txt", deadline=deadline)
             error = child_error(row, workload)
+            if not error and plan.get("metrics", {}).get(workload.name) == "cpuSeconds":
+                cpu = row["workload"]["timing"].get("cpuSeconds")
+                if type(cpu) not in (float, int) or not math.isfinite(cpu) or cpu <= 0:
+                    error = f"invalid selected host CPU time {cpu!r}"
             record.update(row)
             status = "failed" if error else "ok"
         except TimeoutError as exception:
