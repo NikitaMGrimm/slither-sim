@@ -49,9 +49,9 @@ def run(config, out, seconds, reference, tolerances):
     out.mkdir(parents=True, exist_ok=False)
     frozen_config = out / "host-config.json"
     frozen_config.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8", newline="\n")
-    environment = {**os.environ, "CARGO_BUILD_JOBS": "3", "RAYON_NUM_THREADS": "2"}
+    environment = {**os.environ, "CARGO_BUILD_JOBS": "2", "RAYON_NUM_THREADS": "2"}
     environment.setdefault("CARGO_TARGET_DIR", str(tp.ROOT / "target" / "transport-parity"))
-    command = ["cargo", "run", "--release", "--locked", "-j", "3", "--", "host",
+    command = ["cargo", "run", "--release", "--locked", "-j", "2", "--", "host",
                "--config", str(frozen_config), "--bind", f"{host}:{port}"]
     manifest = dict(hostCommand=command, gitHead=output(["git", "rev-parse", "HEAD"], tp.ROOT),
         configSha256=tp.pc.sha256(frozen_config), collectorSha256=tp.pc.sha256(
@@ -103,7 +103,7 @@ def main(argv=None):
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--seconds", type=float, default=60)
-    parser.add_argument("--reference", type=Path, default=tp.ROOT / "tests/fixtures/transport-official-reference.json")
+    parser.add_argument("--reference", type=Path, default=tp.DEFAULT_REFERENCE)
     parser.add_argument("--tolerances", type=Path, default=tp.DEFAULT_TOLERANCES)
     args = parser.parse_args(argv)
     try:

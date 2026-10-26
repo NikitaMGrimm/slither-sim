@@ -8,7 +8,7 @@
 //!
 //! The model and `LatencyConfig::measured_route` come from the [network path
 //! study] of retained official captures. It fits effective application
-//! delivery on one low-RTT route; uplink behavior, direction coupling and
+//! delivery on one home route/collector setup; uplink behavior, direction coupling and
 //! physical causes are not identified.
 //!
 //! [network path study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-network-path/REPORT.md
@@ -86,12 +86,15 @@ impl LatencyConfig {
             ..Self::fixed(round_trip)
         }
     }
-    /// The retained low-RTT official route, as fitted and validated on held-out
+    /// The retained home route/collector setup, fitted and validated on held-out
     /// sessions by the network path study. Its 4.97 ms base round trip assumes
     /// the server answers within one tick of arrival, as this simulator does;
     /// with that the game ping median is near the route's 13.4 ms. The even
     /// split and mirrored uplink are assumptions. Add it only to paths that
-    /// lack real delay: a remote player already has their own.
+    /// lack real delay: a remote player already has their own. This is not a
+    /// server timing profile; the [near-server study] found a much smaller tail.
+    ///
+    /// [near-server study]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md
     pub fn measured_route() -> Self {
         Self {
             round_trip_seconds: vec![0.004974],
@@ -570,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn measured_route_reproduces_its_fitted_delay_shape() {
+    fn measured_home_route_reproduces_its_fitted_delay_shape() {
         let config = LatencyConfig::measured_route();
         config.validate().unwrap();
         let mut extra: Vec<f64> = deliveries(&config, 0.007, 600.)

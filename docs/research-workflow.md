@@ -250,7 +250,7 @@ Measure complete elapsed-header protocol-19 captures on receipt and server clock
 
 ```sh
 uv run --locked --only-group tools python tools/fidelity/transport_parity.py measure CAPTURE.jsonl.gz --output outputs/transport.json
-uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-reference.json outputs/transport.json
+uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-near-server.json outputs/transport.json
 uv run --locked --only-group tools python tools/fidelity/local_capture.py --config arena.json --seconds 60 --out outputs/local-transport
 ```
 
@@ -260,9 +260,14 @@ initial gates; exit 1 means failure (including insufficient samples), 2 invalid
 input. Optional `--tolerances FILE` supplies JSON with explanatory `comment`
 fields. Limits use the observed per-capture official envelope, requiring
 100 samples per gated statistic. The
-[reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-transport-parity/REPORT.md)
-include the fixture's full retained headless manifest and exclusions. Community
-recordings are excluded; raw reference captures require local access.
+[reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)
+pin four completed #111 development batches with its frozen telemetry mask and
+epoch eligibility. Whole gaps and anchor windows must pass; filtering never
+bridges removed frames. Two held-out summaries and all six unfiltered summaries
+remain in the fixture. Community recordings are excluded; raw inputs require
+local access. `local_capture.py` defaults to this clean reference. Its
+`--reference tests/fixtures/transport-official-reference.json` option retains the
+older home-route/collector envelope with its original labels and selection.
 
 Frame cadence and the header-delta histogram expose batching. Anchor correction
 is `v_local * gap - 42` world units: local speed is nine anchor spacings divided
@@ -281,10 +286,14 @@ Samples overlap and correlate; receipt timing includes network jitter and
 collector stalls. Reports retain `collector-timing` metadata and final counters
 (missing older metadata stays unknown), without summing repeated cumulative
 counters. No clock here identifies absolute one-way latency or guarantees
-stock-client playing equivalence. Retained collector stalls can widen the
-official envelope.
+stock-client playing equivalence. Unfiltered captures (including the retained
+home reference) can have collector stalls that widen their envelope. The clean
+reference uses the same +/-600-frame delay gauge before masking, not #111's
+slope-corrected +/-10-second gauge. Limits are exploratory development envelopes;
+the held-out delay p90 of 1.096 ms exceeds the 1.090 ms limit and is retained,
+without tuning the threshold.
 
-`local_capture.py` starts `cargo run --release --locked -j 3 -- host --config FILE`,
+`local_capture.py` starts `cargo run --release --locked -j 2 -- host --config FILE`,
 runs the headless collector, stops both process trees, then measures/compares.
 A new output directory retains capture path, frozen config, Git head, logs and
 comparison table; the Cargo target is isolated by default. Config must bind a

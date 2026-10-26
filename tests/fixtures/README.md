@@ -32,10 +32,33 @@ captured wire evidence. The inventory does not duplicate source hashes.
 source identity and selection limits, rather than full raw frames.
 
 [`transport-official-reference.json`](transport-official-reference.json) is a
-separate wire-19 measurement summary (`schemaVersion: 1`), outside the packet
+retained **home-route/collector** wire-19 measurement summary (`schemaVersion: 1`), outside the packet
 fixture inventory. It contains input paths/hashes, parse exclusions and
 decoder-derived transport quantiles, without raw gameplay bytes. See its
 [selection and limits](../../research/fidelity/2026-10-25-transport-parity/REPORT.md).
+
+[`transport-official-near-server.json`](transport-official-near-server.json) is
+the default server transport reference, derived offline from #111's four
+completed development batches. It pins protocol 19, source archive and analysis
+hashes, the frozen telemetry mask, burn-in and epoch admission; whole gaps and
+anchor windows must be clean. The original metric formulas and maximum eligible
+per-capture envelope are unchanged. It retains two held-out and six unfiltered
+summaries, without raw gameplay bytes or absolute one-way-delay claims.
+
+[`client-reporting-cadence-near-server.json`](client-reporting-cadence-near-server.json)
+pins clean server-header prey/HUD gaps from all six completed batches. Client
+simulation tests compare nominal prey/HUD periods with these medians, while
+[`scheduler-near-server-witnesses.json`](scheduler-near-server-witnesses.json)
+pins selected held-out 24 ms motion, 84 ms mass, motion-before-mass and 3044 ms
+prey cases. The decoder/client tests consume their setup, appearance and logical
+packet bytes, with synthetic reframing and explicit clock differences. These
+witnesses are protocol 19 / `slither-client-v2`; cadence summaries have no frame
+contract. Fixed simulator cadences are model choices, not universal bounds.
+See the [audit, selection and reproduction](../../research/fidelity/2026-10-26-server-timing-references/REPORT.md).
+
+The original `client-reporting-cadence.json` remains a home-capture regression
+with its original labels. `death-jitter-fresh.json` tests spatial death-food
+scatter and tail-first ordering, not network jitter; it remains unchanged.
 
 ## Changing a protocol or contract
 

@@ -17,6 +17,9 @@ import slither_protocol as sp
 
 
 ROOT = Path(__file__).resolve().parents[2]
+# Clean development corpus; the older transport-official-reference.json is a
+# retained home-route/collector case, not a server delivery envelope.
+DEFAULT_REFERENCE = ROOT / "tests/fixtures/transport-official-near-server.json"
 DEFAULT_TOLERANCES = Path(__file__).with_name("transport_tolerances.json")
 MEASUREMENT_ERRORS = (OSError, ValueError, IndexError, KeyError, TypeError, EOFError, zlib.error)
 GATES = {
@@ -131,24 +134,36 @@ class Epoch:
                     self.anchors[key].append((frame.t, frame.server, snake.sp, snake.sct))
                 elif event[0] == "rot":
                     group = "own" if sid == self.world.self_id else "other"
-                    self.motion[(group, key)].append(frame.server)
+                    self.motion[(group, key)].append((frame.t, frame.server))
             self.world.events.clear()
         # Only body/motion state is used; avoid retaining food and prey histories.
         self.world.foods.clear()
         self.world.prey.clear()
 
-    def finish(self):
+    def finish(self, interval=None):
+        # Optional corpus selection keeps the original clock/quantile formulas.
+        # The clean-path reference requires whole gap/anchor windows to pass
+        # the frozen telemetry mask, never bridges removed frames:
+        # research/fidelity/2026-10-26-server-timing-references/REPORT.md
+        eligible = interval or (lambda a, b: True)
         samples = self.samples
         # Setup's header is an epoch, not elapsed time. Exclude its frame from
         # delay samples and cadence, but include its time as the first gap origin.
-        samples.frames = len(self.frames) - 1
+        pairs = [(a, b) for a, b in zip(self.frames, self.frames[1:]) if eligible(a[0], b[0])]
+        samples.frames = len(pairs)
         for index, clock in enumerate(("receipt", "server")):
-            samples.gaps[clock] = [b[index] - a[index] for a, b in zip(self.frames, self.frames[1:])]
-            samples.durations[clock] = self.frames[-1][index] - self.frames[0][index]
-        samples.delays = rolling_excess([receipt - server for receipt, server in self.frames[1:]])
+            samples.gaps[clock] = [b[index] - a[index] for a, b in pairs]
+            samples.durations[clock] = (sum(samples.gaps[clock]) if interval else
+                                        self.frames[-1][index] - self.frames[0][index])
+        delays = rolling_excess([receipt - server for receipt, server in self.frames[1:]])
+        samples.delays = [value for i, value in enumerate(delays)
+                          if eligible(self.frames[i][0], self.frames[i+1][0])]
         for run in self.anchors.values():
             for k in range(5, len(run) - 4):
                 window = run[k-5:k+5]
+                if not eligible(window[0][0], window[-1][0]):
+                    samples.skipped["selection"] += 1
+                    continue
                 speeds = [row[2] for row in window]
                 if min(speeds) <= 0 or max(speeds) > 1.15 * min(speeds):
                     samples.skipped["speedVariation"] += 1
@@ -167,11 +182,12 @@ class Epoch:
         for (group, _), times in self.motion.items():
             samples.motion_tracks[group] += 1
             # Include zero and long gaps; filtering them would hide batching/stalls.
-            samples.motion[group].extend(b-a for a, b in zip(times, times[1:]))
+            samples.motion[group].extend(b[1]-a[1] for a, b in zip(times, times[1:])
+                                        if eligible(a[0], b[0]))
         return samples
 
 
-def measure_capture(source):
+def measure_capture(source, selection=None):
     source = Path(source)
     archive_sha = pc.sha256(source)
     # Reuse census validation (complete gzip/JSONL, timestamps, framing, literal
@@ -188,7 +204,7 @@ def measure_capture(source):
     def finish():
         nonlocal epoch
         if epoch is not None:
-            samples = epoch.finish()
+            samples = epoch.finish(selection(epoch) if selection else None)
             total.merge(samples)
             epochs.append(dict(connection=epoch.connection, setupIndex=epoch.setup_index,
                                setupReceiptMs=epoch.setup_receipt, summary=samples.summary()))

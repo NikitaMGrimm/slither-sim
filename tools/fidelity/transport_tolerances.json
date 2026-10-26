@@ -5,7 +5,7 @@
     "anchor_receipt_p50": {
       "path": "anchors.receipt.all.abs.p50",
       "spreadAllowance": 0,
-      "comment": "Typical stock-client interpolation reset correction, in world units. Includes network and collector timing. Use all eligible official captures, including slower sessions."
+      "comment": "Typical stock-client interpolation reset correction, in world units. Includes network and collector timing. Use every eligible capture in the chosen reference corpus; the default pins clean near-server development batches."
     },
     "anchor_receipt_p95": {
       "path": "anchors.receipt.all.abs.p95",
@@ -20,7 +20,7 @@
     "delay_p90": {
       "path": "excessDelayMs.p90",
       "spreadAllowance": 0,
-      "comment": "Receipt-minus-server excess over a centered +/-600-frame minimum. The full official envelope includes collector stalls; no absolute latency inference."
+      "comment": "Receipt-minus-server excess over a centered +/-600-frame minimum. The default reference filters whole intervals with the frozen near-server telemetry mask; the retained home reference includes collector stalls. No absolute latency inference."
     }
   }
 }

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "wireProtocol": 19,
+  "clientContract": null,
+  "dataOrigin": "captured",
+  "provenance": {
+    "study": "research/fidelity/2026-10-26-vps-timing/REPORT.md",
+    "sourcePinsSha256": "08ed65f3a3ccaa13e7f15021ae811e5dea8dd689fbeb7fa0789174b1f9e859eb",
+    "selectedResultsSha256": "b0bef1bcbe96afee82f13503ef5affdcf7b02084738d66c375f2c3e108d9183f",
+    "builderSha256": "c9b0b82cb0dfc94980914823a44caf043be224072cc5442dde47275a8822fc1a",
+    "decoderSha256": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9"
+  },
+  "sources": [
+    {
+      "archive": "round-1/low-1/network0.jsonl.gz",
+      "archiveSha256": "d7e7e1e29464845c96e6c2ed56facb6c164624f4b54c7ef18cb8c9e2cb90a7c5",
+      "split": "development"
+    },
+    {
+      "archive": "round-1/second-1/network0.jsonl.gz",
+      "archiveSha256": "5ba8e7127f6b91ebabdda9c9900d19d9e4a1bc2029a4c1f26f16064c8fd1947b",
+      "split": "development"
+    },
+    {
+      "archive": "round-2/low-2/network0.jsonl.gz",
+      "archiveSha256": "610475e3614ab3c1de8c79db061e1bc610fac7d42f48b21e71d5da2bd5b7b1a1",
+      "split": "development"
+    },
+    {
+      "archive": "round-2/second-2/network0.jsonl.gz",
+      "archiveSha256": "e19ac33e8700a1bf861a8dcca3606181273a9d6a433207754846e0544a721206",
+      "split": "development"
+    },
+    {
+      "archive": "round-3/low-3/network0.jsonl.gz",
+      "archiveSha256": "8542c31f38ba3405c701fb0bf248ab34ab853991ce36275c9e9317ecf93215ca",
+      "split": "heldout"
+    },
+    {
+      "archive": "round-3/second-3/network0.jsonl.gz",
+      "archiveSha256": "4f3b5cb3c551a0ae123cc41d5fdba51c103d12400cd0c9c137ecf8c4d70b82c3",
+      "split": "heldout"
+    }
+  ],
+  "selection": "All six completed batches; consecutive same-prey j, l and combined M/V gaps; reset at setup/connection and prey y; whole intervals pass frozen clean telemetry mask. No metric-value filtering.",
+  "limits": "Descriptive correlated server-header gaps, including post-death tail; fixed simulator cadences are models, not universal timers.",
+  "minimapGapsMs": {
+    "n": 1089,
+    "min": 2494,
+    "median": 2504,
+    "p95": 2507,
+    "max": 2536
+  },
+  "leaderboardGapsMs": {
+    "n": 883,
+    "min": 2988,
+    "median": 3008,
+    "p95": 3013,
+    "max": 3028
+  },
+  "preyUpdateGapsMs": {
+    "n": 5000,
+    "min": 210,
+    "median": 338.0,
+    "p95": 340,
+    "max": 3044
+  }
+}

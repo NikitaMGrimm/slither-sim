@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Server transport checks now default to a clean near-server reference from
+  existing #111 captures; nominal prey/HUD tests use its server-clock summaries.
+  Retained home-route fixtures and latency examples stay labeled. Selected
+  scheduler exceptions exercise decoder/client state; runtime defaults and
+  simulator cadence rules are unchanged
+  ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
+
 ### Breaking
 
 - The portable `client` JSON protocol is now `slither-client-json-v2`, because
