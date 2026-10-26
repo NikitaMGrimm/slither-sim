@@ -1,6 +1,11 @@
 use crate::{Config, Point, physics};
 use std::f64::consts::{FRAC_PI_2, PI, SQRT_2, TAU};
 
+#[cfg(feature = "networking")]
+mod safety;
+#[cfg(feature = "networking")]
+pub(crate) use safety::Safety;
+
 // Custom circular-spawn policy, not official evidence: keep two seconds of
 // straight travel plus the full 600-unit clearance around every living head.
 // This gives approaching players room without predicting their future turns.

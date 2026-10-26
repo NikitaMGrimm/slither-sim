@@ -396,6 +396,7 @@ impl SimulatorBackend {
         self.world.snakes[slot].alive = false;
         let pose = (|| {
             let circular = self.world.config.spawn_radius.is_some();
+            let mut safety = None;
             let mut open: Option<(f64, Vec<Point>, f64)> = None;
             for _ in 0..SPAWN_ATTEMPTS {
                 let distance = spawn::spawn_distance(&self.world.config, self.spawn_random.unit());
@@ -408,8 +409,22 @@ impl SimulatorBackend {
                 // Local policy: official joins keep a median 925 units from
                 // visible bodies, but three came within 550-600.
                 let (body, heading) = self.world.spawn_body(head, heading)?;
-                if self.world.body_is_clear(&body, spawn::CLEARANCE)
-                    && (!circular || self.world.body_clears_head_paths(&body))
+                let clear = if circular {
+                    safety
+                        .get_or_insert_with(|| {
+                            spawn::Safety::new(
+                                &self.world,
+                                body.len(),
+                                spawn::CLEARANCE,
+                                spawn::HEAD_PATH_SECONDS,
+                            )
+                        })
+                        .clears(&body)
+                } else {
+                    self.world.body_is_clear(&body, spawn::CLEARANCE)
+                };
+                if clear
+                    && (!circular || safety.as_ref().unwrap().clears_departures(body[0], heading))
                 {
                     return Ok((body, heading));
                 }

@@ -969,7 +969,7 @@ impl Simulator {
     /// head's straight two-second path by the full preferred clearance. This
     /// protects a player continuing its current motion; later turns are unknown.
     /// research/battledome/2026-10-26-safe-spawn/REPORT.md
-    #[cfg(feature = "networking")]
+    #[cfg(all(feature = "networking", test))]
     pub(crate) fn body_clears_head_paths(&self, body: &[Point]) -> bool {
         self.snakes.iter().filter(|s| s.alive).all(|s| {
             let travel = s.speed * crate::spawn::HEAD_PATH_SECONDS;
