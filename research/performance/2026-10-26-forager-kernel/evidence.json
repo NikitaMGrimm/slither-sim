@@ -10,7 +10,7 @@
   },
   "baselineBinarySha256": "6779770592c6888bf3fce8f81d982dc106bf7f503dd1204e85933f59f5753f6c",
   "candidateBinarySha256": "41377ae2fd4cd1b9bb854a188ad12bf468e73c719451ce942d8baf535f130534",
-  "rawDirectory": "C:\\Users\\Nikita\\.t3\\scratch\\bot-kernel-speedup\\aws-02\\raw",
+  "rawDirectory": "bot-kernel-speedup/aws-02/raw in local-only task scratch",
   "cleanup": {
     "nonterminatedInstances": 0,
     "volumes": 0,
