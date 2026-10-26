@@ -370,7 +370,7 @@ cross-platform floating-point identity is subject to OS math libraries.
 The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
 pins the original kernel, immutable parameters, bounded fixtures and validation
 limits. The [A4 adoption note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
-records selected held-out gameplay and cost results from private training tooling,
+records selected held-out gameplay and cost results from private tuning tooling,
 including the maintainer's live-mean cost gate and the earlier tail-limit failures.
 
 ### Checkpoints

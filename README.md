@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  A headless Slither.io simulator in Rust for bot development, training and custom servers.
+  A headless Slither.io simulator in Rust for custom servers and bot development.
 </p>
 
 <p align="center">
