@@ -330,7 +330,7 @@ impl Driver {
             Driver::Scenario { bot: false, .. } => "step",
             Driver::Scenario { bot: true, .. } => "step+observe",
             Driver::Client(_) => "reconnect+step_all",
-            Driver::SharedPolicy => "forager-a1+step_all",
+            Driver::SharedPolicy => "forager-a4-mean+step_all",
         }
     }
 
@@ -355,7 +355,7 @@ impl Driver {
         match self {
             Driver::Legacy(_) => None,
             Driver::SharedPolicy => Some(
-                "shared A1 received-frame adapter; eight synthetic sandbox ring starts; reset after death; modeled processing only",
+                "shared A4-mean received-frame adapter; eight synthetic sandbox ring starts; reset after death; modeled processing only",
             ),
             Driver::Scenario { scenario, .. } => Some(scenario.world.synthetic()),
             Driver::Client(_) => Some(
@@ -368,7 +368,7 @@ impl Driver {
         Ok(match self {
             Driver::SharedPolicy => json!({
                 "config": Config::sandbox(), "simulation": simulation_definition(self)?,
-                "policy": "A1",
+                "policy": "A4-mean",
                 "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
                 "operation": "all eight ForagerBot decisions plus step_all; record drain excluded",
                 "timing": "configured virtual processing only; no wall-time feedback",
@@ -467,7 +467,7 @@ fn catalog() -> Vec<Workload> {
                 }
             }
             Registration::SharedPolicy(operation) => workloads.push(Workload {
-                name: "shared-forager-a1-8".into(),
+                name: "shared-forager-a4-mean-8".into(),
                 driver: Driver::SharedPolicy,
                 operation: *operation,
             }),
@@ -1031,7 +1031,7 @@ mod portable {
     }
 
     pub(super) fn run_shared_policy(args: &Args, out: &mut impl Write) -> Result<Value, String> {
-        let mut policy = slither_sim::client::ForagerBot::new(slither_sim::bot::PolicyId::A1);
+        let mut policy = slither_sim::client::ForagerBot::new();
         run_with_policy(args, out, Some(&mut policy))
     }
 
@@ -1115,7 +1115,7 @@ mod portable {
             args,
             meter,
             if policy.is_some() {
-                "ForagerBot A1 decisions + step_all (six physics ticks and all client frames)"
+                "ForagerBot A4-mean decisions + step_all (six physics ticks and all client frames)"
             } else {
                 "step_all (six physics ticks and all client frames)"
             },
@@ -1123,14 +1123,14 @@ mod portable {
                 "initial": initial, "final": WorldStats::from_world(backend.world()), "progress": progress.report(),
                 "config": config, "wireRecording": true, "recordDrainTimed": false,
                 "frameScope": if policy.is_some() {
-                    "all eight slots; one shared A1 adapter; explicit step_all; no BotRunner"
+                    "all eight slots; one shared A4-mean adapter; explicit step_all; no BotRunner"
                 } else {
                     "all eight slots; no BotRunner or automatic background controller"
                 },
             }),
         );
         if policy.is_some() {
-            result["details"]["policy"] = json!("A1");
+            result["details"]["policy"] = json!("A4-mean");
             result["details"]["parameterManifestSha256"] =
                 json!(slither_sim::bot::PARAMETER_MANIFEST_SHA256);
         }
@@ -1139,12 +1139,9 @@ mod portable {
 
     #[test]
     fn shared_policy_trace_repeats_and_matches_fresh_frame_decisions() {
-        use slither_sim::{
-            bot::PolicyId,
-            client::{Bot, ForagerBot},
-        };
+        use slither_sim::client::{Bot, ForagerBot};
         let mut args = super::tests::args(
-            "shared-forager-a1-8",
+            "shared-forager-a4-mean-8",
             Driver::SharedPolicy,
             op(500, 16, Full),
             4,
@@ -1154,7 +1151,7 @@ mod portable {
             let mut out = Vec::new();
             let report = run_shared_policy(&args, &mut out).unwrap();
             assert_eq!(report["timing"], Value::Null);
-            assert_eq!(report["details"]["policy"], "A1");
+            assert_eq!(report["details"]["policy"], "A4-mean");
             assert_eq!(
                 report["details"]["parameterManifestSha256"],
                 slither_sim::bot::PARAMETER_MANIFEST_SHA256
@@ -1174,7 +1171,7 @@ mod portable {
                 let actions: Vec<Option<Action>> =
                     serde_json::from_value(record["actions"].clone()).unwrap();
                 for (frame, action) in previous.iter().zip(actions) {
-                    let expected = ForagerBot::new(PolicyId::A1).decide(frame);
+                    let expected = ForagerBot::new().decide(frame);
                     assert_eq!(
                         action.map(|a| (a.heading.to_bits(), a.boost)),
                         expected.map(|a| (a.heading.to_bits(), a.boost))
@@ -2303,7 +2300,7 @@ mod tests {
                     | "protocol"
                     | "client-battledome-64"
                     | "client-official-500"
-                    | "shared-forager-a1-8"
+                    | "shared-forager-a4-mean-8"
             );
             assert_eq!(
                 workload["available"],

@@ -299,19 +299,18 @@ wire cause codes remain separate future work.
 
 ### Frozen Forager
 
-The dependency-free `bot` feature exposes `bot::PolicyId::{A1, A4}` and
-`bot::Forager::new(PolicyId)`. `PolicyId::default()` selects A4, the adopted
-A4-mean parameters; `Forager::default()` constructs that policy. Select
-`PolicyId::A1` explicitly to retain A1. The `decide(&mut self, &Observation, &Timing,
-&[Intent]) -> Action` method uses the received observation and explicit timing.
+The dependency-free `bot` feature exposes `bot::Forager::new()` and
+`Forager::default()`, both using the adopted A4-mean parameters. The
+`decide(&mut self, &Observation, &Timing, &[Intent]) -> Action` method uses the
+received observation and explicit timing.
 `Timing`, `Sent` and `Intent` live in `bot`; opponent intentions follow observation
 order, with `Intent::default()` representing unknown wanted heading.
 Parameters are private and fully resolved for the named release.
 
 Use `default-features = false, features = ["bot"]` for an offline policy without
 networking or Rayon. Core-only, C ABI and Python builds do not enable `bot`.
-`networking`, enabled by default, includes it and exposes `client::ForagerBot::new(PolicyId::default())`,
-implementing the existing `client::Bot`. The adapter derives timing and intentions
+`networking`, enabled by default, includes it and exposes `client::ForagerBot::new()`
+and `ForagerBot::default()`, implementing the existing `client::Bot`. The adapter derives timing and intentions
 from the complete `ClientFrame` and returns `None` outside a compatible playing
 frame with an observation. Host bots, native background bots and the Rust
 examples use this default adapter; JSON operations are unchanged.

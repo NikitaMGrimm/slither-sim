@@ -64,8 +64,7 @@ fn percentile(sorted: &[f64], share: f64) -> f64 {
 
 fn run(options: Options) -> Result<(), String> {
     println!(
-        "policy={:?} parameter_manifest_sha256={}",
-        slither_sim::bot::PolicyId::default(),
+        "policy=A4-mean parameter_manifest_sha256={}",
         slither_sim::bot::PARAMETER_MANIFEST_SHA256,
     );
     let config = HostConfig {

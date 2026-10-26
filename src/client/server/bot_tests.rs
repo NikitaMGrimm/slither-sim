@@ -2,7 +2,6 @@
 use super::*;
 use crate::{
     Config,
-    bot::PolicyId,
     client::{SimulatorBackend, replay_record},
 };
 
@@ -43,7 +42,7 @@ fn received_seats() -> (Vec<Seat>, f64) {
 #[test]
 fn shared_worker_scratch_matches_fresh_adapters_and_preserves_pending_history() {
     let (mut seats, at) = received_seats();
-    let mut policy = ForagerBot::new(PolicyId::default());
+    let mut policy = ForagerBot::new();
     let latency = LatencyConfig {
         processing_seconds: [0.02, 0.02],
         ..Default::default()
@@ -54,7 +53,7 @@ fn shared_worker_scratch_matches_fresh_adapters_and_preserves_pending_history() 
         let seat = &mut seats[slot];
         seat.link = Link::connect(&latency, &mut random);
         let frame = seat.state.frame(at).unwrap();
-        let expected = ForagerBot::new(PolicyId::default()).decide(&frame).unwrap();
+        let expected = ForagerBot::new().decide(&frame).unwrap();
         seat.decide(at, &commands, &latency, &mut random, &mut policy)
             .unwrap();
         let pending = seat.outbox.unwrap();
@@ -93,7 +92,7 @@ fn shared_worker_scratch_matches_fresh_adapters_and_preserves_pending_history() 
 fn same_heading_sends_boost_change_and_rejoin_clears_seat_history() {
     let (mut seats, at) = received_seats();
     let seat = &mut seats[0];
-    let mut policy = ForagerBot::new(PolicyId::default());
+    let mut policy = ForagerBot::new();
     let expected = policy.decide(&seat.state.frame(at).unwrap()).unwrap();
     let previous = Action {
         boost: !expected.boost,

@@ -39,7 +39,7 @@ The runner checks the contract, decides and sends actions only while playing,
 measures compute time, and resets bot state on connection/life changes or play
 ending. Reconnection is explicit.
 
-`bot::PolicyId::default()` selects the shared runtime policy. Host workers each
+`ForagerBot::new()` and `default()` construct the shared A4-mean policy. Host workers each
 reuse one `ForagerBot`; native background slots reuse one instance sequentially.
 Decisions read only delivered frames, including received timing and actual
 sent-command history.

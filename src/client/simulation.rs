@@ -532,7 +532,7 @@ impl SimulatorBackend {
                     let frame = self.frame_for(slot)?;
                     if let Some(action) = self
                         .background_policy
-                        .get_or_insert_with(|| ForagerBot::new(crate::bot::PolicyId::default()))
+                        .get_or_insert_with(ForagerBot::new)
                         .decide(&frame)
                     {
                         self.send_to(slot, action)?;

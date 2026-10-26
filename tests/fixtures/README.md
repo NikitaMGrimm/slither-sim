@@ -93,7 +93,11 @@ x86_64 GNU outputs live in `forager-oracle-windows-x86_64-msvc.json` and
 `forager-oracle-linux-x86_64-gnu.json`. Exact target tests compare every
 Timing/Intent/action bit after verifying a SHA-256 of each shared canonical frame.
 Each oracle case contains only its ID, input hash and byte-preserved expectations;
-raw output hashes and projection instructions are in the port record.
+raw output hashes and projection instructions are in the port record. The
+obsolete A1 expectations were removed when A4-mean became the sole policy; all
+140 A4-mean expectations per platform, frame hashes and metadata are unchanged.
+To verify this projection, delete only each case's `expected.A1` from the prior
+JSON and compare the full parsed result with the current oracle.
 Its historical contract is `slither-client-v2`, protocol 19. The
 [port record](../../research/bots/2026-10-26-forager-port/REPORT.md) describes
 selection, provenance and four retained last-bit platform differences. macOS

@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..SimulationConfig::default()
     };
     let mut runner = BotRunner::new(SimulatorBackend::new(seed, config)?);
-    let mut bot = ForagerBot::new(slither_sim::bot::PolicyId::default());
+    let mut bot = ForagerBot::new();
     let mut ended = 0;
     for step in 1..=steps {
         let frame = runner.step(&mut bot)?;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use slither_sim::{
         Config, InitialPopulation, Placement, Simulator, WorldOptions,
-        bot::{Forager, PolicyId, Timing},
+        bot::{Forager, Timing},
     };
     let mut world = Simulator::new(WorldOptions {
         seed: 1,
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             placement: Placement::default(),
         },
     })?;
-    let mut bot = Forager::new(PolicyId::default());
+    let mut bot = Forager::new();
     let timing = Timing::default(); // Explicit zero observation/command/processing delay.
     for _ in 0..200 {
         if !world.snakes()[0].alive {

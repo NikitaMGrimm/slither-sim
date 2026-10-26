@@ -114,7 +114,7 @@ at latency-model due times between ticks. OS scheduling and load affect delivery
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
 
-`bots.threads` runs background Forager clients using `PolicyId::default()`. Each
+`bots.threads` runs background Forager clients using A4-mean. Each
 decodes its slot's frames, decides every `decisionTicks × dt` with staggered phases, models processing delay,
 pings and rejoins after death. Each worker shares one stateless policy instance;
 its seats keep separate decoders, outboxes and sent histories. See [worker limits](configuration.md#hostconfig)

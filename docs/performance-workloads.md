@@ -75,13 +75,15 @@ API without it, the harness falls back to `observe_all`.
 
 ## Shared-policy workload
 
-`shared-forager-a1-8` is a separate local-only row. It runs eight synthetic sandbox
-clients with one shared A1 `ForagerBot`, then `step_all`. Its timed operation
+`shared-forager-a4-mean-8` is a separate local-only row. It runs eight synthetic sandbox
+clients with one shared A4-mean `ForagerBot`, then `step_all`. Its timed operation
 includes all decisions plus the six physics ticks and all returned frames;
 wire-record draining remains outside that interval. It uses modeled virtual
 processing only, resets the world after a death, and records the policy and
-resolved parameter-manifest hash in its catalog definition. `--trace` disables
-timing and retains actions, frames and wire records in order.
+original frozen parameter-manifest hash in its catalog definition. `--trace` disables
+timing and retains actions, frames and wire records in order. This replaces
+`shared-forager-a1-8`; historical measurements retain that identity and must not
+be compared as the same workload.
 
 Existing `-bot` rows still mean scripted wander plus step and observation; they
 do not time Forager. Legacy and client-admission rows retain their controllers
@@ -293,7 +295,7 @@ Each invocation starts fresh; `--iterations N` runs one to eight same-seed world
 `step_all` controls every playing slot, while `next_frame` controls slot zero and
 lets built-in Foragers drive the rest. The modes do different work, so compare
 only runs with matching mode, configuration, seed and decision count. `next_frame`
-follows `PolicyId::default()` and its live traces can differ from historical seeker runs; those
+uses A4-mean and its live traces can differ from historical seeker runs; those
 runs are not a behavior-preserving comparison. There are no sockets, listeners,
 `BotRunner` or compute-time feedback into virtual time.
 
