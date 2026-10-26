@@ -16,8 +16,8 @@ envelope (also pinned with removed-field requests in `client-contract-v2.json`)
 and the geometric `slither-sim-json-v5` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
-[`serve-errors-v4.json`](serve-errors-v4.json) pins the geometric controller's
-`slither-sim-json-v4` error envelope and a synthetic overflow reproducer for
+[`serve-errors-v5.json`](serve-errors-v5.json) pins the geometric controller's
+`slither-sim-json-v5` error envelope and a synthetic overflow reproducer for
 Rust/Python lifecycle tests. Without a wire protocol or client-frame contract,
 it stays outside this inventory. Error text is illustrative; tests check literal
 protocol and `sessionEnded` independently of runtime defaults.
@@ -173,12 +173,10 @@ fixtures keep original provenance. Export checks gzip completion/window coverage
 not full capture/study integrity, and labels that limit. Audit the study
 separately before treating derivatives as evidence.
 
-`serve-errors-v4.json` is the current geometric error-envelope fixture;
-`serve-errors-v3.json` is retained for the released historical contract.
-`serve-radius-v4.json` is a synthetic initial/live radius split fixture shared
-by Rust transport, C and Python tests; it includes time-zero and next-tick samples.
-
-`serve-errors-v5.json` pins structured cause codes/locations and lifecycle.
-`serve-radius-v5.json` retains the initial/live radius regression under v5;
+`serve-errors-v5.json` is the current geometric error-envelope fixture and
+pins structured cause codes/locations and lifecycle. `serve-radius-v5.json` is
+a synthetic initial/live radius split fixture shared by Rust transport, C and
+Python tests; it includes time-zero and next-tick samples.
 `serve-rules-v5.json` is a synthetic customized rules fixture shared across Rust,
-C and Python. The v3/v4 fixtures remain unchanged as historical contracts.
+C and Python. `serve-errors-v3.json`, `serve-errors-v4.json` and
+`serve-radius-v4.json` stay unchanged for the released historical contracts.

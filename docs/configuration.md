@@ -252,9 +252,9 @@ requests, see [hosting](raw-server.md#presets) and
 
 Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
-Rust `Observation` omits the rolling score. Geometric frames and portable
-`ClientFrame` omit pit geometry and the floor setting; retain world config
-separately. Portable clients receive per-life kills and the size-based
+Rust `Observation` omits the rolling score. Geometric frames carry pit
+geometry and the floor setting in [`rules`](bot-api.md#frames); `Observation`
+and portable `ClientFrame` omit them, so retain world config separately. Portable clients receive per-life kills and the size-based
 leaderboard, without rolling kill score or distinct pit death reason.
 The stock browser shows the pit edge as a ring of 749 decorative pellets:
 centers 3 units outside the pit, about 15 units apart, palette 8, size byte 31

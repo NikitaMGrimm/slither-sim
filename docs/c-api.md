@@ -56,7 +56,7 @@ return 0; reset the usable handle before reading frames or stepping again.
 | `SLITHER_OK` (0) | Success. |
 | `SLITHER_REJECTED` (1) | The session rejected the call, for example a step before reset, and changed nothing. |
 | `SLITHER_INVALID` (2) | A required pointer was null; nothing changed. Arrays may be null when their length is 0. |
-| `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_last_error` and `slither_session_free` remain valid. |
+| `SLITHER_PANICKED` (3) | An internal error. Panics never unwind into the caller; only `slither_last_error`, `slither_read_error` and `slither_session_free` remain valid. |
 | `SLITHER_ENDED` (4) | Advancement failed and cleared every world; reset to continue. |
 
 ## Frames

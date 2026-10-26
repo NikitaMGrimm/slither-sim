@@ -2,14 +2,16 @@
 use crate::{BoundaryMode, ErrorKind, SimError, Simulator};
 use serde::Serialize;
 
+// Fields stay in alphabetical wire order: the canonical JSON writer otherwise
+// sorts them through scratch space on every encoded frame.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldRules {
     pub boundary_mode: BoundaryMode,
-    pub pit_radius: Option<f64>,
-    pub min_score: Option<u32>,
-    pub kill_score_seconds: Option<f64>,
     pub free_boost_at_floor: bool,
+    pub kill_score_seconds: Option<f64>,
+    pub min_score: Option<u32>,
+    pub pit_radius: Option<f64>,
 }
 
 /// Rules and the requesting slot's rolling score for a raw geometric bot driver.
@@ -25,10 +27,10 @@ impl Simulator {
         let config = self.config();
         WorldRules {
             boundary_mode: config.boundary_mode,
-            pit_radius: config.pit.as_ref().map(|pit| pit.radius),
-            min_score: config.min_score,
-            kill_score_seconds: config.kill_score_seconds,
             free_boost_at_floor: config.min_score.is_some(),
+            kill_score_seconds: config.kill_score_seconds,
+            min_score: config.min_score,
+            pit_radius: config.pit.as_ref().map(|pit| pit.radius),
         }
     }
 

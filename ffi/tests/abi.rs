@@ -165,18 +165,21 @@ fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
     use std::process::Command;
     let mut source = String::from("#include <stddef.h>\n#include \"slither_sim.h\"\n");
     source.push_str(&format!(
-        "_Static_assert(sizeof(slither_frame) == {}, \"size\");\n",
-        size_of::<SlitherFrame>()
+        "_Static_assert(sizeof(slither_frame) == {}, \"size\");\n\
+         _Static_assert(_Alignof(slither_frame) == {}, \"align\");\n",
+        size_of::<SlitherFrame>(),
+        align_of::<SlitherFrame>()
     ));
     for (name, offset, _) in rust {
         source.push_str(&format!(
             "_Static_assert(offsetof(slither_frame, {name}) == {offset}, \"{name}\");\n"
         ));
     }
-    for (c_type, size, fields) in [
+    for (c_type, size, align, fields) in [
         (
             "slither_world_rules",
             size_of::<SlitherWorldRules>(),
+            align_of::<SlitherWorldRules>(),
             vec![
                 (
                     "boundary_mode",
@@ -194,6 +197,7 @@ fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
         (
             "slither_error",
             size_of::<SlitherError>(),
+            align_of::<SlitherError>(),
             vec![
                 ("code", offset_of!(SlitherError, code)),
                 ("rule", offset_of!(SlitherError, rule)),
@@ -206,7 +210,8 @@ fn compile_layout_assertions(rust: &[(&str, usize, &str)]) {
         ),
     ] {
         source.push_str(&format!(
-            "_Static_assert(sizeof({c_type}) == {size}, \"{c_type} size\");\n"
+            "_Static_assert(sizeof({c_type}) == {size}, \"{c_type} size\");\n\
+             _Static_assert(_Alignof({c_type}) == {align}, \"{c_type} align\");\n"
         ));
         for (name, offset) in fields {
             source.push_str(&format!(
