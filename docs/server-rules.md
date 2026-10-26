@@ -15,10 +15,16 @@ sandbox defaults and overrides. Neither is an exact official replica.
 size-floor, free-boost and food-budget rules and synthetic regressions. These
 are design choices, not official-server measurements.
 
-The held radius, food admission limits, prey population, kiosk penalty and rim
+The seat-following radius, food admission limits, prey population, kiosk penalty and rim
 sliding are provisional. In particular:
 
 - For measured radius replay, use [recorded samples](configuration.md#world-config).
+- Default official and host worlds follow occupied seats (living snakes and
+  those waiting to respawn), outside a 3% dead zone. The arena grows at once
+  when players join and shrinks at 23.4375 units/s when they leave; food and
+  prey targets follow its area. This is our design, not an identified official
+  law, and it does not reproduce official multi-minute waves; see the
+  [decision](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md).
 - [Food admission limits](configuration.md#food-admission-limits) count all origins
   toward occupancy, with origin-specific caps.
 - The [prey target](configuration.md#official-and-sandbox) is a density assumption,
@@ -42,7 +48,7 @@ repeating measurements may require those local-only archives.
 | Pickup | `circle_pickup.rs`, `pickup_events.rs`; `boost-circle-food.json` | Selected behavior, not complete coverage. |
 | Death food | `death_food.rs`; `death-food.json`, `death-food-prospective.json`, `death-jitter-fresh.json` | Scatter fits retain count gaps and held-out exceptions. |
 | Food density | `ambient_food.rs`, `boost_food.rs`, `death_food.rs` | Received occupancy cannot isolate generation from delivery filtering. |
-| Boundary/radius | `boundary.rs`; `boundary-contact.json`, `arena-radius-updates.json` | Sliding is fitted; recorded radius traces are stronger than the population law. |
+| Boundary/radius | `boundary.rs`, `seat_radius.rs`; `boundary-contact.json`, `arena-radius-updates.json`, `arena-seat-following-v2.json` | Sliding is fitted; seat-following is a synthetic product model. Recorded traces remain unchanged. |
 | Prey | `prey.rs`, `prey_outward.rs`, `prey_decisions.rs`, `prey_activation.rs`; `prey-*.json` | Speeds constrained; steering, population and outward departure trigger remain approximate. |
 | Kiosk | `kiosk.rs` and core unit tests | Historical model; current official applicability unverified. |
 
@@ -159,23 +165,24 @@ are models. Recipient arrivals/occupancy cannot identify rejected generation,
 global counts or startup seeding. A matched-sector check rejected the earlier
 ambient-replacement association; it supplies no refill retuning.
 
-The opt-in radius controller contradicts retained observations. In
+The radius model's shrink rate is not an official bound. In
 `run4-radius-long-20260927/bot0.jsonl.gz` (SHA-256
 `3180b8201f51d5f4fe9732b6c69e85bab8ce49448742a2a72cfd228ef60613ef`),
 connection 4, server time 292,116→292,243 ms, radius grows 13,940→13,947 faster than
-the model's expansion cap. The replacement is unidentified; replay recorded
+the former model's expansion cap. The official controller is unidentified;
+replay recorded
 `radiusUpdates` with `dynamicRadius: false` rather than adopting the fastest
 observed slope as a cap. The retrospective, exploratory
 [radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md)
 finds sustained official waves (12,926–14,611 units over about 400 s at 447–505
-reported players), versus frequent death/respawn reversals in the local
-controller. Forecast-origin holding (the first usable-count radius, not the
+reported players), versus frequent death/respawn reversals in the historical
+living-count controller. Forecast-origin holding (the first usable-count radius, not the
 setup radius) beats the reported-count controller in
 94/114 connection forecasts (mean MAE 211 versus 520 units), but loses in 20 and
 suppresses real waves. No tested population, EMA, clock or load proxy identifies
-the official controller, so official worlds hold their
-[population-sized](configuration.md#population-sizing) starting radius and the
-old living-population controller is an unfaithful opt-in.
+the official controller. Default worlds now follow occupied seats as a
+[product decision](configuration.md#population-sizing); the old living-count
+controller is removed. The study's historical results do not validate this model.
 
 ## Movement and geometry
 

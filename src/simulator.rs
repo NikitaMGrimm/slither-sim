@@ -141,21 +141,22 @@ impl Preset {
 pub struct Config {
     /// Initial boundary radius. Runtime updates are reported by `Simulator::radius`.
     pub radius: f64,
-    /// Opt into the provisional living-population controller; not faithful to
-    /// official radius waves. Disabled by default; see
+    /// Follow occupied seats: grow at once, shrink gradually, with a 3% dead zone.
+    /// Scale ecology with live area. A product model, not an identified official law; see
     /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
     pub dynamic_radius: bool,
     /// Runtimes enlarge this arena to fit their population at creation, scaling
     /// food with area. Explicit JSON `radius` opts out unless `sizeToPopulation`
-    /// is also supplied; Rust callers choosing a fixed radius set this to false.
+    /// is also supplied; a fixed Rust radius disables this and `dynamic_radius`.
     pub size_to_population: bool,
     pub vision: f64,
-    /// Refill target; counts ambient pellets unless `ambient_refill_counts_all_food`.
+    /// Initial-area refill target; counts ambient pellets unless
+    /// `ambient_refill_counts_all_food`. Seat-following scales it with live area.
     pub food_count: usize,
     /// Count every pellet toward the refill target. A custom ecology choice,
     /// enabled by Battledome; independent of a snake's size floor.
     pub ambient_refill_counts_all_food: bool,
-    /// Ambient placement attempts per simulated second while below food_count.
+    /// Initial-area ambient attempts/s below target; seat-following scales this rate.
     pub ambient_replenish_per_second: f64,
     /// Physics step. The server loop is ~7 ms; larger steps trade event resolution for speed.
     pub dt: f64,
@@ -271,6 +272,7 @@ impl<'de> Deserialize<'de> for Config {
         // Preserve custom radii without changing the preset's other defaults.
         // Serialized configs include the flag, so resolved round trips retain it.
         let explicit_radius = fields.contains_key("radius");
+        let explicit_dynamic_radius = fields.contains_key("dynamicRadius");
         let explicit_population_sizing = fields.contains_key("sizeToPopulation");
         let fields = match fields.remove("preset") {
             None => fields,
@@ -289,6 +291,9 @@ impl<'de> Deserialize<'de> for Config {
             ConfigWire::deserialize(Value::Object(fields)).map_err(D::Error::custom)?;
         if explicit_radius && !explicit_population_sizing {
             config.size_to_population = false;
+        }
+        if explicit_radius && !explicit_dynamic_radius {
+            config.dynamic_radius = false;
         }
         Ok(config)
     }
@@ -331,32 +336,50 @@ fn official_prey(radius: f64) -> usize {
     (PI * radius * radius / 10_000_000.0).round().max(1.0) as usize
 }
 impl Config {
-    /// Startup capacity policy, independent of later boundary motion. Holding
-    /// the selected radius avoids death jitter but omits real official waves:
+    /// Startup capacity policy, independent of later boundary motion:
     /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
     pub(crate) fn size_for_population(&mut self, population: usize) {
         let radius = population_radius(population);
         if self.size_to_population && self.radius > 0. && self.radius < radius {
-            let area = (radius / self.radius).powi(2);
-            // The official prey target floors at one, so scaling a one-snake
-            // world's single prey by area would overshoot its density.
-            self.prey.count = if self.prey.count == official_prey(self.radius) {
+            let (food, rate, prey) = self.ecology_at_radius(radius);
+            self.radius = radius;
+            self.food_count = food;
+            self.ambient_replenish_per_second = rate;
+            self.prey.count = prey;
+        }
+    }
+
+    /// Same density policy at startup and during seat-following motion. Preserve
+    /// custom targets, including zero. Official prey uses its density before
+    /// rounding/flooring, rather than multiplying the one-prey minimum by area.
+    pub(crate) fn ecology_at_radius(&self, radius: f64) -> (usize, f64, usize) {
+        if radius == self.radius {
+            return (
+                self.food_count,
+                self.ambient_replenish_per_second,
+                self.prey.count,
+            );
+        }
+        let area = (radius / self.radius).powi(2);
+        let scale = |value: f64| if value == 0.0 { 0.0 } else { value * area };
+        (
+            scale(self.food_count as f64) as usize,
+            scale(self.ambient_replenish_per_second),
+            if self.prey.count == official_prey(self.radius) {
                 official_prey(radius)
             } else {
-                (self.prey.count as f64 * area).round() as usize
-            };
-            self.radius = radius;
-            self.food_count = (self.food_count as f64 * area) as usize;
-            self.ambient_replenish_per_second *= area;
-        }
+                scale(self.prey.count as f64).round() as usize
+            },
+        )
     }
 
     /// Best-current official-server approximation, initialized for `snakes`.
     /// Includes provisional models; this is not an identified server preset.
-    /// Holds a population-sized initial radius; this practical baseline omits
-    /// real official waves, whose controller remains unidentified. See
+    /// Starts population-sized, then follows occupied seats with a 3% dead zone.
+    /// This product model omits real official waves, whose controller remains
+    /// unidentified. See
     /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
-    /// Food uses the initial area. Prey uses an explicit
+    /// Food follows live area. Prey uses an explicit
     /// working estimate of one per ten million square units, with at least one.
     /// Received prey density does not establish a global census; see
     /// docs/configuration.md#official-and-sandbox.
@@ -365,7 +388,7 @@ impl Config {
         let (food_count, ambient_replenish_per_second) = official_food(radius);
         Self {
             radius,
-            dynamic_radius: false,
+            dynamic_radius: true,
             size_to_population: true,
             // A finite receipt approximation: the paired visibility census
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
@@ -681,9 +704,10 @@ fn check_ambient_rate(rate: f64, dt: f64) -> Result<(), SimError> {
 pub fn population_radius(snakes: usize) -> f64 {
     670.0 * (snakes.max(1) as f64).sqrt()
 }
-/// Local controller rate limit; later received expansions exceed this value.
+/// Local shrink rate limit; growth applies immediately outside the dead zone.
 /// It must not be applied to measured `radius_updates` replay.
 const RADIUS_RATE: f64 = 3.0 / 0.128;
+const RADIUS_DEAD_ZONE: f64 = 0.03;
 
 #[derive(Clone, Debug)]
 struct Random(u32);
@@ -772,6 +796,7 @@ pub struct Simulator {
     kill_times: Vec<VecDeque<f64>>,
     /// `config.min_score` as mass, converted when the world is created.
     min_mass: Option<MassFloor>,
+    /// Fractional refill credit in initial-area seconds, including during motion.
     ambient_clock: f64,
     prey_random: Random,
     next_prey_id: u64,
@@ -872,7 +897,16 @@ impl Simulator {
         // A zero cell limit rejects every candidate, so there is nothing to store.
         let ambient = &world.config.ambient_food;
         let admits = !ambient.enabled || ambient.max_per_cell > 0;
-        let startup = if admits { world.config.food_count } else { 0 };
+        let (food, _, prey) = if world.config.dynamic_radius {
+            world.config.ecology_at_radius(world.radius)
+        } else {
+            (
+                world.config.food_count,
+                world.config.ambient_replenish_per_second,
+                world.config.prey.count,
+            )
+        };
+        let startup = if admits { food } else { 0 };
         world.food.try_reserve(startup).map_err(|_| {
             SimError::new(
                 ErrorKind::AllocationFailed,
@@ -899,21 +933,18 @@ impl Simulator {
             }
         }
         world.food_cache.end();
-        world
-            .prey
-            .try_reserve(world.config.prey.count)
-            .map_err(|_| {
-                SimError::new(
-                    ErrorKind::AllocationFailed,
-                    format!(
-                        "prey count {} does not fit in memory",
-                        world.config.prey.count
-                    ),
-                )
-                .at_field("prey.count")
-            })?;
+        world.prey.try_reserve(prey).map_err(|_| {
+            SimError::new(
+                ErrorKind::AllocationFailed,
+                format!(
+                    "prey count {} does not fit in memory",
+                    world.config.prey.count
+                ),
+            )
+            .at_field("prey.count")
+        })?;
         // A new world has no prey, so IDs 0..count need no collision scan.
-        for _ in 0..world.config.prey.count {
+        for _ in 0..prey {
             world.push_prey();
         }
         Ok(())
@@ -1318,6 +1349,15 @@ impl Simulator {
     }
     pub fn living(&self) -> usize {
         self.snakes.iter().filter(|s| s.alive).count()
+    }
+    /// Living seats plus physics-dead seats waiting to respawn. Dormant and
+    /// explicitly retired slots are vacant; respawning reoccupies them.
+    pub fn occupied(&self) -> usize {
+        self.snakes
+            .iter()
+            .zip(&self.death_times)
+            .filter(|(snake, death)| snake.alive || death.is_some())
+            .count()
     }
     /// Advance one physics tick (`config.dt`, the 7 ms server loop by default).
     /// Actions use stable spawn slots; dead slots may be None. Rejected actions
@@ -1845,13 +1885,35 @@ impl Simulator {
             clock = Some(Instant::now());
         }
         let dt = self.config.dt;
-        let target = self.config.food_count;
+        let target = if self.config.dynamic_radius {
+            self.config.ecology_at_radius(self.radius).0
+        } else {
+            self.config.food_count
+        };
         let replenish = self.config.ambient_replenish_per_second;
+        // Store credit in initial-area seconds. Weight only this tick's earned
+        // credit by live area, so boundary motion never creates/discards credit
+        // and checkpoints need no previous-radius/controller state.
+        let refill_dt = if replenish > 0.0 && self.config.dynamic_radius {
+            dt * (self.radius / self.config.radius).powi(2)
+        } else {
+            dt
+        };
         if replenish == 0.0 {
             self.ambient_clock = 0.0;
+        } else if !(self.ambient_clock + refill_dt).is_finite()
+            || check_ambient_rate(replenish, refill_dt).is_err()
+        {
+            self.failure.get_or_insert_with(|| {
+                SimError::new(
+                    ErrorKind::NumericOverflow,
+                    "Live-area ambient refill cannot advance its clock safely",
+                )
+                .at_field("ambientReplenishPerSecond")
+            });
         } else {
             let interval = 1.0 / replenish;
-            self.ambient_clock += dt;
+            self.ambient_clock += refill_dt;
             if self.ambient_clock + 1e-12 >= interval {
                 let mut refill_count = if self.config.ambient_refill_counts_all_food {
                     self.food.len()
@@ -1898,16 +1960,33 @@ impl Simulator {
         self.buffers = buffers;
     }
     fn update_radius(&mut self, time: f64) {
-        // Provisional opt-in only: death/respawn jitter differs from official
-        // sustained waves. research/fidelity/2026-10-26-arena-radius/REPORT.md
+        // Product/feel model, not an identified official law. Occupied seats
+        // avoid death/respawn jitter; the stateless dead zone absorbs small churn.
+        // research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md
+        let previous = self.radius;
         if self.config.dynamic_radius {
-            let target = population_radius(self.living());
-            let step = RADIUS_RATE * self.config.dt;
-            self.radius += (target - self.radius).clamp(-step, step);
+            let target = population_radius(self.occupied());
+            if (target - self.radius).abs() > RADIUS_DEAD_ZONE * self.radius {
+                // Expansion gives joining players room without a multi-minute
+                // wait. Shrink stays slower than ordinary snake movement.
+                self.radius = if target > self.radius {
+                    target
+                } else {
+                    (self.radius - RADIUS_RATE * self.config.dt).max(target)
+                };
+            }
         }
         // Tick comparisons retain their tolerance; construction uses exact zero
         // so a near-future recorded sample cannot affect the initial frame.
         self.apply_radius_updates(time + 1e-9);
+        if self.config.dynamic_radius && self.radius < previous {
+            // Stranded pellets must not suppress live-area refill. Fixed replay
+            // keeps its historical retention; all food origins leave with this
+            // model's wall. The food cache resynchronizes at the next begin().
+            // Use squared distances except at numerically ambiguous boundaries.
+            self.food
+                .retain(|f| f.point().distance_lt(Point::default(), self.radius));
+        }
     }
 
     fn apply_radius_updates(&mut self, through: f64) {
@@ -2048,7 +2127,17 @@ impl Simulator {
     fn advance_prey(&mut self, previous: &[Point], buffers: &mut PreyBuffers) {
         let c = &self.config;
         let p = &c.prey;
-        let below_target = self.prey.len() < p.count;
+        let target = if c.dynamic_radius {
+            c.ecology_at_radius(self.radius).2
+        } else {
+            p.count
+        };
+        // A shrinking model arena must not retain its old population compressed
+        // against the rim. Stable insertion order makes surplus removal deterministic.
+        if c.dynamic_radius {
+            self.prey.truncate(target);
+        }
+        let below_target = self.prey.len() < target;
         // A full population carries no saved replenishment credit.
         if !below_target {
             self.prey_clock = 0.0;
@@ -2076,7 +2165,7 @@ impl Simulator {
             .retain(|id, _| live_ids.contains(id));
         self.prey_outward.retain(|id| live_ids.contains(id));
         // The global motion-tick phase above survives empty periods.
-        if self.prey.is_empty() && p.count == 0 {
+        if self.prey.is_empty() && target == 0 {
             return;
         }
         // The same pickup circle as food. Eating prey changes only mass, so each
@@ -2264,7 +2353,7 @@ impl Simulator {
                 true
             }
         });
-        if self.prey.len() >= p.count {
+        if self.prey.len() >= target {
             self.prey_clock = 0.0;
         } else if below_target {
             // Provisional population policy: credit starts AFTER the tick that
@@ -2272,14 +2361,14 @@ impl Simulator {
             self.prey_clock += c.dt;
             // Spend all due intervals. The deficit bounds work even when a tiny
             // interval is too small to change the floating-point clock.
-            for _ in self.prey.len()..p.count {
+            for _ in self.prey.len()..target {
                 if self.prey_clock < self.config.prey.respawn_seconds {
                     break;
                 }
                 self.prey_clock -= self.config.prey.respawn_seconds;
                 self.spawn_prey();
             }
-            if self.prey.len() >= self.config.prey.count {
+            if self.prey.len() >= target {
                 self.prey_clock = 0.0;
             }
         }

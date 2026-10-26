@@ -180,3 +180,8 @@ Python tests; it includes time-zero and next-tick samples.
 `serve-rules-v5.json` is a synthetic customized rules fixture shared across Rust,
 C and Python. `serve-errors-v3.json`, `serve-errors-v4.json` and
 `serve-radius-v4.json` stay unchanged for the released historical contracts.
+
+`arena-seat-following-v2.json` is a synthetic rules-v2 mechanics fixture, outside
+the wire/client inventory. Its 500→100 shrink ticks, duration and final radius
+come from the stated scalar formula, not from regenerated simulator output.
+The measured `arena-radius-updates.json` fixture and historical study stay intact.

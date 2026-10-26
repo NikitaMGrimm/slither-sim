@@ -19,6 +19,16 @@
   `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`). The
   `cautious_bot` example is now `forager` and keeps only its core-observation
   path; `portable_bot` runs the policy on received frames.
+- Official and host arenas follow occupied seats by default (`dynamicRadius`
+  is now true). Joins and leaves move the wall; deaths and respawns don't. It
+  grows at once when players join and shrinks at 23.4375 units/s when they
+  leave, ignoring changes within 3% of the current radius. Hosts start sized
+  for their bots instead of every reserved seat. Food and prey targets follow
+  the live area; a shrinking wall removes the food outside it and surplus prey.
+  This is our design, not a recovered official law, and it replaces the
+  living-count controller. Checkpoints stay `slither-sim-checkpoint-v2`; the
+  rules revision becomes `slither-sim-rules-v2`, so v1 checkpoints are rejected
+  ([population sizing](docs/configuration.md#population-sizing)).
 - Config `radius` now retains the initial, population-sized setting; the live
   boundary is runtime state exposed by `Simulator::radius()`, frames and a new
   snapshot `radius` field. Checkpoints use

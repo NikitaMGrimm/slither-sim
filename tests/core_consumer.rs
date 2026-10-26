@@ -475,6 +475,7 @@ fn refill_world(rate: f64) -> Simulator {
     {
         let mut config = world.config().clone();
         config.dt = 0.01;
+        config.dynamic_radius = false;
 
         config.food_count = 100;
 
@@ -545,7 +546,7 @@ fn refill_setter_rejections_same_rate_and_zero_have_defined_state_effects() {
 }
 
 #[test]
-fn radius_evolution_preserves_initial_config_and_fixed_ecology_for_500_ticks() {
+fn radius_evolution_preserves_initial_config_for_500_ticks() {
     for dynamic_radius in [false, true] {
         let config = Config {
             dynamic_radius,
@@ -587,9 +588,13 @@ fn radius_evolution_preserves_initial_config_and_fixed_ecology_for_500_ticks() {
         assert_eq!(world.radius(), expected);
         for _ in 0..500 {
             let through = world.time() + config.dt + 1e-9;
-            if dynamic_radius {
+            if dynamic_radius && (670. - expected).abs() > 0.03 * expected {
                 let step = 23.4375 * config.dt;
-                expected += (670. - expected).clamp(-step, step);
+                expected = if expected < 670. {
+                    670.
+                } else {
+                    (expected - step).max(670.)
+                };
             }
             while let Some(update) = config
                 .radius_updates

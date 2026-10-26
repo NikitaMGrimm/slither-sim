@@ -53,7 +53,7 @@ fn omitted_world_settings_select_the_official_baseline() {
 fn official_baseline_enables_current_models_and_nonzero_prey() {
     let config = Config::default();
     assert_eq!(config.radius, 670.);
-    assert!(!config.dynamic_radius);
+    assert!(config.dynamic_radius);
     assert!(config.size_to_population);
     assert_eq!(config.food_count, 109);
     assert!((config.ambient_replenish_per_second - 1.6045635608990811).abs() < 1e-12);
@@ -112,7 +112,7 @@ fn sandbox_changes_scene_size_and_population_settings_only() {
 }
 
 #[test]
-fn opted_in_radius_tracks_living_snakes_but_sandbox_stays_fixed() {
+fn official_radius_tracks_occupied_seats_but_sandbox_stays_fixed() {
     let mut config = Config::official(4);
     config.dynamic_radius = true;
     config.food_count = 0;
@@ -151,7 +151,7 @@ fn opted_in_radius_tracks_living_snakes_but_sandbox_stays_fixed() {
 
 #[test]
 fn official_radius_holds_across_death_and_respawn() {
-    let mut config = Config::official(4);
+    let mut config = Config::official(1);
     config.food_count = 0;
     config.ambient_replenish_per_second = 0.;
     config.prey.count = 0;
@@ -166,7 +166,7 @@ fn official_radius_holds_across_death_and_respawn() {
     })
     .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert_eq!(world.config().radius, radius);
+    assert_eq!(world.radius(), radius);
     world.retire(0).unwrap();
     world
         .respawn(
@@ -181,14 +181,14 @@ fn official_radius_holds_across_death_and_respawn() {
         .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
     assert!(!world.snakes()[0].alive);
-    assert_eq!(world.config().radius, radius);
+    assert_eq!(world.radius(), radius);
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
     world
         .respawn(0, slither_sim::Point::default(), 0., 2)
         .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
     assert!(world.snakes()[0].alive);
-    assert_eq!(world.config().radius, radius);
+    assert_eq!(world.radius(), radius);
 }
 
 #[test]

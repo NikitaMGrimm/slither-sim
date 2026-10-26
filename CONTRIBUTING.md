@@ -133,6 +133,12 @@ and the JSON contract fixture. Keep units, field meanings and lifecycle behavior
 consistent; readers ignore additional response fields. Physics changes can alter
 trajectories without changing the API.
 
+Tick behavior changes require a new checkpoint `rulesRevision`, even when JSON
+and ABI shapes are unchanged. Exact restore accepts only the current rules
+revision; retain explicit rejection tests for older revisions rather than
+silently continuing their state under new rules. Change the checkpoint format
+only when its serialized shape changes.
+
 The root `Cargo.toml`'s `[workspace.package]` owns the simulator version, inherited
 by the C ABI crate and Python package; `pyproject.toml` owns the tools version.
 Within `0.x`, incompatible Rust API changes bump the minor version. Group
