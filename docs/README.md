@@ -12,6 +12,7 @@ see [contributing](../CONTRIBUTING.md): setup, owners, focused tests and evidenc
 | Run `serve` sessions in-process from Python | [Python package](python.md) |
 | Run `serve` sessions in-process from C or another language | [C ABI](c-api.md) |
 | Host a shared world or connect the stock browser | [WebSocket server](raw-server.md) |
+| Run a public server on Linux | [Linux hosting](hosting.md) |
 | Choose world, timing and network settings | [Configuration](configuration.md) |
 | Run the custom Battledome mode | [Battledome](configuration.md#battledome) |
 | Understand implemented rules and approximations | [Mechanics and delivery limits](server-rules.md) |

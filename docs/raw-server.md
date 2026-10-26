@@ -91,22 +91,17 @@ by 14 ms of world time; at most one search runs per tick. Disconnected waiters
 are removed. A crowded world can wait indefinitely. Worlds without `spawnRadius`
 keep the official fallback and
 refusal behavior.
-With `sizeToPopulation`, the host arena starts sized for all seats
-(`players.max` plus `bots.count`); see [population sizing](configuration.md#population-sizing).
+With `sizeToPopulation`, the host arena starts sized for background bots;
+reserved, disconnected player seats do not enlarge it. See
+[population sizing](configuration.md#population-sizing).
 For Rust constructors and the default `Config::official(1)`, see
 [world settings](configuration.md#official-and-sandbox).
 
 ## VPS use
 
-Build on the VPS or copy a release executable for its platform:
-
-```sh
-slither-sim host --bind 0.0.0.0:8766 --config arena.json
-```
-
-The host serves plain `ws`. For `wss`, use a TLS reverse proxy forwarding
-WebSocket upgrades on `/slither`; HTTPS browser pages require `wss`.
-Game assets are not included.
+[Linux hosting](hosting.md) installs a release as a systemd service, with an
+optional TLS proxy for `wss`, upgrades and resource numbers. The host itself
+serves plain `ws`. Game assets are not included.
 
 The simulation thread owns the world, physics and per-tick encoding. A separate
 socket thread owns the listener and nonblocking connections, releasing frames
