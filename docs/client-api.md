@@ -3,8 +3,8 @@
 The simulator and WebSocket backends hand bots the same `ClientFrame`, decoded
 by the same Rust code, so one bot runs on both unchanged. See the
 [Rust](../examples/portable_bot.rs) and [Python](../examples/portable_bot.py)
-examples. The Rust portable and [cautious](../examples/cautious_bot.rs) runners
-use the same default `ForagerBot` as host bots and native background clients.
+examples. The Rust runner uses the same default `ForagerBot` as host bots and
+native background clients.
 The Python example retains its own simple policy.
 
 ## Interface versions
@@ -50,8 +50,9 @@ Cost and playing-strength qualification on the current runtime is still pending.
 The [frozen port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
 describes parameter identity, conformance targets and limits.
 
-The cautious example also runs directly from core observations with explicit
-zero timing: `cargo run --locked --no-default-features --features bot --example cautious_bot`.
+The [Forager example](../examples/forager.rs) runs the same policy directly
+from core observations with explicit zero timing:
+`cargo run --locked --no-default-features --features bot --example forager`.
 
 Headings are absolute radians: zero is +x, pi/2 is +y. Both backends quantize them
 to bytes 0–250, with separate boost-on/off commands.
