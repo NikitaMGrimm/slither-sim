@@ -10,7 +10,7 @@ Opened, updated and reopened PRs, including drafts and forks, run a comparison
 when they change a measured input. This workflow is separate from `Required checks`.
 
 The authoritative `paths` list in `pr-report.yml` covers simulator sources, Cargo
-manifests/build configuration, two measurement examples, selected regression tests
+manifests/build configuration, measurement examples, selected regression tests
 and fixtures, collector scripts (including imported `tools/` modules) and the
 workflow. `tools/test_pr_report.py` checks that coverage.
 
