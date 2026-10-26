@@ -455,5 +455,5 @@ measured range.
 | Host deadlines | upgrade 5 s, login 10 s, close 1 s | Connection lifecycle. |
 | Host catch-up | 8 ticks per poll, 0.25 s backlog | World time defers rather than bursts. |
 | Decoder retention | 4,096 snakes, 65,536 body points (4,096 per snake), 131,072 food | A broken server cannot grow received state without bound; dense worlds can reach these first. |
-| Spawn attempts | 64 draws per spawn | The spawn is deferred, even if a clear pose exists. |
+| Spawn attempts | 64 draws per spawn; 4,096 cached candidates with `spawnRadius` | An exhausted search defers the spawn even if a clear pose exists. With `spawnRadius`, the joiner waits for a later search. |
 | Network read floor | 1 ms per decision | A bot behind its schedule still reads its socket. |
