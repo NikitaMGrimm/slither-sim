@@ -33,6 +33,8 @@ This was the sole retry. Boost-on packets were recorded in both long legacy live
 
 Integers below are unsigned big-endian; widths are bits. `id` is 16, `fam` is 24.
 `xy16` means two 16-bit coordinates; appearance coordinates are 24-bit values divided by 5.
+In fixtures, decoded `own` marks wire 19's implicit self-ID form; wire 13 always
+carries an explicit ID, including the local snake's.
 Layouts/lengths are observed and checked by the independent offline decoder.
 Field meanings/scales and replacements are **interpretations (I)**, not hidden physics
 measurements or a complete specification.
