@@ -395,6 +395,15 @@ impl Config {
         }
     }
     pub fn validate(&self) -> Result<(), SimError> {
+        self.validate_against_radius(true)
+    }
+    /// A checkpoint stores the live radius in `radius`. Measured updates can
+    /// move it inside the spawn ring or pit after construction, so continuation
+    /// skips the placement checks against it.
+    pub(crate) fn validate_continuation(&self) -> Result<(), SimError> {
+        self.validate_against_radius(false)
+    }
+    fn validate_against_radius(&self, placement: bool) -> Result<(), SimError> {
         for (field, value) in [
             ("radius", self.radius),
             ("vision", self.vision),
@@ -451,13 +460,15 @@ impl Config {
         self.death_food.validate()?;
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
-        self.validate_mode()?;
+        self.validate_mode(placement)?;
         crate::boundary::validate(&self.radius_updates)
     }
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
-    fn validate_mode(&self) -> Result<(), SimError> {
+    fn validate_mode(&self, placement: bool) -> Result<(), SimError> {
         let pit = self.pit.as_ref().map(|pit| pit.radius);
-        if pit.is_some_and(|pit| !(pit > 0.0 && pit < self.radius)) {
+        if pit
+            .is_some_and(|pit| !(pit > 0.0 && pit.is_finite() && (!placement || pit < self.radius)))
+        {
             return Err(SimError::config(
                 Constraint::positive(pit.unwrap()).unwrap_or(Constraint::OutOfRange),
                 "pit.radius",
@@ -527,7 +538,8 @@ impl Config {
             let roundoff = crate::spawn::ring_roundoff(spawn);
             let lower = spawn - roundoff;
             let upper = spawn + roundoff;
-            let fits = upper < self.radius - SPAWN_WALL_MARGIN
+            let fits = spawn.is_finite()
+                && (!placement || upper < self.radius - SPAWN_WALL_MARGIN)
                 && pit.is_none_or(|pit| lower > pit.hypot(ANCHOR_SPACING / 2.0))
                 && crate::spawn::ring_step(lower, segments).is_some()
                 && crate::spawn::ring_step(upper, segments).is_some();
@@ -1652,7 +1664,9 @@ impl Simulator {
             self.snakes[i].alive = false;
             self.death_times[i] = Some(self.time);
             if let Some(k) = killer {
-                self.snakes[k].kills += 1;
+                // A restored checkpoint may carry any count, and one tick can
+                // credit several kills.
+                self.snakes[k].kills = self.snakes[k].kills.saturating_add(1);
                 if self.config.kill_score_seconds.is_some() {
                     self.kill_times[k].push_back(self.time);
                 }

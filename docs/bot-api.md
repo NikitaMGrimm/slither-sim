@@ -280,7 +280,9 @@ The envelope is `slither-sim-checkpoint-v1`, with
 `rulesRevision: "slither-sim-rules-v1"`, producer provenance, today's flat Config
 and ordered slot/entity records. It includes RNG, timers and terminal causes;
 debug `snapshot` replies and old Simulator JSON are rejected. Unknown fields and
-missing companion records reject. Producer version/commit do not select rules.
+missing companion records reject, as do snake or food coordinates, radii and one
+tick of snake travel above 1e150, which would overflow later steps. The live
+radius may lie inside the initial spawn ring or pit after measured updates. Producer version/commit do not select rules.
 `RestoreOptions` chooses `EventRecording { pickups, food_births }` and, with the
 parallel feature, `parallel`; event buffers start empty and caches are rebuilt.
 Sessions, sockets and host/client delivery are outside the format.

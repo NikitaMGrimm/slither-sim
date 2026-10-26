@@ -412,9 +412,18 @@ fn positive(value: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
     require(value > 0., Constraint::NonPositive, field)
 }
+/// Largest accepted coordinate, radius and one tick of travel. Boundaries then
+/// keep points within about twice this, so differences and squared distances
+/// stay finite. Individually finite values near f64::MAX overflow on the next
+/// step instead.
+const MAGNITUDE: f64 = 1e150;
+fn bounded(value: f64, field: &str) -> Result<(), SimError> {
+    finite(value, field)?;
+    require(value.abs() <= MAGNITUDE, Constraint::OutOfRange, field)
+}
 fn position(p: Position, field: &str) -> Result<(), SimError> {
-    finite(p.x, &format!("{field}.x"))?;
-    finite(p.y, &format!("{field}.y"))
+    bounded(p.x, &format!("{field}.x"))?;
+    bounded(p.y, &format!("{field}.y"))
 }
 fn timestamp(value: f64, time: f64, field: &str) -> Result<(), SimError> {
     nonnegative(value, field)?;
@@ -518,7 +527,9 @@ impl Simulator {
             "state.prey.mode",
         )?;
         // Validate Config before its JSON serialization can turn NaN into null.
-        self.config.validate().map_err(checkpoint_config_error)?;
+        self.config
+            .validate_continuation()
+            .map_err(checkpoint_config_error)?;
         let config = self.config.clone();
         let mut slots = Vec::new();
         reserve(&mut slots, n, "state.slots")?;
@@ -660,7 +671,7 @@ impl Simulator {
         let envelope: Envelope = decode(bytes)?;
         envelope
             .config
-            .validate()
+            .validate_continuation()
             .map_err(checkpoint_config_error)?;
         let canonical = ConfigRecord::serialize(&envelope.config, serde_json::value::Serializer)
             .map_err(|e| invalid(Constraint::InconsistentState, "config", e.to_string()))?;
@@ -697,6 +708,10 @@ impl State {
         nonnegative(self.time, "state.time")?;
         finite(self.time + config.dt, "state.time")?;
         positive(self.radius, "state.radius")?;
+        bounded(self.radius, "state.radius")?;
+        for (i, update) in config.radius_updates.iter().enumerate() {
+            bounded(update.radius, &format!("config.radiusUpdates[{i}].radius"))?;
+        }
         let through = if self.time == 0. {
             0.
         } else {
@@ -842,8 +857,8 @@ impl State {
         }
         for (i, food) in self.food.iter().enumerate() {
             let path = format!("state.food[{i}]");
-            finite(food.x, &format!("{path}.x"))?;
-            finite(food.y, &format!("{path}.y"))?;
+            bounded(food.x, &format!("{path}.x"))?;
+            bounded(food.y, &format!("{path}.y"))?;
             nonnegative(food.value, &format!("{path}.value"))?;
             if let Some(size) = food.size {
                 nonnegative(size, &format!("{path}.size"))?;
@@ -857,7 +872,9 @@ impl State {
                 Constraint::Duplicate,
                 &format!("{path}.id"),
             )?;
-            position(prey.position, &format!("{path}.position"))?;
+            // Prey motion has its own stopped path for overflow.
+            finite(prey.position.x, &format!("{path}.position.x"))?;
+            finite(prey.position.y, &format!("{path}.position.y"))?;
             finite(prey.heading, &format!("{path}.heading"))?;
             finite(prey.target_heading, &format!("{path}.targetHeading"))?;
             nonnegative(prey.speed, &format!("{path}.speed"))?;
@@ -1076,20 +1093,17 @@ impl Slot {
             Constraint::OutOfRange,
             "snake.segments",
         )?;
-        require(
-            s.kills.checked_add(1).is_some(),
-            Constraint::OutOfRange,
-            "snake.kills",
-        )?;
         position(s.head, "snake.head")?;
         for (i, &p) in s.body.iter().enumerate() {
             position(p, &format!("snake.body[{i}]"))?;
         }
         finite(s.heading, "snake.heading")?;
         nonnegative(s.speed, "snake.speed")?;
+        bounded(s.speed * config.dt, "snake.speed")?;
         nonnegative(s.fam, "snake.fam")?;
         finite(s.segments as f64 + s.fam, "snake.fam")?;
         nonnegative(self.speed.speed, "speed.speed")?;
+        bounded(self.speed.speed * config.dt, "speed.speed")?;
         finite(self.speed.progress, "speed.progress")?;
         require(
             (0. ..=1.).contains(&self.speed.progress),

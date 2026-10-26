@@ -3,6 +3,7 @@ use slither_sim::{
     Action, Config, Constraint, CoreStepError, ErrorKind, EventRecording, Food, Point, PreyMode,
     RadiusUpdate, RestoreOptions, Simulator, WorldStatus, physics,
 };
+use std::f64::consts::{FRAC_PI_2, PI};
 
 fn options() -> RestoreOptions {
     RestoreOptions {
@@ -192,7 +193,7 @@ fn malformed_state_versions_and_unknown_fields_reject_atomically() {
         ("/state/slots/0/deathTime", json!(1.)),
         ("/state/slots/0/killTimes", json!([1., 0.])),
         ("/state/slots/0/snake/segments", json!(usize::MAX)),
-        ("/state/slots/0/snake/kills", json!(usize::MAX)),
+        ("/state/slots/0/speed/speed", json!(f64::MAX)),
         ("/state/slots/0/snake/length", json!(999)),
         ("/state/slots/0/snake/score", json!(999)),
         ("/state/slots/0/snake/radius", json!(999)),
@@ -626,6 +627,14 @@ fn export_rejects_invalid_public_edits_and_orphan_prey_controls() {
         |w| w.snakes[0].body.clear(),
         |w| w.snakes[1].id = w.snakes[0].id.clone(),
         |w| w.food[0].x = f64::INFINITY,
+        // Finite but large enough to overflow continuation arithmetic.
+        |w| w.food[0].x = 1e200,
+        |w| w.snakes[0].speed = 1e200,
+        |w| {
+            let s = &mut w.snakes[0];
+            s.body[1].x = 1e200;
+            Simulator::update_mass(s);
+        },
         |w| w.prey[0].size = 0.,
         |w| w.config.dt = -1.,
         |w| {
@@ -641,6 +650,87 @@ fn export_rejects_invalid_public_edits_and_orphan_prey_controls() {
             ErrorKind::InvalidCheckpoint { .. }
         ));
     }
+}
+
+#[test]
+fn restored_kill_counts_saturate_when_one_tick_credits_several() {
+    let mut world = Simulator::new(
+        7,
+        Config {
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            ..Config::sandbox()
+        },
+    )
+    .unwrap();
+    for i in 0..3 {
+        world.add(i.to_string(), i, 3).unwrap();
+    }
+    // Two heads beside the third snake's body, both lethal next tick.
+    for (i, y) in [(0, 0.), (1, 84.)] {
+        let s = &mut world.snakes[i];
+        s.head = Point { x: 0., y };
+        s.heading = PI;
+        s.body = vec![s.head; 30];
+        s.segments = 30;
+        Simulator::update_mass(s);
+    }
+    let s = &mut world.snakes[2];
+    s.head = Point { x: -25., y: 342. };
+    s.heading = FRAC_PI_2;
+    s.body = (0..11)
+        .map(|i| Point {
+            x: -25.,
+            y: 300. - 42. * i as f64,
+        })
+        .collect();
+    s.segments = 11;
+    Simulator::update_mass(s);
+    let mut source = value(&world);
+    source["state"]["slots"][2]["snake"]["kills"] = json!(usize::MAX - 1);
+    let mut world = Simulator::from_checkpoint(&bytes(&source), options()).unwrap();
+    let actions: Vec<_> = world
+        .snakes
+        .iter()
+        .map(|s| {
+            Some(Action {
+                heading: s.heading,
+                boost: false,
+            })
+        })
+        .collect();
+    world.step(&actions).unwrap();
+    let credited = |d: &&slither_sim::DeathEvent| d.killer.as_deref() == Some("2");
+    assert_eq!(world.deaths.iter().filter(credited).count(), 2);
+    assert_eq!(world.snakes[2].kills, usize::MAX);
+}
+
+#[test]
+fn live_radius_inside_the_initial_spawn_ring_still_checkpoints() {
+    let mut config = Config {
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        spawn_radius: Some(500.),
+        radius_updates: vec![RadiusUpdate {
+            time: 0.007,
+            radius: 550.,
+        }],
+        ..Config::sandbox()
+    };
+    config.kiosk.enabled = false;
+    let mut world = Simulator::new(7, config).unwrap();
+    world.add("a", 0, 1).unwrap();
+    let heading = world.snakes[0].heading;
+    world
+        .step(&[Some(Action {
+            heading,
+            boost: false,
+        })])
+        .unwrap();
+    assert_eq!(world.config.radius, 550.);
+    let saved = value(&world);
+    let restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+    assert_eq!(value(&restored), saved);
 }
 
 #[test]
