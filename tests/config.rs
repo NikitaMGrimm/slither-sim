@@ -156,11 +156,18 @@ fn official_radius_holds_across_death_and_respawn() {
     config.ambient_replenish_per_second = 0.;
     config.prey.count = 0;
     let radius = config.radius;
-    let mut world = Simulator::new(7, config).unwrap();
-    world.add("one", 0, 1).unwrap();
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["one".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert_eq!(world.config.radius, radius);
-    world.snakes[0].alive = false;
+    assert_eq!(world.config().radius, radius);
+    world.retire(0).unwrap();
     world
         .respawn(
             0,
@@ -173,15 +180,15 @@ fn official_radius_holds_across_death_and_respawn() {
         )
         .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert!(!world.snakes[0].alive);
-    assert_eq!(world.config.radius, radius);
+    assert!(!world.snakes()[0].alive);
+    assert_eq!(world.config().radius, radius);
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
     world
         .respawn(0, slither_sim::Point::default(), 0., 2)
         .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert!(world.snakes[0].alive);
-    assert_eq!(world.config.radius, radius);
+    assert!(world.snakes()[0].alive);
+    assert_eq!(world.config().radius, radius);
 }
 
 #[test]

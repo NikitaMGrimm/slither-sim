@@ -29,21 +29,21 @@ fn population_sized_backends_hold_across_death_and_respawn() {
         let config: SimulationConfig = serde_json::from_value(input).unwrap();
         let mut backend = SimulatorBackend::new(7, config).unwrap();
         assert_eq!(backend.config().world.radius, radius);
-        assert_eq!(backend.world.config.radius, radius);
-        assert!(!backend.world.config.dynamic_radius);
-        assert_eq!(backend.world.config.food_count, 109 * 40);
+        assert_eq!(backend.world.config().radius, radius);
+        assert!(!backend.world.config().dynamic_radius);
+        assert_eq!(backend.world.config().food_count, 109 * 40);
         assert_eq!(
-            backend.world.config.prey.count,
+            backend.world.config().prey.count,
             Config::official(40).prey.count
         );
         assert!(
-            (backend.world.config.ambient_replenish_per_second
+            (backend.world.config().ambient_replenish_per_second
                 - Config::default().ambient_replenish_per_second * 40.)
                 .abs()
                 < 1e-9
         );
-        for snake in &mut backend.world.snakes {
-            snake.alive = false;
+        for slot in 0..backend.world.snakes().len() {
+            backend.world.retire(slot).unwrap();
         }
         backend
             .world
@@ -59,12 +59,12 @@ fn population_sized_backends_hold_across_death_and_respawn() {
             .unwrap();
         backend.slots[0].control = Action::default();
         backend.advance_ticks(1).unwrap();
-        assert!(!backend.world.snakes[0].alive);
-        assert_eq!(backend.world.config.radius, radius);
+        assert!(!backend.world.snakes()[0].alive);
+        assert_eq!(backend.world.config().radius, radius);
         backend.reconnect_slot(0).unwrap();
         backend.advance_ticks(1).unwrap();
-        assert!(backend.world.snakes[0].alive);
-        assert_eq!(backend.world.config.radius, radius);
+        assert!(backend.world.snakes()[0].alive);
+        assert_eq!(backend.world.config().radius, radius);
     }
 }
 
@@ -77,7 +77,7 @@ fn backends_validate_spawn_rings_against_the_sized_arena() {
     // Outside the 670-unit start, inside 670 * sqrt(40), about 4,237 units.
     config.world.spawn_radius = Some(2000.);
     let backend = SimulatorBackend::new(7, config.clone()).unwrap();
-    assert_eq!(backend.world.config.radius, 670. * 40_f64.sqrt());
+    assert_eq!(backend.world.config().radius, 670. * 40_f64.sqrt());
     config.world.size_to_population = false;
     assert!(SimulatorBackend::new(7, config).is_err());
 }
@@ -99,7 +99,7 @@ fn fixed_backend_worlds_keep_their_radius_and_food_settings() {
         let expected = serde_json::to_value(&config.world).unwrap();
         let backend = SimulatorBackend::new(7, config).unwrap();
         assert_eq!(
-            serde_json::to_value(&backend.world.config).unwrap(),
+            serde_json::to_value(backend.world.config()).unwrap(),
             expected
         );
         assert_eq!(

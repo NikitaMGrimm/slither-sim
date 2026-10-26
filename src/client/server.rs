@@ -2207,14 +2207,21 @@ mod tests {
             config.food_count = 0;
             config.ambient_replenish_per_second = 0.;
             config.prey.count = 0;
-            let mut world = crate::Simulator::new(host.seed, config).unwrap();
-            world.add("one", 0, 1).unwrap();
+            let mut world = crate::Simulator::new(crate::WorldOptions {
+                seed: host.seed,
+                config,
+                population: crate::InitialPopulation::Placed {
+                    ids: vec!["one".into()],
+                    placement: crate::Placement::TestRing,
+                },
+            })
+            .unwrap();
             world.step(&[Some(Action::default())]).unwrap();
-            world.snakes[0].alive = false;
+            world.retire(0).unwrap();
             world.step(&[Some(Action::default())]).unwrap();
             world.respawn(0, crate::Point::default(), 0., 2).unwrap();
             world.step(&[Some(Action::default())]).unwrap();
-            assert_eq!(world.config.radius, radius);
+            assert_eq!(world.config().radius, radius);
         }
     }
 
