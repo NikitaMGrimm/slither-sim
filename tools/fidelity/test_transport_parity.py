@@ -395,6 +395,9 @@ class TransportParityTests(unittest.TestCase):
         reference["captures"][0]["viewStrata"] = dict(contract="unknown")
         with self.assertRaisesRegex(ValueError, "contract"):
             self.view_compare(reference, candidate)
+        reference["captures"][0]["viewStrata"] = None
+        with self.assertRaisesRegex(ValueError, "must be an object"):
+            self.view_compare(reference, candidate)
 
     def test_view_cli_is_opt_in_and_does_not_invoke_pooled_comparison(self):
         with tempfile.TemporaryDirectory() as temporary:

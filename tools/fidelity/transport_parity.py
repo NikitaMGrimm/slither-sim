@@ -360,6 +360,8 @@ def compare_views(reference, candidate, tolerances):
         if any("viewStrata" not in capture for capture in report["captures"]):
             print(f"INCONCLUSIVE: {name} lacks view bins")
             return 3
+        if any(not isinstance(capture["viewStrata"], dict) for capture in report["captures"]):
+            raise ValueError(f"{name} viewStrata must be an object")
         if any(capture["viewStrata"].get("contract") != tv.CONTRACT for capture in report["captures"]):
             raise ValueError(f"unsupported {name} view contract")
     limits = tolerances["viewMatched"]
