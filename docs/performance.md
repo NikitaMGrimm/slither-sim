@@ -36,6 +36,12 @@ A temporary index preserves your index, HEAD, stash and files. The candidate's
 measurement examples, selected tests and fixtures overlay the detached baseline;
 this shared harness must compile against the base API.
 
+`examples/support/runtime.rs` adapts construction and borrowed reads across public
+and private state APIs. Its untimed initial-fixture checkpoint import preserves
+join order and idle speed as well as ecology RNG and every other timer; new-life
+replay imports would intentionally reset those controls. The build identity
+records both runtime/state adapter selections and their source hashes.
+
 `examples/support/state.rs` supplies compile-selected state adapters for legacy
 Simulator serde and validated checkpoint v1. The overlay copies that adapter and
 `build.rs` into both revisions; the build script selects the API from the runtime
@@ -112,6 +118,13 @@ share of sequential cost but precedes the parallel split; the study explains
 why it is not reused across steps.
 
 ## Controller transport
+
+`cargo run --release --locked --example perf_session` writes an untimed JSONL
+trace of two-world sandbox, official-128 and Battledome sessions. Typed and JSON
+steps must agree on every frame column and debug snapshot. The shared overlay
+uses typed prepared reset where available and the existing JSON reset on older
+runtimes; every reset/step reply byte is retained for cross-revision comparison.
+
 
 `tools/perf_transport.py` measures [`serve` controller](bot-api.md) costs, including
 reply reading/parsing, beyond the Rust-only workloads above. Its scenario table

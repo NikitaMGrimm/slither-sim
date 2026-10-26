@@ -2361,8 +2361,15 @@ mod tests {
     /// A two-segment snake at the origin heading east, alone in a sandbox
     /// arena of radius 3000.
     fn lone() -> Observation {
-        let mut world = crate::Simulator::new(1, crate::Config::sandbox()).unwrap();
-        world.add("self", 0, 1).unwrap();
+        let world = crate::Simulator::new(crate::WorldOptions {
+            seed: 1,
+            config: crate::Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["self".into()],
+                placement: crate::Placement::default(),
+            },
+        })
+        .unwrap();
         let mut o = world.observe(0).unwrap();
         o.me.head = Point::default();
         o.me.heading = 0.0;

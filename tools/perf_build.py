@@ -22,9 +22,9 @@ from perf_baseline import digest
 TESTS = ("movement_turns", "physics")
 # The candidate's measurement code and evidence, copied into the baseline so both
 # runtimes run identical harness sources. The harness must compile against the base API.
-HARNESS = ("build.rs", "examples/support/state.rs", "examples/perf_baseline.rs",
-           "examples/perf_observation.rs", "examples/perf_client_retained.rs",
-           "examples/fidelity_metrics.rs", *(f"tests/{name}.rs" for name in TESTS))
+HARNESS = ("build.rs", "examples/support/state.rs", "examples/support/runtime.rs", "examples/perf_baseline.rs",
+           "examples/perf_observation.rs", "examples/perf_client_retained.rs", "examples/perf_session.rs",
+           "examples/fidelity_metrics.rs", "tests/support/mod.rs", *(f"tests/{name}.rs" for name in TESTS))
 FIXTURES = "tests/fixtures"
 GIT_TIMEOUT_SECONDS = 120
 SUFFIX = ".exe" if os.name == "nt" else ""
@@ -558,8 +558,9 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
             binaries = {name: directory / f"{name}{SUFFIX}" for name in examples}
             hashes = {path.name: digest(path) for path in binaries.values()}
             record = {"schema": "slither-perf-build-v1", "utc": utc(), **snapshot.record(),
+                      "runtime_adapter": "private-state" if (snapshot.checkout / "src/simulator/initialization.rs").is_file() else "public-state",
                       "state_adapter": "checkpoint-v1" if (snapshot.checkout / "src/simulator/checkpoint.rs").is_file() else "legacy-serde",
-                      "state_adapter_sources": {name: digest(snapshot.checkout / name) for name in ("build.rs", "examples/support/state.rs") if (snapshot.checkout / name).is_file()},
+                      "state_adapter_sources": {name: digest(snapshot.checkout / name) for name in ("build.rs", "examples/support/state.rs", "examples/support/runtime.rs") if (snapshot.checkout / name).is_file()},
                       "runtime_sources": {path.relative_to(snapshot.checkout).as_posix(): digest(path) for path in sorted((snapshot.checkout / "src").rglob("*.rs"))},
                       "rustc": output(["rustc", "-Vv"], snapshot.checkout, **budget),
                       "cargo": output(["cargo", "-V"], snapshot.checkout, **budget),

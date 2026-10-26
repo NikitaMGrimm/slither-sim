@@ -20,9 +20,12 @@ on:
       - examples/perf_observation.rs
       - examples/perf_client_retained.rs
       - examples/support/state.rs
+      - examples/support/runtime.rs
+      - examples/perf_session.rs
       - examples/fidelity_metrics.rs
       - tests/movement_turns.rs
       - tests/physics.rs
+      - tests/support/mod.rs
       - tests/fixtures/**
       - tools/pr_report.py
       - tools/perf_baseline.py

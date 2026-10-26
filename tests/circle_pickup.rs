@@ -20,44 +20,58 @@ fn recorded_circle_retains_food_until_boost_exhaustion() {
     // The official capture has no pickups during these nine seconds of full-speed
     // circling. Reuse its food coordinates, not a simulator-generated expected result.
     for seed in 1..=10 {
-        let mut sim = Simulator::new(
+        let mut sim = Simulator::new(slither_sim::WorldOptions {
             seed,
-            Config {
+            config: Config {
                 radius: 50000.0,
                 food_count: 0,
                 ambient_replenish_per_second: 0.0,
                 emit_boost_food: false,
                 ..Config::sandbox()
             },
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["human".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        sim.import_life(
+            0,
+            slither_sim::ReplayLife::from_observed(
+                circle.initial.clone(),
+                slither_sim::InitialSpeed::Infer(circle.initial.speed),
+            ),
         )
         .unwrap();
-        sim.add("human", 0, 1).unwrap();
-        sim.snakes[0] = circle.initial.clone();
-        sim.pickup_events = Some(vec![]);
+        sim.record_events(slither_sim::EventRecording {
+            pickups: true,
+            food_births: sim.food_spawn_events().is_some(),
+        });
         let mut next_drop = 0;
         let mut exhausted_at = None;
         let mut collected_after = 0;
-        while sim.time < 12.0 {
-            while next_drop < circle.drops.len() && circle.drops[next_drop].time <= sim.time {
-                sim.food.push(circle.drops[next_drop].food.clone());
+        while sim.time() < 12.0 {
+            while next_drop < circle.drops.len() && circle.drops[next_drop].time <= sim.time() {
+                sim.insert_food(circle.drops[next_drop].food.clone())
+                    .unwrap();
                 next_drop += 1;
             }
             sim.step(&[Some(Action {
-                heading: sim.snakes[0].heading + std::f64::consts::FRAC_PI_2,
+                heading: sim.snakes()[0].heading + std::f64::consts::FRAC_PI_2,
                 boost: true,
             })])
             .unwrap();
             // Observed positions replace generated drops before pickup checks, while
             // normal boost costs, timing, and random-number consumption remain active.
-            let pickups = sim.pickup_events.as_ref().unwrap();
+            let pickups = sim.pickup_events().unwrap();
             if sim.is_boosting(0) {
                 assert!(
                     pickups.is_empty(),
                     "seed {seed}: food collected during steady boost at {} seconds",
-                    sim.time
+                    sim.time()
                 );
             } else {
-                exhausted_at.get_or_insert(sim.time);
+                exhausted_at.get_or_insert(sim.time());
                 collected_after += pickups.len();
             }
         }

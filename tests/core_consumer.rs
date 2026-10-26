@@ -1,3 +1,4 @@
+mod support;
 use slither_sim::{Action, AmbientFoodConfig, Config, KioskConfig, Point, Simulator, physics};
 
 fn snapshot(world: &Simulator) -> serde_json::Value {
@@ -5,45 +6,95 @@ fn snapshot(world: &Simulator) -> serde_json::Value {
 }
 
 fn empty_world() -> Simulator {
-    Simulator::new(
-        7,
-        Config {
+    Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             radius: 50_000.,
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Default::default()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap()
 }
 
 #[test]
-fn large_respawn_headings_preserve_orientation_and_can_turn() {
-    for supplied_body in [false, true] {
-        let mut world = empty_world();
-        world.add("self", 0, 1).unwrap();
-        world.snakes[0].alive = false;
-        let heading: f64 = 1e20;
-        if supplied_body {
-            world
-                .respawn_body(0, vec![Point::default(), Point { x: -42., y: 0. }], heading)
-                .unwrap();
-        } else {
-            world.respawn(0, Point::default(), heading, 2).unwrap();
+fn scenario_errors_identify_the_duplicate_or_invalid_slot() {
+    let mut source = empty_world();
+    source
+        .spawn(
+            "source".into(),
+            vec![Point::default(), Point { x: -42., y: 0. }],
+            0.,
+        )
+        .unwrap();
+    let life = slither_sim::ReplayLife::from_observed(
+        source.snakes()[0].clone(),
+        slither_sim::InitialSpeed::Infer(source.snakes()[0].speed),
+    );
+    let config = source.config().clone();
+    let duplicate = Simulator::from_scenario(
+        7,
+        config.clone(),
+        slither_sim::Scenario {
+            snakes: vec![("same".into(), life.clone()), ("same".into(), life.clone())],
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(duplicate.kind, slither_sim::ErrorKind::DuplicateId);
+    assert_eq!(duplicate.slot, Some(1));
+    assert_eq!(duplicate.field.as_deref(), Some("id"));
+
+    let mut invalid = life.clone();
+    invalid.heading = f64::NAN;
+    let replay = Simulator::from_scenario(
+        7,
+        config,
+        slither_sim::Scenario {
+            snakes: vec![("first".into(), life), ("second".into(), invalid)],
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(replay.slot, Some(1));
+    assert_eq!(replay.field.as_deref(), Some("heading"));
+}
+
+#[test]
+fn large_spawn_headings_preserve_orientation_and_can_turn() {
+    for heading in [1e20_f64, 1e150, 1e151, f64::MAX] {
+        for operation in ["spawn", "respawn", "respawn_body"] {
+            let mut world = empty_world();
+            if operation != "spawn" {
+                support::ring_slot(&mut world, "self", 0, 1).unwrap();
+                world.retire(0).unwrap();
+            }
+            let body = vec![Point::default(), Point { x: -42., y: 0. }];
+            match operation {
+                "spawn" => {
+                    world.spawn("self".into(), body, heading).unwrap();
+                }
+                "respawn_body" => world.respawn_body(0, body, heading).unwrap(),
+                "respawn" => world.respawn(0, Point::default(), heading, 2).unwrap(),
+                _ => unreachable!(),
+            }
+            let before = world.snakes()[0].heading;
+            assert!((before.cos() - heading.cos()).abs() < 1e-12);
+            assert!((before.sin() - heading.sin()).abs() < 1e-12);
+            world.step(&[Some(Action::default())]).unwrap();
+            assert!(world.snakes()[0].heading.abs() < before.abs());
+            world.checkpoint().unwrap();
         }
-        let before = world.snakes[0].heading;
-        assert!((before.cos() - heading.cos()).abs() < 1e-12);
-        assert!((before.sin() - heading.sin()).abs() < 1e-12);
-        world.step(&[Some(Action::default())]).unwrap();
-        assert!(world.snakes[0].heading.abs() < before.abs());
     }
 }
 
 #[test]
 fn selected_observations_match_individual_and_indexed_batches_without_mutation() {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             radius: 3000.,
             food_count: 1500,
             ambient_food: AmbientFoodConfig {
@@ -52,19 +103,20 @@ fn selected_observations_match_individual_and_indexed_batches_without_mutation()
             },
             ..Default::default()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..32).map(|i| i.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    for i in 0..32 {
-        world.add(i.to_string(), i, 32).unwrap();
-    }
-    world.snakes[3].alive = false;
+    world.retire(3).unwrap();
     let before = snapshot(&world);
     let selected: Vec<_> = (0..32).map(|i| i % 3 == 0).collect();
     let all = world.observe_all();
     let observations = world.observe_selected(&selected).unwrap();
     assert_eq!(observations.len(), 32);
     for i in 0..32 {
-        if selected[i] && world.snakes[i].alive {
+        if selected[i] && world.snakes()[i].alive {
             assert_eq!(
                 serde_json::to_value(&observations[i]).unwrap(),
                 serde_json::to_value(&all[i]).unwrap()
@@ -93,9 +145,9 @@ fn selected_observations_match_individual_and_indexed_batches_without_mutation()
 
 #[test]
 fn observations_follow_dead_only_selection_and_later_public_mutation() {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             radius: 3000.,
             food_count: 1500,
             ambient_food: AmbientFoodConfig {
@@ -104,11 +156,14 @@ fn observations_follow_dead_only_selection_and_later_public_mutation() {
             },
             ..Default::default()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..32).map(|slot| slot.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
     for slot in 0..32 {
-        world.add(slot.to_string(), slot, 32).unwrap();
-        world.snakes[slot].alive = false;
+        world.retire(slot).unwrap();
     }
     let before = snapshot(&world);
     for flags in [[false; 32], [true; 32]] {
@@ -123,9 +178,29 @@ fn observations_follow_dead_only_selection_and_later_public_mutation() {
     assert_eq!(snapshot(&world), before);
 
     // Reuse the same slots, food length and virtual time after an empty batch.
-    world.snakes[31].alive = true;
-    world.food[0].x = world.snakes[31].head.x;
-    world.food[0].y = world.snakes[31].head.y;
+    {
+        let mut snake = world.snakes()[31].clone();
+        snake.alive = true;
+        world
+            .import_life(
+                31,
+                slither_sim::ReplayLife::from_observed(
+                    snake.clone(),
+                    slither_sim::InitialSpeed::Infer(snake.speed),
+                ),
+            )
+            .unwrap();
+    }
+    {
+        let mut food = world.food().to_vec();
+        food[0].x = world.snakes()[31].head.x;
+        world.replace_food(food).unwrap();
+    }
+    {
+        let mut food = world.food().to_vec();
+        food[0].y = world.snakes()[31].head.y;
+        world.replace_food(food).unwrap();
+    }
     let mut selected = [false; 32];
     selected[31] = true;
     let batch = world.observe_selected(&selected).unwrap();
@@ -135,7 +210,11 @@ fn observations_follow_dead_only_selection_and_later_public_mutation() {
         serde_json::to_value(world.observe(31).unwrap()).unwrap()
     );
     let retained = serde_json::to_value(&batch).unwrap();
-    world.food[0].x += 10_000.;
+    {
+        let mut food = world.food().to_vec();
+        food[0].x += 10_000.;
+        world.replace_food(food).unwrap();
+    }
     let changed = world.observe_selected(&selected).unwrap();
     assert_ne!(retained, serde_json::to_value(&changed).unwrap());
     assert_eq!(retained, serde_json::to_value(&batch).unwrap());
@@ -144,20 +223,39 @@ fn observations_follow_dead_only_selection_and_later_public_mutation() {
 #[test]
 fn supplied_body_clearance_checks_intermediate_edges_heads_and_bounds() {
     let mut world = empty_world();
-    world.config.radius = 3000.;
-    world.add("other", 0, 1).unwrap();
-    world.snakes[0].head = Point { x: 1000., y: 1000. };
-    world.snakes[0].body = vec![
-        world.snakes[0].head,
-        Point {
-            x: -1000.,
-            y: 1000.,
-        },
-        Point {
-            x: -1000.,
-            y: -1000.,
-        },
-    ];
+    {
+        let mut config = world.config().clone();
+        config.radius = 3000.;
+        support::reconfigure(&mut world, config);
+    }
+    support::ring_slot(&mut world, "other", 0, 1).unwrap();
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.head = Point { x: 1000., y: 1000. };
+        world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.body = vec![
+            snake.head,
+            Point {
+                x: -1000.,
+                y: 1000.,
+            },
+            Point {
+                x: -1000.,
+                y: -1000.,
+            },
+        ];
+        world
+            .correct_mass(0, snake.body.clone(), snake.fam)
+            .unwrap();
+        world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     let crossing = [
         Point::default(),
         Point { x: 0., y: 500. },
@@ -167,10 +265,18 @@ fn supplied_body_clearance_checks_intermediate_edges_heads_and_bounds() {
     assert!(!world.body_is_clear(&crossing, 0.));
     let clear = [Point::default(), Point { x: 500., y: -500. }];
     assert!(world.body_is_clear(&clear, 100.));
-    world.snakes[0].body.clear();
-    world.snakes[0].head = Point { x: 250., y: -250. };
+    world
+        .correct_mass(0, vec![Point { x: 250., y: -250. }; 2], 0.)
+        .unwrap();
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.head = Point { x: 250., y: -250. };
+        world
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
     assert!(!world.body_is_clear(&clear, 0.));
-    world.snakes[0].alive = false;
+    world.retire(0).unwrap();
     assert!(world.body_is_clear(&clear, 0.));
     assert!(!world.body_is_clear(&[Point::default(), Point { x: 2940., y: 0. }], 0.));
     for body in [
@@ -196,12 +302,12 @@ fn supplied_body_clearance_checks_intermediate_edges_heads_and_bounds() {
 #[test]
 fn supplied_body_respawn_rejects_invalid_input_without_mutation() {
     let mut world = empty_world();
-    world.add("player", 0, 1).unwrap();
+    support::ring_slot(&mut world, "player", 0, 1).unwrap();
     let body = vec![Point::default(), Point { x: -42., y: 0. }];
     let before = snapshot(&world);
     assert!(world.respawn_body(0, body.clone(), 0.).is_err());
     assert_eq!(snapshot(&world), before);
-    world.snakes[0].alive = false;
+    world.retire(0).unwrap();
     let before = snapshot(&world);
     assert!(world.respawn_body(1, body.clone(), 0.).is_err());
     for heading in [f64::NAN, f64::INFINITY] {
@@ -223,7 +329,7 @@ fn supplied_body_respawn_rejects_invalid_input_without_mutation() {
         vec![
             Point::default(),
             Point {
-                x: world.config.radius,
+                x: world.radius(),
                 y: 0.,
             },
         ],
@@ -241,12 +347,32 @@ fn supplied_body_respawn_resets_motion_penalty_death_and_mass_state() {
             shrink_per_second: 2.,
             ..Default::default()
         },
-        ..empty_world().config
+        ..empty_world().config().clone()
     };
-    let mut world = Simulator::new(7, config.clone()).unwrap();
-    world.add("player", 0, 1).unwrap();
-    world.snakes[0].alive = false;
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: config.clone(),
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["player".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    world.retire(0).unwrap();
     world.respawn(0, Point::default(), 0., 380).unwrap();
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.kills = 13;
+        world
+            .import_life(
+                0,
+                slither_sim::ReplayLife::from_observed(
+                    snake.clone(),
+                    slither_sim::InitialSpeed::Infer(snake.speed),
+                ),
+            )
+            .unwrap();
+    }
     let action = [Some(Action {
         heading: 0.,
         boost: true,
@@ -255,11 +381,17 @@ fn supplied_body_respawn_resets_motion_penalty_death_and_mass_state() {
         world.step(&action).unwrap();
     }
     assert!(world.boost_accounting(0).unwrap().active_boost_seconds > 0.);
-    world.snakes[0].kills = 13;
-    world.snakes[0].head.x = world.config.radius * 2.;
+
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.head.x = world.radius() * 2.;
+        world
+            .correct_pose(0, snake.head, snake.body, snake.heading)
+            .unwrap();
+    }
     world.step(&action).unwrap();
     assert!(world.death_time(0).is_some());
-    let deaths = world.deaths.len();
+    let deaths = world.deaths().len();
     let body = vec![
         Point::default(),
         Point { x: -42., y: 0. },
@@ -267,29 +399,36 @@ fn supplied_body_respawn_resets_motion_penalty_death_and_mass_state() {
         Point { x: -84., y: -42. },
     ];
     world.respawn_body(0, body.clone(), 0.).unwrap();
-    assert_eq!(world.snakes[0].body, body);
-    assert_eq!(world.snakes[0].head, body[0]);
-    assert_eq!(world.snakes[0].segments, 4);
-    assert_eq!(world.snakes[0].fam, 0.);
-    assert_eq!(world.snakes[0].kills, 0);
-    assert_eq!(world.snakes[0].speed, physics::base_speed(4));
-    assert_eq!(world.snakes[0].score, physics::score(4, 0.));
+    assert_eq!(world.snakes()[0].body, body);
+    assert_eq!(world.snakes()[0].head, body[0]);
+    assert_eq!(world.snakes()[0].segments, 4);
+    assert_eq!(world.snakes()[0].fam, 0.);
+    assert_eq!(world.snakes()[0].kills, 0);
+    assert_eq!(world.snakes()[0].speed, physics::base_speed(4));
+    assert_eq!(world.snakes()[0].score, physics::score(4, 0.));
     assert_eq!(world.death_time(0), None);
-    assert_eq!(world.deaths.len(), deaths);
+    assert_eq!(world.deaths().len(), deaths);
     assert!(!world.is_boosting(0));
     let accounting = world.boost_accounting(0).unwrap();
     assert_eq!(accounting.active_boost_seconds, 0.);
     assert_eq!(accounting.boost_mass_spent, 0.);
 
-    let mut fresh = Simulator::new(7, config).unwrap();
-    fresh.add("player", 0, 1).unwrap();
-    fresh.snakes[0].alive = false;
+    let mut fresh = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["player".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    fresh.retire(0).unwrap();
     fresh.respawn_body(0, body, 0.).unwrap();
     for _ in 0..10 {
         let action = [Some(Action::default())];
         world.step(&action).unwrap();
         fresh.step(&action).unwrap();
-        assert_eq!(world.snakes, fresh.snakes);
+        assert_eq!(world.snakes(), fresh.snakes());
     }
 }
 
@@ -297,8 +436,8 @@ fn supplied_body_respawn_resets_motion_penalty_death_and_mass_state() {
 fn supplied_body_respawn_assigns_new_join_order_and_matches_straight_respawn() {
     let mut world = empty_world();
     for i in 0..2 {
-        world.add(i.to_string(), i, 2).unwrap();
-        world.snakes[i].alive = false;
+        support::ring_slot(&mut world, i.to_string(), i, 2).unwrap();
+        world.retire(i).unwrap();
     }
     let body = vec![Point::default(), Point { x: -42., y: 0. }];
     world.respawn_body(0, body.clone(), 0.).unwrap();
@@ -309,7 +448,7 @@ fn supplied_body_respawn_assigns_new_join_order_and_matches_straight_respawn() {
             std::f64::consts::PI,
         )
         .unwrap();
-    world.snakes[0].alive = false;
+    world.retire(0).unwrap();
     let mut straight = world.clone();
     straight.respawn(0, Point::default(), 0., 2).unwrap();
     world.respawn_body(0, body, 0.).unwrap();
@@ -323,19 +462,25 @@ fn supplied_body_respawn_assigns_new_join_order_and_matches_straight_respawn() {
     ];
     for _ in 0..30 {
         world.step(&actions).unwrap();
-        if !world.deaths.is_empty() {
+        if !world.deaths().is_empty() {
             break;
         }
     }
-    assert!(world.snakes[0].alive);
-    assert!(!world.snakes[1].alive);
+    assert!(world.snakes()[0].alive);
+    assert!(!world.snakes()[1].alive);
 }
 
 fn refill_world(rate: f64) -> Simulator {
     let mut world = empty_world();
-    world.config.dt = 0.01;
-    world.config.food_count = 100;
-    world.config.ambient_food.enabled = false;
+    {
+        let mut config = world.config().clone();
+        config.dt = 0.01;
+
+        config.food_count = 100;
+
+        config.ambient_food.enabled = false;
+        support::reconfigure(&mut world, config);
+    }
     world.set_ambient_rate(rate).unwrap();
     world
 }
@@ -352,17 +497,17 @@ fn changing_refill_rate_preserves_fractional_credit_in_both_directions() {
     tick(&mut faster, 5);
     faster.set_ambient_rate(20.).unwrap();
     tick(&mut faster, 2);
-    assert!(faster.food.is_empty());
+    assert!(faster.food().is_empty());
     tick(&mut faster, 1);
-    assert_eq!(faster.food.len(), 1);
+    assert_eq!(faster.food().len(), 1);
 
     let mut slower = refill_world(20.);
     tick(&mut slower, 3);
     slower.set_ambient_rate(5.).unwrap();
     tick(&mut slower, 7);
-    assert!(slower.food.is_empty());
+    assert!(slower.food().is_empty());
     tick(&mut slower, 1);
-    assert_eq!(slower.food.len(), 1);
+    assert_eq!(slower.food().len(), 1);
 }
 
 #[test]
@@ -382,12 +527,12 @@ fn refill_setter_rejections_same_rate_and_zero_have_defined_state_effects() {
     assert_eq!(snapshot(&world), before);
     world.set_ambient_rate(0.).unwrap();
     tick(&mut world, 100);
-    assert!(world.food.is_empty());
+    assert!(world.food().is_empty());
     world.set_ambient_rate(20.).unwrap();
     tick(&mut world, 4);
-    assert!(world.food.is_empty());
+    assert!(world.food().is_empty());
     tick(&mut world, 1);
-    assert_eq!(world.food.len(), 1);
+    assert_eq!(world.food().len(), 1);
 
     let mut untouched = refill_world(7.);
     let mut repeated = untouched.clone();

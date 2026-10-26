@@ -376,14 +376,14 @@ impl SimulatorBackend {
                 }
                 _ if over => {}
                 Uplink::Connect => {
-                    let radius = self.world.config.radius;
+                    let radius = self.world.radius();
                     let connection = &mut self.slots[slot].connection;
                     connection.setup = true;
                     connection.radius = radius.round() as u32;
                     self.emit(
                         slot,
                         now,
-                        &[encode::setup(radius, self.world.config.prey.turn_rate)?],
+                        &[encode::setup(radius, self.world.config().prey.turn_rate)?],
                     )?;
                 }
                 Uplink::Message(bytes) => match bytes[..] {
@@ -400,7 +400,7 @@ impl SimulatorBackend {
                         } else {
                             (amount - 128, 1.)
                         };
-                        let turn = 0.033 * physics::scang(self.world.snakes[slot].segments);
+                        let turn = 0.033 * physics::scang(self.world.snakes()[slot].segments);
                         let control = &mut self.slots[slot].control;
                         control.heading =
                             (control.heading + sign * turn * f64::from(count)).rem_euclid(TAU);

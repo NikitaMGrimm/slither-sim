@@ -392,9 +392,17 @@ mod tests {
 
     #[test]
     fn shared_deltas_preserve_distinct_histories_and_own_packet_types() {
-        let mut world = Simulator::new(7, Config::sandbox()).unwrap();
-        world.add("snake", 0, 1).unwrap();
-        let snake = &mut world.snakes[0];
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["snake".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut detached_snake = world.snakes()[0].clone();
+        let snake = &mut detached_snake;
         let before = KnownSnake::new(2, snake, 0.).unwrap();
         let next = Point {
             x: snake.body[0].x + 42.,

@@ -59,12 +59,24 @@ fn near(a: Bounds, b: Bounds, width: f64) -> bool {
 }
 
 impl Safety {
+    #[cfg(test)]
     pub(crate) fn new(world: &Simulator, segments: usize, clearance: f64, horizon: f64) -> Self {
+        Self::new_excluding(world, None, segments, clearance, horizon)
+    }
+
+    pub(crate) fn new_excluding(
+        world: &Simulator,
+        excluded: Option<usize>,
+        segments: usize,
+        clearance: f64,
+        horizon: f64,
+    ) -> Self {
         let obstacles = world
-            .snakes
+            .snakes()
             .iter()
-            .filter(|s| s.alive)
-            .map(|s| {
+            .enumerate()
+            .filter(|(slot, s)| Some(*slot) != excluded && s.alive)
+            .map(|(_, s)| {
                 let mut edges = Vec::with_capacity(s.body.len() + 1);
                 let mut bounds = Bounds::between(s.head, s.head);
                 let mut previous = s.head;
@@ -99,7 +111,7 @@ impl Safety {
         Self {
             obstacles,
             candidate: Vec::with_capacity(segments.saturating_sub(1)),
-            wall_limit: world.config.radius - crate::simulator::SPAWN_WALL_MARGIN,
+            wall_limit: world.radius() - crate::simulator::SPAWN_WALL_MARGIN,
             segments,
             departure_distance: super::DEPARTURE_SECONDS * base_speed(segments),
         }
@@ -202,7 +214,7 @@ mod tests {
 
     fn reference(world: &Simulator, body: &[Point], clearance: f64, horizon: f64) -> bool {
         world.body_is_clear(body, clearance)
-            && world.snakes.iter().filter(|s| s.alive).all(|s| {
+            && world.snakes().iter().filter(|s| s.alive).all(|s| {
                 let end = Point {
                     x: s.head.x + s.heading.cos() * s.speed * horizon,
                     y: s.head.y + s.heading.sin() * s.speed * horizon,
@@ -218,8 +230,15 @@ mod tests {
     fn cached_search_matches_exhaustive_clearance_and_head_paths() {
         let mut config = Config::battledome();
         config.food_count = 0;
-        let mut world = Simulator::new(7, config).unwrap();
-        world.add_slots(16).unwrap();
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config,
+            population: crate::InitialPopulation::Placed {
+                ids: (0..16).map(|slot| slot.to_string()).collect(),
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
         let mut random = 0x1324_5768_9abc_def0u64;
         let mut unit = || {
             random ^= random << 13;
@@ -228,7 +247,8 @@ mod tests {
             (random >> 11) as f64 / (1u64 << 53) as f64
         };
         for _ in 0..32 {
-            for snake in &mut world.snakes {
+            for slot in 0..world.snakes().len() {
+                let mut snake = world.snakes()[slot].clone();
                 let angle = unit() * std::f64::consts::TAU;
                 let radius = 1800. + unit() * 1600.;
                 let (body, heading) = spawn::ring_body(
@@ -245,6 +265,15 @@ mod tests {
                 snake.heading = heading;
                 snake.speed = 100. + unit() * 337.5;
                 snake.alive = unit() > 0.2;
+                world
+                    .import_life(
+                        slot,
+                        crate::ReplayLife::from_observed(
+                            snake.clone(),
+                            crate::InitialSpeed::Infer(snake.speed),
+                        ),
+                    )
+                    .unwrap();
             }
             let mut queries = [(600., 2.), (600., 1.5), (400., 2.), (400., 1.5)]
                 .map(|(c, h)| (c, h, Safety::new(&world, 26, c, h)));
@@ -273,11 +302,45 @@ mod tests {
 
     #[test]
     fn cached_search_keeps_exact_thresholds_and_rejects_invalid_bodies() {
-        let mut world = Simulator::new(7, Config::sandbox()).unwrap();
-        world.add_slots(1).unwrap();
-        world.snakes[0].head = Point::default();
-        world.snakes[0].body = vec![Point::default(); 2];
-        world.snakes[0].speed = 0.;
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: (0..1).map(|slot| slot.to_string()).collect(),
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.head = Point::default();
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.body = vec![Point::default(); 2];
+            world
+                .correct_mass(0, snake.body.clone(), snake.fam)
+                .unwrap();
+            world
+                .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+                .unwrap();
+        }
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.speed = 0.;
+            world
+                .import_life(
+                    0,
+                    crate::ReplayLife::from_observed(
+                        snake.clone(),
+                        crate::InitialSpeed::Infer(snake.speed),
+                    ),
+                )
+                .unwrap();
+        }
         let mut query = Safety::new(&world, 2, 600., 2.);
         for bits in [600f64.to_bits() - 1, 600f64.to_bits(), 600f64.to_bits() + 1] {
             let body = [
@@ -307,22 +370,42 @@ mod tests {
         let mut config = Config::battledome();
         config.radius = 5000.;
         config.food_count = 0;
-        let mut world = Simulator::new(7, config).unwrap();
-        world.add_slots(1).unwrap();
-        let other = &mut world.snakes[0];
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config,
+            population: crate::InitialPopulation::Placed {
+                ids: (0..1).map(|slot| slot.to_string()).collect(),
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut detached_other = world.snakes()[0].clone();
+        let other = &mut detached_other;
         other.head = Point {
             x: 2600.,
             y: -2000.,
         };
         other.body = vec![other.head, Point { x: 2600., y: 300. }];
+        other
+            .body
+            .resize(other.segments, *other.body.last().unwrap());
         other.speed = 0.;
+        world
+            .import_life(
+                0,
+                crate::ReplayLife::from_observed(
+                    other.clone(),
+                    crate::InitialSpeed::Infer(other.speed),
+                ),
+            )
+            .unwrap();
         let (body, heading) = world
             .spawn_body(Point { x: 3200., y: 0. }, std::f64::consts::FRAC_PI_2)
             .unwrap();
         let mut query = Safety::new(&world, 26, 400., 2.);
         assert!(query.clears(&body));
         assert!(!query.clears_departures(body[0], heading));
-        world.snakes[0].alive = false;
+        world.retire(0).unwrap();
         let mut query = Safety::new(&world, 26, 400., 2.);
         assert!(query.clears(&body));
         assert!(query.clears_departures(body[0], heading));
@@ -330,13 +413,18 @@ mod tests {
 
     #[test]
     fn a_nonfinite_neighbor_path_is_not_admissible() {
-        let mut world = Simulator::new(7, Config::sandbox()).unwrap();
-        world.add_slots(1).unwrap();
-        world.snakes[0].head = Point { x: 0., y: 0. };
-        world.snakes[0].body = vec![];
-        world.snakes[0].heading = f64::NAN;
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["0".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
         let body = [Point { x: 800., y: 0. }, Point { x: 800., y: 42. }];
-        assert!(!Safety::new(&world, 2, 400., 2.).clears(&body));
+        // A finite neighbor can still overflow its projected path at this horizon.
+        assert!(!Safety::new(&world, 2, 400., f64::MAX).clears(&body));
     }
 
     #[test]
@@ -344,12 +432,32 @@ mod tests {
         let mut config = Config::battledome();
         config.radius = 5000.;
         config.food_count = 0;
-        let mut world = Simulator::new(7, config).unwrap();
-        world.add_slots(1).unwrap();
-        let other = &mut world.snakes[0];
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config,
+            population: crate::InitialPopulation::Placed {
+                ids: (0..1).map(|slot| slot.to_string()).collect(),
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut detached_other = world.snakes()[0].clone();
+        let other = &mut detached_other;
         other.head = Point { x: 3184., y: 2000. };
         other.body = vec![other.head, Point { x: 3184., y: 0. }];
+        other
+            .body
+            .resize(other.segments, *other.body.last().unwrap());
         other.speed = 0.;
+        world
+            .import_life(
+                0,
+                crate::ReplayLife::from_observed(
+                    other.clone(),
+                    crate::InitialSpeed::Infer(other.speed),
+                ),
+            )
+            .unwrap();
         let (body, heading) = world
             .spawn_body(Point { x: 2684., y: 0. }, std::f64::consts::FRAC_PI_2)
             .unwrap();

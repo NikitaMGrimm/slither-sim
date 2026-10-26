@@ -1,5 +1,40 @@
+mod support;
 use slither_sim::ErrorKind;
 use slither_sim::{Config, Simulator};
+
+#[test]
+fn radius_limit_rejections_name_the_config_field() {
+    use slither_sim::{Constraint, RadiusUpdate};
+    for (field, config) in [
+        (
+            "radius",
+            Config {
+                radius: 1e151,
+                ..Config::sandbox()
+            },
+        ),
+        (
+            "radiusUpdates[0].radius",
+            Config {
+                radius_updates: vec![RadiusUpdate {
+                    time: 0.007,
+                    radius: 1e151,
+                }],
+                ..Config::sandbox()
+            },
+        ),
+    ] {
+        let error = config.validate().unwrap_err();
+        assert_eq!(
+            error.kind,
+            ErrorKind::InvalidConfig {
+                rule: Constraint::OutOfRange
+            }
+        );
+        assert_eq!(error.field.as_deref(), Some(field));
+        assert!(error.to_string().contains(field));
+    }
+}
 
 #[test]
 fn omitted_world_settings_select_the_official_baseline() {
@@ -32,7 +67,17 @@ fn official_baseline_enables_current_models_and_nonzero_prey() {
     );
     assert_eq!(config.dt, 0.007);
     config.validate().unwrap();
-    assert_eq!(Simulator::new(7, config).unwrap().prey.len(), 1);
+    assert_eq!(
+        Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config,
+            population: slither_sim::InitialPopulation::Empty
+        })
+        .unwrap()
+        .prey()
+        .len(),
+        1
+    );
 
     let populated = Config::official(100);
     assert_eq!(populated.radius, 6700.);
@@ -72,22 +117,36 @@ fn opted_in_radius_tracks_living_snakes_but_sandbox_stays_fixed() {
     config.dynamic_radius = true;
     config.food_count = 0;
     config.prey.count = 0;
-    let mut official = Simulator::new(7, config).unwrap();
-    official.add("one", 0, 1).unwrap();
-    let radius = official.config.radius;
+    let mut official = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["one".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    let radius = official.radius();
     official
         .step(&[Some(slither_sim::Action::default())])
         .unwrap();
-    assert!(official.config.radius < radius);
+    assert!(official.radius() < radius);
 
     let mut config = Config::sandbox();
     config.food_count = 0;
-    let mut sandbox = Simulator::new(7, config).unwrap();
-    sandbox.add("one", 0, 1).unwrap();
+    let mut sandbox = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["one".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     sandbox
         .step(&[Some(slither_sim::Action::default())])
         .unwrap();
-    assert_eq!(sandbox.config.radius, 1000.);
+    assert_eq!(sandbox.radius(), 1000.);
 }
 
 #[test]
@@ -97,11 +156,18 @@ fn official_radius_holds_across_death_and_respawn() {
     config.ambient_replenish_per_second = 0.;
     config.prey.count = 0;
     let radius = config.radius;
-    let mut world = Simulator::new(7, config).unwrap();
-    world.add("one", 0, 1).unwrap();
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["one".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert_eq!(world.config.radius, radius);
-    world.snakes[0].alive = false;
+    assert_eq!(world.config().radius, radius);
+    world.retire(0).unwrap();
     world
         .respawn(
             0,
@@ -114,15 +180,15 @@ fn official_radius_holds_across_death_and_respawn() {
         )
         .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert!(!world.snakes[0].alive);
-    assert_eq!(world.config.radius, radius);
+    assert!(!world.snakes()[0].alive);
+    assert_eq!(world.config().radius, radius);
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
     world
         .respawn(0, slither_sim::Point::default(), 0., 2)
         .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert!(world.snakes[0].alive);
-    assert_eq!(world.config.radius, radius);
+    assert!(world.snakes()[0].alive);
+    assert_eq!(world.config().radius, radius);
 }
 
 #[test]
@@ -162,30 +228,37 @@ fn food_and_prey_targets_have_no_policy_cap() {
         ..Config::sandbox()
     };
     config.validate().unwrap();
-    let world = Simulator::new(7, config).unwrap();
-    assert_eq!(world.prey.len(), 10_001);
-    assert!(world.food.len() > 1000);
+    let world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Empty,
+    })
+    .unwrap();
+    assert_eq!(world.prey().len(), 10_001);
+    assert!(world.food().len() > 1000);
     // An unallocatable target is an error, not an abort.
-    let error = Simulator::new(
-        7,
-        Config {
+    let error = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             food_count: usize::MAX,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap_err();
     assert_eq!(error.kind, ErrorKind::AllocationFailed);
     assert_eq!(error.field.as_deref(), Some("foodCount"));
-    let error = Simulator::new(
-        7,
-        Config {
+    let error = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             prey: slither_sim::PreyConfig {
                 count: usize::MAX,
                 ..Default::default()
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap_err();
     assert_eq!(error.kind, ErrorKind::AllocationFailed);
     assert_eq!(error.field.as_deref(), Some("prey.count"));
@@ -199,21 +272,32 @@ fn zero_food_cell_limits_admit_nothing() {
     config.death_food.max_per_cell = 0;
     // No pellet can be admitted, so even an unrepresentable target starts at once.
     config.food_count = usize::MAX;
-    let mut world = Simulator::new(7, config).unwrap();
-    assert!(world.food.is_empty());
-    world.add("a", 0, 1).unwrap();
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Empty,
+    })
+    .unwrap();
+    assert!(world.food().is_empty());
+    support::ring_slot(&mut world, "a", 0, 1).unwrap();
     // A large snake dies at the boundary; its death food is not admitted.
-    let snake = &mut world.snakes[0];
+    let mut detached_snake = world.snakes()[0].clone();
+    let snake = &mut detached_snake;
     snake.segments = 100;
     snake.body = vec![slither_sim::Point { x: 2000., y: 0. }; 100];
     snake.head = snake.body[0];
-    Simulator::update_mass(snake);
+    world
+        .correct_mass(0, snake.body.clone(), snake.fam)
+        .unwrap();
+    world
+        .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+        .unwrap();
     world.step(&[Some(slither_sim::Action::default())]).unwrap();
-    assert!(!world.snakes[0].alive);
+    assert!(!world.snakes()[0].alive);
     for _ in 0..200 {
         world.step(&[None]).unwrap();
     }
-    assert!(world.food.is_empty());
+    assert!(world.food().is_empty());
 }
 
 #[test]
@@ -227,22 +311,23 @@ fn zero_prey_speeds_turning_and_nutrition_are_valid() {
         ..Default::default()
     };
     prey.validate().unwrap();
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             prey,
             ..Config::default()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     // The first server tick floors the spawn position onto integers.
     world.step(&[]).unwrap();
-    let start = world.prey[0].clone();
+    let start = world.prey()[0].clone();
     for _ in 0..100 {
         world.step(&[]).unwrap();
     }
-    assert_eq!(world.prey[0].position, start.position);
-    assert_eq!(world.prey[0].heading, start.heading);
+    assert_eq!(world.prey()[0].position, start.position);
+    assert_eq!(world.prey()[0].heading, start.heading);
 }
 
 #[test]
@@ -259,15 +344,28 @@ fn zero_kiosk_rates_freeze_their_phase() {
     let mut config = Config::sandbox();
     config.food_count = 0;
     config.kiosk = kiosk;
-    let mut world = Simulator::new(7, config).unwrap();
-    world.add("a", 0, 1).unwrap();
-    let snake = &mut world.snakes[0];
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    let mut detached_snake = world.snakes()[0].clone();
+    let snake = &mut detached_snake;
     snake.segments = 200;
     snake.body = vec![snake.head; 200];
-    Simulator::update_mass(snake);
-    let segments = world.snakes[0].segments;
+    world
+        .correct_mass(0, snake.body.clone(), snake.fam)
+        .unwrap();
+    world
+        .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+        .unwrap();
+    let segments = world.snakes()[0].segments;
     for _ in 0..100 {
         world.step(&[Some(slither_sim::Action::default())]).unwrap();
     }
-    assert_eq!(world.snakes[0].segments, segments);
+    assert_eq!(world.snakes()[0].segments, segments);
 }

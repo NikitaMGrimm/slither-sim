@@ -1,9 +1,10 @@
+mod support;
 use slither_sim::{physics::*, *};
 
 fn world() -> Simulator {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             radius: 1_000_000.0,
             food_count: 0,
             ambient_replenish_per_second: 0.0,
@@ -18,10 +19,14 @@ fn world() -> Simulator {
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["player".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    world.add("player", 0, 1).unwrap();
-    let snake = &mut world.snakes[0];
+    let mut detached_snake = world.snakes()[0].clone();
+    let snake = &mut detached_snake;
     snake.head = Point::default();
     snake.body = (0..380)
         .map(|i| Point {
@@ -33,63 +38,77 @@ fn world() -> Simulator {
     snake.speed = base_speed(380);
     snake.segments = 380;
     snake.fam = 0.0;
-    Simulator::update_mass(snake);
+    world
+        .import_life(
+            0,
+            slither_sim::ReplayLife::from_observed(
+                snake.clone(),
+                slither_sim::InitialSpeed::Infer(snake.speed),
+            ),
+        )
+        .unwrap();
     world
 }
 
 fn step(world: &mut Simulator, count: usize) {
     for _ in 0..count {
         world.step(&[Some(Action::default())]).unwrap();
-        assert!(world.snakes[0].alive);
+        assert!(world.snakes()[0].alive);
     }
 }
 
 #[test]
 fn kiosk_grace_shrink_score_decay_and_recovery_are_distinct() {
     let mut world = world();
-    let original_score = world.snakes[0].score;
+    let original_score = world.snakes()[0].score;
     step(&mut world, 1);
-    assert_eq!(world.snakes[0].score, original_score);
-    assert_eq!(world.snakes[0].segments, 380);
+    assert_eq!(world.snakes()[0].score, original_score);
+    assert_eq!(world.snakes()[0].segments, 380);
 
     step(&mut world, 12);
-    assert!(world.snakes[0].segments < 380);
-    assert_eq!(world.snakes[0].body.len(), world.snakes[0].segments);
-    assert_eq!(world.snakes[0].score, original_score);
+    assert!(world.snakes()[0].segments < 380);
+    assert_eq!(world.snakes()[0].body.len(), world.snakes()[0].segments);
+    assert_eq!(world.snakes()[0].score, original_score);
 
     step(&mut world, 45);
-    let physical_score = score(world.snakes[0].segments, world.snakes[0].fam);
+    let physical_score = score(world.snakes()[0].segments, world.snakes()[0].fam);
     assert!((physical_score - 8_500.0).abs() < 5.0);
-    assert!(world.snakes[0].score < original_score);
-    assert!(world.snakes[0].score > physical_score);
-    let remaining_score = world.snakes[0].score;
-    let short_segments = world.snakes[0].segments;
+    assert!(world.snakes()[0].score < original_score);
+    assert!(world.snakes()[0].score > physical_score);
+    let remaining_score = world.snakes()[0].score;
+    let short_segments = world.snakes()[0].segments;
 
-    world.config.kiosk.stationary_radius = 0.01;
+    {
+        let mut config = world.config().clone();
+
+        config.kiosk.stationary_radius = 0.01;
+
+        support::reconfigure(&mut world, config);
+    }
     step(&mut world, 1_500);
-    assert!(world.snakes[0].segments > short_segments);
-    assert_eq!(world.snakes[0].body.len(), world.snakes[0].segments);
-    assert_eq!(world.snakes[0].score, remaining_score);
-    assert!(score(world.snakes[0].segments, world.snakes[0].fam) <= remaining_score);
+    assert!(world.snakes()[0].segments > short_segments);
+    assert_eq!(world.snakes()[0].body.len(), world.snakes()[0].segments);
+    assert_eq!(world.snakes()[0].score, remaining_score);
+    assert!(score(world.snakes()[0].segments, world.snakes()[0].fam) <= remaining_score);
 }
 
 #[test]
 fn ordinary_boost_still_costs_score_and_emits_only_its_own_pellets() {
     let mut world = world();
     step(&mut world, 13);
-    let before = world.snakes[0].score;
-    let food_before = world.food.len();
+    let before = world.snakes()[0].score;
+    let food_before = world.food().len();
     world
         .step(&[Some(Action {
             heading: 0.0,
             boost: true,
         })])
         .unwrap();
-    assert!(world.snakes[0].score < before);
-    assert_eq!(world.food.len(), food_before + 1);
+    assert!(world.snakes()[0].score < before);
+    assert_eq!(world.food().len(), food_before + 1);
     assert!(
         world
-            .food
+            .food()
             .iter()
             .all(|f| matches!(f.origin, Some(Origin::Boost)))
     );
@@ -98,56 +117,92 @@ fn ordinary_boost_still_costs_score_and_emits_only_its_own_pellets() {
 #[test]
 fn disabled_penalty_keeps_long_stationary_score_and_size_equal() {
     let mut world = world();
-    world.config.kiosk.enabled = false;
+    {
+        let mut config = world.config().clone();
+        config.kiosk.enabled = false;
+        support::reconfigure(&mut world, config);
+    }
     step(&mut world, 60);
-    assert_eq!(world.snakes[0].segments, 380);
-    assert_eq!(world.snakes[0].score, score(380, 0.0));
+    assert_eq!(world.snakes()[0].segments, 380);
+    assert_eq!(world.snakes()[0].score, score(380, 0.0));
 }
 
 #[test]
 fn disabling_active_penalty_restores_physical_size_without_refunding_score() {
     let mut world = world();
     step(&mut world, 13);
-    let size_before = world.snakes[0].segments;
-    let score_before = world.snakes[0].score;
-    world.config.kiosk.enabled = false;
+    let size_before = world.snakes()[0].segments;
+    let score_before = world.snakes()[0].score;
+    {
+        let mut config = world.config().clone();
+        config.kiosk.enabled = false;
+        support::reconfigure(&mut world, config);
+    }
     step(&mut world, 1_500);
-    assert!(world.snakes[0].segments > size_before);
-    assert_eq!(world.snakes[0].score, score_before);
+    assert!(world.snakes()[0].segments > size_before);
+    assert_eq!(world.snakes()[0].score, score_before);
 }
 
 #[test]
 fn kiosk_physical_decay_is_stable_across_step_sizes() {
     let mut fine = world();
     let mut coarse = world();
-    fine.config.dt = 0.008;
-    coarse.config.dt = 0.016;
-    fine.config.kiosk.grace_seconds = 0.0;
-    coarse.config.kiosk.grace_seconds = 0.0;
-    fine.config.kiosk.shrink_per_second = 0.7;
-    coarse.config.kiosk.shrink_per_second = 0.7;
+    {
+        let mut config = fine.config().clone();
+        config.dt = 0.008;
+        support::reconfigure(&mut fine, config);
+    }
+    {
+        let mut config = coarse.config().clone();
+        config.dt = 0.016;
+        support::reconfigure(&mut coarse, config);
+    }
+    {
+        let mut config = fine.config().clone();
+        config.kiosk.grace_seconds = 0.0;
+        support::reconfigure(&mut fine, config);
+    }
+    {
+        let mut config = coarse.config().clone();
+        config.kiosk.grace_seconds = 0.0;
+        support::reconfigure(&mut coarse, config);
+    }
+    {
+        let mut config = fine.config().clone();
+        config.kiosk.shrink_per_second = 0.7;
+        support::reconfigure(&mut fine, config);
+    }
+    {
+        let mut config = coarse.config().clone();
+        config.kiosk.shrink_per_second = 0.7;
+        support::reconfigure(&mut coarse, config);
+    }
     step(&mut fine, 125);
     step(&mut coarse, 63);
     assert!(
-        (score(fine.snakes[0].segments, fine.snakes[0].fam)
-            - score(coarse.snakes[0].segments, coarse.snakes[0].fam))
+        (score(fine.snakes()[0].segments, fine.snakes()[0].fam)
+            - score(coarse.snakes()[0].segments, coarse.snakes()[0].fam))
         .abs()
             < 200.0
     );
-    assert_eq!(fine.snakes[0].score, coarse.snakes[0].score);
+    assert_eq!(fine.snakes()[0].score, coarse.snakes()[0].score);
 }
 
 #[test]
 fn respawn_discards_kiosk_credit_and_old_config_remains_readable() {
     let mut world = world();
     step(&mut world, 13);
-    assert!(world.snakes[0].score > score(world.snakes[0].segments, world.snakes[0].fam));
-    world.snakes[0].alive = false;
+    assert!(world.snakes()[0].score > score(world.snakes()[0].segments, world.snakes()[0].fam));
+    world.retire(0).unwrap();
     world.respawn(0, Point::default(), 0.0, 2).unwrap();
-    assert_eq!(world.snakes[0].score, score(2, 0.0));
-    world.config.kiosk.enabled = false;
+    assert_eq!(world.snakes()[0].score, score(2, 0.0));
+    {
+        let mut config = world.config().clone();
+        config.kiosk.enabled = false;
+        support::reconfigure(&mut world, config);
+    }
     step(&mut world, 3);
-    assert_eq!(world.snakes[0].score, score(2, 0.0));
+    assert_eq!(world.snakes()[0].score, score(2, 0.0));
 
     let mut old: serde_json::Value = serde_json::to_value(Config::sandbox()).unwrap();
     old.as_object_mut().unwrap().remove("kiosk");
@@ -159,16 +214,17 @@ fn respawn_discards_kiosk_credit_and_old_config_remains_readable() {
 fn death_food_uses_penalized_physical_body() {
     let mut world = world();
     step(&mut world, 13);
-    let short_body = world.snakes[0].body.len();
+    let short_body = world.snakes()[0].body.len();
     assert!(short_body < 380);
-    assert!(world.snakes[0].score > score(world.snakes[0].segments, world.snakes[0].fam));
+    assert!(world.snakes()[0].score > score(world.snakes()[0].segments, world.snakes()[0].fam));
 
-    world.add("obstacle", 0, 2).unwrap();
+    support::ring_slot(&mut world, "obstacle", 0, 2).unwrap();
     // A long body crosses just ahead of the player's tip; its head moves away.
-    let player = &world.snakes[0];
+    let player = &world.snakes()[0];
     let x = player.head.x + BODY_RADIUS * scale(player.segments) + 10.0;
     let y = player.head.y;
-    let obstacle = &mut world.snakes[1];
+    let mut detached_obstacle = world.snakes()[1].clone();
+    let obstacle = &mut detached_obstacle;
     obstacle.head = Point { x, y: y + 342.0 };
     obstacle.heading = std::f64::consts::FRAC_PI_2;
     obstacle.body = (0..11)
@@ -178,25 +234,45 @@ fn death_food_uses_penalized_physical_body() {
         })
         .collect();
     obstacle.segments = obstacle.body.len();
-    Simulator::update_mass(obstacle);
+    world
+        .correct_mass(1, obstacle.body.clone(), obstacle.fam)
+        .unwrap();
+    world
+        .correct_pose(1, obstacle.head, obstacle.body.clone(), obstacle.heading)
+        .unwrap();
     world
         .step(&[Some(Action::default()), Some(Action::default())])
         .unwrap();
-    let event = world.deaths.iter().find(|d| d.victim == "player").unwrap();
-    assert_eq!(event.food, 2 * world.snakes[0].body.len() + 1);
+    let event = world
+        .deaths()
+        .iter()
+        .find(|d| d.victim == "player")
+        .unwrap();
+    assert_eq!(event.food, 2 * world.snakes()[0].body.len() + 1);
     assert!(event.food <= 2 * short_body + 1);
 }
 
 #[test]
 fn a_frozen_kiosk_tick_preserves_a_growth_backlog() {
     let mut world = world();
-    world.config.dt = 0.007;
-    world.config.kiosk.grace_seconds = 0.;
-    world.config.kiosk.shrink_per_second = 0.;
-    world.snakes[0].fam = 3.25;
-    Simulator::update_mass(&mut world.snakes[0]);
-    let before = world.snakes[0].length;
+    {
+        let mut config = world.config().clone();
+        config.dt = 0.007;
+
+        config.kiosk.grace_seconds = 0.;
+
+        config.kiosk.shrink_per_second = 0.;
+        support::reconfigure(&mut world, config);
+    }
+    {
+        let mut snake = world.snakes()[0].clone();
+        snake.fam = 3.25;
+        world
+            .correct_mass(0, snake.body.clone(), snake.fam)
+            .unwrap();
+    }
+    let before = world.snakes()[0].length;
     step(&mut world, 1);
-    assert_eq!(world.snakes[0].segments, 380);
-    assert_eq!(world.snakes[0].length, before);
+    assert_eq!(world.snakes()[0].segments, 380);
+    assert_eq!(world.snakes()[0].length, before);
 }

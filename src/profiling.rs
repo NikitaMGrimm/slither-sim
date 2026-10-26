@@ -37,7 +37,7 @@ impl WorldStats {
     pub fn from_world(world: &crate::Simulator) -> Self {
         use crate::Origin;
         let mut food_counts = [0; 3];
-        for f in &world.food {
+        for f in world.food() {
             match f.origin {
                 Some(Origin::Ambient) => food_counts[0] += 1,
                 Some(Origin::Boost) => food_counts[1] += 1,
@@ -46,23 +46,23 @@ impl WorldStats {
             }
         }
         Self {
-            time: world.time,
-            physics_tick_ms: world.config.dt * 1000.0,
-            arena_radius: world.config.radius,
-            spawned: world.snakes.len(),
+            time: world.time(),
+            physics_tick_ms: world.config().dt * 1000.0,
+            arena_radius: world.config().radius,
+            spawned: world.snakes().len(),
             living: world.living(),
             living_segments: world
-                .snakes
+                .snakes()
                 .iter()
                 .filter(|s| s.alive)
                 .map(|s| s.body.len())
                 .sum(),
-            food: world.food.len(),
-            prey: world.prey.len(),
+            food: world.food().len(),
+            prey: world.prey().len(),
             ambient_food: food_counts[0],
             boost_food: food_counts[1],
             death_food: food_counts[2],
-            deaths: world.deaths.len(),
+            deaths: world.deaths().len(),
         }
     }
 }

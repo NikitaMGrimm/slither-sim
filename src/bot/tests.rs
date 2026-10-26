@@ -39,8 +39,15 @@ unsafe impl GlobalAlloc for CountAllocations {
 static ALLOCATOR: CountAllocations = CountAllocations;
 
 fn fixture() -> Observation {
-    let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-    world.add("self", 0, 1).unwrap();
+    let world = Simulator::new(crate::WorldOptions {
+        seed: 1,
+        config: Config::sandbox(),
+        population: crate::InitialPopulation::Placed {
+            ids: vec!["self".into()],
+            placement: crate::Placement::default(),
+        },
+    })
+    .unwrap();
     let mut observation = world.observe(0).unwrap();
     observation.me.head = Point::default();
     observation.me.heading = 0.0;
@@ -1043,16 +1050,26 @@ fn a_turning_approach_to_a_cut_off_does_not_meet_the_victim() {
         intent_weight: 1.0,
         ..Params::default()
     };
-    let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-    world.add("self", 0, 2).unwrap();
-    world.add("victim", 1, 2).unwrap();
-    world.snakes[0] = observation.me.clone();
-    world.snakes[1] = victim;
-    world.food.clear();
+    let mut world = Simulator::new(crate::WorldOptions {
+        seed: 1,
+        config: Config::sandbox(),
+        population: crate::InitialPopulation::Placed {
+            ids: vec!["self".into(), "victim".into()],
+            placement: crate::Placement::default(),
+        },
+    })
+    .unwrap();
+    for (slot, snake) in [observation.me.clone(), victim].into_iter().enumerate() {
+        let speed = crate::InitialSpeed::Known(physics::SpeedState::idle(snake.speed));
+        world
+            .import_life(slot, crate::ReplayLife::from_observed(snake, speed))
+            .unwrap();
+    }
+    world.replace_food(Vec::new()).unwrap();
     let mut action = Action::default();
     let mut scratch = Scratch::default();
     for tick in 0..64 {
-        if !world.snakes[0].alive || !world.snakes[1].alive {
+        if !world.snakes()[0].alive || !world.snakes()[1].alive {
             break;
         }
         if tick % 6 == 0 {
@@ -1069,7 +1086,7 @@ fn a_turning_approach_to_a_cut_off_does_not_meet_the_victim() {
             ])
             .unwrap();
     }
-    assert!(world.snakes[0].alive, "{:?}", world.deaths);
+    assert!(world.snakes()[0].alive, "{:?}", world.deaths());
 }
 
 #[test]

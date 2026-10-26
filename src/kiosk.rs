@@ -200,14 +200,23 @@ mod tests {
 
     #[test]
     fn zero_shrink_rate_preserves_all_pending_growth() {
-        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-        world.add("player", 0, 1).unwrap();
-        let snake = &mut world.snakes[0];
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 1,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
+        world.append_dormant("player".into()).unwrap();
+        let mut detached = world.snakes()[0].clone();
+        detached.alive = true;
+        let snake = &mut detached;
         // Synthetic backlog; HUD score intentionally represents at most one fam.
         snake.segments = 380;
         snake.fam = 3.25;
         snake.body = vec![Point::default(); 380];
-        Simulator::update_mass(snake);
+        snake.length = snake.segments as f64 + snake.fam;
+        snake.score = crate::physics::score(snake.segments, snake.fam);
+        snake.radius = 14.5 * crate::physics::scale(snake.segments);
         let before = snake.clone();
         let mut state = KioskState::default();
         state.step(
@@ -234,9 +243,16 @@ mod tests {
     fn shrink_debits_only_the_mass_represented_by_the_clamped_score() {
         let mut previous = f64::INFINITY;
         for rate in [0.1, 0.01, 0.001, 0.000001] {
-            let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-            world.add("player", 0, 1).unwrap();
-            let snake = &mut world.snakes[0];
+            let mut world = Simulator::new(crate::WorldOptions {
+                seed: 1,
+                config: Config::sandbox(),
+                ..Default::default()
+            })
+            .unwrap();
+            world.append_dormant("player".into()).unwrap();
+            let mut detached = world.snakes()[0].clone();
+            detached.alive = true;
+            let snake = &mut detached;
             snake.segments = 380;
             snake.fam = 3.25;
             snake.body = vec![Point::default(); 380];
@@ -270,9 +286,16 @@ mod tests {
 
     #[test]
     fn backlog_shrink_retains_the_existing_mode_floor() {
-        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-        world.add("player", 0, 1).unwrap();
-        let snake = &mut world.snakes[0];
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 1,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
+        world.append_dormant("player".into()).unwrap();
+        let mut detached = world.snakes()[0].clone();
+        detached.alive = true;
+        let snake = &mut detached;
         snake.segments = 380;
         snake.fam = 3.25;
         snake.body = vec![Point::default(); 380];
@@ -298,9 +321,16 @@ mod tests {
 
     #[test]
     fn historical_twenty_minute_grace_has_no_effect_before_its_boundary() {
-        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-        world.add("player", 0, 1).unwrap();
-        let snake = &mut world.snakes[0];
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 1,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
+        world.append_dormant("player".into()).unwrap();
+        let mut detached = world.snakes()[0].clone();
+        detached.alive = true;
+        let snake = &mut detached;
         snake.segments = 380;
         snake.body = vec![Point::default(); 380];
         snake.fam = 0.0;
@@ -319,9 +349,16 @@ mod tests {
 
     #[test]
     fn physical_boost_below_floor_cannot_create_new_score_credit() {
-        let mut world = Simulator::new(1, Config::sandbox()).unwrap();
-        world.add("player", 0, 1).unwrap();
-        let snake = &mut world.snakes[0];
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 1,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
+        world.append_dormant("player".into()).unwrap();
+        let mut detached = world.snakes()[0].clone();
+        detached.alive = true;
+        let snake = &mut detached;
         let mass = mass_for_score(8_450.0);
         snake.segments = mass.floor() as usize;
         snake.fam = mass - snake.segments as f64;

@@ -119,7 +119,7 @@ fn self_appears_first_and_nothing_is_observed_before_it() {
     assert_eq!(frame.status, ClientStatus::Playing);
     let me = &frame.observation.unwrap().me;
     assert_eq!(me.id, "2");
-    let actual = &backend.world().snakes[2];
+    let actual = &backend.world().snakes()[2];
     assert!(me.body[0].distance(actual.body[0]) < 1.);
     let records = backend.drain_records(2).unwrap();
     let first = records
@@ -153,7 +153,7 @@ fn commands_wait_for_the_uplink_and_frames_for_the_downlink() {
         assert!((emitted / DT - (emitted / DT).round()).abs() < 1e-6);
     }
 
-    let heading = backend.world().snakes[0].heading;
+    let heading = backend.world().snakes()[0].heading;
     let sent_at = backend.time();
     backend
         .send_to(
@@ -167,7 +167,7 @@ fn commands_wait_for_the_uplink_and_frames_for_the_downlink() {
     let mut turned = None;
     for _ in 0..40 {
         backend.advance_ticks(1).unwrap();
-        if turned.is_none() && backend.world().snakes[0].heading != heading {
+        if turned.is_none() && backend.world().snakes()[0].heading != heading {
             turned = Some(backend.time());
         }
     }
@@ -236,7 +236,7 @@ fn variation_and_pauses_never_reorder_either_stream() {
     let spread = transit.iter().copied().fold(f64::MIN, f64::max)
         - transit.iter().copied().fold(f64::MAX, f64::min);
     assert!(spread > 0.02);
-    let snake = &backend.world().snakes[0];
+    let snake = &backend.world().snakes()[0];
     let target = (f64::from(last) * TAU / 251.).rem_euclid(TAU);
     let error = (snake.heading - target)
         .sin()
@@ -446,7 +446,7 @@ fn appearances_only_on_entry_and_unreported_fields_keep_aging() {
     assert!(me.heading.age_seconds > 0.5, "{}", me.heading.age_seconds);
     assert!(me.body.age_seconds < 0.5);
     let observed = frame.observation.unwrap().me;
-    let actual = &backend.world().snakes[0];
+    let actual = &backend.world().snakes()[0];
     assert_eq!(observed.body.len(), actual.body.len());
     for (a, b) in observed.body.iter().zip(&actual.body) {
         assert!(a.distance(*b) < 0.5);
@@ -481,7 +481,7 @@ fn dead_slots_stop_and_reconnect_resets_history() {
             break;
         }
     }
-    assert!(!backend.world().snakes[1].alive);
+    assert!(!backend.world().snakes()[1].alive);
     let frame = backend.frame_for(1).unwrap();
     assert_eq!(frame.status, ClientStatus::Dead);
     assert!(backend.send_to(1, outward).is_err());
@@ -496,10 +496,10 @@ fn dead_slots_stop_and_reconnect_resets_history() {
     assert!(frame.received.snakes.is_empty() && frame.timing.sent_commands.is_empty());
     assert!(frame.timing.ping_seconds.is_none());
     assert_eq!(frame.received.connection_generation, generation + 1);
-    assert!(backend.world().snakes[1].alive);
+    assert!(backend.world().snakes()[1].alive);
     let frame = playing(&mut backend, 1);
     let front = frame.observation.unwrap().me.body[0];
-    assert!(front.distance(backend.world().snakes[1].body[0]) < 1.);
+    assert!(front.distance(backend.world().snakes()[1].body[0]) < 1.);
     let records = backend.drain_records(1).unwrap();
     let disconnect = records
         .iter()
@@ -691,7 +691,7 @@ fn accepted_prey_size_matches_the_received_appearance() {
         config.world.prey.max_size = max_size;
         let mut backend = SimulatorBackend::new(7, config).unwrap();
         backend.advance_ticks(6).unwrap();
-        let authoritative = &backend.world().prey;
+        let authoritative = &backend.world().prey();
         let received = backend.frame().unwrap().observation.unwrap().prey;
         assert_eq!(authoritative.len(), 1);
         assert_eq!(received.len(), 1);
@@ -709,7 +709,7 @@ fn prey_that_cannot_turn_are_shown_without_turning() {
     config.world.prey.turn_rate = 0.;
     let mut backend = SimulatorBackend::new(7, config).unwrap();
     backend.advance_ticks(6).unwrap();
-    let heading = backend.world().prey[0].heading;
+    let heading = backend.world().prey()[0].heading;
     let shown = |backend: &mut SimulatorBackend| {
         let prey = backend.frame().unwrap().observation.unwrap().prey;
         assert_eq!(prey.len(), 1);
@@ -718,7 +718,7 @@ fn prey_that_cannot_turn_are_shown_without_turning() {
     let first = shown(&mut backend);
     assert!((first - heading).abs() < 1e-6);
     backend.advance_ticks(200).unwrap();
-    assert_eq!(backend.world().prey[0].heading, heading);
+    assert_eq!(backend.world().prey()[0].heading, heading);
     assert!((shown(&mut backend) - first).abs() < 1e-6);
 }
 

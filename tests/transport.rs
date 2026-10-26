@@ -122,18 +122,22 @@ fn view(frame: &Value, slot: usize) -> Value {
 
 fn world(seed: u32, agents: usize, config: Value) -> Simulator {
     let config: Config = serde_json::from_value(config).unwrap();
-    let mut world = Simulator::new(seed, config).unwrap();
-    for slot in 0..agents {
-        world.add(slot.to_string(), slot, agents).unwrap();
-    }
-    world
+    Simulator::new(slither_sim::WorldOptions {
+        seed,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..agents).map(|slot| slot.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap()
 }
 
 fn assert_frame_matches(frame: &Value, world: &Simulator) {
-    assert_eq!(frame["time"], json!(world.time));
+    assert_eq!(frame["time"], json!(world.time()));
     assert_eq!(frame["living"], world.living());
-    assert_eq!(frame["radius"], json!(world.config.radius));
-    assert_eq!(frame["vision"], json!(world.config.vision));
+    assert_eq!(frame["radius"], json!(world.radius()));
+    assert_eq!(frame["vision"], json!(world.config().vision));
     for (slot, observation) in world.observe_all().iter().enumerate() {
         match observation {
             Some(observation) => assert_eq!(view(frame, slot), expected(observation, slot)),
@@ -323,8 +327,8 @@ fn snapshots_exclude_hidden_state() {
         assert!(!snapshot.contains_key(hidden));
     }
     let core = world(9, 2, replies[1]["result"]["config"].clone());
-    assert_eq!(snapshot["snakes"], json!(core.snakes));
-    assert_eq!(snapshot["food"], json!(core.food));
+    assert_eq!(snapshot["snakes"], json!(core.snakes()));
+    assert_eq!(snapshot["food"], json!(core.food()));
 }
 
 #[test]
@@ -414,6 +418,7 @@ fn requests_answer_with_the_serve_lines() {
         br#"{"op":"reset","seed":5,"worlds":2,"agents":3}"#,
         br#"{"op":"step","actions":[{"heading":[0,1,2],"boost":[true,false,false]},{"heading":[2,1,0],"boost":[false,false,true]}]}"#,
         br#"{"op":"snapshot","world":1}"#,
+        br#"{"op":"reset","config":{"preset":"sandbox","radius":60,"foodCount":0}}"#,
     ];
     let mut session = transport::Session::new();
     assert_eq!((session.worlds(), session.agents()), (0, 0));
@@ -428,6 +433,9 @@ fn requests_answer_with_the_serve_lines() {
     assert_eq!(lines, served);
     assert_eq!((session.worlds(), session.agents()), (2, 3));
     assert!(session.frame(1).is_some() && session.frame(2).is_none());
+    let reply: Value = serde_json::from_slice(&session.request(input.last().unwrap())).unwrap();
+    assert_eq!(reply["error"], "Initial spawn body extends outside arena");
+    assert_eq!(reply["sessionEnded"], false);
 }
 
 #[test]

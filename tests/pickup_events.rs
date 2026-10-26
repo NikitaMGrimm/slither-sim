@@ -1,48 +1,60 @@
+mod support;
 use slither_sim::*;
 
 #[test]
 fn capture_telemetry_identifies_the_eater_without_changing_the_simulation() {
-    let mut world = Simulator::new(
-        42,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
-    world.add("a", 0, 2).unwrap();
-    world.add("b", 1, 2).unwrap();
-    let s = &world.snakes[1];
+    support::ring_slot(&mut world, "a", 0, 2).unwrap();
+    support::ring_slot(&mut world, "b", 1, 2).unwrap();
+    let s = &world.snakes()[1];
     // Place both items at the center of snake b's pickup circle, ahead of its head.
     let (head, _) = physics::pickup_circle(s.head, s.heading, s.speed, s.segments);
-    world.food.push(Food {
-        x: head.x,
-        y: head.y,
-        size: Some(5.),
-        value: 1.,
-        origin: Some(Origin::Ambient),
-    });
-    world.prey.push(Prey {
-        id: 51,
-        position: head,
-        heading: 0.,
-        target_heading: 0.,
-        speed: 120.,
-        size: 6.,
-    });
+    world
+        .insert_food(Food {
+            x: head.x,
+            y: head.y,
+            size: Some(5.),
+            value: 1.,
+            origin: Some(Origin::Ambient),
+        })
+        .unwrap();
+    world
+        .insert_prey(slither_sim::ReplayPrey {
+            prey: Prey {
+                id: 51,
+                position: head,
+                heading: 0.,
+                target_heading: 0.,
+                speed: 120.,
+                size: 6.,
+            },
+            mode: slither_sim::PreyMode::Roaming,
+        })
+        .unwrap();
     let mut traced = world.clone();
-    assert!(world.pickup_events.is_none());
-    traced.pickup_events = Some(vec![]);
+    assert!(world.pickup_events().is_none());
+    traced.record_events(slither_sim::EventRecording {
+        pickups: true,
+        food_births: traced.food_spawn_events().is_some(),
+    });
     for tick in 0..200 {
         let actions = [Some(Action::default()), Some(Action::default())];
         world.step(&actions).unwrap();
         traced.step(&actions).unwrap();
-        assert_eq!(world.snakes, traced.snakes);
-        assert_eq!(world.food, traced.food);
-        assert_eq!(world.prey, traced.prey);
-        assert_eq!(world.deaths, traced.deaths);
-        let events = traced.pickup_events.as_ref().unwrap();
+        assert_eq!(world.snakes(), traced.snakes());
+        assert_eq!(world.food(), traced.food());
+        assert_eq!(world.prey(), traced.prey());
+        assert_eq!(world.deaths(), traced.deaths());
+        let events = traced.pickup_events().unwrap();
         if tick == 0 {
             assert_eq!(events.len(), 2);
             assert!(events.iter().all(|e| e.eater == 1));

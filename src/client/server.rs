@@ -1931,9 +1931,17 @@ mod tests {
         seat.join(0., &commands, &latency, &mut random).unwrap();
         let _ = received.recv().unwrap();
         seat.decide_at = 1.;
-        let mut world = crate::Simulator::new(1, crate::Config::sandbox()).unwrap();
-        world.add("large", 0, 1).unwrap();
-        let snake = &mut world.snakes[0];
+        let world = crate::Simulator::new(crate::WorldOptions {
+            seed: 1,
+            config: crate::Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["large".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut detached_snake = world.snakes()[0].clone();
+        let snake = &mut detached_snake;
         snake.body = vec![crate::Point::default(); 430];
         let mut packets = vec![super::super::encode::setup(32000., 0.029).unwrap()];
         for id in 1..=152 {
@@ -2199,14 +2207,21 @@ mod tests {
             config.food_count = 0;
             config.ambient_replenish_per_second = 0.;
             config.prey.count = 0;
-            let mut world = crate::Simulator::new(host.seed, config).unwrap();
-            world.add("one", 0, 1).unwrap();
+            let mut world = crate::Simulator::new(crate::WorldOptions {
+                seed: host.seed,
+                config,
+                population: crate::InitialPopulation::Placed {
+                    ids: vec!["one".into()],
+                    placement: crate::Placement::TestRing,
+                },
+            })
+            .unwrap();
             world.step(&[Some(Action::default())]).unwrap();
-            world.snakes[0].alive = false;
+            world.retire(0).unwrap();
             world.step(&[Some(Action::default())]).unwrap();
             world.respawn(0, crate::Point::default(), 0., 2).unwrap();
             world.step(&[Some(Action::default())]).unwrap();
-            assert_eq!(world.config.radius, radius);
+            assert_eq!(world.config().radius, radius);
         }
     }
 

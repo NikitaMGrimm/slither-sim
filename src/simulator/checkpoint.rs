@@ -419,13 +419,13 @@ fn positive(value: f64, field: &str) -> Result<(), SimError> {
 }
 /// Largest accepted radius, heading and one tick of snake travel. Individually
 /// finite values near f64::MAX would overflow on the next step.
-const MAGNITUDE: f64 = 1e150;
+pub(super) const MAGNITUDE: f64 = 1e150;
 /// Living snakes lie within this. A tick moves a head at most one more
 /// MAGNITUDE before the boundary constrains or kills it, so dead snakes and
 /// their food stay within DEAD and continuation remains exportable. Squared
 /// distances between such points stay finite.
-const LIVING: f64 = 2. * MAGNITUDE;
-const DEAD: f64 = LIVING + MAGNITUDE;
+pub(super) const LIVING: f64 = 2. * MAGNITUDE;
+pub(super) const DEAD: f64 = LIVING + MAGNITUDE;
 fn bounded(value: f64, limit: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
     require(value.abs() <= limit, Constraint::OutOfRange, field)
@@ -1232,8 +1232,13 @@ mod tests {
 
     #[test]
     fn export_rejects_each_short_runtime_companion_before_indexing() {
-        let mut source = Simulator::new(7, Config::sandbox()).unwrap();
-        source.add("a", 0, 1).unwrap();
+        let mut source = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
+        source.push_ring("a".into(), 0, 1).unwrap();
         for shorten in [
             (|w: &mut Simulator| w.boosts.clear()) as fn(&mut Simulator),
             |w| w.speeds.clear(),

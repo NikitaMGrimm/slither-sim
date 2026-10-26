@@ -54,7 +54,7 @@ pub(super) struct Board {
 impl Board {
     pub(super) fn new(world: &Simulator, profiles: &[PlayerAppearance]) -> Result<Self, String> {
         let mut order: Vec<(f64, usize)> = world
-            .snakes
+            .snakes()
             .iter()
             .enumerate()
             .filter(|(_, snake)| snake.alive)
@@ -63,7 +63,7 @@ impl Board {
         order.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
         let mut rows = Vec::new();
         for &(_, slot) in order.iter().take(LEADERBOARD_ROWS) {
-            let (segments, fam, _) = represented(&world.snakes[slot]);
+            let (segments, fam, _) = represented(&world.snakes()[slot]);
             let (color, name) = match profiles.get(slot) {
                 Some(profile) => (profile.skin, profile.nickname.clone()),
                 None => (0, slot.to_string().into_bytes()),
@@ -100,7 +100,7 @@ impl SimulatorBackend {
     /// qualification check.
     pub(super) fn victory(&mut self, slot: usize, text: Vec<u8>, now: f64) -> Result<(), String> {
         let life = self.slots[slot].life;
-        let dead = !self.world.snakes[slot].alive;
+        let dead = !self.world.snakes()[slot].alive;
         if self.record.as_ref().is_some_and(|record| {
             record.slot == slot && record.life == life && dead && !record.message_set
         }) {
@@ -122,7 +122,7 @@ impl SimulatorBackend {
             return;
         }
         for slot in 0..self.slots.len() {
-            let snake = &self.world.snakes[slot];
+            let snake = &self.world.snakes()[slot];
             let s = &mut self.slots[slot];
             if snake.alive {
                 s.living = Some(s.life);
@@ -177,7 +177,7 @@ impl SimulatorBackend {
         // and pings return in as little as 4.9 ms; ingesting only arrivals
         // before the tick began added a full tick to both. See section 10 of
         // the scheduler study linked from `MOTION_REPORT_TICKS`.
-        let end = (self.tick + 1) as f64 * self.world.config.dt;
+        let end = (self.tick + 1) as f64 * self.world.config().dt;
         // A drainable capacity failure must not leave an earlier slot's client
         // clock ahead of public time. Check every due departure and its earlier
         // receipts before any client advances into this tick.
@@ -200,7 +200,7 @@ impl SimulatorBackend {
         }
         let actions: Vec<_> = self
             .world
-            .snakes
+            .snakes()
             .iter()
             .zip(&self.slots)
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
@@ -208,7 +208,7 @@ impl SimulatorBackend {
         self.world
             .step(&actions)
             .map_err(|error| error.to_string())?;
-        let births = self.world.food_spawn_events.as_deref().unwrap_or(&[]);
+        let births = self.world.food_spawn_events().unwrap_or(&[]);
         // Physics appends boost/death food, visits pickups in reverse food
         // order, then appends ambient replenishment. Preserve that ordering for
         // co-located lifetimes, including a refill at a just-eaten point.
@@ -217,7 +217,7 @@ impl SimulatorBackend {
             let color = self.food_presentation.newest(&event.food);
             self.food_index.add(&event.food, true, color);
         }
-        for event in self.world.pickup_events.as_deref().unwrap_or(&[]) {
+        for event in self.world.pickup_events().unwrap_or(&[]) {
             if let PickupItem::Prey(prey) = &event.item {
                 self.prey_eaters
                     .entry(prey.id)
@@ -242,7 +242,7 @@ impl SimulatorBackend {
         self.settle_lives();
         self.tick += 1;
         let now = self.time();
-        for (slot, snake) in self.slots.iter_mut().zip(&self.world.snakes) {
+        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
             if slot.connection.setup {
                 slot.connection
                     .food_interest
@@ -297,10 +297,10 @@ impl SimulatorBackend {
             self.food_index.reveal();
         }
         // Food edited outside physics (fixtures) leaves the index behind.
-        if self.food_index.stale || self.food_index.count != self.world.food.len() {
-            self.food_presentation.sync(&self.world.food)?;
+        if self.food_index.stale || self.food_index.count != self.world.food().len() {
+            self.food_presentation.sync(self.world.food())?;
             self.food_index
-                .rebuild(&self.world.food, &self.food_presentation);
+                .rebuild(self.world.food(), &self.food_presentation);
         }
         self.update_reports()?;
         // HUD clocks run even without recipients, so a join meets their phase.
@@ -321,7 +321,7 @@ impl SimulatorBackend {
         }
         // Dead clients still render the world during the stock death fade;
         // withholding deltas leaves opponents extrapolating stale motion.
-        for (slot, snake) in self.slots.iter_mut().zip(&self.world.snakes) {
+        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
             if slot.connection.setup {
                 // Also covers explicit diagnostic broadcasts between physics ticks.
                 slot.connection
@@ -335,7 +335,7 @@ impl SimulatorBackend {
         let eaten = eaten_sectors(&self.food_eaters);
         let bounds: Vec<[f64; 4]> = self
             .world
-            .snakes
+            .snakes()
             .iter()
             .map(|snake| {
                 snake.body.iter().fold(
@@ -344,7 +344,7 @@ impl SimulatorBackend {
                 )
             })
             .collect();
-        let grid = CoverageGrid::new(&self.world.snakes, &bounds, self.world.config.vision);
+        let grid = CoverageGrid::new(self.world.snakes(), &bounds, self.world.config().vision);
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
         // they are consumed by the next broadcast's update_reports.
@@ -359,7 +359,7 @@ impl SimulatorBackend {
             if !connection.setup {
                 continue;
             }
-            let alive = self.world.snakes[slot].alive;
+            let alive = self.world.snakes()[slot].alive;
             let was_over = connection.over;
             // The board is needed when a leaderboard is due or to freeze the
             // rank at death.
@@ -367,7 +367,7 @@ impl SimulatorBackend {
                 board = Some(Board::new(&self.world, &self.profiles)?);
             }
             if !alive && !was_over {
-                let snake = &self.world.snakes[slot];
+                let snake = &self.world.snakes()[slot];
                 let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
@@ -419,7 +419,7 @@ impl SimulatorBackend {
     /// appearance, so a connection still showing a retired ID sees it removed
     /// before its reuse. All 65,536 IDs can therefore be live.
     fn assign_prey_wire(&mut self) -> Result<(), String> {
-        let live: BTreeSet<u64> = self.world.prey.iter().map(|prey| prey.id).collect();
+        let live: BTreeSet<u64> = self.world.prey().iter().map(|prey| prey.id).collect();
         self.prey_wire.retain(|id, _| live.contains(id));
         let mut taken: Option<BTreeSet<u16>> = None;
         for &id in &live {
@@ -441,7 +441,7 @@ impl SimulatorBackend {
 
     /// Open each living snake's shared report opportunities for this tick.
     fn update_reports(&mut self) -> Result<(), String> {
-        for (slot, snake) in self.world.snakes.iter().enumerate() {
+        for (slot, snake) in self.world.snakes().iter().enumerate() {
             let reports = &mut self.reports[slot];
             if !snake.alive {
                 reports.motion_due = false;
@@ -475,7 +475,7 @@ impl SimulatorBackend {
     fn update_prey_clocks(&mut self) -> Result<(), String> {
         let now = self.time();
         let mut clocks = BTreeMap::new();
-        for prey in &self.world.prey {
+        for prey in self.world.prey() {
             let speed = u32::from(encode::speed_u16(prey.speed)?);
             let mut clock = self
                 .prey_clocks
@@ -507,15 +507,15 @@ impl SimulatorBackend {
         map: &mut Option<Minimap>,
     ) -> Result<Option<Vec<u8>>, String> {
         let connection = &self.slots[slot].connection;
-        if !self.world.snakes[slot].alive || !connection.snakes.contains_key(slot) {
+        if !self.world.snakes()[slot].alive || !connection.snakes.contains_key(slot) {
             return Ok(None);
         }
         if map.is_none() {
             *map = Some(Minimap::from_snakes(
-                &self.world.snakes,
+                self.world.snakes(),
                 &Arena {
                     center: Point::default(),
-                    radius: self.world.config.radius,
+                    radius: self.world.radius(),
                 },
                 self.config.minimap_side,
             )?);
@@ -548,7 +548,7 @@ impl SimulatorBackend {
         snake_deltas: &mut [SnakeDeltaCache],
     ) -> Result<PacketViews, String> {
         let world = &self.world;
-        let me = &world.snakes[slot];
+        let me = &world.snakes()[slot];
         let record = self
             .record
             .as_ref()
@@ -578,12 +578,12 @@ impl SimulatorBackend {
                 packets.push(encode::removal(id, true));
             }
         }
-        let radius = world.config.radius.round() as u32;
+        let radius = world.radius().round() as u32;
         if connection.radius != radius {
             connection.radius = radius;
-            packets.push(encode::radius(world.config.radius)?);
+            packets.push(encode::radius(world.radius())?);
         }
-        let vision = world.config.vision;
+        let vision = world.config().vision;
         let head = me.head;
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
@@ -594,7 +594,7 @@ impl SimulatorBackend {
         others.dedup();
         let order = std::iter::once(slot).chain(others.into_iter().filter(|&i| i != slot));
         for i in order {
-            let snake = &world.snakes[i];
+            let snake = &world.snakes()[i];
             let life = self.slots[i].life;
             let control = self.slots[i].control.heading;
             let eligible = snake.alive && (i == slot || covered(head, snake, bounds[i], vision));
@@ -678,7 +678,7 @@ impl SimulatorBackend {
             None
         };
         let mut visible = BTreeMap::new();
-        for prey in &world.prey {
+        for prey in world.prey() {
             if prey.position.distance(head) <= vision {
                 visible.entry(prey.id).or_insert(prey);
             }

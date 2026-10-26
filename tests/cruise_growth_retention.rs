@@ -1,3 +1,4 @@
+mod support;
 use serde_json::Value;
 use slither_sim::{
     Action, Config, KioskConfig, Point, Simulator, SpeedModel, SpeedState,
@@ -157,9 +158,9 @@ fn illustrative_growth_anchors_match_retained_simulator_and_reject_direct_speed(
     ))
     .unwrap();
     let measured: [f64; 3] = std::array::from_fn(|index| projected_sp(&fixture["windows"][index]));
-    let mut retained = Simulator::new(
-        42,
-        Config {
+    let mut retained = Simulator::new(slither_sim::WorldOptions {
+        seed: 42,
+        config: Config {
             radius: 100_000.0,
             food_count: 0,
             ambient_replenish_per_second: 0.0,
@@ -171,14 +172,38 @@ fn illustrative_growth_anchors_match_retained_simulator_and_reject_direct_speed(
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["illustrative_growth".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    retained.add("illustrative_growth", 0, 1).unwrap();
-    retained.snakes[0].head = Point::default();
-    retained.snakes[0].heading = 0.0;
-    retained.snakes[0].body = vec![Point::default(), Point { x: -42.0, y: 0.0 }];
-    let spawn_speed = retained.snakes[0].speed;
-    assert_eq!(retained.snakes[0].segments, 2);
+    {
+        let mut snake = retained.snakes()[0].clone();
+        snake.head = Point::default();
+        retained
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = retained.snakes()[0].clone();
+        snake.heading = 0.0;
+        retained
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    {
+        let mut snake = retained.snakes()[0].clone();
+        snake.body = vec![Point::default(), Point { x: -42.0, y: 0.0 }];
+        retained
+            .correct_mass(0, snake.body.clone(), snake.fam)
+            .unwrap();
+        retained
+            .correct_pose(0, snake.head, snake.body.clone(), snake.heading)
+            .unwrap();
+    }
+    let spawn_speed = retained.snakes()[0].speed;
+    assert_eq!(retained.snakes()[0].segments, 2);
     assert_eq!(spawn_speed, base_speed(2));
     let idle = Some(Action {
         heading: 0.0,
@@ -186,38 +211,48 @@ fn illustrative_growth_anchors_match_retained_simulator_and_reject_direct_speed(
     });
     for _ in 0..350 {
         retained.step(&[idle]).unwrap();
-        assert!(retained.snakes[0].alive);
-        assert_eq!(retained.snakes[0].segments, 2);
-        assert_eq!(retained.snakes[0].speed, spawn_speed);
+        assert!(retained.snakes()[0].alive);
+        assert_eq!(retained.snakes()[0].segments, 2);
+        assert_eq!(retained.snakes()[0].speed, spawn_speed);
     }
-    assert!((retained.snakes[0].speed * 0.032 - measured[0]).abs() < 0.01);
-    retained.snakes[0].fam += 20.99;
+    assert!((retained.snakes()[0].speed * 0.032 - measured[0]).abs() < 0.01);
+    {
+        let mut snake = retained.snakes()[0].clone();
+        snake.fam += 20.99;
+        retained
+            .correct_mass(0, snake.body.clone(), snake.fam)
+            .unwrap();
+    }
     let mut direct = retained.clone();
-    direct.config.speed_model = SpeedModel::DirectSpeed;
+    {
+        let mut config = direct.config().clone();
+        config.speed_model = SpeedModel::DirectSpeed;
+        support::reconfigure(&mut direct, config);
+    }
     let mut state = SpeedState::idle(spawn_speed);
     for _ in 0..1100 {
         retained.step(&[idle]).unwrap();
         direct.step(&[idle]).unwrap();
-        assert!(retained.snakes[0].alive && direct.snakes[0].alive);
-        assert_eq!(retained.snakes[0].speed, spawn_speed);
+        assert!(retained.snakes()[0].alive && direct.snakes()[0].alive);
+        assert_eq!(retained.snakes()[0].speed, spawn_speed);
         assert_eq!(
             state.step(
                 false,
-                retained.snakes[0].segments,
+                retained.snakes()[0].segments,
                 LOOP_SECONDS,
                 SpeedModel::RetainedProgress
             ),
-            retained.snakes[0].speed
+            retained.snakes()[0].speed
         );
         assert_eq!(state.progress(), 0.0);
     }
-    assert_eq!(retained.snakes[0].segments, 22);
-    assert_eq!(direct.snakes[0].segments, 22);
-    assert_eq!(retained.snakes[0].body.len(), 22);
-    assert!((retained.snakes[0].speed * 0.032 - measured[1]).abs() < 0.01);
-    assert!((direct.snakes[0].speed - base_speed(22)).abs() < 1e-10);
+    assert_eq!(retained.snakes()[0].segments, 22);
+    assert_eq!(direct.snakes()[0].segments, 22);
+    assert_eq!(retained.snakes()[0].body.len(), 22);
+    assert!((retained.snakes()[0].speed * 0.032 - measured[1]).abs() < 0.01);
+    assert!((direct.snakes()[0].speed - base_speed(22)).abs() < 1e-10);
     assert!(
-        (direct.snakes[0].speed * 0.032 - measured[1]).abs() > 0.03,
+        (direct.snakes()[0].speed * 0.032 - measured[1]).abs() > 0.03,
         "DirectSpeed must fail the grown-idle fixture's 0.01-sp agreement"
     );
     assert_eq!(
@@ -230,37 +265,37 @@ fn illustrative_growth_anchors_match_retained_simulator_and_reject_direct_speed(
     let boost_seconds = (commands[1]["local_ms"].as_f64().unwrap()
         - commands[0]["local_ms"].as_f64().unwrap())
         / 1000.0;
-    let boost_ticks = (boost_seconds / retained.config.dt).ceil() as usize;
+    let boost_ticks = (boost_seconds / retained.config().dt).ceil() as usize;
     let boost = Some(Action {
         heading: 0.0,
         boost: true,
     });
     for _ in 0..boost_ticks {
         retained.step(&[boost]).unwrap();
-        assert!(retained.snakes[0].alive && retained.is_boosting(0));
-        assert_eq!(retained.snakes[0].segments, 22);
+        assert!(retained.snakes()[0].alive && retained.is_boosting(0));
+        assert_eq!(retained.snakes()[0].segments, 22);
         assert_eq!(
             state.step(true, 22, LOOP_SECONDS, SpeedModel::RetainedProgress),
-            retained.snakes[0].speed
+            retained.snakes()[0].speed
         );
     }
-    assert_eq!(retained.snakes[0].speed, BOOST_SPEED);
+    assert_eq!(retained.snakes()[0].speed, BOOST_SPEED);
     assert_eq!(state.progress(), 1.0);
     for _ in 0..400 {
         retained.step(&[idle]).unwrap();
-        assert!(retained.snakes[0].alive && !retained.is_boosting(0));
-        assert_eq!(retained.snakes[0].segments, 22);
+        assert!(retained.snakes()[0].alive && !retained.is_boosting(0));
+        assert_eq!(retained.snakes()[0].segments, 22);
         assert_eq!(
             state.step(false, 22, LOOP_SECONDS, SpeedModel::RetainedProgress),
-            retained.snakes[0].speed
+            retained.snakes()[0].speed
         );
     }
     assert_eq!(state.progress(), 0.0);
-    assert_eq!(retained.snakes[0].speed, base_speed(22));
-    assert!((retained.snakes[0].speed * 0.032 - measured[2]).abs() < 0.01);
+    assert_eq!(retained.snakes()[0].speed, base_speed(22));
+    assert!((retained.snakes()[0].speed * 0.032 - measured[2]).abs() < 0.01);
     assert!(measured[2] - measured[1] > 0.03);
     assert!(retained.boost_accounting(0).unwrap().boost_mass_spent > 0.0);
-    assert!(retained.food.is_empty() && direct.food.is_empty());
-    assert!(retained.prey.is_empty() && direct.prey.is_empty());
-    assert!(retained.deaths.is_empty() && direct.deaths.is_empty());
+    assert!(retained.food().is_empty() && direct.food().is_empty());
+    assert!(retained.prey().is_empty() && direct.prey().is_empty());
+    assert!(retained.deaths().is_empty() && direct.deaths().is_empty());
 }

@@ -367,12 +367,52 @@ class ErrorTests(unittest.TestCase):
         reply = encoded.request({"op": "reset", "seed": 1, "worlds": 2, "agents": 3, "decisionTicks": 0})
         self.assertEqual(str(caught.exception), reply["error"])
 
+    def test_scalar_reset_errors_match_json_exactly(self):
+        typed, encoded = Session(), Session()
+        reset(typed)
+        before = fingerprint(typed)
+        for field in ["seed", "worlds", "agents", "decision_ticks"]:
+            for value in [True, -1, 1.5, "2"]:
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(ValueError) as caught:
+                        typed.reset(**{field: value})
+                    wire_field = "decisionTicks" if field == "decision_ticks" else field
+                    reply = encoded.request({"op": "reset", wire_field: value})
+                    self.assertEqual(str(caught.exception), reply["error"])
+                    self.assertEqual(fingerprint(typed), before)
+
+    def test_tiny_arena_reset_keeps_legacy_error_and_previous_frames(self):
+        typed, encoded = Session(), Session()
+        reset(typed)
+        before = fingerprint(typed)
+        config = {"preset": "sandbox", "radius": 60, "foodCount": 0}
+        with self.assertRaises(ValueError) as caught:
+            typed.reset(config=config)
+        reply = encoded.request({"op": "reset", "config": config})
+        self.assertEqual(reply["error"], "Initial spawn body extends outside arena")
+        self.assertEqual(str(caught.exception), reply["error"])
+        self.assertEqual(fingerprint(typed), before)
+
     def test_default_reset_matches_the_protocol_defaults(self):
         typed, encoded = Session(), Session()
         typed.reset()
         reply = encoded.request({"op": "reset"})
         self.assertEqual((typed.worlds, typed.agents), (1, 4))
         self.assertEqual(fingerprint(typed), reply["result"]["worlds"])
+
+    def test_typed_admission_matches_json_and_failure_keeps_frames(self):
+        typed, encoded = Session(), Session()
+        placement = {"kind": "admitted", "attempts": 64, "preferredClearance": 300}
+        options = {"seed": 7, "agents": 4, "config": {"preset": "sandbox"}, "placement": placement}
+        typed.reset(**options)
+        reply = encoded.request({"op": "reset", **options})
+        self.assertEqual(fingerprint(typed), reply["result"]["worlds"])
+        before = fingerprint(typed)
+        for bad in [{"kind": "admitted", "attempts": 0},
+                    {"kind": "admitted", "preferredClearance": -1}]:
+            with self.subTest(bad), self.assertRaises(ValueError):
+                typed.reset(placement=bad)
+            self.assertEqual(fingerprint(typed), before)
 
     def test_rejected_steps_change_no_world(self):
         session, control = Session(), Session()

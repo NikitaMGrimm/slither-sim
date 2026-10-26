@@ -1,3 +1,4 @@
+mod support;
 use serde_json::{Value, json};
 use slither_sim::{
     Action, Config, Constraint, CoreStepError, ErrorKind, EventRecording, Food, Point, PreyMode,
@@ -22,9 +23,9 @@ fn bytes(value: &Value) -> Vec<u8> {
     serde_json::to_vec(value).unwrap()
 }
 fn world() -> Simulator {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             food_count: 10,
             ambient_replenish_per_second: 20.,
             prey: slither_sim::PreyConfig {
@@ -34,13 +35,20 @@ fn world() -> Simulator {
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..3).map(|i| i.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    for i in 0..3 {
-        world.add(i.to_string(), i, 3).unwrap();
-    }
-    world.pickup_events = Some(Vec::new());
-    world.food_spawn_events = Some(Vec::new());
+    world.record_events(slither_sim::EventRecording {
+        pickups: true,
+        food_births: world.food_spawn_events().is_some(),
+    });
+    world.record_events(slither_sim::EventRecording {
+        food_births: true,
+        pickups: world.pickup_events().is_some(),
+    });
     world
 }
 
@@ -55,12 +63,17 @@ fn radius_controller_and_population_sizing_settings_round_trip_and_continue() {
                 ambient_replenish_per_second: 0.,
                 ..Config::official(4)
             };
-            let mut original = Simulator::new(7, config).unwrap();
+            let mut original = Simulator::new(slither_sim::WorldOptions {
+                seed: 7,
+                config,
+                population: slither_sim::InitialPopulation::Empty,
+            })
+            .unwrap();
             original.step(&[]).unwrap();
             let saved = value(&original);
             let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
-            assert_eq!(restored.config.dynamic_radius, dynamic_radius);
-            assert_eq!(restored.config.size_to_population, size_to_population);
+            assert_eq!(restored.config().dynamic_radius, dynamic_radius);
+            assert_eq!(restored.config().size_to_population, size_to_population);
             assert_eq!(value(&restored), saved);
             for _ in 0..10 {
                 original.step(&[]).unwrap();
@@ -73,8 +86,8 @@ fn radius_controller_and_population_sizing_settings_round_trip_and_continue() {
 fn rejects_atomic(incumbent: &mut Simulator, bad: &Value) -> slither_sim::SimError {
     let before = value(incumbent);
     let events = (
-        incumbent.pickup_events.clone(),
-        incumbent.food_spawn_events.clone(),
+        incumbent.pickup_events().map(<[_]>::to_vec),
+        incumbent.food_spawn_events().map(<[_]>::to_vec),
     );
     let cause = incumbent.restore(&bytes(bad), options()).unwrap_err();
     assert!(matches!(
@@ -85,8 +98,8 @@ fn rejects_atomic(incumbent: &mut Simulator, bad: &Value) -> slither_sim::SimErr
     assert_eq!(value(incumbent), before);
     assert_eq!(
         (
-            incumbent.pickup_events.clone(),
-            incumbent.food_spawn_events.clone()
+            incumbent.pickup_events().map(<[_]>::to_vec),
+            incumbent.food_spawn_events().map(<[_]>::to_vec)
         ),
         events
     );
@@ -332,7 +345,7 @@ fn restore_options_choose_fresh_event_buffers_and_parallelism() {
     let saved = value(&source);
     let plain = Simulator::from_checkpoint(&bytes(&saved), RestoreOptions::default()).unwrap();
     assert_eq!(value(&plain), saved);
-    assert!(plain.pickup_events.is_none() && plain.food_spawn_events.is_none());
+    assert!(plain.pickup_events().is_none() && plain.food_spawn_events().is_none());
     #[cfg(feature = "parallel")]
     assert!(!plain.parallel());
     let chosen = Simulator::from_checkpoint(
@@ -348,8 +361,8 @@ fn restore_options_choose_fresh_event_buffers_and_parallelism() {
     )
     .unwrap();
     assert_eq!(value(&chosen), saved);
-    assert_eq!(chosen.pickup_events, Some(Vec::new()));
-    assert_eq!(chosen.food_spawn_events, Some(Vec::new()));
+    assert_eq!(chosen.pickup_events(), Some([].as_slice()));
+    assert_eq!(chosen.food_spawn_events(), Some([].as_slice()));
     #[cfg(feature = "parallel")]
     assert!(chosen.parallel());
     assert_eq!(source.observe_all(), chosen.observe_all());
@@ -361,14 +374,17 @@ fn valid_replay_states_are_not_restricted_to_spawn_invariants() {
     for _ in 0..5 {
         source.step(&[Some(Action::default()); 3]).unwrap();
     }
+    let body = vec![Point { x: 2000., y: 0. }; 512];
+    source.correct_mass(0, body.clone(), 3.25).unwrap();
+    source
+        .correct_pose(
+            0,
+            Point { x: 2001., y: 0. },
+            body,
+            source.snakes()[0].heading,
+        )
+        .unwrap();
     let mut checkpoint = value(&source);
-    let snake = &mut source.snakes[0];
-    snake.segments = 512;
-    snake.fam = 3.25;
-    snake.body = vec![Point { x: 2000., y: 0. }; 512];
-    snake.head = Point { x: 2001., y: 0. };
-    Simulator::update_mass(snake);
-    checkpoint["state"]["slots"][0]["snake"] = serde_json::to_value(snake).unwrap();
     checkpoint["state"]["slots"][0]["speed"] = json!({"speed":200.,"progress":0.});
     checkpoint["state"]["prey"][0]["size"] = json!(18.8);
     checkpoint["state"]["prey"][0]["nextDecision"] = json!(0.);
@@ -378,14 +394,14 @@ fn valid_replay_states_are_not_restricted_to_spawn_invariants() {
     let restored = Simulator::from_checkpoint(&bytes(&checkpoint), options()).unwrap();
     let state = value(&restored);
     assert_eq!(state["state"], checkpoint["state"]);
-    assert_eq!(restored.snakes[0].segments, 512);
-    assert_ne!(restored.snakes[0].head, restored.snakes[0].body[0]);
+    assert_eq!(restored.snakes()[0].segments, 512);
+    assert_ne!(restored.snakes()[0].head, restored.snakes()[0].body[0]);
 }
 
 fn intervention(world: &mut Simulator, tick: usize) -> bool {
     let mut respawned = false;
-    for i in 0..world.snakes.len() {
-        if !world.snakes[i].alive {
+    for i in 0..world.snakes().len() {
+        if !world.snakes()[i].alive {
             world
                 .respawn(
                     i,
@@ -401,25 +417,41 @@ fn intervention(world: &mut Simulator, tick: usize) -> bool {
         }
     }
     if tick.is_multiple_of(41) {
-        world.food.clear();
+        world.replace_food(Vec::new()).unwrap();
     }
-    let snake = &world.snakes[0];
+    let snake = &world.snakes()[0];
     let (point, _) = physics::pickup_circle(snake.head, snake.heading, snake.speed, snake.segments);
     if tick.is_multiple_of(17) {
-        world.food.push(Food {
-            x: point.x,
-            y: point.y,
-            value: 0.5,
-            size: None,
-            origin: None,
-        });
+        world
+            .insert_food(Food {
+                x: point.x,
+                y: point.y,
+                value: 0.5,
+                size: None,
+                origin: None,
+            })
+            .unwrap();
     }
-    if tick.is_multiple_of(37) && !world.prey.is_empty() {
-        world.prey[0].position = point;
-        world.prey[0].speed = 0.;
+    if tick.is_multiple_of(37) && !world.prey().is_empty() {
+        {
+            let mut prey = world.prey()[0].clone();
+            prey.position = point;
+            support::restore_prey(world, 0, prey);
+        }
+        {
+            let mut prey = world.prey()[0].clone();
+            prey.speed = 0.;
+            support::restore_prey(world, 0, prey);
+        }
     }
     if tick % 79 == 20 {
-        world.snakes[0].head.x = world.config.radius * 2.;
+        {
+            let mut snake = world.snakes()[0].clone();
+            snake.head.x = world.radius() * 2.;
+            world
+                .correct_pose(0, snake.head, snake.body, snake.heading)
+                .unwrap();
+        }
     }
     respawned
 }
@@ -451,10 +483,17 @@ fn continuation_matches_for_320_ticks_across_every_lifecycle_phase() {
         },
         ..Config::sandbox()
     };
-    let mut uninterrupted = Simulator::new(91, config).unwrap();
+    let mut uninterrupted = Simulator::new(slither_sim::WorldOptions {
+        seed: 91,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..3).map(|i| i.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
     for i in 0..3 {
-        uninterrupted.add(i.to_string(), i, 3).unwrap();
-        uninterrupted.snakes[i].alive = false;
+        uninterrupted.retire(i).unwrap();
         uninterrupted
             .respawn(
                 i,
@@ -467,10 +506,16 @@ fn continuation_matches_for_320_ticks_across_every_lifecycle_phase() {
             )
             .unwrap();
     }
-    uninterrupted.pickup_events = Some(Vec::new());
-    uninterrupted.food_spawn_events = Some(Vec::new());
+    uninterrupted.record_events(slither_sim::EventRecording {
+        pickups: true,
+        food_births: uninterrupted.food_spawn_events().is_some(),
+    });
+    uninterrupted.record_events(slither_sim::EventRecording {
+        food_births: true,
+        pickups: uninterrupted.pickup_events().is_some(),
+    });
     let actions = |w: &Simulator, tick: usize| {
-        w.snakes
+        w.snakes()
             .iter()
             .map(|s| {
                 s.alive.then_some(Action {
@@ -487,8 +532,8 @@ fn continuation_matches_for_320_ticks_across_every_lifecycle_phase() {
     let encoded = bytes(&value(&uninterrupted));
     let mut resumed = Simulator::from_checkpoint(&encoded, options()).unwrap();
     assert_eq!(value(&uninterrupted), value(&resumed));
-    assert_eq!(resumed.pickup_events, Some(Vec::new()));
-    assert_eq!(resumed.food_spawn_events, Some(Vec::new()));
+    assert_eq!(resumed.pickup_events(), Some([].as_slice()));
+    assert_eq!(resumed.food_spawn_events(), Some([].as_slice()));
     let mut respawns = 0;
     let mut pickups = 0;
     let mut prey_pickups = 0;
@@ -510,26 +555,28 @@ fn continuation_matches_for_320_ticks_across_every_lifecycle_phase() {
             "observations {tick}"
         );
         assert_eq!(
-            uninterrupted.pickup_events, resumed.pickup_events,
+            uninterrupted.pickup_events(),
+            resumed.pickup_events(),
             "pickups {tick}"
         );
         assert_eq!(
-            uninterrupted.food_spawn_events, resumed.food_spawn_events,
+            uninterrupted.food_spawn_events(),
+            resumed.food_spawn_events(),
             "births {tick}"
         );
-        pickups += uninterrupted.pickup_events.as_ref().unwrap().len();
+        pickups += uninterrupted.pickup_events().unwrap().len();
         prey_pickups += uninterrupted
-            .pickup_events
+            .pickup_events()
             .as_ref()
             .unwrap()
             .iter()
             .filter(|e| matches!(e.item, slither_sim::PickupItem::Prey(_)))
             .count();
-        births += uninterrupted.food_spawn_events.as_ref().unwrap().len();
+        births += uninterrupted.food_spawn_events().unwrap().len();
     }
     assert!(respawns > 0 && pickups > 0 && prey_pickups > 0 && births > 0);
-    assert!(!uninterrupted.deaths.is_empty());
-    assert!(uninterrupted.snakes.iter().enumerate().any(|(i, _)| {
+    assert!(!uninterrupted.deaths().is_empty());
+    assert!(uninterrupted.snakes().iter().enumerate().any(|(i, _)| {
         uninterrupted
             .boost_accounting(i)
             .unwrap()
@@ -537,26 +584,28 @@ fn continuation_matches_for_320_ticks_across_every_lifecycle_phase() {
             > 0.
     }));
     assert_eq!(value(&uninterrupted)["state"]["radiusUpdateIndex"], 3);
-    assert_eq!(uninterrupted.config.radius, 1300.);
+    assert_eq!(uninterrupted.radius(), 1300.);
 }
 
 #[test]
 fn stopped_checkpoint_stays_stopped_and_retry_changes_nothing() {
     let mut source = world();
-    let s = &source.snakes[0];
+    let s = &source.snakes()[0];
     let (p, _) = physics::pickup_circle(s.head, s.heading, s.speed, s.segments);
-    source.food = vec![
-        Food {
-            x: p.x,
-            y: p.y,
-            value: f64::MAX,
-            size: None,
-            origin: None
-        };
-        2
-    ];
+    source
+        .replace_food(vec![
+            Food {
+                x: p.x,
+                y: p.y,
+                value: f64::MAX,
+                size: None,
+                origin: None
+            };
+            2
+        ])
+        .unwrap();
     let a = source
-        .snakes
+        .snakes()
         .iter()
         .map(|s| {
             Some(Action {
@@ -580,9 +629,9 @@ fn stopped_checkpoint_stays_stopped_and_retry_changes_nothing() {
 
 #[test]
 fn nonfinite_prey_motion_cause_survives_checkpoint_restore() {
-    let mut source = Simulator::new(
-        7,
-        Config {
+    let mut source = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             dt: 2.,
             boundary_mode: slither_sim::BoundaryMode::Hard,
             food_count: 0,
@@ -597,7 +646,8 @@ fn nonfinite_prey_motion_cause_survives_checkpoint_restore() {
             },
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     assert!(matches!(source.step(&[]), Err(CoreStepError::Stopped(_))));
     let original = value(&source);
@@ -614,9 +664,9 @@ fn nonfinite_prey_motion_cause_survives_checkpoint_restore() {
 
 #[test]
 fn mass_floor_kiosk_credit_and_cross_life_kill_history_round_trip() {
-    let source = Simulator::new(
-        7,
-        Config {
+    let source = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             radius: 1000.,
             food_count: 0,
             ambient_replenish_per_second: 0.,
@@ -626,10 +676,11 @@ fn mass_floor_kiosk_credit_and_cross_life_kill_history_round_trip() {
             kill_score_seconds: Some(2.),
             ..Config::battledome()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     let mut source = source;
-    source.add("a", 0, 1).unwrap();
+    support::ring_slot(&mut source, "a", 0, 1).unwrap();
     let mut saved = value(&source);
     saved["state"]["slots"][0]["kiosk"]["scoreCredit"] = json!(37.);
     saved["state"]["slots"][0]["snake"]["score"] = json!(437.);
@@ -649,77 +700,65 @@ fn mass_floor_kiosk_credit_and_cross_life_kill_history_round_trip() {
 }
 
 #[test]
-fn export_rejects_invalid_public_edits_and_orphan_prey_controls() {
+fn loader_rejects_invalid_entity_edits_without_changing_the_incumbent() {
     for change in [
-        (|w: &mut Simulator| w.snakes[0].fam = f64::NAN) as fn(&mut Simulator),
-        |w| w.snakes[0].body.clear(),
-        |w| w.snakes[1].id = w.snakes[0].id.clone(),
-        |w| w.food[0].x = f64::INFINITY,
-        // Finite but large enough to overflow continuation arithmetic.
-        |w| w.food[0].x = 1e200,
-        |w| w.snakes[0].speed = 1e200,
-        |w| w.prey[0].heading = -f64::MAX,
-        |w| {
-            let s = &mut w.snakes[0];
-            s.body[1].x = 1e200;
-            Simulator::update_mass(s);
-        },
-        |w| w.prey[0].size = 0.,
-        |w| w.config.dt = -1.,
-        |w| {
-            let id = w.prey[0].id;
-            w.set_prey_mode(id, PreyMode::Outward).unwrap();
-            w.prey.clear();
-        },
+        (|v: &mut Value| v["state"]["slots"][0]["snake"]["fam"] = Value::Null) as fn(&mut Value),
+        |v| v["state"]["slots"][0]["snake"]["body"] = json!([]),
+        |v| v["state"]["slots"][1]["snake"]["id"] = v["state"]["slots"][0]["snake"]["id"].clone(),
+        |v| v["state"]["food"][0]["x"] = Value::Null,
+        |v| v["state"]["food"][0]["x"] = json!(1e200),
+        |v| v["state"]["slots"][0]["snake"]["speed"] = json!(1e200),
+        |v| v["state"]["slots"][0]["snake"]["body"][1]["x"] = json!(1e200),
+        |v| v["state"]["prey"][0]["heading"] = json!(-f64::MAX),
+        |v| v["state"]["prey"][0]["size"] = json!(0.),
+        |v| v["config"]["dt"] = json!(-1.),
     ] {
         let mut source = world();
-        change(&mut source);
-        assert!(matches!(
-            source.checkpoint().unwrap_err().kind,
-            ErrorKind::InvalidCheckpoint { .. }
-        ));
+        let mut bad = value(&source);
+        change(&mut bad);
+        rejects_atomic(&mut source, &bad);
     }
 }
 
 #[test]
 fn restored_kill_counts_saturate_when_one_tick_credits_several() {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..3).map(|i| i.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    for i in 0..3 {
-        world.add(i.to_string(), i, 3).unwrap();
-    }
     // Two heads beside the third snake's body, both lethal next tick.
     for (i, y) in [(0, 0.), (1, 84.)] {
-        let s = &mut world.snakes[i];
-        s.head = Point { x: 0., y };
-        s.heading = PI;
-        s.body = vec![s.head; 30];
-        s.segments = 30;
-        Simulator::update_mass(s);
+        let head = Point { x: 0., y };
+        let body = vec![head; 30];
+        let fam = world.snakes()[i].fam;
+        world.correct_mass(i, body.clone(), fam).unwrap();
+        world.correct_pose(i, head, body, PI).unwrap();
     }
-    let s = &mut world.snakes[2];
-    s.head = Point { x: -25., y: 342. };
-    s.heading = FRAC_PI_2;
-    s.body = (0..11)
+    let body = (0..11)
         .map(|i| Point {
             x: -25.,
             y: 300. - 42. * i as f64,
         })
-        .collect();
-    s.segments = 11;
-    Simulator::update_mass(s);
+        .collect::<Vec<_>>();
+    let fam = world.snakes()[2].fam;
+    world.correct_mass(2, body.clone(), fam).unwrap();
+    world
+        .correct_pose(2, Point { x: -25., y: 342. }, body, FRAC_PI_2)
+        .unwrap();
     let mut source = value(&world);
     source["state"]["slots"][2]["snake"]["kills"] = json!(usize::MAX - 1);
     let mut world = Simulator::from_checkpoint(&bytes(&source), options()).unwrap();
     let actions: Vec<_> = world
-        .snakes
+        .snakes()
         .iter()
         .map(|s| {
             Some(Action {
@@ -730,22 +769,25 @@ fn restored_kill_counts_saturate_when_one_tick_credits_several() {
         .collect();
     world.step(&actions).unwrap();
     let credited = |d: &&slither_sim::DeathEvent| d.killer.as_deref() == Some("2");
-    assert_eq!(world.deaths.iter().filter(credited).count(), 2);
-    assert_eq!(world.snakes[2].kills, usize::MAX);
+    assert_eq!(world.deaths().iter().filter(credited).count(), 2);
+    assert_eq!(world.snakes()[2].kills, usize::MAX);
 }
 
 #[test]
 fn a_step_from_an_accepted_far_state_stays_exportable() {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    world.add("a", 0, 1).unwrap();
     let mut source = value(&world);
     source["config"]["radius"] = json!(1e150);
     source["state"]["radius"] = json!(1e150);
@@ -766,7 +808,7 @@ fn a_step_from_an_accepted_far_state_stays_exportable() {
             boost: false,
         })])
         .unwrap();
-    assert!(world.snakes[0].head.x > 1e150);
+    assert!(world.snakes()[0].head.x > 1e150);
     let saved = value(&world);
     let restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
     assert_eq!(value(&restored), saved);
@@ -785,19 +827,38 @@ fn live_radius_inside_the_initial_spawn_ring_still_checkpoints() {
         ..Config::sandbox()
     };
     config.kiosk.enabled = false;
-    let mut world = Simulator::new(7, config).unwrap();
-    world.add("a", 0, 1).unwrap();
-    let heading = world.snakes[0].heading;
+    let mut world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config,
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
+    .unwrap();
+    let heading = world.snakes()[0].heading;
     world
         .step(&[Some(Action {
             heading,
             boost: false,
         })])
         .unwrap();
-    assert_eq!(world.config.radius, 550.);
+    assert_eq!(world.radius(), 550.);
     let saved = value(&world);
     let restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
     assert_eq!(value(&restored), saved);
+}
+
+#[test]
+fn checked_prey_removal_cannot_leave_orphan_controls() {
+    let mut source = world();
+    let id = source.prey()[0].id;
+    source.set_prey_mode(id, PreyMode::Outward).unwrap();
+    source.replace_prey(Vec::new()).unwrap();
+    assert!(source.set_prey_mode(id, PreyMode::Outward).is_err());
+    let saved = value(&source);
+    assert!(saved["state"]["prey"].as_array().unwrap().is_empty());
+    assert!(Simulator::from_checkpoint(&bytes(&saved), options()).is_ok());
 }
 
 #[test]
@@ -809,27 +870,28 @@ fn load_does_not_allocate_from_population_targets_or_require_initial_live_radius
     source["state"]["radius"] = json!(1000.);
     let loaded = Simulator::from_checkpoint(&bytes(&source), options()).unwrap();
     assert_eq!(
-        loaded.food.len(),
+        loaded.food().len(),
         source["state"]["food"].as_array().unwrap().len()
     );
     assert_eq!(
-        loaded.prey.len(),
+        loaded.prey().len(),
         source["state"]["prey"].as_array().unwrap().len()
     );
-    assert_eq!(loaded.config.radius, 1000.);
+    assert_eq!(loaded.radius(), 1000.);
 }
 
 #[test]
 fn valid_refill_credit_and_large_batched_motion_roundoff_are_preserved() {
-    let mut source = Simulator::new(
-        7,
-        Config {
+    let mut source = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             dt: f64::MIN_POSITIVE,
             food_count: 0,
             ambient_replenish_per_second: 1e13,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Empty,
+    })
     .unwrap();
     source.step(&[]).unwrap();
     assert!(value(&source)["state"]["ambientClock"].as_f64().unwrap() < 0.);
@@ -843,16 +905,17 @@ fn valid_refill_credit_and_large_batched_motion_roundoff_are_preserved() {
         1e13,
         physics::LOOP_SECONDS * 2f64.powi(53) * 0.999,
     ] {
-        let mut source = Simulator::new(
-            7,
-            Config {
+        let mut source = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config {
                 dt,
                 boundary_mode: slither_sim::BoundaryMode::Hard,
                 food_count: 0,
                 ambient_replenish_per_second: 0.,
                 ..Config::sandbox()
             },
-        )
+            population: slither_sim::InitialPopulation::Empty,
+        })
         .unwrap();
         source.step(&[]).unwrap();
         let saved = value(&source);
@@ -865,20 +928,21 @@ fn valid_refill_credit_and_large_batched_motion_roundoff_are_preserved() {
 
 #[test]
 fn checkpoint_slots_have_no_500_agent_policy_cap() {
-    let mut source = Simulator::new(
-        7,
-        Config {
+    let source = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: (0..512).map(|slot| slot.to_string()).collect(),
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    for slot in 0..512 {
-        source.add(slot.to_string(), slot, 512).unwrap();
-    }
     let saved = value(&source);
     let restored = Simulator::from_checkpoint(&bytes(&saved), RestoreOptions::default()).unwrap();
-    assert_eq!(restored.snakes.len(), 512);
+    assert_eq!(restored.snakes().len(), 512);
     assert_eq!(value(&restored), saved);
 }

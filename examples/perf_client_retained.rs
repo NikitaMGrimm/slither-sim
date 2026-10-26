@@ -11,11 +11,19 @@
 //! Use the same example source, copied/pinned binaries and matched settings when
 //! comparing runtimes. Neither these workloads nor source hypotheses imply speedups.
 
+#[path = "support/runtime.rs"]
+mod runtime;
+#[cfg(not(slither_private_state))]
+#[allow(unused_imports)]
+use runtime::LegacyState;
+
 #[path = "support/state.rs"]
 #[cfg(feature = "networking")]
 mod checkpoint_state;
 #[cfg(feature = "networking")]
 mod retained {
+    #[cfg(not(slither_private_state))]
+    use crate::runtime::LegacyState;
     use serde_json::{Value, json};
     use slither_sim::{
         Action, Config, Simulator,
@@ -221,7 +229,7 @@ mod retained {
 
     fn snapshot(world: &Simulator) -> Result<Value, String> {
         let state = crate::checkpoint_state::projection(world)?;
-        let pickups = world.pickup_events.as_ref().map(|events| {
+        let pickups = world.pickup_events().as_ref().map(|events| {
             events
                 .iter()
                 .map(|event| {
@@ -237,7 +245,7 @@ mod retained {
                 })
                 .collect::<Vec<_>>()
         });
-        let births = world.food_spawn_events.as_ref().map(|events| {
+        let births = world.food_spawn_events().as_ref().map(|events| {
             events
                 .iter()
                 .map(|event| json!({"source": event.source, "food": event.food}))
@@ -502,11 +510,11 @@ mod retained {
             }
             self.checked_frames += SLOTS;
             self.living.add(self.backend.world().living());
-            self.food.add(self.backend.world().food.len());
+            self.food.add(self.backend.world().food().len());
             self.world_anchors.add(
                 self.backend
                     .world()
-                    .snakes
+                    .snakes()
                     .iter()
                     .filter(|s| s.alive)
                     .map(|s| s.body.len())
@@ -517,7 +525,7 @@ mod retained {
                 line(
                     out,
                     json!({"kind": "checkpoint", "context": context, "virtualTime": at,
-                    "coreTime": self.backend.world().time, "framesBySlot": self.current,
+                    "coreTime": self.backend.world().time(), "framesBySlot": self.current,
                     "replayFramesBySlot": replayed, "wireRecordsBySlot": wire,
                     "snapshot": snapshot(self.backend.world())?}),
                 )?;
@@ -645,7 +653,7 @@ mod retained {
                 "achievedCoverage": {
                     "V": any(|s| s.delta_maps > 0), "sectorExit_w": any(|s| s.sector_clears > 0),
                     "gameOver": any(|s| s.game_overs > 0), "postReconnectMap": post_map,
-                    "coreDeath": !run.backend.world().deaths.is_empty(),
+                    "coreDeath": !run.backend.world().deaths().is_empty(),
                     "privateSectorExpiryReason": Value::Null,
                     "backgroundReconnect": run.coverage.iter().skip(1).any(|s| s.connects > 1)
                 },

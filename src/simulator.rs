@@ -1,4 +1,9 @@
 pub mod checkpoint;
+mod initialization;
+#[cfg(test)]
+mod initialization_tests;
+#[cfg(test)]
+mod observation_tests;
 use crate::bounds_index::BoundsIndex;
 use crate::food_grid::{EaterGrid, FoodCache};
 use crate::kiosk::{KioskConfig, KioskState};
@@ -7,6 +12,9 @@ use crate::profiling::StepProfile;
 use crate::{Constraint, ErrorKind, SimError};
 use crate::{CoreStepError, WorldStatus};
 use crate::{model::*, physics::*};
+pub use initialization::{
+    InitialPopulation, InitialSpeed, Placement, ReplayLife, ReplayPrey, Scenario, WorldOptions,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
@@ -463,6 +471,19 @@ impl Config {
                 ));
             }
         }
+        let radius_limit_error = |field: &str| {
+            SimError::config(
+                Constraint::OutOfRange,
+                field,
+                format!(
+                    "{field} must be at most {:e} for checkpoint-safe continuation",
+                    checkpoint::MAGNITUDE
+                ),
+            )
+        };
+        if self.radius > checkpoint::MAGNITUDE {
+            return Err(radius_limit_error("radius"));
+        }
         check_ambient_rate(self.ambient_replenish_per_second, self.dt)?;
         // A slide leaves the head one contact lead behind the rim along its
         // heading. Moving at least that far in one tick puts a head that keeps
@@ -507,7 +528,17 @@ impl Config {
         self.ambient_food.validate()?;
         self.boost_food.validate()?;
         self.validate_mode(placement)?;
-        crate::boundary::validate(&self.radius_updates)
+        crate::boundary::validate(&self.radius_updates)?;
+        if let Some(index) = self
+            .radius_updates
+            .iter()
+            .position(|update| update.radius > checkpoint::MAGNITUDE)
+        {
+            return Err(radius_limit_error(&format!(
+                "radiusUpdates[{index}].radius"
+            )));
+        }
+        Ok(())
     }
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
     fn validate_mode(&self, placement: bool) -> Result<(), SimError> {
@@ -712,20 +743,28 @@ pub struct FoodSpawnEvent {
 }
 
 /// A running world. Use the validated checkpoint boundary for exact continuation.
+///
+/// ```compile_fail
+/// let mut world = slither_sim::Simulator::new(slither_sim::WorldOptions::default()).unwrap();
+/// world.snakes.clear();
+/// ```
+/// ```compile_fail
+/// let mut world = slither_sim::Simulator::new(slither_sim::WorldOptions::default()).unwrap();
+/// world.config().radius = 10.0;
+/// ```
 #[derive(Clone, Debug)]
 pub struct Simulator {
-    pub config: Config,
-    /// Stable slots: use add(), never remove or reorder snakes during a run.
-    pub snakes: Vec<Snake>,
-    pub food: Vec<Food>,
-    /// Publicly injected prey must have unique IDs; decision phases follow IDs.
-    pub prey: Vec<Prey>,
-    pub deaths: Vec<DeathEvent>,
+    config: Config,
+    /// Stable slots: checked operations never remove or reorder snakes.
+    snakes: Vec<Snake>,
+    food: Vec<Food>,
+    prey: Vec<Prey>,
+    deaths: Vec<DeathEvent>,
     /// Latest step only. None avoids event allocation/copying.
-    pub pickup_events: Option<Vec<PickupEvent>>,
+    pickup_events: Option<Vec<PickupEvent>>,
     /// Latest step only. Disabled by default.
-    pub food_spawn_events: Option<Vec<FoodSpawnEvent>>,
-    pub time: f64,
+    food_spawn_events: Option<Vec<FoodSpawnEvent>>,
+    time: f64,
     death_times: Vec<Option<f64>>,
     /// Join order of each slot's current life; collisions resolve oldest first.
     joins: Vec<u64>,
@@ -792,7 +831,7 @@ impl Simulator {
         }
         Ok(())
     }
-    pub fn new(seed: u32, config: Config) -> Result<Self, SimError> {
+    fn empty(seed: u32, config: Config) -> Result<Self, SimError> {
         config.validate()?;
         let min_mass = config.min_score.and_then(MassFloor::for_score);
         let mut world = Self {
@@ -832,6 +871,10 @@ impl Simulator {
         // Construction applies measured time-zero overrides without spending a
         // population-controller tick before any snakes have joined.
         world.apply_radius_updates(0.0);
+        Ok(world)
+    }
+    fn initialize_ecology(&mut self) -> Result<(), SimError> {
+        let world = self;
         // A zero cell limit rejects every candidate, so there is nothing to store.
         let ambient = &world.config.ambient_food;
         let admits = !ambient.enabled || ambient.max_per_cell > 0;
@@ -879,7 +922,7 @@ impl Simulator {
         for _ in 0..world.config.prey.count {
             world.push_prey();
         }
-        Ok(world)
+        Ok(())
     }
     fn pellet(p: Point, size: f64, origin: Origin) -> Food {
         Food {
@@ -911,43 +954,7 @@ impl Simulator {
             Origin::Ambient,
         )
     }
-    pub fn add(
-        &mut self,
-        id: impl Into<String>,
-        index: usize,
-        count: usize,
-    ) -> Result<usize, SimError> {
-        let id = id.into();
-        if count == 0 || index >= count {
-            return Err(
-                SimError::state(Constraint::OutOfRange, "index", "Invalid spawn slot")
-                    .at_slot(index),
-            );
-        }
-        if self.snakes.iter().any(|s| s.id == id) {
-            return Err(SimError::new(ErrorKind::DuplicateId, "Duplicate agent id").at_field("id"));
-        }
-        self.push_snake(id, index, count)
-    }
-    /// Adds slots `0..count` of a ring as `add(slot.to_string(), slot, count)`
-    /// would, to a world without snakes. Those IDs are distinct, so the
-    /// duplicate scan, quadratic over a large ring, is skipped.
-    pub(crate) fn add_slots(&mut self, count: usize) -> Result<(), SimError> {
-        if !self.snakes.is_empty() {
-            return Err(SimError::state(
-                Constraint::InconsistentState,
-                "snakes",
-                "Slots are added to a world without snakes",
-            ));
-        }
-        for slot in 0..count {
-            self.push_snake(slot.to_string(), slot, count)?;
-        }
-        Ok(())
-    }
-    /// Spawns `id` at slot `index` of a ring of `count`; the caller has checked
-    /// both and that `id` is new.
-    fn push_snake(&mut self, id: String, index: usize, count: usize) -> Result<usize, SimError> {
+    fn push_ring(&mut self, id: String, index: usize, count: usize) -> Result<usize, SimError> {
         let a = index as f64 / count as f64 * TAU;
         let (body, heading) = match self.config.spawn_radius {
             // A ring life lies along the ring, counterclockwise.
@@ -972,45 +979,8 @@ impl Simulator {
                 (vec![head, tail], a + PI)
             }
         };
-        // The synthetic ring is unchanged in small arenas; reject geometry
-        // outside the same strict boundary as respawn_body before adding a slot.
-        if body
-            .iter()
-            .any(|point| !point.finite() || point.distance(Point::default()) >= self.config.radius)
-        {
-            return Err(SimError::state(
-                Constraint::OutsideArena,
-                "body",
-                "Initial spawn body extends outside arena",
-            )
-            .at_slot(self.snakes.len()));
-        }
-        let segments = body.len();
-        let mut snake = Snake {
-            id,
-            head: body[0],
-            body,
-            heading,
-            speed: base_speed(segments),
-            radius: 0.0,
-            length: 0.0,
-            segments,
-            fam: self.min_mass.map_or(0.0, |floor| floor.fam),
-            score: 0.0,
-            kills: 0,
-            alive: true,
-        };
-        Self::update_mass(&mut snake);
-        self.snakes.push(snake);
-        self.boosts.push(Boost::default());
-        self.speeds.push(SpeedState::idle(base_speed(segments)));
-        self.kiosks.push(KioskState::default());
-        self.pit_entered.push(false);
-        self.kill_times.push(VecDeque::new());
-        self.death_times.push(None);
-        self.joins.push(self.next_join);
-        self.next_join += 1;
-        Ok(self.snakes.len() - 1)
+        self.push_spawn(id, body, heading)
+            .map_err(|e| e.at_slot(self.snakes.len()))
     }
     pub fn death_time(&self, index: usize) -> Option<f64> {
         self.death_times.get(index).copied().flatten()
@@ -1023,27 +993,6 @@ impl Simulator {
         Some(self.config.kill_score_seconds.map_or(0, |window| {
             times.len() - times.partition_point(|&t| t + window <= self.time)
         }))
-    }
-    /// Synchronize an imported/replaced snake's hidden motion state. None infers
-    /// progress from its public speed; Some supplies known progress (0 means idle).
-    /// Call after replacement even when the new public speed equals the old value.
-    pub fn initialize_speed_state(
-        &mut self,
-        index: usize,
-        progress: Option<f64>,
-    ) -> Result<(), SimError> {
-        let snake = self.snakes.get(index).ok_or_else(|| {
-            SimError::new(ErrorKind::UnknownSlot, "Unknown speed-state slot").at_slot(index)
-        })?;
-        let state = match progress {
-            Some(q) => SpeedState::with_progress(snake.speed, q).map_err(|e| e.at_slot(index))?,
-            None => {
-                SpeedState::with_progress(snake.speed, 0.0).map_err(|e| e.at_slot(index))?;
-                SpeedState::from_observed_speed(snake.speed, snake.segments)
-            }
-        };
-        self.speeds[index] = state;
-        Ok(())
     }
     /// Read-only replay diagnostic: successful active boost, not the held button.
     pub fn is_boosting(&self, index: usize) -> bool {
@@ -1108,7 +1057,7 @@ impl Simulator {
             x: head.x - heading.cos() * 42. * (segments - 1) as f64,
             y: head.y - heading.sin() * 42. * (segments - 1) as f64,
         };
-        self.line_is_clear(&[head, tail], segments, clearance)
+        self.line_is_clear(&[head, tail], segments, clearance, None)
     }
     /// Check a supplied head-first body with one anchor per segment (2..=430).
     /// Uses the same arena margin and centerline exclusion as straight spawns.
@@ -1116,7 +1065,20 @@ impl Simulator {
     pub fn body_is_clear(&self, body: &[Point], clearance: f64) -> bool {
         (2..=430).contains(&body.len())
             && body.iter().all(|p| p.finite())
-            && self.line_is_clear(body, body.len(), clearance)
+            && self.line_is_clear(body, body.len(), clearance, None)
+    }
+    // The host's clearance probes used to temporarily mark its slot dead. An
+    // explicit exclusion preserves that query without exposing mutable state.
+    #[cfg(feature = "networking")]
+    pub(crate) fn body_is_clear_excluding(
+        &self,
+        body: &[Point],
+        clearance: f64,
+        excluded: Option<usize>,
+    ) -> bool {
+        (2..=430).contains(&body.len())
+            && body.iter().all(|p| p.finite())
+            && self.line_is_clear(body, body.len(), clearance, excluded)
     }
     /// Custom circular admission: the newborn must also miss each living
     /// head's straight two-second path by the full preferred clearance. This
@@ -1148,6 +1110,14 @@ impl Simulator {
     /// As `spawn_margin`, but may return an upper bound at most `stop_at` as
     /// soon as an edge rules out beating it. Larger results remain exact.
     pub(crate) fn spawn_margin_bounded(&self, body: &[Point], stop_at: f64) -> Option<f64> {
+        self.spawn_margin_bounded_excluding(body, stop_at, None)
+    }
+    pub(crate) fn spawn_margin_bounded_excluding(
+        &self,
+        body: &[Point],
+        stop_at: f64,
+        excluded: Option<usize>,
+    ) -> Option<f64> {
         let limit = self.config.radius - SPAWN_WALL_MARGIN;
         if !(2..=430).contains(&body.len())
             || body
@@ -1157,7 +1127,12 @@ impl Simulator {
             return None;
         }
         let mut margin = f64::INFINITY;
-        for s in self.snakes.iter().filter(|s| s.alive) {
+        for (_, s) in self
+            .snakes
+            .iter()
+            .enumerate()
+            .filter(|(i, s)| s.alive && Some(*i) != excluded)
+        {
             let contact = collision_distance(s.segments, body.len()) + 40.;
             for edge in body.windows(2) {
                 let (head, tail) = (edge[0], edge[1]);
@@ -1177,7 +1152,13 @@ impl Simulator {
         }
         Some(margin)
     }
-    fn line_is_clear(&self, line: &[Point], segments: usize, clearance: f64) -> bool {
+    fn line_is_clear(
+        &self,
+        line: &[Point],
+        segments: usize,
+        clearance: f64,
+        excluded: Option<usize>,
+    ) -> bool {
         if !clearance.is_finite()
             || clearance < 0.0
             || line
@@ -1186,22 +1167,26 @@ impl Simulator {
         {
             return false;
         }
-        self.snakes.iter().filter(|s| s.alive).all(|s| {
-            let width = (collision_distance(s.segments, segments) + 40.).max(clearance);
-            line.windows(2).all(|edge| {
-                let (head, tail) = (edge[0], edge[1]);
-                // Include the head even if an externally supplied body is empty.
-                if segment_distance(s.head, head, tail) <= width {
-                    return false;
-                }
-                let mut a = s.head;
-                s.body.iter().all(|&b| {
-                    let distance = swept_distance(head, tail, a, b);
-                    a = b;
-                    distance > width
+        self.snakes
+            .iter()
+            .enumerate()
+            .filter(|(i, s)| s.alive && Some(*i) != excluded)
+            .all(|(_, s)| {
+                let width = (collision_distance(s.segments, segments) + 40.).max(clearance);
+                line.windows(2).all(|edge| {
+                    let (head, tail) = (edge[0], edge[1]);
+                    // Include the head even if an externally supplied body is empty.
+                    if segment_distance(s.head, head, tail) <= width {
+                        return false;
+                    }
+                    let mut a = s.head;
+                    s.body.iter().all(|&b| {
+                        let distance = swept_distance(head, tail, a, b);
+                        a = b;
+                        distance > width
+                    })
                 })
             })
-        })
     }
 
     /// Replace a dead snake in its existing slot and clear all per-life internal state.
@@ -1295,6 +1280,14 @@ impl Simulator {
             )
             .at_slot(index));
         }
+        // Large finite angles lose per-tick turn increments to rounding.
+        let heading = if heading.abs() > TAU {
+            heading.sin().atan2(heading.cos())
+        } else {
+            heading
+        };
+        self.validate_spawn(&body, heading)
+            .map_err(|e| e.at_slot(index))?;
         let floor = self.min_mass;
         if let Some(floor) = floor.filter(|floor| body.len() < floor.segments) {
             return Err(SimError::state(
@@ -1307,16 +1300,12 @@ impl Simulator {
             )
             .at_slot(index));
         }
+        self.check_join().map_err(|e| e.at_slot(index))?;
         let s = &mut self.snakes[index];
         s.head = body[0];
         s.segments = body.len();
         s.body = body;
-        // Large finite angles lose per-tick turn increments to rounding.
-        s.heading = if heading.abs() > TAU {
-            heading.sin().atan2(heading.cos())
-        } else {
-            heading
-        };
+        s.heading = heading;
         s.speed = base_speed(s.segments);
         s.fam = floor
             .filter(|floor| floor.segments == s.segments)
@@ -1359,9 +1348,6 @@ impl Simulator {
             error.kind = ErrorKind::WorldStopped;
             return Err(error);
         }
-        // The public configuration may have changed since construction. Reject
-        // invalid prey settings before movement, clocks or refill mutate state.
-        self.config.prey.validate()?;
         if actions.len() != self.snakes.len() {
             return Err(SimError::new(
                 ErrorKind::ActionShape {
@@ -1482,8 +1468,8 @@ impl Simulator {
             }
             let sc = scale(s.segments);
             let speed = &mut self.speeds[i];
-            // Public snapshot replacement can change speed; mass-only updates
-            // must preserve the prior progress and retained idle speed.
+            // Checkpoint v1 can retain a pending observed-speed inference from
+            // the former public-state API. Preserve that continuation behavior.
             if speed.speed != s.speed {
                 *speed = SpeedState::from_observed_speed(s.speed, s.segments);
             }
@@ -1983,20 +1969,28 @@ impl Simulator {
     /// so observations retain their public schema. The exact-11 pulse is not
     /// modeled: its advertised speed does not reproduce recorded displacement.
     pub fn set_prey_mode(&mut self, id: u64, mode: PreyMode) -> Result<(), SimError> {
-        let mut matching = self.prey.iter_mut().filter(|prey| prey.id == id);
-        let first = matching.next();
-        let duplicate = matching.next().is_some();
-        let kind = if duplicate {
-            ErrorKind::DuplicateId
-        } else {
-            ErrorKind::UnknownEntity
-        };
-        let Some(prey) = first.filter(|_| !duplicate) else {
-            return Err(
-                SimError::new(kind, "prey mode requires exactly one matching identity")
-                    .at_field("prey.id"),
-            );
-        };
+        let index = self
+            .prey
+            .iter()
+            .position(|prey| prey.id == id)
+            .ok_or_else(|| {
+                SimError::new(ErrorKind::UnknownEntity, "Unknown prey identity").at_field("prey.id")
+            })?;
+        if mode == PreyMode::Outward {
+            self.prey_outward.try_reserve(1).map_err(|_| {
+                SimError::new(
+                    ErrorKind::AllocationFailed,
+                    "Prey modes do not fit in memory",
+                )
+            })?;
+            self.prey_decision_times.try_reserve(1).map_err(|_| {
+                SimError::new(
+                    ErrorKind::AllocationFailed,
+                    "Prey decisions do not fit in memory",
+                )
+            })?;
+        }
+        let prey = &mut self.prey[index];
         match mode {
             PreyMode::Roaming => {
                 self.prey_outward.remove(&id);
@@ -2296,7 +2290,7 @@ impl Simulator {
         }
     }
 
-    pub fn update_mass(s: &mut Snake) {
+    fn update_mass(s: &mut Snake) {
         s.length = s.segments as f64 + s.fam;
         s.score = score(s.segments, s.fam);
         s.radius = 14.5 * scale(s.segments);
@@ -2551,9 +2545,9 @@ mod death_food_density_tests {
     use crate::food_grid::{Axis, food_cell};
 
     fn world(enabled: bool) -> Simulator {
-        let mut world = Simulator::new(
-            7,
-            Config {
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config {
                 food_count: 0,
                 ambient_replenish_per_second: 0.0,
                 death_food: DeathFoodConfig {
@@ -2562,14 +2556,15 @@ mod death_food_density_tests {
                 },
                 ..Config::sandbox()
             },
-        )
+            ..Default::default()
+        })
         .unwrap();
         add_corpse(&mut world, "a", Point { x: 37.5, y: 37.5 });
         world
     }
 
     fn add_corpse(world: &mut Simulator, id: &str, point: Point) {
-        let index = world.add(id, 0, 1).unwrap();
+        let index = world.push_ring(id.into(), 0, 1).unwrap();
         let snake = &mut world.snakes[index];
         snake.head = point;
         snake.body = vec![point; 30];
@@ -2607,9 +2602,9 @@ mod death_food_density_tests {
             // Exactly one pellet: the final crossing must not round away.
             (10, 2, 0.5, vec![4]),
         ] {
-            let mut world = Simulator::new(
-                7,
-                Config {
+            let mut world = Simulator::new(crate::WorldOptions {
+                seed: 7,
+                config: Config {
                     radius: 5000.0,
                     food_count: 0,
                     ambient_replenish_per_second: 0.0,
@@ -2617,10 +2612,11 @@ mod death_food_density_tests {
                     min_score: Some(min_score),
                     ..Config::sandbox()
                 },
-            )
+                ..Default::default()
+            })
             .unwrap();
             world.config.death_food.enabled = false;
-            world.add("victim", 0, 1).unwrap();
+            world.push_ring("victim".into(), 0, 1).unwrap();
             let snake = &mut world.snakes[0];
             snake.head = Point { x: -75.0, y: 0.0 };
             snake.body = (0..segments)
@@ -2843,8 +2839,13 @@ mod prey_index_tests {
         config.food_count = 0;
         config.ambient_replenish_per_second = 0.0;
         config.kiosk.enabled = false;
-        let mut world = Simulator::new(123, config).unwrap();
-        world.add("0", 0, 1).unwrap();
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 123,
+            config,
+            ..Default::default()
+        })
+        .unwrap();
+        world.push_ring("0".into(), 0, 1).unwrap();
         let head = Point {
             x: -(2f64.powi(70)),
             y: 0.0,
@@ -2855,7 +2856,7 @@ mod prey_index_tests {
         s.body = vec![head; s.segments];
         // The pickup lead almost cancels the head, leaving the circle near the prey.
         s.speed = f64::from_bits((-head.x / (0.032 * 7.55)).to_bits() + 1);
-        world.initialize_speed_state(0, Some(0.0)).unwrap();
+        world.speeds[0] = SpeedState::idle(world.snakes[0].speed);
         world.prey = (0..512)
             .map(|id| Prey {
                 id,
@@ -2911,27 +2912,45 @@ mod slot_tests {
     use super::*;
 
     #[test]
-    fn generated_slots_match_checked_adds_without_a_duplicate_scan() {
-        let mut checked = Simulator::new(3, Config::sandbox()).unwrap();
+    fn placed_population_keeps_order_and_unique_slots() {
+        let mut checked = Simulator::new(crate::WorldOptions {
+            seed: 3,
+            config: Config::sandbox(),
+            ..Default::default()
+        })
+        .unwrap();
         for slot in 0..5 {
-            checked.add(slot.to_string(), slot, 5).unwrap();
+            checked.push_ring(slot.to_string(), slot, 5).unwrap();
         }
-        let mut generated = Simulator::new(3, Config::sandbox()).unwrap();
-        generated.add_slots(5).unwrap();
+        let mut generated = Simulator::new(crate::WorldOptions {
+            seed: 3,
+            config: Config::sandbox(),
+            population: InitialPopulation::Placed {
+                ids: (0..5).map(|s| s.to_string()).collect(),
+                placement: Placement::default(),
+            },
+        })
+        .unwrap();
         assert_eq!(
             serde_json::to_value(generated.checkpoint().unwrap()).unwrap(),
             serde_json::to_value(checked.checkpoint().unwrap()).unwrap()
         );
-        // Caller-supplied IDs are still checked, and slots need an empty world.
+        // Caller-supplied IDs are still checked.
         assert_eq!(
-            generated.add("3", 0, 1).unwrap_err().kind,
+            generated.append_dormant("3".into()).unwrap_err().kind,
             ErrorKind::DuplicateId
         );
-        assert!(generated.add_slots(1).is_err());
         // The largest protocol-19 ring is linear work: the old per-slot scan
         // made 2.1 billion ID comparisons here.
-        let mut ring = Simulator::new(3, Config::sandbox()).unwrap();
-        ring.add_slots(65_535).unwrap();
+        let ring = Simulator::new(crate::WorldOptions {
+            seed: 3,
+            config: Config::sandbox(),
+            population: InitialPopulation::Placed {
+                ids: (0..65_535).map(|s| s.to_string()).collect(),
+                placement: Placement::default(),
+            },
+        })
+        .unwrap();
         assert_eq!(ring.snakes.len(), 65_535);
         assert_eq!(ring.snakes[65_534].id, "65534");
     }

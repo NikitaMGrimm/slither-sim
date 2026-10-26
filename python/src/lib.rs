@@ -7,7 +7,6 @@ use pyo3::ffi;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBytes, PyDict, PyString, PyTuple};
-use serde::Deserialize;
 use slither_sim::transport;
 use std::ffi::{CStr, CString};
 
@@ -206,16 +205,37 @@ fn dumps(py: Python<'_>, object: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
     Ok(text.cast::<PyString>()?.to_str()?.as_bytes().to_vec())
 }
 
-#[derive(Deserialize)]
-struct Reply {
-    error: Option<String>,
-    result: Option<ResetResult>,
+// Successful scalars avoid JSON conversion. Rejections use serde's value
+// decoding, like the internally tagged JSON request, to preserve its diagnostics.
+fn reset_scalar<T>(value: Option<Bound<'_, PyAny>>, default: T) -> PyResult<T>
+where
+    for<'py> T: FromPyObject<'py, 'py> + serde::de::DeserializeOwned,
+{
+    let Some(value) = value else {
+        return Ok(default);
+    };
+    if value.is_none() {
+        return Ok(default);
+    }
+    if !value.is_instance_of::<pyo3::types::PyBool>()
+        && let Ok(value) = value.extract::<T>()
+    {
+        return Ok(value);
+    }
+    let value: serde_json::Value = serde_json::from_slice(&dumps(value.py(), &value)?)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    serde_json::from_value(value).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-#[derive(Deserialize)]
-struct ResetResult {
-    #[serde(default)]
-    warnings: Vec<String>,
+fn reset_object<T: serde::de::DeserializeOwned + Default>(
+    py: Python<'_>,
+    value: Option<Bound<'_, PyAny>>,
+) -> PyResult<T> {
+    match value.filter(|v| !v.is_none()) {
+        None => Ok(T::default()),
+        Some(value) => serde_json::from_slice(&dumps(py, &value)?)
+            .map_err(|e| PyValueError::new_err(e.to_string())),
+    }
 }
 
 /// A `slither-sim-json-v3` session of independent worlds, run in this process.
@@ -246,9 +266,10 @@ impl Session {
     /// Each reply warning, about valid but unmeasured settings, is issued as a
     /// `UserWarning`.
     #[pyo3(
-        signature = (seed=None, worlds=None, agents=None, decision_ticks=None, config=None),
-        text_signature = "(self, seed=1, worlds=1, agents=4, decision_ticks=6, config=None)"
+        signature = (seed=None, worlds=None, agents=None, decision_ticks=None, config=None, placement=None),
+        text_signature = "(self, seed=1, worlds=1, agents=4, decision_ticks=6, config=None, placement=None)"
     )]
+    #[allow(clippy::too_many_arguments)] // Public Python keyword signature.
     fn reset(
         &mut self,
         py: Python<'_>,
@@ -257,40 +278,33 @@ impl Session {
         agents: Option<Bound<'_, PyAny>>,
         decision_ticks: Option<Bound<'_, PyAny>>,
         config: Option<Bound<'_, PyAny>>,
+        placement: Option<Bound<'_, PyAny>>,
     ) -> PyResult<()> {
-        // Omitted or None members take the protocol's defaults (those of the
-        // text signature); others pass through, so the protocol words every error.
-        let request = PyDict::new(py);
-        request.set_item("op", "reset")?;
-        for (key, value) in [
-            ("seed", seed),
-            ("worlds", worlds),
-            ("agents", agents),
-            ("decisionTicks", decision_ticks),
-            ("config", config),
-        ] {
-            if let Some(value) = value {
-                request.set_item(key, value)?;
-            }
-        }
-        let line = dumps(py, &request)?;
-        // Warnings can raise: prepare a replacement before touching the session.
-        let mut replacement = transport::Session::new();
-        let reply = py.detach(|| replacement.request(&line));
-        let reply: Reply = serde_json::from_slice(&reply).expect("replies are JSON objects");
-        if let Some(error) = reply.error {
-            return Err(PyValueError::new_err(error));
-        }
+        let defaults = transport::ResetOptions::default();
+        let options = transport::ResetOptions::from_counts(
+            reset_scalar(seed, defaults.seed)?,
+            reset_scalar(worlds, defaults.worlds.get())?,
+            reset_scalar(agents, defaults.agents.get() as usize)?,
+            reset_scalar(decision_ticks, defaults.decision_ticks.get() as usize)?,
+            reset_object(py, config)?,
+            reset_object(py, placement)?,
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let prepared = py
+            .detach(|| transport::Session::prepare_reset(options))
+            .map_err(|mut e| {
+                // Reset diagnostics predate the typed world's location metadata.
+                e.world = None;
+                PyValueError::new_err(e.to_string())
+            })?;
+        // Warnings can raise; retain both the old worlds and their frame buffers
+        // until every warning has been accepted by Python.
         let category = py.get_type::<PyUserWarning>();
-        for warning in reply
-            .result
-            .map(|result| result.warnings)
-            .unwrap_or_default()
-        {
-            let message = CString::new(warning).expect("warnings have no NUL");
+        for warning in &prepared.summary().warnings {
+            let message = CString::new(warning.as_str()).expect("warnings have no NUL");
             PyErr::warn(py, &category, &message, 1)?;
         }
-        self.inner = replacement;
+        self.inner.commit_reset(prepared);
         Ok(())
     }
 

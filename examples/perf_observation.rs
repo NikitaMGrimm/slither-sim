@@ -17,6 +17,12 @@
 //! floats), negative bin boundaries, 64-bin aliasing, signed zero, tiny vision,
 //! saturated cell casts, dead slots, mask errors, and insertion-order ties. These
 //! eight bounded fixtures do not establish parity for all such numerical cases.
+#[path = "support/runtime.rs"]
+mod runtime;
+#[cfg(not(slither_private_state))]
+#[allow(unused_imports)]
+use runtime::LegacyState;
+
 #[path = "support/state.rs"]
 mod checkpoint_state;
 use serde_json::{Value, json};
@@ -105,18 +111,16 @@ fn world(case: &str) -> Result<Simulator, String> {
     if case == "observe-compact" {
         config.ambient_food.enabled = false;
     }
-    let mut world = Simulator::new(SEED, config).map_err(|error| error.to_string())?;
     let agents = agents(case);
+    let mut world = runtime::ring(SEED, config, agents)?;
+    let mut snakes = world.snakes().to_vec();
+    let mut food = world.food().to_vec();
     let anchors = if case == "observe-clustered" {
         CLUSTERED_ANCHORS
     } else {
         ANCHORS
     };
-    for slot in 0..agents {
-        world
-            .add(slot.to_string(), slot, agents)
-            .map_err(|error| error.to_string())?;
-        let snake = &mut world.snakes[slot];
+    for (slot, snake) in snakes.iter_mut().enumerate() {
         if case == "observe-strip" {
             snake.head = Point {
                 x: 0.0,
@@ -143,19 +147,15 @@ fn world(case: &str) -> Result<Simulator, String> {
         snake.segments = snake.body.len();
         snake.fam = 0.75;
         snake.speed = physics::base_speed(snake.segments);
-        Simulator::update_mass(snake);
-        world
-            .initialize_speed_state(slot, Some(0.0))
-            .map_err(|error| error.to_string())?;
     }
     if case == "observe-strip" {
         // Remap admitted seed-7 pellets without consuming RNG or changing order,
         // values, sizes or origins. This bypasses density admission after remapping.
-        let count = world.food.len();
+        let count = food.len();
         if count < 2 {
             return Err("Strip construction requires at least two admitted pellets".into());
         }
-        for (index, food) in world.food.iter_mut().enumerate() {
+        for (index, food) in food.iter_mut().enumerate() {
             food.x = ((index * 37 + SEED as usize) % 151) as f64 - 75.0;
             food.y = -48_000.0 + 96_000.0 * index as f64 / (count - 1) as f64;
         }
@@ -163,11 +163,11 @@ fn world(case: &str) -> Result<Simulator, String> {
     if case == "observe-sparse" {
         // SYNTHETIC: eight observers share one head, and a lattice replaces the
         // (empty) startup food, so the grid has many cells for few observers.
-        for snake in &mut world.snakes[SPARSE_LIVING..] {
+        for snake in &mut snakes[SPARSE_LIVING..] {
             snake.alive = false;
         }
         let step = 2.0 * SPARSE_HALF_SPAN / (SPARSE_SIDE - 1) as f64;
-        world.food = (0..SPARSE_SIDE * SPARSE_SIDE)
+        food = (0..SPARSE_SIDE * SPARSE_SIDE)
             .map(|i| Food {
                 x: -SPARSE_HALF_SPAN + step * (i % SPARSE_SIDE) as f64,
                 y: -SPARSE_HALF_SPAN + step * (i / SPARSE_SIDE) as f64,
@@ -183,7 +183,7 @@ fn world(case: &str) -> Result<Simulator, String> {
         let step = CLUSTERED_PATCH / (CLUSTERED_SIDE - 1) as f64;
         let far = CLUSTERED_HALF_SPAN - CLUSTERED_PATCH;
         let patch = CLUSTERED_SIDE * CLUSTERED_SIDE;
-        world.food = (0..4 * patch)
+        food = (0..4 * patch)
             .map(|i| {
                 let (corner, at) = (i / patch, i % patch);
                 let x0 = if corner % 2 == 0 {
@@ -206,7 +206,7 @@ fn world(case: &str) -> Result<Simulator, String> {
             })
             .collect();
         let bins = (2.0 * CLUSTERED_HALF_SPAN / 100.0) as usize - 1;
-        world.food.extend((0..CLUSTERED_BACKGROUND).map(|i| Food {
+        food.extend((0..CLUSTERED_BACKGROUND).map(|i| Food {
             x: 100.0 - CLUSTERED_HALF_SPAN + ((i * 127 + 13) % bins) as f64 * 100.0,
             y: 100.0 - CLUSTERED_HALF_SPAN + ((i * 73 + 31) % bins) as f64 * 100.0,
             value: 1.0,
@@ -214,9 +214,10 @@ fn world(case: &str) -> Result<Simulator, String> {
             origin: None,
         }));
     }
+    runtime::initial_snakes(&mut world, snakes)?;
+    runtime::replace_food(&mut world, food)?;
     // Same telemetry path as the original harness, including in timing mode.
-    world.pickup_events = Some(Vec::new());
-    world.food_spawn_events = Some(Vec::new());
+    runtime::record_events(&mut world);
     Ok(world)
 }
 
@@ -254,7 +255,7 @@ fn verify_scalar(
     // Public scalar observe bypasses the batch index in src/observation/mod.rs.
     // Do not replicate its visibility predicates in the harness.
     let reference = world
-        .snakes
+        .snakes()
         .iter()
         .enumerate()
         .map(|(slot, snake)| {
@@ -279,8 +280,8 @@ fn verify_scalar(
 fn snapshot(world: &Simulator) -> Result<Value, String> {
     let state = checkpoint_state::projection(world)?;
     let observations = world.observe_all();
-    verify_scalar(world, &vec![true; world.snakes.len()], &observations)?;
-    let pickups = world.pickup_events.as_ref().map(|events| {
+    verify_scalar(world, &vec![true; world.snakes().len()], &observations)?;
+    let pickups = world.pickup_events().as_ref().map(|events| {
         events
             .iter()
             .map(|event| {
@@ -292,7 +293,7 @@ fn snapshot(world: &Simulator) -> Result<Value, String> {
             })
             .collect::<Vec<_>>()
     });
-    let births = world.food_spawn_events.as_ref().map(|events| {
+    let births = world.food_spawn_events().as_ref().map(|events| {
         events
             .iter()
             .map(|event| json!({"source": event.source, "food": event.food}))
@@ -385,7 +386,11 @@ fn run() -> Result<(), String> {
             output_drop.seconds.push(drop_elapsed);
         }
     }
-    let anchors: Vec<_> = world.snakes.iter().map(|snake| snake.body.len()).collect();
+    let anchors: Vec<_> = world
+        .snakes()
+        .iter()
+        .map(|snake| snake.body.len())
+        .collect();
     line(
         &mut out,
         json!({
@@ -397,8 +402,8 @@ fn run() -> Result<(), String> {
             "outputDrop": output_drop.report("sum of separate Instant intervals destroying detached output Vec and owned observations via drop(black_box(output)); excludes materialization, setup, sample storage, trace and report"),
             "details": {
                 "synthetic": true, "immutableWorld": true, "physicsTicks": 0,
-                "config": world.config, "actualCounts": WorldStats::from_world(&world),
-                "foodPlacementAttempts": world.config.food_count,
+                "config": world.config(), "actualCounts": WorldStats::from_world(&world),
+                "foodPlacementAttempts": world.config().food_count,
                 "bodyComplexity": {
                     "anchorsPerSlot": anchors, "totalAnchors": anchors.iter().sum::<usize>(),
                     "placement": if args.case == "observe-clustered" { "2 anchors at head - heading_unit * anchor_index * ANCHOR_SPACING; heading = slot / 128 * TAU + PI" } else { "32 anchors at head - heading_unit * anchor_index * ANCHOR_SPACING; heading = slot / 32 * TAU + PI" },
@@ -411,8 +416,8 @@ fn run() -> Result<(), String> {
                 "construction": {
                     "denseReference": "examples/perf_baseline.rs::core_world(observe) at 7d33ebd; dense/one/empty have identical worlds",
                     "compactOverride": if args.case == "observe-compact" { Some("SYNTHETIC: ambient_food.enabled=false before Simulator::new, retaining 2000 startup attempts to trigger index; no package default changes") } else { None },
-                    "sparseLattice": if args.case == "observe-sparse" { Some("SYNTHETIC: radius 100000 and food_count 0; then 512x512 pellets x,y = -65625 + i*131250/511 (row-major, value 1, no size or origin) replace world.food, and slots 8-31 are marked dead") } else { None },
-                    "clusteredPatches": if args.case == "observe-clustered" { Some("SYNTHETIC: radius 20000 and food_count 0; then four 64x64 lattices with step 1200/63 from corners x,y in {-12000, 10800} (corner c: x from c%2, y from c/2; row-major, value 1, no size or origin) replace world.food, followed by 512 pellets x=-11900+((i*127+13)%239)*100, y=-11900+((i*73+31)%239)*100") } else { None },
+                    "sparseLattice": if args.case == "observe-sparse" { Some("SYNTHETIC: radius 100000 and food_count 0; then 512x512 pellets x,y = -65625 + i*131250/511 (row-major, value 1, no size or origin) replace world.food(), and slots 8-31 are marked dead") } else { None },
+                    "clusteredPatches": if args.case == "observe-clustered" { Some("SYNTHETIC: radius 20000 and food_count 0; then four 64x64 lattices with step 1200/63 from corners x,y in {-12000, 10800} (corner c: x from c%2, y from c/2; row-major, value 1, no size or origin) replace world.food(), followed by 512 pellets x=-11900+((i*127+13)%239)*100, y=-11900+((i*73+31)%239)*100") } else { None },
                     "stripRemap": if args.case == "observe-strip" { Some("After seed-7 radius-50000 startup admission, remap each admitted food at insertion index i: x=((i*37+7)%151)-75; y=-48000+96000*i/(admitted_count-1). Retain values/sizes/origins/order and RNG state; no post-remap density cap.") } else { None },
                 },
                 "scalarParity": if args.trace { "canonical observation bytes checked against public scalar observe(slot), which bypasses the batch index; snapshots also check all slots" } else { "not checked in timing mode; run --trace separately" },

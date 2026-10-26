@@ -4,7 +4,8 @@
 //! drive the same [`Session`] directly: [`Session::request`] answers one JSON
 //! request, and [`Session::step`] with [`Session::frame`] skip JSON altogether.
 use crate::{
-    Action, Config, Constraint, DeathEvent, ErrorKind, Food, Prey, SimError, Simulator, Snake,
+    Action, Config, Constraint, DeathEvent, ErrorKind, Food, InitialPopulation, Placement, Prey,
+    SimError, Simulator, Snake, WorldOptions,
 };
 use frame::Frame;
 pub use frame::{
@@ -14,6 +15,7 @@ pub use frame::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::{self, BufRead, Write};
+use std::num::{NonZeroU32, NonZeroUsize};
 
 mod frame;
 #[cfg(test)]
@@ -73,6 +75,108 @@ fn default_decision_ticks() -> usize {
     6
 }
 
+/// Typed reset options. Placement defaults to the historical synthetic ring.
+#[derive(Clone, Debug)]
+pub struct ResetOptions {
+    pub seed: u32,
+    pub worlds: NonZeroUsize,
+    pub agents: NonZeroU32,
+    pub decision_ticks: NonZeroU32,
+    pub config: Config,
+    pub placement: Placement,
+}
+
+impl Default for ResetOptions {
+    fn default() -> Self {
+        Self {
+            seed: default_seed(),
+            worlds: NonZeroUsize::new(default_worlds()).unwrap(),
+            agents: NonZeroU32::new(default_agents() as u32).unwrap(),
+            decision_ticks: NonZeroU32::new(default_decision_ticks() as u32).unwrap(),
+            config: Config::default(),
+            placement: Placement::default(),
+        }
+    }
+}
+
+impl ResetOptions {
+    /// Shared boundary validation for JSON and language bindings, before any
+    /// allocation or world creation. Typed callers may construct options directly.
+    pub fn from_counts(
+        seed: u32,
+        worlds: usize,
+        agents: usize,
+        decision_ticks: usize,
+        config: Config,
+        placement: Placement,
+    ) -> Result<Self, SimError> {
+        if worlds == 0 || agents == 0 || decision_ticks == 0 {
+            return Err(SimError::config(
+                Constraint::NonPositive,
+                if worlds == 0 {
+                    "worlds"
+                } else if agents == 0 {
+                    "agents"
+                } else {
+                    "decisionTicks"
+                },
+                "Need at least one world, agent and decision tick",
+            ));
+        }
+        if agents > MAX_AGENTS {
+            return Err(SimError::new(ErrorKind::RepresentationLimit,
+                format!("agents must be at most {MAX_AGENTS}: frame slot indices are u32 and u32::MAX means none")).at_field("agents"));
+        }
+        if decision_ticks > MAX_DECISION_TICKS {
+            return Err(SimError::new(
+                ErrorKind::RepresentationLimit,
+                format!(
+                    "decisionTicks must be at most {MAX_DECISION_TICKS}: frames report ticks as u32"
+                ),
+            )
+            .at_field("decisionTicks"));
+        }
+        Ok(Self {
+            seed,
+            worlds: NonZeroUsize::new(worlds).unwrap(),
+            agents: NonZeroU32::new(agents as u32).unwrap(),
+            decision_ticks: NonZeroU32::new(decision_ticks as u32).unwrap(),
+            config,
+            placement,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ResetSummary {
+    pub config: Config,
+    pub seed: u32,
+    pub placement: Placement,
+    pub decision_ticks: NonZeroU32,
+    pub warnings: Vec<String>,
+}
+
+/// Fully built worlds and frames. Dropping it leaves the incumbent untouched.
+pub struct PreparedReset {
+    run: Run,
+    summary: ResetSummary,
+    unprinted: Vec<String>,
+}
+
+impl std::fmt::Debug for PreparedReset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreparedReset")
+            .field("summary", &self.summary)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PreparedReset {
+    pub fn summary(&self) -> &ResetSummary {
+        &self.summary
+    }
+}
+
 /// One world's actions: a heading and a boost flag per agent slot. Dead slots
 /// may give a null heading.
 #[derive(Deserialize)]
@@ -103,6 +207,8 @@ enum Request {
         decision_ticks: usize,
         #[serde(default)]
         config: Box<Config>,
+        #[serde(default)]
+        placement: Placement,
     },
     Step {
         actions: Vec<WorldActions>,
@@ -178,7 +284,7 @@ impl WorldState {
     /// Holds the validated actions for up to `decision_ticks` ticks, stopping
     /// once every snake has died, then collects the new frame.
     fn advance(&mut self, decision_ticks: usize) -> Result<(), SimError> {
-        let previous_deaths = self.world.deaths.len();
+        let previous_deaths = self.world.deaths().len();
         let mut ticks = 0;
         for _ in 0..decision_ticks {
             if self.world.living() == 0 {
@@ -188,7 +294,7 @@ impl WorldState {
             ticks += 1;
         }
         self.frame
-            .collect(&self.world, ticks, &self.world.deaths[previous_deaths..])
+            .collect(&self.world, ticks, &self.world.deaths()[previous_deaths..])
     }
 }
 
@@ -238,6 +344,94 @@ pub struct Session {
 impl Session {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn prepare_reset(options: ResetOptions) -> Result<PreparedReset, SimError> {
+        let ResetOptions {
+            seed,
+            worlds,
+            agents,
+            decision_ticks,
+            mut config,
+            placement,
+        } = options;
+        let worlds = worlds.get();
+        let agents = usize::try_from(agents.get()).map_err(|_| {
+            SimError::new(ErrorKind::RepresentationLimit, "agents must fit in usize")
+                .at_field("agents")
+        })?;
+        worlds.checked_mul(agents).ok_or_else(|| {
+            SimError::new(
+                ErrorKind::RepresentationLimit,
+                "worlds * agents must fit in usize",
+            )
+            .at_field("worlds")
+        })?;
+        config.size_for_population(agents);
+        config.validate()?;
+        let mut states = Vec::new();
+        states.try_reserve_exact(worlds).map_err(|_| {
+            SimError::new(
+                ErrorKind::AllocationFailed,
+                format!("{worlds} worlds do not fit in memory"),
+            )
+            .at_field("worlds")
+        })?;
+        for index in 0..worlds {
+            let mut ids = Vec::new();
+            ids.try_reserve_exact(agents).map_err(|_| {
+                SimError::new(
+                    ErrorKind::AllocationFailed,
+                    "Agent slots do not fit in memory",
+                )
+                .at_field("agents")
+                .at_world(index)
+            })?;
+            ids.extend((0..agents).map(|slot| slot.to_string()));
+            let world = Simulator::new(WorldOptions {
+                seed: seed.wrapping_add(index as u32),
+                config: config.clone(),
+                population: InitialPopulation::Placed { ids, placement },
+            })
+            .map_err(|e| e.at_world(index))?;
+            states.push(WorldState {
+                world,
+                frame: Frame::default(),
+                actions: Vec::new(),
+            });
+        }
+        each_ok(each_world(&mut states, |state| {
+            state.frame.collect(&state.world, 0, &[])
+        }))?;
+        let warnings = config.warnings();
+        let summary = ResetSummary {
+            config: states[0].world.config().clone(),
+            seed,
+            placement,
+            decision_ticks,
+            warnings: warnings.clone(),
+        };
+        Ok(PreparedReset {
+            run: Run {
+                worlds: states,
+                agents,
+                decision_ticks: decision_ticks.get() as usize,
+            },
+            summary,
+            unprinted: warnings,
+        })
+    }
+
+    /// Installs already allocated state; cannot fail or allocate.
+    pub fn commit_reset(&mut self, prepared: PreparedReset) -> ResetSummary {
+        self.current = Some(prepared.run);
+        self.unprinted = prepared.unprinted;
+        prepared.summary
+    }
+
+    pub fn reset(&mut self, options: ResetOptions) -> Result<ResetSummary, SimError> {
+        let prepared = Self::prepare_reset(options)?;
+        Ok(self.commit_reset(prepared))
     }
 
     /// Answers one JSON request line, given without its newline, with exactly
@@ -359,95 +553,43 @@ impl Session {
                 worlds,
                 agents,
                 decision_ticks,
-                mut config,
+                config,
+                placement,
             } => {
-                if worlds == 0 || agents == 0 || decision_ticks == 0 {
-                    return Err(SimError::config(
-                        Constraint::NonPositive,
-                        if worlds == 0 {
-                            "worlds"
-                        } else if agents == 0 {
-                            "agents"
-                        } else {
-                            "decisionTicks"
-                        },
-                        "Need at least one world, agent and decision tick",
-                    )
-                    .into());
-                }
-                if agents > MAX_AGENTS {
-                    return Err(SimError::new(
-                        ErrorKind::RepresentationLimit,
-                        format!(
-                            "agents must be at most {MAX_AGENTS}: frame slot indices are u32 \
-                         and u32::MAX means none"
-                        ),
-                    )
-                    .at_field("agents")
-                    .into());
-                }
-                if decision_ticks > MAX_DECISION_TICKS {
-                    return Err(SimError::new(
-                        ErrorKind::RepresentationLimit,
-                        format!(
-                            "decisionTicks must be at most {MAX_DECISION_TICKS}: frames report \
-                         ticks as u32"
-                        ),
-                    )
-                    .at_field("decisionTicks")
-                    .into());
-                }
-                // The typed step and the C ABI index slots world-major.
-                worlds.checked_mul(agents).ok_or_else(|| {
-                    SimError::new(
-                        ErrorKind::RepresentationLimit,
-                        "worlds * agents must fit in usize",
-                    )
-                    .at_field("worlds")
+                let options = ResetOptions::from_counts(
+                    seed,
+                    worlds,
+                    agents,
+                    decision_ticks,
+                    *config,
+                    placement,
+                )?;
+                let prepared = Self::prepare_reset(options).map_err(|mut e| {
+                    // Preserve reset wire text while typed callers retain locations.
+                    e.world = None;
+                    e
                 })?;
-                // Construct completely, with fresh frames, before replacing a
-                // working session: it stays intact until the whole reply exists.
-                let mut states = Vec::new();
-                states.try_reserve_exact(worlds).map_err(|_| {
-                    SimError::new(
-                        ErrorKind::AllocationFailed,
-                        format!("{worlds} worlds do not fit in memory"),
-                    )
-                    .at_field("worlds")
-                })?;
-                config.size_for_population(agents);
-                for index in 0..worlds {
-                    let mut world =
-                        Simulator::new(seed.wrapping_add(index as u32), (*config).clone())?;
-                    world.add_slots(agents)?;
-                    states.push(WorldState {
-                        world,
-                        frame: Frame::default(),
-                        actions: Vec::new(),
-                    });
-                }
-                let frames = each_ok(each_world(&mut states, |state| {
-                    state.frame.collect(&state.world, 0, &[])?;
-                    Ok(state.frame.encode())
-                }))?;
+                // Encode every frame and the complete reply before installing it.
+                let frames: Vec<_> = prepared
+                    .run
+                    .worlds
+                    .iter()
+                    .map(|state| state.frame.encode())
+                    .collect();
                 let mut head = b"\"config\":".to_vec();
                 head.extend_from_slice(
-                    &crate::json::to_vec(&states[0].world.config).expect("configs serialize"),
+                    &crate::json::to_vec(&prepared.summary.config).expect("configs serialize"),
                 );
                 head.extend_from_slice(
                     format!(",\"decisionTicks\":{decision_ticks},\"seed\":{seed},").as_bytes(),
                 );
-                let warnings = config.warnings();
                 head.extend_from_slice(b"\"warnings\":");
-                head.extend_from_slice(&crate::json::to_vec(&warnings).expect("strings serialize"));
+                head.extend_from_slice(
+                    &crate::json::to_vec(&prepared.summary.warnings).expect("strings serialize"),
+                );
                 head.push(b',');
                 let result = worlds_reply(&head, &frames)?;
-                self.current = Some(Run {
-                    worlds: states,
-                    agents,
-                    decision_ticks,
-                });
-                self.unprinted = warnings;
+                self.commit_reset(prepared);
                 Ok(result)
             }
             Request::Step { actions } => {
@@ -526,12 +668,12 @@ impl Session {
                     .world;
                 // Deliberately exclude hidden RNG/control state from this debug view.
                 Ok(reply(&SnapshotReply {
-                    config: &world.config,
-                    time: world.time,
-                    snakes: &world.snakes,
-                    food: &world.food,
-                    prey: &world.prey,
-                    deaths: &world.deaths,
+                    config: world.config(),
+                    time: world.time(),
+                    snakes: world.snakes(),
+                    food: world.food(),
+                    prey: world.prey(),
+                    deaths: world.deaths(),
                 }))
             }
         }
@@ -557,5 +699,160 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
         for warning in session.unprinted.drain(..) {
             eprintln!("warning: {warning}");
         }
+    }
+}
+
+#[cfg(test)]
+mod reset_tests {
+    use super::*;
+
+    #[test]
+    fn initial_containment_errors_keep_typed_locations() {
+        let error = Session::prepare_reset(ResetOptions {
+            config: Config {
+                radius: 60.,
+                food_count: 0,
+                ..Config::sandbox()
+            },
+            ..ResetOptions::default()
+        })
+        .unwrap_err();
+        assert_eq!(error.world, Some(0));
+        assert_eq!(error.slot, Some(0));
+        assert_eq!(error.field.as_deref(), Some("body"));
+    }
+
+    #[test]
+    fn prepared_reset_sizes_before_validation_and_keeps_official_prey_density() {
+        let prepared = Session::prepare_reset(ResetOptions {
+            agents: NonZeroU32::new(484).unwrap(),
+            config: Config {
+                // This ring fits only after population sizing enlarges the default arena.
+                spawn_radius: Some(1000.),
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::default()
+            },
+            ..ResetOptions::default()
+        })
+        .unwrap();
+        assert_eq!(prepared.summary().config.radius, 14_740.);
+        assert_eq!(prepared.summary().config.prey.count, 68);
+        assert!(prepared.summary().config.size_to_population);
+        let mut typed = Session::new();
+        typed.commit_reset(prepared);
+        let mut json = Session::new();
+        let reply: serde_json::Value = serde_json::from_slice(&json.request(
+            br#"{"op":"reset","agents":484,"config":{"spawnRadius":1000,"foodCount":0,"ambientReplenishPerSecond":0}}"#,
+        ))
+        .unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(
+            typed.current.as_ref().unwrap().worlds[0].frame.encode(),
+            json.current.as_ref().unwrap().worlds[0].frame.encode()
+        );
+    }
+
+    #[test]
+    fn maximum_config_radius_resets_and_checkpoints() {
+        let mut session = Session::new();
+        let reply: serde_json::Value = serde_json::from_slice(&session.request(
+            br#"{"op":"reset","agents":1,"config":{"preset":"sandbox","radius":1e150,"foodCount":0,"radiusUpdates":[{"time":0.007,"radius":1e150}]}}"#,
+        ))
+        .unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"]["config"]["radius"], json!(1e150));
+        let world = &session.current.as_ref().unwrap().worlds[0].world;
+        let saved = serde_json::to_vec(&world.checkpoint().unwrap()).unwrap();
+        let restored =
+            Simulator::from_checkpoint(&saved, crate::RestoreOptions::default()).unwrap();
+        assert_eq!(
+            serde_json::to_vec(&restored.checkpoint().unwrap()).unwrap(),
+            saved
+        );
+    }
+
+    #[test]
+    fn typed_preparation_is_atomic_and_matches_json_defaults() {
+        let mut session = Session::new();
+        let summary = session.reset(ResetOptions::default()).unwrap();
+        assert_eq!(summary.placement, Placement::TestRing);
+        let before = session.request(br#"{"op":"snapshot"}"#);
+        let mut options = ResetOptions::default();
+        options.config.radius = -1.;
+        assert!(session.reset(options).is_err());
+        assert_eq!(session.request(br#"{"op":"snapshot"}"#), before);
+        let options = ResetOptions {
+            seed: 8,
+            ..Default::default()
+        };
+        let prepared = Session::prepare_reset(options).unwrap();
+        assert_eq!(prepared.summary().seed, 8);
+        assert_eq!(session.request(br#"{"op":"snapshot"}"#), before);
+        drop(prepared);
+        assert_eq!(session.request(br#"{"op":"snapshot"}"#), before);
+        let prepared = Session::prepare_reset(ResetOptions {
+            seed: 8,
+            ..Default::default()
+        })
+        .unwrap();
+        session.commit_reset(prepared);
+        let mut encoded = Session::new();
+        encoded.request(br#"{"op":"reset","seed":8}"#);
+        assert_eq!(
+            session.request(br#"{"op":"snapshot"}"#),
+            encoded.request(br#"{"op":"snapshot"}"#)
+        );
+        assert_eq!(
+            session.current.as_ref().unwrap().worlds[0].frame.encode(),
+            encoded.current.as_ref().unwrap().worlds[0].frame.encode()
+        );
+    }
+
+    #[test]
+    fn representation_and_later_world_placement_failure_keep_old_session() {
+        let mut session = Session::new();
+        session.reset(ResetOptions::default()).unwrap();
+        let before = session.request(br#"{"op":"snapshot"}"#);
+        let too_many = ResetOptions {
+            worlds: NonZeroUsize::new(usize::MAX).unwrap(),
+            agents: NonZeroU32::new(2).unwrap(),
+            ..Default::default()
+        };
+        assert_eq!(
+            session.reset(too_many).unwrap_err().kind,
+            ErrorKind::RepresentationLimit
+        );
+        let mut found = false;
+        for seed in 0..1000 {
+            let options = ResetOptions {
+                seed,
+                worlds: NonZeroUsize::new(2).unwrap(),
+                agents: NonZeroU32::new(2).unwrap(),
+                config: Config {
+                    radius: 400.,
+                    food_count: 0,
+                    ..Config::sandbox()
+                },
+                placement: Placement::Admitted {
+                    attempts: NonZeroU32::new(1).unwrap(),
+                    preferred_clearance: 0.,
+                },
+                ..Default::default()
+            };
+            if let Err(error) = Session::prepare_reset(options.clone())
+                && error.world == Some(1)
+                && matches!(error.kind, ErrorKind::PlacementExhausted { .. })
+            {
+                assert!(session.reset(options).is_err());
+                found = true;
+                break;
+            }
+        }
+        assert!(
+            found,
+            "fixture must exercise a later-world admission failure"
+        );
+        assert_eq!(session.request(br#"{"op":"snapshot"}"#), before);
     }
 }

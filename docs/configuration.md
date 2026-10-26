@@ -88,7 +88,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
-| `radius` | `670` | Positive finite arena radius. |
+| `radius` | `670` | Positive finite arena radius, at most `1e150`. |
 | `dynamicRadius` | `false` | Opt into the provisional living-population controller (`670 × sqrt(living)`, capped at 23.4375 units/s); it is not faithful to official radius waves. |
 | `sizeToPopulation` | `true` | Runtimes enlarge this arena to fit their population at creation, scaling food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. See [population sizing](#population-sizing). |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
@@ -100,7 +100,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | `emitBoostFood` | `true` | Emit boost pellets; disabling preserves boost cost and random-stream consumption. |
 | `speedModel` | `"retained_progress"` | Retained boost progress, or `"direct_speed"` for differential runs. |
 | `prey` | Defaults below | Moving edible entities. |
-| `radiusUpdates` | `[]` | Recorded `{time, radius}` samples applied at tick ends; times must be finite, nonnegative and strictly increasing; radii positive and finite. |
+| `radiusUpdates` | `[]` | Recorded `{time, radius}` samples applied at tick ends; times must be finite, nonnegative and strictly increasing; radii positive, finite and at most `1e150`. |
 | `boundaryMode` | `"sliding"` | Approximate rim sliding, or `"hard"` for immediate boundary death. |
 | `kiosk` | Defaults below | Provisional penalty for remaining in one area. |
 | `deathFood` | Defaults below | Death-food admission limit. |
@@ -108,7 +108,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | `boostFood` | Defaults below | Boost-food admission limit. |
 | `pit` | `null` | `{"radius": r}`, `0 < r < radius`: a one-way inner boundary; entry allowed, exit lethal. Uses the head center's swept path; see [Battledome](#battledome). |
 | `spawnRadius` | `null` | Inner radius for circular newborn bodies, anchors 42 apart and tangent heading; uses the [circular admission policy](#battledome), with strict waiting. `null` keeps official admission and straight two-segment newborns. Body chords must clear the pit (`spawnRadius > hypot(pit.radius, 21)`), all spawn radii must stay more than 60 inside the wall, and the head-tail gap must exceed newborn diameter, including rounding error. |
-| `spawnRadiusMax` | `null` | Optional outer spawn radius, finite and at least `spawnRadius`; requires it. The host samples radius uniformly by area, angle and tangent direction uniformly. `null` keeps one circle. Deterministic `Simulator::add` initialization stays on the inner circle with arena containment checks and no neighbor admission checks, for synthetic tests. |
+| `spawnRadiusMax` | `null` | Optional outer spawn radius, finite and at least `spawnRadius`; requires it. The host samples radius uniformly by area, angle and tangent direction uniformly. `null` keeps one circle. Deterministic `Placement::TestRing` initialization stays on the inner circle with arena containment checks and no neighbor admission checks, for synthetic tests. |
 | `killScoreSeconds` | `null` | Positive finite rolling kill-score window, per slot across lives; `null` reads as 0. See [score semantics](#battledome). |
 | `minScore` | `null` | Permanent integer displayed-score floor, 10–18,436,960; requires `spawnRadius`. Converted to mass at world creation. The maximum is the score at the table's end, 430 segments; larger snakes display less, so growth could break a higher floor. See [floor behavior](#battledome). |
 
@@ -129,9 +129,9 @@ is explicitly enabled. This is a startup capacity policy, not an official radius
 Sandbox, Battledome and explicit JSON radii opt out unless `sizeToPopulation`
 is explicitly enabled. Larger radii are never shrunk. Rust callers choosing a
 custom fixed radius set `size_to_population` false. Resolved configs and
-checkpoints retain the flag. `Simulator::new` alone has no population argument
-and preserves the supplied radius; `Config::official(n)` selects that initial
-size directly. Adding or respawning snakes does not reapply startup sizing.
+checkpoints retain the flag. Core `Simulator::new(WorldOptions { .. })`
+construction preserves the supplied Config; `Config::official(n)` selects that
+initial size directly. Adding or respawning snakes does not reapply startup sizing.
 
 ### Official and sandbox
 
@@ -425,6 +425,7 @@ Bounds have three kinds, with rationale beside the owning checks.
 
 | Bound | Reason |
 | --- | --- |
+| `radius` and every `radiusUpdates[].radius` ≤ `1e150` | Construction and checkpoints share the same numerical envelope, keeping squared geometry and one tick of continuation finite. Config validation names the offending field before construction. |
 | Sliding `dt < 16 / 437.5 s` (≈ 36.57 ms) | A slide leaves the head one contact lead (16 × scale) behind the rim. A boosting minimum-size snake that moves that far in one tick, keeping its heading, lands on or outside the rim and dies instead of sliding. Hard boundaries kill on contact anyway and accept longer steps, up to the substep bound below. |
 | `dt < 0.007 × 2⁵³` s (≈ 6.3 × 10¹³ s; smaller if `usize` is narrower) | Prey advance in 7 ms substeps and boosting snakes drop food every 0.155 s; one tick's count of each must be an exact integer that fits `usize`. This also keeps a tick of boost travel, `dt × 437.5`, finite. |
 | Refill rate | Refill subtracts one attempt interval at a time while credit remains; the interval must still change the refill clock in f64, or the loop never ends. |
