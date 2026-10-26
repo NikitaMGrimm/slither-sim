@@ -1,0 +1,20 @@
+{
+  "studyId": "2026-10-26-host-capacity",
+  "dataOrigin": "local-simulator",
+  "question": "Protocol-19 native Linux host capacity and current CPU hotspots, without optimizing the host",
+  "sourcePolicy": "Fetch origin/main immediately before AWS launch; record exact commit and merge states of PRs 111 and 112",
+  "server": {"instanceType": "c7a.medium", "vcpus": 1, "memoryGiB": 2},
+  "generator": {"instanceType": "c7a.4xlarge", "vcpus": 16, "memoryGiB": 32, "processes": 8},
+  "topology": "Ubuntu 24.04 x86-64, same AZ, private game traffic, separate security groups",
+  "world": "Unmodified HostConfig defaults, seed 7, maxClients=N, bots=0, botThreads=0; default dt and default seat-sized official world",
+  "sweep": {"counts": [100, 250, 500, 750], "conditionalCount": 1000, "conditionalRule": "Run 1000 if 750 meets criterion b", "warmupSeconds": 15, "holdSeconds": 120},
+  "confirmation": {"selection": "Largest sweep N meeting criterion b", "warmupSeconds": 15, "holdSeconds": 300},
+  "bots": {"bots": 500, "maxClients": 1, "botThreads": 7, "warmupSeconds": 15, "holdSeconds": 120, "fixedRoundTripMs": 40, "simulationCpu": "0", "socketAndWrapperCpu": "1", "botCpus": "2-15", "watcherCpu": "1"},
+  "profiles": {"counts": "500 and largest criterion-b N if different", "separateHolds": true, "warmupSeconds": 15, "holdSeconds": 120, "sampleStartSecondsIntoHold": 15, "sampleSeconds": 60, "event": "cpu-clock", "frequencyHz": 99, "callGraph": "dwarf,16384", "build": "release, line-table debuginfo"},
+  "thresholds": {"a": "excess p99 <= 3 ms", "b": "excess p99 <= 10 ms and zero newly deferred ticks", "c": "Observed sweep N where world time falls behind; publish executed ticks, deferrals and start/end world lag"},
+  "timing": "All post-setup frame receipts in hold: receipt milliseconds minus summed elapsed headers, minimum-normalized separately for each connection within the hold. Own-update gaps require both receipts in hold. Pooled and per-client exact nearest-rank quantiles. No timer-stall masking.",
+  "generatorValidity": "Report each process CPU, total CPU out of 16 cores, poll and steering lateness, decode errors and time-weighted populations; shard further if CPU approaches saturation",
+  "exclusions": "Failed or incomplete attempts retained, labelled, excluded from capacity thresholds. No mature/clustered/boosting/slow-reader claims. No mechanical fit or optimization; held-out fitting validation inapplicable.",
+  "limits": {"localBuildJobs": 2, "localClients": 50, "plannedMinutes": 120, "selfTerminateMinutes": 150, "awsCapUsd": 5, "serverSpotMaxUsdHour": 0.06, "generatorSpotMaxUsdHour": 0.65, "downloadCapGiB": 8},
+  "cleanup": "Terminate own instances, cancel own Spot requests, delete own key and security groups, verify zero account nonterminated instances/volumes/addresses/snapshots/open Spot requests in eu-central-1; save before/after credit-plan state privately"
+}

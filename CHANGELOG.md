@@ -167,6 +167,10 @@
 
 ### Performance
 
+- Document [native Linux host capacity and CPU profiles](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md),
+  including the failed 250-client long confirmation and a passing 100-client
+  five-minute hold; no host or simulator behavior changed.
+
 - Crowded hosts spend far less time choosing spawn positions: candidates stop
   being scored once they cannot win, and the chosen pose is unchanged. A
   64-seat Battledome host drops from about 45 to 3.5 ms per tick. Background
