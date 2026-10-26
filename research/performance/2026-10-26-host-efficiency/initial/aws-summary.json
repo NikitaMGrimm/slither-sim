@@ -1,0 +1,35 @@
+{
+  "basis": "Launch quotes times launch-to-cleanup-completion lifetimes; conservative ancillary allowance, not an invoice",
+  "instances": [
+    {
+      "role": "generator",
+      "instanceType": "c7a.4xlarge",
+      "hoursUpperEstimate": 0.6475671944444444,
+      "launchQuoteUsdHour": 0.4007,
+      "computeUsdEstimate": 0.2594801748138889
+    },
+    {
+      "role": "server",
+      "instanceType": "c7a.medium",
+      "hoursUpperEstimate": 0.6470116388888889,
+      "launchQuoteUsdHour": 0.0272,
+      "computeUsdEstimate": 0.017598716577777777
+    }
+  ],
+  "computeUsdEstimate": 0.2770788913916667,
+  "ancillaryAllowanceUsd": 0.2,
+  "totalUsdEstimate": 0.48,
+  "targetUsd": 3,
+  "hardCeilingUsd": 5,
+  "cleanupVerifiedUTC": "2026-10-26T03:38:02.241900+00:00",
+  "cleanup": {
+    "region": "eu-central-1",
+    "nonterminatedInstances": 0,
+    "volumes": 0,
+    "addresses": 0,
+    "snapshots": 0,
+    "openOrActiveSpotRequests": 0,
+    "keyPairDeleted": true,
+    "securityGroupsDeleted": true
+  }
+}

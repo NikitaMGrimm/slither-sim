@@ -1,0 +1,92 @@
+{
+  "method": "Complete decompressed byte comparison before timing; SHA-256 is supplemental",
+  "traceLimits": "Finite deterministic windows; retained harness excludes private backend state",
+  "baseCommit": "9480608d6c3cd0e6c12c0ec247ca52a4cdede9bc",
+  "candidateCommit": "08b1fade2a2ab37d35e157a0e03161075cf8248d",
+  "traces": [
+    {
+      "case": "portable",
+      "equal": true,
+      "base": {
+        "sha256": "18e8af02a72c1ff9459c0b3487fe4bdec7d6dcb12aca9033d20c4a4a972da175",
+        "bytes": 17204000,
+        "file": "portable-base.jsonl.gz"
+      },
+      "candidate": {
+        "sha256": "18e8af02a72c1ff9459c0b3487fe4bdec7d6dcb12aca9033d20c4a4a972da175",
+        "bytes": 17204000,
+        "file": "portable-candidate.jsonl.gz"
+      }
+    },
+    {
+      "case": "protocol",
+      "equal": true,
+      "base": {
+        "sha256": "4b0405da764e374820b7b6b6e817dafaa77c938864b991d95b5e841e450bb6f8",
+        "bytes": 8248574,
+        "file": "protocol-base.jsonl.gz"
+      },
+      "candidate": {
+        "sha256": "4b0405da764e374820b7b6b6e817dafaa77c938864b991d95b5e841e450bb6f8",
+        "bytes": 8248574,
+        "file": "protocol-candidate.jsonl.gz"
+      }
+    },
+    {
+      "case": "client-official-500",
+      "equal": true,
+      "base": {
+        "sha256": "329daff900cbf4cb1d0b63ce02a31ee8ad38768e7051bebc6d62636580212155",
+        "bytes": 82184175,
+        "file": "client-official-500-base.jsonl.gz"
+      },
+      "candidate": {
+        "sha256": "329daff900cbf4cb1d0b63ce02a31ee8ad38768e7051bebc6d62636580212155",
+        "bytes": 82184175,
+        "file": "client-official-500-candidate.jsonl.gz"
+      }
+    },
+    {
+      "case": "client-battledome-64",
+      "equal": true,
+      "base": {
+        "sha256": "2f87805705f4200eb5e42bb92d42afc8d14497e685ff5cf78c63be578081e097",
+        "bytes": 22504185,
+        "file": "client-battledome-64-base.jsonl.gz"
+      },
+      "candidate": {
+        "sha256": "2f87805705f4200eb5e42bb92d42afc8d14497e685ff5cf78c63be578081e097",
+        "bytes": 22504185,
+        "file": "client-battledome-64-candidate.jsonl.gz"
+      }
+    },
+    {
+      "case": "retained-step_all",
+      "equal": true,
+      "base": {
+        "sha256": "e27822d6ba28006ba74eb432761c8d996bdf0f3e63d76a4c915b858c350a324f",
+        "bytes": 1771005662,
+        "file": "retained-step_all-base.jsonl.gz"
+      },
+      "candidate": {
+        "sha256": "e27822d6ba28006ba74eb432761c8d996bdf0f3e63d76a4c915b858c350a324f",
+        "bytes": 1771005662,
+        "file": "retained-step_all-candidate.jsonl.gz"
+      }
+    },
+    {
+      "case": "retained-next_frame",
+      "equal": true,
+      "base": {
+        "sha256": "8949f0f55df18fcfc1582917619db28220c29e2de8de3e84cf8e384984a03b38",
+        "bytes": 1745484172,
+        "file": "retained-next_frame-base.jsonl.gz"
+      },
+      "candidate": {
+        "sha256": "8949f0f55df18fcfc1582917619db28220c29e2de8de3e84cf8e384984a03b38",
+        "bytes": 1745484172,
+        "file": "retained-next_frame-candidate.jsonl.gz"
+      }
+    }
+  ]
+}

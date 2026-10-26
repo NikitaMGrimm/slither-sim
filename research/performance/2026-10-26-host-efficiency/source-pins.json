@@ -1,0 +1,107 @@
+{
+  "baseCommit": "473e1882932356906cdb2f338b39bce0796667af",
+  "measuredCandidateCommit": "c63eef61360d6291a7733bfaeeb3f77ac8e12f3b",
+  "rebasedRuntimeCommit": "c63eef61360d6291a7733bfaeeb3f77ac8e12f3b",
+  "harnessHashes": {
+    "examples/perf_baseline.rs": "f5b347e33b24218e3d2e8b9cc7a1a0f4a9c48cb5cc292d826ed38ae1e8760a87",
+    "examples/perf_client_retained.rs": "1e95498d0bdfb5511c8fad25c611b60467a7e1632725c9891613450016a963d4",
+    "tools/perf_compare.py": "01d1118d21590f57987728c1b72c4528c3565633830dca84973196334ddf35d5",
+    "tools/perf_build.py": "f377bd7918626a5c80280b1c1d30a65ae70e301d471f9f2e3c580562b10198de"
+  },
+  "capacityHarnessSourceCommit": "3d10f2922b5c51ec4229b937929137392c256528",
+  "capacityHarnessHashes": {
+    "analyze.py": "d9d2eafdb9e5c3c1fe92df033e49732dd376c54e3012783cf7401c2c299d072e",
+    "host_capacity_load.rs": "0e05b2ffcd897f99b2ce6464f09cf63b338c1ff25c44e78e1d69905ca6dd1020",
+    "host_probe.rs": "89fa27f8f9cdff6524f25f527eca04f0b289afbbe62b53efd7ae9cb87f643e84",
+    "run_trial.py": "dfcf3528ca45e64d6659799e3b30b0875d526ce0125cca7f0273c16718dbfeac"
+  },
+  "planSha256": "05e465b04d626e9f87169de15f28849bb908715c08dfccdc194f131583095f61",
+  "dataOrigin": "local-simulator",
+  "access": "Raw binaries, traces, samples and cloud metadata local-only",
+  "rawAccess": "local-only; original attempt-3 archives remain unmodified",
+  "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "comparisonRound": "Final after #113; initial/ pins preserve the prior round",
+  "capacityAndIdentityBinarySha256": {
+    "bin-base/host_capacity_load": "2d29d587f4d012d7c8943f6c9f0622b60a701927de68b115bdac0413156b17cb",
+    "bin-base/host_probe": "b30ee3efa126112534e33b01ec9d8cdcf4019fff14cd682a053df784925ded36",
+    "bin-base/perf_baseline": "321d73faa69dd7acea1f0352489e8fcb4415b397b554e04ed1f4cd0424a00cc2",
+    "bin-base/perf_client_retained": "b89a152b6ea22e6c1bc6b3efc17262feb969d2a684ba2c0713ff4adc861ba108",
+    "bin-candidate/host_capacity_load": "40fc4b2827d5d0d8842c9bf08c0cca56e6d6d97d898cc358604397f63c652b27",
+    "bin-candidate/host_probe": "ed81da9bce89079e732fcedab0cee45868501156d7f5db1aeacfb3ecf6d2309b",
+    "bin-candidate/perf_baseline": "954060558c09f136f76708fad79463b266175ad84818de8b0e4a69047f46afaf",
+    "bin-candidate/perf_client_retained": "c3b4922765e150489ca25cd8b42ad037a38daa7781d616f9c25ee207115ddee2"
+  },
+  "rebasePlanSha256": "f5d307dd236ed97c6ca5570f13699f4db3a9845fe736e1f416bb4f9bdc9b0659",
+  "perfBuildIdentities": {
+    "baseline": {
+      "commit": "473e1882932356906cdb2f338b39bce0796667af",
+      "tree": "07d8d9dab793ff857f2c558160e3ae0f5e2245a3",
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+      "cargo_lock_sha256": "4f9d5d1be5778018ffd3e90f2767c572a36b222ca44e0f6a096d67e63fea80a4",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--example",
+        "perf_baseline"
+      ],
+      "log_sha256": "a23fb37b3cffceed9f1ac4956540893aa843183cc36f9d5d088566864a0e2b28",
+      "binaries": {
+        "perf_baseline": {
+          "path": "/home/ubuntu/study/perf-combined/bin-baseline/perf_baseline",
+          "sha256": "8fe13f0372c48969136ec99f61015fcef2e59c209a6a86e5d570886699707690"
+        }
+      }
+    },
+    "candidate": {
+      "commit": "d4420fef0290a5848ab26c092fa16f2e88f44a98",
+      "tree": "da6f2e45d4370a0bde2aae9c80f1b18573220f1a",
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+      "cargo_lock_sha256": "4f9d5d1be5778018ffd3e90f2767c572a36b222ca44e0f6a096d67e63fea80a4",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--example",
+        "perf_baseline"
+      ],
+      "log_sha256": "c37fd5d8e4ab7a59a02aac1067c81bae3c39fda129f1426973ae3ce253415504",
+      "binaries": {
+        "perf_baseline": {
+          "path": "/home/ubuntu/study/perf-combined/bin-candidate/perf_baseline",
+          "sha256": "389e8b285037b801a8b7e20e3ed32623d5d312f740c828b1a235ee8634486670"
+        }
+      },
+      "snapshotOf": {
+        "commit": "c63eef61360d6291a7733bfaeeb3f77ac8e12f3b",
+        "addedUntrackedFiles": [
+          "examples/host_capacity_load.rs",
+          "examples/host_probe.rs"
+        ],
+        "note": "tools/perf_build.py freezes the working tree, including untracked files; the run copied the unchanged capacity examples (capacityHarnessHashes) into the candidate checkout before perf_compare. Rebuilding that tree on this commit with the fixed snapshot metadata reproduces this commit and tree exactly."
+      }
+    }
+  },
+  "returnedArchives": {
+    "generator-results.tar.gz": {
+      "sha256": "1bc5dcaa4aacfaefb1f540955e299be466b4503ef1c242e5806c57b7e8ab07d4",
+      "bytes": 1177650164,
+      "digestComputedOn": "AWS generator; original remote archive",
+      "localDownloadRehashed": false
+    },
+    "server-results.tar.gz": {
+      "sha256": "7bcc782655e9d5a64e7ba4f0b5c4934c20eaaa7e136c6bff723f480b1db1043f",
+      "bytes": 163045,
+      "digestComputedOn": "local; 163 KB file",
+      "localDownloadRehashed": true
+    }
+  },
+  "testLogSha256": {
+    "checks-rust.log": "790f269fc38e22b34a45f76648ebe34f13f0e6570dc013a8f737ecf1a1f53bd1",
+    "checks-documentation.log": "3e832d2a460f604f1b4d58721a302a6ac10243d9ec698aad4eef972c89ac6fa5"
+  }
+}
