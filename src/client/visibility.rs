@@ -6,7 +6,10 @@
 
 use super::encode;
 use crate::model::Point;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 const HEADING_LEAD: f64 = 100.;
 const RETENTION_SECONDS: f64 = 2.6;
@@ -16,6 +19,9 @@ pub(super) const CLEANUP_SECONDS: f64 = 0.504;
 #[derive(Clone, Debug, Default)]
 pub(super) struct SectorInterest {
     subscribed: BTreeSet<[u8; 2]>,
+    // Held food listings share this identity, avoiding a key-by-key comparison
+    // on every broadcast. Replace it only when membership actually changes.
+    revision: Arc<()>,
     /// Keys are exactly the subscribed sectors. Sectors of the current stencil
     /// were last seen at `touched`; their stored values may be older.
     last_seen: BTreeMap<[u8; 2], f64>,
@@ -29,6 +35,7 @@ impl SectorInterest {
     /// Advance on every physics tick using finite, monotonic virtual time.
     /// The caller keeps the final pose for dead clients and resets on reconnect.
     pub(super) fn advance(&mut self, head: Point, heading: f64, now: f64) {
+        let mut changed = false;
         let size = f64::from(encode::SECTOR_SIZE);
         let center = f64::from(encode::GRID_CENTER);
         // The wire origin is half a sector from the centered world origin, so
@@ -43,7 +50,7 @@ impl SectorInterest {
                 }
             }
             for sector in stencil([cx, cy]) {
-                self.subscribed.insert(sector);
+                changed |= self.subscribed.insert(sector);
                 self.last_seen.insert(sector, now);
             }
             self.center = Some([cx, cy]);
@@ -65,15 +72,33 @@ impl SectorInterest {
                 if current || now - *last_seen <= RETENTION_SECONDS {
                     true
                 } else {
-                    subscribed.remove(sector);
+                    changed |= subscribed.remove(sector);
                     false
                 }
             });
+        }
+        if changed {
+            self.revision = Arc::new(());
         }
     }
 
     pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
         &self.subscribed
+    }
+
+    pub(super) fn revision(&self) -> &Arc<()> {
+        &self.revision
+    }
+
+    /// Synthetic retained membership for wire-diff regressions.
+    #[cfg(test)]
+    pub(super) fn from_subscribed(subscribed: BTreeSet<[u8; 2]>) -> Self {
+        let last_seen = subscribed.iter().map(|&sector| (sector, 0.)).collect();
+        Self {
+            subscribed,
+            last_seen,
+            ..Self::default()
+        }
     }
 }
 
@@ -100,6 +125,34 @@ mod tests {
     use std::f64::consts::FRAC_PI_2;
 
     const FAR: Point = Point { x: 10_000., y: 0. };
+
+    #[test]
+    fn revision_tracks_membership_across_cloning_revisits_and_cleanup() {
+        let mut interest = SectorInterest::default();
+        let empty = interest.revision().clone();
+        interest.advance(Point::default(), 0., 0.);
+        assert!(!Arc::ptr_eq(&empty, interest.revision()));
+        let original = interest.clone();
+        interest.advance(Point { x: 1., y: 1. }, 0., 0.504);
+        assert!(Arc::ptr_eq(original.revision(), interest.revision()));
+
+        interest.advance(FAR, 0., 0.505);
+        let expanded = interest.revision().clone();
+        assert!(!Arc::ptr_eq(original.revision(), &expanded));
+        assert_ne!(original.subscribed(), interest.subscribed());
+        // Returning to the original center retains the new sectors as well.
+        interest.advance(Point::default(), 0., 0.506);
+        assert!(Arc::ptr_eq(&expanded, interest.revision()));
+        assert_ne!(original.subscribed(), interest.subscribed());
+
+        interest.advance(Point::default(), 0., 3.528);
+        assert!(!Arc::ptr_eq(&expanded, interest.revision()));
+        assert_eq!(original.subscribed(), interest.subscribed());
+        let cleaned = interest.revision().clone();
+        interest.advance(Point::default(), 0., 4.032);
+        assert!(Arc::ptr_eq(&cleaned, interest.revision()));
+        assert!(!Arc::ptr_eq(&cleaned, SectorInterest::default().revision()));
+    }
 
     #[test]
     fn fresh_received_sector_entries_are_admitted_beyond_the_old_circle() {

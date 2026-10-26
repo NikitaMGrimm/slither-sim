@@ -1,7 +1,9 @@
 use super::*;
 use crate::{
     Config,
-    client::{Minimap, WireEvent, encode, latency::LatencyConfig, protocol},
+    client::{
+        Minimap, WireEvent, encode, latency::LatencyConfig, protocol, visibility::SectorInterest,
+    },
     model::{Food, Origin, Snake},
     physics,
 };
@@ -10,7 +12,7 @@ use std::collections::BTreeSet;
 use super::{
     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},
-    food::{KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
+    food::{FoodChanges, KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
     snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
 };
 
@@ -753,9 +755,12 @@ fn diff_food(
     food_updates(
         packets,
         &mut connection.food,
-        subscribed,
+        &SectorInterest::from_subscribed(subscribed.clone()),
         &listings,
-        &eaten_sectors(eaters),
+        &FoodChanges {
+            changed: subscribed.clone(),
+            eaten: eaten_sectors(eaters),
+        },
         eaters,
     );
 }
@@ -776,16 +781,16 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     let mut sectors = vec![None; 1 << 16];
     sectors[usize::from(u16::from_be_bytes([sx, sy]))] =
         Some(Arc::new(SectorFood(vec![([rx, ry], food)])));
-    let subscribed = BTreeSet::from([[sx, sy]]);
+    let interest = SectorInterest::from_subscribed(BTreeSet::from([[sx, sy]]));
     let mut known = KnownSectors::default();
     let mut packets = Vec::new();
     let none = BTreeMap::new();
     food_updates(
         &mut packets,
         &mut known,
-        &subscribed,
+        &interest,
         &sectors,
-        &eaten_sectors(&none),
+        &FoodChanges::default(),
         &none,
     );
     assert_eq!(packets.len(), 1);
@@ -793,9 +798,9 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     food_updates(
         &mut packets,
         &mut known,
-        &subscribed,
+        &interest,
         &sectors,
-        &eaten_sectors(&none),
+        &FoodChanges::default(),
         &none,
     );
     assert!(packets.is_empty());
@@ -804,9 +809,12 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     food_updates(
         &mut packets,
         &mut known,
-        &subscribed,
+        &interest,
         &sectors,
-        &eaten_sectors(&eaters),
+        &FoodChanges {
+            changed: eaten_sectors(&eaters),
+            eaten: eaten_sectors(&eaters),
+        },
         &eaters,
     );
     assert_eq!(
