@@ -258,9 +258,9 @@ state; checkpoints store only the live radius.
 
 `dynamicRadius: false` restores the fixed arena with strict waiting. With
 growth on, the host accepts up to 105 configured seats so the largest allowance
-stays inside the 32,000-unit wire limit. Other circular worlds with `minScore`
-and `dynamicRadius` use the same controller and scale their pit and spawn radii
-with the wall; circular worlds without a floor keep their geometry.
+stays inside the 32,000-unit wire limit. Other worlds that set `dynamicRadius`,
+`spawnRadius` and `minScore` use the same controller and scale their pit and
+spawn radii with the wall; worlds missing any of them keep their geometry.
 
 In fresh 16–32-seat worlds the wall, pit, spawn band, food density and
 spawn-to-pit travel (about 4.9–8.8 s at normal speed) are unchanged. After a
