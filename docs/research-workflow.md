@@ -221,7 +221,7 @@ qualification samples and post-event deaths in the ordinary archive format.
 no paired `mode` or `direction` fields apply. Outside endpoints require an
 explicit official-server plan and `--allow-outside yes`; the default is loopback.
 
-The [unexecuted pilot and commands](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/README.md)
+The [pilot plan and commands](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/README.md)
 freeze population selection, trial qualification, uncertainty and stop rules.
 The offline preparer binds retained selection metadata without probing any
 server. `collect.py` rejects pilot two after failed integrity, zero qualified
@@ -244,6 +244,29 @@ Simulator API. These verify current simulator outcomes, not online laws or
 live-server feasibility. Raw local test archives remain outside Git, including
 failures; the test prints their location. Use `CARGO_BUILD_JOBS=2` and
 `RAYON_NUM_THREADS=2` on a shared machine.
+
+#### Busy official servers
+
+Every controlled route tried on official servers so far stopped on interference
+before reaching its coverage gate:
+
+- The [visibility pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-visibility-pilot/REPORT.md)
+  produced no qualified crossing: every leg paused for staleness and avoidance.
+- The [collision pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/EXECUTION.md)
+  lost five of seven slots to third-party proximity and one to the rim margin
+  before a join failed.
+- The [food-interest pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-food-interest/REPORT.md)
+  ended at its first avoidance abort after three slots, as the
+  [October 23 food lanes](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
+  had after 13 seconds.
+
+Before freezing another route, show offline that it survives interference.
+Restage or re-site after an abort within a fixed budget instead of ending the
+invocation. Keep the staging footprint away from the rim, pace reconnects and
+screen opponent bodies, not just heads. Check that the freshness gates can pass
+from the planned vantage: every October 23 food reintroduction failed the
+anchor-age gate.
+Keep failed pilots as evidence; a rerun of the same controller is not new data.
 
 ### Capture records
 
