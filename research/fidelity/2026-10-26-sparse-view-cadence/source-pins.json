@@ -19,9 +19,9 @@
   "adaptation": "Portable CLI paths and bounded selections; no decoder, bins, eligibility, thresholds or numeric outcomes changed.",
   "publicationScripts": {
     "analyze.py": "ae5e5cbf1814ee0aa42b853cb3b347997fc5044b4aebcbcbe8152a8e29d4b11d",
-    "enrich_witnesses.py": "f64d89d87e35270bcbbb23f39e724234aa9a7efe78bded1a6c5e2ab963665531",
+    "enrich_witnesses.py": "21d10406bed2e8194999ae5006b426b56216b6e450c37b4277059701517522dd",
     "select_results.py": "d1524c68447a21b7b632edb013dba40650b6304468a996a0a3666fa94e0c372f",
-    "summarize.py": "da4b9831bc88d536107831a3c5bcbfb3e41ff664f9ad8576ddf4840a4521dd74",
+    "summarize.py": "bac734809e2be3c0f2a20325b974dcc14c7c7796a4d79fa6334130494f0273ed",
     "verify.py": "a1540828fbfc59a7f8f5cbd352e39f9d2654b6b40c35405573564cd786391a94"
   }
 }

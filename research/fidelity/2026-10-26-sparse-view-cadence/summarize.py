@@ -76,6 +76,7 @@ pooled=dict(groups={k:v.result() for k,v in groups.items()},
 a.save(OUT/'pooled.json',pooled)
 for key,witness in witnesses.items():
     source=next(r['path'] for r in results if r['id']==witness['capture'])
+    if a.sha(source)!=witness['sourceSha256']: raise ValueError('witness archive hash mismatch')
     for i,frame in enumerate(x for x in a.sp.read(source) if isinstance(x,a.sp.Frame)):
         if i==int(witness['frame']):
             witness['packetsHex']=[p.hex() for p in frame.packets];break

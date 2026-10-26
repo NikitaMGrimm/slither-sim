@@ -11,7 +11,9 @@ witnesses=a.load(out/'selected-witnesses.json')
 inputs={s['id']:s for s in a.load(out/'inputs.json')}
 for witness in witnesses.values():
     world=None; conn=None; target=int(witness['frame']); number=-1
-    for frame in a.sp.read(inputs[witness['capture']]['path']):
+    source=inputs[witness['capture']]['path']
+    if a.sha(source)!=witness['sourceSha256']: raise ValueError('witness archive hash mismatch')
+    for frame in a.sp.read(source):
         if not isinstance(frame,a.sp.Frame): continue
         number+=1
         if world is None or conn!=frame.conn or any(p[:1]==b'a' for p in frame.packets):
