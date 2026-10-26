@@ -1,10 +1,10 @@
-# Collision capture tooling: local verification; official pilot not executed
+# Collision capture tooling: historical local verification
 
-No outside game server was contacted. No simulator rule changes are proposed.
-The [pilot plan](plan.json) is exploratory and remains unexecuted; its two
-ten-minute invocations and population scouting need later collection
-authorization. This record distinguishes synthetic simulator outcomes from
-future official evidence.
+This report records the original loopback-only engineering work; no outside
+game server was contacted during that work. The later official pilot one
+failed feasibility and pilot two was stopped: see [execution and limits](EXECUTION.md).
+The exploratory [frozen plan](plan.json) is preserved. No simulator rule changes
+are proposed; the local results below are synthetic, separate from execution.
 
 ## Design and qualification
 

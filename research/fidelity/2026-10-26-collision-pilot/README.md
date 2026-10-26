@@ -1,9 +1,9 @@
 # Collision pilot preparation
 
-Official pilots: **not executed**. One official scouting attempt failed
-before any join (see below). This PR builds tooling and tests
-only against a loopback SlitherSim host. [Frozen method](plan.json),
-[local verification and limits](REPORT.md).
+Official pilot one **failed feasibility**: seven attempted slots, none launched;
+pilot two was stopped by the frozen gate. [Execution and limits](EXECUTION.md),
+[selected results](execution-results.json), [frozen method](plan.json), and
+[historical local verification](REPORT.md).
 
 After separate collection authorization, retain the decoded official list and
 sequential scouting archives privately. The selection file has this shape:

@@ -1,0 +1,686 @@
+{
+  "schemaVersion": 1,
+  "scientificStatus": "failed acquisition feasibility; no launched or qualified collision encounter",
+  "rawAccess": "local-only; raw captures, source exports, bundles and transfer archives retained outside Git; aliases do not make them downloadable",
+  "archiveScope": "All archives retained in this collision acquisition history, deduplicated by bytes; copies share one alias. Earlier tooling-development evidence remains in local-results.json.",
+  "sourcePins": [
+    {
+      "id": "pre-fix",
+      "commit": "d21d90b84069242c2b2d7d58c98b8103dd4adf08",
+      "files": {
+        "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+        "tools/fidelity/slither-paired-collision.mjs": "0751b44d702b329a3870a01a4f1a8ac8c8d3d7d28a0d083e069e58143651fa10",
+        "tools/fidelity/prepare_collision_pilot.py": "cb206eb405a7c1d62210a7b9b5d570bcb1c4fbb12f318a85eba41c75a4df08d6",
+        "tools/fidelity/collect.py": "726229c1b5641f7e69214c4910d4f6d4461d0ebdcb14fc90a8f6fc43047646d2",
+        "tools/fidelity/evidence.py": "d763503b29514639b5a011bfac1e986efa788fa1c247abb76cbadd952afc155b"
+      }
+    },
+    {
+      "id": "fixed",
+      "commit": "42ef95eec464cf0f3fa142ac9f572127deda8e5d",
+      "files": {
+        "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+        "tools/fidelity/slither-paired-collision.mjs": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+        "tools/fidelity/prepare_collision_pilot.py": "d062619a4a309998807947f64dc403106ca1b7eca729571c1421685418972b4e",
+        "tools/fidelity/collect.py": "726229c1b5641f7e69214c4910d4f6d4461d0ebdcb14fc90a8f6fc43047646d2",
+        "tools/fidelity/evidence.py": "d763503b29514639b5a011bfac1e986efa788fa1c247abb76cbadd952afc155b"
+      }
+    }
+  ],
+  "frozenTemplateSha256": "92e4083b55f3e62aa0aedf6fc41d4b5a0568023171a4fac0943fdcfa501d14c7",
+  "history": [
+    {
+      "phase": "initial-scouting",
+      "archives": [
+        "initial-scout-01",
+        "initial-scout-02",
+        "initial-scout-03",
+        "initial-scout-04",
+        "initial-scout-05"
+      ],
+      "populations": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "incomingFrames": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "closeCodes": [
+        1006,
+        1006,
+        1006,
+        1006,
+        1006
+      ],
+      "defect": "Origin omitted; no frames or joins; no pilot reserved"
+    },
+    {
+      "phase": "origin-reproduction",
+      "archives": [
+        "repro-01",
+        "repro-02"
+      ],
+      "incomingFrames": [
+        0,
+        1
+      ],
+      "outgoingFrames": [
+        0,
+        4
+      ],
+      "setup": [
+        false,
+        false
+      ],
+      "leaderboard": [
+        false,
+        false
+      ],
+      "closeCodes": [
+        1006,
+        1006
+      ],
+      "defect": "Origin-present scout sent ping 0xfb before the challenge, then replied and sent login before close; fixed by readiness guard in #152"
+    },
+    {
+      "phase": "base-headless-comparison",
+      "archives": [
+        "headless-check-01",
+        "headless-check-02"
+      ],
+      "joined": [
+        true,
+        true
+      ],
+      "setup": [
+        true,
+        true
+      ],
+      "leaderboard": [
+        true,
+        true
+      ],
+      "firstPopulations": [
+        454,
+        499
+      ],
+      "incomingFrames": [
+        1861,
+        1368
+      ],
+      "outgoingFrames": [
+        237,
+        247
+      ],
+      "closeCodes": [
+        1006,
+        1006
+      ],
+      "closeContext": "both followed requested 20-second shutdown; both authorized comparison vantages joined; no pre-setup ping"
+    },
+    {
+      "phase": "corrected-scouting",
+      "archives": [
+        "corrected-scout-01",
+        "corrected-scout-02",
+        "corrected-scout-03",
+        "corrected-scout-04",
+        "corrected-scout-05"
+      ],
+      "sourcePin": "fixed",
+      "populations": [
+        447,
+        309,
+        201,
+        94,
+        null
+      ],
+      "setup": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "populationLimit": 100,
+      "eligibleCandidates": 1,
+      "chosenPopulation": 94,
+      "preSetupPings": 0,
+      "preOwnAppearancePings": 0,
+      "preparer": "succeeded; Origin bound; scientific fields unchanged",
+      "audit": "five verified"
+    }
+  ],
+  "officialPilot": {
+    "plannedInvocations": 2,
+    "startedInvocations": 1,
+    "completedInvocations": 0,
+    "failedInvocations": 1,
+    "secondInvocationRun": false,
+    "sourcePin": "fixed",
+    "archives": [
+      "pilot-one-a",
+      "pilot-one-b"
+    ],
+    "reason": "join timeout",
+    "attemptedSlots": 7,
+    "launched": 0,
+    "qualifiedLadder": 0,
+    "qualifiedHeadOn": 0,
+    "qualifiedTargets": {
+      "ladder": 16,
+      "headOn": 8
+    },
+    "cells": [
+      {
+        "kind": "ladder",
+        "probe": 0,
+        "factor": 1.3,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 0,
+        "factor": 1.1,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 0,
+        "factor": 0.9,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 1,
+        "exclusionReason": "arena_margin",
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 0,
+        "factor": 0.7,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 1,
+        "factor": 1.3,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 1,
+        "factor": 1.1,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 1,
+        "exclusionReason": "third_party",
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 1,
+        "factor": 0.9,
+        "attempted": 1,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 0,
+        "censored": 1,
+        "target": 2
+      },
+      {
+        "kind": "ladder",
+        "probe": 1,
+        "factor": 0.7,
+        "attempted": 0,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 0,
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "head-on",
+        "probe": 0,
+        "first": 0,
+        "attempted": 0,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 0,
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "head-on",
+        "probe": 1,
+        "first": 0,
+        "attempted": 0,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 0,
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "head-on",
+        "probe": 0,
+        "first": 1,
+        "attempted": 0,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 0,
+        "censored": 0,
+        "target": 2
+      },
+      {
+        "kind": "head-on",
+        "probe": 1,
+        "first": 1,
+        "attempted": 0,
+        "launched": 0,
+        "qualified": 0,
+        "contact": 0,
+        "survival": 0,
+        "excluded": 0,
+        "censored": 0,
+        "target": 2
+      }
+    ],
+    "exclusions": {
+      "third_party_before_launch": 5,
+      "arena_margin_before_launch": 1,
+      "join_timeout_censored_unfinished_slot": 1
+    },
+    "firstPopulations": [
+      98,
+      98
+    ],
+    "maximumObservedPopulations": [
+      99,
+      99
+    ],
+    "gameOverPackets": [
+      0,
+      0
+    ],
+    "gates": {
+      "endpointPopulation": "passed",
+      "completedAcquisition": "failed",
+      "nonzeroQualifiedLadder": "failed: 0",
+      "nonzeroQualifiedHeadOn": "failed: 0",
+      "thirdPartyLaunchedFraction": null,
+      "thirdPartyLaunchedDenominator": 0,
+      "pilotTwo": "refused; no replacement"
+    },
+    "audit": "quarantined: interrupted captures, failed attempt and planned second attempt absent",
+    "integrity": {
+      "completeGzipMembers": 2,
+      "validPrefixReceipts": 2,
+      "sourcesUnchanged": true,
+      "matchedTerminalResultLedgers": true
+    },
+    "maxConcurrentGameSockets": 2,
+    "allSocketLifecyclesClosed": true
+  },
+  "unqualifiedStaging": {
+    "independentEncounters": 0,
+    "limits": "Dependent join/staging metadata only; not launched/qualified encounter geometry or server truth",
+    "quantities": {
+      "ownAnchorAgeMs": {
+        "n": 464,
+        "min": 1.174407999998948,
+        "max": 267.0367030000052,
+        "p50": 121.30890499999805,
+        "p95": 226.21477199999936
+      },
+      "peerAnchorAgeMs": {
+        "n": 298,
+        "min": 1.1730490000045393,
+        "max": 264.12316300000384,
+        "p50": 122.54335400000127,
+        "p95": 225.41960700000345
+      },
+      "predictedHeadAgreement": {
+        "n": 298,
+        "min": 0.17517414799978073,
+        "max": 32.81298471408353,
+        "p50": 0.559962118122487,
+        "p95": 1.2776924933241782
+      }
+    }
+  },
+  "syntheticPrechecks": {
+    "nodeUnitTestsPassed": 7,
+    "firstFixedLoopback": {
+      "attempted": 12,
+      "qualified": 10,
+      "passed": false,
+      "exclusions": [
+        "staging_timeout",
+        "body_overlap_lost"
+      ],
+      "archives": [
+        "local-check-02-a",
+        "local-check-02-b"
+      ]
+    },
+    "wholeCycleRepeat": {
+      "attempted": 12,
+      "qualified": 12,
+      "passed": true,
+      "archives": [
+        "local-check-03-a",
+        "local-check-03-b"
+      ]
+    },
+    "deterministicCurve": "passed; synthetic only"
+  },
+  "limits": [
+    "One dependent failed pilot; no geometry or join-order verdict, fit, p-value or simulator adoption.",
+    "Candidate inconsistency and half/base/double timing envelopes are undefined on an empty qualified set.",
+    "No inference from death/close receipt order or cache disappearance.",
+    "Archive checksums establish integrity, not physics or acquisition success.",
+    "No new game connection was made to prepare this record."
+  ],
+  "archives": [
+    {
+      "alias": "initial-scout-01",
+      "sha256": "f6509211d08b1d46cb57fb94c4a8d534b651a4dc0808281c01b374648c66f8bf",
+      "kind": "official-population-scout",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "d0f986672d5ccedb9f4be79347e68b8a1e9a56f308797f9905c4093568ee14fc",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "initial-scout-02",
+      "sha256": "4fc2263267f7df349af68abbab9ef3148dd2c063a2dcf2a8b3d9ab51b483b3b8",
+      "kind": "official-population-scout",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "d0f986672d5ccedb9f4be79347e68b8a1e9a56f308797f9905c4093568ee14fc",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "initial-scout-03",
+      "sha256": "d455d7a7317670f5c248dfbf0057e3edd0ab45737dece61e4f10be5cdd9d2d6c",
+      "kind": "official-population-scout",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "d0f986672d5ccedb9f4be79347e68b8a1e9a56f308797f9905c4093568ee14fc",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "initial-scout-04",
+      "sha256": "ef6977d42434d3e5546064068b988f532d237c2fab6c27b9c80e61bd7a6ec65c",
+      "kind": "official-population-scout",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "d0f986672d5ccedb9f4be79347e68b8a1e9a56f308797f9905c4093568ee14fc",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "initial-scout-05",
+      "sha256": "72ff89a6f70e0830f1fd6ea99411ce64769ac421a5f9249c150a3a8673b0536f",
+      "kind": "official-population-scout",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "d0f986672d5ccedb9f4be79347e68b8a1e9a56f308797f9905c4093568ee14fc",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "corrected-scout-01",
+      "sha256": "0812eb97eee2c3505a9a0a3399b6df2d460600ff5b729bc7830407f4712ec428",
+      "kind": "official-population-scout",
+      "sourcePin": "fixed",
+      "collectorSha256": "121ddb8b461d1155d9c4303ceeaa17abedf2e4a3e7a93780707c23ab49b6a974",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "corrected-scout-02",
+      "sha256": "7e9b01a43c15288fa9d98158ea2cb81d13c051f3030eeff482d4e1b3617fc720",
+      "kind": "official-population-scout",
+      "sourcePin": "fixed",
+      "collectorSha256": "121ddb8b461d1155d9c4303ceeaa17abedf2e4a3e7a93780707c23ab49b6a974",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "corrected-scout-03",
+      "sha256": "eed5f30a5ebb10ad3b11a9a6b937c07235741db7e6d0934c6dea7de534538046",
+      "kind": "official-population-scout",
+      "sourcePin": "fixed",
+      "collectorSha256": "121ddb8b461d1155d9c4303ceeaa17abedf2e4a3e7a93780707c23ab49b6a974",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "corrected-scout-04",
+      "sha256": "12515c447ccb002dfeb9e59de705cd4dc5bd0f7a51ff9d5b7e21fe22d11b99cc",
+      "kind": "official-population-scout",
+      "sourcePin": "fixed",
+      "collectorSha256": "121ddb8b461d1155d9c4303ceeaa17abedf2e4a3e7a93780707c23ab49b6a974",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "corrected-scout-05",
+      "sha256": "fadad7573beb0a5648c95d2ca3eaf639ade83c56d418c0d33a65189441c519cb",
+      "kind": "official-population-scout",
+      "sourcePin": "fixed",
+      "collectorSha256": "121ddb8b461d1155d9c4303ceeaa17abedf2e4a3e7a93780707c23ab49b6a974",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "repro-01",
+      "sha256": "1d92535a6b8b0ec39f0057954b2a23da128b69c8f913637ff127a3b6e414b912",
+      "kind": "official-login-reproduction",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "4fe6bcc5a7147851fd8eb10b19d75a8cdc78746a3d6e582f47397fd915cda34a",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "repro-02",
+      "sha256": "3f592bc2e5833e92eb12497fa3c028d3456921b78d63383d0e14572a8bddc461",
+      "kind": "official-login-reproduction",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "4fe6bcc5a7147851fd8eb10b19d75a8cdc78746a3d6e582f47397fd915cda34a",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "headless-check-01",
+      "sha256": "5a9d87231444efe5f387cef8771b78ec492435357d5de81b601c79ef7e67eafe",
+      "kind": "official-base-headless-diagnostic",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 2
+    },
+    {
+      "alias": "headless-check-02",
+      "sha256": "2672c2901c6ba83e673463b7d9742bcc2f26d2b3773e2b4f5c3cbba8b1267532",
+      "kind": "official-base-headless-diagnostic",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 2
+    },
+    {
+      "alias": "local-check-01-a",
+      "sha256": "ba8359067ef2062a6e06353d5af06d6bdf129fc7bcbecafd3d9d6228498d09d6",
+      "kind": "synthetic-loopback",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "0751b44d702b329a3870a01a4f1a8ac8c8d3d7d28a0d083e069e58143651fa10",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "local-check-01-b",
+      "sha256": "b88e6bd969e49858c4f412ccb905b5fbe8920155b48c27b51169b2dea95b00c1",
+      "kind": "synthetic-loopback",
+      "sourcePin": "pre-fix",
+      "collectorSha256": "0751b44d702b329a3870a01a4f1a8ac8c8d3d7d28a0d083e069e58143651fa10",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "local-check-02-a",
+      "sha256": "1f9c6e76fbb45ace60d4e251945911428b377d8a0a6a1a9ad28aacc24824ad0f",
+      "kind": "synthetic-loopback",
+      "sourcePin": "fixed",
+      "collectorSha256": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "local-check-02-b",
+      "sha256": "fee670e0156450e4858fec66df5cc569026e6d2e6ea2d4f880d926f04e972815",
+      "kind": "synthetic-loopback",
+      "sourcePin": "fixed",
+      "collectorSha256": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "local-check-03-a",
+      "sha256": "7a72ee3d547c4590d59be985811fc7a798b44684c590eafb834e6c12e063177f",
+      "kind": "synthetic-loopback",
+      "sourcePin": "fixed",
+      "collectorSha256": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "local-check-03-b",
+      "sha256": "ad1168c5d63bc5f1f088bbb2b4fdcff24c9c642032379b16bda2d7e650114edc",
+      "kind": "synthetic-loopback",
+      "sourcePin": "fixed",
+      "collectorSha256": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "pilot-one-a",
+      "sha256": "03ed03fd1c68043e372d85b26bcd686afcd1cbc48cd198128b9e4cf972164ab7",
+      "kind": "official-paired-collision",
+      "sourcePin": "fixed",
+      "collectorSha256": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "pilot-one-b",
+      "sha256": "e3ef8445eb8e8f369b275186abd2be6a23fed7e70ee58429f6003493e8e0ec7e",
+      "kind": "official-paired-collision",
+      "sourcePin": "fixed",
+      "collectorSha256": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+      "headlessSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "transfer-package-01",
+      "sha256": "1c32e1b0afc4ae9af050b3e721d67d3f43f8977912a71ef06454f7b093dc70d1",
+      "kind": "private-container-archive",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "transfer-package-02",
+      "sha256": "2457bd9e7a4822d8edc6646094271daeb4612b922d316b89c89bfd89e8ea2500",
+      "kind": "private-container-archive",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "source-export-01",
+      "sha256": "2d4f31c9919bbd03017e5d938a749e0973a58b7a33b8eab86d95bba723ebf6b5",
+      "kind": "private-container-archive",
+      "sourcePin": "pre-fix",
+      "retainedCopies": 4
+    },
+    {
+      "alias": "evidence-bundle-01",
+      "sha256": "924324dda5cf1ab880d85c17e9291af1edd04e1922bdca3cda5acd70cd1ec009",
+      "kind": "private-container-archive",
+      "sourcePin": "fixed",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "transfer-package-03",
+      "sha256": "abc73397d33b099c809864a0fb7aadb343637150bfffa9b4d50c5ccc11c5ac11",
+      "kind": "private-container-archive",
+      "retainedCopies": 1
+    },
+    {
+      "alias": "source-export-02",
+      "sha256": "e9209d76bb7e7ae81a42be6af988da3fd1fa9af7e2fb34e12c6c0d8d5e6570c2",
+      "kind": "private-container-archive",
+      "sourcePin": "fixed",
+      "retainedCopies": 2
+    },
+    {
+      "alias": "transfer-package-04",
+      "sha256": "f413cb729882296e4a617f4605278d0ca212ec3f8fad44987443f7cdacfd5bd1",
+      "kind": "private-container-archive",
+      "retainedCopies": 1
+    }
+  ]
+}
