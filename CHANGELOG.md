@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- Linux hosting resource guidance now includes real socket tests on one Zen 4
+  and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
+
 ### Performance
 
 - Host food updates reuse each broadcast's changed sectors for every recipient

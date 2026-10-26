@@ -98,6 +98,12 @@ scatter and tail-first ordering, not network jitter; it remains unchanged.
 
 ## Changing a protocol or contract
 
+`protocol-catalog-13.json` and `protocol-catalog-19.json` are **scrubbed derivatives**:
+explicit text/identity ranges are replaced without changing lengths. A `selection`
+extracts a payload with synthetic transport reframing; archive/frame hashes and
+indices retain provenance. The [catalog](../../research/fidelity/2026-10-26-protocol13-catalog/REPORT.md)
+owns limits; `tools/fidelity/protocol_catalog.py` decodes offline. No runtime support is added.
+
 `forager-conformance.json` contains full selected synthetic/local client frames
 with binary64 bit encoding. Compact independent Windows x86_64 MSVC and Linux
 x86_64 GNU outputs live in `forager-oracle-windows-x86_64-msvc.json` and

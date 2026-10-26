@@ -163,19 +163,32 @@ breaking changes can rename settings, and unknown settings stop startup.
 
 ## Resource use
 
-One 30-second run per case on one desktop core, with test clients on another
-core, no bots and no TLS
-([method](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-hosting-sizes/REPORT.md)):
+One real AMD EPYC server core, with test clients on a separate machine, no bots
+and no TLS. Each row is one five-minute test; official 500 uses two minutes
+([method and full results](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-epyc-host/REPORT.md)).
+Memory covers the host process, including startup. CPU is the average share of one core.
 
-| Mode | Clients | Playing (mean) | CPU of one core | Memory |
-| --- | ---: | ---: | ---: | ---: |
-| Battledome | 80 | 35.5 | 56% | 9.5 MiB |
-| Official | 250 | 250 | 51% | 21.6 MiB |
-| Official | 500 | 500 | 91% | 44.2 MiB |
+| Server core | Mode | Clients | Playing (mean) | CPU | Memory | Delivery target |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Zen 4 (c7a.medium) | Official | 250 | 250.0 | 52% | 31.4 MiB | Missed |
+| Zen 4 (c7a.medium) | Official | 500 | 500.0 | 89% | 54.7 MiB | Missed |
+| Zen 4 (c7a.medium) | Battledome | 32 | 31.4 | 17% | 10.2 MiB | Met |
+| Zen 4 (c7a.medium) | Battledome | 80 | 80.0 | 87% | 42.7 MiB | Missed |
+| Zen 5 (c8a.medium) | Official | 250 | 250.0 | 23% | 31.5 MiB | Met |
+| Zen 5 (c8a.medium) | Official | 500 | 500.0 | 43% | 54.8 MiB | Met |
+| Zen 5 (c8a.medium) | Battledome | 32 | 31.6 | 8% | 10.0 MiB | Met |
+| Zen 5 (c8a.medium) | Battledome | 80 | 80.0 | 53% | 42.8 MiB | Missed |
 
-500 clients leave little CPU headroom on one core, and bots, TLS and long
-sessions with grown snakes add more. Battledome currently admits about 35
-players at once while the rest wait for a safe spawn; that limit is being reworked.
+The delivery target is no newly deferred ticks and at most 10 ms of extra delay
+for 99% of received frames. A missed target can occur even below 100% average
+CPU. These short synthetic tests are sizing examples, not a capacity guarantee;
+bots, TLS, larger snakes and longer sessions can add work.
+
+Battledome's 32-seat arena keeps its original size. Its growth above 32 seats is
+being reworked, so treat the 80-seat rows as provisional.
+Playing counts exclude clients waiting to spawn. The study reports those waits
+separately, including unfinished requests. Measure your intended workload before
+choosing a player limit.
 
 ## Not included
 
