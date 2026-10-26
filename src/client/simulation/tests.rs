@@ -76,10 +76,27 @@ fn backends_validate_spawn_rings_against_the_sized_arena() {
     };
     // Outside the 670-unit start, inside 670 * sqrt(40), about 4,237 units.
     config.world.spawn_radius = Some(2000.);
+    config.validate().unwrap();
     let backend = SimulatorBackend::new(7, config.clone()).unwrap();
     assert_eq!(backend.world.config().radius, 670. * 40_f64.sqrt());
     config.world.size_to_population = false;
+    assert!(config.validate().is_err());
     assert!(SimulatorBackend::new(7, config).is_err());
+}
+
+#[test]
+fn validation_checks_the_prey_count_of_the_sized_world() {
+    let mut config = SimulationConfig {
+        agents: 484,
+        ..Default::default()
+    };
+    // 200 prey scale with area to 96,800, beyond the u16 prey IDs.
+    config.world.prey.count = 200;
+    let error = config.validate().unwrap_err();
+    assert!(error.contains("prey count must be at most"), "{error}");
+    assert!(SimulatorBackend::new(7, config.clone()).is_err());
+    config.world.size_to_population = false;
+    config.validate().unwrap();
 }
 
 #[test]

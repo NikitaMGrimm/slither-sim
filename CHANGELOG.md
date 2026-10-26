@@ -8,6 +8,15 @@
   pilot plan for measuring the collision hitbox and head-on resolution order
   ([research workflow](docs/research-workflow.md#paired-collision-trials)).
 
+### Fixed
+
+- `SimulationConfig::validate()` checks the population-sized world that
+  backends and hosts run. It no longer rejects a spawn ring that fits the sized
+  arena or accepts a prey target that scales past the u16 prey IDs.
+- Simulation configs must be JSON objects; arrays were read positionally and
+  started defaults. A repeated key now keeps its last value, as in world
+  configs, instead of being rejected.
+
 ## [0.5.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.4.0...v0.5.0) - 2026-10-26
 
 ### Breaking

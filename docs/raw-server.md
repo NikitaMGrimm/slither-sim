@@ -91,8 +91,8 @@ by 14 ms of world time; at most one search runs per tick. Disconnected waiters
 are removed. A crowded world can wait indefinitely. Worlds without `spawnRadius`
 keep the official fallback and
 refusal behavior.
-A dynamic host arena starts sized for all seats (`players.max` plus `bots.count`), with
-its food target and ambient rate scaled to the same density.
+With `sizeToPopulation`, the host arena starts sized for all seats
+(`players.max` plus `bots.count`); see [population sizing](configuration.md#population-sizing).
 For Rust constructors and the default `Config::official(1)`, see
 [world settings](configuration.md#official-and-sandbox).
 
