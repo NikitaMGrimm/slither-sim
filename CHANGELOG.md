@@ -130,6 +130,9 @@
 
 ### Changed
 
+- Adopt an S-shaped snake logo and square project icon, paired with
+  SlitherClient's C-shaped snake, with outlined Inter lettering and automatic
+  light/dark colors.
 - Transport checks now compare against timing recorded near the official
   servers in #111 instead of the home captures, whose delay spikes came from the
   home route. The home reference stays available and labeled. Each limit is the
