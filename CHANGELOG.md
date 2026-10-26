@@ -2,13 +2,6 @@
 
 ## Unreleased
 
-- Host and native background bots, plus both Rust bot examples, now use the
-  shared default Forager policy. Worker scratch is shared while sent history and lifecycle
-  stay per client; boost-only changes are transmitted. A separate
-  `shared-forager-a1-8` workload preserves existing scripted benchmark identities.
-  Current-runtime cost and playing-strength qualification remains pending
-  ([portable bots](docs/client-api.md#rust)).
-
 ### Breaking
 
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
@@ -131,9 +124,17 @@
   and bot food are unchanged; socket bots get real food only by sending the
   `X-SlitherSim-Food: physical` upgrade header
   ([Battledome](docs/configuration.md#battledome)).
+- A [`cautious_bot`](examples/cautious_bot.rs) example runs the default Forager,
+  with zero timing when built without networking.
 
 ### Changed
 
+- Host and native background bots, plus both Rust bot examples, now use the
+  shared default Forager policy. Worker scratch is shared while sent history and lifecycle
+  stay per client; boost-only changes are transmitted. A separate
+  `shared-forager-a1-8` workload preserves existing scripted benchmark identities.
+  Current-runtime cost and playing-strength qualification remains pending
+  ([portable bots](docs/client-api.md#rust)).
 - Transport checks now compare against timing recorded near the official
   servers in #111 instead of the home captures, whose delay spikes came from the
   home route. The home reference stays available and labeled. Each limit is the
