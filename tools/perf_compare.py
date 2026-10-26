@@ -238,6 +238,11 @@ def sequential(binaries, hashes, workloads, output, deadline, plan, *, checkpoin
                               "baseline_wall_seconds": detail["baseline"]["workload"]["timing"]["wallSeconds"],
                               "candidate_wall_seconds": detail["candidate"]["workload"]["timing"]["wallSeconds"],
                               "operations_per_block": workload.iterations, "blocks": 1}
+                    metric = plan.get("metrics", {}).get(workload.name, "wallSeconds")
+                    record["metric"] = metric
+                    if metric == "cpuSeconds":
+                        for label in ("baseline", "candidate"):
+                            record[f"{label}_cpu_seconds"] = detail[label]["workload"]["timing"].get("cpuSeconds")
                     row["pairs"].append(record)
                     pairs_log.write(json.dumps(record, separators=(",", ":")) + "\n")
                     pairs_log.flush()
@@ -250,7 +255,19 @@ def sequential(binaries, hashes, workloads, output, deadline, plan, *, checkpoin
                         stop(workload.name, "measurement_failure", f"invalid pair data at {index} pairs")
                         active.remove(workload)
                         continue
-                    look = perf_stats.analyze(row["pairs"])
+                    # Keep real wall values in raw pairs. The statistical routine
+                    # consumes a view in the chosen unit, fixed before sampling.
+                    selected = [{**p, **({f"{label}_wall_seconds": p[f"{label}_cpu_seconds"] for label in ("baseline", "candidate")}
+                                                   if metric == "cpuSeconds" else {})} for p in row["pairs"]]
+                    if not perf_stats.valid_pairs(selected, workload.iterations, 1):
+                        stop(workload.name, "measurement_failure", f"invalid {metric} at {index} pairs")
+                        active.remove(workload)
+                        continue
+                    look = perf_stats.analyze(selected)
+                    if metric != "wallSeconds":
+                        look["metric"] = metric
+                        for label in ("baseline", "candidate"):
+                            look[f"{label}_busy_wall_ms"] = 1000 * perf_stats.geometric_block_time([p[f"{label}_wall_seconds"] for p in row["pairs"]]) / workload.iterations
                     row["history"].append(look)
                     print(f"[performance] {workload.name}: {look['label']} at {index} pairs", flush=True)
                     if look["label"] == "Unavailable":

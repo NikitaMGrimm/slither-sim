@@ -122,6 +122,7 @@ class ReportTests(unittest.TestCase):
                         patch.object(pr_report.subprocess, "check_output", return_value="synthetic rustc"),                         patch.object(pr_report.platform, "platform", return_value="fixture-platform"), \
                         patch.object(pr_report.perf_build, "command", side_effect=command), \
                         patch.object(pr_report, "load_catalog", return_value=listed), \
+                        patch.object(pr_report, "REPORT_CASES", ("step-default", "official-100-step")), \
                         patch.object(pr_report, "capture_trace", side_effect=trace), \
                         patch.object(pr_report, "measure") as measure, \
                         patch.dict(os.environ, environment), contextlib.redirect_stdout(io.StringIO()):
@@ -346,7 +347,7 @@ test same_name ... ok
                 observe = report["performance"][1]
                 self.assertEqual(observe["termination"], "measurement_failure" if changed_suite else "not_started")
                 if changed_suite:
-                    self.assertEqual(observe["failure"], "workload definitions differ between base and PR")
+                    self.assertIn("workload definitions differ", observe["failure"])
                 self.assertEqual(captured["plan"]["order"], perf_stats.ORDER)
 
     def test_sampler_failure_after_published_checkpoint_withdraws_final_claims(self):

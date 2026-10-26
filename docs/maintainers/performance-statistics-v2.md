@@ -68,3 +68,21 @@ without waiting for unused publication slots.
 
 The [reporting guide](pr-reports.md#publishing-and-permissions) describes trusted
 publication, failure withdrawal, postmerge identity and release consolidation.
+
+## PR metric extension
+
+New PR plans use `slither-perf-sequential-v3`; direct release comparisons retain
+v2. The paired analysis, order, error allocation, covered looks and ±5% band above
+are unchanged. Six selected timing rows consume six of the ten reserved slots;
+unused slots lend no allocation. Ten deterministic trace checks remain separate.
+
+Before freezing comparison pairs, the same head binary supplies six balanced A/A
+pairs per selected row after one discarded warmup pair, bounded to 240 seconds
+within the job reserve. Each socket row selects host process CPU per completed
+tick when its order-adjusted log residual SD is finite and no greater than
+simulation busy wall; otherwise it retains busy wall. Deterministic rows retain
+operation wall because whole-case CPU includes untimed setup/warmup. Metric
+selection uses no comparison pair and is pinned in the plan. This does not prove
+independence or the hosted timing model. Failed/incomplete pilots retain their
+records and use wall; they are not retried. Both metrics stay in raw results;
+CPU inference rows retain busy wall values in the comment's Details.

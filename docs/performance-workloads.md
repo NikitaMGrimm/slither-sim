@@ -21,8 +21,9 @@ cargo run --release --locked --example perf_baseline -- --list
   [calibration](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/pr-reports.md#calibration).
   Each block rebuilds the case from the seed, warmup included, and the report
   lists every block's timing and elapsed time under `blocks`.
-- `suite`: `ci` rows are timed and traced by PR CI (at most ten); `full` rows
-  are local only.
+- `suite`: `ci` preserves the ten deterministic rows used by local/direct release
+  comparisons; `full` adds optional rows. PR timing selects six named rows
+  separately (see below).
 - `iterations` and `traceIterations`: the default timed sample size and parity
   window. Trace windows aim for about 64 MB uncompressed or less. The 500-agent
   client row uses the minimum of one decision and still produces about 82 MB,
@@ -64,9 +65,29 @@ cargo run --release --locked --example perf_baseline -- --list
   - Official warms for eight decisions, so its initial death and respawn burst
     stays in the measured window.
 
-CI runs ten rows: the six legacy cases, `official-100-step`, `official-100-bot`,
-`battledome-32-step` and `client-battledome-64`. `official-100-bot` covers batch
-observation in CI; Battledome observation stays in the full suite.
+PR timing runs six rows: `step-food`, `observe`, `official-100-step`,
+`official-100-bot`, `host-official-500` and `host-battledome-80`. Ten existing
+trace windows remain: the six legacy cases, the two official-100 rows,
+`battledome-32-step` and `client-battledome-64`. Retiring a timing row does not
+remove its trace, local catalog entry or calibration workload.
+
+The socket rows reuse `examples/host_load.rs`: 500 real loopback socket clients
+in a fixed official-size world, or 80 socket clients with the Battledome preset.
+They run without bot workers. Each client sends a scripted circle command every
+100 ms and logs in again after death; a separate child process drains messages.
+Linux sampling pins all host threads to one logical CPU and the driver to a
+second. Samples connect every socket, warm for one second, then observe at least
+286 physics ticks with a 20-second progress timeout. They report process CPU over
+that window, simulation busy wall, elapsed wall, tick/deferred counts, connected
+and living-client diagnostics. CPU excludes the child driver. Counts normalize
+to the requested ticks; raw actual counts remain. These rows support timing,
+not `--trace`, `--profile` or `--parallel`. The PR collector retains the ten
+older deterministic traces instead. Short runs include admission and churn;
+connected sockets do not prove the same count of living snakes.
+
+The [audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-pr-report-audit/REPORT.md)
+explains the selection. The head's resolved Config values are supplied to both
+PR runtimes; defaults changing no longer inherently make a row unavailable.
 
 Sandbox, official and Battledome registrations expand into `<id>-step` (one
 `Simulator::step`) and `<id>-bot` (`step`, then batch observation into a reused
@@ -197,7 +218,9 @@ line must match the run without it. Runners and PR comparisons don't pass it.
    byte-identical.
 4. Keep at most ten `ci` rows and run `cargo test --locked --example perf_baseline`.
 
-Give a changed definition a new name so old results stay comparable. A new
+Give an incompatible workload a new name so archived results stay interpretable.
+PR runs pin head Config defaults on both runtimes; other definition differences
+show a head-only Redefined value with a reason when possible. A new
 registration needs no runner or workflow edit, but when retiring a row, the
 calibration pilot's explicit groups must still name available workloads.
 

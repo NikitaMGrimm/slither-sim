@@ -2,7 +2,11 @@
 //! `perf_baseline --list` prints the workload catalog as one canonical JSON line;
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
-//! No additional dependencies, sockets, files, or wall-clock bot processing samples.
+//! Socket rows reuse host_load; all connections stay on loopback.
+#[cfg(feature = "networking")]
+#[allow(dead_code)]
+#[path = "host_load.rs"]
+mod host_load;
 #[path = "support/runtime.rs"]
 mod runtime;
 #[cfg(not(slither_private_state))]
@@ -23,6 +27,38 @@ use std::{
     io::{self, BufWriter, Write},
     time::Instant,
 };
+
+// PR comparisons supply the head's resolved Config values to both runtimes.
+// Invalid/unsupported configs fail visibly; no fallback to baseline defaults.
+fn pinned_config(key: &str, default: Config) -> Config {
+    static CONFIGS: std::sync::OnceLock<serde_json::Map<String, Value>> =
+        std::sync::OnceLock::new();
+    let configs = CONFIGS.get_or_init(|| {
+        std::env::var("SLITHER_PERF_CONFIGS")
+            .ok()
+            .map_or_else(serde_json::Map::new, |path| {
+                serde_json::from_slice(&std::fs::read(path).expect("read pinned configs"))
+                    .expect("parse pinned configs")
+            })
+    });
+    configs.get(key).map_or(default, |value| {
+        serde_json::from_value(value.clone()).expect("runtime cannot use head config")
+    })
+}
+
+fn socket_config(clients: usize, battledome: bool) -> Config {
+    let (key, config) = if battledome {
+        (
+            format!("host-battledome-{clients}"),
+            World::Battledome.config(),
+        )
+    } else {
+        let mut config = World::Official(clients).config();
+        config.dynamic_radius = false;
+        (format!("host-official-{clients}"), config)
+    };
+    pinned_config(&key, config)
+}
 
 const SEED: u32 = 7;
 const EPISODE_TICKS: usize = 1000;
@@ -115,11 +151,14 @@ enum World {
 
 impl World {
     fn config(self) -> Config {
-        match self {
-            World::Sandbox => Config::sandbox(),
-            World::Official(snakes) => Config::official(snakes),
-            World::Battledome => Config::battledome(),
-        }
+        pinned_config(
+            &format!("world:{:?}", self),
+            match self {
+                World::Sandbox => Config::sandbox(),
+                World::Official(snakes) => Config::official(snakes),
+                World::Battledome => Config::battledome(),
+            },
+        )
     }
 
     fn mode(self) -> &'static str {
@@ -189,6 +228,7 @@ enum Registration {
     Scenario(Scenario),
     Client(ClientScenario),
     SharedPolicy(Operation),
+    Socket(&'static str, usize, bool, Operation),
 }
 
 /// New sample sizes target roughly one second per release sample on the development machine.
@@ -300,6 +340,8 @@ static REGISTRATIONS: &[Registration] = &[
         operation: op(25, 1, Full),
     }),
     Registration::SharedPolicy(op(500, 16, Full)),
+    Registration::Socket("host-official-500", 500, false, op(286, 1, Full)),
+    Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
 ];
 
 #[derive(Clone, Copy)]
@@ -311,6 +353,7 @@ enum Driver {
     },
     Client(&'static ClientScenario),
     SharedPolicy,
+    Socket(usize, bool),
 }
 
 impl Driver {
@@ -319,6 +362,7 @@ impl Driver {
             Driver::Legacy(Legacy::Portable | Legacy::Protocol)
             | Driver::Client(_)
             | Driver::SharedPolicy => "client",
+            Driver::Socket(..) => "socket-host",
             Driver::Legacy(_) => "sandbox",
             Driver::Scenario { scenario, .. } => scenario.world.mode(),
         }
@@ -331,6 +375,7 @@ impl Driver {
             Driver::Scenario { bot: true, .. } => "step+observe",
             Driver::Client(_) => "reconnect+step_all",
             Driver::SharedPolicy => "forager-a4-mean+step_all",
+            Driver::Socket(..) => "host-tick",
         }
     }
 
@@ -348,11 +393,15 @@ impl Driver {
             Driver::Legacy(Legacy::Portable | Legacy::Protocol)
                 | Driver::Client(_)
                 | Driver::SharedPolicy
+                | Driver::Socket(..)
         )
     }
 
     fn synthetic(self) -> Option<&'static str> {
         match self {
+            Driver::Socket(..) => Some(
+                "loopback socket clients; scripted circles and reconnects, no bot workers; 1 s warmup",
+            ),
             Driver::Legacy(_) => None,
             Driver::SharedPolicy => Some(
                 "shared A4-mean received-frame adapter; eight synthetic sandbox ring starts; reset after death; modeled processing only",
@@ -366,15 +415,20 @@ impl Driver {
 
     fn definition(self) -> Result<Value, String> {
         Ok(match self {
+            Driver::Socket(clients, battledome) => json!({
+                "clients": clients, "config": socket_config(clients, battledome),
+                "warmupSeconds": 1, "driver": "separate socket-driver process; circle commands every 100 ms; reconnect on death",
+                "operation": "host process CPU and simulation busy wall time per completed physics tick",
+            }),
             Driver::SharedPolicy => json!({
-                "config": Config::sandbox(), "simulation": simulation_definition(self)?,
+                "config": pinned_config("portable", Config::sandbox()), "simulation": simulation_definition(self)?,
                 "policy": "A4-mean",
                 "parameterManifestSha256": "94669e26cb399b3f7facb9de14da01df01823cecc90fd3a1e6f5970f2fa0490e",
                 "operation": "all eight ForagerBot decisions plus step_all; record drain excluded",
                 "timing": "configured virtual processing only; no wall-time feedback",
             }),
             Driver::Legacy(Legacy::Portable | Legacy::Protocol) => json!({
-                "config": Config::sandbox(), "simulation": simulation_definition(self)?,
+                "config": pinned_config("portable", Config::sandbox()), "simulation": simulation_definition(self)?,
             }),
             Driver::Legacy(case) => {
                 let (agents, config) = core_config(case.name())?;
@@ -441,6 +495,13 @@ fn catalog() -> Vec<Workload> {
     let mut workloads = Vec::new();
     for registration in REGISTRATIONS {
         match registration {
+            Registration::Socket(name, clients, battledome, operation) => {
+                workloads.push(Workload {
+                    name: (*name).into(),
+                    driver: Driver::Socket(*clients, *battledome),
+                    operation: *operation,
+                })
+            }
             Registration::Legacy(case, operation) => workloads.push(Workload {
                 name: case.name().into(),
                 driver: Driver::Legacy(*case),
@@ -720,7 +781,7 @@ fn core_config(case: &str) -> Result<(usize, Config), String> {
     if case == "observe" {
         config.prey.count = 8;
     }
-    Ok((agents, config))
+    Ok((agents, pinned_config(case, config)))
 }
 
 fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
@@ -974,7 +1035,7 @@ mod portable {
         SimulationConfig {
             agents: AGENTS,
             record_wire,
-            world: Config::sandbox(),
+            world: pinned_config("portable", Config::sandbox()),
             ..SimulationConfig::default()
         }
     }
@@ -2100,6 +2161,10 @@ fn run_scenario(
 }
 
 fn run() -> Result<(), String> {
+    #[cfg(feature = "networking")]
+    if std::env::args().nth(1).as_deref() == Some("--socket-driver") {
+        return host_load::socket_driver();
+    }
     let args = match Args::parse()? {
         Command::List => {
             let mut out = BufWriter::new(io::stdout().lock());
@@ -2133,7 +2198,9 @@ fn run() -> Result<(), String> {
 }
 
 fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
-    Ok(match args.driver {
+    #[cfg(feature = "networking")]
+    let cpu = host_load::cpu_seconds();
+    let result = match args.driver {
         Driver::Legacy(
             Legacy::StepDefault | Legacy::StepFood | Legacy::StepBody | Legacy::Observe,
         ) => run_core(args, out)?,
@@ -2146,13 +2213,39 @@ fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
         Driver::Client(client) => portable::run_client(args, client, out)?,
         #[cfg(feature = "networking")]
         Driver::SharedPolicy => portable::run_shared_policy(args, out)?,
+        #[cfg(feature = "networking")]
+        Driver::Socket(clients, battledome) => {
+            if args.trace || args.profile || args.parallel {
+                return Err("socket rows support timing only".into());
+            }
+            host_load::benchmark(
+                &args.case,
+                clients,
+                args.iterations,
+                socket_config(clients, battledome),
+            )?
+        }
         #[cfg(not(feature = "networking"))]
         Driver::Legacy(Legacy::Portable | Legacy::Protocol)
         | Driver::Client(_)
-        | Driver::SharedPolicy => {
+        | Driver::SharedPolicy
+        | Driver::Socket(..) => {
             return Err(format!("{} requires the networking feature", args.case));
         }
-    })
+    };
+    #[cfg(feature = "networking")]
+    let result = {
+        let mut result = result;
+        if !args.trace {
+            result["timing"]["processCpuSeconds"] = json!(
+                host_load::cpu_seconds()
+                    .zip(cpu)
+                    .map(|(end, start)| end - start)
+            );
+        }
+        result
+    };
+    Ok(result)
 }
 
 fn main() {
@@ -2259,7 +2352,7 @@ mod tests {
                     assert!(scenario.population > 1 && scenario.epoch > 0);
                     assert!(scenario.clearance >= 0.0);
                 }
-                Registration::SharedPolicy(_) => {}
+                Registration::SharedPolicy(_) | Registration::Socket(..) => {}
                 Registration::Client(client) => {
                     client.world.config().validate().unwrap();
                     assert!((1..=500).contains(&client.agents));
@@ -2301,6 +2394,8 @@ mod tests {
                     | "client-battledome-64"
                     | "client-official-500"
                     | "shared-forager-a4-mean-8"
+                    | "host-official-500"
+                    | "host-battledome-80"
             );
             assert_eq!(
                 workload["available"],

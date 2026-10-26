@@ -17,6 +17,7 @@ on:
       - rust-toolchain
       - rust-toolchain.toml
       - examples/perf_baseline.rs
+      - examples/host_load.rs
       - examples/perf_observation.rs
       - examples/perf_client_retained.rs
       - examples/support/state.rs
@@ -29,6 +30,7 @@ on:
       - tests/support/mod.rs
       - tests/fixtures/**
       - tools/pr_report.py
+      - tools/perf_report_probe.py
       - tools/perf_baseline.py
       - tools/perf_compare.py
       - tools/perf_build.py
