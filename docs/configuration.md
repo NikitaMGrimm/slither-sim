@@ -239,45 +239,38 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 | Prey | `prey.count: 0` | Snakes only |
 | Ambient food | Reference `foodCount: 3138`, about 45.9 attempts/s; `ambientRefillCountsAllFood: true` | Live target/refill follow area; death/boost pellets also fill the target, with inherited admission caps |
 
-The wall target is `3584 × (1 + 1.5 × (max(seats, 32) / 32 - 1))`.
-Seats include living and dead players retained for respawn. Before a host search,
-queued joins count too, so a full spawn band cannot prevent expansion. Wall
-radii at 40/64/80 seats are 4,928/8,960/11,648 units. This adds room for complete
-newborn bodies and departure corridors; density becomes lower above 32.
-The existing controller grows at once, shrinks at 23.4375 units/s and ignores
-changes within 3% of the live radius. Waiting sockets retain priority over bots;
-at most one 4,096-candidate search runs per tick, with 14 ms after failure.
+Above 32 seats the wall target is `3584 × (1 + 1.5 × (seats / 32 - 1))`:
+4,928, 8,960 and 11,648 units at 40, 64 and 80 seats. Seats count living
+players, dead players who can respawn and, before a host spawn search, queued
+joins. Pit and spawn band scale with the wall, so newborns keep room for their
+whole body and a safe departure; above 32 seats the arena is less dense. Growth
+is immediate; shrinking runs at 23.4375 units/s and ignores changes within 3%
+of the live radius.
 
-For a selected waiting request above 32 seats, two seconds of world-time queue
-age permits a wall radius 1.5 times the seat target; four seconds permits twice
-it. This creates space while retaining every strict safety check. No timer is
-saved in the core checkpoint: queue age belongs to the host, and its temporary
-space is the existing live radius. Further host expansion waits until the
-latest admitted snake has had its three-second departure window. Admissions
-pause during that hold so repeated births cannot postpone expansion; the hold
-spends no search work. These are bounded work/space allowances,
-not a proof of a fixed maximum wait: an adversarial crowd can still block every
-sampled pose. `dynamicRadius: false` restores fixed geometry and strict waiting.
-With this preset, protocol-19 host validation permits up to 105 configured
-seats, reserving room below the 32,000-unit wire limit for the largest
-allowance. Fixed geometry retains the usual protocol seat limit.
-Circular worlds with `minScore` use this controller and scale their configured
-pit/spawn radii by `live radius / radius`; generic circular worlds without a
-floor keep their existing geometry and population sizing.
+After a spawn request has waited 2 seconds, the host may grow the wall to 1.5
+times the seat target, and after 4 seconds to twice it. Every strict safety
+check still applies. Before growing further, the host waits until the latest
+newborn has had its 3-second departure window, pausing admissions meanwhile.
+Waiting players come before bots, and at most one 4,096-candidate search runs
+per tick (14 ms after a failure). These limits bound work and space, not the
+worst-case wait: a crowd can still block every sampled pose. Queue age is host
+state; checkpoints store only the live radius.
 
-In fresh 16–32-seat worlds the wall, pit, spawn band, food density and normal-speed radial
-spawn-to-pit travel (about 4.90–8.79 s) are unchanged. After a larger population
-leaves, gradual shrink and the 3% dead zone still apply. Larger populations have
-longer approaches and more space. Floor, boost, scoring, food and one-way pit
-rules are unchanged. The
+`dynamicRadius: false` restores the fixed arena with strict waiting. With
+growth on, the host accepts up to 105 configured seats so the largest allowance
+stays inside the 32,000-unit wire limit. Other circular worlds with `minScore`
+and `dynamicRadius` use the same controller and scale their pit and spawn radii
+with the wall; circular worlds without a floor keep their geometry.
+
+In fresh 16–32-seat worlds the wall, pit, spawn band, food density and
+spawn-to-pit travel (about 4.9–8.8 s at normal speed) are unchanged. After a
+large population leaves, the arena shrinks gradually. The
 [local capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)
-compares fixed strict admission, fixed-arena relaxation and strict arena growth;
-it reports waits, safety, censored requests and admission CPU separately.
+compares fixed strict admission, fixed-arena relaxation and strict growth.
 
-In a growing arena, the edge passing over an outside snake does not count as
-that snake entering: it can leave the engulfed area. A later physical inward
-crossing, or a life initialized inside, commits it to the one-way rule. Lives
-already entered stay entered. No timer or collision immunity is added.
+When the growing pit passes over a snake that hasn't entered it, the snake can
+still leave. Crossing the edge inward, or starting inside, commits it to the
+one-way rule as before.
 
 The pit tests the head center's swept path each tick: after entering distance
 `< r`, reaching `r` kills with reason `pit` and no credited killer, including
