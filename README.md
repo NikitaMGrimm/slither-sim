@@ -39,7 +39,7 @@ cargo run --release --locked --example portable_bot -- --steps 200
 
 The bot runs locally, prints a summary and exits. No game window opens.
 
-For the same bot in Python:
+For a simple portable controller in Python:
 
 ```sh
 python examples/portable_bot.py --steps 200
