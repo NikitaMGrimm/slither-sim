@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Selected [legacy-login evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-legacy-login/REPORT.md):
+  one official selector-12 session advertised protocol 13; offline tests retain
+  the challenge reply and protocol rejection. The host remains protocol 19.
+
 ## [0.6.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.0...v0.6.1) - 2026-10-26
 
 ### Added

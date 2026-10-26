@@ -159,7 +159,7 @@ compression and schedules can differ from official sessions. See
 
 | Direction | Supported messages |
 | --- | --- |
-| Client to host | Login, appearance, headings 0–250, ping 251, keyboard 252, boost 253/254, bounded victory text; framing/session negotiation before login. |
+| Client to host | Stock-layout login, appearance, headings 0–250, ping 251, keyboard 252, boost 253/254, bounded victory text; framing/session negotiation before login. |
 | Host to client | Setup/radius, snakes, motion, body/growth/tail/mass, sector food, prey, minimap, pongs, game-over, leaderboard, kills, record and requested session IDs. |
 | Additional messages decoded by `ClientState` | Alternate gameplay encodings, compressed food, own score credits, minimap formats/deltas, team scores and team layers. |
 | Not provided by the host | Team gameplay, accounts, persistent daily records, administrative/debug services and unspecified extensions. |
@@ -169,6 +169,13 @@ and neither selects two-byte elapsed milliseconds. A second framing request is
 rejected. Optional `[4]` requests `S` after self appearance and may accompany
 framing in either order; repeated requests are rejected. IDs identify connections,
 not authentication or resumed lives. Challenge and direct logins are accepted.
+
+Some browser mods use `[99, 4]` and a legacy login
+`[115, 12, skin, nameLength, name..., 0, cosmetic, customSkin...]`.
+This exchange is not supported: a bounded official observation returned the
+existing 27-byte challenge format, then **protocol 13** in setup after that login.
+The host remains protocol 19; see the
+[selected evidence and implementation stop](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-legacy-login/REPORT.md).
 
 ### Reports and game-over
 

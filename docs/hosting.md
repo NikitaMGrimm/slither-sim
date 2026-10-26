@@ -95,6 +95,10 @@ pointed at it with the [console snippet](raw-server.md#stock-browser-client);
 browser mods need their own server setting. Pages served over HTTPS can only
 open `wss` connections, which need the TLS proxy below.
 
+Some browser mods use a legacy login that negotiates another wire version.
+The observed selector-12 exchange advertised protocol 13 and is currently
+unsupported; see [packet compatibility](raw-server.md#packet-compatibility).
+
 To check that a client can join, run the example bot from any machine with
 Python 3.11+ and a `slither-sim` binary:
 
