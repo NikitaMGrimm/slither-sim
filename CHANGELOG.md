@@ -67,6 +67,8 @@
 
 ### Added
 
+- Optional `bot` feature with the frozen A1 Forager and a portable client adapter.
+  Runtime bot defaults are unchanged.
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from

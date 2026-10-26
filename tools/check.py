@@ -35,6 +35,7 @@ def commands(group):
             ["cargo", "fmt", "--all", "--check"],
             clippy("--workspace"),
             clippy("--no-default-features"),
+            clippy("--no-default-features", "--features", "bot"),
             clippy("--no-default-features", "--features", "networking"),
             clippy("--no-default-features", "--features", "parallel"),
         ]
@@ -42,6 +43,8 @@ def commands(group):
         return [
             ["cargo", "test", "--all-targets", "--locked"],
             ["cargo", "test", "--all-targets", "--no-default-features", "--locked"],
+            ["cargo", "test", "--all-targets", "--no-default-features", "--features", "bot", "--locked"],
+            ["cargo", "test", "--all-targets", "--no-default-features", "--features", "networking", "--locked"],
             ["cargo", "test", "--doc", "--locked"],
             ["cargo", "test", "--doc", "--no-default-features", "--locked"],
             ["cargo", "test", "-p", "slither-sim-ffi", "--all-targets", "--locked"],
@@ -86,7 +89,10 @@ def commands(group):
     if group == "package":
         return [["cargo", "package", "--locked"]]
     if group == "wasm":
-        return [["cargo", "check", "--lib", "--locked", "--no-default-features", "--target", "wasm32-unknown-unknown"]]
+        return [
+            ["cargo", "check", "--lib", "--locked", "--no-default-features", "--target", "wasm32-unknown-unknown"],
+            ["cargo", "check", "--lib", "--locked", "--no-default-features", "--features", "bot", "--target", "wasm32-unknown-unknown"],
+        ]
     raise ValueError(f"Unknown check group: {group}")
 
 

@@ -65,6 +65,14 @@ scatter and tail-first ordering, not network jitter; it remains unchanged.
 
 ## Changing a protocol or contract
 
+`forager-conformance.json` contains full selected synthetic/local client frames
+with binary64 bit encoding and frozen-kernel Timing/Intent/action expectations.
+Its historical contract is `slither-client-v2`, protocol 19. The
+[port record](../../research/bots/2026-10-26-forager-port/REPORT.md) describes
+selection, provenance and the cross-platform gate. A draft with pending oracle
+expectations deliberately fails conformance. `forager-native-parity.json` remains
+the separate twelve-case historical default-policy regression.
+
 Runtime defaults advance independently. Never derive historical tags from
 `protocol::PROTOCOL_VERSION`, rewrite old packets or relabel expectations to pass
 a new default. Inventory checks compare literal historical tags with setup bytes

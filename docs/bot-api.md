@@ -242,6 +242,31 @@ with indexed paths for radius samples. `ErrorCode` numeric values 1–17 and
 retain human messages and chained causes. Successful steps allocate no error
 strings. JSON, C and Python errors and contract identifiers stay unchanged.
 
+### Frozen Forager
+
+The dependency-free `bot` feature exposes `bot::PolicyId::A1` and
+`bot::Forager::new(PolicyId)`. Its `decide(&mut self, &Observation, &Timing,
+&[Intent]) -> Action` method uses the received observation and explicit timing.
+`Timing`, `Sent` and `Intent` live in `bot`; opponent intentions follow observation
+order, with `Intent::default()` representing unknown wanted heading.
+Parameters are private and fully resolved for the named release.
+
+Use `default-features = false, features = ["bot"]` for an offline policy without
+networking or Rayon. Core-only, C ABI and Python builds do not enable `bot`.
+`networking` includes it and exposes `client::ForagerBot::new(PolicyId::A1)`,
+implementing the existing `client::Bot`. The adapter derives timing and intentions
+from the complete `ClientFrame` and returns `None` outside a compatible playing
+frame with an observation. Existing host, native background bots, examples and
+JSON operations retain their current behavior.
+
+One policy/adapter instance can be reused for sequential decisions across seats:
+scratch buffers retain no policy state. Keep each seat's received frame, sent
+commands and lifecycle separate. This heuristic does not guarantee safety;
+cross-platform floating-point identity is subject to OS math libraries.
+The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
+pins the original kernel, immutable parameters, bounded fixtures and validation
+limits. A4-mean is retained only as private test data and is not selectable.
+
 ### In-process sessions
 
 `transport::Session` is the session `serve` runs, without the stream. JSON

@@ -9,6 +9,8 @@ use std::time::Instant;
 pub mod challenge;
 mod encode;
 mod fast_hash;
+mod forager;
+pub use forager::ForagerBot;
 pub mod hud;
 pub mod latency;
 pub mod minimap;

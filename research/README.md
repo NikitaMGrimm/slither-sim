@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Bots | [Frozen Forager port](bots/2026-10-26-forager-port/REPORT.md) | Immutable A1 and test-only A4-mean parameters, selected decision conformance; runtime defaults unchanged. |
 | Battledome | [Safe spawn band](battledome/2026-10-26-safe-spawn/REPORT.md) | Local 120-second sensitivity grid and retained initial attempt; cached admission, head-path/departure protection and socket-first waiting. |
 | Battledome | [Food balance](battledome/2026-10-25-food-balance/REPORT.md) | Offline custom-mode before/after runs at 32 and 64 slots; floor-aware death food and total-food refill. |
 | Fidelity | [Official baseline selection](fidelity/2026-10-23-official-defaults/REPORT.md) | Configuration choices and explicit model assumptions; no new measurements. |

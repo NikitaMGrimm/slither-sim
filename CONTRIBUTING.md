@@ -34,10 +34,10 @@ review and the documentation test above, without a Rust build.
 
 | Group | Command | Coverage / prerequisites |
 | --- | --- | --- |
-| Rust | `python tools/check.py rust` | `lint` (formatting; Clippy on default, core-only and single-feature builds) then `test` (default/core-only/C ABI tests, doctests and a Python crate build); no uv or Node |
+| Rust | `python tools/check.py rust` | `lint` (formatting; Clippy on default, core-only and single-feature builds) then `test` (default/core-only/bot-only/networking/C ABI tests, doctests and a Python crate build); no uv or Node |
 | Tools | `uv run --locked --only-group tools python tools/check.py tools` | Python/Node tests, local bot/C ABI smoke tests and Python package tests; Python 3.12, uv, Node 22+ (24 recommended) and Rust |
 | Package | `python tools/check.py package` | Local crate verification; no registry publication |
-| WASM | `python tools/check.py wasm` | Core target check; install `wasm32-unknown-unknown` first |
+| WASM | `python tools/check.py wasm` | Core-only and bot-only target checks; install `wasm32-unknown-unknown` first |
 
 Before the tools group, run `uv sync --locked --only-group tools`. `all` runs
 `rust`, `tools` and `package`; WASM is explicit. Append `--list` to inspect commands
