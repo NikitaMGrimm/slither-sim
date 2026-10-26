@@ -4,9 +4,9 @@
 
 ### Performance
 
-- Host food broadcasts share changed-sector hints across recipients, with
-  byte-identical output: 6.53% fewer user instructions in the fixed official
-  500-client fixture; live CPU and capacity gains remain unqualified
+- Host food updates reuse each broadcast's changed sectors for every recipient
+  instead of rescanning per recipient. Output is byte-identical; the official
+  500-client fixture runs 6.5% fewer instructions
   ([measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-food-sharing/REPORT.md)).
 
 ## [0.6.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.1...v0.6.2) - 2026-10-26
