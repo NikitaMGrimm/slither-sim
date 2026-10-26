@@ -139,6 +139,11 @@
 - The host bounds raw socket reads per poll, so one long fragmented message
   cannot stall other connections. A background bot whose decoder fails now only
   reconnects that bot, and stopping no longer waits out a long physics tick.
+- Prey respawn is no longer capped at one per tick, and a replacement waits a
+  full `respawnSeconds` after the catch. With a coarse `dt`, pickup follows each
+  prey motion step instead of the straight line between endpoints, and prey
+  motion that overflows ends the world with an error instead of producing NaN
+  positions.
 - `Config::deserialize` called directly from Rust now accepts presets, like JSON
   parsing ([presets](docs/configuration.md#presets)).
 - A world stopped by mass overflow stays stopped after a JSON round trip

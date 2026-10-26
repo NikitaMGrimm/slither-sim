@@ -737,8 +737,9 @@ impl Simulator {
             origin: Some(origin),
         }
     }
-    /// Provisional radial profile fitted to received additions. Recipient coverage
-    /// and admission censor those counts; this is not a recovered generation law.
+    /// Provisional decreasing area-density profile. The inherited coefficients
+    /// have no local fit citation; recipient coverage and admission censor counts.
+    /// This is a model choice, not a recovered generation law.
     fn new_food(&mut self) -> Food {
         let a = self.random.next() * TAU;
         let r = loop {
@@ -1773,6 +1774,11 @@ impl Simulator {
     fn advance_prey(&mut self, previous: &[Point], buffers: &mut PreyBuffers) {
         let c = &self.config;
         let p = &c.prey;
+        let below_target = self.prey.len() < p.count;
+        // A full population carries no saved replenishment credit.
+        if !below_target {
+            self.prey_clock = 0.0;
+        }
         // Preserve integer-coordinate steps even when a caller batches snake
         // simulation into a larger dt. Rounding one large displacement would
         // invent movement for stationary, sub-unit-per-tick prey.
@@ -1788,6 +1794,7 @@ impl Simulator {
             slots,
             sweeps,
             candidates,
+            path,
         } = buffers;
         live_ids.clear();
         live_ids.extend(self.prey.iter().map(|prey| prey.id));
@@ -1859,16 +1866,46 @@ impl Simulator {
             if decide {
                 Self::decide_prey(prey, outward, &self.snakes, c, &mut self.prey_random);
             }
+            // Keep the default one-substep path allocation-free and preserve its
+            // exact endpoint arithmetic. Coarse ticks need every quantized bend.
+            path.clear();
+            if motion_ticks > 1 {
+                path.push(old);
+            }
+            let mut finite_motion = true;
             for _ in 0..motion_ticks {
                 prey.advance_server_tick(p.turn_rate);
+                if !prey.position.finite() {
+                    finite_motion = false;
+                    break;
+                }
+                if motion_ticks > 1 {
+                    path.push(prey.position);
+                }
             }
             let distance = prey.position.distance(Point::default());
+            // Finite speeds need not produce finite accumulated motion. Preserve
+            // the last tick's valid position and use the existing terminal path,
+            // rather than allowing rim correction to multiply infinity by zero.
+            if !finite_motion || !distance.is_finite() {
+                prey.position = old;
+                self.failure.get_or_insert_with(|| {
+                    "Prey motion overflowed f64; the tick completed without that motion and the world cannot advance further".into()
+                });
+                return true;
+            }
             if distance >= c.radius {
                 let ratio = c.radius * (1.0 - 1e-9) / distance;
                 prey.position.x *= ratio;
                 prey.position.y *= ratio;
             }
-            // Sweep relative motion, so fast prey cannot tunnel through a mouth.
+            if let Some(last) = path.last_mut() {
+                *last = prey.position;
+            }
+            // Sweep each computed prey substep relative to linearly interpolated
+            // snake motion. Steering and the end-of-tick rim clamp remain models;
+            // this tests the computed polyline rather than its endpoint chord.
+            // tests/prey.rs pins a curved path whose chord misses the mouth.
             let sweep = |i: usize| {
                 // Swept from the previous head's circle to the current one.
                 let (center, radius, lead) = circles[i]?;
@@ -1880,19 +1917,49 @@ impl Simulator {
                     x: prey.position.x - center.x,
                     y: prey.position.y - center.y,
                 };
-                if sweep_misses(a, b, radius) {
-                    return None;
-                }
-                let d = segment_distance(Point::default(), a, b);
+                let distance = |a, b| {
+                    if sweep_misses(a, b, radius) {
+                        f64::INFINITY
+                    } else {
+                        segment_distance(Point::default(), a, b)
+                    }
+                };
+                let d = if motion_ticks > 1 {
+                    let mut prior = a;
+                    let mut closest = f64::INFINITY;
+                    for (k, point) in path.iter().enumerate().skip(1) {
+                        let relative = if k == motion_ticks {
+                            b
+                        } else {
+                            let phase = k as f64 / motion_ticks as f64;
+                            Point {
+                                x: point.x
+                                    - (previous[i].x + (self.snakes[i].head.x - previous[i].x) * phase)
+                                    - lead.x,
+                                y: point.y
+                                    - (previous[i].y + (self.snakes[i].head.y - previous[i].y) * phase)
+                                    - lead.y,
+                            }
+                        };
+                        closest = closest.min(distance(prior, relative));
+                        prior = relative;
+                    }
+                    closest
+                } else {
+                    distance(a, b)
+                };
                 (d <= radius).then_some((i, d))
             };
             let nearest = |(i, a): &(usize, f64), (j, b): &(usize, f64)| {
                 a.total_cmp(b)
                     .then_with(|| self.snakes[*i].id.cmp(&self.snakes[*j].id))
             };
-            let query = Bounds::between(old, prey.position);
+            let mut query = Bounds::between(old, prey.position);
+            for &point in path.iter() {
+                query.include(point);
+            }
             let indexed = index.as_ref().is_some_and(|index| {
-                small(&[old.x, old.y, prey.position.x, prey.position.y])
+                small(&[query.min.x, query.min.y, query.max.x, query.max.y])
                     && index.candidates(query, reach, candidates)
             });
             // Both visit slots in ascending order, so ties resolve as before.
@@ -1925,11 +1992,21 @@ impl Simulator {
         });
         if self.prey.len() >= p.count {
             self.prey_clock = 0.0;
-        } else {
+        } else if below_target {
+            // Provisional population policy: credit starts AFTER the tick that
+            // drops below target, so a catch waits a full respawn interval.
             self.prey_clock += c.dt;
-            if self.prey_clock >= p.respawn_seconds {
-                self.prey_clock -= p.respawn_seconds;
+            // Spend all due intervals. The deficit bounds work even when a tiny
+            // interval is too small to change the floating-point clock.
+            for _ in self.prey.len()..p.count {
+                if self.prey_clock < self.config.prey.respawn_seconds {
+                    break;
+                }
+                self.prey_clock -= self.config.prey.respawn_seconds;
                 self.spawn_prey();
+            }
+            if self.prey.len() >= self.config.prey.count {
+                self.prey_clock = 0.0;
             }
         }
     }
@@ -2052,6 +2129,8 @@ struct StepBuffers {
 }
 #[derive(Default)]
 struct PreyBuffers {
+    /// Reused for one prey at a time, only on ticks with multiple motion steps.
+    path: Vec<Point>,
     live_ids: HashSet<u64>,
     circles: Vec<Option<(Point, f64, Point)>>,
     slots: Vec<usize>,
