@@ -1200,6 +1200,26 @@ fn setup_order_and_protocol_are_enforced() {
 }
 
 #[test]
+fn captured_legacy_login_setup_remains_protocol_13_and_is_rejected() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/client-legacy-login.json")).unwrap();
+    let prefix = hex(fixture["joinedSession"]["setup"]["commandPrefixHex"]
+        .as_str()
+        .unwrap());
+    assert_eq!(fixture["wireProtocol"], 13);
+    assert_eq!(prefix.len(), 25);
+    assert_eq!(prefix[23], 13);
+    let mut state = ClientState::new();
+    state.new_connection(0.).unwrap();
+    let before = state.frame(0.).unwrap();
+    assert_eq!(
+        state.receive_packet(&prefix, 0., 0.).unwrap_err(),
+        "Unsupported protocol version 13; expected 19"
+    );
+    assert_eq!(state.frame(0.).unwrap(), before);
+}
+
+#[test]
 fn observed_wsl_setup_prefix_decodes_server_number_separately() {
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/client-protocol-paired-coil.json")).unwrap();

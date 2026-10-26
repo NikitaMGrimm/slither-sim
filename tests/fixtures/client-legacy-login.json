@@ -1,0 +1,129 @@
+{
+  "description": "Selected official legacy-login witnesses. Selector 12 receives protocol 13; this does not establish host or browser-mod compatibility.",
+  "wireProtocol": 13,
+  "dataOrigin": "captured",
+  "expectedOrigin": "reference-decoder",
+  "source": {
+    "study": "research/fidelity/2026-10-26-legacy-login/REPORT.md",
+    "access": "Full recordings, endpoint and collector snapshots are local-only and outside Git.",
+    "discoverySha256": "8628ee2df2ef8332cd8000dd0d0814167ee2b60dbf823a381a3ff00053563064",
+    "officialClientSha256": "5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095",
+    "planSha256": "adc89a4d377c1f468a992ae52b978c0c35780915727d47c6578b0412cb61e29d",
+    "amendedPlanSha256": "fe7fca6fd52c6807f7414670122641f52761082a8e1f1de02dd7da1d598a1b16",
+    "archives": [
+      {
+        "file": "session-1-legacy.jsonl",
+        "sha256": "fcaa28a61ac5d6bfe98a23eb5000b3ecb5e97576f6dc9369e7eb4aae2f0deeb2",
+        "collectorSha256": "77840e463e1f9acea926c2c50085b425adb95cd47a8e7d2565b3472f9368beb5",
+        "outcome": "Stopped after unexpected stock-format challenge; no reply/login sent."
+      },
+      {
+        "file": "session-2-legacy-observed.jsonl",
+        "sha256": "725663de883525773c6d1eda30a18b3e4fe9096e864816603ada38b28ef16bda",
+        "collectorSha256": "38ff070a7212adb8165df1b504a5c199b4ebc1e8ad18d1ed5939590d253e49e5",
+        "outcome": "Joined using observed 27-byte challenge reply and synthetic selector-12 login; eight-second gameplay window."
+      }
+    ],
+    "selection": "Both request/challenge exchanges; session 2 reply/login, first setup prefix through body spacing (25 command bytes, excluding server number), first pong and first 3/G motion/body frames. Other player appearances and identifiers in setup extensions are excluded."
+  },
+  "reference": {
+    "challengeSolver": "src/client/challenge.rs at fbefe17 (restricted two-literal parser; no JavaScript execution)",
+    "challengeSolverSha256": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+    "setupVersion": "Direct command byte 23; independently checked by protocol-19 decoder rejection in tests/client_protocol.rs.",
+    "historicalStockSetup": "tools/fidelity/fixtures/protocol19-setup.json (captured prefix, advertised version 19)"
+  },
+  "firstAttempt": {
+    "request": {
+      "recordIndex": 0,
+      "event": "send",
+      "opcode": 2,
+      "hex": "6304",
+      "description": "Actual scripted binary request."
+    },
+    "challenge": {
+      "recordIndex": 1,
+      "event": "receive",
+      "opcode": 2,
+      "hex": "00003665556c787567584d4a564e43775844536c43555864536a4672765a5a48797150426e46666f70566d69534f50547666456d4276765a4468687050437769695369765266584d47587844516b42574d45434a47756b784f474672497a5a49554c41547167776e7a57495a4f6c665152794d4746726c777745756d485574467a4a6a52527a786d48546e62716a577264797648426f6e555666724a4d564a64774c7875675a504a4a72475a50667471457471467a4a6873726542",
+      "description": "Elapsed-ms header, 6 command and encoded two-literal 27-character source; unexpected by initial 24-character parser."
+    }
+  },
+  "joinedSession": {
+    "request": {
+      "recordIndex": 0,
+      "event": "send",
+      "opcode": 2,
+      "hex": "6304",
+      "description": "Actual scripted binary request."
+    },
+    "challenge": {
+      "recordIndex": 1,
+      "event": "receive",
+      "opcode": 2,
+      "hex": "00003645756c585547586d6a764e63575864534c43547763764a43776a7a5648595150624e46664f50764d45456d42574f44644d47724a63564d467566636f4b484e6a574f4965706b747564436c7a764c5a786c585270584f674672697a7a49554c41747167576e5a57497a6f6c665172594d4766526c575745554d487554665a6a6a52525a586d48546e62516a775264797648626f4e557646526a6d764a44774c5875675a506a6a52675a50467451657451465a4a6873724542",
+      "description": "Elapsed-ms header, 6 command and encoded two-literal 27-character source."
+    },
+    "reply": {
+      "recordIndex": 2,
+      "event": "send",
+      "opcode": 2,
+      "hex": "3830314d31303e3d33343434706a656b4f466b7847565a684e7246",
+      "description": "Scripted reply computed with existing documented 27-byte transform; accepted by server."
+    },
+    "login": {
+      "recordIndex": 3,
+      "event": "send",
+      "opcode": 2,
+      "hex": "730c070b436f6d70617450726f626500ff",
+      "description": "Synthetic login generated from documented legacy layout; transmitted to official server.",
+      "dataOrigin": "synthetic",
+      "expected": {
+        "selector": 12,
+        "skin": 7,
+        "nickname": "CompatProbe",
+        "customSkinBytes": 0
+      }
+    },
+    "setup": {
+      "recordIndex": 5,
+      "rawFrameSha256": "d1800e583aa3c21a21af8150fc2ccb884fbd75209fc827b8f945378b6a31c32d",
+      "originalFrameBytes": 63,
+      "commandPrefixHex": "61007f2601ae012c006630021b002805780021001d01ae0d2a",
+      "expected": {
+        "protocol": 13,
+        "commandPrefixBytes": 25
+      },
+      "selection": "First 25 command bytes only; original elapsed header and all setup bytes from server-number offset 25 onward omitted."
+    },
+    "gameplay": [
+      {
+        "recordIndex": 8,
+        "event": "receive",
+        "opcode": 2,
+        "hex": "000070",
+        "description": "First elapsed-framed p command; no protocol-13 semantic decoding."
+      },
+      {
+        "recordIndex": 80,
+        "event": "receive",
+        "opcode": 2,
+        "hex": "001533016b806e",
+        "description": "First elapsed-framed 3 command; no protocol-13 semantic decoding."
+      },
+      {
+        "recordIndex": 56,
+        "event": "receive",
+        "opcode": 2,
+        "hex": "007847016b567f",
+        "description": "First elapsed-framed G command; no protocol-13 semantic decoding."
+      }
+    ]
+  },
+  "limitations": [
+    "One official-listed endpoint, two sequential reserved sessions; the first failed before login. No optional request variants were tested.",
+    "No third-party mod code was used by the scripted collector. This is not a capture of the real mod joining an official server.",
+    "The captured challenge conflicts with the real mod parser observed locally. No invented 24-character host profile is justified.",
+    "Protocol 13 is deliberately unsupported; selected motion/body bytes are retained as witnesses, not decoded using protocol-19 assumptions.",
+    "The setup prefix is a byte selection, not a full captured frame. Existing protocol-19 captures retain their original version and bytes."
+  ]
+}
