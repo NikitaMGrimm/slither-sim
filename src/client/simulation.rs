@@ -59,6 +59,7 @@ mod food;
 mod markers;
 #[cfg(test)]
 mod pit_tests;
+mod prey_visibility;
 mod remote;
 mod snakes;
 

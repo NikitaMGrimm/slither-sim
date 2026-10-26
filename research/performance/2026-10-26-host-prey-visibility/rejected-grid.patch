@@ -1,0 +1,218 @@
+diff --git a/src/client/simulation.rs b/src/client/simulation.rs
+index 0c0212b..e11a8eb 100644
+--- a/src/client/simulation.rs
++++ b/src/client/simulation.rs
+@@ -59,6 +59,7 @@ mod food;
+ mod markers;
+ #[cfg(test)]
+ mod pit_tests;
++mod prey_visibility;
+ mod remote;
+ mod snakes;
+
+diff --git a/src/client/simulation/broadcast.rs b/src/client/simulation/broadcast.rs
+index c9c25ea..d430bbb 100644
+--- a/src/client/simulation/broadcast.rs
++++ b/src/client/simulation/broadcast.rs
+@@ -3,6 +3,7 @@ use super::{
+     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
+     connection::KnownPrey,
+     food::{eaten_sectors, food_identity, food_updates},
++    prey_visibility::PreyGrid,
+     snakes::{CoverageGrid, KnownSnake, SnakeDeltaCache, covered, full},
+ };
+ use crate::{
+@@ -345,6 +346,14 @@ impl SimulatorBackend {
+             })
+             .collect();
+         let grid = CoverageGrid::new(self.world.snakes(), &bounds, self.world.config().vision);
++        let prey_grid = PreyGrid::new(
++            self.world.prey(),
++            self.world.config().vision,
++            self.slots
++                .iter()
++                .filter(|slot| slot.connection.setup)
++                .count(),
++        );
+         // Physics, profiles and report opportunities stay fixed throughout this
+         // broadcast. Only observe's stale flags accumulate between recipients;
+         // they are consumed by the next broadcast's update_reports.
+@@ -375,8 +384,14 @@ impl SimulatorBackend {
+             // and put the map before gameplay updates.
+             let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
+             let mut packets = vec![encode::pong(); pongs];
+-            let (updates, presented_updates) =
+-                self.updates(slot, &eaten, &bounds, &grid, &mut snake_deltas)?;
++            let (updates, presented_updates) = self.updates(
++                slot,
++                &eaten,
++                &bounds,
++                &grid,
++                prey_grid.as_ref(),
++                &mut snake_deltas,
++            )?;
+             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
+                 packets.push(packet);
+             }
+@@ -545,6 +560,7 @@ impl SimulatorBackend {
+         eaten: &BTreeSet<[u8; 2]>,
+         bounds: &[[f64; 4]],
+         grid: &CoverageGrid,
++        prey_grid: Option<&PreyGrid>,
+         snake_deltas: &mut [SnakeDeltaCache],
+     ) -> Result<PacketViews, String> {
+         let world = &self.world;
+@@ -678,10 +694,20 @@ impl SimulatorBackend {
+             None
+         };
+         let mut visible = BTreeMap::new();
+-        for prey in world.prey() {
++        let mut consider = |index: usize| {
++            let prey = &world.prey()[index];
+             if prey.position.distance(head) <= vision {
+                 visible.entry(prey.id).or_insert(prey);
+             }
++        };
++        if let Some(grid) = prey_grid {
++            for &index in grid.near(head) {
++                consider(index);
++            }
++        } else {
++            for index in 0..world.prey().len() {
++                consider(index);
++            }
+         }
+         let gone: Vec<u64> = connection
+             .prey
+diff --git a/src/client/simulation/prey_visibility.rs b/src/client/simulation/prey_visibility.rs
+new file mode 100644
+index 0000000..7633141
+--- /dev/null
++++ b/src/client/simulation/prey_visibility.rs
+@@ -0,0 +1,126 @@
++//! Shared broad phase for per-recipient prey visibility.
++//! Measured scope: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-prey-visibility/REPORT.md
++use crate::{Prey, client::fast_hash::FastMap, model::Point};
++
++pub(super) struct PreyGrid {
++    cell: f64,
++    cells: FastMap<(i64, i64), Vec<usize>>,
++}
++
++impl PreyGrid {
++    pub(super) fn new(prey: &[Prey], vision: f64, recipients: usize) -> Option<Self> {
++        // Nine memberships per prey repay their construction only in batches.
++        // Small broadcasts keep the original scan; this selects work, not a
++        // different visibility rule.
++        if prey.len() < 16 || recipients < 16 {
++            return None;
++        }
++        let mut grid = Self {
++            // Half-cell visibility reach leaves slack at floating cell edges.
++            // Even if doubling overflows, finite positions map to cell zero.
++            cell: (2. * vision).max(256.),
++            cells: FastMap::default(),
++        };
++        for (index, prey) in prey.iter().enumerate() {
++            let (x, y) = grid.key(prey.position);
++            for x in x.saturating_sub(1)..=x.saturating_add(1) {
++                for y in y.saturating_sub(1)..=y.saturating_add(1) {
++                    grid.cells.entry((x, y)).or_default().push(index);
++                }
++            }
++        }
++        Some(grid)
++    }
++
++    fn key(&self, point: Point) -> (i64, i64) {
++        (
++            (point.x / self.cell).floor() as i64,
++            (point.y / self.cell).floor() as i64,
++        )
++    }
++
++    /// A superset of visible prey in world order. Keep the original distance
++    /// test after lookup, including its exact rounding and inclusive boundary.
++    pub(super) fn near(&self, point: Point) -> &[usize] {
++        self.cells.get(&self.key(point)).map_or(&[], Vec::as_slice)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::collections::BTreeMap;
++
++    fn prey(id: u64, x: f64, y: f64) -> Prey {
++        Prey {
++            id,
++            position: Point { x, y },
++            heading: 0.,
++            target_heading: 0.,
++            speed: 1.,
++            size: 1.,
++        }
++    }
++
++    #[test]
++    fn candidates_preserve_exact_visibility_world_order_and_duplicate_ids() {
++        for vision in [f64::from_bits(1), 0.1, 128., 1500., 1e10, 1e300, f64::MAX] {
++            let mut items = Vec::new();
++            for x in [
++                -1e300, -32768., -3000., -256., -0., 0., 256., 3000., 32768., 1e300,
++            ] {
++                for y in [-3000., 0., 3000.] {
++                    items.push(prey((items.len() % 7) as u64, x, y));
++                }
++            }
++            let grid = PreyGrid::new(&items, vision, 16).unwrap();
++            for anchor in &items {
++                for x in [
++                    anchor.position.x,
++                    anchor.position.x + vision,
++                    anchor.position.x - vision,
++                ] {
++                    for x in [x.next_down(), x, x.next_up()] {
++                        if !x.is_finite() {
++                            continue;
++                        }
++                        let head = Point {
++                            x,
++                            y: anchor.position.y,
++                        };
++                        let mut expected = BTreeMap::new();
++                        let indices = grid.near(head);
++                        for (i, prey) in items.iter().enumerate() {
++                            if prey.position.distance(head) <= vision {
++                                assert!(indices.binary_search(&i).is_ok(), "omitted prey {i}");
++                                expected.entry(prey.id).or_insert(i);
++                            }
++                        }
++                        assert!(indices.windows(2).all(|w| w[0] < w[1]));
++                        let mut actual = BTreeMap::new();
++                        for &i in indices {
++                            if items[i].position.distance(head) <= vision {
++                                actual.entry(items[i].id).or_insert(i);
++                            }
++                        }
++                        assert_eq!(actual, expected, "vision={vision}, head={head:?}");
++                    }
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn small_batches_keep_the_scan_and_rebuilding_tracks_motion() {
++        let mut items = vec![prey(0, 0., 0.); 16];
++        assert!(PreyGrid::new(&items[..15], 1500., 16).is_none());
++        assert!(PreyGrid::new(&items, 1500., 15).is_none());
++        let before = PreyGrid::new(&items, 1500., 16).unwrap();
++        assert_eq!(before.near(Point::default()), &(0..16).collect::<Vec<_>>());
++        for item in &mut items {
++            item.position.x = 30_000.;
++        }
++        let after = PreyGrid::new(&items, 1500., 16).unwrap();
++        assert!(after.near(Point::default()).is_empty());
++    }
++}

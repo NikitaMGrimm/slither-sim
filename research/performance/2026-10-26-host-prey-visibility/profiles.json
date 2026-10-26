@@ -1,0 +1,190 @@
+{
+  "metric": "separate sampled user CPU only, excludes kernel",
+  "workloads": {
+    "official-500": {
+      "base": {
+        "samples": 3491,
+        "phaseSharesPercent": {
+          "per-recipient delta encoding": 42.824405614437126,
+          "visibility/food-sector work": 26.6112861644228,
+          "physics": 13.663706674305356,
+          "framing/flush": 6.960756230306503,
+          "socket service": 4.554568891435119,
+          "allocation": 4.1248925809223715,
+          "other/unknown": 1.2603838441707247
+        },
+        "alive": 499.98699999999997,
+        "waiting": 0,
+        "hypotSelfSharePercentAllCallers": 11.572615296476654
+      },
+      "candidate": {
+        "samples": 3704,
+        "phaseSharesPercent": {
+          "per-recipient delta encoding": 39.98380129589633,
+          "visibility/food-sector work": 29.265658747300215,
+          "physics": 14.227861771058315,
+          "framing/flush": 6.668466522678186,
+          "socket service": 4.967602591792657,
+          "allocation": 3.833693304535637,
+          "other/unknown": 1.0529157667386608
+        },
+        "alive": 499.934,
+        "waiting": 0,
+        "hypotSelfSharePercentAllCallers": 5.642548596112311
+      }
+    },
+    "dome-40": {
+      "base": {
+        "samples": 3162,
+        "phaseSharesPercent": {
+          "physics": 88.64642631246046,
+          "other/unknown": 3.194180898165718,
+          "visibility/food-sector work": 3.194180898165718,
+          "per-recipient delta encoding": 2.340290955091714,
+          "framing/flush": 0.9171410499683744,
+          "allocation": 0.8855154965211891,
+          "socket service": 0.8222643896268185
+        },
+        "alive": 34.09,
+        "waiting": 5.558
+      },
+      "candidate": {
+        "samples": 3183,
+        "phaseSharesPercent": {
+          "physics": 87.99874332390826,
+          "visibility/food-sector work": 3.550109959158027,
+          "other/unknown": 3.3301916431039897,
+          "per-recipient delta encoding": 1.916431039899466,
+          "framing/flush": 1.3823437009110902,
+          "allocation": 0.9739239710964499,
+          "socket service": 0.8482563619227145
+        },
+        "alive": 34.006,
+        "waiting": 5.715999999999999
+      }
+    },
+    "dome-64": {
+      "base": {
+        "samples": 3302,
+        "phaseSharesPercent": {
+          "physics": 88.27983040581466,
+          "visibility/food-sector work": 3.119321623258631,
+          "other/unknown": 2.9376135675348274,
+          "per-recipient delta encoding": 2.150211992731678,
+          "framing/flush": 1.6959418534221684,
+          "socket service": 1.0902483343428224,
+          "allocation": 0.726832222895215
+        },
+        "alive": 37.659,
+        "waiting": 26.034
+      },
+      "candidate": {
+        "samples": 3824,
+        "phaseSharesPercent": {
+          "physics": 88.36297071129707,
+          "visibility/food-sector work": 3.268828451882845,
+          "other/unknown": 3.059623430962343,
+          "per-recipient delta encoding": 1.9351464435146444,
+          "framing/flush": 1.6997907949790796,
+          "socket service": 0.9152719665271967,
+          "allocation": 0.7583682008368201
+        },
+        "alive": 35.409,
+        "waiting": 28.259
+      }
+    },
+    "dome-80": {
+      "base": {
+        "samples": 3430,
+        "phaseSharesPercent": {
+          "physics": 88.86297376093295,
+          "other/unknown": 3.4110787172011663,
+          "visibility/food-sector work": 2.565597667638484,
+          "per-recipient delta encoding": 1.8075801749271136,
+          "framing/flush": 1.4285714285714286,
+          "socket service": 1.1078717201166182,
+          "allocation": 0.8163265306122449
+        },
+        "alive": 33.641999999999996,
+        "waiting": 45.971000000000004
+      },
+      "candidate": {
+        "samples": 3576,
+        "phaseSharesPercent": {
+          "physics": 88.59060402684564,
+          "other/unknown": 3.2158836689038033,
+          "visibility/food-sector work": 2.460850111856823,
+          "framing/flush": 2.0134228187919465,
+          "per-recipient delta encoding": 1.9574944071588367,
+          "socket service": 0.9507829977628636,
+          "allocation": 0.8109619686800895
+        },
+        "alive": 31.121000000000002,
+        "waiting": 48.55
+      }
+    }
+  },
+  "integratedRuntime": {
+    "runtimeCommit": "bf5e29c1928d6edb69399ab18e7d3dd242e8b6c9",
+    "metric": "separate user CPU profiles after main integration; unpaired, not speed measurements",
+    "hostProbeSha256": "0c1ceb8f90a7566569e0501d7a6cb4afaf2252583826b823a9b4116ba1f376da",
+    "workloads": {
+      "official-500": {
+        "samples": 3592,
+        "phaseSharesPercent": {
+          "per-recipient delta encoding": 36.720489977728285,
+          "visibility/food-sector work": 30.762806236080177,
+          "physics": 14.949888641425389,
+          "framing/flush": 6.959910913140312,
+          "socket service": 5.038975501113586,
+          "allocation": 3.8418708240534523,
+          "other/unknown": 1.7260579064587973
+        },
+        "alive": 499.953,
+        "waiting": 0
+      },
+      "dome-40": {
+        "samples": 3224,
+        "phaseSharesPercent": {
+          "physics": 89.48511166253101,
+          "visibility/food-sector work": 3.101736972704715,
+          "other/unknown": 2.791563275434243,
+          "framing/flush": 1.6129032258064515,
+          "per-recipient delta encoding": 1.6129032258064515,
+          "socket service": 0.7444168734491315,
+          "allocation": 0.6513647642679901
+        },
+        "alive": 33.900999999999996,
+        "waiting": 5.7330000000000005
+      },
+      "dome-64": {
+        "samples": 3273,
+        "phaseSharesPercent": {
+          "physics": 90.22303696914146,
+          "visibility/food-sector work": 2.6275588145432325,
+          "other/unknown": 2.2914757103574703,
+          "framing/flush": 1.7109685304002444,
+          "per-recipient delta encoding": 1.6193095019859456,
+          "allocation": 0.8860372746715551,
+          "socket service": 0.6416131989000916
+        },
+        "alive": 37.501,
+        "waiting": 26.186
+      },
+      "dome-80": {
+        "samples": 3405,
+        "phaseSharesPercent": {
+          "physics": 88.928046989721,
+          "other/unknown": 2.9368575624082234,
+          "visibility/food-sector work": 2.76064610866373,
+          "per-recipient delta encoding": 1.9676945668135095,
+          "framing/flush": 1.9383259911894273,
+          "socket service": 0.9397944199706314,
+          "allocation": 0.5286343612334802
+        },
+        "alive": 33.959,
+        "waiting": 45.726
+      }
+    }
+  }
+}

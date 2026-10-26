@@ -3,6 +3,7 @@ use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::KnownPrey,
     food::{eaten_sectors, food_identity, food_updates},
+    prey_visibility::PreyBounds,
     snakes::{CoverageGrid, KnownSnake, SnakeDeltaCache, covered, full},
 };
 use crate::{
@@ -345,6 +346,7 @@ impl SimulatorBackend {
             })
             .collect();
         let grid = CoverageGrid::new(self.world.snakes(), &bounds, self.world.config().vision);
+        let prey_bounds = PreyBounds::new(self.world.prey(), self.world.config().vision);
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
         // they are consumed by the next broadcast's update_reports.
@@ -375,8 +377,14 @@ impl SimulatorBackend {
             // and put the map before gameplay updates.
             let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
             let mut packets = vec![encode::pong(); pongs];
-            let (updates, presented_updates) =
-                self.updates(slot, &eaten, &bounds, &grid, &mut snake_deltas)?;
+            let (updates, presented_updates) = self.updates(
+                slot,
+                &eaten,
+                &bounds,
+                &grid,
+                &prey_bounds,
+                &mut snake_deltas,
+            )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 packets.push(packet);
             }
@@ -545,6 +553,7 @@ impl SimulatorBackend {
         eaten: &BTreeSet<[u8; 2]>,
         bounds: &[[f64; 4]],
         grid: &CoverageGrid,
+        prey_bounds: &PreyBounds,
         snake_deltas: &mut [SnakeDeltaCache],
     ) -> Result<PacketViews, String> {
         let world = &self.world;
@@ -678,7 +687,8 @@ impl SimulatorBackend {
             None
         };
         let mut visible = BTreeMap::new();
-        for prey in world.prey() {
+        for index in prey_bounds.near(head) {
+            let prey = &world.prey()[index];
             if prey.position.distance(head) <= vision {
                 visible.entry(prey.id).or_insert(prey);
             }
