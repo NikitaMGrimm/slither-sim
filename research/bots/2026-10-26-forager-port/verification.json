@@ -14,7 +14,7 @@
     "RAYON_NUM_THREADS": "4"
   },
   "inputsSha256": "168c0f3d54f2df1958a6745e8a26b74100b2c0b8002a073ef40775229afe5cda",
-  "exporterSha256": "c19ad22ec3741434246b0b0f7ec683221caa87b7392c86724e7207fa393720d9",
+  "exporterSha256": "6a5c4e7467858cc0837244ad7585e6ba42610e608a7fb6b1acce117bf6a91c82",
   "oracleCargoLockSha256": "3ad6bbe4f420b8eaf3548c7c9626e08951d0c0b5051643bdea5c30a8faecddb0",
   "platforms": {
     "x86_64-pc-windows-msvc": {
@@ -23,7 +23,7 @@
         "A1",
         "A4-mean"
       ],
-      "oracleSha256": "16f640ccb248b1ed6bcef8b64514bd1ea4ce67b8ebb58c6b083923d2c7c08045",
+      "oracleSha256": "8cfae5a73be7494f088ad756c97193fd19bd686b4863ff8c4e4b3bed4743eef4",
       "fixture": "tests/fixtures/forager-oracle-windows-x86_64-msvc.json",
       "portConformance": {
         "A1": {
@@ -34,7 +34,10 @@
           "cases": 140,
           "mismatches": 0
         }
-      }
+      },
+      "rawOutputSha256": "16f640ccb248b1ed6bcef8b64514bd1ea4ce67b8ebb58c6b083923d2c7c08045",
+      "rawOutputBytes": 9882974,
+      "projectedBytes": 1546854
     },
     "x86_64-unknown-linux-gnu": {
       "oracleCasesPerPolicy": 140,
@@ -42,7 +45,7 @@
         "A1",
         "A4-mean"
       ],
-      "oracleSha256": "bb40c98f10d3a013a8b4584de6671711baae5771554a7f61c0a6267a30469fdc",
+      "oracleSha256": "089a1a4f3c7ceb97dc4ced909eb6d884be486c7b113d63ef5ce60a7ba9d5fdf7",
       "fixture": "tests/fixtures/forager-oracle-linux-x86_64-gnu.json",
       "portConformance": {
         "A1": {
@@ -53,7 +56,10 @@
           "cases": 140,
           "mismatches": 0
         }
-      }
+      },
+      "rawOutputSha256": "bb40c98f10d3a013a8b4584de6671711baae5771554a7f61c0a6267a30469fdc",
+      "rawOutputBytes": 9882971,
+      "projectedBytes": 1546851
     }
   },
   "crossPlatformDifferences": [
@@ -110,5 +116,12 @@
       "skipped": 1,
       "skipReason": "existing platform-specific test"
     }
-  }
+  },
+  "projection": {
+    "script": "project_oracle.py",
+    "scriptSha256": "ee7cd9c6595ef64365ca07255106ae050f8eb837bb7e3e9216e067afd97ecfb2",
+    "canonicalInputFrame": "Compact UTF-8 JSON of the bit-encoded frame, recursively sorted object keys, non-ASCII preserved, no trailing newline.",
+    "expectedValues": "Raw expected JSON subtrees copied byte-for-byte; no policy execution or value recomputation."
+  },
+  "rawExporterSha256": "c19ad22ec3741434246b0b0f7ec683221caa87b7392c86724e7207fa393720d9"
 }

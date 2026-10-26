@@ -1,5 +1,6 @@
 //! Standalone oracle exporter. Build against the untouched be3a035 crate.
-//! Arguments: bit-encoded selected inputs, policy-data directory, output file.
+//! Arguments: bit-encoded selected inputs, policy-data directory, raw output file.
+//! Retain that raw file; project_oracle.py produces the committed compact format.
 use serde_json::{Value, json};
 use slither_sim::{
     Action,

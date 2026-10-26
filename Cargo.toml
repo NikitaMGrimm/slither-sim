@@ -78,6 +78,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 tungstenite = { version = "0.30.0", features = ["rustls-tls-webpki-roots"], optional = true }
 
+[dev-dependencies]
+sha2 = "0.11"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

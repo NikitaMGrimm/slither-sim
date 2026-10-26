@@ -253,7 +253,7 @@ Parameters are private and fully resolved for the named release.
 
 Use `default-features = false, features = ["bot"]` for an offline policy without
 networking or Rayon. Core-only, C ABI and Python builds do not enable `bot`.
-`networking` includes it and exposes `client::ForagerBot::new(PolicyId::A1)`,
+`networking`, enabled by default, includes it and exposes `client::ForagerBot::new(PolicyId::A1)`,
 implementing the existing `client::Bot`. The adapter derives timing and intentions
 from the complete `ClientFrame` and returns `None` outside a compatible playing
 frame with an observation. Existing host, native background bots, examples and

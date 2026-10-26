@@ -53,8 +53,8 @@ More examples: [embedding the simulator](examples/basic.rs) and
 library elsewhere, run `cargo add slither-sim`; for the CLI alone,
 `cargo install slither-sim --locked`.
 
-Rust callers can opt into the [frozen A1 Forager](docs/bot-api.md#frozen-forager)
-with the `bot` feature. Existing examples and runtime bot defaults are unchanged.
+Rust bots can reuse the tuned [Forager policy](docs/bot-api.md#frozen-forager)
+through `client::ForagerBot`; core-only builds get the policy alone with `--features bot`.
 
 ### Download a release
 

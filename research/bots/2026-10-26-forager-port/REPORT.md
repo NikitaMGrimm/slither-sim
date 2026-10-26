@@ -77,16 +77,26 @@ signed zero survive decoding. Derived Timing/Intent values use raw hex bits,
 including unknown-Intent NaNs. Actions record presence, heading bits and boost.
 No public-mode guard is applied.
 
-The complete, independent untouched-kernel outputs are retained separately:
+Compact projections of the independent untouched-kernel outputs are retained separately:
 
 - [Windows x86_64 MSVC](../../../tests/fixtures/forager-oracle-windows-x86_64-msvc.json).
 - [Linux x86_64 GNU](../../../tests/fixtures/forager-oracle-linux-x86_64-gnu.json).
 
-Each file came from its own oracle run, with all 140 inputs under both resolved
-parameter sets. Neither platform's expectations are derived from the other's.
-The test selects an oracle only for its exact OS/architecture/environment, checks
-that input frames match, compares every Timing/Intent bit before actions, and
-requires zero mismatches including heading bits. No tolerance is used.
+Each file comes from its own raw oracle run, with all 140 cases under both resolved
+parameter sets. Raw files remain locally retained; their SHA-256s are recorded as
+`rawOutputSha256` in [verification.json](verification.json). The committed files
+are exact projections: each case contains only `id`, `expected` and `inputSha256`.
+Every complete `expected` JSON subtree is copied byte for byte from that platform's
+raw output. Fields are dropped; expected values are never recomputed or derived
+from the other platform.
+
+`inputSha256` hashes the original bit-encoded frame as compact UTF-8 JSON with
+recursively sorted object keys, preserved non-ASCII characters and no trailing
+newline. Inputs exist only in the shared fixture. The Rust test canonicalizes and
+hashes each shared frame before comparing any Timing/Intent or action bits. SHA-256
+support is test-only; the `bot` feature has no dependency additions. The test
+selects an oracle only for its exact OS/architecture/environment and requires
+zero mismatches including heading bits. No tolerance is used.
 
 On every target, a separate test compares two fresh instances and one instance
 reused across interleaved slots, lives and connections, in forward and reverse
@@ -104,7 +114,7 @@ passing those tests is not oracle equality.
 Complete original-kernel comparison found these four heading differences. They
 are last-bit differences between the platforms' math libraries; no individual
 function has been isolated. Timing/Intent bits, presence and boost all matched.
-Both versions of every differing case remain in the complete oracle files and
+Both versions of every differing case remain in the projected oracle files and
 [verification data](verification.json).
 
 | Policy | Case | Windows heading bits | Linux heading bits |
@@ -122,6 +132,18 @@ feature. Its three arguments are shared bit-encoded inputs, `src/bot/data`, and 
 fresh output filename. It calls original `ForagerBot::timing`/`Bot::decide` and
 verbatim original intent extraction. It never calls the port. Each target must
 produce its own expectations; do not copy or normalize another target's headings.
+Then run [project_oracle.py](project_oracle.py) with the raw output and a different
+output path:
+
+```sh
+python research/bots/2026-10-26-forager-port/project_oracle.py raw.json projected.json
+```
+
+This standard-library projection copies raw `expected` subtrees verbatim without
+reserializing or recomputing their values, adds hashes of their original input frames and
+retains the platform/protocol/kernel metadata. Keep the raw file and record both
+raw and projected file hashes. Rerunning the projection reproduces the committed
+format without executing either policy implementation.
 
 Both oracle runs used Rust 1.99.0 (`b940084d7`, LLVM 23.1.1), dev profile, optimization
 level 0, debug information disabled, incremental compilation disabled and empty
@@ -137,7 +159,8 @@ through `b6bc684`. The Windows run of `python tools/check.py rust package wasm`
 passed all 18 commands: formatting, every Clippy feature build, default/core-only/
 bot-only/networking-only tests, doctests, C ABI tests, Python crate checking,
 the basic example, package verification and core-only/bot-only WASM. Packaging
-retains all three full-frame files and the legacy fixture (3.0 MiB compressed).
+retained all three full-frame files and the legacy fixture before projection
+(3.0 MiB compressed); updated fixture and package measurements are recorded below.
 CI results on Linux, Windows and macOS are tracked in
 [PR #124](https://github.com/NikitaMGrimm/slither-sim/pull/124); all checks must pass
 before ready promotion.
@@ -146,7 +169,7 @@ Initial attempts are retained in the private execution record: the first build
 found the missing `Action` import; the frame generator initially sent a control to
 a non-playing slot; the first oracle attempts rejected an incomplete synthetic
 HUD object. These were corrected before the complete oracle runs. The initial
-cross-platform mismatch prompted an explicit owner decision to preserve separate
+cross-platform mismatch prompted a maintainer decision to preserve separate
 exact oracle sets, not a tolerance or numerical kernel change.
 
 Host/native background wiring, examples, JSON bot stepping, headless forage,

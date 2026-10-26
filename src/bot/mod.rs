@@ -15,6 +15,7 @@ use crate::{Action, Observation};
 
 /// Immutable named policy release.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PolicyId {
     /// The adopted A1 parameters, resolved against the frozen be3a035 kernel.
     A1,
@@ -28,6 +29,7 @@ pub struct Forager {
 }
 
 impl Forager {
+    /// Construct the named policy with reusable decision buffers.
     pub fn new(policy: PolicyId) -> Self {
         let params = match policy {
             PolicyId::A1 => params::A1,
@@ -38,6 +40,7 @@ impl Forager {
         }
     }
 
+    /// Choose an action from received observations, timing and opponent intentions.
     pub fn decide(
         &mut self,
         observation: &Observation,

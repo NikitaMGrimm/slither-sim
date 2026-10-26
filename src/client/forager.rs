@@ -20,6 +20,7 @@ pub struct ForagerBot {
 }
 
 impl ForagerBot {
+    /// Construct the named policy's received-frame adapter.
     pub fn new(policy: crate::bot::PolicyId) -> Self {
         Self {
             policy: crate::bot::Forager::new(policy),

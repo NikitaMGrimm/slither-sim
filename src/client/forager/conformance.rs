@@ -1,6 +1,29 @@
 use super::{ForagerBot, fill_intents};
 use crate::{Action, bot::PolicyId, client::Bot};
 use serde_json::{Value, json};
+#[cfg(any(
+    all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
+    all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"),
+))]
+use sha2::{Digest, Sha256};
+
+#[cfg(any(
+    all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
+    all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"),
+))]
+fn input_sha256(frame: &Value) -> String {
+    use std::fmt::Write;
+    // Match project_oracle.py: compact UTF-8 bit-encoded JSON, recursively
+    // sorted keys, no trailing newline. This hashes the input before decoding.
+    let mut canonical = frame.clone();
+    canonical.sort_all_objects();
+    let digest = Sha256::digest(serde_json::to_vec(&canonical).unwrap());
+    let mut hex = String::with_capacity(64);
+    for byte in digest {
+        write!(hex, "{byte:02x}").unwrap();
+    }
+    hex
+}
 
 fn bits(value: f64) -> String {
     format!("{:016x}", value.to_bits())
@@ -163,6 +186,7 @@ fn full_frames_are_deterministic_with_fresh_and_interleaved_shared_instances() {
 fn platform_oracle_equality_zero_mismatches() {
     let raw = PLATFORM_ORACLE.expect("this exact target has a frozen-kernel oracle");
     let oracle: Value = serde_json::from_str(raw).unwrap();
+    assert_eq!(oracle["schemaVersion"], 2);
     assert_eq!(oracle["oracleStatus"], "complete");
     assert_eq!(oracle["oraclePlatform"]["os"], std::env::consts::OS);
     assert_eq!(oracle["oraclePlatform"]["arch"], std::env::consts::ARCH);
@@ -173,9 +197,13 @@ fn platform_oracle_equality_zero_mismatches() {
     for name in ["A1", "A4-mean"] {
         let mut shared = make_bot(name);
         for (case, oracle_case) in cases.iter().zip(expected) {
-            for field in ["id", "slot", "decisionOrder", "frame"] {
-                assert_eq!(case[field], oracle_case[field], "oracle input {field}");
-            }
+            assert_eq!(case["id"], oracle_case["id"], "oracle case ID");
+            assert_eq!(
+                input_sha256(&case["frame"]),
+                oracle_case["inputSha256"].as_str().unwrap(),
+                "{}: oracle input hash",
+                case["id"]
+            );
             let frame = serde_json::from_value(decode(&case["frame"])).unwrap();
             let expected = &oracle_case["expected"][name];
             // Compare every derived bit before any action, including all 64
