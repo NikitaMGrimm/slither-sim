@@ -302,7 +302,7 @@ pub fn socket_driver() -> Result<(), String> {
         Ok(socket)
     };
     let mut sockets = (0..count)
-        .map(connect_slot)
+        .map(|i| connect_slot(i).map(Some))
         .collect::<Result<Vec<_>, _>>()?;
     println!("ready");
     io::stdout().flush().map_err(|e| e.to_string())?;
@@ -313,7 +313,8 @@ pub fn socket_driver() -> Result<(), String> {
     let mut minimum_playing = count;
     while !stop.load(Ordering::Relaxed) {
         let command = Instant::now() >= steer;
-        for (i, socket) in sockets.iter_mut().enumerate() {
+        for (i, connection) in sockets.iter_mut().enumerate() {
+            let mut socket = connection.take().ok_or("missing load socket")?;
             let mut died = false;
             for _ in 0..64 {
                 match socket.read() {
@@ -325,6 +326,9 @@ pub fn socket_driver() -> Result<(), String> {
                         if died {
                             break;
                         }
+                    }
+                    Ok(Message::Close(reason)) => {
+                        return Err(format!("load socket {i} closed: {reason:?}"));
                     }
                     Ok(_) => {}
                     Err(tungstenite::Error::Io(e))
@@ -338,7 +342,8 @@ pub fn socket_driver() -> Result<(), String> {
             if died {
                 // Socket sessions keep their Playing generation after death.
                 // Reconnect through a new TCP session, as NetworkBackend does.
-                *socket = connect_slot(i)?;
+                drop(socket);
+                socket = connect_slot(i)?;
             }
             if command {
                 let heading = ((started.elapsed().as_secs_f64() * 1.2
@@ -355,6 +360,7 @@ pub fn socket_driver() -> Result<(), String> {
                 Err(tungstenite::Error::Io(e)) if e.kind() == std::io::ErrorKind::WouldBlock => {}
                 Err(e) => return Err(e.to_string()),
             }
+            *connection = Some(socket);
         }
         if started.elapsed().as_secs_f64() >= 1. {
             minimum_playing = minimum_playing.min(lives.iter().filter(|life| life.playing).count());

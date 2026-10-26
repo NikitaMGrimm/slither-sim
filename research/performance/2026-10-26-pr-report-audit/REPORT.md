@@ -132,3 +132,19 @@ cell. No socket measurement from that attempt is accepted. The retained full
 artifact holds stderr, partial A/A records and the failed attempt. Corrections
 reuse the public protocol splitter, reconnect after death with a new socket
 session, add a bundled-lifecycle regression and retain EOF probe failures.
+
+The [second PR run](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40377917826)
+at head `920968ad60f2e4e7bd286c13da8bb1d8a762ad84` completed the report but accepted
+neither socket row: child sockets closed during reconnect, leaving Unavailable
+results. The driver must release the old TCP session before requesting a new
+slot. A short one-tick functional smoke after that correction connected all 80
+Battledome sockets and received gameplay; its debug timing is not performance
+evidence. The full hosted workload remains the validation target.
+
+That second run completed six A/A pairs for each deterministic row. Whole-case
+CPU / operation-wall log residual SD percentages were: step-food 1.782 / 1.989,
+observe 1.500 / 1.885, official-100-step 1.555 / 2.160 and official-100-bot
+3.202 / 2.811. Different timing scopes prevent substituting whole-case CPU for
+operation cost from those values alone. The runner's `perf stat -e instructions`
+probe failed because hardware events were unavailable at its existing access
+policy; Valgrind was not installed. No runner security settings were changed.

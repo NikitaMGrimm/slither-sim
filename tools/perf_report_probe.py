@@ -4,14 +4,16 @@ Six balanced fresh-process A/A pairs; one discarded warmup pair per workload.
 No CI decision is made from instruction counts without a working counter.
 """
 
+import argparse
 import json
 import math
 import shutil
 import statistics
 import subprocess
 import time
+from pathlib import Path
 
-from perf_baseline import digest, native
+from perf_baseline import digest, load_catalog, native
 from perf_compare import child_error
 from perf_stats import ORDER
 
@@ -48,8 +50,8 @@ def counter_probe():
 
 
 def probe(binary, workloads, output, *, deadline):
-    sockets = list(workloads) if any(w.mode == "socket-host" for w in workloads) else []
-    if not sockets:
+    selected = sorted(workloads, key=lambda w: w.mode != "socket-host")
+    if not any(w.mode == "socket-host" for w in selected):
         return {}
     output.mkdir()
     result = {"schema": 1, "executable_sha256": digest(binary), "pairs": 6,
@@ -59,7 +61,7 @@ def probe(binary, workloads, output, *, deadline):
     # bound. Incomplete probes retain wall; there are no retries or exclusions.
     deadline = min(deadline, time.perf_counter() + 240)
     with (output / "results.jsonl").open("w", encoding="utf-8", newline="\n") as log:
-        for workload in sockets:
+        for workload in selected:
             pairs, failure = [], None
             for index in range(7):
                 pair = {}
@@ -89,3 +91,21 @@ def probe(binary, workloads, output, *, deadline):
         raise ValueError("benchmark executable changed during A/A probe")
     (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n")
     return result
+
+
+def main():
+    # Keep ongoing calibration out of routine PR sampling once a metric has been
+    # selected. The manual workflow preserves pilots, including incomplete cells.
+    from pr_report import REPORT_CASES
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    binary = args.binary.resolve(strict=True)
+    result = probe(binary, load_catalog(binary).select(cases=REPORT_CASES), args.output,
+                   deadline=time.perf_counter() + 240)
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()
