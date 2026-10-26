@@ -2789,7 +2789,12 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(2);
         while gateway.sessions.is_empty() && Instant::now() < deadline {
             gateway.accept(Instant::now());
+            thread::yield_now();
         }
+        assert!(
+            !gateway.sessions.is_empty(),
+            "gateway did not accept the loopback connection within two seconds"
+        );
         assert!(matches!(gateway.sessions[0].stage, Stage::Http(_)));
         for fragment in [
             &b"GET /slither HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nX-SlitherSim-F"[..],
