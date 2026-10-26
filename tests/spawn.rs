@@ -101,3 +101,29 @@ fn tiny_custom_arena_without_a_spawn_band_uses_its_center() {
         }
     }
 }
+
+#[test]
+fn initial_ring_rejects_an_outside_tail_without_changing_any_slot_state() {
+    for radius in [50., 84.] {
+        let mut world = Simulator::new(
+            1,
+            Config {
+                radius,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::sandbox()
+            },
+        )
+        .unwrap();
+        let before = serde_json::to_value(&world).unwrap();
+        let error = world.add("a", 0, 1).unwrap_err();
+        assert!(
+            error.contains("Initial spawn body extends outside arena"),
+            "{error}"
+        );
+        assert_eq!(serde_json::to_value(&world).unwrap(), before);
+        // The same ring remains available once the arena contains its tail.
+        world.config.radius = 85.;
+        assert_eq!(world.add("a", 0, 1).unwrap(), 0);
+    }
+}

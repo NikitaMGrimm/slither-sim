@@ -684,7 +684,9 @@ impl Simulator {
             parallel: false,
             failure: None,
         };
-        world.update_radius(0.0);
+        // Construction applies measured time-zero overrides without spending a
+        // population-controller tick before any snakes have joined.
+        world.apply_radius_updates(0.0);
         // A zero cell limit rejects every candidate, so there is nothing to store.
         let ambient = &world.config.ambient_food;
         let admits = !ambient.enabled || ambient.max_per_cell > 0;
@@ -809,6 +811,14 @@ impl Simulator {
                 (vec![head, tail], a + PI)
             }
         };
+        // The synthetic ring is unchanged in small arenas; reject geometry
+        // outside the same strict boundary as respawn_body before adding a slot.
+        if body
+            .iter()
+            .any(|point| !point.finite() || point.distance(Point::default()) >= self.config.radius)
+        {
+            return Err("Initial spawn body extends outside arena".into());
+        }
         let segments = body.len();
         let mut snake = Snake {
             id,
@@ -1639,8 +1649,14 @@ impl Simulator {
             let step = RADIUS_RATE * self.config.dt;
             self.config.radius += (target - self.config.radius).clamp(-step, step);
         }
+        // Tick comparisons retain their tolerance; construction uses exact zero
+        // so a near-future recorded sample cannot affect the initial frame.
+        self.apply_radius_updates(time + 1e-9);
+    }
+
+    fn apply_radius_updates(&mut self, through: f64) {
         while let Some(update) = self.config.radius_updates.get(self.radius_update_index) {
-            if update.time > time + 1e-9 {
+            if update.time > through {
                 break;
             }
             self.config.radius = update.radius;

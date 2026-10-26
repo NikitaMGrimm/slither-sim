@@ -1298,6 +1298,8 @@ mod portable {
                                 "No clear spawn position"
                                     | "No spawn position is clear of other snakes"
                                     | "No spawn position fits inside the arena"
+                                    | "Spawn candidate search exhausted: no sampled position is clear of other snakes"
+                                    | "Spawn candidate search exhausted: no sampled position fits inside the arena"
                             ) =>
                         {
                             deferred.push(slot);

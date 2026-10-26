@@ -386,7 +386,8 @@ impl SimulatorBackend {
     /// `Simulator::spawn_margin` does: no official join has been seen refused,
     /// and refusing would disconnect a socket player. That candidate must still
     /// clear every contact range, or the first tick could kill the newborn or
-    /// its neighbor; only an arena too full for that refuses. Evidence:
+    /// its neighbor. Failure exhausts the configured candidate search, which
+    /// does not establish that no legal pose exists. Evidence:
     /// research/fidelity/2026-10-25-spawn-admission/REPORT.md.
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
         let alive = self.world.snakes[slot].alive;
@@ -420,8 +421,8 @@ impl SimulatorBackend {
             }
             match open {
                 Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
-                Some(_) => Err("No spawn position is clear of other snakes".into()),
-                None => Err("No spawn position fits inside the arena".into()),
+                Some(_) => Err("Spawn candidate search exhausted: no sampled position is clear of other snakes".into()),
+                None => Err("Spawn candidate search exhausted: no sampled position fits inside the arena".into()),
             }
         })();
         self.world.snakes[slot].alive = alive;

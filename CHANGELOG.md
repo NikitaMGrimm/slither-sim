@@ -125,6 +125,11 @@
 
 ### Fixed
 
+- A new world starts at its configured radius instead of one population step
+  smaller, so resetting with the returned config reproduces the first frame.
+  `add` rejects an initial ring body that would extend outside a small arena, and
+  a refused hosted join now says the candidate search was exhausted rather than
+  implying the arena is full.
 - Kiosk shrinkage no longer deletes pending growth: it removes only mass the
   score shows, and a zero shrink rate changes nothing.
 - Native commands with processing delay apply in the tick they arrive instead of

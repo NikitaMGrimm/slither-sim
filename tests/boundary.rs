@@ -453,3 +453,47 @@ fn long_boost_steps_count_their_drops() {
         .count();
     assert_eq!(drops, 7);
 }
+
+#[test]
+fn construction_keeps_the_configured_population_radius_until_a_tick() {
+    let config = Config {
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        ..Config::official(500)
+    };
+    let radius = config.radius;
+    let mut world = Simulator::new(1, config).unwrap();
+    assert_eq!(world.time, 0.);
+    assert_eq!(world.config.radius, radius);
+    world.step(&[]).unwrap();
+    assert!(world.config.radius < radius);
+}
+
+#[test]
+fn construction_does_not_apply_a_recorded_radius_from_the_near_future() {
+    let mut world = Simulator::new(
+        1,
+        Config {
+            radius: 1000.,
+            dynamic_radius: true,
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            radius_updates: vec![
+                RadiusUpdate {
+                    time: 0.,
+                    radius: 800.,
+                },
+                RadiusUpdate {
+                    time: 5e-10,
+                    radius: 900.,
+                },
+            ],
+            ..Config::sandbox()
+        },
+    )
+    .unwrap();
+    assert_eq!(world.time, 0.);
+    assert_eq!(world.config.radius, 800.);
+    world.step(&[]).unwrap();
+    assert_eq!(world.config.radius, 900.);
+}

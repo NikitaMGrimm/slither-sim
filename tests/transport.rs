@@ -731,3 +731,18 @@ fn reset_sizes_are_bounded_by_frame_types_and_memory_not_policy() {
         129
     );
 }
+
+#[test]
+fn resolved_dynamic_radius_reset_replays_the_initial_frame() {
+    let mut session = transport::Session::new();
+    let mut reset = json!({"op":"reset", "seed":1, "agents":1,
+        "config":{"radius":1000., "dynamicRadius":true, "foodCount":0,
+        "ambientReplenishPerSecond":0., "prey":{"count":0}}});
+    let first: Value =
+        serde_json::from_slice(&session.request(&serde_json::to_vec(&reset).unwrap())).unwrap();
+    reset["config"] = first["result"]["config"].clone();
+    let replay: Value =
+        serde_json::from_slice(&session.request(&serde_json::to_vec(&reset).unwrap())).unwrap();
+    assert_eq!(first, replay);
+    assert_eq!(first["result"]["worlds"][0]["radius"], 1000.);
+}
