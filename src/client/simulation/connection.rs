@@ -101,8 +101,6 @@ pub(super) struct Slot {
     pub(super) pinged_at: Option<f64>,
     pub(super) records: Option<Vec<WireRecord>>,
     pub(super) record_bytes: usize,
-    /// Heading byte last requested by the built-in background seeker.
-    pub(super) seeker: Option<u8>,
     /// An external client exchanges this slot's raw payloads; the in-process
     /// decoder, pings, records and processing model stay idle.
     pub(super) remote: bool,

@@ -20,7 +20,7 @@
 //! provides stock-client compatibility, not authentication. A direct `s` login
 //! is also accepted.
 use super::{
-    ClientState, ClientStatus, SimulationConfig, challenge,
+    Bot, ClientState, ClientStatus, ForagerBot, SimulationConfig, challenge,
     latency::{LatencyConfig, Link, Random},
     protocol,
     simulation::{
@@ -380,6 +380,7 @@ impl Host {
                 .collect();
             let bots = Bots {
                 seats,
+                policy: ForagerBot::new(crate::bot::DEFAULT_POLICY),
                 stride: self.bot_threads,
                 deliveries: receiver,
                 commands: commands.clone(),
@@ -1377,10 +1378,11 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 }
 
-/// One bot thread: background seekers in their own slots.
+/// One bot thread: received-frame clients sharing stateless policy scratch.
 struct Bots {
     /// Every `stride`th slot from the first seat's.
     seats: Vec<Seat>,
+    policy: ForagerBot,
     stride: usize,
     deliveries: Receiver<Vec<Delivery>>,
     commands: Sender<Command>,
@@ -1391,15 +1393,13 @@ struct Bots {
     interval: f64,
 }
 
-/// A background seeker that decides from delivered frames every interval, sends
+/// A background client that decides from delivered frames every interval, sends
 /// after processing, pings on the client's cadence and rejoins after death,
 /// matching the simulator's native background client.
 struct Seat {
     slot: usize,
     generation: u64,
     state: ClientState,
-    /// Last heading byte sent; see `seeker_action`.
-    sent: Option<u8>,
     /// Processing draws for this connection.
     link: Link,
     frames: VecDeque<(f64, Vec<u8>)>,
@@ -1435,6 +1435,7 @@ impl Bots {
                     &self.latency,
                     &mut self.random,
                     self.interval,
+                    &mut self.policy,
                 )?;
                 next = next.min(seat.next_event());
             }
@@ -1477,7 +1478,6 @@ impl Seat {
             slot,
             generation: 0,
             state: ClientState::new(),
-            sent: None,
             link: Link::default(),
             frames: VecDeque::new(),
             clock: 0.,
@@ -1524,6 +1524,7 @@ impl Seat {
         latency: &LatencyConfig,
         random: &mut Random,
         interval: f64,
+        policy: &mut ForagerBot,
     ) -> Result<(), String> {
         loop {
             let frame = self.frames.front().map_or(f64::INFINITY, |(at, _)| *at);
@@ -1552,7 +1553,7 @@ impl Seat {
             } else {
                 // A late thread makes at most one catch-up decision.
                 self.decide_at = (decide + interval).max(now);
-                self.decide(at, commands, latency, random)?;
+                self.decide(at, commands, latency, random, policy)?;
             }
         }
         let at = self.tick(now);
@@ -1569,6 +1570,7 @@ impl Seat {
         commands: &Sender<Command>,
         latency: &LatencyConfig,
         random: &mut Random,
+        policy: &mut ForagerBot,
     ) -> Result<(), String> {
         if self.closed || self.state.status() == ClientStatus::Dead {
             return self.join(at, commands, latency, random);
@@ -1577,7 +1579,7 @@ impl Seat {
             return Ok(());
         }
         let frame = self.state.frame(at)?;
-        if let Some(action) = super::simulation::seeker_action(&frame, &mut self.sent) {
+        if let Some(action) = policy.decide(&frame) {
             let processing = self.link.processing(latency, random);
             self.outbox = Some((at, action, processing));
         }
@@ -1614,7 +1616,6 @@ impl Seat {
         self.state.new_connection(at)?;
         self.generation += 1;
         self.link = Link::connect(latency, random);
-        self.sent = None;
         self.frames.clear();
         self.outbox = None;
         self.previous_boost = None;
@@ -1683,6 +1684,9 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
     let solved = challenge::solve_challenge(&encoded)?;
     Ok((encoded, [literal, solved]))
 }
+
+#[cfg(test)]
+mod bot_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1877,6 +1881,7 @@ mod tests {
         let (commands, received) = mpsc::channel();
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
+        let mut policy = ForagerBot::new(crate::bot::DEFAULT_POLICY);
         let mut seat = Seat::new(4, 1.);
         seat.join(0., &commands, &latency, &mut random).unwrap();
         let _ = received.recv().unwrap();
@@ -1913,7 +1918,8 @@ mod tests {
         );
         seat.frames.push_back((0.1, overflow));
         seat.outbox = Some((0., Action::default(), 0.2));
-        seat.run(0.1, &commands, &latency, &mut random, 1.).unwrap();
+        seat.run(0.1, &commands, &latency, &mut random, 1., &mut policy)
+            .unwrap();
         assert!(seat.closed && seat.frames.is_empty() && seat.outbox.is_none());
         assert!(matches!(
             received.recv().unwrap(),
@@ -1926,9 +1932,10 @@ mod tests {
         let mut healthy = Seat::new(5, 1.);
         healthy.join(0.1, &commands, &latency, &mut random).unwrap();
         healthy
-            .run(0.1, &commands, &latency, &mut random, 1.)
+            .run(0.1, &commands, &latency, &mut random, 1., &mut policy)
             .unwrap();
-        seat.run(1., &commands, &latency, &mut random, 1.).unwrap();
+        seat.run(1., &commands, &latency, &mut random, 1., &mut policy)
+            .unwrap();
         assert!(!seat.closed);
         assert_eq!(seat.generation, 2);
         assert!(received.try_iter().any(|command| matches!(
@@ -2275,6 +2282,7 @@ mod tests {
         let (commands, received) = mpsc::channel();
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
+        let mut policy = ForagerBot::new(crate::bot::DEFAULT_POLICY);
         let mut seat = Seat::new(4, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         assert!(matches!(
@@ -2282,10 +2290,10 @@ mod tests {
             Command::Connect { generation: 1, .. }
         ));
         seat.close(0.2);
-        seat.run(1.19, &commands, &latency, &mut random, 0.042)
+        seat.run(1.19, &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
         assert!(received.try_recv().is_err());
-        seat.run(1.2, &commands, &latency, &mut random, 0.042)
+        seat.run(1.2, &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
         assert!(matches!(
             received.try_recv().unwrap(),
@@ -2294,10 +2302,10 @@ mod tests {
         // A second refusal starts a fresh delay from its actual receipt time,
         // including when the simulation has fallen behind the wall clock.
         seat.close(2.);
-        seat.run(2.99, &commands, &latency, &mut random, 0.042)
+        seat.run(2.99, &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
         assert!(received.try_recv().is_err());
-        seat.run(3., &commands, &latency, &mut random, 0.042)
+        seat.run(3., &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
         assert!(matches!(
             received.try_recv().unwrap(),
@@ -2308,7 +2316,7 @@ mod tests {
         let next_decision = seat.decide_at;
         seat.close(3.02);
         assert_eq!(seat.decide_at, next_decision);
-        seat.run(3.1, &commands, &latency, &mut random, 0.042)
+        seat.run(3.1, &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
         assert!(matches!(
             received.try_recv().unwrap(),
@@ -2443,6 +2451,7 @@ mod tests {
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         let mut bots = Bots {
             seats: vec![seat],
+            policy: ForagerBot::new(crate::bot::DEFAULT_POLICY),
             stride: 1,
             deliveries,
             commands,
@@ -2479,13 +2488,14 @@ mod tests {
             ..Default::default()
         };
         let mut random = Random::new(1);
+        let mut policy = ForagerBot::new(crate::bot::DEFAULT_POLICY);
         let mut seat = Seat::new(0, 0.042);
         seat.join(0.5, &commands, &latency, &mut random).unwrap();
         // A world catching up on ticks stamps the setup before the join.
         let mut frame = vec![0, 0];
         frame.extend(super::super::encode::setup(1000., 0.029).unwrap());
         seat.frames.push_back((0.1, frame));
-        seat.run(0.6, &commands, &latency, &mut random, 0.042)
+        seat.run(0.6, &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
         // A close while a command is processing cancels its departure, due
         // here before the next decision would rejoin.
@@ -2499,7 +2509,7 @@ mod tests {
             0.01,
         ));
         seat.close(0.6);
-        seat.run(0.7, &commands, &latency, &mut random, 0.042)
+        seat.run(0.7, &commands, &latency, &mut random, 0.042, &mut policy)
             .unwrap();
     }
 

@@ -1,47 +1,11 @@
-//! Seeks the nearest food. `cargo run --release --locked --example portable_bot -- --steps 200`
+//! Runs the shared A1 Forager policy. `cargo run --release --locked --example portable_bot -- --steps 200`
 use slither_sim::client::{
-    Backend, Bot, BotRunner, ClientFrame, ClientStatus, NetworkBackend, NetworkConfig,
-    SimulationConfig, SimulatorBackend,
+    Backend, BotRunner, ClientStatus, ForagerBot, NetworkBackend, NetworkConfig, SimulationConfig,
+    SimulatorBackend,
 };
-use slither_sim::{Action, Food, Point};
-
-#[derive(Default)]
-struct FoodBot {
-    target: Option<Point>,
-}
-impl Bot for FoodBot {
-    fn decide(&mut self, frame: &ClientFrame) -> Option<Action> {
-        let view = frame.observation.as_ref()?;
-        let head = view.me.head;
-        // Chase the same pellet until it disappears; turn inward near the wall.
-        self.target = if view.food.is_empty()
-            || head.distance(view.arena.center) >= view.arena.radius * 0.8
-        {
-            None
-        } else {
-            self.target
-                .filter(|p| view.food.iter().any(|food| food.point() == *p))
-                .or_else(|| {
-                    view.food
-                        .iter()
-                        .map(Food::point)
-                        .min_by(|a, b| head.distance(*a).total_cmp(&head.distance(*b)))
-                })
-        };
-        let target = self.target.unwrap_or(view.arena.center);
-        Some(Action {
-            heading: (target.y - head.y).atan2(target.x - head.x),
-            boost: false,
-        })
-    }
-    fn reset(&mut self) {
-        self.target = None;
-    }
-}
-
 fn run(backend: impl Backend, steps: usize, lives: u64) -> Result<(), String> {
     let mut runner = BotRunner::new(backend);
-    let mut bot = FoodBot::default();
+    let mut bot = ForagerBot::new(slither_sim::bot::DEFAULT_POLICY);
     let mut ended = 0;
     for step in 1..=steps {
         let frame = runner.step(&mut bot)?; // Observe, decide, then send the action.
