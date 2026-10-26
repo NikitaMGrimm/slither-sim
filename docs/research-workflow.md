@@ -333,6 +333,54 @@ raw inputs require local access. `local_capture.py` defaults to this near-server
 `--reference tests/fixtures/transport-official-reference.json` option retains the
 older home-route/collector envelope with its original labels and selection.
 
+`measure` also adds per-capture `viewStrata` (`transport-view-v1`); pooled and
+existing per-epoch statistics keep their original definitions. The frozen bins
+are 0, 1–2, 3–5, 6–10, 11–20 and 21+ cached peers, excluding self. Active-to-active
+gaps use the preceding frame's membership; setup, appearance/death and connection
+boundaries are censored. Exposure and decoded own/peer speed, high-speed (>9),
+near-boost (>=13.9), turning (wanted/heading separation > one angle byte) and size
+are time-weighted on server time. Report counts cover anchors, mass (including
+growth/tails), wanted-angle changes, food/prey families and incoming pongs. State
+fractions and own/peer report rates use snake-seconds; food/prey/pong rates use
+active seconds. These are workload proxies; wire turn direction is unavailable.
+
+The opt-in gate is separate from the four pooled gates:
+
+```sh
+uv run --locked --only-group tools python tools/fidelity/transport_parity.py compare tests/fixtures/transport-official-near-server.json outputs/transport.json --view-matched
+```
+
+Each candidate capture is compared with **each reference capture separately**;
+no batch pooling or best-match selection. A bin needs at least 30 active seconds
+and 20 complete stable one-server-second windows in both captures. Window
+coverage integrates causal membership, includes fully silent seconds and censors
+partial windows or any bin transition. Emission rate is total received frames
+divided by these whole seconds, rather than reciprocal median gap. Frames are
+assigned to half-open server-second windows. The <=9 ms fraction remains the
+original workload-dependent diagnostic and has no new threshold.
+
+The single mixture uses each candidate capture's **active exposure weights**,
+fixed across references. Every supported bin and the full mixture must pass;
+missing support is never renormalized away. Bins without exposure are still
+shown as inconclusive, but only positive candidate exposure affects mixture
+admission. Activity is screened in each bin before emission rate: unmatched
+bins are labelled `NOT ACTIVITY-MATCHED`, never passes. The provisional
+engineering thresholds in `transport_tolerances.json` have explanatory comments:
+rate difference <= max(2 frames/s, 20% of reference); mean peers <= max(0.5, 10%);
+mean speed <=1; state-fraction difference <=0.10; mean segments <= max(5, 25%);
+report rates <= max(0.5/snake-second, 25%); food/prey <= max(1/s, 25%); pongs
+<= max(0.5/s, 25%). They were declared before the new #144 replay, are not fitted
+to its outcomes, and have no calibrated false-reject or fidelity guarantee.
+
+View-mode exits: **0** all positive-exposure bins and all full mixtures pass
+against every reference capture; **1** any activity-matched rate failure
+(takes precedence over inconclusive bins); **2** invalid input; **3** otherwise
+inconclusive, including insufficient exposure, activity mismatch, no active
+exposure or a legacy reference/candidate lacking view bins. Partial weighted
+sums are labelled and cannot pass. Run the original command separately to
+retain the original pooled gate decisions and exit semantics; sparse-view
+results do not waive #144's cadence or delay failures.
+
 Frame cadence and the header-delta histogram expose batching. Anchor correction
 is `v_local * gap - 42` world units: local speed is nine anchor spacings divided
 by their duration, centered on the measured interval (four neighboring intervals

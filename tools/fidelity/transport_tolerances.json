@@ -23,5 +23,123 @@
       "spreadAllowance": 1,
       "comment": "Receipt-minus-server excess over a centered +/-600-frame minimum, unfiltered for both reference and candidate. Later batch-3 delay quantiles exceed batches 1-2; false-reject control is only the six-capture LOO check. Masked development/held-out summaries remain server characterization, not the default gate. No spread floor or absolute latency inference."
     }
+  },
+  "viewMatched": {
+    "comment": "Provisional engineering screening bounds, declared before replaying #144 with this gate. Not fitted to the sparse-view table or calibrated for false-reject probability. Each candidate/reference capture pair must satisfy every exposed bin and the same candidate-exposure mixture. No pooling across captures, no sparse waiver; <=9 ms is diagnostic only. See docs/research-workflow.md#transport-parity.",
+    "minimumSeconds": {
+      "value": 30,
+      "comment": "At least 30 active server seconds per bin in each capture, to reject momentary view visits. Engineering admission minimum, not independent sample size or a confidence guarantee."
+    },
+    "minimumWholeWindows": {
+      "value": 20,
+      "comment": "At least 20 complete stable server-second windows per bin per capture. Requires sustained support for emission rate, and retains fully silent windows. Not fitted from observed pass/fail outcomes."
+    },
+    "emissionRate": {
+      "absolute": 2,
+      "relative": 0.2,
+      "comment": "Two-sided whole-window mean frames/s difference <= max(2 frames/s, 20% of reference). Provisional material-regression screen, not an empirical official tolerance or fidelity claim. Applied to each bin and the fixed candidate-exposure mixture."
+    },
+    "activity": {
+      "meanPeers": {
+        "absolute": 0.5,
+        "relative": 0.1,
+        "comment": "Time-weighted cached peers; allow half a peer or 10% of reference to bound within-bin workload differences."
+      },
+      "ownSpeed": {
+        "absolute": 1,
+        "relative": 0,
+        "comment": "Mean decoded speed within 1 protocol speed unit; time-weighted per own/peer snake-second. Bounds declared independently of #144."
+      },
+      "ownFast": {
+        "absolute": 0.1,
+        "relative": 0,
+        "comment": "Absolute fraction difference <= 0.10 (10 percentage points). Fast is speed >9, boost proxy >=13.9, turning is wanted/heading separation > one angle byte; no boost command or turn direction is inferred."
+      },
+      "ownBoost": {
+        "absolute": 0.1,
+        "relative": 0,
+        "comment": "Absolute fraction difference <= 0.10 (10 percentage points). Fast is speed >9, boost proxy >=13.9, turning is wanted/heading separation > one angle byte; no boost command or turn direction is inferred."
+      },
+      "ownTurning": {
+        "absolute": 0.1,
+        "relative": 0,
+        "comment": "Absolute fraction difference <= 0.10 (10 percentage points). Fast is speed >9, boost proxy >=13.9, turning is wanted/heading separation > one angle byte; no boost command or turn direction is inferred."
+      },
+      "ownSegments": {
+        "absolute": 5,
+        "relative": 0.25,
+        "comment": "Mean cached body anchors within max(5, 25% of reference), to screen size-related activity differences; not a geometry/physics validation."
+      },
+      "ownAnchorsPerSnakeSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Decoded reports per own/peer snake-second within max(0.5, 25% of reference). Anchors count events; mass includes standalone, tail and growth-anchor mass; turn counts wanted-angle changes. Provisional workload screen."
+      },
+      "ownMassPerSnakeSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Decoded reports per own/peer snake-second within max(0.5, 25% of reference). Anchors count events; mass includes standalone, tail and growth-anchor mass; turn counts wanted-angle changes. Provisional workload screen."
+      },
+      "ownTurnChangesPerSnakeSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Decoded reports per own/peer snake-second within max(0.5, 25% of reference). Anchors count events; mass includes standalone, tail and growth-anchor mass; turn counts wanted-angle changes. Provisional workload screen."
+      },
+      "peerSpeed": {
+        "absolute": 1,
+        "relative": 0,
+        "comment": "Mean decoded speed within 1 protocol speed unit; time-weighted per own/peer snake-second. Bounds declared independently of #144."
+      },
+      "peerFast": {
+        "absolute": 0.1,
+        "relative": 0,
+        "comment": "Absolute fraction difference <= 0.10 (10 percentage points). Fast is speed >9, boost proxy >=13.9, turning is wanted/heading separation > one angle byte; no boost command or turn direction is inferred."
+      },
+      "peerBoost": {
+        "absolute": 0.1,
+        "relative": 0,
+        "comment": "Absolute fraction difference <= 0.10 (10 percentage points). Fast is speed >9, boost proxy >=13.9, turning is wanted/heading separation > one angle byte; no boost command or turn direction is inferred."
+      },
+      "peerTurning": {
+        "absolute": 0.1,
+        "relative": 0,
+        "comment": "Absolute fraction difference <= 0.10 (10 percentage points). Fast is speed >9, boost proxy >=13.9, turning is wanted/heading separation > one angle byte; no boost command or turn direction is inferred."
+      },
+      "peerSegments": {
+        "absolute": 5,
+        "relative": 0.25,
+        "comment": "Mean cached body anchors within max(5, 25% of reference), to screen size-related activity differences; not a geometry/physics validation."
+      },
+      "peerAnchorsPerSnakeSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Decoded reports per own/peer snake-second within max(0.5, 25% of reference). Anchors count events; mass includes standalone, tail and growth-anchor mass; turn counts wanted-angle changes. Provisional workload screen."
+      },
+      "peerMassPerSnakeSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Decoded reports per own/peer snake-second within max(0.5, 25% of reference). Anchors count events; mass includes standalone, tail and growth-anchor mass; turn counts wanted-angle changes. Provisional workload screen."
+      },
+      "peerTurnChangesPerSnakeSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Decoded reports per own/peer snake-second within max(0.5, 25% of reference). Anchors count events; mass includes standalone, tail and growth-anchor mass; turn counts wanted-angle changes. Provisional workload screen."
+      },
+      "foodPerSecond": {
+        "absolute": 1,
+        "relative": 0.25,
+        "comment": "Incoming logical packets/s within max(1, 25% of reference). Food families FbfwcC< and prey yj include events with unchanged net populations; ping load uses incoming pongs. Provisional workload bound, not packet scheduling calibration."
+      },
+      "preyPerSecond": {
+        "absolute": 1,
+        "relative": 0.25,
+        "comment": "Incoming logical packets/s within max(1, 25% of reference). Food families FbfwcC< and prey yj include events with unchanged net populations; ping load uses incoming pongs. Provisional workload bound, not packet scheduling calibration."
+      },
+      "pingPerSecond": {
+        "absolute": 0.5,
+        "relative": 0.25,
+        "comment": "Incoming logical packets/s within max(0.5, 25% of reference). Food families FbfwcC< and prey yj include events with unchanged net populations; ping load uses incoming pongs. Provisional workload bound, not packet scheduling calibration."
+      }
+    }
   }
 }

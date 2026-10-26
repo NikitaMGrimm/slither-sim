@@ -48,6 +48,28 @@ and held-out summaries remain separate characterization; the original dev-only
 envelope and held-out exceedance stay in the report as the first attempt. No raw
 gameplay bytes or absolute one-way-delay claims are included.
 
+The additive `viewStrata` fields pin **`transport-view-v1` / protocol 19** for
+those same six unfiltered captures, replayed from complete setup prefixes.
+`viewStrataProvenance` identifies the original fixture and measurement sources;
+all original pooled/per-capture summaries, masked/heldout cases and their labels
+remain unchanged. The new strata follow the
+[sparse-view reconstruction](../../research/fidelity/2026-10-26-sparse-view-cadence/REPORT.md)
+and [residual activity proxies](../../research/fidelity/2026-10-26-cadence-residual/REPORT.md).
+Per-bin counts, exposure, <=9 ms fractions and complete-window counts reconcile
+with the retained study outputs; 6–10-peer speed/boost/turn fractions also
+reconcile with the residual replay. This justifies the additive expectations;
+it supplies neither new empirical gate calibration nor independent server-model
+validation. Underexposed bins stay in the fixture and remain inconclusive.
+
+To reproduce with local access, run `transport_parity.py measure` on each pinned
+archive with `--summary-only`, check the capture SHA-256 and exact original
+`summary` equality, then append only that capture's `viewStrata`. Keep historical
+tool/provenance fields intact and identify the new tool, view module, decoder and
+census hashes separately in `viewStrataProvenance`. No raw bytes, endpoints or
+local paths are needed in the additive fields. The focused transport tests pin
+the unchanged original fixture digest and reconcile the committed study's
+per-capture selections, so regeneration alone cannot approve changed values.
+
 [`client-reporting-cadence-near-server.json`](client-reporting-cadence-near-server.json)
 pins clean server-header prey/HUD gaps from all six completed batches. Client
 simulation tests compare nominal prey/HUD periods with these medians, while

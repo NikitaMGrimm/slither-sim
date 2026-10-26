@@ -14,6 +14,9 @@
 
 ### Added
 
+- Offline transport measurement now includes view/activity strata and an opt-in
+  per-capture view-matched emission-rate gate, with explicit inconclusive results
+  for insufficient exposure or workload mismatches.
 - A retained [official food-interest pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-food-interest/REPORT.md):
   one avoidance abort ended the route after three completed slots, failing the
   frozen feasibility gate; no food-model change.
