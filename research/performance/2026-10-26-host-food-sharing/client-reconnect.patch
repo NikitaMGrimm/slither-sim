@@ -1,0 +1,34 @@
+--- a/examples/perf_baseline.rs
++++ b/examples/perf_baseline.rs
+@@ -460,6 +460,7 @@
+             Driver::Client(client) => json!({
+                 "world": client.world.definition(), "config": client.world.config(),
+                 "agents": client.agents, "simulation": simulation_definition(self)?,
++                "studyForcedReconnectSlotAtStart": client.id.starts_with("client-battledome-").then_some(0),
+                 "controller": Controller::Wander.definition(),
+                 "lifecycle": {"reconnect": "timed reconnect_slot after the client reports death; refused admissions wait refusalRetryDecisions",
+                     "operation": "reconnect admission plus step_all; controller and record drain excluded"},
+@@ -1476,11 +1477,18 @@
+             let admission_start = (measured && !args.trace).then(Instant::now);
+             let (mut reconnects, mut deferred) = (Vec::new(), Vec::new());
+             for (slot, frame) in current_frames.iter().enumerate() {
+-                if decision >= retry_at[slot]
+-                    && matches!(
+-                        frame.status,
+-                        ClientStatus::Dead | ClientStatus::Disconnected
+-                    )
++                // The study's steady Battledome window needs real admission work
++                // even when the growing arena has no naturally dead clients.
++                let forced = measured
++                    && decision == client.warmup_decisions
++                    && slot == 0
++                    && client.id.starts_with("client-battledome-");
++                if forced
++                    || (decision >= retry_at[slot]
++                        && matches!(
++                            frame.status,
++                            ClientStatus::Dead | ClientStatus::Disconnected
++                        ))
+                 {
+                     match backend.reconnect_slot(slot) {
+                         Ok(()) => reconnects.push(slot),

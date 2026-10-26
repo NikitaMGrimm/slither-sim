@@ -58,3 +58,10 @@ before measurements: a growing arena has no admission calls in that window.
 Preserve that failure. Freeze only client-fixture arena sizing in a shared
 overlay (size_to_population=false) with matching definition metadata; retain
 the admission gate. Socket profiles still use the current growing preset.
+
+That fixed-arena attempt also fails the admission gate; reject the overlay and
+keep the witness locally. Before any instruction pairs, define a controlled
+client fixture: explicitly reconnect slot zero once at the first measured
+Battledome decision. Record it in definition metadata and retain the gate.
+Both arms use that overlay and the current growing preset. This adds real
+admission work rather than relaxing the gate; it does not change runtime rules.
