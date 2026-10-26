@@ -17,6 +17,7 @@ use crate::Action;
 pub struct ForagerBot {
     policy: crate::bot::Forager,
     intents: Vec<crate::bot::Intent>,
+    pit: Option<(f64, Option<f64>)>,
 }
 
 impl ForagerBot {
@@ -25,6 +26,22 @@ impl ForagerBot {
         Self {
             policy: crate::bot::Forager::new(),
             intents: Vec::with_capacity(4096),
+            pit: None,
+        }
+    }
+
+    /// Supply local mode rules absent from stock protocol frames. The live
+    /// wall comes from each received observation, including radius updates.
+    pub fn with_world_rules(world: &crate::Config) -> Self {
+        Self {
+            pit: world.pit.as_ref().map(|pit| {
+                let reference = (world.dynamic_radius
+                    && world.spawn_radius.is_some()
+                    && world.min_score.is_some())
+                .then_some(world.radius);
+                (pit.radius, reference)
+            }),
+            ..Self::new()
         }
     }
     /// The kernel timing this adapter derives from a frame.
@@ -75,7 +92,13 @@ impl Bot for ForagerBot {
         let observation = frame.observation.as_ref()?;
         let timing = self.timing(frame);
         fill_intents(&mut self.intents, observation, &frame.received);
-        Some(self.policy.decide(observation, &timing, &self.intents))
+        let pit = self.pit.map(|(radius, reference)| {
+            radius * reference.map_or(1., |base| observation.arena.radius / base)
+        });
+        Some(
+            self.policy
+                .decide_with_pit(observation, &timing, &self.intents, pit),
+        )
     }
 }
 

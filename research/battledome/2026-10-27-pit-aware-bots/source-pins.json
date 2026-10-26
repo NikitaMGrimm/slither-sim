@@ -1,0 +1,11 @@
+{
+  "codeCommit": "ba723fec5c8dd62c1cd639dc374f0d0390314255",
+  "baseCommit": "f8bcf5a6da256e4f3c02727f1d23172159249a32",
+  "sourceManifestSha256": "9e48636fec6e301627b9fefb8cfdbcc4e1ba400e8370ddb6922ce64b79ed8ba4",
+  "frozenPlanSha256": "cb8f2cac622ba1f6c7ea6298a19bbb88392329bfa5dc32902f0730003b1bb03d",
+  "fixtureSha256": "f71ac4820cf86fc5b8aa39e7574daeafeab9cce1851f5326e38c907c464a6e24",
+  "runnerSha256": "be4f4aecceced728070115608ad0fb56ddda50d728ce257e975c7bb753932eb2",
+  "binarySha256": "c9a456207e65667710666ce7cb1a3886b9134d8a04e38ace1b51568a4ae950ba",
+  "localEvidence": "outputs/pit-redesign (local-only; not downloadable)",
+  "attemptsSha256": "53f6abe7e539045edb88abf5d5f5c07357ecd0e97b09b221a4f227058aadd8da"
+}

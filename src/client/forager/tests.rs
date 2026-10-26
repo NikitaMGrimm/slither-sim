@@ -20,6 +20,40 @@ fn backend(round_trip: f64) -> SimulatorBackend {
 }
 
 #[test]
+fn local_pit_rules_follow_live_wall_and_leave_pitless_decisions_unchanged() {
+    let mut backend = backend(0.);
+    backend.advance_ticks(1).unwrap();
+    let mut frame = backend.frame_for(0).unwrap();
+    let o = frame.observation.as_mut().unwrap();
+    o.opponents.clear();
+    o.food.clear();
+    o.prey.clear();
+    o.arena.radius = 3584.;
+    o.me.head = crate::Point { x: 2200., y: 0. };
+    o.me.heading = std::f64::consts::FRAC_PI_2;
+    o.me.body = vec![o.me.head];
+    let plain = ForagerBot::new().decide(&frame);
+    assert_eq!(
+        ForagerBot::with_world_rules(&Config::official(4)).decide(&frame),
+        plain
+    );
+    let mut rules = Config::battledome();
+    let mut pit_bot = ForagerBot::with_world_rules(&rules);
+    let inward = pit_bot.decide(&frame).unwrap();
+    assert!(inward.heading.cos() < -0.5, "{inward:?}");
+    // With a doubled live wall this same head is inside the live pit. Its
+    // ordinary tangent is safe there; a fixed reference pit would still enter.
+    frame.observation.as_mut().unwrap().arena.radius *= 2.;
+    let inside = pit_bot.decide(&frame).unwrap();
+    assert!(inside.heading.cos().abs() < 0.1, "{inside:?}");
+    rules.dynamic_radius = false;
+    assert_eq!(
+        ForagerBot::with_world_rules(&rules).decide(&frame),
+        Some(inward)
+    );
+}
+
+#[test]
 fn adapter_checks_lifecycle_and_keeps_no_state_between_decisions() {
     let mut backend = backend(0.1);
     let mut bots: Vec<_> = (0..4).map(|_| ForagerBot::new()).collect();
