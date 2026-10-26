@@ -105,18 +105,15 @@ const CHALLENGE_LITERAL: (&[u8; 5], &[u8; 22]) = (b"Slith", b"erSimLocalHostChal
 /// Real-time host configuration.
 ///
 /// `simulation.agents` and `simulation.controlledSlot` are derived: the world
-/// has `maxClients` socket slots followed by `bots` background seekers, and no
+/// has `players.max` socket slots followed by `bots.count` background seekers, and no
 /// in-process controlled slot. Values given for those two fields are replaced.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 pub struct HostConfig {
     pub bind: SocketAddr,
     pub seed: u32,
-    pub max_clients: usize,
-    pub bots: usize,
-    /// Threads that run the background seekers, apart from the simulation and
-    /// socket threads.
-    pub bot_threads: usize,
+    pub players: PlayerConfig,
+    pub bots: BotConfig,
     pub simulation: SimulationConfig,
 }
 
@@ -125,10 +122,47 @@ impl Default for HostConfig {
         Self {
             bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, DEFAULT_PORT)),
             seed: 1,
-            max_clients: 4,
-            bots: 4,
-            bot_threads: 2,
+            players: PlayerConfig::default(),
+            bots: BotConfig::default(),
             simulation: SimulationConfig::default(),
+        }
+    }
+}
+
+/// Socket player slots and artificial server-side link delay.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+pub struct PlayerConfig {
+    pub max: usize,
+    /// Players already incur their own compute time; processing must be zero.
+    pub latency: LatencyConfig,
+}
+
+impl Default for PlayerConfig {
+    fn default() -> Self {
+        Self {
+            max: 4,
+            latency: LatencyConfig::default(),
+        }
+    }
+}
+
+/// Built-in bot slots, workers, and modeled link and processing delay.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+pub struct BotConfig {
+    pub count: usize,
+    /// Workers apart from the simulation and socket threads.
+    pub threads: usize,
+    pub latency: LatencyConfig,
+}
+
+impl Default for BotConfig {
+    fn default() -> Self {
+        Self {
+            count: 4,
+            threads: 2,
+            latency: LatencyConfig::default(),
         }
     }
 }
@@ -145,21 +179,39 @@ impl HostConfig {
 
     fn world_config(&self) -> Result<SimulationConfig, String> {
         let agents = self
-            .max_clients
-            .checked_add(self.bots)
-            .ok_or("maxClients + bots must fit in usize")?;
-        if self.max_clients == 0 {
-            return Err("Host needs 1 or more maxClients".into());
+            .players
+            .max
+            .checked_add(self.bots.count)
+            .ok_or("players.max + bots.count must fit in usize")?;
+        if self.players.max == 0 {
+            return Err("Host needs 1 or more players.max".into());
         }
-        if self.bots > 0 && self.bot_threads == 0 {
-            return Err("Bots need 1 or more botThreads".into());
+        if self.bots.count > 0 && self.bots.threads == 0 {
+            return Err("Bots need 1 or more bots.threads".into());
         }
         if self.simulation.record_wire {
             return Err("The host does not retain wire records; set recordWire to false".into());
         }
+        if self.simulation.latency != LatencyConfig::default() {
+            return Err("Host simulation.latency must stay at its default; use players.latency or bots.latency".into());
+        }
+        if self.players.latency.processing_seconds != [0.; 2]
+            || self.players.latency.processing_jitter_seconds != 0.
+        {
+            return Err("players.latency.processingSeconds and processingJitterSeconds must be zero; socket players incur their own compute time".into());
+        }
+        self.players
+            .latency
+            .validate()
+            .map_err(|e| format!("players.latency: {e}"))?;
+        self.bots
+            .latency
+            .validate()
+            .map_err(|e| format!("bots.latency: {e}"))?;
         let mut config = SimulationConfig {
             agents,
             controlled_slot: 0,
+            latency: self.bots.latency.clone(),
             ..self.simulation.clone()
         };
         // A dynamic arena follows its living population, but presets and
@@ -325,15 +377,20 @@ impl Host {
         let latency = simulation.latency.clone();
         let decision_seconds = simulation.decision_ticks as f64 * simulation.world.dt;
         // Bots are clients of their own slots, like sockets.
-        let world = RawSimulator::new(config.seed, simulation, config.max_clients + config.bots)?;
+        let mut world = RawSimulator::new(
+            config.seed,
+            simulation,
+            config.players.max + config.bots.count,
+        )?;
+        world.set_player_latency(config.players.max, config.players.latency);
         let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         Ok(Self {
             listener,
             world,
-            max_clients: config.max_clients,
-            bots: config.bots,
-            bot_threads: config.bot_threads.min(config.bots),
+            max_clients: config.players.max,
+            bots: config.bots.count,
+            bot_threads: config.bots.threads.min(config.bots.count),
             seed: config.seed,
             latency,
             decision_seconds,
@@ -1954,8 +2011,14 @@ mod tests {
         if let Ok(mode) = std::env::var(CHILD) {
             let mut config = HostConfig {
                 bind: "127.0.0.1:0".parse().unwrap(),
-                max_clients: 1,
-                bots: 0,
+                players: PlayerConfig {
+                    max: 1,
+                    ..Default::default()
+                },
+                bots: BotConfig {
+                    count: 0,
+                    ..Default::default()
+                },
                 ..Default::default()
             };
             config.simulation.world = crate::Config::sandbox();
@@ -2024,7 +2087,7 @@ mod tests {
     fn a_default_host_admits_every_seat() {
         let host = HostConfig::default();
         let config = host.world_config().unwrap();
-        let seats = host.max_clients + host.bots;
+        let seats = host.players.max + host.bots.count;
         let official = crate::Config::official(seats);
         assert_eq!(config.world.radius, official.radius);
         // The area scale floors 109 pellets × 8 rather than the 877.4 target.
@@ -2038,6 +2101,74 @@ mod tests {
         let mut world = RawSimulator::new(host.seed, config, seats).unwrap();
         for slot in 0..seats {
             world.connect(slot, PlayerAppearance::default()).unwrap();
+        }
+    }
+
+    #[test]
+    fn host_player_and_bot_links_schedule_independently() {
+        // Clock the actual host's world manually: slots 0 and 1 are a socket
+        // player and a hosted bot, without wall-clock or socket jitter.
+        for rtts in [[0.084, 0.], [0., 0.084]] {
+            let config = HostConfig {
+                bind: "127.0.0.1:0".parse().unwrap(),
+                players: PlayerConfig {
+                    max: 1,
+                    latency: LatencyConfig::fixed(rtts[0]),
+                },
+                bots: BotConfig {
+                    count: 1,
+                    latency: LatencyConfig {
+                        processing_seconds: [0.03, 0.03],
+                        ..LatencyConfig::fixed(rtts[1])
+                    },
+                    ..Default::default()
+                },
+                simulation: SimulationConfig {
+                    world: crate::Config::sandbox(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let host = Host::bind(config.clone()).unwrap();
+            assert_eq!(host.latency, config.bots.latency);
+            let mut world = host.world;
+            for slot in 0..2 {
+                assert!(world.connect(slot, PlayerAppearance::default()).unwrap());
+            }
+            // Both setup and subsequent pongs traverse uplink and downlink.
+            let mut tick = 0;
+            for packet_type in *b"ap" {
+                let sent = tick as f64 * world.dt();
+                if packet_type == b'p' {
+                    for slot in 0..2 {
+                        world.receive_at(slot, &[251], sent).unwrap();
+                    }
+                }
+                let mut arrivals = [None; 2];
+                for _ in 0..20 {
+                    world.advance_tick_with(0, &mut |_| Ok(())).unwrap();
+                    tick += 1;
+                    for (slot, arrival) in arrivals.iter_mut().enumerate() {
+                        for (at, bytes) in world.take(slot).unwrap() {
+                            if protocol::split_frame(&bytes)
+                                .unwrap()
+                                .iter()
+                                .any(|p| p[0] == packet_type)
+                            {
+                                assert!(arrival.replace(at).is_none());
+                            }
+                        }
+                    }
+                }
+                for (slot, arrival) in arrivals.into_iter().enumerate() {
+                    let delay = arrival.expect("setup or pong") - sent;
+                    assert!(delay >= rtts[slot] - 1e-9, "slot {slot}: {delay}");
+                    assert!(
+                        delay <= rtts[slot] + world.dt() + 1e-9,
+                        "slot {slot}: {delay}"
+                    );
+                }
+            }
         }
     }
 
@@ -2807,11 +2938,22 @@ mod tests {
     #[test]
     fn overflowing_client_and_bot_counts_are_errors() {
         let config = HostConfig {
-            max_clients: usize::MAX,
-            bots: 1,
+            players: PlayerConfig {
+                max: usize::MAX,
+                ..Default::default()
+            },
+            bots: BotConfig {
+                count: 1,
+                ..Default::default()
+            },
             ..HostConfig::default()
         };
-        assert!(config.validate().unwrap_err().contains("maxClients + bots"));
+        assert!(
+            config
+                .validate()
+                .unwrap_err()
+                .contains("players.max + bots.count")
+        );
     }
 
     #[test]

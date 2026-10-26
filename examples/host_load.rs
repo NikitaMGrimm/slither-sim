@@ -11,7 +11,10 @@
 //! load and deferred ticks show whether one core keeps up.
 use slither_sim::{
     Config,
-    client::{Host, HostConfig, LatencyConfig, SimulationConfig, network::login_packet},
+    client::{
+        BotConfig, Host, HostConfig, LatencyConfig, PlayerConfig, SimulationConfig,
+        network::login_packet,
+    },
 };
 use std::{
     process::ExitCode,
@@ -67,12 +70,17 @@ fn run(options: Options) -> Result<(), String> {
     );
     let config = HostConfig {
         bind: "127.0.0.1:0".parse().map_err(|_| "bad address")?,
-        max_clients: 1,
-        bots: options.bots,
-        bot_threads: options.bot_threads,
+        players: PlayerConfig {
+            max: 1,
+            latency: LatencyConfig::fixed(options.round_trip),
+        },
+        bots: BotConfig {
+            count: options.bots,
+            threads: options.bot_threads,
+            latency: LatencyConfig::fixed(options.round_trip),
+        },
         simulation: SimulationConfig {
             world: Config::official(options.bots + 1),
-            latency: LatencyConfig::fixed(options.round_trip),
             ..Default::default()
         },
         ..Default::default()

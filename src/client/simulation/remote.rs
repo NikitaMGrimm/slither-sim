@@ -1,10 +1,11 @@
 //! Raw remote slots sharing the native backend's world and scheduler.
 use super::{
-    EarlyFrames, MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT,
+    EarlyFrames, MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, PlayerLatency, REMOTE_IN_FLIGHT,
     SimulationConfig, SimulatorBackend, client_message,
     connection::{Connection, Uplink},
 };
 use crate::Action;
+use crate::client::LatencyConfig;
 
 /// One shared world whose leading slots are external protocol-19 clients.
 ///
@@ -20,6 +21,11 @@ pub(crate) struct RawSimulator {
 }
 
 impl RawSimulator {
+    /// Called by the host before any slots connect; bot slots keep config.latency.
+    pub(crate) fn set_player_latency(&mut self, slots: usize, config: LatencyConfig) {
+        self.backend.player_latency = PlayerLatency { slots, config };
+    }
+
     pub(crate) fn new(
         seed: u32,
         config: SimulationConfig,
