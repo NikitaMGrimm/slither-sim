@@ -339,6 +339,11 @@ impl Config {
     /// Startup capacity policy, independent of later boundary motion:
     /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
     pub(crate) fn size_for_population(&mut self, population: usize) {
+        // Circular seat-following keeps radius/pit/spawn settings as reference
+        // geometry. Scaling them here would move the controller's base too.
+        if self.dynamic_radius && self.spawn_radius.is_some() && self.min_score.is_some() {
+            return;
+        }
         let radius = population_radius(population);
         if self.size_to_population && self.radius > 0. && self.radius < radius {
             let (food, rate, prey) = self.ecology_at_radius(radius);
@@ -346,6 +351,27 @@ impl Config {
             self.food_count = food;
             self.ambient_replenish_per_second = rate;
             self.prey.count = prey;
+        }
+    }
+
+    /// Circular arenas keep their reference size through 32 occupied seats.
+    /// Above it, add perimeter and band area for complete newborn bodies and
+    /// departure room using the existing radius controller.
+    /// Custom mode choice: research/battledome/2026-10-26-spawn-capacity/REPORT.md.
+    pub(crate) fn seat_radius(&self, seats: usize) -> f64 {
+        if self.dynamic_radius && self.spawn_radius.is_some() && self.min_score.is_some() {
+            (self.radius * (1. + 1.5 * (seats.max(32) as f64 / 32. - 1.)))
+                .min(checkpoint::MAGNITUDE)
+        } else {
+            population_radius(seats)
+        }
+    }
+
+    pub(crate) fn circular_scale(&self, radius: f64) -> f64 {
+        if self.dynamic_radius && self.spawn_radius.is_some() && self.min_score.is_some() {
+            radius / self.radius
+        } else {
+            1.
         }
     }
 
@@ -438,7 +464,7 @@ impl Config {
         }
     }
 
-    /// Battledome: official physics in a fixed 3584-unit arena,
+    /// Battledome: official physics in a seat-following, initially 3584-unit arena,
     /// with a one-way pit of radius 1784, spawns in an outer band, a
     /// 15-minute kill score, a 400-point size floor and no prey. See docs/configuration.md#battledome.
     pub fn battledome() -> Self {
@@ -447,7 +473,7 @@ impl Config {
         let (food_count, ambient_replenish_per_second) = official_food(RADIUS);
         Self {
             radius: RADIUS,
-            dynamic_radius: false,
+            dynamic_radius: true,
             size_to_population: false,
             food_count,
             // Design choice: death/boost food already feeds snakes, so it also
@@ -985,8 +1011,8 @@ impl Simulator {
             // A ring life lies along the ring, counterclockwise.
             Some(distance) => self.spawn_body(
                 Point {
-                    x: a.cos() * distance,
-                    y: a.sin() * distance,
+                    x: a.cos() * distance * self.config.circular_scale(self.radius),
+                    y: a.sin() * distance * self.config.circular_scale(self.radius),
                 },
                 a + FRAC_PI_2,
             )?,
@@ -1326,6 +1352,7 @@ impl Simulator {
             .at_slot(index));
         }
         self.check_join().map_err(|e| e.at_slot(index))?;
+        let pit_entered = self.initial_pit_entry(body[0], true);
         let s = &mut self.snakes[index];
         s.head = body[0];
         s.segments = body.len();
@@ -1341,7 +1368,7 @@ impl Simulator {
         self.boosts[index] = Boost::default();
         self.speeds[index] = SpeedState::idle(s.speed);
         self.kiosks[index] = KioskState::default();
-        self.pit_entered[index] = false;
+        self.pit_entered[index] = pit_entered;
         self.death_times[index] = None;
         self.joins[index] = self.next_join;
         self.next_join += 1;
@@ -1358,6 +1385,47 @@ impl Simulator {
             .zip(&self.death_times)
             .filter(|(snake, death)| snake.alive || death.is_some())
             .count()
+    }
+
+    /// Live pit geometry; circular seat-following scales it with the wall so
+    /// its minimap position and the stock player's own marker agree.
+    pub fn pit_radius(&self) -> Option<f64> {
+        self.config
+            .pit
+            .as_ref()
+            .map(|pit| pit.radius * self.config.circular_scale(self.radius))
+    }
+
+    fn initial_pit_entry(&self, head: Point, alive: bool) -> bool {
+        // Moving pits count physical entry, so a life explicitly initialized
+        // inside must start entered. Outside newborns are not trapped when
+        // growth carries the pit over them. Fixed worlds retain their rules.
+        alive
+            && self.config.dynamic_radius
+            && self.config.min_score.is_some()
+            && self
+                .pit_radius()
+                .is_some_and(|pit| head.distance_lt(Point::default(), pit))
+    }
+
+    /// Give queued host seats room before searching, without saving a second
+    /// population/controller state. Shrink still belongs to update_radius.
+    #[cfg(feature = "networking")]
+    /// False leaves the radius untouched when a recent host birth holds growth.
+    pub(crate) fn grow_for_seats(&mut self, seats: usize, allowance: f64, permitted: bool) -> bool {
+        if self.config.dynamic_radius
+            && self.config.spawn_radius.is_some()
+            && self.config.min_score.is_some()
+        {
+            let target = (self.config.seat_radius(seats) * allowance).min(checkpoint::MAGNITUDE);
+            if target - self.radius > RADIUS_DEAD_ZONE * self.radius {
+                if !permitted {
+                    return false;
+                }
+                self.radius = target;
+            }
+        }
+        true
     }
     /// Advance one physics tick (`config.dt`, the 7 ms server loop by default).
     /// Actions use stable spawn slots; dead slots may be None. Rejected actions
@@ -1439,7 +1507,9 @@ impl Simulator {
         if let Some(events) = &mut self.food_spawn_events {
             events.clear();
         }
+        let previous_pit_radius = self.pit_radius();
         self.update_radius(self.time + self.config.dt);
+        let pit_radius = self.pit_radius();
         let mut buffers = std::mem::take(&mut self.buffers);
         let StepBuffers {
             alive,
@@ -1584,14 +1654,24 @@ impl Simulator {
             s.head = head;
             if lethal {
                 boundary_deaths.push((i, DeathReason::Boundary));
-            } else if let Some(pit) = &c.pit {
+            } else if let Some(pit) = pit_radius {
                 // A mode rule, not an official mechanic: docs/configuration.md#battledome.
                 // The swept head-center path counts, so the rule does not depend on
                 // dt: crossing the pit or clipping its edge within a tick also kills.
+                // Growth overtaking a head is not physical entry. The existing
+                // entry bit keeps engulfed newborns free to leave, while lives
+                // initialized inside and later inward crossings remain one-way.
+                // research/battledome/2026-10-26-spawn-capacity/REPORT.md
+                let can_enter = !c.dynamic_radius
+                    || c.min_score.is_none()
+                    || !previous[i].distance_lt(
+                        Point::default(),
+                        pit.max(previous_pit_radius.unwrap_or(pit)),
+                    );
                 let touched =
-                    self.pit_entered[i] || reaches_center(previous[i], s.head, pit.radius);
+                    self.pit_entered[i] || (can_enter && reaches_center(previous[i], s.head, pit));
                 if touched {
-                    if s.head.distance_lt(Point::default(), pit.radius) {
+                    if s.head.distance_lt(Point::default(), pit) {
                         self.pit_entered[i] = true;
                     } else {
                         boundary_deaths.push((i, DeathReason::Pit));
@@ -1965,7 +2045,7 @@ impl Simulator {
         // research/fidelity/2026-10-26-arena-radius/SEAT-FOLLOWING.md
         let previous = self.radius;
         if self.config.dynamic_radius {
-            let target = population_radius(self.occupied());
+            let target = self.config.seat_radius(self.occupied());
             if (target - self.radius).abs() > RADIUS_DEAD_ZONE * self.radius {
                 // Expansion gives joining players room without a multi-minute
                 // wait. Shrink stays slower than ordinary snake movement.

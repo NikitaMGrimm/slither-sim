@@ -168,6 +168,7 @@ impl SimulatorBackend {
             for slot in 0..config.agents {
                 world.retire(slot).map_err(|error| error.to_string())?;
             }
+            world.grow_for_seats(population, 1., true);
         }
         world.record_events(crate::EventRecording {
             pickups: true,

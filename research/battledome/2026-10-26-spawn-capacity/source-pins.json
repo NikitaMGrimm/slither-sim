@@ -1,0 +1,83 @@
+{
+  "studyBase": "901b02e2e71144c6ffd35291ddb6603b2c6a1ca7",
+  "measurement": {
+    "baseCommit": "150d4b1b70f7ebf0447cde70e9daa97aa69d3bc1",
+    "productionManifest": {
+      "localFile": "outputs/spawn-capacity/pruned-record-c1ccde1/measured-source-manifest.json",
+      "sha256": "092b112e76f077b6c6490b20232ef4c5d590abe7058c4f75bdc4e14e2b459a1f"
+    },
+    "instrumentedSnapshot": {
+      "localFile": "outputs/spawn-capacity/delivery-source.json",
+      "sha256": "5a24ed9dfe58b742e1b560cc20f1371821a867c264febec3f7b068d47899b9ff"
+    },
+    "binary": {
+      "localFile": "outputs/spawn-capacity/comparison-delivery.exe",
+      "sha256": "1744d6490002686eae43f70067a957b90bfe23f035e1e3dad2c57ad97b754e98"
+    }
+  },
+  "rejectedA": {
+    "baseCommit": "249cdb217d83a234895bc7eee4d98c3636c1cd76",
+    "instrumentedSnapshot": {
+      "localFile": "outputs/spawn-capacity/corrected-comparison-source.json",
+      "sha256": "102685d589382d44e575bfd9e86388ec5d031664b2c457d8b6d20406be7ad7e2"
+    },
+    "binary": {
+      "localFile": "outputs/spawn-capacity/comparison-corrected.exe",
+      "sha256": "078911bbb6eafe6339e79f547b36d8ca18fff7237529f6d97cc0a38da358c7a9"
+    }
+  },
+  "delivered": {
+    "implementationCommit": "c1ccde16aa6efc48442c985eb369eabda214c856",
+    "baseCommit": "3a23dc9e130b2ff84100faf71645f655242e6ed4",
+    "productionManifest": {
+      "localFile": "outputs/spawn-capacity/pruned-record-c1ccde1/delivered-source-manifest.json",
+      "sha256": "f65a3ded2b3323693ed4376794fba8c8d5feb8def80b42d3ea9e205b811e457b"
+    },
+    "scope": "Original admission implementation; the shrink-presentation follow-up is separately pinned."
+  },
+  "harness": {
+    "probeSha256": "7c1bad04632d16d9a08b6e5fb8a91d13b8a74d4ea60a50b6bdfbd7908f56683c",
+    "telemetry": {
+      "localFile": "outputs/spawn-capacity/delivery-telemetry.rs",
+      "sha256": "cebbf916bc097b18cb1e7e31451625618ed92f8f04f21b1715838a72ee5b18cd"
+    },
+    "runner": {
+      "localFile": "outputs/spawn-capacity/run-delivery.py",
+      "sha256": "379fd70311743f6f029c41c10d8ec86df1d1ac4c3b0e2eead00de89cf2ddec0f"
+    },
+    "analyzer": {
+      "localFile": "outputs/spawn-capacity/summarize-delivery.py",
+      "sha256": "366a155834c092fbc8ea3f5c7f3c1f6fb3cb957fd808ee463a3f81290c3f8a5b"
+    }
+  },
+  "planSha256": "1b8c7d466ececc75b6ea1aeb075e8f08a422528859781724308bd03df450286b",
+  "affinityVerification": {
+    "localFile": "outputs/spawn-capacity/pruned-record-c1ccde1/selected-affinity.json",
+    "sha256": "afc5411613718d59ff174bd2408baac1b091806061e49bd4221991aa8dc41f84"
+  },
+  "fullSourcePins": {
+    "localFile": "outputs/spawn-capacity/pruned-record-c1ccde1/source-pins.json",
+    "sha256": "4907a87418048d1e429fcd5fd70c5fac2f8b98f5b3bb862b7aaa91e9100c5334"
+  },
+  "build": {
+    "rustc": "1.99.0",
+    "platform": "Windows x86-64",
+    "profile": "release/thin LTO",
+    "command": "cargo build --release --locked --example spawn_capacity",
+    "env": {
+      "CARGO_BUILD_JOBS": "2",
+      "RAYON_NUM_THREADS": "2",
+      "RUST_TEST_THREADS": "2"
+    }
+  },
+  "access": "Full source snapshots, manifests, binaries and raw runs are local-only; hashes identify them without making them downloadable.",
+  "shrinkFollowUp": {
+    "baseCommit": "202d2caf7ed6046582e49a446e3f7f78a362936f",
+    "manifest": {
+      "localFile": "outputs/spawn-capacity/shrink-phase/evidence-pins.json",
+      "sha256": "b3a8dd0f5486379866f4e2b082ee4375d7402162449e3f1000701da7d4d6d91a"
+    },
+    "fixtureSha256": "a8956ac54a28661f400bc7c9b0f271cb10675147bd66fd1b93f23a67f1921a80",
+    "candidateSourceSha256": "3d7d8e96e7163d5b3bc215a53f748199b284a8c6fbbccc969ae1b786dca6467c"
+  }
+}

@@ -1077,12 +1077,14 @@ fn old_rules_revision_is_rejected_atomically_without_changing_the_format() {
     let mut incumbent = world();
     let mut old = value(&incumbent);
     assert_eq!(old["format"], "slither-sim-checkpoint-v2");
-    assert_eq!(old["rulesRevision"], "slither-sim-rules-v2");
-    old["rulesRevision"] = json!("slither-sim-rules-v1");
-    let error = rejects_atomic(&mut incumbent, &old);
-    assert!(matches!(
-        error.kind,
-        ErrorKind::UnsupportedCheckpoint { .. }
-    ));
-    assert_eq!(error.field.as_deref(), Some("rulesRevision"));
+    assert_eq!(old["rulesRevision"], "slither-sim-rules-v3");
+    for revision in ["slither-sim-rules-v1", "slither-sim-rules-v2"] {
+        old["rulesRevision"] = json!(revision);
+        let error = rejects_atomic(&mut incumbent, &old);
+        assert!(matches!(
+            error.kind,
+            ErrorKind::UnsupportedCheckpoint { .. }
+        ));
+        assert_eq!(error.field.as_deref(), Some("rulesRevision"));
+    }
 }

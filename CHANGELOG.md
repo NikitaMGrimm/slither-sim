@@ -25,6 +25,19 @@
   500/80-client socket hosts, retain ten state traces, and run both runtimes with
   the head workload configuration. Manual calibration retains CPU/wall noise.
 
+### Changed
+
+- **Breaking:** Battledome grows above 32 players so every spawn still passes
+  the strict safety checks. Wall, pit and spawn band scale together, reaching
+  3.25 times the base radius at 80 seats; a spawn queue waiting 2–4 seconds gets
+  up to twice that. Games of 16–32 players are unchanged. In local runs at 80
+  seats everyone spawned within 0.6 s and spawn search fell from 1.7 ms to under
+  0.01 ms per tick ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)). When the growing pit passes over a snake
+  that hasn't entered it, the snake can still leave. `dynamicRadius: false` keeps
+  the fixed arena ([configuration](docs/configuration.md#battledome)).
+- **Breaking:** checkpoints use rules revision `slither-sim-rules-v3` and reject
+  v1/v2. Frame `rules.pitRadius` follows the live pit in Battledome.
+
 ### Performance
 
 - Host broadcasts test prey against shared bounding boxes before the exact

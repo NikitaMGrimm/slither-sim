@@ -4,10 +4,11 @@ use crate::{client::encode, model::Point};
 use std::{collections::BTreeMap, f64::consts::TAU};
 
 #[derive(Default)]
-pub(super) struct PitMarkers(BTreeMap<u16, Vec<([u8; 2], KnownFood)>>);
+pub(super) struct PitMarkers(BTreeMap<u16, Vec<([u8; 2], KnownFood)>>, f64);
 
 impl PitMarkers {
     pub(super) fn new(radius: f64) -> Result<Self, String> {
+        let pit_radius = radius;
         // Local design choices, not measurements: roughly 15 units between
         // centers, 3 units outside the lethal edge, palette 8, size byte 31
         // (6.2 decoded). The offset exceeds food-grid rounding error (~0.83).
@@ -41,7 +42,21 @@ impl PitMarkers {
                     },
                 ));
         }
-        Ok(Self(sectors))
+        Ok(Self(sectors, pit_radius))
+    }
+
+    pub(super) fn radius(&self) -> f64 {
+        self.1
+    }
+
+    pub(super) fn needs_update(&self, radius: f64) -> bool {
+        // A shrinking edge may leave decorations at most one radial food cell
+        // outward, avoiding a rebuild and recipient diffs every 7 ms. Growth
+        // past the cached edge refreshes immediately so the ring stays outside.
+        // Protocol-19 food coordinates have 256 offsets per sector.
+        let cell = f64::from(encode::SECTOR_SIZE) / 256.;
+        let previous = self.radius();
+        radius > previous || (radius / cell).floor() != (previous / cell).floor()
     }
 
     pub(super) fn overlay(
