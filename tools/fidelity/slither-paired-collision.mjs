@@ -263,7 +263,9 @@ export class CollisionBot extends Bot {
     }
   }
   drive(control, now) {
-    if (this.world.dead || this.ws?.readyState !== 1) return;
+    // Like Bot.tick, stay silent until our snake exists. Official servers close
+    // a socket that pings before the challenge; the loopback host tolerates it.
+    if (this.world.dead || this.ws?.readyState !== 1 || !this.world.snakes.has(this.world.self)) return;
     this.ping(now);
     if (!control) return;
     const encoded = Math.round(251 * ((control.heading % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI)) % 251;

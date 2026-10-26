@@ -23,7 +23,10 @@ time, retaining failures with `population: null`. Record the first leaderboard
 within 10 seconds; close and await close before the next scout. Every scout
 sends `Origin: http://slither.io`: official servers closed all five Origin-less
 scouts of 2026-10-26 before any frame. The preparer binds the same Origin into
-the plan unless `--origin` overrides it. `listedIndex`
+the plan unless `--origin` overrides it. A repeat with the Origin still closed
+after login. Its collision bot had pinged before the challenge, which the
+loopback host tolerates and the headless collector never does; it now stays
+silent until its snake exists. `listedIndex`
 is the index in the full decoded list. Population ranks ascending, then list
 index; require at most 100. The preparer checks this normalized selection's
 ordering, bounds and digests; the collector must independently verify its
