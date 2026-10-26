@@ -183,6 +183,7 @@ enum Registration {
     Legacy(Legacy, Operation),
     Scenario(Scenario),
     Client(ClientScenario),
+    SharedPolicy(Operation),
 }
 
 /// New sample sizes target roughly one second per release sample on the development machine.
@@ -293,6 +294,7 @@ static REGISTRATIONS: &[Registration] = &[
         refusal_retry_decisions: 1,
         operation: op(25, 1, Full),
     }),
+    Registration::SharedPolicy(op(500, 16, Full)),
 ];
 
 #[derive(Clone, Copy)]
@@ -303,12 +305,15 @@ enum Driver {
         bot: bool,
     },
     Client(&'static ClientScenario),
+    SharedPolicy,
 }
 
 impl Driver {
     fn mode(self) -> &'static str {
         match self {
-            Driver::Legacy(Legacy::Portable | Legacy::Protocol) | Driver::Client(_) => "client",
+            Driver::Legacy(Legacy::Portable | Legacy::Protocol)
+            | Driver::Client(_)
+            | Driver::SharedPolicy => "client",
             Driver::Legacy(_) => "sandbox",
             Driver::Scenario { scenario, .. } => scenario.world.mode(),
         }
@@ -320,6 +325,7 @@ impl Driver {
             Driver::Scenario { bot: false, .. } => "step",
             Driver::Scenario { bot: true, .. } => "step+observe",
             Driver::Client(_) => "reconnect+step_all",
+            Driver::SharedPolicy => "forager-a1+step_all",
         }
     }
 
@@ -334,13 +340,18 @@ impl Driver {
     fn networking(self) -> bool {
         matches!(
             self,
-            Driver::Legacy(Legacy::Portable | Legacy::Protocol) | Driver::Client(_)
+            Driver::Legacy(Legacy::Portable | Legacy::Protocol)
+                | Driver::Client(_)
+                | Driver::SharedPolicy
         )
     }
 
     fn synthetic(self) -> Option<&'static str> {
         match self {
             Driver::Legacy(_) => None,
+            Driver::SharedPolicy => Some(
+                "shared A1 received-frame adapter; eight synthetic sandbox ring starts; reset after death; modeled processing only",
+            ),
             Driver::Scenario { scenario, .. } => Some(scenario.world.synthetic()),
             Driver::Client(_) => Some(
                 "wander controller; synthetic backend ring initialization; warmup then timed native reconnect_slot admission after deaths; deterministic refused-admission backoff",
@@ -350,6 +361,13 @@ impl Driver {
 
     fn definition(self) -> Result<Value, String> {
         Ok(match self {
+            Driver::SharedPolicy => json!({
+                "config": Config::sandbox(), "simulation": simulation_definition(self)?,
+                "policy": "A1",
+                "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+                "operation": "all eight ForagerBot decisions plus step_all; record drain excluded",
+                "timing": "configured virtual processing only; no wall-time feedback",
+            }),
             Driver::Legacy(Legacy::Portable | Legacy::Protocol) => json!({
                 "config": Config::sandbox(), "simulation": simulation_definition(self)?,
             }),
@@ -443,6 +461,11 @@ fn catalog() -> Vec<Workload> {
                     });
                 }
             }
+            Registration::SharedPolicy(operation) => workloads.push(Workload {
+                name: "shared-forager-a1-8".into(),
+                driver: Driver::SharedPolicy,
+                operation: *operation,
+            }),
             Registration::Client(client) => workloads.push(Workload {
                 name: client.id.into(),
                 driver: Driver::Client(client),
@@ -1005,6 +1028,20 @@ mod portable {
     }
 
     pub(super) fn run(args: &Args, out: &mut impl Write) -> Result<Value, String> {
+        run_with_policy(args, out, None)
+    }
+
+    pub(super) fn run_shared_policy(args: &Args, out: &mut impl Write) -> Result<Value, String> {
+        let mut policy = slither_sim::client::ForagerBot::new(slither_sim::bot::PolicyId::A1);
+        run_with_policy(args, out, Some(&mut policy))
+    }
+
+    fn run_with_policy(
+        args: &Args,
+        out: &mut impl Write,
+        mut policy: Option<&mut slither_sim::client::ForagerBot>,
+    ) -> Result<Value, String> {
+        use slither_sim::client::Bot;
         // Recording is enabled in both modes: parity tracing does not switch the
         // measured backend onto a different record-allocation path.
         let mut backend = backend(true)?;
@@ -1033,8 +1070,27 @@ mod portable {
                     )?;
                 }
             }
-            let actions = actions(&backend, &current_frames, progress.episode_ticks);
-            current_frames = meter.operation(args.trace, || backend.step_all(&actions))?;
+            let mut actions = if policy.is_none() {
+                actions(&backend, &current_frames, progress.episode_ticks)
+            } else {
+                Vec::new()
+            };
+            current_frames = meter.operation(args.trace, || {
+                if let Some(policy) = policy.as_deref_mut() {
+                    actions = current_frames
+                        .iter()
+                        .enumerate()
+                        .map(|(slot, frame)| {
+                            Ok(if backend.decision_pending(slot)? {
+                                None
+                            } else {
+                                policy.decide(frame)
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
+                }
+                backend.step_all(&actions)
+            })?;
             black_box(&current_frames);
             let wire = records(&mut backend)?;
             black_box(&wire);
@@ -1046,16 +1102,80 @@ mod portable {
                 )?;
             }
         }
-        Ok(report(
+        let mut result = report(
             args,
             meter,
-            "step_all (six physics ticks and all client frames)",
+            if policy.is_some() {
+                "ForagerBot A1 decisions + step_all (six physics ticks and all client frames)"
+            } else {
+                "step_all (six physics ticks and all client frames)"
+            },
             json!({
                 "initial": initial, "final": WorldStats::from_world(backend.world()), "progress": progress.report(),
                 "config": config, "wireRecording": true, "recordDrainTimed": false,
-                "frameScope": "all eight slots; no BotRunner or automatic background controller",
+                "frameScope": if policy.is_some() {
+                    "all eight slots; one shared A1 adapter; explicit step_all; no BotRunner"
+                } else {
+                    "all eight slots; no BotRunner or automatic background controller"
+                },
             }),
-        ))
+        );
+        if policy.is_some() {
+            result["details"]["policy"] = json!("A1");
+            result["details"]["parameterManifestSha256"] =
+                json!(slither_sim::bot::PARAMETER_MANIFEST_SHA256);
+        }
+        Ok(result)
+    }
+
+    #[test]
+    fn shared_policy_trace_repeats_and_matches_fresh_frame_decisions() {
+        use slither_sim::{
+            bot::PolicyId,
+            client::{Bot, ForagerBot},
+        };
+        let mut args = super::tests::args(
+            "shared-forager-a1-8",
+            Driver::SharedPolicy,
+            op(500, 16, Full),
+            4,
+        );
+        args.trace = true;
+        let trace = || {
+            let mut out = Vec::new();
+            let report = run_shared_policy(&args, &mut out).unwrap();
+            assert_eq!(report["timing"], Value::Null);
+            assert_eq!(report["details"]["policy"], "A1");
+            assert_eq!(
+                report["details"]["parameterManifestSha256"],
+                slither_sim::bot::PARAMETER_MANIFEST_SHA256
+            );
+            out
+        };
+        let output = trace();
+        assert_eq!(output, trace());
+        let mut previous: Vec<ClientFrame> = Vec::new();
+        let mut decisions = 0;
+        for line in output
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+        {
+            let record: Value = serde_json::from_slice(line).unwrap();
+            if record["kind"] == "decision" {
+                let actions: Vec<Option<Action>> =
+                    serde_json::from_value(record["actions"].clone()).unwrap();
+                for (frame, action) in previous.iter().zip(actions) {
+                    let expected = ForagerBot::new(PolicyId::A1).decide(frame);
+                    assert_eq!(
+                        action.map(|a| (a.heading.to_bits(), a.boost)),
+                        expected.map(|a| (a.heading.to_bits(), a.boost))
+                    );
+                    decisions += usize::from(action.is_some());
+                }
+            }
+            previous = serde_json::from_value(record["frames"].clone()).unwrap();
+        }
+        assert!(decisions >= 16);
     }
 
     struct Group {
@@ -2022,8 +2142,12 @@ fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
         Driver::Scenario { scenario, bot } => run_scenario(args, scenario, bot, out)?,
         #[cfg(feature = "networking")]
         Driver::Client(client) => portable::run_client(args, client, out)?,
+        #[cfg(feature = "networking")]
+        Driver::SharedPolicy => portable::run_shared_policy(args, out)?,
         #[cfg(not(feature = "networking"))]
-        Driver::Legacy(Legacy::Portable | Legacy::Protocol) | Driver::Client(_) => {
+        Driver::Legacy(Legacy::Portable | Legacy::Protocol)
+        | Driver::Client(_)
+        | Driver::SharedPolicy => {
             return Err(format!("{} requires the networking feature", args.case));
         }
     })
@@ -2133,6 +2257,7 @@ mod tests {
                     assert!(scenario.population > 1 && scenario.epoch > 0);
                     assert!(scenario.clearance >= 0.0);
                 }
+                Registration::SharedPolicy(_) => {}
                 Registration::Client(client) => {
                     client.world.config().validate().unwrap();
                     assert!((1..=500).contains(&client.agents));
@@ -2169,7 +2294,11 @@ mod tests {
             );
             let networking = matches!(
                 workload["name"].as_str().unwrap(),
-                "portable" | "protocol" | "client-battledome-64" | "client-official-500"
+                "portable"
+                    | "protocol"
+                    | "client-battledome-64"
+                    | "client-official-500"
+                    | "shared-forager-a1-8"
             );
             assert_eq!(
                 workload["available"],

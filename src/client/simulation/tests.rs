@@ -2564,7 +2564,6 @@ fn recording_exhaustion_preserves_reconnect_state_and_allows_retry() {
                         s.previous_boost,
                         s.control,
                         s.pinged_at,
-                        s.seeker,
                         s.living,
                     ),
                     (&s.records, s.record_bytes),

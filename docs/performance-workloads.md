@@ -73,6 +73,21 @@ Sandbox, official and Battledome registrations expand into `<id>-step` (one
 buffer through `observe_all_into`). When `perf_compare --base` targets an older
 API without it, the harness falls back to `observe_all`.
 
+## Shared-policy workload
+
+`shared-forager-a1-8` is a separate local-only row. It runs eight synthetic sandbox
+clients with one shared A1 `ForagerBot`, then `step_all`. Its timed operation
+includes all decisions plus the six physics ticks and all returned frames;
+wire-record draining remains outside that interval. It uses modeled virtual
+processing only, resets the world after a death, and records the policy and
+resolved parameter-manifest hash in its catalog definition. `--trace` disables
+timing and retains actions, frames and wire records in order.
+
+Existing `-bot` rows still mean scripted wander plus step and observation; they
+do not time Forager. Legacy and client-admission rows retain their controllers
+and workload identities. The new row is a bounded integration workload, not the
+500-bot host cost gate or evidence of playing strength. Those checks remain pending.
+
 ## Steady-state lifecycle
 
 Legacy cases reset after any death. Scenario rows keep deaths, death food,
@@ -246,7 +261,7 @@ so new profiling must start from current source.
 protocol fixtures: a seed-7 synthetic world run for up to 384 decisions of six
 7 ms ticks (16.128 virtual seconds). Eight slots keep their connections and
 decoders; slot zero reconnects after decision 192. Death does not reset the
-world, and in `next_frame` native background seekers may reconnect dead
+world, and in `next_frame` native background Foragers may reconnect dead
 background slots.
 
 The workload overrides radius (6,000), food placement attempts (12,000), prey
@@ -275,9 +290,11 @@ On Windows, use `./outputs/retained-client/bin/perf_client_retained.exe`.
 
 Each invocation starts fresh; `--iterations N` runs one to eight same-seed worlds.
 `step_all` controls every playing slot, while `next_frame` controls slot zero and
-lets built-in seekers drive the rest. The modes do different work, so compare
-only runs with matching mode, configuration, seed and decision count. There are
-no sockets, listeners, `BotRunner` or compute-time feedback into virtual time.
+lets built-in Foragers drive the rest. The modes do different work, so compare
+only runs with matching mode, configuration, seed and decision count. `next_frame`
+follows `PolicyId::default()` and its live traces can differ from historical seeker runs; those
+runs are not a behavior-preserving comparison. There are no sockets, listeners,
+`BotRunner` or compute-time feedback into virtual time.
 
 At every decision and lifecycle checkpoint, the harness drains all eight slots'
 records, replays them through independent public decoders, builds frames and
@@ -293,7 +310,7 @@ submission, extra backend frames, record draining, replay application, replay
 frames and manual reconnects. They exclude control calculation, equality checks,
 counters, serialization and returned-output destruction, which process CPU and
 wall time include. Physics, encoding, delivery and decoding stay combined inside
-the operation, and `next_frame` also includes background-seeker frame
+the operation, and `next_frame` also includes background-policy frame
 construction. Agree a quiet interval before reading timing, keep every raw
 sample, and report process CPU and peak memory separately from the inner wall
 intervals.
@@ -309,6 +326,6 @@ optimization.
 Private backend RNG, transport queues, subscription and presentation state, and
 the event buffers of the five intermediate ticks are not reachable through these
 public seams, so a matching trace does not prove full private-state parity. It
-does keep the sent background commands rather than substituting another seeker.
+does keep the sent background commands rather than substituting another policy.
 The fixture doesn't stage 128-anchor bodies or assert that `V`, death or sector
 expiration occurs; check the coverage report before claiming any of them.
