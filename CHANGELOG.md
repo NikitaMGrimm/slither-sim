@@ -4,10 +4,9 @@
 
 ### Added
 
-- Selected [legacy-login evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-legacy-login/REPORT.md):
-  one official selector-12 session advertised protocol 13; offline tests retain
-  the challenge reply and protocol rejection. A local browser trial with an
-  experimental connection patch failed on protocol-19 output; no host change.
+- Evidence for browser mods that use an older login: an official server answers
+  it with protocol 13, which this server doesn't serve yet, and a tested mod
+  can't play protocol 19 ([report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-legacy-login/REPORT.md)).
 
 ## [0.6.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.0...v0.6.1) - 2026-10-26
 
