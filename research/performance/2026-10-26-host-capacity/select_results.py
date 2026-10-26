@@ -12,6 +12,14 @@ HERE=Path(__file__).resolve().parent
 def digest(path):
     with path.open('rb') as f: return hashlib.file_digest(f,'sha256').hexdigest()
 
+def spread(per_client):
+    out={}
+    for metric in ['excessMs','ownUpdateGapMs']:
+        for stat in ['p50','p99','max']:
+            values=sorted(c[metric][stat] for c in per_client.values() if c[metric]['count'])
+            out[metric+'.'+stat]={'clients':len(values),'min':values[0],'median':values[(len(values)-1)//2],'max':values[-1]}
+    return out
+
 def main(raw, output):
     output.mkdir(parents=True,exist_ok=True)
     state=json.loads((raw/'state.json').read_text())
@@ -35,8 +43,10 @@ def main(raw, output):
             summary['generatorResources'].pop('threadCpuPercentOneCore')
             summary['threadCpuLimit']='Unavailable: initial sampler read group CPU per thread; corrected before sweep-250. Process CPU is valid.'
         summary['scenario']='500 bots and one watcher' if trial['bots'] else ('profiled sockets' if trial['profile'] else 'unprofiled sockets')
-        if trial['profile']:
-            summary.pop('perClient')  # Detailed diagnostic receipts remain raw.
+        per_client=summary.pop('perClient')
+        if not trial['profile']:
+            # Per-client rows stay raw; the spread shows whether pooled tails hide uneven clients.
+            summary['perClientSpread']=spread(per_client)
         host_config=json.loads((host_root/'host.json').read_text())['config']
         host_config.pop('bind')
         summary['inputHostConfig']=host_config
