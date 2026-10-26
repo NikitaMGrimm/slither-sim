@@ -49,6 +49,10 @@ It varies both probe identity and actual respawn/join order. It predicts:
 | 0.9 | 13.323927 | dies | survives |
 | 0.7 | 10.363054 | dies | survives |
 
+After rebasing onto #136, the example moved to `WorldOptions` with a dormant
+population and the `snakes()` accessor; its printed curve is unchanged. The
+hash in [local-results.json](local-results.json) records the version that ran.
+
 Matched collinear head-on contact kills the oldest life and leaves the newer
 alive; reversing join order reverses the dead identity. This tests the current
 inferred order, not an official rule. `3.666` gates candidate checks and is not
