@@ -1,0 +1,10 @@
+--- a/src/client/simulation/pit_tests.rs
++++ b/src/client/simulation/pit_tests.rs
+@@ -29,6 +29,7 @@
+     let now = sim.time();
+     let mut packets = Vec::new();
+     for frame in sim.drain(slot).unwrap() {
++        println!("PIT_TRACE {:?}", frame);
+         state.receive_frame(&frame, now).unwrap();
+         packets.extend(
+             super::super::protocol::split_frame(&frame)
