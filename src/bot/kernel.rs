@@ -2378,6 +2378,42 @@ mod tests {
         o
     }
 
+    /// A4's fractional occupancy penalty decides between two near-equal food
+    /// cells: the slightly richer north cell holds a far opponent's body. Bits
+    /// come from the kernel before occupancy skipping; factor 1 flips the choice.
+    #[test]
+    fn a4_food_choice_keeps_its_fractional_occupancy_penalty() {
+        let mut o = lone();
+        let food = |x, y, value| crate::Food {
+            x,
+            y,
+            value,
+            size: None,
+            origin: None,
+        };
+        o.food = vec![food(400.0, 200.0, 1.01), food(400.0, -200.0, 1.0)];
+        let mut enemy = o.me.clone();
+        enemy.id = "far-head-near-food-body".into();
+        enemy.head = Point {
+            x: 1800.0,
+            y: 1200.0,
+        };
+        enemy.body = vec![Point { x: 400.0, y: 200.0 }];
+        o.opponents.push(enemy);
+        let p = crate::bot::params::A4_MEAN;
+        assert!(p.occupied_factor < 1.0);
+        let decide_with =
+            |p: &Params| decide(&o, &Timing::default(), &[], p, &mut Scratch::default());
+        let penalized = decide_with(&p);
+        let identity = decide_with(&Params {
+            occupied_factor: 1.0,
+            ..p
+        });
+        assert_eq!(penalized.heading.to_bits(), 0xbfddac670561bb4f);
+        assert_eq!(identity.heading.to_bits(), 0x3fddac670561bb4f);
+        assert!(!penalized.boost && !identity.boost);
+    }
+
     fn pellet(x: f64, y: f64, value: f64) -> crate::Food {
         crate::Food {
             x,
