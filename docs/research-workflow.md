@@ -211,6 +211,40 @@ speed/turn settings, exact fresh anchors and no obstacles; stationary/moving
 targets cover both signs of each route. Tests protect control wiring without
 depending on measured physics defaults or claiming live acquisition success.
 
+#### Paired collision trials
+
+`slither-paired-collision.mjs` coordinates two identities through a compact
+tandem lateral-offset ladder and head-on crossings with reversed roles/join
+order. It records both own streams, actual sent bytes, staging failures,
+qualification samples and post-event deaths in the ordinary archive format.
+`paired-collision` capture plans require exactly two bots and at most 600 seconds;
+no paired `mode` or `direction` fields apply. Outside endpoints require an
+explicit official-server plan and `--allow-outside yes`; the default is loopback.
+
+The [unexecuted pilot and commands](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/README.md)
+freeze population selection, trial qualification, uncertainty and stop rules.
+The offline preparer binds retained selection metadata without probing any
+server. `collect.py` rejects pilot two after failed integrity, zero qualified
+ladder/head-on trials or excessive third-party contamination in pilot one.
+Only the coordinator owns reconnection, waiting for both close handshakes before
+the next ordered joins. Run no other game collectors during acquisition.
+
+For a complete **localhost-only** engineering check, build the binary and run:
+
+```sh
+node --test tools/fidelity/slither-paired-collision.test.mjs
+SLITHER_COLLISION_E2E=1 node --test tools/fidelity/slither-paired-collision.local.test.mjs
+cargo test --locked --example collision_curve
+cargo run --locked --example collision_curve
+```
+
+The local regression uses a production host with two socket players and no
+background bots or teleports. The separate synthetic curve uses the public
+Simulator API. These verify current simulator outcomes, not online laws or
+live-server feasibility. Raw local test archives remain outside Git, including
+failures; the test prints their location. Use `CARGO_BUILD_JOBS=2` and
+`RAYON_NUM_THREADS=2` on a shared machine.
+
 ### Capture records
 
 Raw frames retain direction, bytes and monotonic send/receipt times. Metadata

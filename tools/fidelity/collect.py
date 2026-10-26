@@ -1,6 +1,7 @@
 """Run one declared headless capture attempt, preserving failures and partial files."""
 
 import argparse
+import gzip
 import ipaddress
 import json
 from pathlib import Path
@@ -9,6 +10,38 @@ import subprocess
 import uuid
 
 import evidence
+
+
+def collision_second_pilot_gate(study, ends):
+    """Do not spend the second frozen pilot after an uninformative first one."""
+    audit = evidence.audit_study(study)
+    if set(audit["issues"]) - {"planned_attempts_missing"}:
+        raise ValueError("collision pilot stop: first acquisition failed integrity/completion checks")
+    if len(ends) != 1:
+        raise ValueError("collision pilot stop: first attempt is unfinished")
+    captures = next(iter(ends.values()))["captures"]
+    results = []
+    for name in captures:
+        with gzip.open(Path(study) / name, "rt", encoding="utf-8") as stream:
+            terminal = None
+            for line in stream:
+                terminal = json.loads(line)
+        if not isinstance(terminal, dict) or terminal.get("event") != "capture-end":
+            raise ValueError("collision pilot stop: first acquisition has no completion receipt")
+        results.append(terminal.get("results", []))
+    if len(results) != 2 or results[0] != results[1]:
+        raise ValueError("collision pilot stop: mismatched paired result ledgers")
+    check_collision_feasibility(results[0])
+
+
+def check_collision_feasibility(results):
+    for kind in ("ladder", "head-on"):
+        if not any(row["qualified"] and row["spec"]["kind"] == kind for row in results):
+            raise ValueError(f"collision pilot stop: zero qualified {kind} encounters")
+    launched = [row for row in results if row.get("initial") is not None]
+    contaminated = sum("third_party" in row["reasons"] for row in launched)
+    if contaminated > len(launched) / 2:
+        raise ValueError("collision pilot stop: over half of launched encounters had a third party")
 
 
 def capture_command(study, output, node="node"):
@@ -26,8 +59,9 @@ def capture_command(study, output, node="node"):
     if executable is None:
         raise ValueError(f"Node executable not found: {node}")
     paired = capture["scenario"] in ("paired-prey", "paired-snake")
+    collision = capture["scenario"] == "paired-collision"
     food_lanes = capture["scenario"] == "food-lanes"
-    driver = f"slither-{capture['scenario']}.mjs" if paired or food_lanes else "slither-headless.mjs"
+    driver = f"slither-{capture['scenario']}.mjs" if paired or food_lanes or collision else "slither-headless.mjs"
     command = [
         executable, str(evidence.ROOT / "tools/fidelity" / driver),
         "--out", str(output), "--plan", str(study / "plan.json"),
@@ -38,6 +72,9 @@ def capture_command(study, output, node="node"):
         command.extend(["--mode", capture["mode"]])
         if "direction" in capture:
             command.extend(["--direction", capture["direction"]])
+    elif collision:
+        if plan["dataOrigin"] == "official-server":
+            command.extend(["--allow-outside", "yes"])
     elif not food_lanes:
         command.extend(["--bots", str(capture["bots"]), "--scenario", capture["scenario"]])
     if "origin" in capture:
@@ -59,9 +96,11 @@ def collect(study, node="node"):
     study = Path(study).resolve()
     with evidence.study_lock(study):
         plan = evidence.read_plan(study)
-        starts, _ = evidence.read_attempts(study)
+        starts, ends = evidence.read_attempts(study)
         if len(starts) >= plan["sampling"]["attempts"]:
             raise ValueError("all planned attempts are already reserved; no automatic replacements")
+        if plan.get("capture", {}).get("scenario") == "paired-collision" and starts:
+            collision_second_pilot_gate(study, ends)
         attempt = str(uuid.uuid4())
         output = study / "raw" / attempt
         command = capture_command(study, output, node)

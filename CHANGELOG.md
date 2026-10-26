@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- A two-client `paired-collision` collector and a frozen, not yet run, official
+  pilot plan for measuring the collision hitbox and head-on resolution order
+  ([research workflow](docs/research-workflow.md#paired-collision-trials)).
+
 ## [0.5.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.4.0...v0.5.0) - 2026-10-26
 
 ### Breaking
