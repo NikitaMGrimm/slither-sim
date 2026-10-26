@@ -119,6 +119,12 @@ the fixed simulator release model is unchanged. The
 found 451 motion gaps under 35 ms and 107 standalone `h` gaps under 100 ms in
 its three held-out runs, so neither gap is a hard floor. It selects no
 replacement scheduler: clients never see when state changes or inputs apply.
+The [own wanted/speed check](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-wanted-gate/REPORT.md)
+supports own wanted-heading and boost changes waiting for the six-tick gate:
+549/581 qualified steering commands sent while it was nominally armed reflected
+41–44 ms after the previous own motion report. After confound screens, 3/575
+wanted and 1/86 boost observations contradict a literal 42 ms floor; send-clock
+bounds do not identify ingress or exact physics ticks.
 
 Each tick reads all inputs and pings received during it; pongs lead its frame.
 Official input reflection takes about one ping round trip (median 13.2 vs

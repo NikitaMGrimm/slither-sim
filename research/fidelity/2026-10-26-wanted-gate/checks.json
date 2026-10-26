@@ -1,0 +1,58 @@
+[
+  {
+    "ordinal": 1,
+    "rawOwnMotionRowsVerified": 5736,
+    "counts": {
+      "wanted/qualified": 939,
+      "boost/qualified": 28
+    }
+  },
+  {
+    "ordinal": 2,
+    "rawOwnMotionRowsVerified": 5826,
+    "counts": {
+      "wanted/qualified": 1079,
+      "boost/qualified": 28
+    }
+  },
+  {
+    "ordinal": 3,
+    "rawOwnMotionRowsVerified": 5807,
+    "counts": {
+      "wanted/qualified": 1037,
+      "boost/qualified": 30
+    }
+  },
+  {
+    "ordinal": 4,
+    "rawOwnMotionRowsVerified": 5703,
+    "counts": {
+      "wanted/qualified": 932,
+      "boost/qualified": 47
+    }
+  },
+  {
+    "ordinal": 5,
+    "rawOwnMotionRowsVerified": 5899,
+    "counts": {
+      "wanted/qualified": 997,
+      "boost/qualified": 36
+    }
+  },
+  {
+    "ordinal": 6,
+    "rawOwnMotionRowsVerified": 5757,
+    "counts": {
+      "wanted/qualified": 898,
+      "boost/qualified": 34
+    }
+  },
+  {
+    "older": {
+      "steer/clean": 17812,
+      "unchangedWantedExcluded": 408,
+      "boost/clean": 519
+    },
+    "archives": 70
+  }
+]
