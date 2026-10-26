@@ -1,0 +1,2245 @@
+{
+  "dataOrigin": "local-simulator",
+  "access": "Raw logs and full archives local-only; no public download",
+  "planSha256": "ef54c0e40a9e9dd18ae978961b742fad4d89951fba8e4326903100c402107e7d",
+  "revisions": {
+    "A": "2cc67b78c968bfed36cc472010d8256947e56fbb",
+    "B": "7d1d9bdcccd1dc575629f68823aae5ca05a64cc3",
+    "originMain": "ceb7471722b4298ed6ee280e89f2a493c7c476e7",
+    "pr136State": "MERGED",
+    "mergeBase": "2cc67b78c968bfed36cc472010d8256947e56fbb",
+    "selection": "PR 136 first parent on main and merge commit"
+  },
+  "attempt5AmendmentSha256": "cd6c36cfead8c1a84dd77f24da13e1f197f39cbd2fbf0bc819117abc5927c884",
+  "awsInstanceType": "c7a.4xlarge",
+  "hardware": [
+    "Architecture: x86_64",
+    "CPU(s): 16",
+    "On-line CPU(s) list: 0-15",
+    "Model name: AMD EPYC 9R14",
+    "Thread(s) per core: 1",
+    "Core(s) per socket: 16",
+    "Socket(s): 1"
+  ],
+  "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+  "trials": [
+    {
+      "name": "A1",
+      "holdSeconds": 299.9998781681061,
+      "cpuWindowSeconds": 299.99925804138184,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 2
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.85672468168443,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 57.590142431675,
+      "socketCpuPercentOneCore": 0.9266689585000666,
+      "hostCpuPercentOneCore": 58.516811390175064,
+      "botCpuCores": 0.463667813407767,
+      "simulationBusyWallPercent": 57.86184236739281,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.4866678702914019,
+        "slither-bots-0": 22.9267233689333,
+        "slither-bots-1": 23.440057971843405,
+        "slither-simulat": 57.590142431675,
+        "slither-sockets": 0.9266689585000666,
+        "study-watcher": 0.11666695520684289
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00020890695701948267,
+      "excessMs": {
+        "count": 32352,
+        "p50": 0.06234200000471901,
+        "p99": 0.07764999999199063,
+        "max": 10.07578499999363
+      },
+      "watcher": {
+        "connections": 9,
+        "frames": 32352,
+        "maxSteeringLatenessMs": 63.804579,
+        "playingSeconds": 297.70378099600003,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "1e21a61708a4f931dadf3eedfac87e7ee462cb343666a6893fc6ff8bb4b5661b",
+          "bytes": 780843
+        },
+        "host.json": {
+          "sha256": "c8aa771e556ac0028d55509c6b2dfd6ecef49c51b7ce17fe15d12567891eaa65",
+          "bytes": 59641
+        },
+        "ready.json": {
+          "sha256": "961f95f377981818f0262534b5fc4d74813df364517ea137b80baae1a95bb2a5",
+          "bytes": 2291
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "976a66e678b4905e136bf8fe8b30ad8be1434185b5ce9a4351beb1cbe3e7e5b1",
+          "bytes": 7111
+        },
+        "telemetry.json": {
+          "sha256": "fe8d4d7b8dc3f1b5b5cee9284bf5dd9fbd0062a7ca0d608d78542c94b0875279",
+          "bytes": 178801
+        },
+        "watcher.json": {
+          "sha256": "15dc15093af06ad3b8e2ab485226c0821557ed236247d83932981e75d0916900",
+          "bytes": 1107
+        }
+      },
+      "rawDirectory": "A1",
+      "receivedPopulation": {
+        "count": 100,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 500.99
+      }
+    },
+    {
+      "name": "B1",
+      "holdSeconds": 299.999879360199,
+      "cpuWindowSeconds": 299.9990704059601,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 2
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.85672411402257,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 58.18018027982944,
+      "socketCpuPercentOneCore": 0.9200028507638892,
+      "hostCpuPercentOneCore": 59.10018313059333,
+      "botCpuCores": 0.46966812200228986,
+      "simulationBusyWallPercent": 58.48808757030416,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.4866681746794488,
+        "slither-bots-0": 23.426739257857296,
+        "slither-bots-1": 23.54007294237169,
+        "slither-simulat": 58.18018027982944,
+        "slither-sockets": 0.9200028507638892,
+        "study-watcher": 0.10000030986564015
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00020991380938986453,
+      "excessMs": {
+        "count": 27635,
+        "p50": 0.06357699999352917,
+        "p99": 0.08068499999353662,
+        "max": 4.782365999999456
+      },
+      "watcher": {
+        "connections": 5,
+        "frames": 27635,
+        "maxSteeringLatenessMs": 64.92252900000001,
+        "playingSeconds": 298.851889711,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "24d9db3f4689ad81b64f74cb66d3bd592a8a686183cad7816779e91dffe2b5f2",
+          "bytes": 675791
+        },
+        "host.json": {
+          "sha256": "7a1d5c4069bde9c774396fa6f82c02c7937136cbfc4a185c424e3e0aec7b3d08",
+          "bytes": 59528
+        },
+        "ready.json": {
+          "sha256": "668a5e02744b2fd2b9e087739b831f03dfead909300acc63eddde26c67dac787",
+          "bytes": 2291
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "984eae8765ef44f386854ee92e7092debfb67cd4499c9e676fbefc4d6f7ea8b3",
+          "bytes": 7118
+        },
+        "telemetry.json": {
+          "sha256": "92b5a2096f8cf05eec28dedb074d64e61635c651493b2c07337c5948b33120b2",
+          "bytes": 178957
+        },
+        "watcher.json": {
+          "sha256": "b09c4de52129700dc144b050033cba88fe7089fb77b76b862499c45157d45993",
+          "bytes": 1110
+        }
+      },
+      "rawDirectory": "B1",
+      "receivedPopulation": {
+        "count": 100,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 501.0
+      }
+    },
+    {
+      "name": "A2",
+      "holdSeconds": 299.999826669693,
+      "cpuWindowSeconds": 300.00108647346497,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 2
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.85674920468065,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 57.399792122163205,
+      "socketCpuPercentOneCore": 0.9466632382517045,
+      "hostCpuPercentOneCore": 58.34645536041491,
+      "botCpuCores": 0.46126499615940453,
+      "simulationBusyWallPercent": 57.714934328824285,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.48666490417165104,
+        "slither-bots-0": 22.603251473890175,
+        "slither-bots-1": 23.523248142050278,
+        "slither-simulat": 57.399792122163205,
+        "slither-sockets": 0.9466632382517045,
+        "study-watcher": 0.11666624415073823
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00020918795328414628,
+      "excessMs": {
+        "count": 33688,
+        "p50": 0.06146600001375191,
+        "p99": 0.07576399999379646,
+        "max": 7.354764000017894
+      },
+      "watcher": {
+        "connections": 8,
+        "frames": 33688,
+        "maxSteeringLatenessMs": 63.666867,
+        "playingSeconds": 297.990726839,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "63dfaed547632d54bc71a391a62b3878d71e2708e0c54966d3d68551eaddf727",
+          "bytes": 809675
+        },
+        "host.json": {
+          "sha256": "ef13ac30f7de6647930874b3d117bee223d3a8aa375cafc81e5742cf4ae019ef",
+          "bytes": 59559
+        },
+        "ready.json": {
+          "sha256": "3a7c1fd1624396cb8714e531d2fbe8e2c7e4445c44b12711414d625505a8d9fd",
+          "bytes": 2289
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "daa8649b0b71b6ca226e99100ae4891757d0a24594510fab85bdeb1e803e2042",
+          "bytes": 7116
+        },
+        "telemetry.json": {
+          "sha256": "f0a10164c17083724ef06055a12ccb101ddbc525972ba793a2ca6b3b564fe620",
+          "bytes": 179294
+        },
+        "watcher.json": {
+          "sha256": "cfbf4df131c7e2343f80263738c44de4181634d8272bce23936ff24f20ab40b2",
+          "bytes": 1102
+        }
+      },
+      "rawDirectory": "A2",
+      "receivedPopulation": {
+        "count": 100,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 501.0
+      }
+    },
+    {
+      "name": "B2",
+      "holdSeconds": 299.9999420642853,
+      "cpuWindowSeconds": 299.99931049346924,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 2
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.8566942550156,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 57.50013215572214,
+      "socketCpuPercentOneCore": 0.9466688424478312,
+      "hostCpuPercentOneCore": 58.44680099816997,
+      "botCpuCores": 0.4707010818382332,
+      "simulationBusyWallPercent": 57.884115240525304,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.48666778520205406,
+        "slither-bots-0": 23.22005336792814,
+        "slither-bots-1": 23.850054815895184,
+        "slither-simulat": 57.50013215572214,
+        "slither-sockets": 0.9466688424478312,
+        "study-watcher": 0.10666691182510772
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00020669954567439862,
+      "excessMs": {
+        "count": 30579,
+        "p50": 0.06215800000063609,
+        "p99": 0.0778890000001411,
+        "max": 0.523228999983985
+      },
+      "watcher": {
+        "connections": 7,
+        "frames": 30579,
+        "maxSteeringLatenessMs": 66.902228,
+        "playingSeconds": 298.277857737,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "2c951bc46adcd1ca451ef4e683973661634cd929a2ab2e56e88c6919daf356a4",
+          "bytes": 741129
+        },
+        "host.json": {
+          "sha256": "23bb14ccca44271a4a9e4d7c45bec3e58107efd016079fb81902f71a3ae439dd",
+          "bytes": 59555
+        },
+        "ready.json": {
+          "sha256": "ddd2cf0071c64630c258db7d738028c36e3b5cb23132faec31e39cb755fec3d0",
+          "bytes": 2291
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "bfa61c639207fa83f2a9fbdb551c99c3beb7c24780c3685e5cabb34678474c53",
+          "bytes": 7111
+        },
+        "telemetry.json": {
+          "sha256": "9d34b2d9fdaf16a98f172205b2cd4f6f72014b1f64f99c934d2c54655d29f826",
+          "bytes": 179493
+        },
+        "watcher.json": {
+          "sha256": "a4cfc7630c9bfcf1f83253ad79bfa71ce7bf8c53d05902ea4e5cacfa4496d014",
+          "bytes": 1102
+        }
+      },
+      "rawDirectory": "B2",
+      "receivedPopulation": {
+        "count": 100,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 500.99
+      }
+    },
+    {
+      "name": "A3",
+      "holdSeconds": 299.99988055229187,
+      "cpuWindowSeconds": 300.0006275177002,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 2
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.85672354636074,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 57.39654660883691,
+      "socketCpuPercentOneCore": 0.9166647492554824,
+      "hostCpuPercentOneCore": 58.31321135809239,
+      "botCpuCores": 0.46043237023512645,
+      "simulationBusyWallPercent": 57.77821001824922,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.48666564869563794,
+        "slither-bots-0": 22.73661910789689,
+        "slither-bots-1": 23.306617915615753,
+        "slither-simulat": 57.39654660883691,
+        "slither-sockets": 0.9166647492554824,
+        "study-watcher": 0.10333311718879984
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00021002799673196438,
+      "excessMs": {
+        "count": 30045,
+        "p50": 0.059148000000277534,
+        "p99": 0.07455099999788217,
+        "max": 2.0780650000015157
+      },
+      "watcher": {
+        "connections": 8,
+        "frames": 30045,
+        "maxSteeringLatenessMs": 64.292818,
+        "playingSeconds": 298.27787878299995,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "b1a6682cb9c8045cfef30b0e18ed9435866eb687160444c3b193f62f2ebff442",
+          "bytes": 728056
+        },
+        "host.json": {
+          "sha256": "a0b46ab872ee559889ecc155bdd58e7b507c4d38398a853828bc46188d63b6a7",
+          "bytes": 59513
+        },
+        "ready.json": {
+          "sha256": "d14bf9be6c1d54ffb4e087fce87faded23540958b08167e183e8cbd09da48d81",
+          "bytes": 2291
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "1fee2ca87affab95703a5947d1176be274152ff9d095277c008593a3699bf8f9",
+          "bytes": 7109
+        },
+        "telemetry.json": {
+          "sha256": "7b8740b9723ed04869bbefb1d20fb57e8f003e78e7e4aaef62460da1bc756ec3",
+          "bytes": 179473
+        },
+        "watcher.json": {
+          "sha256": "e0bbd7a7853d5f335f7ab154d1befd6cd79181c3874a3edc9189b1899174812b",
+          "bytes": 1098
+        }
+      },
+      "rawDirectory": "A3",
+      "receivedPopulation": {
+        "count": 99,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 500.979797979798
+      }
+    },
+    {
+      "name": "B3",
+      "holdSeconds": 300.0000033378601,
+      "cpuWindowSeconds": 300.0000581741333,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 2
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.85666507721479,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 57.46998885577735,
+      "socketCpuPercentOneCore": 0.8899998274167714,
+      "hostCpuPercentOneCore": 58.359988683194125,
+      "botCpuCores": 0.4525665789077717,
+      "simulationBusyWallPercent": 57.752571671433316,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.4799999069214049,
+        "slither-bots-0": 22.53332896381039,
+        "slither-bots-1": 22.72332892696678,
+        "slither-simulat": 57.46998885577735,
+        "slither-sockets": 0.8899998274167714,
+        "study-watcher": 0.1066666459825344
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00021091662254993978,
+      "excessMs": {
+        "count": 30095,
+        "p50": 0.059440999990329146,
+        "p99": 0.07686000000103377,
+        "max": 8.997108999988995
+      },
+      "watcher": {
+        "connections": 9,
+        "frames": 30095,
+        "maxSteeringLatenessMs": 64.466409,
+        "playingSeconds": 297.7038013829999,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "c0361823e37589cb90cc9f74187af65e0b22e031f1339d8c3cc6947b1bebfb3b",
+          "bytes": 726528
+        },
+        "host.json": {
+          "sha256": "10fa675c5f5724cfdb21246c25f4259e2b4146a8160113f5f27de3c8cf1467b7",
+          "bytes": 59490
+        },
+        "ready.json": {
+          "sha256": "b8930ae81106884509b909dd9bb57123576eee32cd5c228e9cde04d92bba77ff",
+          "bytes": 2289
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "efa6f99867c221e915131c31227aa4f5e32ac593b2476af32a249335f6e600f2",
+          "bytes": 7104
+        },
+        "telemetry.json": {
+          "sha256": "413629f9fc80ada360f7472af286bc38733b7666f240f7747246630a3fca02e2",
+          "bytes": 179463
+        },
+        "watcher.json": {
+          "sha256": "ed240e75a7d0549133c150f06e00680f2ee4352f002487b9b5f883eefcd28cbc",
+          "bytes": 1097
+        }
+      },
+      "rawDirectory": "B3",
+      "receivedPopulation": {
+        "count": 99,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 500.989898989899
+      }
+    },
+    {
+      "name": "A4t",
+      "holdSeconds": 299.9995958805084,
+      "cpuWindowSeconds": 300.00028014183044,
+      "config": {
+        "bind": "127.0.0.1:0",
+        "bots": {
+          "count": 500,
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "threads": 4
+        },
+        "players": {
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [
+              0.04
+            ],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "max": 1
+        },
+        "seed": 7,
+        "simulation": {
+          "agents": 1,
+          "controlledSlot": 0,
+          "decisionTicks": 6,
+          "delivery": "responsive",
+          "latency": {
+            "pauses": {
+              "meanSeconds": 0.0,
+              "ratePerSecond": 0.0
+            },
+            "processingJitterSeconds": 0.0,
+            "processingSeconds": [
+              0.0,
+              0.0
+            ],
+            "roundTripSeconds": [],
+            "roundTripSpread": 0.0,
+            "roundTripWeights": [],
+            "uplinkShare": 0.5,
+            "variation": {
+              "correlatedShare": 0.0,
+              "correlationSeconds": 0.0,
+              "logSigma": 0.0,
+              "medianSeconds": 0.0
+            }
+          },
+          "leaderboardIntervalSeconds": 3.008,
+          "localRecords": false,
+          "minimapIntervalSeconds": 2.504,
+          "minimapSide": 136,
+          "recordWire": false,
+          "world": {
+            "ambientFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 2
+            },
+            "ambientReplenishPerSecond": 803.8863440104399,
+            "boostFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 9
+            },
+            "boundaryMode": "sliding",
+            "deathFood": {
+              "cellSize": 75.0,
+              "enabled": true,
+              "maxPerCell": 22
+            },
+            "dt": 0.007,
+            "dynamicRadius": false,
+            "emitBoostFood": true,
+            "foodCount": 54953,
+            "foodIndex": true,
+            "kiosk": {
+              "enabled": true,
+              "floorScore": 8500.0,
+              "graceSeconds": 1200.0,
+              "recoveryPerSecond": 0.005519633948746724,
+              "scoreDecayPerSecond": 0.0002759816974373362,
+              "shrinkPerSecond": 0.005519633948746724,
+              "stationaryRadius": 800.0
+            },
+            "prey": {
+              "count": 71,
+              "cruiseSpeed": 118.74999999999999,
+              "escapeSpeed": 192.28124999999997,
+              "fleeHalfWidth": 320.0,
+              "maxSize": 9.2,
+              "nutritionFactor": 30.0,
+              "respawnSeconds": 1.0,
+              "size": 6.0,
+              "sprintSpeed": 343.65625,
+              "turnRate": 3.625
+            },
+            "radius": 14996.629621351593,
+            "radiusUpdates": [],
+            "sizeToPopulation": true,
+            "speedModel": "retained_progress",
+            "vision": 1500.0
+          }
+        }
+      },
+      "policy": "A4",
+      "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+      "ticks": 42857,
+      "ticksPerSecond": 142.85685910413756,
+      "deferredTicks": 0,
+      "warmupDeferredTicks": 0,
+      "simulationCpuPercentOneCore": 56.86328023405529,
+      "socketCpuPercentOneCore": 0.906665820016592,
+      "hostCpuPercentOneCore": 57.76994605407188,
+      "botCpuCores": 0.4642662331320255,
+      "simulationBusyWallPercent": 57.141547330043515,
+      "threadCpuPercentOneCore": {
+        "host_qualificat": 0.47666622155284066,
+        "slither-bots-0": 11.659989111831024,
+        "slither-bots-1": 11.433322656826878,
+        "slither-bots-2": 11.58998917719739,
+        "slither-bots-3": 11.743322367347256,
+        "slither-simulat": 56.86328023405529,
+        "slither-sockets": 0.906665820016592,
+        "study-watcher": 0.10333323684012631
+      },
+      "affinities": {
+        "host_qualificat": [
+          1
+        ],
+        "slither-bots-0": [
+          2
+        ],
+        "slither-bots-1": [
+          3
+        ],
+        "slither-bots-2": [
+          4
+        ],
+        "slither-bots-3": [
+          5
+        ],
+        "slither-simulat": [
+          0
+        ],
+        "slither-sockets": [
+          0
+        ],
+        "study-watcher": [
+          1
+        ]
+      },
+      "systemStealPercent": 0.00020896239721662088,
+      "excessMs": {
+        "count": 31184,
+        "p50": 0.062212000018917024,
+        "p99": 0.07929299998795614,
+        "max": 5.875395999988541
+      },
+      "watcher": {
+        "connections": 5,
+        "frames": 31184,
+        "maxSteeringLatenessMs": 63.529942000000005,
+        "playingSeconds": 298.851904826,
+        "readOrSendFailures": 0,
+        "readTimeouts": 0
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawFiles": {
+        "DONE": {
+          "sha256": "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1",
+          "bytes": 9
+        },
+        "frames.csv": {
+          "sha256": "dd0df55040b665b64586ba9e77823cfa5a192f88c345dd48803ee2efe094a02c",
+          "bytes": 761079
+        },
+        "host.json": {
+          "sha256": "d7197b948b435c0e19ad268939d3b1b781ccb125465418bde6c2d7a4344be145",
+          "bytes": 59484
+        },
+        "ready.json": {
+          "sha256": "f4bd0b695135a9f5f3e6432f6acee3354447413c11b863c3ab03b1f97da027ca",
+          "bytes": 2291
+        },
+        "run.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "summary.json": {
+          "sha256": "cf2104405062aaf5b938bcd0b2fceefd8a541107a89a84790afd0bc286024881",
+          "bytes": 7284
+        },
+        "telemetry.json": {
+          "sha256": "03af52f1af329833261e8452c33d82ae2b7f65c98d8fa7c3c5fe0ca6bd785477",
+          "bytes": 224632
+        },
+        "watcher.json": {
+          "sha256": "d5c293a665a5b4d2f14e0be49b509bcbf2bd56d2386f02e21f4611fd6de66743",
+          "bytes": 1111
+        }
+      },
+      "receivedPopulation": {
+        "count": 100,
+        "p50": 501,
+        "p99": 501,
+        "max": 501,
+        "mean": 500.99
+      }
+    }
+  ],
+  "comparison": {
+    "simulationCpuPercentOneCore": {
+      "a": [
+        57.590142431675,
+        57.399792122163205,
+        57.39654660883691
+      ],
+      "b": [
+        58.18018027982944,
+        57.50013215572214,
+        57.46998885577735
+      ],
+      "aMedian": 57.399792122163205,
+      "bMedian": 57.50013215572214,
+      "bMinusAMedian": 0.10034003355893617,
+      "aRange": 0.19359582283809118,
+      "bRange": 0.7101914240520912,
+      "spread": 0.7101914240520912,
+      "pairedDifferences": [
+        0.590037848154445,
+        0.10034003355893617,
+        0.07344224694044499
+      ],
+      "pairedDifferenceRange": 0.516595601214,
+      "regressionBeyondSpread": false
+    },
+    "excessP99Ms": {
+      "a": [
+        0.07764999999199063,
+        0.07576399999379646,
+        0.07455099999788217
+      ],
+      "b": [
+        0.08068499999353662,
+        0.0778890000001411,
+        0.07686000000103377
+      ],
+      "aMedian": 0.07576399999379646,
+      "bMedian": 0.0778890000001411,
+      "bMinusAMedian": 0.002125000006344635,
+      "aRange": 0.0030989999941084534,
+      "bRange": 0.0038249999925028533,
+      "spread": 0.0038249999925028533,
+      "pairedDifferences": [
+        0.0030350000015459955,
+        0.002125000006344635,
+        0.0023090000031515956
+      ],
+      "pairedDifferenceRange": 0.0009099999952013604,
+      "regressionBeyondSpread": false
+    }
+  },
+  "attempts": [
+    {
+      "status": "invalid native smoke; no graded holds",
+      "rawArchive": {
+        "sha256": "8e9f880d75dfabff941470dfdc3605a22c02ac46f56b0920009c86418223c311",
+        "bytes": 24721,
+        "access": "local-only"
+      },
+      "observedAwsStateReasonCodes": [],
+      "retainedSummaries": {},
+      "cleanupUtc": "2026-10-26T08:33:34.007413+00:00",
+      "cleanup": {
+        "eu-central-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-east-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-west-2": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "eu-west-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        }
+      },
+      "elapsedHoursUpperBound": 0.05805761472222223,
+      "quotedSpotPriceUsdHour": 0.2145,
+      "estimatedSpendUsd": 0.012926885807308601,
+      "computeAtPriceCapUsd": 0.029028807361111113
+    },
+    {
+      "status": "AWS-confirmed Spot termination; entire attempt excluded from primary design",
+      "rawArchive": null,
+      "observedAwsStateReasonCodes": [
+        "Server.SpotInstanceTermination"
+      ],
+      "retainedSummaries": {
+        "A1-summary.json": {
+          "sha256": "64241e0e0e4f8f994d828c4f08392bbdb98aa3a39173a4a2dfa391c8d1facc4b",
+          "bytes": 7109
+        },
+        "B1-summary.json": {
+          "sha256": "4ee2571b088cc07025c6269734b3ff12de30cb39b249cea30b96c9fd909c382b",
+          "bytes": 7052
+        }
+      },
+      "cleanupUtc": "2026-10-26T08:52:23.075224+00:00",
+      "cleanup": {
+        "eu-central-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-east-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-west-2": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "eu-west-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        }
+      },
+      "elapsedHoursUpperBound": 0.2880764511111111,
+      "quotedSpotPriceUsdHour": 0.2145,
+      "estimatedSpendUsd": 0.0641419976536286,
+      "computeAtPriceCapUsd": 0.14403822555555554
+    },
+    {
+      "status": "AWS-confirmed Spot termination; entire attempt excluded from primary design",
+      "rawArchive": null,
+      "observedAwsStateReasonCodes": [
+        "Server.SpotInstanceTermination"
+      ],
+      "retainedSummaries": {
+        "A1-summary.json": {
+          "sha256": "f842d5e04fb1f30def7f005112b23d6de4e260ff5b8a62b233794c8ac3070fc6",
+          "bytes": 7100
+        },
+        "B1-summary.json": {
+          "sha256": "aec56d10b90125741ede7448336a4ab2cfe4f0861f9835fe5d259bae7ae082c0",
+          "bytes": 7091
+        }
+      },
+      "cleanupUtc": "2026-10-26T09:19:07.617705+00:00",
+      "cleanup": {
+        "eu-central-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-east-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-west-2": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "eu-west-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        }
+      },
+      "elapsedHoursUpperBound": 0.3529493625,
+      "quotedSpotPriceUsdHour": 0.2145,
+      "estimatedSpendUsd": 0.07858635127587328,
+      "computeAtPriceCapUsd": 0.17647468125
+    },
+    {
+      "status": "AWS-confirmed Spot termination; entire attempt excluded from primary design",
+      "rawArchive": null,
+      "observedAwsStateReasonCodes": [
+        "Server.SpotInstanceTermination"
+      ],
+      "retainedSummaries": {
+        "Asmoke-summary.json": {
+          "sha256": "b1e34b315ac4f51e855bde7e8274e98057c2b5ee57ef94b4cee280c717cef3ec",
+          "bytes": 6248
+        }
+      },
+      "cleanupUtc": "2026-10-26T09:44:03.445099+00:00",
+      "cleanup": {
+        "eu-central-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-east-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-west-2": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "eu-west-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        }
+      },
+      "elapsedHoursUpperBound": 0.22929030527777777,
+      "quotedSpotPriceUsdHour": 0.2145,
+      "estimatedSpendUsd": 0.05105289990348592,
+      "computeAtPriceCapUsd": 0.11464515263888889
+    },
+    {
+      "status": "completed",
+      "rawArchive": {
+        "sha256": "cc11f15868db3fba7433a7e04663502511b08e48809d89f66f900bd1aab7df86",
+        "bytes": 2158716,
+        "access": "local-only"
+      },
+      "observedAwsStateReasonCodes": [],
+      "retainedSummaries": {
+        "A1-summary.json": {
+          "sha256": "70ffaafa91500653c46939449c0d9dca13ee9d3b7701e6064ccbe69745ddbe4c",
+          "bytes": 7444
+        },
+        "A2-summary.json": {
+          "sha256": "7dd8b645f86bf7c243a9e13f6afb68220af8ee1b80ac0fcd462e564bef9f84af",
+          "bytes": 7449
+        },
+        "A3-summary.json": {
+          "sha256": "3de3bf8779156b244884f61d62de7d129a53e5c362be4bab86528ef88bf575e4",
+          "bytes": 7441
+        },
+        "A4t-summary.json": {
+          "sha256": "7db450ca476f2b6f1e97d6af935dbe4fc1df27a2452aef16f62a65de55d8d0b8",
+          "bytes": 7625
+        },
+        "Asmoke-summary.json": {
+          "sha256": "00dfc365a8edf183e66b13344a618e6725baac29c62d2af9857220743240e3ca",
+          "bytes": 6255
+        },
+        "B1-summary.json": {
+          "sha256": "62dbccb57956a3b3d03d0d8caebaf830cc90280967649e206d2f02ce591821af",
+          "bytes": 7451
+        },
+        "B2-summary.json": {
+          "sha256": "339ab1a9d254208f9fd65e4b39183ceca8d1ab7eb6f215ce8ac47a5ac9d4cf33",
+          "bytes": 7444
+        },
+        "B3-summary.json": {
+          "sha256": "aa19f1bc47ed66e755740d854ca215067469db02f4d33f1714ac86f33705bdd5",
+          "bytes": 7436
+        }
+      },
+      "cleanupUtc": "2026-10-26T10:29:22.020452+00:00",
+      "cleanup": {
+        "eu-central-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-east-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "us-west-2": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        },
+        "eu-west-1": {
+          "nonterminatedInstances": 0,
+          "openOrActiveSpotRequests": 0,
+          "volumes": 0,
+          "securityGroups": 0,
+          "keyPairs": 0
+        }
+      },
+      "elapsedHoursUpperBound": 0.7202834588888889,
+      "quotedSpotPriceUsdHour": 0.4587,
+      "estimatedSpendUsd": 0.3362687728857915,
+      "computeAtPriceCapUsd": 0.5762267671111111
+    }
+  ],
+  "supplementary": [
+    {
+      "attempt": 2,
+      "slot": "A1",
+      "excludedFromPrimary": true,
+      "revisions": {
+        "A": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "B": "c274de6bff077fd8d7c5a0cc4511bc291bf0142b",
+        "originMain": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "selection": "Open at launch: A origin/main, B latest PR head",
+        "pr136State": "OPEN",
+        "mergeBase": "80bd4035734ea8978226c5600d411d8d721d47af"
+      },
+      "summaryFile": {
+        "sha256": "64241e0e0e4f8f994d828c4f08392bbdb98aa3a39173a4a2dfa391c8d1facc4b",
+        "bytes": 7109
+      },
+      "holdSeconds": 299.9999511241913,
+      "simulationCpuPercentOneCore": 57.913060127953756,
+      "botCpuCores": 0.46059782712562736,
+      "ticksPerSecond": 142.8566899407875,
+      "deferredTicks": 0,
+      "excessMs": {
+        "count": 25215,
+        "p50": 0.060192999997525476,
+        "p99": 0.07903200000873767,
+        "max": 4.7514460000093095
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawAccess": "Full raw not recovered; returned summary only"
+    },
+    {
+      "attempt": 2,
+      "slot": "B1",
+      "excludedFromPrimary": true,
+      "revisions": {
+        "A": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "B": "c274de6bff077fd8d7c5a0cc4511bc291bf0142b",
+        "originMain": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "selection": "Open at launch: A origin/main, B latest PR head",
+        "pr136State": "OPEN",
+        "mergeBase": "80bd4035734ea8978226c5600d411d8d721d47af"
+      },
+      "summaryFile": {
+        "sha256": "4ee2571b088cc07025c6269734b3ff12de30cb39b249cea30b96c9fd909c382b",
+        "bytes": 7052
+      },
+      "holdSeconds": 299.9994661808014,
+      "simulationCpuPercentOneCore": 57.17311537151779,
+      "botCpuCores": 0.45879825091742704,
+      "ticksPerSecond": 142.85692086589003,
+      "deferredTicks": 0,
+      "excessMs": {
+        "count": 26944,
+        "p50": 0.0525809999962803,
+        "p99": 0.07075500000064494,
+        "max": 7.956162999995286
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawAccess": "Full raw not recovered; returned summary only"
+    },
+    {
+      "attempt": 3,
+      "slot": "A1",
+      "excludedFromPrimary": true,
+      "revisions": {
+        "A": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "B": "768928591a81e4ecf3849ad20720640d56b4996e",
+        "originMain": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "pr136State": "OPEN",
+        "mergeBase": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "selection": "Launch-time main and PR head; merged case uses first parent and merge commit"
+      },
+      "summaryFile": {
+        "sha256": "f842d5e04fb1f30def7f005112b23d6de4e260ff5b8a62b233794c8ac3070fc6",
+        "bytes": 7100
+      },
+      "holdSeconds": 300.0008842945099,
+      "simulationCpuPercentOneCore": 57.236426265626896,
+      "botCpuCores": 0.4632647208896876,
+      "ticksPerSecond": 142.85624557668777,
+      "deferredTicks": 0,
+      "excessMs": {
+        "count": 29392,
+        "p50": 0.06200100000205566,
+        "p99": 0.07869000002392568,
+        "max": 9.032055000017863
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawAccess": "Full raw not recovered; returned summary only"
+    },
+    {
+      "attempt": 3,
+      "slot": "B1",
+      "excludedFromPrimary": true,
+      "revisions": {
+        "A": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "B": "768928591a81e4ecf3849ad20720640d56b4996e",
+        "originMain": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "pr136State": "OPEN",
+        "mergeBase": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+        "selection": "Launch-time main and PR head; merged case uses first parent and merge commit"
+      },
+      "summaryFile": {
+        "sha256": "aec56d10b90125741ede7448336a4ab2cfe4f0861f9835fe5d259bae7ae082c0",
+        "bytes": 7091
+      },
+      "holdSeconds": 300.0005326271057,
+      "simulationCpuPercentOneCore": 57.53651019260256,
+      "botCpuCores": 0.4590987514528216,
+      "ticksPerSecond": 142.8564130360073,
+      "deferredTicks": 0,
+      "excessMs": {
+        "count": 29692,
+        "p50": 0.062015999981667846,
+        "p99": 0.07929599998169579,
+        "max": 11.216404999984661
+      },
+      "valid": true,
+      "realTime": true,
+      "officialLike": true,
+      "rawAccess": "Full raw not recovered; returned summary only"
+    }
+  ],
+  "estimatedSpendUsdTotal": 0.5529769075260879,
+  "computeStorageIpv4EstimateUsd": 0.5429769075260878,
+  "handoffAndTransferAllowanceUsd": 0.01,
+  "spendScope": "Spot at launch quote plus public IPv4 at $0.005/h and 24 GiB gp3 rounded up to $0.096/GiB-month, plus $0.01 S3/request/transfer allowance; estimate, not invoice",
+  "handoffCleanup": {
+    "bucketDeleted": true,
+    "instanceProfileDeleted": true,
+    "roleDeleted": true
+  },
+  "finalCleanup": {
+    "verifiedUtc": "2026-10-26T10:30:00.179317+00:00",
+    "attemptCount": 5,
+    "regions": {
+      "eu-central-1": {
+        "nonterminatedInstances": 0,
+        "openOrActiveSpotRequests": 0,
+        "volumes": 0,
+        "securityGroups": 0,
+        "keyPairs": 0
+      },
+      "us-east-1": {
+        "nonterminatedInstances": 0,
+        "openOrActiveSpotRequests": 0,
+        "volumes": 0,
+        "securityGroups": 0,
+        "keyPairs": 0
+      },
+      "us-west-2": {
+        "nonterminatedInstances": 0,
+        "openOrActiveSpotRequests": 0,
+        "volumes": 0,
+        "securityGroups": 0,
+        "keyPairs": 0
+      },
+      "eu-west-1": {
+        "nonterminatedInstances": 0,
+        "openOrActiveSpotRequests": 0,
+        "volumes": 0,
+        "securityGroups": 0,
+        "keyPairs": 0
+      }
+    },
+    "handoff": {
+      "buckets": 0,
+      "roles": 0,
+      "instanceProfiles": 0
+    },
+    "allZero": true
+  },
+  "botDecisionCost": null,
+  "botDecisionCostReason": "Production host exposes no per-decision timing counter"
+}

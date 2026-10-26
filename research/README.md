@@ -8,6 +8,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
 | Bots | [A4 adoption](bots/2026-10-26-a4-adoption/REPORT.md) | A4-mean becomes the public default, with A1 selectable; selected private held-out gameplay and cost results, maintainer mean-cost gate and retained tail-limit failures. |
+| Performance | [500-bot AWS qualification](performance/2026-10-26-500-bot-qualification/REPORT.md) | 500 default A4 bots plus a watcher, one pinned simulation/socket core and two bot workers: six 300-second parent/merge holds pass both fixed delivery grades; no #136 regression beyond trial spread. Spot interruptions and supplementary holds retained. |
 | Performance | [Forager kernel shortcuts](performance/2026-10-26-forager-kernel/REPORT.md) | Exact occupancy and clearance shortcuts; platform conformance and paired AWS replay measurements. |
 | Bots | [Frozen Forager port](bots/2026-10-26-forager-port/REPORT.md) | Immutable A1 and test-only A4-mean parameters, selected decision conformance; runtime defaults unchanged. |
 | Battledome | [Safe spawn band](battledome/2026-10-26-safe-spawn/REPORT.md) | Local 120-second sensitivity grid and retained initial attempt; cached admission, head-path/departure protection and socket-first waiting. |

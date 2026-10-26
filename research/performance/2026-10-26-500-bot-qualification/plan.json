@@ -1,0 +1,129 @@
+{
+  "studyId": "2026-10-26-500-bot-qualification",
+  "dataOrigin": "local-simulator",
+  "frozenUtc": "2026-10-26T08:29:21.147043+00:00",
+  "question": "Can one host core plus separate A4 bot threads deliver 500 bots and one watcher in real time; does PR 136 regress?",
+  "revisions": {
+    "A": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+    "B": "c274de6bff077fd8d7c5a0cc4511bc291bf0142b",
+    "originMain": "cbe8bd9544e1cbba98756323cd0e02bc36290160",
+    "selection": "Open at launch: A origin/main, B latest PR head",
+    "pr136State": "OPEN",
+    "mergeBase": "80bd4035734ea8978226c5600d411d8d721d47af"
+  },
+  "build": {
+    "toolchain": "1.99.0",
+    "profile": "repository release: thin LTO, one codegen unit",
+    "command": "cargo build --release --locked --example host_qualification",
+    "jobsAws": 4,
+    "localBuildJobsMax": 2,
+    "localLogicalCpusMax": 4,
+    "flags": "none; no added profiling instrumentation",
+    "isolatedTargets": true
+  },
+  "aws": {
+    "region": "eu-central-1",
+    "instanceType": "c7a.2xlarge",
+    "vcpus": 8,
+    "market": "one-time Spot",
+    "maxPriceUsdHour": 0.5,
+    "capUsdTotal": 10,
+    "hardShutdownMinutes": 100,
+    "instanceInitiatedShutdown": "terminate",
+    "rootGp3GiB": 24,
+    "deleteOnTermination": true
+  },
+  "workload": {
+    "harness": "host_qualification.rs, study extension of examples/host_load.rs",
+    "seed": 7,
+    "bots": 500,
+    "playersMax": 1,
+    "world": "Config::official(501)",
+    "delivery": "default responsive",
+    "policy": "default A4 Forager",
+    "botThreads": 2,
+    "fixedRoundTripMs": 40,
+    "warmupSeconds": 30,
+    "holdSeconds": 300,
+    "watcher": "loopback slow circle; reconnect 250 ms after death/closure",
+    "affinity": {
+      "simulationAndSockets": [
+        0
+      ],
+      "watcherAndWrapper": [
+        1
+      ],
+      "botWorker0": [
+        2
+      ],
+      "botWorker1": [
+        3
+      ],
+      "sampler": [
+        6
+      ]
+    },
+    "rayonNumThreads": 1
+  },
+  "trialOrder": [
+    "A1",
+    "B1",
+    "A2",
+    "B2",
+    "A3",
+    "B3"
+  ],
+  "exploratory": {
+    "revision": "A",
+    "botThreads": 4,
+    "botCpus": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "rule": "One 30+300 s hold after primary trials if elapsed instance time < 70 min and no interruption"
+  },
+  "metrics": [
+    "ticks/s",
+    "deferred ticks",
+    "simulation thread Linux user+system CPU / one core",
+    "socket CPU",
+    "bot-thread CPU cores",
+    "simulation busy wall fraction",
+    "watcher frame-excess p50/p99/max",
+    "system steal",
+    "watcher coverage and errors"
+  ],
+  "botDecisionCost": "No per-decision production counter: unavailable; do not alter runtime for it",
+  "timing": "All post-setup binary frames received during hold; receipt ms minus cumulative server elapsed header; minimum-normalize per connection over the entire hold, exact nearest-rank quantiles. No 1200-frame reset, filtering or stall masking.",
+  "grades": {
+    "realTime": "No newly deferred ticks AND excess p99 <= 10 ms",
+    "officialLike": "No newly deferred ticks AND excess p99 <= 3 ms"
+  },
+  "validity": "Complete 300 s hold, exact pinned thread affinities at both boundaries and samples, no watcher read/send errors, >=95% watcher playing coverage. Report warmup deferrals separately. Invalid/interrupted attempts retained, never silently replaced.",
+  "regression": {
+    "difference": "B median minus A median, simulation CPU percentage points and excess p99 ms",
+    "spread": "max(A max-min, B max-min) separately for each metric",
+    "criterion": "Call regression for a metric only when positive median difference strictly exceeds spread",
+    "alsoReport": "All trial values and paired B_i-A_i differences with min-max range; descriptive, no inferential significance claim"
+  },
+  "limits": "Single machine/type/seed, fresh world plus five-minute growth; asynchronous A4 runs are not trajectory-identical; no official-server or WAN traffic, no mature-world or 500 socket-player claim; no fitting, held-out fitting validation inapplicable.",
+  "failures": "Stop primary collection on invalid/incomplete trial; retain error and raw files; repair only harness faults with a recorded amendment and rerun all affected comparisons",
+  "cleanup": {
+    "regions": [
+      "eu-central-1",
+      "us-east-1",
+      "us-west-2",
+      "eu-west-1"
+    ],
+    "scope": "Only resources created by this study",
+    "verify": [
+      "nonterminated instances",
+      "open/active Spot requests",
+      "volumes",
+      "security groups",
+      "key pairs"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "recordedUtc": "2026-10-26T09:45:36.903881+00:00",
+  "originalPlanSha256": "ef54c0e40a9e9dd18ae978961b742fad4d89951fba8e4326903100c402107e7d",
+  "authorization": "Continue the original AWS qualification within $10 after AWS-confirmed Spot capacity interruptions; retain all prior attempts",
+  "revisions": {
+    "A": "2cc67b78c968bfed36cc472010d8256947e56fbb",
+    "B": "7d1d9bdcccd1dc575629f68823aae5ca05a64cc3",
+    "originMain": "ceb7471722b4298ed6ee280e89f2a493c7c476e7",
+    "pr136State": "MERGED",
+    "mergeBase": "2cc67b78c968bfed36cc472010d8256947e56fbb",
+    "selection": "PR 136 first parent on main and merge commit"
+  },
+  "unchanged": "500 bots, default responsive and A4, two primary bot workers, exact affinity, 30+300 s, ABABAB, both fixed grades and range-based regression rule",
+  "execution": "Upload once, detach the whole build and ABAB sequence on EC2. Instance writes progress and archive to two keys in a temporary private S3 bucket through a temporary least-privilege instance role. Desktop polls S3 every 90 s; no SSH needed after start. Boot hard shutdown +100 min and instance-initiated shutdown=terminate remain. One same-slot retry only for stopped invalid attempts; completed failed-attempt holds supplementary only.",
+  "failedAttempt3": "SSH control link failed after completed A1/B1, subsequent hold incomplete; cleanup verified, no full raw archive recovered. Excluded from primary design.",
+  "pythonHandoffDependency": "uv run --no-project --with boto3==1.43.118",
+  "cumulativePriorSpendUsd": 0.15565523473681048,
+  "budget": "Prior actual estimate plus $0.80/h x 100/60 plus $2 reserve must be below $10 before launch",
+  "additionalCleanup": "Delete and verify temporary private S3 bucket, instance profile and IAM role after retrieving results; no credentials or cloud identifiers in repository",
+  "aws": {
+    "region": "eu-central-1",
+    "instanceType": "c7a.4xlarge",
+    "vcpus": 16,
+    "maxPriceUsdHour": 0.8,
+    "priorSpendUsd": 0.20670813464029641,
+    "selection": "Highest current mixed-type placement score among eligible default-subnet AZs not used by interrupted attempts, then lowest price. Scores are advisory; interruptions remain possible."
+  },
+  "failedAttempt4": "AWS Spot status instance-terminated-no-capacity during A1. Autonomous smoke and progress preserved in private S3; no completed primary hold.",
+  "correctedCause": "AWS also records Server.SpotInstanceTermination for attempts 2 and 3; SSH failures were symptoms, not proof of desktop-only link failure."
+}
