@@ -63,5 +63,13 @@ These references establish packet layouts and observed behavior, not closed-serv
 algorithms. Local ranking, record, session and team support is described in the
 [server guide](raw-server.md); mechanics limits are in [server rules](server-rules.md).
 
+## Branding
+
+`assets/logo.svg` and `assets/icon.svg` use an original S-shaped snake with an
+eye cutout, paired with SlitherClient's C-shaped snake. The wordmark was typeset
+in [Inter Medium](https://github.com/rsms/inter) and converted to vector paths.
+Inter is distributed under the [SIL Open Font License 1.1](https://github.com/rsms/inter/blob/master/LICENSE.txt).
+The SVGs contain no official game artwork, scripts or external resources.
+
 Initial implementation assistance: GPT 6.1 Sol via Codex and Claude Opus 5.5 via
 the Claude Agent harness. Source evidence and verification are recorded separately.

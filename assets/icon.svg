@@ -1,12 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="SlitherSim">
+<svg class="slither-brand" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" color="#15171b" role="img" aria-label="SlitherSim snake S icon">
   <style>
-    .snake { fill: none; stroke: #0969da; }
-    .food { fill: #0969da; }
+    .slither-brand { color: #15171b; }
     @media (prefers-color-scheme: dark) {
-      .snake { stroke: #4493f8; }
-      .food { fill: #4493f8; }
+      .slither-brand { color: #f4f6f8; }
     }
   </style>
-  <path class="snake" d="M5 37H31V25H11V11H37" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect class="food" x="35" y="34" width="6" height="6"/>
-</svg>
+  <path fill="currentColor" fill-rule="evenodd" d="M117 48C119 43 113 36 106 29C100 23 93 29 86 22C63 3 39 5 19 23C5 36 5 56 20 68C33 78 49 79 67 82C85 85 96 90 91 99C86 108 67 109 52 104C38 99 29 91 23 85Q20 81 16 84L10 90Q7 93 10 97C25 116 47 126 68 125C95 125 116 115 117 96C120 75 104 63 79 58L49 51C35 48 29 44 33 38C39 29 48 28 55 28C67 28 77 33 82 43C86 51 100 50 111 51C115 51 117 50 117 48ZM106 39a3 3 0 1 0-6 0a3 3 0 1 0 6 0Z"/></svg>

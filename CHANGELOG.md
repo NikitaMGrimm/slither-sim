@@ -134,6 +134,9 @@
 
 ### Changed
 
+- Adopt an S-shaped snake logo and square project icon, paired with
+  SlitherClient's C-shaped snake, with outlined Inter lettering and automatic
+  light/dark colors.
 - Host and native background bots, plus both Rust bot examples, now use the
   shared default Forager policy. Worker scratch is shared while sent history and lifecycle
   stay per client; boost-only changes are transmitted. A separate
