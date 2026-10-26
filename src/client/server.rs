@@ -2784,7 +2784,17 @@ mod tests {
         client.set_nodelay(true).unwrap();
         // The upgrade is first interrupted before any bytes, then inside both
         // the header name and its value, forcing the saved HTTP state to resume.
-        gateway.accept(Instant::now());
+        // A nonblocking listener may not see a fresh loopback connection on the
+        // first accept, notably on macOS.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while gateway.sessions.is_empty() && Instant::now() < deadline {
+            gateway.accept(Instant::now());
+            thread::yield_now();
+        }
+        assert!(
+            !gateway.sessions.is_empty(),
+            "gateway did not accept the loopback connection within two seconds"
+        );
         assert!(matches!(gateway.sessions[0].stage, Stage::Http(_)));
         for fragment in [
             &b"GET /slither HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nX-SlitherSim-F"[..],
