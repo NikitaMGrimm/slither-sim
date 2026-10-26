@@ -280,6 +280,8 @@ integrity/RTT analysis nor infers world populations from recipient counts.
 
 ### Transport parity
 
+Frame cadence depends on view content, so cadence comparisons should be view-matched; see the [sparse-view study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-sparse-view-cadence/REPORT.md).
+
 Measure complete elapsed-header protocol-19 captures on receipt and server clocks:
 
 ```sh
