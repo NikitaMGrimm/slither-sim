@@ -75,6 +75,57 @@ fn still(observation: &Observation) -> Action {
     decide(observation, &Timing::default(), &Params::default())
 }
 
+#[test]
+fn inside_pit_decisions_reuse_buffers_without_copying_observations() {
+    let mut o = fixture();
+    o.arena.radius = 3584.;
+    o.food = vec![food(300., 0., 1.)];
+    let mut bot = super::Forager::new();
+    let timing = Timing::default();
+    let expected = bot.decide_with_pit(&o, &timing, &[], Some(1784.));
+    ALLOCATIONS.with(|count| count.set(0));
+    COUNTING.with(|counting| counting.set(true));
+    let actual = bot.decide_with_pit(&o, &timing, &[], Some(1784.));
+    COUNTING.with(|counting| counting.set(false));
+    assert_eq!(actual, expected);
+    assert_eq!(ALLOCATIONS.with(Cell::get), 0);
+}
+
+#[test]
+fn one_way_pit_steering_enters_then_survives_outward_food_and_a_shrinking_edge() {
+    let mut o = fixture();
+    o.arena.radius = 3584.;
+    o.me.segments = 26;
+    o.me.speed = physics::base_speed(26);
+    o.me.head = Point { x: 2684., y: 0. };
+    o.me.heading = std::f64::consts::FRAC_PI_2;
+    let mut bot = super::Forager::new();
+    let mut entered = false;
+    let dt = 0.007;
+    for tick in 0..6000 {
+        let pit = 1784. - tick as f64 * dt * 2.;
+        o.food = vec![food(2000., 0., 10000.)];
+        let action = bot.decide_with_pit(&o, &Timing::default(), &[], Some(pit));
+        let turn = physics::turn_rate(o.me.segments) * dt;
+        let delta = (action.heading - o.me.heading)
+            .sin()
+            .atan2((action.heading - o.me.heading).cos());
+        o.me.heading += delta.clamp(-turn, turn);
+        o.me.head.x += o.me.heading.cos() * o.me.speed * dt;
+        o.me.head.y += o.me.heading.sin() * o.me.speed * dt;
+        if o.me.head.distance(o.arena.center) < pit {
+            entered = true;
+        }
+        if entered {
+            assert!(
+                o.me.head.distance(o.arena.center) < pit,
+                "escaped at tick {tick}"
+            );
+        }
+    }
+    assert!(entered);
+}
+
 /// Native decisions recorded from the original crate at its pinned commit.
 #[test]
 fn default_zero_lead_decisions_match_the_original_forager() {

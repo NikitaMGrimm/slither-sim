@@ -59,6 +59,25 @@ impl Forager {
         )
     }
 
+    /// Use a supplied live, centered one-way pit: enter it, then treat its
+    /// edge as a lethal wall. `None` keeps ordinary A4 decisions unchanged.
+    pub fn decide_with_pit(
+        &mut self,
+        observation: &Observation,
+        timing: &Timing,
+        intents: &[Intent],
+        pit_radius: Option<f64>,
+    ) -> Action {
+        kernel::decide_with_pit(
+            observation,
+            timing,
+            intents,
+            &self.params,
+            &mut self.scratch,
+            pit_radius,
+        )
+    }
+
     #[cfg(feature = "networking")]
     pub(crate) fn uplink_share(&self) -> f64 {
         self.params.uplink_share
