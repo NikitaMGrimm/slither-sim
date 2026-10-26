@@ -3,7 +3,7 @@ use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::KnownPrey,
     food::{eaten_sectors, food_identity, food_updates},
-    snakes::{CoverageGrid, KnownSnake, changes, covered, full},
+    snakes::{CoverageGrid, KnownSnake, SnakeDeltaCache, covered, full},
 };
 use crate::{
     Simulator,
@@ -335,6 +335,10 @@ impl SimulatorBackend {
             })
             .collect();
         let grid = CoverageGrid::new(&self.world.snakes, &bounds, self.world.config.vision);
+        // Physics, profiles and report opportunities stay fixed throughout this
+        // broadcast. Only observe's stale flags accumulate between recipients;
+        // they are consumed by the next broadcast's update_reports.
+        let mut snake_deltas = vec![SnakeDeltaCache::default(); self.slots.len()];
         let mut board = None;
         let mut map = None;
         for slot in 0..self.slots.len() {
@@ -361,7 +365,8 @@ impl SimulatorBackend {
             // and put the map before gameplay updates.
             let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
             let mut packets = vec![encode::pong(); pongs];
-            let (updates, presented_updates) = self.updates(slot, &eaten, &bounds, &grid)?;
+            let (updates, presented_updates) =
+                self.updates(slot, &eaten, &bounds, &grid, &mut snake_deltas)?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 packets.push(packet);
             }
@@ -530,6 +535,7 @@ impl SimulatorBackend {
         eaten: &BTreeSet<[u8; 2]>,
         bounds: &[[f64; 4]],
         grid: &CoverageGrid,
+        snake_deltas: &mut [SnakeDeltaCache],
     ) -> Result<PacketViews, String> {
         let world = &self.world;
         let me = &world.snakes[slot];
@@ -591,7 +597,7 @@ impl SimulatorBackend {
                 (Some(known), true) if known.life == life => {
                     let wanted = physics::quantize_heading(control);
                     let reports = &self.reports[i];
-                    changes(
+                    snake_deltas[i].changes(
                         &mut packets,
                         own,
                         id,
