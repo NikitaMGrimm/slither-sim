@@ -64,27 +64,29 @@ fn scenario_errors_identify_the_duplicate_or_invalid_slot() {
 
 #[test]
 fn large_spawn_headings_preserve_orientation_and_can_turn() {
-    for operation in ["spawn", "respawn", "respawn_body"] {
-        let mut world = empty_world();
-        if operation != "spawn" {
-            support::ring_slot(&mut world, "self", 0, 1).unwrap();
-            world.retire(0).unwrap();
-        }
-        let heading: f64 = 1e20;
-        let body = vec![Point::default(), Point { x: -42., y: 0. }];
-        match operation {
-            "spawn" => {
-                world.spawn("self".into(), body, heading).unwrap();
+    for heading in [1e20_f64, 1e150, 1e151, f64::MAX] {
+        for operation in ["spawn", "respawn", "respawn_body"] {
+            let mut world = empty_world();
+            if operation != "spawn" {
+                support::ring_slot(&mut world, "self", 0, 1).unwrap();
+                world.retire(0).unwrap();
             }
-            "respawn_body" => world.respawn_body(0, body, heading).unwrap(),
-            "respawn" => world.respawn(0, Point::default(), heading, 2).unwrap(),
-            _ => unreachable!(),
+            let body = vec![Point::default(), Point { x: -42., y: 0. }];
+            match operation {
+                "spawn" => {
+                    world.spawn("self".into(), body, heading).unwrap();
+                }
+                "respawn_body" => world.respawn_body(0, body, heading).unwrap(),
+                "respawn" => world.respawn(0, Point::default(), heading, 2).unwrap(),
+                _ => unreachable!(),
+            }
+            let before = world.snakes()[0].heading;
+            assert!((before.cos() - heading.cos()).abs() < 1e-12);
+            assert!((before.sin() - heading.sin()).abs() < 1e-12);
+            world.step(&[Some(Action::default())]).unwrap();
+            assert!(world.snakes()[0].heading.abs() < before.abs());
+            world.checkpoint().unwrap();
         }
-        let before = world.snakes()[0].heading;
-        assert!((before.cos() - heading.cos()).abs() < 1e-12);
-        assert!((before.sin() - heading.sin()).abs() < 1e-12);
-        world.step(&[Some(Action::default())]).unwrap();
-        assert!(world.snakes()[0].heading.abs() < before.abs());
     }
 }
 

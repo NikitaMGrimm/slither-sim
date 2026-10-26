@@ -418,6 +418,7 @@ fn requests_answer_with_the_serve_lines() {
         br#"{"op":"reset","seed":5,"worlds":2,"agents":3}"#,
         br#"{"op":"step","actions":[{"heading":[0,1,2],"boost":[true,false,false]},{"heading":[2,1,0],"boost":[false,false,true]}]}"#,
         br#"{"op":"snapshot","world":1}"#,
+        br#"{"op":"reset","config":{"preset":"sandbox","radius":60,"foodCount":0}}"#,
     ];
     let mut session = transport::Session::new();
     assert_eq!((session.worlds(), session.agents()), (0, 0));
@@ -432,6 +433,9 @@ fn requests_answer_with_the_serve_lines() {
     assert_eq!(lines, served);
     assert_eq!((session.worlds(), session.agents()), (2, 3));
     assert!(session.frame(1).is_some() && session.frame(2).is_none());
+    let reply: Value = serde_json::from_slice(&session.request(input.last().unwrap())).unwrap();
+    assert_eq!(reply["error"], "Initial spawn body extends outside arena");
+    assert_eq!(reply["sessionEnded"], false);
 }
 
 #[test]

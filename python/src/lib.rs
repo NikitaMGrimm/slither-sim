@@ -205,8 +205,8 @@ fn dumps(py: Python<'_>, object: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
     Ok(text.cast::<PyString>()?.to_str()?.as_bytes().to_vec())
 }
 
-// Only configuration/placement need JSON conversion. Scalar extraction rejects
-// Python bool explicitly, as the JSON boundary does, before preparing any worlds.
+// Successful scalars avoid JSON conversion. Rejections use serde's value
+// decoding, like the internally tagged JSON request, to preserve its diagnostics.
 fn reset_scalar<T>(value: Option<Bound<'_, PyAny>>, default: T) -> PyResult<T>
 where
     for<'py> T: FromPyObject<'py, 'py> + serde::de::DeserializeOwned,
@@ -217,17 +217,14 @@ where
     if value.is_none() {
         return Ok(default);
     }
-    if value.is_instance_of::<pyo3::types::PyBool>() {
-        return Err(PyValueError::new_err(
-            "invalid type: boolean, expected an unsigned integer",
-        ));
+    if !value.is_instance_of::<pyo3::types::PyBool>()
+        && let Ok(value) = value.extract::<T>()
+    {
+        return Ok(value);
     }
-    match value.extract::<T>() {
-        Ok(value) => Ok(value),
-        // Keep the JSON boundary's diagnostics for rejected scalar inputs.
-        Err(_) => serde_json::from_slice(&dumps(value.py(), &value)?)
-            .map_err(|e| PyValueError::new_err(e.to_string())),
-    }
+    let value: serde_json::Value = serde_json::from_slice(&dumps(value.py(), &value)?)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    serde_json::from_value(value).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 fn reset_object<T: serde::de::DeserializeOwned + Default>(
@@ -295,7 +292,11 @@ impl Session {
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let prepared = py
             .detach(|| transport::Session::prepare_reset(options))
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            .map_err(|mut e| {
+                // Reset diagnostics predate the typed world's location metadata.
+                e.world = None;
+                PyValueError::new_err(e.to_string())
+            })?;
         // Warnings can raise; retain both the old worlds and their frame buffers
         // until every warning has been accepted by Python.
         let category = py.get_type::<PyUserWarning>();

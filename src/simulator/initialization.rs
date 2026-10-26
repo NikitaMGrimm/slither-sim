@@ -415,7 +415,7 @@ impl Simulator {
     }
     pub fn spawn(&mut self, id: String, body: Vec<Point>, heading: f64) -> Result<usize, SimError> {
         self.check_id(&id)?;
-        bounded(heading, MAGNITUDE, "heading")?;
+        finite(heading, "heading")?;
         // Match respawn without changing synthetic ring or replay representations.
         let heading = if heading.abs() > TAU {
             heading.sin().atan2(heading.cos())
@@ -466,7 +466,7 @@ impl Simulator {
             return Err(SimError::state(
                 Constraint::OutsideArena,
                 "body",
-                "Spawn body extends outside arena",
+                "Initial spawn body extends outside arena",
             ));
         }
         Ok(())

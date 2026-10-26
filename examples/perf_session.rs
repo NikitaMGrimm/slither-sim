@@ -37,6 +37,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut out,
             json!({"kind":"reset", "case":name, "replyBytes":reset}),
         )?;
+        if name == "sandbox" {
+            let request =
+                br#"{"op":"reset","config":{"preset":"sandbox","radius":60,"foodCount":0}}"#;
+            let rejection = encoded.request(request);
+            assert_eq!(typed.request(request), rejection);
+            let value: Value = serde_json::from_slice(&rejection)?;
+            assert_eq!(value["error"], "Initial spawn body extends outside arena");
+            emit(
+                &mut out,
+                json!({"kind":"rejectedReset", "case":name, "replyBytes":rejection}),
+            )?;
+        }
         for tick in 0..=32 {
             for world in 0..2 {
                 let left = format!("{:?}", typed.frame(world).unwrap());

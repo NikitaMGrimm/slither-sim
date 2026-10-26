@@ -564,7 +564,11 @@ impl Session {
                     *config,
                     placement,
                 )?;
-                let prepared = Self::prepare_reset(options)?;
+                let prepared = Self::prepare_reset(options).map_err(|mut e| {
+                    // Preserve reset wire text while typed callers retain locations.
+                    e.world = None;
+                    e
+                })?;
                 // Encode every frame and the complete reply before installing it.
                 let frames: Vec<_> = prepared
                     .run
@@ -701,6 +705,22 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> 
 #[cfg(test)]
 mod reset_tests {
     use super::*;
+
+    #[test]
+    fn initial_containment_errors_keep_typed_locations() {
+        let error = Session::prepare_reset(ResetOptions {
+            config: Config {
+                radius: 60.,
+                food_count: 0,
+                ..Config::sandbox()
+            },
+            ..ResetOptions::default()
+        })
+        .unwrap_err();
+        assert_eq!(error.world, Some(0));
+        assert_eq!(error.slot, Some(0));
+        assert_eq!(error.field.as_deref(), Some("body"));
+    }
 
     #[test]
     fn prepared_reset_sizes_before_validation_and_keeps_official_prey_density() {

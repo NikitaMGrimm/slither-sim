@@ -1280,6 +1280,12 @@ impl Simulator {
             )
             .at_slot(index));
         }
+        // Large finite angles lose per-tick turn increments to rounding.
+        let heading = if heading.abs() > TAU {
+            heading.sin().atan2(heading.cos())
+        } else {
+            heading
+        };
         self.validate_spawn(&body, heading)
             .map_err(|e| e.at_slot(index))?;
         let floor = self.min_mass;
@@ -1299,12 +1305,7 @@ impl Simulator {
         s.head = body[0];
         s.segments = body.len();
         s.body = body;
-        // Large finite angles lose per-tick turn increments to rounding.
-        s.heading = if heading.abs() > TAU {
-            heading.sin().atan2(heading.cos())
-        } else {
-            heading
-        };
+        s.heading = heading;
         s.speed = base_speed(s.segments);
         s.fam = floor
             .filter(|floor| floor.segments == s.segments)
