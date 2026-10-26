@@ -4,9 +4,11 @@
 
 ### Added
 
-- A two-client `paired-collision` collector and a frozen, not yet run, official
-  pilot plan for measuring the collision hitbox and head-on resolution order
-  ([research workflow](docs/research-workflow.md#paired-collision-trials)).
+- A two-client `paired-collision` collector and a frozen official pilot plan
+  for measuring the collision hitbox and head-on resolution order
+  ([research workflow](docs/research-workflow.md#paired-collision-trials)). The
+  first official pilot failed feasibility without a qualified encounter
+  ([execution](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/EXECUTION.md)).
 
 ### Fixed
 
