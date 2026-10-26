@@ -1,7 +1,9 @@
 use super::*;
 use crate::{
     Config,
-    client::{Minimap, WireEvent, encode, latency::LatencyConfig, protocol},
+    client::{
+        Minimap, WireEvent, encode, latency::LatencyConfig, protocol, visibility::SectorInterest,
+    },
     model::{Food, Origin, Snake},
     physics,
 };
@@ -10,7 +12,7 @@ use std::collections::BTreeSet;
 use super::{
     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},
-    food::{KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
+    food::{FoodChanges, KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
     snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
 };
 
@@ -753,9 +755,13 @@ fn diff_food(
     food_updates(
         packets,
         &mut connection.food,
-        subscribed,
+        &SectorInterest::from_subscribed(subscribed.clone()),
         &listings,
-        &eaten_sectors(eaters),
+        &FoodChanges {
+            changed: subscribed.clone(),
+            eaten: eaten_sectors(eaters),
+            ..Default::default()
+        },
         eaters,
     );
 }
@@ -776,16 +782,21 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     let mut sectors = vec![None; 1 << 16];
     sectors[usize::from(u16::from_be_bytes([sx, sy]))] =
         Some(Arc::new(SectorFood(vec![([rx, ry], food)])));
-    let subscribed = BTreeSet::from([[sx, sy]]);
+    let interest = SectorInterest::from_subscribed(BTreeSet::from([[sx, sy]]));
     let mut known = KnownSectors::default();
     let mut packets = Vec::new();
     let none = BTreeMap::new();
+    let initial = FoodChanges::default();
+    let unchanged = FoodChanges {
+        previous: initial.current.clone(),
+        ..Default::default()
+    };
     food_updates(
         &mut packets,
         &mut known,
-        &subscribed,
+        &interest,
         &sectors,
-        &eaten_sectors(&none),
+        &initial,
         &none,
     );
     assert_eq!(packets.len(), 1);
@@ -793,9 +804,9 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     food_updates(
         &mut packets,
         &mut known,
-        &subscribed,
+        &interest,
         &sectors,
-        &eaten_sectors(&none),
+        &unchanged,
         &none,
     );
     assert!(packets.is_empty());
@@ -804,9 +815,14 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
     food_updates(
         &mut packets,
         &mut known,
-        &subscribed,
+        &interest,
         &sectors,
-        &eaten_sectors(&eaters),
+        &FoodChanges {
+            changed: eaten_sectors(&eaters),
+            eaten: eaten_sectors(&eaters),
+            previous: unchanged.current.clone(),
+            ..Default::default()
+        },
         &eaters,
     );
     assert_eq!(
@@ -993,6 +1009,89 @@ fn raw_config(agents: usize) -> SimulationConfig {
             ..Config::sandbox()
         },
         ..Default::default()
+    }
+}
+
+#[test]
+fn interrupted_broadcast_resumes_food_diffs_for_later_recipients() {
+    for decorations in [false, true] {
+        let mut config = raw_config(2);
+        if decorations {
+            config.world = Config::battledome();
+        }
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut backend = SimulatorBackend::new(7, config).unwrap();
+        for slot in &mut backend.slots {
+            slot.connection.decorations = decorations;
+        }
+        backend.advance_ticks(4).unwrap();
+        assert!(backend.slots.iter().all(|slot| slot.connection.setup));
+        for slot in &mut backend.slots {
+            slot.connection.downlink.clear();
+        }
+        let point = backend.world.snakes()[1].head;
+        let food = Food {
+            x: point.x,
+            y: point.y,
+            value: 1.,
+            size: Some(2.),
+            origin: None,
+        };
+        let [sx, sy, rx, ry] = encode::food_key(point).unwrap();
+        let index = usize::from(u16::from_be_bytes([sx, sy]));
+        let old = backend.slots[1]
+            .connection
+            .food
+            .get(&[sx, sy])
+            .unwrap()
+            .clone();
+        backend.world.insert_food(food).unwrap();
+        backend.slots[0].connection.pongs = 1;
+        // Synthetic queue pressure interrupts emission before recipient one.
+        backend.slots[0]
+            .connection
+            .downlink
+            .resize(super::connection::MAX_IN_FLIGHT, (f64::MAX, vec![0]));
+        assert_eq!(backend.broadcast().unwrap_err(), "Downlink queue is full");
+        let current = backend.food_sectors[index].as_ref().unwrap().clone();
+        assert!(!Arc::ptr_eq(&old, &current));
+        assert!(Arc::ptr_eq(
+            &old,
+            backend.slots[1].connection.food.get(&[sx, sy]).unwrap()
+        ));
+        backend.slots[0].connection.downlink.clear();
+        backend.broadcast().unwrap(); // No further food or membership changes.
+        assert!(Arc::ptr_eq(
+            &current,
+            backend.food_sectors[index].as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            &current,
+            backend.slots[1].connection.food.get(&[sx, sy]).unwrap()
+        ));
+        if decorations {
+            assert!(Arc::ptr_eq(
+                backend.decorated_food_sectors[index].as_ref().unwrap(),
+                backend.slots[1]
+                    .connection
+                    .decorated_food
+                    .get(&[sx, sy])
+                    .unwrap(),
+            ));
+        } else {
+            let mut packets = Vec::new();
+            for (_, frame) in &backend.slots[1].connection.downlink {
+                packets.extend(
+                    protocol::split_frame(frame)
+                        .unwrap()
+                        .into_iter()
+                        .map(<[u8]>::to_vec),
+                );
+            }
+            let style = current[&[rx, ry]].style;
+            assert!(packets.contains(&encode::food_add([sx, sy, rx, ry], style)));
+        }
     }
 }
 

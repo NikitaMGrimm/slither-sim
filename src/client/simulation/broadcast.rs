@@ -2,7 +2,7 @@
 use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::KnownPrey,
-    food::{eaten_sectors, food_identity, food_updates},
+    food::{FoodChanges, food_identity, food_updates},
     prey_visibility::PreyBounds,
     snakes::{CoverageGrid, KnownSnake, SnakeDeltaCache, covered, full},
 };
@@ -347,10 +347,9 @@ impl SimulatorBackend {
                     .advance(snake.head, snake.heading, now);
             }
         }
-        self.sync_food_sectors()?;
+        let food_changes = self.sync_food_sectors()?;
         self.assign_prey_wire()?;
         self.update_prey_clocks()?;
-        let eaten = eaten_sectors(&self.food_eaters);
         let bounds: Vec<[f64; 4]> = self
             .world
             .snakes()
@@ -401,7 +400,7 @@ impl SimulatorBackend {
             let mut packets = vec![encode::pong(); pongs];
             let (updates, presented_updates) = self.updates(
                 slot,
-                &eaten,
+                &food_changes,
                 &bounds,
                 &grid,
                 &prey_bounds,
@@ -568,7 +567,7 @@ impl SimulatorBackend {
     fn updates(
         &mut self,
         slot: usize,
-        eaten: &BTreeSet<[u8; 2]>,
+        food_changes: &FoodChanges,
         bounds: &[[f64; 4]],
         grid: &CoverageGrid,
         prey_bounds: &PreyBounds,
@@ -684,9 +683,9 @@ impl SimulatorBackend {
         food_updates(
             &mut packets,
             &mut connection.food,
-            connection.food_interest.subscribed(),
+            &connection.food_interest,
             &self.food_sectors,
-            eaten,
+            food_changes,
             &self.food_eaters,
         );
         let food_end = packets.len();
@@ -695,9 +694,9 @@ impl SimulatorBackend {
             food_updates(
                 &mut presented,
                 &mut connection.decorated_food,
-                connection.food_interest.subscribed(),
+                &connection.food_interest,
                 &self.decorated_food_sectors,
-                eaten,
+                food_changes,
                 &self.food_eaters,
             );
             Some(presented)
