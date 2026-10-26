@@ -316,13 +316,20 @@ def percentiles(values):
 def native(executable, case, iterations, stderr_path, profile=False, *, deadline=None, blocks=None):
     args = [str(executable), case, str(iterations)] + (["--profile"] if profile else []) + (
         ["--blocks", str(blocks)] if blocks is not None else [])
+    environment = None
+    if platform.system() == "Linux" and case.startswith("host-"):
+        cores = sorted(os.sched_getaffinity(0))
+        if len(cores) < 2:
+            raise RuntimeError("socket comparison needs one host CPU and one separate driver CPU")
+        environment = {**os.environ, "SLITHER_LOAD_DRIVER_CPU": str(cores[1]), "SLITHER_LOAD_HOST_CPU": str(cores[0])}
+        args = ["taskset", "-c", str(cores[0]), *args]
     started = time.perf_counter()
     child_deadline = min(started + 120, deadline) if deadline is not None else started + 120
     if child_deadline <= started:
         raise TimeoutError("performance run deadline exceeded before native child")
     with ExitStack() as cleanup:
         errors = cleanup.enter_context(stderr_path.open("wb"))
-        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
+        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors, **({"env": environment} if environment else {}))
         reader, line = Lines(process.stdout), None
         try:
             line = reader.read(child_deadline)

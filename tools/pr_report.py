@@ -7,6 +7,7 @@ requires a quiet runner and matched inputs.
 
 import argparse
 import copy
+from contextlib import contextmanager, nullcontext
 import json
 import math
 import os
@@ -32,7 +33,42 @@ JOB_TIMEOUT_SECONDS = 1800
 RESERVE_SECONDS = 90
 STAGE_CAP_SECONDS = 1500
 RESULTS = {"Faster": "🟢 Faster", "Slower": "🔴 Slower", "Within": "⚪ Within ±5%",
-           "Undecided": "🟡 Undecided", "Unavailable": "⚠️ Unavailable"}
+           "Undecided": "🟡 Undecided", "Unavailable": "⚠️ Unavailable", "Redefined": "🟡 Redefined"}
+
+# Timing selection and deterministic regression coverage have separate purposes.
+REPORT_CASES = ("step-food", "observe", "official-100-step", "official-100-bot",
+                "host-official-500", "host-battledome-80")
+# Fixed from the two hosted A/A jobs in the row audit; no per-PR metric selection.
+REPORT_METRICS = {"host-official-500": "cpuSeconds"}
+TRACE_CASES = ("step-default", "step-food", "step-body", "observe", "portable", "protocol",
+               "official-100-step", "official-100-bot", "battledome-32-step", "client-battledome-64")
+
+
+@contextmanager
+def head_configs(catalog, output):
+    """Resolve constructors on head, then supply the same Config to both runtimes."""
+    configs = {}
+    for workload in catalog.workloads:
+        definition = json.loads(workload.definition)
+        if "config" not in definition:
+            continue
+        configs[workload.name] = definition["config"]
+        world = definition.get("world", {})
+        kind = world.get("kind")
+        key = {"official": f"Official({world.get('snakes')})", "sandbox": "Sandbox", "battledome": "Battledome"}.get(kind)
+        if key:
+            configs[f"world:{key}"] = definition["config"]
+    path = output / "head-configs.json"
+    path.write_text(json.dumps(configs, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    prior = os.environ.get("SLITHER_PERF_CONFIGS")
+    os.environ["SLITHER_PERF_CONFIGS"] = str(path.resolve())
+    try:
+        yield
+    finally:
+        if prior is None:
+            os.environ.pop("SLITHER_PERF_CONFIGS", None)
+        else:
+            os.environ["SLITHER_PERF_CONFIGS"] = prior
 
 
 def git(*args):
@@ -124,6 +160,8 @@ def change_cell(result):
 def stopping(row):
     """One Details line: pairs used and why sampling stopped."""
     name, used, complete = f"`{cell(row['case'])}`", row["n_used"], row["n_complete"]
+    if row["label"] == "Redefined":
+        return f"- {name}: head only, redefined; {cell(row['failure'])}."
     if row["label"] == "Unavailable":
         why = {"measurement_failure": f"{row['failure'] or row['reason'].replace('_', ' ')} (see raw logs)",
                "not_started": "time cap before sampling started"}.get(
@@ -144,10 +182,15 @@ def render(report):
              "### Performance", "", "Operation wall time, ms/op. Negative change means less time.", "",
              "| Workload | Base | PR | Change | Result |",
              "| --- | ---: | ---: | ---: | --- |"]
+    if any(row.get("result", {}).get("metric") == "cpuSeconds" for row in performance if row.get("result")):
+        lines[7] = "ms/op; CPU marks host process CPU per tick; other rows use operation wall time. Negative change means less time."
     for row in performance:
         result = row["result"]
         costs = [f"{result[f'{label}_ms_per_operation']:.5f}" if result else "—" for label in ("baseline", "candidate")]
-        lines.append(f"| {cell(row['case'])} | {costs[0]} | {costs[1]} | {change_cell(result)} | {RESULTS[row['label']]} |")
+        if "head_ms_per_operation" in row:
+            costs[1] = f"{row['head_ms_per_operation']:.5f}"
+        name = row['case'] + (" · CPU" if result and result.get("metric") == "cpuSeconds" else "")
+        lines.append(f"| {cell(name)} | {costs[0]} | {costs[1]} | {change_cell(result)} | {RESULTS[row['label']]} |")
     if not performance:
         lines.append("| — | — | — | — | ⚠️ Unavailable |")
     lines += ["", "### Regression and fidelity", "",
@@ -199,7 +242,9 @@ def render(report):
         lines += ["", "⚠️ **Incomplete report:** see details for missing results."]
     lines += ["", "<details><summary>Details</summary>", "",
               f"- PR head: `{report['head']}`. Runner: {cell(report['platform'])}.",
-              "- Paired operation wall time after warmup, with balanced order and covered checks at 8/12/26, "
+              ("- Paired time in each row's frozen metric after warmup, with balanced order and covered checks at 8/12/26, "
+               if any((r.get("result") or {}).get("metric") == "cpuSeconds" for r in performance) else
+               "- Paired operation wall time after warmup, with balanced order and covered checks at 8/12/26, ") +
               "then doubling through 53,248 pairs (finite safety guard). "
               "Base/PR are geometric means; Change shows estimate [interval] against a −5% to +5% band.",
               "- V2 order-adjusted t intervals provide ≥95% simultaneous coverage across 10 workloads and 14 pre-budgeted looks "
@@ -209,6 +254,11 @@ def render(report):
               "- Hosted model calibration is not established; performance labels are advisory and conditional on the timing model.",
               "- Both runtimes use the same selected test sources and fixtures. Errors describe those fixtures, not overall accuracy.",
               "- Turn errors are duration weighted; speed ramps are grouped by source. Changed traces indicate changed behavior."]
+    for row in performance:
+        result = row.get("result") or {}
+        if result.get("metric") == "cpuSeconds":
+            lines.append(f"- `{cell(row['case'])}` simulation busy wall: {result['baseline_busy_wall_ms']:.5f} → "
+                         f"{result['candidate_busy_wall_ms']:.5f} ms/tick (diagnostic, same covered pairs).")
     if traces:
         lines.append("- State trace windows (operations): " + ", ".join(
             f"`{cell(t['case'])}` {t.get('iterations', '—')}" for t in traces) + ".")
@@ -322,45 +372,54 @@ def collect(output, head, job_start):
     report["identities"] = {label: build.record for label, build in builds.items()}
     report["fidelity"] = metric_rows(fidelity.get("baseline"), fidelity.get("candidate"))
     binaries = {label: build.binaries["perf_baseline"] for label, build in builds.items()}
-    catalogs, suites = {}, {}
-    for label, binary in binaries.items():
+    primary_catalog = None
+    if "candidate" in binaries:
         try:
-            catalogs[label] = load_catalog(binary)
-            suites[label] = catalogs[label].select(suite="ci")
+            primary_catalog = load_catalog(binaries["candidate"])
         except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as error:
-            report["errors"].append(f"{label} workload catalog: {error}")
-    if len(suites) == 2:
-        try:
-            same_plan(suites)
-            if catalogs["baseline"].seed != catalogs["candidate"].seed:
-                raise ValueError("baseline and candidate catalog seeds differ")
-            if len(suites["candidate"]) > perf_stats.WORKLOAD_SLOTS:
-                raise ValueError(f"more than {perf_stats.WORKLOAD_SLOTS} ci workloads need a new error budget")
-        except ValueError as error:
-            report["errors"].append(str(error))
-            suites = {}
-    workloads = suites.get("candidate", suites.get("baseline", ()))
-    report["workloads"] = [w.plan() for w in workloads]
-    phases["parity"] = time.monotonic() - job_start
-    for workload in workloads:
-        print(f"[parity] Capturing {workload.name} traces", flush=True)
-        hashes = {}
-        for label in suites:
-            directory = output / f"traces-{label}"
-            directory.mkdir(exist_ok=True)
+            report["errors"].append(f"head workload definitions unavailable: {error}")
+    with head_configs(primary_catalog, output) if primary_catalog else nullcontext():
+        catalogs, suites = {}, {}
+        for label, binary in binaries.items():
             try:
-                hashes[label] = capture_trace(binaries[label], workload.name, workload.trace_iterations,
-                                              directory, terminal=not workload.legacy)
-            except Exception as error:
-                report["errors"].append(f"{label} {workload.name} trace: {error}")
-        report["traces"].append({"case": workload.name, "iterations": workload.trace_iterations, **hashes,
-                                 "reading": "Unavailable" if len(hashes) != 2
-                                 else "Equal" if hashes["baseline"]["sha256"] == hashes["candidate"]["sha256"] else "Changed"})
-    if len(suites) == 2 and workloads:
-        measure(report, binaries, {label: builds[label].hashes[binaries[label].name] for label in binaries},
-                catalogs, suites, output / "performance", job_start)
-    phases["finished"] = time.monotonic() - job_start
-    return report
+                catalogs[label] = load_catalog(binary)
+                suites[label] = catalogs[label].select(cases=REPORT_CASES)
+            except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as error:
+                report["errors"].append(f"{label} workload catalog: {error}")
+        if len(suites) == 2:
+            try:
+                same_plan(suites)
+                if catalogs["baseline"].seed != catalogs["candidate"].seed:
+                    raise ValueError("baseline and candidate catalog seeds differ")
+                if len(suites["candidate"]) > perf_stats.WORKLOAD_SLOTS:
+                    raise ValueError(f"more than {perf_stats.WORKLOAD_SLOTS} ci workloads need a new error budget")
+            except ValueError as error:
+                report["errors"].append(str(error))
+                suites = {}
+        workloads = suites.get("candidate", suites.get("baseline", ()))
+        report["workloads"] = [w.plan() for w in workloads]
+        phases["parity"] = time.monotonic() - job_start
+        trace_catalog = catalogs.get("candidate", catalogs.get("baseline"))
+        trace_workloads = tuple(w for w in trace_catalog.workloads if w.name in TRACE_CASES and w.available) if trace_catalog else ()
+        for workload in trace_workloads:
+            print(f"[parity] Capturing {workload.name} traces", flush=True)
+            hashes = {}
+            for label in suites:
+                directory = output / f"traces-{label}"
+                directory.mkdir(exist_ok=True)
+                try:
+                    hashes[label] = capture_trace(binaries[label], workload.name, workload.trace_iterations,
+                                                  directory, terminal=not workload.legacy)
+                except Exception as error:
+                    report["errors"].append(f"{label} {workload.name} trace: {error}")
+            report["traces"].append({"case": workload.name, "iterations": workload.trace_iterations, **hashes,
+                                     "reading": "Unavailable" if len(hashes) != 2
+                                     else "Equal" if hashes["baseline"]["sha256"] == hashes["candidate"]["sha256"] else "Changed"})
+        if "candidate" in suites and workloads:
+            measure(report, binaries, {label: builds[label].hashes[binaries[label].name] for label in binaries},
+                    catalogs, {"baseline": (), **suites}, output / "performance", job_start)
+        phases["finished"] = time.monotonic() - job_start
+        return report
 
 
 def measure(report, binaries, hashes, catalogs, suites, output, job_start):
@@ -373,8 +432,25 @@ def measure(report, binaries, hashes, catalogs, suites, output, job_start):
     # A row whose definition differs measures different inputs on each side.
     matched = [w for w, other in zip(suites["candidate"], suites["baseline"])
                if (w.fingerprint, w.operation) == (other.fingerprint, other.operation)]
-    plan = {"plan": perf_stats.PLAN, "seed": catalogs["candidate"].seed,
-            "metric": "operation wall time: the sum of the harness's monotonic operation intervals",
+    redefined = {}
+    for w in suites["candidate"]:
+        if w in matched:
+            continue
+        reason = "baseline cannot use the same head workload definition; comparison withheld"
+        try:
+            from perf_baseline import native
+            result = native(binaries["candidate"], w.name, w.iterations, output.parent / f"{w.name}-redefined-stderr.txt", deadline=deadline)
+            error = perf_compare.child_error(result, w)
+            if error:
+                raise ValueError(error)
+            redefined[w.name] = {**perf_stats.final([], 0, "measurement_failure", reason), "label": "Redefined",
+                                 "head_ms_per_operation": result["workload"]["timing"]["wallSeconds"] * 1000 / w.iterations,
+                                 "n_attempted": 0}
+        except Exception as error:
+            report["errors"].append(f"{w.name} redefined head measurement: {error}")
+    plan = {"plan": "slither-perf-sequential-v3", "seed": catalogs["candidate"].seed,
+            "metric": "fixed host CPU per tick for host-official-500; operation/busy wall for other rows",
+            "metrics": {w.name: REPORT_METRICS.get(w.name, "wallSeconds") for w in matched},
             "catalogs": {label: catalog.sha256 for label, catalog in catalogs.items()},
             "executables": hashes,
             "workloads": [{"name": w.name, "operation": w.operation, "definitionSha256": w.fingerprint,
@@ -393,7 +469,7 @@ def measure(report, binaries, hashes, catalogs, suites, output, job_start):
                 "n_attempted": 0}
 
     def checkpoint(rows, deadline):
-        report["performance"] = [{"case": w.name, **rows.get(w.name, mismatch)} for w in suites["candidate"]]
+        report["performance"] = [{"case": w.name, **rows.get(w.name, redefined.get(w.name, mismatch))} for w in suites["candidate"]]
         report["performance_plan_sha256"] = digest(output / "plan.json")
         snapshots.checkpoint(report, deadline)
 
@@ -409,7 +485,7 @@ def measure(report, binaries, hashes, catalogs, suites, output, job_start):
             "measurement_failure", failure), "n_attempted": prior.get(w.name, {}).get("n_attempted", 0)}
             for w in suites["candidate"]]
         return
-    report["performance"] = [{"case": w.name, **rows.get(w.name, mismatch)} for w in suites["candidate"]]
+    report["performance"] = [{"case": w.name, **rows.get(w.name, redefined.get(w.name, mismatch))} for w in suites["candidate"]]
     report["performance_plan_sha256"] = digest(output / "plan.json")
     report["budget"] = {"stage_budget_seconds": deadline - stage, "stage_seconds": time.perf_counter() - stage,
                         "limited_by": "stage cap" if stage + STAGE_CAP_SECONDS <= job_deadline else "job reserve"}

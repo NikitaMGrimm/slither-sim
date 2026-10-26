@@ -43,14 +43,26 @@ Before each build, after copying and hashing the previous executables, the
 simulator's release/dev outputs are cleaned. Compatible dependencies survive;
 failed cleanup makes that revision unavailable.
 
-Performance and traces cover the PR harness's `ci`
-[workload catalog](../performance.md#workload-selection): six legacy workloads,
-`official-100-step`/`official-100-bot`, `battledome-32-step` and
-`client-battledome-64`. The client row includes reconnect admission as well as
-stepping and delivery; its controller and wire draining remain outside timing.
-Both builds must list the same plan.
-New `ci` registrations need no collector change, up to the ten rows covered by
-the error budget. Rows use [operation wall time](#how-results-are-decided).
+The PR timing budget covers six rows: `step-food`, `observe`,
+`official-100-step`, `official-100-bot`, `host-official-500` and
+`host-battledome-80`. The socket rows reuse `host_load`, with no background bot
+workers, a separate load-generator process, one host CPU and a second driver CPU.
+Official uses a fixed official-size 500-seat world; Battledome uses its preset.
+Each sample warms for one second after opening all sockets, allows up to five
+additional untimed seconds for every slot to connect, then measures at least
+286 physics ticks, ending at a boundary with every socket connected. Connected/living counts, admissions, deaths, bytes, deferred
+ticks and actual tick counts stay in the raw record. This is a short synthetic
+load, not sustained capacity qualification or an 80-living-snake guarantee.
+
+The ten existing deterministic trace windows remain independent of timing
+selection. Socket scheduling has no deterministic state trace. The legacy
+catalog and direct release comparison suite remain available unchanged.
+The [row audit](../../research/performance/2026-10-26-pr-report-audit/REPORT.md) records removals, costs and calibration.
+Both builds list the same operation counts. The head resolves Config defaults
+once into `head-configs.json`, supplied to both runtime processes. Unsupported
+head configurations or remaining definition differences never yield a speed
+claim: the collector shows a measured head-only value marked **Redefined**, with
+its reason, when the candidate runs successfully.
 
 The fidelity table exposes the existing duration-weighted turn residuals and
 speed-ramp residuals by source, with denominators, using the same recorded
@@ -68,22 +80,44 @@ those cases unavailable and labels the report incomplete.
 
 ## How results are decided
 
-New runs implement [statistics protocol v2](performance-statistics-v2.md);
+New PR runs use the [fixed metric extension of protocol v2](performance-statistics-v2.md#pr-metric-extension);
 the frozen v1 contract and its evidence retain their historical allocation.
 `tools/perf_stats.py` cites its sections, and the sampler is
 `perf_compare.sequential`.
 
-**Metric.** Every row uses operation wall time: the sum of the harness's
-monotonic operation intervals, excluding setup, placement, warmup, resets,
-output destruction and serialization. It is instrumented operation cost, not
-process or end-to-end latency. Process CPU stays in the raw results as a
-diagnostic only.
+**Metric.** The four deterministic rows retain operation wall time: the sum of
+monotonic operation intervals excluding setup, controls, resets and output work.
+Linux process CPU includes the entire case including setup/warmup and is retained
+as a diagnostic, not substituted for operation cost. Socket rows retain host
+process CPU (simulation plus sockets, excluding the child driver), simulation
+busy wall time and elapsed wall time per completed tick. They normalize the
+observed tick count to the requested count and record both.
+
+The report fixes `host-official-500` to process CPU per tick, covering all host
+threads. Its pooled A/A log residual SD was 1.81% for CPU versus 1.88% for busy
+wall, with the ranking reversed between jobs; this is no consistent noise win.
+CPU covers gateway work as well as simulation. `host-battledome-80` uses simulation
+busy wall, consistently quieter in both jobs (pooled 0.66% versus 1.06% for CPU).
+A later job after the host optimization reversed the Battledome ranking
+(1.33% CPU / 1.56% wall); no uniformly quietest metric is established. The
+[audit](../../research/performance/2026-10-26-pr-report-audit/REPORT.md) retains
+all jobs, sources and limits. CPU rows are marked; the same covered pairs' busy-wall
+values remain in Details. Raw results always retain both metrics. Instruction
+events were blocked and Valgrind was not installed; no security settings changed.
+
+Routine PRs run no metric-selection pilot. The manual calibration workflow's
+`Host` group measures the six current rows, sockets first, with six balanced A/A
+pairs plus one discarded warmup pair and a 240-second measurement cap. It retains
+CPU/wall noise, failures and instruction-counter availability. A maintainer can
+review new pilots before changing the report's fixed metric. The older A/B
+calibration groups and their historical plans remain available.
 
 **Sampling.** One observation is an adjacent pair of fresh baseline and PR
 processes for one workload. Both sides follow one plan frozen before sampling
 (`performance/plan.json`): workload definition hash, seed, operation count,
 executable hashes, the order sequence and the deadline. A row whose workload
-definitions differ between the revisions is unavailable. Each workload first
+definitions still differ after head configuration pinning is shown head-only as
+Redefined when possible. Each workload first
 runs one discarded baseline-then-PR warmup pair. Rounds then visit the active
 rows in catalog order, one pair each, following a fixed sequence in which every
 two consecutive pairs contain one baseline-first and one PR-first pair.
@@ -262,9 +296,11 @@ trigger it; see the [workflow_run documentation](https://docs.github.com/en/acti
 A separate bot-owned comment on the rolling `release-plz-*` PR consolidates merged
 PR reports since the latest published release tag, pinned to that tag's commit
 and the current main candidate. It preserves all outcome-label counts and exposes
-two preselected headline workloads (`step-default`, `official-100-bot`) with their
+two headline columns (`host-official-500`, with `step-default` retained for
+historical reports, and `official-100-bot`) with their
 own uncertainty and source links. Missing, historical, failed and incomplete
-reports stay explicit. Preview measurements are not relabeled as shipped-tree
+reports stay explicit. Redefined outcomes stay head-only; host workload names
+and CPU/wall units remain explicit. Preview measurements are not relabeled as shipped-tree
 measurements, and PR percentages are never summed.
 
 Cheap refreshes follow terminal PR reporting, merges, and completion of Release PR

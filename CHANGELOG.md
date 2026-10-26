@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- PR comparisons focus timing on two regression canaries, official workloads and
+  500/80-client socket hosts, retain ten state traces, and run both runtimes with
+  the head workload configuration. Manual calibration retains CPU/wall noise.
+
 ## [0.6.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.0...v0.6.1) - 2026-10-26
 
 ### Added
