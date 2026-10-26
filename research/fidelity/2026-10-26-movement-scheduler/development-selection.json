@@ -1,0 +1,76 @@
+{
+  "selectedCandidate": null,
+  "parameters": null,
+  "scientificStatus": "unreviewed",
+  "reason": "Authoritative dirty/application timing is not identified between reported states; all scalar packet-state and next-report prediction metrics are undefined. No candidate winner or phase was selected.",
+  "coverageGate": {
+    "requiredEligibleDevelopmentBatches": 2,
+    "eligibleDevelopmentBatches": 3,
+    "eligibleMotionBatches": 3,
+    "eligibleMassBatches": 3,
+    "passed": true
+  },
+  "perBatchMandatoryCounts": [
+    {
+      "ordinal": 1,
+      "counts": {
+        "motion-under42": 4524,
+        "unchanged-decoded-motion-tuple": 165,
+        "unchanged-tuple/direction-changed": 32,
+        "h-under105": 896,
+        "order/body-anchor/motion-first": 2304,
+        "unchanged-tuple/direction-unchanged": 133,
+        "order/mass-tail/motion-last": 1945,
+        "motion-under40": 285,
+        "field-heading-under40": 253,
+        "field-wanted-under40": 228,
+        "field-speed-under40": 91,
+        "order/growth-anchor/motion-first": 347,
+        "motion-under35": 123,
+        "h-under100": 27,
+        "order/mass-tail/motion-first": 2,
+        "reverse-same-frame-mass-motion": 2
+      }
+    },
+    {
+      "ordinal": 2,
+      "counts": {
+        "motion-under42": 3236,
+        "order/body-anchor/motion-first": 2238,
+        "order/mass-tail/motion-last": 1820,
+        "motion-under35": 137,
+        "motion-under40": 290,
+        "field-heading-under40": 234,
+        "field-wanted-under40": 217,
+        "h-under105": 712,
+        "order/growth-anchor/motion-first": 225,
+        "h-under100": 24,
+        "field-speed-under40": 114,
+        "unchanged-decoded-motion-tuple": 89,
+        "unchanged-tuple/direction-changed": 25,
+        "unchanged-tuple/direction-unchanged": 64
+      }
+    },
+    {
+      "ordinal": 3,
+      "counts": {
+        "motion-under42": 4087,
+        "h-under105": 944,
+        "order/body-anchor/motion-first": 2034,
+        "motion-under35": 80,
+        "motion-under40": 213,
+        "field-speed-under40": 72,
+        "order/mass-tail/motion-last": 1685,
+        "field-heading-under40": 177,
+        "unchanged-decoded-motion-tuple": 71,
+        "unchanged-tuple/direction-unchanged": 62,
+        "field-wanted-under40": 157,
+        "h-under100": 35,
+        "order/growth-anchor/motion-first": 235,
+        "order/mass-tail/motion-first": 1,
+        "reverse-same-frame-mass-motion": 1,
+        "unchanged-tuple/direction-changed": 9
+      }
+    }
+  ]
+}

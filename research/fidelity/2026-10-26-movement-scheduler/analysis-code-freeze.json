@@ -1,0 +1,24 @@
+{
+  "createdUtc": "2026-10-26T08:57:36.378320+00:00",
+  "frozenPlanSha256": "0ae285cf9f1a728309059ca17b9bc6509a4ef2cefcba47faaf91675d937c2781",
+  "sourceRevision": "7580d53baffa35d776af4fc22a9926220d33c672",
+  "analysisVersion": 4,
+  "syntheticTestsPassed": 20,
+  "files": {
+    "analyze_p2.py": "b0db4c6c2efd1c7a659df619b1683c99b8dec78ec0088785fcc801b743203eb8",
+    "test_analyze_p2.py": "33396b0757b7fc56cb56ababcd6c7d55fbedfebe8712b25d64d98e2a11541057",
+    "check_analysis.py": "452a2019c97d44f12b891299bf0e6cdbd9473997f9dc9e6a24d0533f66c1af7e",
+    "diagnose_ordinal.py": "5e8130ec1d5a2d0b5dd01d69935b192418ad1105be206d73b8678bc98f9dfdbc"
+  },
+  "rules": {
+    "commandTarget": "floor(byte*256/251)",
+    "priorTarget": "causal last received wanted angle on 256-byte circle",
+    "holdMinMs": 150,
+    "priorTargetDistanceStrictGreaterThan": 2.1,
+    "boost": "Observed directional speed response to toggle; exclude avoidance and intervening pickup/growth/tail before first response",
+    "pickups": "Explicit own-eater credit to next own h/r-with-fam/n/N/+ in raw packet order within life, retaining censored credits",
+    "clock": "Per setup/connection minimum-offset samples in five-second bins; at least two bins for drift fit; +/-5-second ping inequalities; never RTT/2",
+    "missingDirtyTimes": "No point dirty-time imputation; scalar schedule scores undefined; retain observable constraints and all-phase residual profiles",
+    "split": "Started ordinals 1-3 development, 4-6 heldout; no heldout inspected yet"
+  }
+}

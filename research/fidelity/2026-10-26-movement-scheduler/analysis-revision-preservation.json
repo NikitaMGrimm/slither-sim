@@ -1,0 +1,22 @@
+[
+  {
+    "source": "analyze_p2-v01.py",
+    "output": "ordinal-01-p2-analysis.json",
+    "sourceSha256": "9bbf940951cb3ee403057742c39f6bf6036545818d5f9d6701b444680f2789fa"
+  },
+  {
+    "source": "analyze_p2-v02.py",
+    "output": "ordinal-01-p2-analysis-v02.json",
+    "sourceSha256": "1126d064495e049e511421d5e5045737ea64af47462d4c2ccacf7edb6f1ccb58"
+  },
+  {
+    "source": "analyze_p2-v03.py",
+    "output": "ordinal-01-p2-analysis-v03.json",
+    "sourceSha256": "ce142eef4ba9848b924e1d889d84dde554cd77ae1da94b5468600dcc53343211"
+  },
+  {
+    "source": "analyze_p2.py",
+    "output": "ordinal-01-p2-analysis-final.json",
+    "sourceSha256": "b0db4c6c2efd1c7a659df619b1683c99b8dec78ec0088785fcc801b743203eb8"
+  }
+]
