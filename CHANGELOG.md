@@ -127,6 +127,10 @@
 
 - Kiosk shrinkage no longer deletes pending growth: it removes only mass the
   score shows, and a zero shrink rate changes nothing.
+- Native commands with processing delay apply in the tick they arrive instead of
+  one tick later. Cancelling or non-finite one-way legs fail validation, and
+  latency scheduling returns an error instead of hanging or producing non-finite
+  times.
 - `Config::deserialize` called directly from Rust now accepts presets, like JSON
   parsing ([presets](docs/configuration.md#presets)).
 - A world stopped by mass overflow stays stopped after a JSON round trip

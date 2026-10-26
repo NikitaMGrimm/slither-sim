@@ -179,6 +179,13 @@ impl SimulatorBackend {
         // the scheduler study linked from `MOTION_REPORT_TICKS`.
         let end = (self.tick + 1) as f64 * self.world.config.dt;
         for slot in 0..self.slots.len() {
+            if let Some((at, _, processing)) = self.slots[slot].outbox
+                && at + processing <= end
+            {
+                // These decisions already exist: release them before ingest,
+                // with earlier receipts first, so they reach their arrival tick.
+                self.client_io_until(slot, at + processing)?;
+            }
             self.ingest(slot, end)?;
         }
         let actions: Vec<_> = self
