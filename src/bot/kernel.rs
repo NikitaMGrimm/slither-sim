@@ -1259,6 +1259,9 @@ impl Scene {
             occupied: [false; MAX_CELLS * MAX_CELLS],
             n,
         };
+        // Occupancy is read only by food(): multiplying a positive cell value
+        // by 1 leaves its bits unchanged. A boost regather discards its scene.
+        let mark_occupied = !boosting && p.occupied_factor != 1.0;
         // A boost-reach regather keeps the cruise scene's food.
         for food in o.food.iter().filter(|_| !boosting) {
             if let Some(i) = cell(food.point()) {
@@ -1350,10 +1353,12 @@ impl Scene {
                 } else {
                     enemy.head
                 };
-                for step in 0..=steps {
-                    let t = p.head_path_seconds * step as f64 / steps as f64;
-                    if let Some(i) = cell(path(view.lead + t)) {
-                        scene.occupied[i] = true;
+                if mark_occupied {
+                    for step in 0..=steps {
+                        let t = p.head_path_seconds * step as f64 / steps as f64;
+                        if let Some(i) = cell(path(view.lead + t)) {
+                            scene.occupied[i] = true;
+                        }
                     }
                 }
                 let middle = path(view.lead + p.lookahead_seconds / 2.0);
@@ -1382,14 +1387,16 @@ impl Scene {
             } else {
                 // The original straight-line forecast.
                 let head = view.head(enemy);
-                for step in 0..=steps {
-                    let q = forward(
-                        head,
-                        enemy.heading,
-                        enemy.speed * p.head_path_seconds * step as f64 / steps as f64,
-                    );
-                    if let Some(i) = cell(q) {
-                        scene.occupied[i] = true;
+                if mark_occupied {
+                    for step in 0..=steps {
+                        let q = forward(
+                            head,
+                            enemy.heading,
+                            enemy.speed * p.head_path_seconds * step as f64 / steps as f64,
+                        );
+                        if let Some(i) = cell(q) {
+                            scene.occupied[i] = true;
+                        }
                     }
                 }
                 let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
@@ -1419,9 +1426,10 @@ impl Scene {
                 {
                     near.push(Obstacle::new(previous, point, width, k, false));
                 }
-                // A boost-reach regather keeps the cruise scene's occupancy.
-                if let Some(i) = cell(point).filter(|_| !boosting) {
-                    scene.occupied[i] = true;
+                if mark_occupied {
+                    if let Some(i) = cell(point) {
+                        scene.occupied[i] = true;
+                    }
                 }
                 previous = point;
                 previous2 = point2;
