@@ -2,8 +2,20 @@
 
 ## Unreleased
 
+## [0.6.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.5.0...v0.6.0) - 2026-10-26
+
 ### Breaking
 
+- Official and host arenas follow occupied seats by default (`dynamicRadius`
+  is now true). Joins and leaves move the wall; deaths and respawns don't. It
+  grows at once when players join and shrinks at 23.4375 units/s when they
+  leave, ignoring changes within 3% of the current radius. Hosts start sized
+  for their bots instead of every reserved seat. Food and prey targets follow
+  the live area; a shrinking wall removes the food outside it and surplus prey.
+  This is our design, not a recovered official law, and it replaces the
+  living-count controller. Checkpoints stay `slither-sim-checkpoint-v2`; the
+  rules revision becomes `slither-sim-rules-v2`, so v1 checkpoints are rejected
+  ([population sizing](docs/configuration.md#population-sizing)).
 - Geometric JSON is `slither-sim-json-v5` and the C ABI is `slither-sim-abi-v3`
   (`SLITHER_ABI_VERSION` 3). Frames carry each world's fixed rules: boundary
   mode, pit radius, minimum score, kill-score window and free boost at the
@@ -19,22 +31,10 @@
   `PolicyId` is gone (`Forager::new()`, `ForagerBot::new()`). The
   `cautious_bot` example is now `forager` and keeps only its core-observation
   path; `portable_bot` runs the policy on received frames.
-- Official and host arenas follow occupied seats by default (`dynamicRadius`
-  is now true). Joins and leaves move the wall; deaths and respawns don't. It
-  grows at once when players join and shrinks at 23.4375 units/s when they
-  leave, ignoring changes within 3% of the current radius. Hosts start sized
-  for their bots instead of every reserved seat. Food and prey targets follow
-  the live area; a shrinking wall removes the food outside it and surplus prey.
-  This is our design, not a recovered official law, and it replaces the
-  living-count controller. Checkpoints stay `slither-sim-checkpoint-v2`; the
-  rules revision becomes `slither-sim-rules-v2`, so v1 checkpoints are rejected
-  ([population sizing](docs/configuration.md#population-sizing)).
-- Config `radius` now retains the initial, population-sized setting; the live
-  boundary is runtime state exposed by `Simulator::radius()`, frames and a new
-  snapshot `radius` field. Checkpoints use
-  `slither-sim-checkpoint-v2` and reject v1, preserving initial and live radii
-  separately. Flat config keys, fixed ecology targets and radius timing stay
-  unchanged ([configuration](docs/configuration.md#population-sizing)).
+- Config `radius` is the initial, population-sized radius; the live boundary
+  is runtime state in `Simulator::radius()`, frames and a new snapshot `radius`
+  field. Checkpoints are `slither-sim-checkpoint-v2`, store both radii and
+  reject v1 ([checkpoints](docs/bot-api.md#checkpoints)).
 
 ### Added
 
