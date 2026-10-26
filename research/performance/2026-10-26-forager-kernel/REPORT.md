@@ -14,6 +14,15 @@ separately verified changes. `658e7dc` subsequently formats one closure without
 changing operations. Parameters, timing derivation, intent derivation, math
 functions and floating-point expression order are unchanged.
 
+After measurement, rebase onto `7cec662` incorporated the parallel A4-default
+PR #130 and checkpoint PR #128. The optimized kernel and frame adapter are
+byte-identical to the post-format measured tree. Only benchmark construction
+changes from the private A4 test constructor to public `PolicyId::A4`, outside
+the timed interval; the immutable parameter values are unchanged. Oracle and
+regression checks were repeated after the rebase. The timing table remains
+the measurement of the explicitly pinned pre-rebase binaries, not a new timing
+run of the rebased executable.
+
 ## Profile and exactness arguments
 
 First, sample the baseline with Linux `perf record -e cpu-clock -F 997 -g
@@ -53,7 +62,8 @@ cut-off head paths, rim cases and restricted boost fans.
   unit. Debug line information enabled equally for both builds; no custom
   `RUSTFLAGS`, native CPU tuning or fast-math. Build logs and binary hashes
   retained. Both binaries are library test executables, allowing the private A4
-  parameters to be exercised without adding a public benchmark API.
+  parameters to be exercised before their public adoption without adding a
+  public benchmark API.
 - The identical opt-in `client::forager::conformance::replay_benchmark` harness
   decodes once, creates one reused bot, reserves the sample buffer and warms up
   for 200 complete passes. Each measured interval wraps one full adapter
@@ -132,7 +142,7 @@ test is ignored during correctness runs. Fresh/shared interleaving and
 steady-allocation regressions pass. AWS release-profile baseline and candidate
 conformance and kernel tests also pass before timing.
 
-The full `python tools/check.py rust` group passes on Windows (format, all
+Before the rebase, the full `python tools/check.py rust` group passed on Windows (format, all
 Clippy feature groups, default/core/bot/networking tests, doctests, C ABI,
 Python-crate check and basic example). Windows release-profile focused checks
 also pass all 51 tests. The seven documentation tests pass. The tools,
@@ -144,7 +154,14 @@ capacity, 500-bot scheduling, playing strength or every possible hardware target
 
 ## Reproduction and evidence
 
-Build the baseline and candidate in separate output directories with the same
+The pre-rebase commit IDs identify the original local measurement snapshots.
+[measured.patch](measured.patch) preserves their exact source delta without
+depending on those commits being reachable after rebase. Starting with two
+copies of `git archive 04ede66`, apply only its
+`src/client/forager/conformance.rs` hunk to the baseline (`git -c core.autocrlf=false apply
+--include=src/client/forager/conformance.rs measured.patch`), and the complete
+patch to the candidate, also with `core.autocrlf=false`. The patch was checked
+to reproduce both measured source files byte for byte. Build in separate output directories with the same
 harness and toolchain:
 
 ```sh

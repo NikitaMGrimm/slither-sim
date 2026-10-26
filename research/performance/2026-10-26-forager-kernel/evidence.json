@@ -5,7 +5,8 @@
     "conformance.rs": "5309c12798b0f68d7e653191c37905b48da18a071c1cb14a9a72230df08086b3",
     "measure.py": "99d3644fe214a36bcb6a0d47b9e4e3112a2f8892dff8b2bd09903124ecd9e6fe",
     "baseline-results.tar.gz": "e475ce740f0f134c2d9c61a925384475a655f50048144d7a4d3e41036a7db818",
-    "comparison-results.tar.gz": "c35a95a614252f2b9f151a60a6c38fb2f70e3321539694761f962f49dd29f9cd"
+    "comparison-results.tar.gz": "c35a95a614252f2b9f151a60a6c38fb2f70e3321539694761f962f49dd29f9cd",
+    "measured.patch": "b73c4e6abb0523b905e402fc5431fcf172c1d776cfdb5d31bcbbe6509017d08b"
   },
   "baselineBinarySha256": "6779770592c6888bf3fce8f81d982dc106bf7f503dd1204e85933f59f5753f6c",
   "candidateBinarySha256": "41377ae2fd4cd1b9bb854a188ad12bf468e73c719451ce942d8baf535f130534",
@@ -18,5 +19,16 @@
     "openOrActiveSpotRequests": 0,
     "temporaryKeysRemaining": 0,
     "temporaryGroupsRemaining": 0
+  },
+  "measuredSource": {
+    "baseline": "04ede6605b14a35706182359a329869caeff69cc",
+    "harnessCommit": "6dc0a95",
+    "candidateCommit": "6db923d",
+    "postMeasureFormattingCommit": "658e7dc"
+  },
+  "kernelSha256": {
+    "baseline": "3c25910c2f42d51d12da6f09e6a5ab5bbffb4a16167b8944b47adf54c5234d68",
+    "candidate": "34af4812f150ae2938f313866fa0891b03904b9ef94d4c0e0d79309ab10f1811",
+    "rebased": "d2dcccf6a905f8fe83b25297ceb1d3c03a4620b125d9a323f3d38e14304a4657"
   }
 }
