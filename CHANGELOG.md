@@ -6,20 +6,17 @@
 
 ### Added
 
-- *(python)* expose the resolved reset config as Session.config ([#166](https://github.com/NikitaMGrimm/slither-sim/pull/166))
-
-### Other
-
-- *(host)* enumerate only known snake slots ([#168](https://github.com/NikitaMGrimm/slither-sim/pull/168))
-- *(hosting)* add Linux server replacement runbook ([#170](https://github.com/NikitaMGrimm/slither-sim/pull/170))
-
-### Added
-
-- [Linux hosting guide](docs/hosting.md): verified release install, systemd
-  service, optional TLS proxy, join check, upgrades, rollback and resource use.
+- [Linux hosting guide](docs/hosting.md): release install, systemd service,
+  optional TLS proxy, join check, updates and resource use.
 - Python `Session.config` returns the resolved world config of the last reset
   as a new camelCase dict, matching a JSON reset reply's `config`
   ([Python](docs/python.md#api)).
+
+### Performance
+
+- Host broadcasts visit only the snakes each recipient already knows instead of
+  every world slot, with byte-identical output: about 6% less host CPU per tick
+  with 500 clients in the [single-core measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-known-slots/REPORT.md).
 
 ## [0.6.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.5.0...v0.6.0) - 2026-10-26
 
@@ -69,12 +66,6 @@
   ([research workflow](docs/research-workflow.md#paired-collision-trials)). The
   first official pilot failed feasibility without a qualified encounter
   ([execution](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/EXECUTION.md)).
-
-### Performance
-
-- Broadcasts enumerate only the snakes a recipient already knows, retaining
-  direct slot lookup and ascending packet order instead of scanning every
-  world slot per recipient.
 
 ### Fixed
 
