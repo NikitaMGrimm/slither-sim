@@ -52,3 +52,9 @@ the original completed series locally and at the historical record `e8074c0`;
 repeat checks, all traces, five instruction pairs and socket profiles against
 this new baseline. Keep the same budget/method and label the new growing-arena
 Battledome workload; do not attribute its admission changes to this optimization.
+
+The refresh baseline fails its existing four-decision Battledome admission gate
+before measurements: a growing arena has no admission calls in that window.
+Preserve that failure. Freeze only client-fixture arena sizing in a shared
+overlay (size_to_population=false) with matching definition metadata; retain
+the admission gate. Socket profiles still use the current growing preset.

@@ -1,0 +1,48 @@
+--- a/examples/perf_baseline.rs
++++ b/examples/perf_baseline.rs
+@@ -221,6 +221,18 @@
+     /// Deterministic client backoff after a refused admission, in decision intervals.
+     refusal_retry_decisions: usize,
+     operation: Operation,
++}
++
++impl ClientScenario {
++    fn config(&self) -> Config {
++        let mut config = self.world.config();
++        if matches!(self.world, World::Battledome) {
++            // Freeze the original dense fixture; growing arenas can eliminate
++            // the admission work required by its unchanged validity gate.
++            config.size_to_population = false;
++        }
++        config
++    }
+ }
+ 
+ enum Registration {
+@@ -458,7 +470,7 @@
+                 "operation": if bot { "step+batch_observe" } else { "step" },
+             }),
+             Driver::Client(client) => json!({
+-                "world": client.world.definition(), "config": client.world.config(),
++                "world": client.world.definition(), "config": client.config(),
+                 "agents": client.agents, "simulation": simulation_definition(self)?,
+                 "controller": Controller::Wander.definition(),
+                 "lifecycle": {"reconnect": "timed reconnect_slot after the client reports death; refused admissions wait refusalRetryDecisions",
+@@ -1361,7 +1373,7 @@
+                 DeliveryProfile::Official
+             },
+             record_wire: true,
+-            world: client.world.config(),
++            world: client.config(),
+             ..SimulationConfig::default()
+         }
+     }
+@@ -2399,7 +2411,7 @@
+                 }
+                 Registration::SharedPolicy(_) | Registration::Socket(..) => {}
+                 Registration::Client(client) => {
+-                    client.world.config().validate().unwrap();
++                    client.config().validate().unwrap();
+                     assert!((1..=500).contains(&client.agents));
+                     assert!(client.warmup_decisions > 0 && client.refusal_retry_decisions > 0);
+                 }
