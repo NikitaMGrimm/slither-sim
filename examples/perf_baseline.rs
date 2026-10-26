@@ -1056,6 +1056,10 @@ mod portable {
                 out,
                 json!({"kind": "initial", "case": args.case, "seed": SEED, "frames": current_frames, "wireRecords": initial_records, "snapshot": world_trace(backend.world())?}),
             )?;
+            if policy.is_some() {
+                // This scenario starts immediately; preserve its zero-warmup workload.
+                line(out, json!({"kind": "warmed", "warmupTicks": 0}))?;
+            }
         }
         for iteration in 0..args.iterations {
             if progress.needs_reset(backend.world(), DECISION_TICKS) {
@@ -1066,7 +1070,7 @@ mod portable {
                 if args.trace {
                     line(
                         out,
-                        json!({"kind": "reset", "iteration": iteration, "episode": progress.resets, "frames": current_frames, "wireRecords": wire, "snapshot": world_trace(backend.world())?}),
+                        json!({"kind": if policy.is_some() { "epoch" } else { "reset" }, "iteration": iteration, "episode": progress.resets, "frames": current_frames, "wireRecords": wire, "snapshot": world_trace(backend.world())?}),
                     )?;
                 }
             }
@@ -1101,6 +1105,12 @@ mod portable {
                     json!({"kind": "decision", "iteration": iteration, "episode": progress.resets, "episodeTick": progress.episode_ticks, "actions": actions, "frames": current_frames, "wireRecords": wire, "snapshot": world_trace(backend.world())?}),
                 )?;
             }
+        }
+        if args.trace && policy.is_some() {
+            line(
+                out,
+                json!({"kind": "end", "case": args.case, "operations": args.iterations}),
+            )?;
         }
         let mut result = report(
             args,
@@ -1173,7 +1183,9 @@ mod portable {
                     decisions += usize::from(action.is_some());
                 }
             }
-            previous = serde_json::from_value(record["frames"].clone()).unwrap();
+            if let Some(frames) = record.get("frames") {
+                previous = serde_json::from_value(frames.clone()).unwrap();
+            }
         }
         assert!(decisions >= 16);
     }
