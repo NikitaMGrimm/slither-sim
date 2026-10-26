@@ -2081,6 +2081,53 @@ fn to_tip(path: &mut [(Point, f64)], me: &Me, p: &Params) {
     }
 }
 
+/// Lower bound on clearance along the full pit steering path. The ordinary
+/// two-step steering forecast can hide an early outward bulge during a turn.
+fn pit_arc_clearance(
+    o: &Observation,
+    me: &Me,
+    p: &Params,
+    heading: f64,
+    boost: bool,
+    cap: f64,
+) -> f64 {
+    let Some(pit) = me.pit else {
+        return cap;
+    };
+    let speed_limit = if boost {
+        me.speed.max(BOOST_SPEED)
+    } else {
+        me.speed
+    };
+    if me.head.distance(o.arena.center) + speed_limit * p.lookahead_seconds < pit - me.width - cap {
+        return cap;
+    }
+    let (mut head, mut angle, mut state) = (me.head, me.heading, me.state);
+    let (mut time, mut result) = (0., cap);
+    while time < p.lookahead_seconds {
+        let dt = SUBSTEP.min(p.lookahead_seconds - time);
+        let speed = if boost {
+            state.step(true, me.segments, dt, SpeedModel::default())
+        } else {
+            me.speed
+        };
+        let delta = wrap(heading - angle);
+        let next = turn_then_straight(head, angle, delta, speed, me.turn, dt);
+        // A constant-speed turn deviates from its chord by at most v*w*dt²/8;
+        // the chord itself stays within the larger endpoint center distance.
+        let bow = speed * me.turn * dt * dt / 8.;
+        let reach = head
+            .distance(o.arena.center)
+            .max(next.distance(o.arena.center))
+            + bow;
+        result = result.min(pit - me.width - reach);
+        head = next;
+        angle += delta.clamp(-me.turn * dt, me.turn * dt);
+        time += dt;
+    }
+    result
+}
+
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
 /// capped at `cap`. Only clearance below `safe` changes a cost, so callers pass
 /// `safe` and obstacles that provably cannot lower the running minimum are
@@ -2106,6 +2153,9 @@ fn clearance(
     let ahead = forward(end, rim_heading, me.speed * p.rim_ahead_seconds);
     let rim = |q: Point| me.radius(o) - me.width - q.distance(o.arena.center);
     let mut clearance = rim(end).min(rim(ahead) + p.rim_ahead_credit).min(cap);
+    if me.pit.is_some() {
+        clearance = clearance.min(pit_arc_clearance(o, me, p, heading, ramp.is_some(), cap));
+    }
     to_tip(path, me, p);
     let speed = if ramp.is_some() {
         me.speed.max(BOOST_SPEED)
@@ -2932,6 +2982,51 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn pit_clearance_detects_an_early_exit_hidden_by_the_coarse_endpoints() {
+        let mut o = lone();
+        o.arena.radius = 3584.;
+        o.me.head = Point { x: 1783.9, y: 0. };
+        o.me.heading = 80_f64.to_radians();
+        o.me.segments = 26;
+        o.me.speed = base_speed(26);
+        let mut me = Me::new(&o.me);
+        me.pit = Some(1784.);
+        let p = crate::bot::params::A4_MEAN;
+        let target = std::f64::consts::PI;
+        let (path, n, rim_heading) = arc(&me, &p, target, None);
+        let end = path[n - 1].0;
+        let ahead = forward(end, rim_heading, me.speed * p.rim_ahead_seconds);
+        let old = (1784. - me.width - end.distance(o.arena.center))
+            .min(1784. - me.width - ahead.distance(o.arena.center) + p.rim_ahead_credit);
+        assert!(
+            old >= p.safe,
+            "endpoint-only checks report this safe: {old}"
+        );
+        let (first_step, _) = advance(me.head, me.heading, target, me.speed, me.turn, 0.007);
+        assert!(first_step.distance(o.arena.center) > 1784.);
+        let checked = clearance(&o, &me, &p, &[], target, p.safe, None, None, |_| false);
+        assert!(checked < 0., "the full pit path must be unsafe: {checked}");
+        // A pit-less decision retains the original outer-rim arithmetic.
+        me.pit = None;
+        let expected = (o.arena.radius - me.width - end.distance(o.arena.center))
+            .min(o.arena.radius - me.width - ahead.distance(o.arena.center) + p.rim_ahead_credit)
+            .min(p.safe);
+        assert_eq!(
+            clearance(&o, &me, &p, &[], target, p.safe, None, None, |_| false).to_bits(),
+            expected.to_bits()
+        );
+        me.pit = Some(1784.);
+        me.speed = BOOST_SPEED;
+        me.state = SpeedState::from_observed_speed(BOOST_SPEED, me.segments);
+        let ramp = me.boost_ramp();
+        assert!(
+            clearance(&o, &me, &p, &[], target, p.safe, None, Some(&ramp), |_| {
+                false
+            }) < 0.
+        );
     }
 
     #[test]
