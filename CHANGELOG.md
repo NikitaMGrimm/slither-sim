@@ -8,11 +8,12 @@
   500/80-client socket hosts, retain ten state traces, and run both runtimes with
   the head workload configuration. Manual calibration retains CPU/wall noise.
 
-### Changed
+### Performance
 
-- Host broadcasts share conservative prey visibility bounds across recipients,
-  retaining the original distance check and packet order
-  ([local measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-prey-visibility/REPORT.md)).
+- Host broadcasts test prey against shared bounding boxes before the exact
+  distance check, with byte-identical output: 4.6% fewer instructions on the
+  official 500-client workload; the live CPU change stayed within noise
+  ([measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-prey-visibility/REPORT.md)).
 
 ## [0.6.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.0...v0.6.1) - 2026-10-26
 
