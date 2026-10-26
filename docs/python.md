@@ -52,6 +52,7 @@ print(session.frame(1).time)
 | `frame(world)` | A copy of world `world`'s current frame. |
 | `request(message)` | Answers one JSON request, given as a dict, `str` or `bytes`, and returns the parsed reply dict with `protocol` and `result` or `error`. Use it for `info` and `snapshot`. |
 | `worlds`, `agents` | Session shape; 0 before the first reset. |
+| `config` | The resolved [world config](configuration.md#world-config) of the last reset, with presets and startup sizing applied, as a new camelCase dict like a JSON reset reply's `config`. `None` before the first reset or after the session ended; editing the dict changes nothing. |
 
 Default and official resets size each arena for `agents`
 ([population sizing](configuration.md#population-sizing)).

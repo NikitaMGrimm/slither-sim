@@ -97,6 +97,9 @@ class Session:
     @property
     def agents(self) -> int:
         """Agent slots per world; 0 before the first reset."""
+    @property
+    def config(self) -> dict[str, Any] | None:
+        """The resolved world config of the last reset as a new camelCase dict; None before the first reset or after the session ended."""
 
 @final
 class Frame:

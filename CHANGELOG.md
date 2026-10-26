@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Python `Session.config` returns the resolved world config of the last reset
+  as a new camelCase dict, matching a JSON reset reply's `config`
+  ([Python](docs/python.md#api)).
+
 ## [0.6.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.5.0...v0.6.0) - 2026-10-26
 
 ### Breaking

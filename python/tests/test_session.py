@@ -369,6 +369,23 @@ class ErrorTests(unittest.TestCase):
             session.step([0.], [False])
 
 
+    def test_config_is_the_resolved_reset_config(self):
+        typed, encoded = Session(), Session()
+        self.assertIsNone(typed.config)
+        options = {"seed": 3, "worlds": 2, "agents": 3,
+                   "config": {"preset": "battledome", "killScoreSeconds": 300}}
+        typed.reset(**options)
+        reply = encoded.request({"op": "reset", **options})
+        config = typed.config
+        self.assertEqual(config, reply["result"]["config"])
+        self.assertEqual(config["killScoreSeconds"], 300)
+        self.assertNotIn("preset", config)
+        config["killScoreSeconds"] = 1
+        self.assertEqual(typed.config["killScoreSeconds"], 300)
+        with self.assertRaises(ValueError):
+            typed.reset(agents=0)
+        self.assertEqual(typed.config, reply["result"]["config"])
+
     def test_errors_before_reset(self):
         session = Session()
         self.assertEqual((session.worlds, session.agents), (0, 0))
@@ -534,6 +551,7 @@ class ErrorTests(unittest.TestCase):
         self.assert_cause(caught.exception, reply)
         reply["error"]["message"] = fixture["terminalReply"]["error"]["message"]
         self.assertEqual(reply, fixture["terminalReply"])
+        self.assertIsNone(typed.config)
         for session in (typed, encoded):
             self.assertEqual((session.worlds, session.agents), (0, 0))
             for world in (0, 1):
