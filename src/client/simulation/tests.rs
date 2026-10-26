@@ -32,6 +32,10 @@ fn population_sized_backends_hold_across_death_and_respawn() {
         assert_eq!(backend.world.config.radius, radius);
         assert!(!backend.world.config.dynamic_radius);
         assert_eq!(backend.world.config.food_count, 109 * 40);
+        assert_eq!(
+            backend.world.config.prey.count,
+            Config::official(40).prey.count
+        );
         assert!(
             (backend.world.config.ambient_replenish_per_second
                 - Config::default().ambient_replenish_per_second * 40.)

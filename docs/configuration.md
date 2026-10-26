@@ -121,9 +121,10 @@ set `dynamicRadius` false to prevent model changes between samples. See
 The host, `serve`/Python/C ABI resets and `SimulatorBackend` enlarge a smaller
 initial radius to `670 × sqrt(population)` when `sizeToPopulation` is true.
 Population is all host seats (`players.max + bots.count`), `agents` per reset
-world, or `SimulationConfig.agents`. Food target and ambient attempt rate scale with area;
-prey targets stay unchanged. The boundary then holds unless `dynamicRadius` is
-explicitly enabled. This is a startup capacity policy, not an official radius law.
+world, or `SimulationConfig.agents`. Food target and ambient attempt rate scale with area.
+A prey target at the official density keeps following it (68 prey for 484 seats);
+other prey targets scale with area. The boundary then holds unless `dynamicRadius`
+is explicitly enabled. This is a startup capacity policy, not an official radius law.
 
 Sandbox, Battledome and explicit JSON radii opt out unless `sizeToPopulation`
 is explicitly enabled. Larger radii are never shrunk. Rust callers choosing a
