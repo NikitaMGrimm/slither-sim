@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     Config,
-    bot::DEFAULT_POLICY,
+    bot::PolicyId,
     client::{LatencyConfig, protocol},
 };
 
@@ -56,7 +56,7 @@ fn native_shared_policy_matches_fresh_slots_across_pending_decisions_and_reconne
                 if slot == 0 || backend.pending(slot) {
                     None
                 } else {
-                    ForagerBot::new(DEFAULT_POLICY).decide(frame)
+                    ForagerBot::new(PolicyId::default()).decide(frame)
                 }
             })
             .collect();
@@ -101,7 +101,7 @@ fn native_background_sends_boost_only_changes_at_transmission() {
     let mut backend = backend(0.);
     backend.advance_ticks(1).unwrap();
     let at = backend.time();
-    let action = ForagerBot::new(DEFAULT_POLICY)
+    let action = ForagerBot::new(PolicyId::default())
         .decide(&backend.frame_for(1).unwrap())
         .unwrap();
     let previous = Action {

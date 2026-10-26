@@ -4,7 +4,7 @@ The simulator and WebSocket backends hand bots the same `ClientFrame`, decoded
 by the same Rust code, so one bot runs on both unchanged. See the
 [Rust](../examples/portable_bot.rs) and [Python](../examples/portable_bot.py)
 examples. The Rust portable and [cautious](../examples/cautious_bot.rs) runners
-use the same frozen A1 `ForagerBot` as host bots and native background clients.
+use the same default `ForagerBot` as host bots and native background clients.
 The Python example retains its own simple policy.
 
 ## Interface versions
@@ -39,9 +39,10 @@ The runner checks the contract, decides and sends actions only while playing,
 measures compute time, and resets bot state on connection/life changes or play
 ending. Reconnection is explicit.
 
-`bot::DEFAULT_POLICY` selects A1. Host workers each reuse one `ForagerBot`;
-native background slots reuse one instance sequentially. Decisions read only
-delivered frames, including received timing and actual sent-command history.
+`bot::PolicyId::default()` selects the shared runtime policy. Host workers each
+reuse one `ForagerBot`; native background slots reuse one instance sequentially.
+Decisions read only delivered frames, including received timing and actual
+sent-command history.
 The runners send every returned action, including unchanged-heading boost toggles.
 The kernel retains scratch space but no per-seat state. Custom Battledome rules
 are not inferred from packets, and these runners add no mode-specific guard.

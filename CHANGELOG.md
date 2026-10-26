@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Host and native background bots, plus both Rust bot examples, now use the
-  frozen A1 Forager. Worker scratch is shared while sent history and lifecycle
+  shared default Forager policy. Worker scratch is shared while sent history and lifecycle
   stay per client; boost-only changes are transmitted. A separate
   `shared-forager-a1-8` workload preserves existing scripted benchmark identities.
   Current-runtime cost and playing-strength qualification remains pending

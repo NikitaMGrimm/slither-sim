@@ -292,7 +292,7 @@ Each invocation starts fresh; `--iterations N` runs one to eight same-seed world
 `step_all` controls every playing slot, while `next_frame` controls slot zero and
 lets built-in Foragers drive the rest. The modes do different work, so compare
 only runs with matching mode, configuration, seed and decision count. `next_frame`
-now uses A1 and its live traces can differ from historical seeker runs; those
+follows `PolicyId::default()` and its live traces can differ from historical seeker runs; those
 runs are not a behavior-preserving comparison. There are no sockets, listeners,
 `BotRunner` or compute-time feedback into virtual time.
 

@@ -1,11 +1,11 @@
-//! Runs the shared A1 Forager policy. `cargo run --release --locked --example portable_bot -- --steps 200`
+//! Runs the shared default Forager policy. `cargo run --release --locked --example portable_bot -- --steps 200`
 use slither_sim::client::{
     Backend, BotRunner, ClientStatus, ForagerBot, NetworkBackend, NetworkConfig, SimulationConfig,
     SimulatorBackend,
 };
 fn run(backend: impl Backend, steps: usize, lives: u64) -> Result<(), String> {
     let mut runner = BotRunner::new(backend);
-    let mut bot = ForagerBot::new(slither_sim::bot::DEFAULT_POLICY);
+    let mut bot = ForagerBot::new(slither_sim::bot::PolicyId::default());
     let mut ended = 0;
     for step in 1..=steps {
         let frame = runner.step(&mut bot)?; // Observe, decide, then send the action.

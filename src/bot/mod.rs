@@ -25,11 +25,8 @@ pub enum PolicyId {
     A4,
 }
 
-/// Shared selection for built-in host clients, native background clients and runners.
-pub const DEFAULT_POLICY: PolicyId = PolicyId::A1;
-
 /// SHA256 of the complete frozen `bot/data/resolved.json` parameter manifest.
-/// Identifies the resolved A1 and test-only A4 data, not a performance result.
+/// Identifies the resolved A1 and A4 data, not a performance result.
 pub const PARAMETER_MANIFEST_SHA256: &str =
     "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482";
 
