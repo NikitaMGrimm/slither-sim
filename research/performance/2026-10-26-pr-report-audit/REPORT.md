@@ -202,3 +202,13 @@ at `41fe897ef2232ad5cb49d4319eed0324b967df79` also completed without report erro
 all six timing rows resolved Within ±5%, ten of ten deterministic traces matched,
 and sampling took 189.50 seconds without a per-PR pilot. This verifies the new
 rows on the inherited host optimization; it is not a sustained-capacity claim.
+
+A further [manual A/A job after #168](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40383156762),
+using the same `41fe897ef2232ad5cb49d4319eed0324b967df79` head, completed all six
+pairs per row. The 500-client CPU / busy-wall log SD was 2.652% / 3.924%;
+Battledome was 1.331% / 1.562%. This supports the 500-client CPU choice but is a
+counterexample to uniformly quieter Battledome wall time. Keep the fixed
+Battledome choice based on the two original jobs; a single new job does not
+establish a replacement metric. Source changes and host variation mean these
+three jobs are not a common-variance calibration or a proven noise winner.
+All current raw results retain CPU and wall so later pilots can revisit this.

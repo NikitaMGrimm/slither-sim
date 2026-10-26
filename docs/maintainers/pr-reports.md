@@ -98,8 +98,10 @@ threads. Its pooled A/A log residual SD was 1.81% for CPU versus 1.88% for busy
 wall, with the ranking reversed between jobs; this is no consistent noise win.
 CPU covers gateway work as well as simulation. `host-battledome-80` uses simulation
 busy wall, consistently quieter in both jobs (pooled 0.66% versus 1.06% for CPU).
-The [audit](../../research/performance/2026-10-26-pr-report-audit/REPORT.md) retains
-both jobs and their limits. CPU rows are marked; the same covered pairs' busy-wall
+A later job after the host optimization reversed the Battledome ranking
+(1.33% CPU / 1.56% wall); no uniformly quietest metric is established. The
+[audit](../../research/performance/2026-10-26-pr-report-audit/REPORT.md) retains
+all jobs, sources and limits. CPU rows are marked; the same covered pairs' busy-wall
 values remain in Details. Raw results always retain both metrics. Instruction
 events were blocked and Valgrind was not installed; no security settings changed.
 
