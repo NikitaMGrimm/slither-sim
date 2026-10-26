@@ -1,0 +1,42 @@
+--- a/loopback.py
++++ b/loopback.py
+@@ -13,3 +13,3 @@
+     fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
+-    return (int(fields[11]) + int(fields[12])) / os.sysconf('SC_CLK_TCK')
++    return int(fields[11]) / os.sysconf('SC_CLK_TCK'), int(fields[12]) / os.sysconf('SC_CLK_TCK')
+
+@@ -39,6 +39,6 @@
+         offset = 0
+-        for shard in range(3):
+-            shard_count = count // 3 + (shard < count % 3)
++        for shard in range(1):
++            shard_count = count
+             env = dict(os.environ, STUDY_SERVER_IP='127.0.0.1', STUDY_EPOCH_UNIX_S=str(epoch),
+-                       RAYON_NUM_THREADS='2')
++                       RAYON_NUM_THREADS='1')
+             launch(['taskset', '-c', str(2 + 2 * shard), str(load), str(shard_count), '18766',
+@@ -58,3 +58,4 @@
+                 time.sleep(min(.02, max(0, boundary - time.time())))
+-            samples.append({'unix': time.time(), 'cpuSeconds': cpu(host.pid)})
++            user, system = cpu(host.pid)
++            samples.append({'unix': time.time(), 'cpuSeconds': user+system, 'userSeconds': user, 'systemSeconds': system})
+         for p in children:
+@@ -68,7 +69,9 @@
+                   'deferredTicks': bounds[1]['deferred'] - bounds[0]['deferred'],
++                  'userCpuMsPerTick': 1000*(samples[1]['userSeconds']-samples[0]['userSeconds'])/ticks,
++                  'systemCpuMsPerTick': 1000*(samples[1]['systemSeconds']-samples[0]['systemSeconds'])/ticks,
+                   'samples': samples, 'tickBoundaries': bounds,
+                   'binarySha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+-                  'hostCpu': [0], 'loadCpus': [2, 4, 6], 'warmupSeconds': warmup, 'holdSeconds': hold,
++                  'hostCpu': [0], 'loadCpus': [2], 'warmupSeconds': warmup, 'holdSeconds': hold,
+                   'requested': count, 'preset': preset or 'official',
+-                  'loads': [json.loads((output / f'load-{i}.json').read_text()) for i in range(3)]}
++                  'loads': [json.loads((output / f'load-{i}.json').read_text()) for i in range(1)]}
+         (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
+--- a/instructions.py
++++ b/instructions.py
+@@ -21,3 +21,3 @@
+         pairs = []
+-        for index in range(-1, 3):
++        for index in range(-1, 5):
+             order = ['base', 'candidate'] if index < 0 or index % 2 == 0 else ['candidate', 'base']
