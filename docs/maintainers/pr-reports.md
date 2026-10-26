@@ -64,19 +64,51 @@ head configurations or remaining definition differences never yield a speed
 claim: the collector shows a measured head-only value marked **Redefined**, with
 its reason, when the candidate runs successfully.
 
-The fidelity table exposes the existing duration-weighted turn residuals and
-speed-ramp residuals by source, with denominators, using the same recorded
-fixtures on both runtimes. It also compares named outcomes from `movement_turns`
-and `physics` and one canonical trace per `ci` workload over its catalog trace
-window, listed under Details. A scenario trace without its terminal record is
-unavailable rather than equal. Test source changes,
-new tests and removals are disclosed; removed tests are never counted as fixes.
-Ignored tests stay distinct from passes. A changed trace means changed behavior,
-which may be appropriate for a fidelity correction. No overall accuracy score
-or empirical claim about unmeasured server mechanics is produced.
-The denominator includes every declared test in these two selected source files,
-including cases absent from both execution logs after an abort. The table marks
-those cases unavailable and labels the report incomplete.
+The fidelity table reports nine numeric residuals, each with its unit, case count
+and source fixture under `tests/fixtures`. Both runtimes receive the same head
+fixture bytes. A changed fixture name, unit or denominator makes a residual
+comparison unavailable. Very small nonzero residuals use scientific notation.
+
+| Residual | Cases | Unit | Fixture and calculation |
+| --- | ---: | --- | --- |
+| Sustained turns, large / small | 6 / 3 | rad/s | [movement-turn-runs.json](../../tests/fixtures/movement-turn-runs.json); duration-weighted turn-rate RMSE. |
+| Speed-ramp slopes, three source groups | 343 / 203 / 1,021 | protocol speed/s | [speed-ramp-validation.json](../../tests/fixtures/speed-ramp-validation.json); slope RMSE per source. |
+| Food nutrition | 23 | growth units (`segments + fam`) | [food-growth.json](../../tests/fixtures/food-growth.json); public nutrition helper minus observed isolated-pickup growth. |
+| Prospective death-pellet size | 35 | pellet size units | [death-food-prospective.json](../../tests/fixtures/death-food-prospective.json); public size helper minus the recorded size, equal weight per non-boundary death. |
+| Prey displacement | 11 | world units | [prey-motion-quantization.json](../../tests/fixtures/prey-motion-quantization.json); RMSE of Euclidean endpoint distances after the nearest nominal tick count, using the public authoritative prey motion helper. |
+| Prey flight speed | 13 | protocol speed units | [prey-flight-speed-fresh.json](../../tests/fixtures/prey-flight-speed-fresh.json); default flight-speed helper versus recorded prey speed at the recorded snake speed. |
+
+The prospective size row retains all five count-gap cases; only four flagged
+boundary deaths with zero received pellets have no size residual. A zero size
+error does not establish correct death-food counts. Prey displacement includes
+wire-coordinate quantization and unknown initial tick phase. Flight-speed cases
+include the two calibrated endpoints and the recorded outlier; no error-based
+filter is applied. These selected, correlated observations are not independent
+trials or a score of overall accuracy, and the report adds no acceptance bands.
+The predictions and case selections follow the existing nutrition, death-food
+and prey regressions; this tooling change introduces no fitted rule or capture.
+
+Other proposed residuals remain omitted:
+
+- Boost length cost: `boost-circle-food.json` has an initial body and pellet
+  births, but no paired recorded length debits. Pellet births are not mass debits.
+- Death-food count: the fixtures explicitly contain incomplete received additions
+  and unresolved compact/count gaps, not authoritative emitted totals. Candidate
+  site counts would not measure the density-filtered runtime output.
+- Motion/mass cadence: `scheduler-near-server-witnesses.json` selects minimum-gap
+  witnesses without complete intervening traffic or dirty-state/input timing;
+  its limits explicitly exclude simulator cadence requirements. A gap-minus-timer
+  value would not be a defensible scheduler RMSE.
+
+The selected `movement_turns` and `physics` regressions appear as one pass/fail
+count line (currently 22 tests), followed by one state-trace count line. Details
+retain changed, failing, ignored and missing test outcomes, source-suite changes,
+removals and the ten deterministic trace windows. A trace without its terminal
+record remains unavailable. Removed tests are never fixes; ignored tests are not
+passes. The denominator includes every declared test in these two source files,
+even when an abort leaves cases absent from both execution logs. Missing results
+make the count line unavailable and the report incomplete. A changed trace means
+changed behavior, which can be appropriate for a fidelity correction.
 
 ## How results are decided
 
@@ -326,7 +358,7 @@ cargo test --locked --test movement_turns --test physics
 cargo run --locked --example fidelity_metrics -- tests/fixtures
 ```
 
-The second command prints JSON turn/speed-ramp errors and sample counts.
+The second command prints JSON residuals with units, source fixtures and sample counts.
 For target-branch performance, follow the [local performance guide](../performance.md#compare-a-change):
 
 ```sh

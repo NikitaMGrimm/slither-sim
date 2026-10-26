@@ -2,17 +2,18 @@
 //!
 //! cargo run --locked --example fidelity_metrics -- tests/fixtures > metrics.json
 //!
-//! The directory must contain `movement-turn-runs.json` and
-//! `speed-ramp-validation.json`. Data is read at runtime so two simulator
-//! builds can be measured against the same pinned fixtures. The formulas match
+//! Each metric names its source fixture. Runtime loading lets two simulator builds
+//! use the same pinned fixture bytes. The formulas match
 //! `tests/movement_turns.rs` and `tests/physics.rs::independently_recorded_speed_ramps`;
-//! the values are residuals against recorded observations, not an overall
+//! food nutrition, prospective death-pellet size and prey metrics use the same
+//! public helpers and case selection as their matching regression tests. These
+//! values are residuals against recorded observations, not an overall
 //! accuracy claim, and carry no pass/fail thresholds.
 
 use serde::Deserialize;
 use serde_json::json;
 use slither_sim::{
-    Point,
+    Point, Prey, PreyConfig,
     physics::{BOOST_SPEED, advance, approach_speed, base_speed, turn_rate},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,6 +24,10 @@ use std::process::ExitCode;
 
 const TURN_FILE: &str = "movement-turn-runs.json";
 const RAMP_FILE: &str = "speed-ramp-validation.json";
+const NUTRITION_FILE: &str = "food-growth.json";
+const DEATH_FILE: &str = "death-food-prospective.json";
+const PREY_MOTION_FILE: &str = "prey-motion-quantization.json";
+const PREY_SPEED_FILE: &str = "prey-flight-speed-fresh.json";
 /// Converts simulator speed (world units/s) to the protocol speed units used in
 /// the ramp fixture, as in the physics test.
 const PROTOCOL_SPEED_SCALE: f64 = 0.032;
@@ -67,6 +72,7 @@ struct Metric {
     value: f64,
     unit: String,
     samples: usize,
+    fixture: &'static str,
 }
 
 fn finite(value: f64, what: &str) -> Result<f64, String> {
@@ -172,6 +178,7 @@ fn turn_metrics(fixture: &TurnFixture) -> Result<Vec<Metric>, String> {
             value,
             unit: "rad/s".into(),
             samples: cohort.len(),
+            fixture: TURN_FILE,
         });
     }
     Ok(metrics)
@@ -242,9 +249,227 @@ fn ramp_metrics(fixture: &RampFixture) -> Result<Vec<Metric>, String> {
             value: finite((sum / count as f64).sqrt(), source)?,
             unit: "protocol speed/s".into(),
             samples: count,
+            fixture: RAMP_FILE,
         });
     }
     Ok(metrics)
+}
+
+#[derive(Deserialize)]
+struct NutritionFixture {
+    samples: Vec<NutritionSample>,
+}
+#[derive(Deserialize)]
+struct NutritionSample {
+    segments: usize,
+    fam: f64,
+    size: f64,
+    delta: f64,
+}
+#[derive(Deserialize)]
+struct DeathFixture {
+    own_deaths: Vec<DeathSample>,
+}
+#[derive(Deserialize)]
+struct DeathSample {
+    segments: usize,
+    boundary_candidate: bool,
+    count: usize,
+    sizes: BTreeMap<String, usize>,
+}
+#[derive(Deserialize)]
+struct PreyMotionFixture {
+    cases: Vec<PreyMotionSample>,
+}
+#[derive(Deserialize)]
+struct PreyMotionSample {
+    prey_id: u64,
+    source_x: f64,
+    source_y: f64,
+    heading: f64,
+    target_heading: f64,
+    speed_protocol: f64,
+    server_start_ms: i64,
+    server_end_ms: i64,
+    observed_dx: f64,
+    observed_dy: f64,
+}
+#[derive(Deserialize)]
+struct PreySpeedFixture {
+    cases: Vec<PreySpeedSample>,
+}
+#[derive(Deserialize)]
+struct PreySpeedSample {
+    snake_speed: f64,
+    prey_speed: f64,
+}
+
+fn rmse_metric(
+    id: &str,
+    label: &str,
+    fixture: &'static str,
+    unit: &str,
+    errors: Vec<f64>,
+) -> Result<Metric, String> {
+    for &error in &errors {
+        finite(error, id)?;
+    }
+    let pairs: Vec<_> = errors.iter().map(|&error| (1., error)).collect();
+    Ok(Metric {
+        id: id.into(),
+        label: label.into(),
+        fixture,
+        unit: unit.into(),
+        samples: errors.len(),
+        value: weighted_rmse(&pairs).map_err(|e| format!("{fixture}: {e}"))?,
+    })
+}
+
+fn nutrition_metric(fixture: &NutritionFixture) -> Result<Metric, String> {
+    let mut errors = Vec::new();
+    for row in &fixture.samples {
+        if row.segments < 2
+            || finite(row.fam, NUTRITION_FILE)? < 0.
+            || finite(row.size, NUTRITION_FILE)? <= 0.
+            || finite(row.delta, NUTRITION_FILE)? <= 0.
+        {
+            return Err(format!("{NUTRITION_FILE}: invalid pickup"));
+        }
+        errors.push(
+            slither_sim::physics::nutrition(row.size, row.segments as f64 + row.fam) - row.delta,
+        );
+    }
+    rmse_metric(
+        "food-nutrition-rmse",
+        "Food nutrition RMSE",
+        NUTRITION_FILE,
+        "growth units",
+        errors,
+    )
+}
+
+fn death_size_metric(fixture: &DeathFixture) -> Result<Metric, String> {
+    let mut errors = Vec::new();
+    for row in &fixture.own_deaths {
+        if row.segments < 2
+            || row
+                .sizes
+                .values()
+                .try_fold(0usize, |sum, n| sum.checked_add(*n))
+                != Some(row.count)
+        {
+            return Err(format!("{DEATH_FILE}: invalid size histogram"));
+        }
+        // The same four boundary cases excluded by tests/death_food.rs have no
+        // received pellet size. Keep them in the fixture; no size residual exists.
+        if row.boundary_candidate {
+            if row.count != 0 {
+                return Err(format!("{DEATH_FILE}: boundary case has pellets"));
+            }
+            continue;
+        }
+        if row.count == 0 || row.sizes.len() != 1 {
+            return Err(format!(
+                "{DEATH_FILE}: expected one observed size per non-boundary death"
+            ));
+        }
+        let observed = row
+            .sizes
+            .keys()
+            .next()
+            .unwrap()
+            .parse::<f64>()
+            .map_err(|e| format!("{DEATH_FILE}: {e}"))?;
+        if finite(observed, DEATH_FILE)? <= 0. {
+            return Err(format!("{DEATH_FILE}: invalid pellet size"));
+        }
+        errors.push(slither_sim::physics::death_food_size(row.segments) - observed);
+    }
+    rmse_metric(
+        "death-food-size-rmse",
+        "Death-pellet size RMSE (prospective)",
+        DEATH_FILE,
+        "pellet size units",
+        errors,
+    )
+}
+
+fn prey_motion_metric(fixture: &PreyMotionFixture) -> Result<Metric, String> {
+    let mut errors = Vec::new();
+    let turn_rate = PreyConfig::default().turn_rate;
+    for row in &fixture.cases {
+        let elapsed = row
+            .server_end_ms
+            .checked_sub(row.server_start_ms)
+            .filter(|&ms| ms > 0)
+            .ok_or_else(|| format!("{PREY_MOTION_FILE}: expected positive packet interval"))?;
+        for value in [
+            row.source_x,
+            row.source_y,
+            row.heading,
+            row.target_heading,
+            row.speed_protocol,
+            row.observed_dx,
+            row.observed_dy,
+        ] {
+            finite(value, PREY_MOTION_FILE)?;
+        }
+        if row.speed_protocol < 0. {
+            return Err(format!("{PREY_MOTION_FILE}: negative speed"));
+        }
+        let mut prey = Prey {
+            id: row.prey_id,
+            position: Point {
+                x: row.source_x,
+                y: row.source_y,
+            },
+            heading: row.heading,
+            target_heading: row.target_heading,
+            speed: row.speed_protocol / PROTOCOL_SPEED_SCALE,
+            size: 6.,
+        };
+        // Match tests/prey.rs: nearest nominal tick count, retaining unknown
+        // tick phase and the three-unit wire grid in the resulting error.
+        let ticks =
+            (elapsed as f64 / (slither_sim::physics::LOOP_SECONDS * 1000.)).round() as usize;
+        for _ in 0..ticks {
+            prey.advance_server_tick(turn_rate);
+        }
+        errors.push(prey.position.distance(Point {
+            x: row.source_x + row.observed_dx,
+            y: row.source_y + row.observed_dy,
+        }));
+    }
+    rmse_metric(
+        "prey-motion-rmse",
+        "Prey displacement RMSE",
+        PREY_MOTION_FILE,
+        "world units",
+        errors,
+    )
+}
+
+fn prey_speed_metric(fixture: &PreySpeedFixture) -> Result<Metric, String> {
+    let mut errors = Vec::new();
+    for row in &fixture.cases {
+        if finite(row.snake_speed, PREY_SPEED_FILE)? < 0.
+            || finite(row.prey_speed, PREY_SPEED_FILE)? < 0.
+        {
+            return Err(format!("{PREY_SPEED_FILE}: negative speed"));
+        }
+        errors.push(
+            PreyConfig::default().flight_speed(row.snake_speed / PROTOCOL_SPEED_SCALE)
+                * PROTOCOL_SPEED_SCALE
+                - row.prey_speed,
+        );
+    }
+    rmse_metric(
+        "prey-flight-speed-rmse",
+        "Prey flight-speed RMSE",
+        PREY_SPEED_FILE,
+        "protocol speed units",
+        errors,
+    )
 }
 
 fn load<T: for<'de> Deserialize<'de>>(dir: &Path, name: &str) -> Result<T, String> {
@@ -256,6 +481,10 @@ fn load<T: for<'de> Deserialize<'de>>(dir: &Path, name: &str) -> Result<T, Strin
 fn metrics(dir: &Path) -> Result<Vec<Metric>, String> {
     let mut metrics = turn_metrics(&load(dir, TURN_FILE)?)?;
     metrics.extend(ramp_metrics(&load(dir, RAMP_FILE)?)?);
+    metrics.push(nutrition_metric(&load(dir, NUTRITION_FILE)?)?);
+    metrics.push(death_size_metric(&load(dir, DEATH_FILE)?)?);
+    metrics.push(prey_motion_metric(&load(dir, PREY_MOTION_FILE)?)?);
+    metrics.push(prey_speed_metric(&load(dir, PREY_SPEED_FILE)?)?);
     Ok(metrics)
 }
 
@@ -268,6 +497,7 @@ fn report(metrics: &[Metric]) -> serde_json::Value {
             "value": m.value,
             "unit": m.unit,
             "samples": m.samples,
+            "fixture": m.fixture,
         })).collect::<Vec<_>>(),
     })
 }
@@ -431,6 +661,145 @@ mod tests {
     }
 
     #[test]
+    fn nutrition_uses_growth_mass_and_equal_sample_weights() {
+        let predicted = slither_sim::physics::nutrition(50., 2.5);
+        let fixture = NutritionFixture {
+            samples: [1., 3.]
+                .into_iter()
+                .map(|offset| NutritionSample {
+                    segments: 2,
+                    fam: 0.5,
+                    size: 50.,
+                    delta: predicted + offset,
+                })
+                .collect(),
+        };
+        let metric = nutrition_metric(&fixture).unwrap();
+        assert!((metric.value - 5f64.sqrt()).abs() < 1e-12);
+        assert_eq!((metric.samples, metric.fixture), (2, NUTRITION_FILE));
+    }
+
+    #[test]
+    fn prospective_size_weights_deaths_equally_and_retains_boundary_exclusion() {
+        let fixture = DeathFixture {
+            own_deaths: vec![
+                DeathSample {
+                    segments: 2,
+                    boundary_candidate: false,
+                    count: 2,
+                    sizes: [("13.6".into(), 2)].into(),
+                },
+                DeathSample {
+                    segments: 2,
+                    boundary_candidate: false,
+                    count: 10,
+                    sizes: [("14.6".into(), 10)].into(),
+                },
+                DeathSample {
+                    segments: 2,
+                    boundary_candidate: true,
+                    count: 0,
+                    sizes: BTreeMap::new(),
+                },
+            ],
+        };
+        let metric = death_size_metric(&fixture).unwrap();
+        assert!((metric.value - (0.5f64).sqrt()).abs() < 1e-12);
+        assert_eq!(metric.samples, 2);
+    }
+
+    #[test]
+    fn prey_displacement_uses_euclidean_endpoint_error_per_case() {
+        let sample = |dx, dy| PreyMotionSample {
+            prey_id: 1,
+            source_x: 0.,
+            source_y: 0.,
+            heading: 0.,
+            target_heading: 0.,
+            speed_protocol: 0.,
+            server_start_ms: 0,
+            server_end_ms: 7,
+            observed_dx: dx,
+            observed_dy: dy,
+        };
+        let metric = prey_motion_metric(&PreyMotionFixture {
+            cases: vec![sample(3., 4.), sample(0., 0.)],
+        })
+        .unwrap();
+        assert!((metric.value - (12.5f64).sqrt()).abs() < 1e-12);
+        assert_eq!(metric.samples, 2);
+    }
+
+    #[test]
+    fn prey_flight_speed_residuals_use_protocol_units() {
+        let predicted =
+            PreyConfig::default().flight_speed(5.79 / PROTOCOL_SPEED_SCALE) * PROTOCOL_SPEED_SCALE;
+        let fixture = PreySpeedFixture {
+            cases: vec![PreySpeedSample {
+                snake_speed: 5.79,
+                prey_speed: predicted + 0.2,
+            }],
+        };
+        assert!((prey_speed_metric(&fixture).unwrap().value - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn empty_or_invalid_nonmovement_evidence_is_not_zero_error() {
+        assert!(nutrition_metric(&NutritionFixture { samples: vec![] }).is_err());
+        assert!(death_size_metric(&DeathFixture { own_deaths: vec![] }).is_err());
+        assert!(prey_motion_metric(&PreyMotionFixture { cases: vec![] }).is_err());
+        assert!(prey_speed_metric(&PreySpeedFixture { cases: vec![] }).is_err());
+        assert!(
+            nutrition_metric(&NutritionFixture {
+                samples: vec![NutritionSample {
+                    segments: 2,
+                    fam: f64::NAN,
+                    size: 4.8,
+                    delta: 0.07,
+                }]
+            })
+            .is_err()
+        );
+        assert!(
+            death_size_metric(&DeathFixture {
+                own_deaths: vec![DeathSample {
+                    segments: 2,
+                    boundary_candidate: false,
+                    count: 2,
+                    sizes: [("13.6".into(), 1)].into(),
+                }]
+            })
+            .is_err()
+        );
+        assert!(
+            prey_motion_metric(&PreyMotionFixture {
+                cases: vec![PreyMotionSample {
+                    prey_id: 1,
+                    source_x: 0.,
+                    source_y: 0.,
+                    heading: 0.,
+                    target_heading: 0.,
+                    speed_protocol: 3.8,
+                    server_start_ms: 7,
+                    server_end_ms: 0,
+                    observed_dx: 0.,
+                    observed_dy: 0.,
+                }]
+            })
+            .is_err()
+        );
+        assert!(
+            prey_speed_metric(&PreySpeedFixture {
+                cases: vec![PreySpeedSample {
+                    snake_speed: -1.,
+                    prey_speed: 3.8,
+                }]
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
     fn repository_fixtures_produce_the_pinned_cohorts() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let metrics = metrics(&dir).unwrap();
@@ -443,6 +812,10 @@ mod tests {
                 ("speed-ramp-rmse:run3-large-radius-20260927", 343),
                 ("speed-ramp-rmse:run3-single-20260927", 203),
                 ("speed-ramp-rmse:visibility-covariates-20260928", 1021),
+                ("food-nutrition-rmse", 23),
+                ("death-food-size-rmse", 35),
+                ("prey-motion-rmse", 11),
+                ("prey-flight-speed-rmse", 13),
             ]
         );
         assert!(
@@ -452,6 +825,11 @@ mod tests {
         );
         let report = report(&metrics);
         assert_eq!(report["schema"], 1);
-        assert_eq!(report["metrics"].as_array().unwrap().len(), 5);
+        assert_eq!(report["metrics"].as_array().unwrap().len(), 9);
+        assert!(
+            metrics
+                .iter()
+                .all(|metric| dir.join(metric.fixture).is_file())
+        );
     }
 }
