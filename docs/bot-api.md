@@ -154,8 +154,7 @@ disconnection rules.
 Frames round coordinates (head, anchors, food, prey) to 0.01 world units,
 headings to 0.0001 radians and speeds to 0.01 units per second; every other
 number is exact. `info.precision` reports these steps. Rounding happens only
-when a frame is written; simulation, snapshots, the [portable bot
-API](client-api.md) and the [WebSocket host](raw-server.md) keep full precision.
+when a frame is written; simulation and snapshots keep full precision.
 
 Nearest rounding changes a heading by at most 0.00005 radians and a point by at
 most 0.0071 world units. The [precision study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-24-observation-precision/REPORT.md)
@@ -285,8 +284,8 @@ The envelope is `slither-sim-checkpoint-v1`, with
 and ordered slot/entity records. It includes RNG, timers and terminal causes;
 debug `snapshot` replies and old Simulator JSON are rejected. Unknown fields and
 missing companion records reject, as do radii, headings and one tick of snake
-travel above 1e150, and snake or food coordinates beyond 2e150 (3e150 for dead
-snakes and food), which would overflow later steps. The live
+travel above 1e150, living snake coordinates beyond 2e150, and dead snake or food
+coordinates beyond 3e150, which would overflow later steps. The live
 radius may lie inside the initial spawn ring or pit after measured updates. Producer version/commit do not select rules.
 `RestoreOptions` chooses `EventRecording { pickups, food_births }` and, with the
 parallel feature, `parallel`; event buffers start empty and caches are rebuilt.

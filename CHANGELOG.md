@@ -2,13 +2,6 @@
 
 ## Unreleased
 
-- Host and native background bots, plus both Rust bot examples, now use the
-  shared default Forager policy. Worker scratch is shared while sent history and lifecycle
-  stay per client; boost-only changes are transmitted. A separate
-  `shared-forager-a1-8` workload preserves existing scripted benchmark identities.
-  Current-runtime cost and playing-strength qualification remains pending
-  ([portable bots](docs/client-api.md#rust)).
-
 ### Breaking
 
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
@@ -84,8 +77,7 @@
   policy (`bot::Forager`) and `client::ForagerBot`. `PolicyId::default()` and
   `Forager::default()` select A4 (A4-mean); A1 remains explicitly selectable.
   The [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
-  records gameplay, cost and the maintainer's mean-cost gate. Host and background
-  bots keep their current policy for now.
+  records gameplay, cost and the maintainer's mean-cost gate.
 - `pip install slither-sim`: the Python package is published to PyPI with each
   crate release. Stable-ABI wheels cover CPython 3.11+ on Linux (x86-64, ARM64),
   macOS (Apple silicon, Intel) and Windows (x86-64); other platforms build from
@@ -104,7 +96,7 @@
   follow the official preset. World settings: `pit`, `spawnRadius`, `spawnRadiusMax`,
   `killScoreSeconds`, `minScore` and `ambientRefillCountsAllFood`.
 - World configs take `"preset": "official" | "sandbox" | "battledome"` in `serve`
-  and Python resets and in `host` and `client` config files; explicit fields
+  and Python resets, `host` config files and `client` simulation requests; explicit fields
   override the preset ([presets](docs/configuration.md#presets)).
 - Frames carry each snake's rolling kill score: `snakes.killScore` in `serve`
   JSON (an additive `slither-sim-json-v3` column), `kill_score` in `FrameRef`,
@@ -132,14 +124,20 @@
   and bot food are unchanged; socket bots get real food only by sending the
   `X-SlitherSim-Food: physical` upgrade header
   ([Battledome](docs/configuration.md#battledome)).
-- A [cautious bot example](examples/cautious_bot.rs) that seeks food while
-  avoiding walls and other snakes; the `portable_bot` examples are shorter.
+- A [`cautious_bot`](examples/cautious_bot.rs) example runs the default Forager,
+  with zero timing when built without networking.
 
 ### Changed
 
 - Adopt an S-shaped snake logo and square project icon, paired with
   SlitherClient's C-shaped snake, with outlined Inter lettering and automatic
   light/dark colors.
+- Host and native background bots, plus both Rust bot examples, now use the
+  shared default Forager policy. Worker scratch is shared while sent history and lifecycle
+  stay per client; boost-only changes are transmitted. A separate
+  `shared-forager-a1-8` workload preserves existing scripted benchmark identities.
+  Current-runtime cost and playing-strength qualification remains pending
+  ([portable bots](docs/client-api.md#rust)).
 - Transport checks now compare against timing recorded near the official
   servers in #111 instead of the home captures, whose delay spikes came from the
   home route. The home reference stays available and labeled. Each limit is the
@@ -188,7 +186,7 @@
   reconnects that bot, and stopping no longer waits out a long physics tick.
 - `Config::deserialize` called directly from Rust now accepts presets, like JSON
   parsing ([presets](docs/configuration.md#presets)).
-- A world stopped by mass overflow stays stopped after a JSON round trip
+- A world stopped by mass overflow stays stopped after checkpoint restore
   ([limits](docs/configuration.md#limits)).
 - Python `Session.reset` issues its warnings before replacing worlds, so a
   warning raised as an error keeps the previous session ([Python](docs/python.md)).
