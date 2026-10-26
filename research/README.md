@@ -7,7 +7,6 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
-| Fidelity | [Cadence residual](fidelity/2026-10-26-cadence-residual/REPORT.md) | Offline follow-up: local speed/boost activity and concentrated report phases explain most of the sparse-view residual in synthetic occupancy sensitivities; no host change. |
 | Bots | [A4 adoption](bots/2026-10-26-a4-adoption/REPORT.md) | A4-mean becomes the public default, with A1 selectable; selected private held-out gameplay and cost results, maintainer mean-cost gate and retained tail-limit failures. |
 | Performance | [500-bot AWS qualification](performance/2026-10-26-500-bot-qualification/REPORT.md) | 500 default A4 bots plus a watcher, one pinned simulation/socket core and two bot workers: six 300-second parent/merge holds pass both fixed delivery grades; no #136 regression beyond trial spread. Spot interruptions and supplementary holds retained. |
 | Performance | [Forager kernel shortcuts](performance/2026-10-26-forager-kernel/REPORT.md) | Exact occupancy and clearance shortcuts; platform conformance and paired AWS replay measurements. |
@@ -20,7 +19,8 @@ archive integrity establishes neither scientific rules nor product adoption.
 | Fidelity | [Collision pilot tooling](fidelity/2026-10-26-collision-pilot/REPORT.md) | Local two-client clearance ladder and reversed head-on joins; frozen official pilots not executed, no online rule fitted. |
 | Fidelity | [Arena radius](fidelity/2026-10-26-arena-radius/REPORT.md) | Exploratory retrospective audit: sustained official waves, rejected predictive candidates and death-driven controller jitter; hold initial radius as a practical default, not an identified official law. |
 | Fidelity | [Transport parity reference](fidelity/2026-10-25-transport-parity/REPORT.md) | Offline official headless summaries, empirical transport gates and a localhost host baseline. |
-| Fidelity | [Sparse-view cadence](fidelity/2026-10-26-sparse-view-cadence/REPORT.md) | Offline conditional cadence: sparse official views slow too; no heartbeat change, view-matched gates recommended, residual 6–10-peer cadence difference remains open. |
+| Fidelity | [Sparse-view cadence](fidelity/2026-10-26-sparse-view-cadence/REPORT.md) | Offline conditional cadence: sparse official views slow too; no heartbeat change, view-matched gates recommended; the residual 6–10-peer difference is traced to workload in the follow-up below. |
+| Fidelity | [Cadence residual](fidelity/2026-10-26-cadence-residual/REPORT.md) | Offline follow-up: local speed/boost activity and concentrated report phases explain most of the sparse-view residual in synthetic occupancy sensitivities; no host change. |
 | Fidelity | [Host transport with 500 bots](fidelity/2026-10-26-host-transport-500-bots/REPORT.md) | Three AWS loopback repetitions per arm: 500-bot pool passes, but separate cadence and held-out delay failures prevent a consistent-parity claim; sparse baseline and acquisition failures retained. |
 | Fidelity | [Packet scheduler](fidelity/2026-10-25-packet-scheduler/REPORT.md) | Offline retained protocol-19 census; adopted per-tick emission and partial per-family gates; counterexamples and unknown exact rules retained. |
 | Fidelity | [Delivery profiles](fidelity/2026-10-25-delivery-profiles/REPORT.md) | Local official/naive/responsive comparison: prompt input and mass reports with six-tick steady turns; 500-seat measurements and failed overloaded 64-seat Battledome attempt retained. |

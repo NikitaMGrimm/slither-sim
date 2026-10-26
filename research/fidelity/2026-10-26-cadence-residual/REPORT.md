@@ -1,6 +1,13 @@
 # Cadence residual, 2026-10-26
 
-**No host change. The leading explanation is the local workload's lack of speed/boost activity and mass/body/food traffic, amplified by concentrated motion-report phases.** Synthetic traffic substitution recovers **11.1–12.9 percentage points** of the ≤9 ms share; phase spreading recovers **3.6–8.2 points**. Effects overlap and are explanatory capacities, not identified causal shares. Local motion reports per snake are already more frequent than official. Host catch-up/deferral has little observed signature.
+**No host change: the remaining cadence gap comes mostly from our test workload.**
+Our bots almost never boost, so they generate far less mass, body and food
+traffic than official players, and their motion reports bunch onto fewer tick
+phases. Substituting official-like traffic recovers **11.1–12.9 percentage
+points** of the ≤9 ms share, and spreading report phases recovers
+**3.6–8.2 points**. The effects overlap and measure explanatory capacity, not
+causal shares. Our bots already send more motion reports per snake than
+official players, and the host shows almost no catch-up or deferral signature.
 
 This follows the [sparse-view study](../2026-10-26-sparse-view-cadence/REPORT.md), using its twelve primary archives. In the 6–10-peer bin the official pool is **83.43%** ≤9 ms, versus local **67.99/68.05/64.00%** for r1/r2/r3: deficits **15.44/15.39/19.44 points**. Frames, windows and snakes are correlated; each acquisition remains separate.
 
@@ -96,7 +103,7 @@ All-three substitution adds **12.39/11.11/12.89 points**; phase shifts alone add
 
 **No host change, heartbeat or gate/tolerance adjustment.** `src/client/simulation/broadcast.rs` already emits every nonempty tick. Measured: received bytes, cache membership, intervals and decoded activity. Inferred: workload and phase concentration explain most of the residual. Unknown: missing internal ticks, dirty/rearm semantics and causal shares. The original r2 cadence and r3 delay failures remain failures. Older recordings are not pooled; no new held-out validation or frame-level significance is claimed. Raw archives, full CSV/window/event traces and original notes stay external and local-only; no redistribution rights are established. [Source pins](source-pins.json) retain the sparse-view commit, decoder, scripts and [neutral archive hashes](sources.json); hashes establish identity, not scientific validity.
 
-P2 should stratify continuous-visibility reports by speed, turn, size and food activity, retaining wire turn direction, unchanged tuples, growth/tail mass and joint phases on both clocks. A future offline in-memory experiment should cross controlled cruise/boost/turn/food schedules with synchronized/staggered starts, hold size/peers/gates fixed and log dirty fields, `SnakeReports::update` opportunities and broadcast reasons. Perturb only initial report phases while preserving six-tick minimum spacing. Only activity-matched causal evidence would justify an opportunity-phase change.
+A future official capture should stratify continuous-visibility reports by speed, turn, size and food activity, retaining wire turn direction, unchanged tuples, growth/tail mass and joint phases on both clocks. A future offline in-memory experiment should cross controlled cruise/boost/turn/food schedules with synchronized/staggered starts, hold size/peers/gates fixed and log dirty fields, `SnakeReports::update` opportunities and broadcast reasons. Perturb only initial report phases while preserving six-tick minimum spacing. Only activity-matched causal evidence would justify an opportunity-phase change.
 
 ## Reproduction
 
