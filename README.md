@@ -54,8 +54,9 @@ library elsewhere, run `cargo add slither-sim`; for the CLI alone,
 `cargo install slither-sim --locked`.
 
 Rust bots can reuse the tuned [Forager policy](docs/bot-api.md#frozen-forager)
-through `client::ForagerBot`; core-only builds get the policy alone with
-`--features bot`.
+through `client::ForagerBot::new(PolicyId::default())`. The default is A4
+(A4-mean); A1 remains selectable as `PolicyId::A1`. Offline builds get
+`bot::Forager::default()` with `--no-default-features --features bot`.
 
 ### Download a release
 

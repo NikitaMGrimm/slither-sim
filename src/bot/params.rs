@@ -75,7 +75,6 @@ pub(super) const A1: Params = Params {
     boost_free_score: f64::from_bits(0x0000000000000000),
 };
 
-#[cfg(test)]
 pub(super) const A4_MEAN: Params = Params {
     cell: f64::from_bits(0x4056e753153fabbe),
     cells: 13,
