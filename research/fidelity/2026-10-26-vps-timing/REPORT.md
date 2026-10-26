@@ -1,18 +1,30 @@
 # Remote official-server timing, 2026-10-26
 
-The original attempt and first continuation misclassified collector-requested
-post-death closes as endpoint failures. That interpretation and the endpoint-
-unusable conclusion are withdrawn; a block is not indicated. Their four raw
-streams remain unchanged and quarantined.
+Two official endpoints were recorded from a remote Linux host near them
+(held-out game-ping medians 6.3 and 23.5 ms), in six ten-minute batches with at
+most two connections at once. Four batches were used for development and two
+were held out.
 
-With corrected life-ending handling, the second continuation completed all six
-ten-minute batches: **38 connections, 32 deaths and 32 rejoins, peak concurrency
-2**, and no unrequested socket error/close. Both held-out batches pass the frozen
-clean-exposure gates and classify as **near-zero**: clean frame-excess p99
-**2.322 / 2.372 ms**, with one >10 ms episode each. Server-clock motion/mass,
-reverse-order and long prey-correction counterexamples persist. No simulator
-model, default or bot policy changed; no new numeric replacement model is fitted.
-Spawn admission stayed outside scope.
+- **Server delivery is regular.** On held-out data, the 99th-percentile frame
+  delay beyond what the server's own clock implies was **2.3–2.4 ms**, with
+  about one >10 ms episode per 500 clean seconds. The much larger tail measured from
+  home (p99 9.21 ms, 0.351 runs/s above 10 ms) does not appear here. So the
+  fitted pauses in `LatencyConfig::measured_route()` describe one route and
+  collector setup, not server processing; this study cannot separate the home
+  route from the earlier collector setup.
+- **Scheduler exceptions are real.** On the server's clock, a few motion reports
+  arrive under 35 ms apart (minimum 24 ms, median 43 ms), a few mass reports
+  under 100 ms (minimum 84 ms, median 107 ms), one frame puts motion before mass,
+  and one prey went 3,044 ms without a correction. The simulator's fixed
+  cadences stay a model with documented counterexamples.
+- No simulator model, default or bot policy changed, and no replacement model
+  was fitted. Spawn admission was out of scope.
+
+The first attempt and first continuation stopped early because their wrappers
+treated the collector's own post-death close as an endpoint failure. Their
+conclusion that the low endpoint was unusable is withdrawn. Their four raw
+streams stay unchanged and excluded from analysis; the sections below keep
+that history.
 
 ## Original attempt: results and failure
 
