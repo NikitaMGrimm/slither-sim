@@ -82,5 +82,33 @@
       "caseId": "current-22-0"
     }
   ],
-  "macOS": "macOS conformance is unverified because no macOS oracle exists."
+  "macOS": "macOS conformance is unverified because no macOS oracle exists.",
+  "mathLibraries": {
+    "windowsUcrtFileVersion": "10.0.26100.9444 (WinBuild.160101.0800)",
+    "linux": "glibc 2.39",
+    "differingFunction": "not isolated"
+  },
+  "localChecks": {
+    "command": "python tools/check.py rust package wasm",
+    "target": "x86_64-pc-windows-msvc",
+    "sourceCommit": "de4d867a261fca4b0ea54ece6b2386f8d6989f17",
+    "mainIntegrated": "b6bc684",
+    "commandsPassed": 18,
+    "commandsFailed": 0,
+    "elapsedSeconds": 164.9,
+    "ci": "PR #124 checks are tracked separately; ready promotion requires success"
+  },
+  "focusedPythonTests": {
+    "documentation": {
+      "passed": 7
+    },
+    "fixtureVersions": {
+      "passed": 9
+    },
+    "checkRunner": {
+      "passed": 15,
+      "skipped": 1,
+      "skipReason": "existing platform-specific test"
+    }
+  }
 }

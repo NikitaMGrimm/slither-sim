@@ -125,14 +125,22 @@ produce its own expectations; do not copy or normalize another target's headings
 
 Both oracle runs used Rust 1.99.0 (`b940084d7`, LLVM 23.1.1), dev profile, optimization
 level 0, debug information disabled, incremental compilation disabled and empty
-Rust flags. The dependency lock was shared between oracle builds. Exact hashes,
+Rust flags. Windows used UCRT file version 10.0.26100.9444; WSL used glibc 2.39.
+The dependency lock was shared between oracle builds. Exact hashes,
 compiler targets, resource limits and four differences are in [verification.json](verification.json).
 The original output arrays repeated identically on each platform after adding
 explicit exporter completeness/platform metadata.
 
 Windows and WSL Linux port conformance each passed all 140 A1 and 140 A4-mean cases
-with zero mismatches. Fresh/shared determinism also passed on both. Full Rust,
-package, WASM and CI results are pending completion at this revision of the note.
+with zero mismatches. Fresh/shared determinism also passed on both, including after integrating main
+through `b6bc684`. The Windows run of `python tools/check.py rust package wasm`
+passed all 18 commands: formatting, every Clippy feature build, default/core-only/
+bot-only/networking-only tests, doctests, C ABI tests, Python crate checking,
+the basic example, package verification and core-only/bot-only WASM. Packaging
+retains all three full-frame files and the legacy fixture (3.0 MiB compressed).
+CI results on Linux, Windows and macOS are tracked in
+[PR #124](https://github.com/NikitaMGrimm/slither-sim/pull/124); all checks must pass
+before ready promotion.
 
 Initial attempts are retained in the private execution record: the first build
 found the missing `Action` import; the frame generator initially sent a control to
