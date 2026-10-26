@@ -1,21 +1,30 @@
 # 500-bot host qualification on AWS — 2026-10-26
 
-## Question and outcome
+Can one host run 500 background bots with the default A4 Forager plus one
+watching player in real time, with simulation and sockets sharing one core and
+the bots on their own threads? Did #136 (private simulator state) slow it down?
 
-Can one host process deliver 500 background bots using the default A4 Forager
-policy plus one watching player in real time, with simulation/socket work sharing
-one core and bot workers on separate cores? Does PR #136's merge show a
-performance regression against its parent on main?
+## Findings
 
-The merged host qualifies for the measured 500-bot target on this AWS instance. A: 3/3 real-time passes; 3/3 official-like passes. B: 3/3 real-time passes; 3/3 official-like passes. Neither measured B-minus-A median increase exceeds its predeclared trial-to-trial spread; the frozen rule flags no regression.
+- **The host qualifies.** All six primary 300-second holds kept the full
+  142.857 ticks/s with no deferred ticks. The simulation thread used 57.4–58.2%
+  of its core, 58.3–59.1% with sockets, and the two bot workers 0.45–0.47 cores
+  in total.
+- Watcher frame excess p99 stayed at 0.075–0.081 ms, inside the 3 ms
+  official-like grade; the largest single frame was 10.1 ms late.
+- **#136 shows no regression.** Median simulation CPU rose 0.10 points against a
+  0.71-point trial spread, and excess p99 rose 0.002 ms against a 0.004 ms spread.
+- Four bot workers instead of two changed nothing material (56.9% simulation CPU,
+  same delay).
+- The [host capacity study](../2026-10-26-host-capacity/REPORT.md) measured 50.9%
+  at 500 bots, but with older scripted bots, seven workers and an older world, so
+  the two numbers are not a like-for-like comparison.
+- Four earlier attempts ended in Spot interruptions or a harness fault; they are
+  retained below and excluded from the primary results.
 
-**Revision scope:** #136 had merged at the completed attempt's launch. A is the
-merge's first parent and B is the merge commit, including the fixed-radius and
-population/prey changes
-(#134/#138). Both initialize the same explicit `Config::official(501)` world with
-`dynamicRadius: false`. This removes the world-version confound in the earlier
-failed attempts. The verdict covers the complete pinned #136 change and review
-fixes included in the merge. Later commits are not measured by this study.
+A is #136's parent on main and B its merge commit, so B includes the review
+fixes. Both run the same explicit `Config::official(501)` world with
+`dynamicRadius: false`. Later commits are not measured.
 
 ## Frozen method and sources
 
@@ -159,7 +168,7 @@ later AWS state records identify `Server.SpotInstanceTermination`. The instance
 ended while A2 was incomplete, and no full raw archive was recovered. This entire
 attempt is excluded from the primary comparison.
 
-Attempt 3, authorized by the owner, re-pinned #136 after it had rebased onto main.
+Attempt 3 re-pinned #136 after it had rebased onto main.
 SSH setup is retried at most five times, with 2/4/8/16 s backoff. Builds and holds
 run under a detached remote supervisor with an exclusive job claim and persistent
 status. Reconnecting observes the same job and cannot start a duplicate hold.
