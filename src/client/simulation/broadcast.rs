@@ -45,7 +45,7 @@ pub(super) struct Record {
 }
 
 /// Rank living seats by size, or living/recently scoring seats by rolling kills.
-/// Ties use slot order; kills belong to the reserved slot across connections.
+/// Ties use slot order; a newly admitted socket player clears the prior history.
 pub(super) struct Board {
     /// `(display score, slot)` in rank order.
     pub(super) order: Vec<(f64, usize)>,

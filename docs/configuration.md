@@ -289,8 +289,9 @@ A kill at time `t` counts while `world.time < t + killScoreSeconds`, separately
 from per-life `kills` and size `score`. Worlds with `killScoreSeconds` rank
 the stock leaderboard and own rank by rolling kills, descending with slot-order
 ties. Living seats and dead or disconnected seats with unexpired kills are ranked;
-unused seats and dead seats with zero kills are absent. Scores belong to slots,
-so a new connection reusing a remote seat inherits its recent kills. The preset
+unused seats and dead seats with zero kills are absent. A newly admitted socket
+connection starts at zero and replaces the prior occupant's board entry.
+Respawns by the same connection and bot lives retain recent kills. The preset
 defines no deadline, winner or automatic episode reset.
 A new world clears the rolling score.
 
@@ -339,7 +340,8 @@ Pit worlds default to a 256-cell map (280 pixels in the stock browser), and
 worlds without a pit stay at 136 (160 pixels). Set `minimapSide` explicitly
 to override either default. Bots get only real food, including any pellet a
 marker hides in the browser. Leaderboard kill counts use exact integers within
-the stock score-table range; larger counts fail encoding. Own length,
+the stock score-table range; larger displayed counts saturate at its largest
+exactly representable integer. Ranks still use actual rolling kills. Own length,
 physical mass, per-life kills and optional local size records keep their existing
 meanings. Stock labels are unchanged.
 

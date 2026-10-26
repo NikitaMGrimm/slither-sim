@@ -686,6 +686,16 @@ fn rolling_kill_board_retains_dead_disconnected_seats_until_expiry() {
         .world
         .restore(&serde_json::to_vec(&saved).unwrap(), Default::default())
         .unwrap();
+    // A new life for the same socket connection retains its history.
+    sim.connect(
+        1,
+        PlayerAppearance {
+            nickname: b"Scorer".to_vec(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(sim.backend.world.kill_score(1), Some(2));
     sim.disconnect(1).unwrap();
     sim.backend.world.retire(2).unwrap();
     let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
@@ -705,13 +715,73 @@ fn rolling_kill_board_retains_dead_disconnected_seats_until_expiry() {
         [2., 1.]
     );
     assert_eq!(frame.observation.unwrap().me.score, 400.);
-    // Reusing the reserved seat keeps its existing rolling points.
-    sim.connect(1, PlayerAppearance::default()).unwrap();
-    assert_eq!(sim.backend.world.kill_score(1), Some(2));
+    // A stranger reusing the seat starts at zero; the departed scorer vanishes.
+    sim.connect_new_player(
+        1,
+        PlayerAppearance {
+            nickname: b"New".to_vec(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(sim.backend.world.kill_score(1), Some(0));
+    let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
+    assert_eq!(board.order, [(1., 0), (0., 1)]);
+    sim.backend.next_leaderboard = 0;
+    sim.advance_ticks(1).unwrap();
+    pump(&mut sim, &mut reader);
+    let board = reader.frame(sim.time()).unwrap().hud.leaderboard.unwrap();
+    assert!(board.entries.iter().all(|entry| entry.name != "Scorer"));
+    assert_eq!(
+        board
+            .entries
+            .iter()
+            .find(|entry| entry.name == "New")
+            .unwrap()
+            .score,
+        Some(0.)
+    );
     sim.disconnect(1).unwrap();
     sim.advance_ticks(72).unwrap();
     let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
     assert_eq!(board.order, [(0., 0)]);
+}
+
+#[test]
+fn new_player_clears_only_its_slot_and_native_bot_lives_keep_kills() {
+    let mut world = Config::sandbox();
+    world.radius = 6000.;
+    world.food_count = 0;
+    world.ambient_replenish_per_second = 0.;
+    world.kill_score_seconds = Some(60.);
+    let config = SimulationConfig {
+        world,
+        agents: 3,
+        ..Default::default()
+    };
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    sim.connect(0, PlayerAppearance::default()).unwrap();
+    sim.connect(1, PlayerAppearance::default()).unwrap();
+    let mut saved = serde_json::to_value(sim.backend.world.checkpoint().unwrap()).unwrap();
+    for slot in 0..3 {
+        saved["state"]["slots"][slot]["killTimes"] = serde_json::json!(vec![0.; slot + 1]);
+    }
+    sim.backend
+        .world
+        .restore(&serde_json::to_vec(&saved).unwrap(), Default::default())
+        .unwrap();
+    sim.disconnect(1).unwrap();
+    assert!(
+        sim.connect_new_player(1, PlayerAppearance::default())
+            .unwrap()
+    );
+    sim.backend.reconnect_slot(2).unwrap();
+    assert_eq!(
+        (0..3)
+            .map(|slot| sim.backend.world.kill_score(slot).unwrap())
+            .collect::<Vec<_>>(),
+        [1, 0, 3]
+    );
 }
 
 /// Stock food lifetime model: pinned client newFood starts fr=0;

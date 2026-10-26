@@ -431,18 +431,13 @@ pub(crate) fn max_leaderboard_points() -> usize {
     display_score(physics::MAX_SEGMENTS, U24 as u32 - 1) as usize
 }
 
-/// Encode an integer into stock leaderboard score-table inputs only. Segment
+/// Encode an integer, saturated at the stock table maximum, into leaderboard
+/// score-table inputs only. Segment
 /// index 1 permits 0..9; gameplay newborns still start at two or more segments.
 /// Bisection on the actual quantized table avoids rounding a kill up or down.
 /// See docs/raw-server.md#presentation for the leaderboard-only scope.
 pub(crate) fn leaderboard_points(target: usize) -> Result<(usize, u32), String> {
-    if target > max_leaderboard_points() {
-        return Err(format!(
-            "Kill leaderboard points exceed stock table maximum {}",
-            max_leaderboard_points()
-        ));
-    }
-    let target = target as f64;
+    let target = target.min(max_leaderboard_points()) as f64;
     let max_fam = U24 as u32 - 1;
     let segments = (1..=physics::MAX_SEGMENTS)
         .find(|&segments| display_score(segments, max_fam) >= target)
@@ -1080,9 +1075,9 @@ mod tests {
             .receive_frame(&frame(0, &[setup(3584., 4.).unwrap()]).unwrap(), 0.)
             .unwrap();
         let max = max_leaderboard_points();
-        for target in [0, 1, 2, 10, 255, 1000, max - 1, max] {
+        for target in [0, 1, 2, 10, 255, 1000, max - 1, max, max + 1, usize::MAX] {
             let (segments, fam) = leaderboard_points(target).unwrap();
-            assert_eq!(display_score(segments, fam), target as f64);
+            assert_eq!(display_score(segments, fam), target.min(max) as f64);
             let mut rows = Vec::new();
             leaderboard_row(&mut rows, segments, fam, 0, b"Kills").unwrap();
             state
@@ -1090,7 +1085,7 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 state.frame(0.).unwrap().hud.leaderboard.unwrap().entries[0].score,
-                Some(target as f64)
+                Some(target.min(max) as f64)
             );
         }
         // Exhaust small counts and sample the whole supported range, including
@@ -1099,7 +1094,7 @@ mod tests {
             let (segments, fam) = leaderboard_points(target).unwrap();
             assert_eq!(display_score(segments, fam), target as f64);
         }
-        assert!(leaderboard_points(max + 1).is_err());
-        assert!(leaderboard_points(usize::MAX).is_err());
+        assert_eq!(leaderboard_points(max + 1), leaderboard_points(max));
+        assert_eq!(leaderboard_points(usize::MAX), leaderboard_points(max));
     }
 }

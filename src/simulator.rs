@@ -1045,6 +1045,13 @@ impl Simulator {
             times.len() - times.partition_point(|&t| t + window <= self.time)
         }))
     }
+
+    /// End the previous player's rolling history after networking validates
+    /// and admits a new connection to this slot. Respawning alone retains it.
+    #[cfg(feature = "networking")]
+    pub(crate) fn reset_kill_score(&mut self, index: usize) {
+        self.kill_times[index].clear();
+    }
     /// Read-only replay diagnostic: successful active boost, not the held button.
     pub fn is_boosting(&self, index: usize) -> bool {
         self.snakes.get(index).is_some_and(|s| s.alive)

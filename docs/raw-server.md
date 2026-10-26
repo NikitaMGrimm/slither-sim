@@ -231,7 +231,9 @@ automatically. In-process clients and host bots always get real food. See
 Worlds with `killScoreSeconds` use exact rolling kill counts for the stock
 leaderboard number column and own rank. They include living seats plus dead or
 disconnected seats with unexpired kills; population in that packet is the ranked
-seat count. Ties use slot order. Reusing a remote seat retains its recent kills.
+seat count. Ties use slot order. A newly admitted socket connection clears the
+prior occupant's kills; same-connection respawns and bot lives retain theirs.
+Displayed kill counts saturate at the stock table maximum; ranks use actual kills.
 Own length and local records still show size; stock labels are unchanged. Pit
 minimaps show the pit outline and inner snake cells, using the live wall projection
 so the stock own-player marker stays aligned, including outside the pit.
