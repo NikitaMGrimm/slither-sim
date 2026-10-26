@@ -93,3 +93,29 @@ The result is one dependent failed pilot, with unseen-third-party and body/
 timing uncertainty limits. No p-values, held-out validation, simulator change
 or new game connection was made for this publication. Verified copy-back
 preceded scratch cleanup; no acquisition process or task container remains.
+
+## No second design yet
+
+No v2 official pilot is planned. A scratch design review found two problems
+that a retry would not fix:
+
+- **The fine comparison is unidentifiable.** The frozen position floor alone
+  allows at least 4 units of relative perpendicular displacement at base scale
+  (2 at half scale). H0's `0.975 * r_body` and a `1.00 * r_body` band differ by
+  about 0.37 units at the observed 2–5 segment sizes and 0.63 units at 80
+  segments. At newborn sizes the H1 bands are also only a few units apart.
+  Capsule versus point-band contact might still separate on isolated geometry,
+  but that needs an offline uncertainty screen first. Do not shrink the
+  allowance to make a candidate win.
+- **Acquisition needs a new method.** Pilot one started the next pair 0.6–25 ms
+  after both prior sockets closed, which made 13 connection attempts in the
+  first minute. The last attempt closed 0.5 s after connect, before any open or
+  frame. A same-address rate limit fits that but is not established. Third-party
+  exclusions happened while the own snakes were still 2.4–7.7 thousand units
+  apart, so every restart discarded their approach. The one pair that staged
+  cruised straight at about 181 units/s for 27.6 s until it crossed the 900-unit
+  rim margin of a 6,953-unit arena.
+
+A v2 would need bounded, persistent staging, paced admissions and a coarser
+question, validated offline before any official pilot. It must keep the
+600-unit guard and this failed attempt visible.
