@@ -7,7 +7,7 @@ use std::{
     mem::size_of,
 };
 
-pub const FORMAT: &str = "slither-sim-checkpoint-v1";
+pub const FORMAT: &str = "slither-sim-checkpoint-v2";
 pub const RULES_REVISION: &str = "slither-sim-rules-v1";
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -585,7 +585,7 @@ impl Simulator {
         }
         let state = State {
             time: self.time,
-            radius: self.config.radius,
+            radius: self.radius,
             radius_update_index: self.radius_update_index,
             next_join: self.next_join,
             random: self.random.0,
@@ -922,11 +922,7 @@ impl State {
         Ok(())
     }
 
-    fn into_world(
-        self,
-        mut config: Config,
-        options: RestoreOptions,
-    ) -> Result<Simulator, SimError> {
+    fn into_world(self, config: Config, options: RestoreOptions) -> Result<Simulator, SimError> {
         let mut snakes = Vec::new();
         let mut boosts = Vec::new();
         let mut speeds = Vec::new();
@@ -1044,11 +1040,9 @@ impl State {
             reason: d.reason,
             food: d.food,
         })?;
-        // Today's flat Config stores the live radius; the explicit state scalar
-        // is authoritative on load, including measured-radius continuations.
-        config.radius = self.radius;
         Ok(Simulator {
             config,
+            radius: self.radius,
             snakes,
             food,
             prey,

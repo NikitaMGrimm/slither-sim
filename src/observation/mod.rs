@@ -26,7 +26,7 @@ impl<'a> VisibleState<'a> {
             snakes: world.snakes(),
             food: world.food(),
             prey: world.prey(),
-            radius: world.config().radius,
+            radius: world.radius(),
             vision: world.config().vision,
         }
     }

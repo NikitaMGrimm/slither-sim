@@ -38,7 +38,7 @@ class Watchdog(unittest.TestCase):
 
 
 def frame(heads, food, views):
-    """Synthetic slither-sim-json-v3 frame with only the columns the decision reads."""
+    """Synthetic slither-sim-json-v4 frame with only the columns the decision reads."""
     return {"snakes": {"x": [x for x, _ in heads], "y": [y for _, y in heads]},
             "food": {"x": [x for x, _ in food], "y": [y for _, y in food]}, "views": views}
 

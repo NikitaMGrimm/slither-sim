@@ -543,3 +543,71 @@ fn refill_setter_rejections_same_rate_and_zero_have_defined_state_effects() {
     }
     assert_eq!(snapshot(&repeated), snapshot(&untouched));
 }
+
+#[test]
+fn radius_evolution_preserves_initial_config_and_fixed_ecology_for_500_ticks() {
+    for dynamic_radius in [false, true] {
+        let config = Config {
+            dynamic_radius,
+            food_count: 10,
+            ambient_replenish_per_second: 7.,
+            prey: slither_sim::PreyConfig {
+                count: 2,
+                ..Default::default()
+            },
+            radius_updates: vec![
+                slither_sim::RadiusUpdate {
+                    time: 0.,
+                    radius: 900.,
+                },
+                slither_sim::RadiusUpdate {
+                    time: 0.014,
+                    radius: 850.,
+                },
+                slither_sim::RadiusUpdate {
+                    time: 1.75,
+                    radius: 1100.,
+                },
+                slither_sim::RadiusUpdate {
+                    time: 3.5,
+                    radius: 800.,
+                },
+            ],
+            ..Config::sandbox()
+        };
+        let initial = serde_json::to_value(&config).unwrap();
+        let mut world = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: config.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        let mut expected = 900_f64;
+        let mut cursor = 1;
+        assert_eq!(world.radius(), expected);
+        for _ in 0..500 {
+            let through = world.time() + config.dt + 1e-9;
+            if dynamic_radius {
+                let step = 23.4375 * config.dt;
+                expected += (670. - expected).clamp(-step, step);
+            }
+            while let Some(update) = config
+                .radius_updates
+                .get(cursor)
+                .filter(|u| u.time <= through)
+            {
+                expected = update.radius;
+                cursor += 1;
+            }
+            world.step(&[]).unwrap();
+            assert_eq!(world.radius().to_bits(), expected.to_bits());
+            assert_eq!(serde_json::to_value(world.config()).unwrap(), initial);
+        }
+        let saved = world.checkpoint().unwrap();
+        let restored =
+            Simulator::from_checkpoint(&serde_json::to_vec(&saved).unwrap(), Default::default())
+                .unwrap();
+        assert_eq!(restored.radius(), expected);
+        assert_eq!(serde_json::to_value(restored.config()).unwrap(), initial);
+    }
+}

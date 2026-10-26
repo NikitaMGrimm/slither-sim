@@ -210,3 +210,35 @@ impl LegacyState for Simulator {
         self.food_spawn_events.as_deref()
     }
 }
+
+/// The old helper read the live radius from Config; the split API takes it explicitly.
+pub fn spawn_distance(world: &Simulator, unit: f64) -> f64 {
+    #[cfg(slither_runtime_radius)]
+    {
+        slither_sim::spawn::spawn_distance(world.config(), world.radius(), unit)
+    }
+    #[cfg(not(slither_runtime_radius))]
+    {
+        slither_sim::spawn::spawn_distance(world.config(), unit)
+    }
+}
+
+/// Project only the intended geometric v4 contract/radius split onto v3 for comparison.
+/// Full original replies are retained by the separate ordered radius comparison.
+pub fn geometric_reply(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let mut value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    match value["protocol"].as_str() {
+        Some("slither-sim-json-v3" | "slither-sim-json-v4") => {}
+        _ => return Err("Unknown geometric comparison contract".into()),
+    }
+    value["protocol"] = serde_json::json!("slither-sim-json-v3");
+    if let Some(result) = value
+        .get_mut("result")
+        .and_then(serde_json::Value::as_object_mut)
+        && result.contains_key("snakes")
+        && let Some(radius) = result.remove("radius")
+    {
+        result.get_mut("config").ok_or("Snapshot has no config")?["radius"] = radius;
+    }
+    serde_json::to_vec(&value).map_err(|e| e.to_string())
+}

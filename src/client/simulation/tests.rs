@@ -158,7 +158,7 @@ fn exhaustive_spawn_pose(
 ) -> Result<(Vec<Point>, f64), String> {
     let mut open: Option<(f64, Vec<Point>, f64)> = None;
     for _ in 0..SPAWN_ATTEMPTS {
-        let distance = spawn::spawn_distance(world.config(), random.unit());
+        let distance = spawn::spawn_distance(world.config(), world.radius(), random.unit());
         let angle = random.unit() * TAU;
         let heading = random.unit() * TAU;
         let (body, heading) = world

@@ -30,7 +30,7 @@ an extracted library or another build with `--library PATH` or `SLITHER_SIM_FFI`
 | --- | --- |
 | `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 2 for `slither-sim-abi-v2`. Check it first. |
 | `slither_session_new()`, `slither_session_free(s)` | Create and free a session; free ignores null. |
-| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v3` request line as `serve` would. |
+| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v4` request line as `serve` would. |
 | `slither_step(s, headings, n, boosts, n)` | Steps every world like a JSON `step`, without JSON. |
 | `slither_read_frame(s, world, &frame)` | Fills a `slither_frame` with one world's current frame. |
 | `slither_worlds(s)`, `slither_agents(s)` | Worlds and slots per world; 0 before reset. |
@@ -57,6 +57,11 @@ return 0; reset the usable handle before reading frames or stepping again.
 | `SLITHER_ENDED` (4) | Advancement failed and cleared every world; reset to continue. |
 
 ## Frames
+
+`slither_frame.radius` is the live boundary, independent of the initial
+`snapshot.config.radius`. `slither_request` snapshots expose a separate live
+`radius` field. These JSON semantics use geometric v4; ABI v2's frame layout
+and column meanings are unchanged.
 
 `slither_frame` holds the frame's `time`, `radius`, `vision`, `ticks` and
 `living`; the counts `slots`, `snakes`, `body`, `food`, `prey` and `deaths`; and
@@ -92,5 +97,5 @@ separate threads. Steps advance several worlds in parallel on the library's
 `slither-sim-abi-v2` covers function signatures, `slither_frame` layout, codes
 and column meanings. Incompatible changes need a new identifier and
 `SLITHER_ABI_VERSION`. Rebuild v1 callers; see [migration notes](../CHANGELOG.md#050---2026-10-26).
-Requests and replies follow `slither-sim-json-v3`; check `protocol` and record
+Requests and replies follow `slither-sim-json-v4`; check `protocol` and record
 the commit for reproducibility.

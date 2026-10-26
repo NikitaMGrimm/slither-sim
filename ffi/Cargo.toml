@@ -13,3 +13,6 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 slither-sim = { path = "..", default-features = false, features = ["parallel"] }
+
+[dev-dependencies]
+serde_json = "1"

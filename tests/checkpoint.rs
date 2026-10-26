@@ -585,11 +585,18 @@ fn continuation_matches_for_320_ticks_across_every_lifecycle_phase() {
     }));
     assert_eq!(value(&uninterrupted)["state"]["radiusUpdateIndex"], 3);
     assert_eq!(uninterrupted.radius(), 1300.);
+    assert_eq!(uninterrupted.config().radius, 1200.);
 }
 
 #[test]
 fn stopped_checkpoint_stays_stopped_and_retry_changes_nothing() {
     let mut source = world();
+    let mut rules = source.config().clone();
+    rules.radius_updates = vec![RadiusUpdate {
+        time: rules.dt,
+        radius: 1200.,
+    }];
+    support::reconfigure(&mut source, rules);
     let s = &source.snakes()[0];
     let (p, _) = physics::pickup_circle(s.head, s.heading, s.speed, s.segments);
     source
@@ -616,6 +623,8 @@ fn stopped_checkpoint_stays_stopped_and_retry_changes_nothing() {
         .collect::<Vec<_>>();
     assert!(matches!(source.step(&a), Err(CoreStepError::Stopped(_))));
     let original = value(&source);
+    assert_eq!(original["config"]["radius"], 1000.);
+    assert_eq!(original["state"]["radius"], 1200.);
     let mut restored = Simulator::from_checkpoint(&bytes(&original), options()).unwrap();
     assert_eq!(value(&restored), original);
     assert!(
@@ -945,4 +954,18 @@ fn checkpoint_slots_have_no_500_agent_policy_cap() {
     let restored = Simulator::from_checkpoint(&bytes(&saved), RestoreOptions::default()).unwrap();
     assert_eq!(restored.snakes().len(), 512);
     assert_eq!(value(&restored), saved);
+}
+
+#[test]
+fn old_checkpoint_format_is_rejected_atomically() {
+    let mut incumbent = world();
+    let mut old = value(&incumbent);
+    assert_eq!(old["format"], "slither-sim-checkpoint-v2");
+    old["format"] = json!("slither-sim-checkpoint-v1");
+    let error = rejects_atomic(&mut incumbent, &old);
+    assert!(matches!(
+        error.kind,
+        ErrorKind::UnsupportedCheckpoint { .. }
+    ));
+    assert_eq!(error.field.as_deref(), Some("format"));
 }

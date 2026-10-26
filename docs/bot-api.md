@@ -1,4 +1,4 @@
-# Geometric controller: slither-sim-json-v3
+# Geometric controller: slither-sim-json-v4
 
 Run `slither-sim serve` from a [release archive](../README.md#download-a-release)
 without Rust, or `cargo run --release --locked -- serve` from a checkout. One
@@ -8,8 +8,8 @@ process. Rust callers can use [in-process sessions](#in-process-sessions) or the
 library directly.
 
 ```json
-{"protocol":"slither-sim-json-v3","result":{}}
-{"protocol":"slither-sim-json-v3","error":"Reset first","sessionEnded":false}
+{"protocol":"slither-sim-json-v4","result":{}}
+{"protocol":"slither-sim-json-v4","error":"Reset first","sessionEnded":false}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
@@ -104,10 +104,12 @@ the session after advancement, as described above.
 {"op":"snapshot","world":0}
 ```
 
-Returns world `world`'s (default 0) whole-world `config`, `time`, `snakes`,
+Returns world `world`'s (default 0) whole-world `config`, live `radius`, `time`, `snakes`,
 `food`, `prey` and cumulative `deaths` at full precision, with string slot IDs.
 This debug view excludes internal motion/RNG state and is not a restorable
-checkpoint. Keep it out of limited-visibility bot evaluations.
+checkpoint. `config.radius` retains the initial setting after startup sizing;
+`radius` follows samples and the controller. This changed config meaning is the
+geometric v4 cutover from v3. Keep snapshots out of limited-visibility bot evaluations.
 
 ## Frames
 
@@ -119,7 +121,7 @@ indexes those rows.
 | `time`, `ticks` | World time, and ticks advanced by this request (0 on reset). |
 | `living` | Surviving snakes. |
 | `deaths` | Death events from this request: `time`, `victim` and `killer` slots, `reason` and dropped `food`. |
-| `radius`, `vision` | Arena radius around the origin, and the vision radius. |
+| `radius`, `vision` | Live arena radius around the origin, and the vision radius. |
 | `snakes` | One row per snake that some living slot sees, including each slot's own. |
 | `food`, `prey` | One row per item that some living slot sees. |
 | `views` | One entry per slot: `null` for dead slots, otherwise `self` (its own `snakes` row) and the `snakes`, `food` and `prey` rows it sees. |
@@ -193,7 +195,9 @@ Generated ecology is independent of the initial snake population. Configure
 Simulator fields are private. `config()`, `snakes()`, `food()`, `prey()`,
 `deaths()`, `pickup_events()` and `food_spawn_events()` borrow existing storage;
 `radius()` and `time()` return scalars. Config retains its existing flat keys
-and currently carries the live radius. No mutable slices or config setters are
+and retains the initial radius after startup sizing; `radius()` reports the live
+boundary. Radius evolution never changes the initial Config or ecology targets.
+An explicit `set_ambient_rate` still updates that effective rule. No mutable slices or config setters are
 exposed. Detached `Snake`, `Food` and `Prey` values remain editable.
 
 Use `append_dormant`, `spawn`, `retire` and the existing respawn methods for
@@ -290,7 +294,8 @@ and string `field` locations, a `Constraint` where applicable, and
 with indexed paths for radius samples. `ErrorCode` numeric values 1–17 and
 `as_str()` names are stable; message wording is diagnostic. `Display`/`Error`
 retain human messages and chained causes. Successful steps allocate no error
-strings. JSON, C and Python errors and contract identifiers stay unchanged.
+strings. JSON, C and Python error handling is unchanged by the radius split;
+wire cause codes remain separate future work.
 
 ### Frozen Forager
 
@@ -330,9 +335,13 @@ Use `serde_json::to_vec(&world.checkpoint()?)` for exact core continuation;
 the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
-The envelope is `slither-sim-checkpoint-v1`, with
+The envelope is `slither-sim-checkpoint-v2`, with
 `rulesRevision: "slither-sim-rules-v1"`, producer provenance, today's flat Config
-and ordered slot/entity records. It includes RNG, timers and terminal causes;
+and ordered slot/entity records. `config.radius` is the initial radius and
+`state.radius` is the live radius; loading preserves both. Version 1 is rejected
+because it stored the live radius in Config and cannot recover the initial value.
+The rules revision stays v1 because tick behavior is unchanged.
+The checkpoint includes RNG, timers and terminal causes;
 debug `snapshot` replies and old Simulator JSON are rejected. Unknown fields and
 missing companion records reject, as do radii, headings and one tick of snake
 travel above 1e150, living snake coordinates beyond 2e150, and dead snake or food

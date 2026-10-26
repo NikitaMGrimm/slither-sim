@@ -43,7 +43,7 @@ replay imports would intentionally reset those controls. The build identity
 records both runtime/state adapter selections and their source hashes.
 
 `examples/support/state.rs` supplies compile-selected state adapters for legacy
-Simulator serde and validated checkpoint v1. The overlay copies that adapter and
+Simulator serde and validated checkpoint v1/v2. The overlay copies that adapter and
 `build.rs` into both revisions; the build script selects the API from the runtime
 source, without changing it. Workloads and measurement code stay shared. The
 checkpoint adapter projects every authoritative field back to the legacy shape,
@@ -51,6 +51,13 @@ preserving RNG, failures, timers and ordered arrays; only the envelope, slot
 grouping, field spelling and optional null representation are normalized.
 Producer provenance is outside state comparison. Unprojected fields fail instead
 of disappearing. Build identities record adapter selection and source hashes.
+
+For the runtime-radius split, checkpoint v2 and geometric v4 are projected onto
+v1/v3's historical live-radius representation for comparison. The explicit live
+radius is retained; only the intended Config/radius placement and contract labels
+are normalized. Separate ordered radius traces retain the complete original
+checkpoints and snapshots, check initial Config invariance and compare every
+other field without omission.
 
 Separate persistent targets live under `target/perf-suite/` (or
 `CARGO_TARGET_DIR`). Locks refuse concurrent use; verify ownership before removing

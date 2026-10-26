@@ -15,7 +15,6 @@ use serde_json::{Value, json};
 use slither_sim::{
     Action, Config, DeathEvent, DeathReason, Observation, Point, Simulator, physics,
     profiling::{StepProfile, WorldStats},
-    spawn,
 };
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -731,7 +730,7 @@ fn core_world(case: &str) -> Result<(Simulator, Vec<Point>, f64), String> {
     let orbit = if case == "step-body" {
         400.0
     } else {
-        world.config().radius * 0.5
+        world.radius() * 0.5
     };
     let mut snakes = world.snakes().to_vec();
     for (slot, center) in centers.iter_mut().enumerate() {
@@ -1010,7 +1009,7 @@ mod portable {
         let mut actions = controls(
             backend.world(),
             &centers,
-            backend.world().config().radius * 0.5,
+            backend.world().radius() * 0.5,
             tick,
         );
         for (action, frame) in actions.iter_mut().zip(frames) {
@@ -1604,7 +1603,7 @@ impl Controller {
 }
 
 fn wander(world: &Simulator, tick: usize) -> Vec<Option<Action>> {
-    let radius = world.config().radius;
+    let radius = world.radius();
     let margin = (radius * 0.12).max(300.0);
     let count = world.snakes().len();
     world
@@ -1852,7 +1851,7 @@ impl Scene {
 
     fn pose(&mut self, segments: usize, attempts: usize) -> Option<(Point, f64)> {
         for _ in 0..attempts {
-            let distance = spawn::spawn_distance(self.world.config(), self.random.unit());
+            let distance = runtime::spawn_distance(&self.world, self.random.unit());
             let angle = self.random.unit() * TAU;
             let heading = self.random.unit() * TAU;
             let head = Point {
