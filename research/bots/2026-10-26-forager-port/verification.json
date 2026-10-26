@@ -123,5 +123,32 @@
     "canonicalInputFrame": "Compact UTF-8 JSON of the bit-encoded frame, recursively sorted object keys, non-ASCII preserved, no trailing newline.",
     "expectedValues": "Raw expected JSON subtrees copied byte-for-byte; no policy execution or value recomputation."
   },
-  "rawExporterSha256": "c19ad22ec3741434246b0b0f7ec683221caa87b7392c86724e7207fa393720d9"
+  "rawExporterSha256": "c19ad22ec3741434246b0b0f7ec683221caa87b7392c86724e7207fa393720d9",
+  "maintainerFollowup": {
+    "sourceCommit": "98a394d3a124740a2b150e1a0c10b137779d170e",
+    "command": "python tools/check.py rust package wasm",
+    "commandsPassed": 18,
+    "commandsFailed": 0,
+    "windowsConformance": {
+      "A1": 140,
+      "A4-mean": 140,
+      "mismatches": 0
+    },
+    "linuxConformance": {
+      "A1": 140,
+      "A4-mean": 140,
+      "mismatches": 0
+    },
+    "expectedSubtreesByteIdenticalPerPlatform": 140,
+    "projectionCliReproducesCommittedBytes": true,
+    "fixturesBytes": {
+      "forager-conformance.json": 8352478,
+      "forager-oracle-windows-x86_64-msvc.json": 1546854,
+      "forager-oracle-linux-x86_64-gnu.json": 1546851
+    },
+    "fixturesTotalBytes": 11446183,
+    "previousFixturesTotalBytes": 28118423,
+    "compressedPackageBytes": 1333935,
+    "previousCompressedPackageBytes": 3101422
+  }
 }

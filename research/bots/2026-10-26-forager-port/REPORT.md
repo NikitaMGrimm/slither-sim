@@ -109,6 +109,28 @@ other targets without an exact target oracle run determinism and structural
 invariants only. The test names and an explicit notice identify this limitation;
 passing those tests is not oracle equality.
 
+## Compact fixture measurements
+
+The projection follow-up passed Windows and WSL Linux conformance again: 140 A1
+and 140 A4-mean cases per platform, zero mismatches, with input-frame hashes checked
+before expected outputs. The projection CLI reproduces both committed files
+byte for byte, and all 140 `expected` subtrees per platform match their raw output
+bytes. The missing-input failure mode remains a hard assertion in the test.
+
+| File | Bytes |
+| --- | ---: |
+| `forager-conformance.json` | 8,352,478 |
+| `forager-oracle-windows-x86_64-msvc.json` | 1,546,854 |
+| `forager-oracle-linux-x86_64-gnu.json` | 1,546,851 |
+| Total | 11,446,183 |
+
+The three fixtures shrink from 28,118,423 to 11,446,183 bytes.
+At follow-up source `98a394d`, `python tools/check.py rust package wasm` passed
+all 18 commands. The verified compressed crate shrinks from
+3,101,422 bytes (2.96 MiB) to 1,333,935 bytes (1.27 MiB).
+`PolicyId` is now non-exhaustive; constructor/decision docs and feature-default
+wording were corrected. No expected value or kernel arithmetic changed.
+
 ## Last-bit platform differences
 
 Complete original-kernel comparison found these four heading differences. They
