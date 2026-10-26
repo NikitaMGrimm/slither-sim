@@ -1,4 +1,5 @@
 //! Checked scene construction and targeted replay edits, outside the tick path.
+use super::checkpoint::{DEAD, LIVING, MAGNITUDE};
 use super::*;
 use crate::EventRecording;
 use std::num::NonZeroU32;
@@ -135,12 +136,10 @@ fn nonnegative(value: f64, field: &str) -> Result<(), SimError> {
         Ok(())
     }
 }
-// Match checkpoint v1's continuation envelope: coordinate differences and
-// squared distances remain finite even after a boundary correction.
-const MAGNITUDE: f64 = 1e150;
-fn bounded(value: f64, field: &str) -> Result<(), SimError> {
+// Share the checkpoint continuation envelope for all checked replay ingress.
+fn bounded(value: f64, limit: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
-    if value.abs() > MAGNITUDE {
+    if value.abs() > limit {
         return Err(SimError::state(
             Constraint::OutOfRange,
             field,
@@ -149,11 +148,11 @@ fn bounded(value: f64, field: &str) -> Result<(), SimError> {
     }
     Ok(())
 }
-fn point(point: Point, field: &str) -> Result<(), SimError> {
-    bounded(point.x, field)?;
-    bounded(point.y, field)
+fn point(point: Point, limit: f64, field: &str) -> Result<(), SimError> {
+    bounded(point.x, limit, field)?;
+    bounded(point.y, limit, field)
 }
-fn body(body: &[Point]) -> Result<(), SimError> {
+fn body(body: &[Point], limit: f64) -> Result<(), SimError> {
     if body.len() < 2
         || body
             .len()
@@ -168,13 +167,13 @@ fn body(body: &[Point]) -> Result<(), SimError> {
         ));
     }
     for &p in body {
-        point(p, "body")?;
+        point(p, limit, "body")?;
     }
     Ok(())
 }
 fn food(food: &Food) -> Result<(), SimError> {
-    bounded(food.x, "food.x")?;
-    bounded(food.y, "food.y")?;
+    bounded(food.x, DEAD, "food.x")?;
+    bounded(food.y, DEAD, "food.y")?;
     nonnegative(food.value, "food.value")?;
     if let Some(size) = food.size {
         nonnegative(size, "food.size")?;
@@ -433,9 +432,9 @@ impl Simulator {
         )?;
         self.push_life(snake, speed)
     }
-    fn validate_spawn(&self, points: &[Point], heading: f64) -> Result<(), SimError> {
-        body(points)?;
-        finite(heading, "heading")?;
+    pub(super) fn validate_spawn(&self, points: &[Point], heading: f64) -> Result<(), SimError> {
+        body(points, LIVING)?;
+        bounded(heading, MAGNITUDE, "heading")?;
         if points.len() > MAX_SEGMENTS {
             return Err(SimError::state(
                 Constraint::OutOfRange,
@@ -456,9 +455,10 @@ impl Simulator {
         Ok(())
     }
     fn replay_snake(&self, id: String, life: ReplayLife) -> Result<(Snake, SpeedState), SimError> {
-        body(&life.body)?;
-        point(life.head, "head")?;
-        finite(life.heading, "heading")?;
+        let limit = if life.alive { LIVING } else { DEAD };
+        body(&life.body, limit)?;
+        point(life.head, limit, "head")?;
+        bounded(life.heading, MAGNITUDE, "heading")?;
         self.validate_mass(life.body.len(), life.fam)?;
         let speed = match life.speed {
             InitialSpeed::Infer(speed) => {
@@ -467,7 +467,7 @@ impl Simulator {
             }
             InitialSpeed::Known(state) => SpeedState::with_progress(state.speed, state.progress())?,
         };
-        bounded(speed.speed * self.config.dt, "speed")?;
+        bounded(speed.speed * self.config.dt, MAGNITUDE, "speed")?;
         let mut snake = Snake {
             id,
             head: life.head,
@@ -532,7 +532,15 @@ impl Simulator {
         fam: f64,
     ) -> Result<(), SimError> {
         self.check_slot(slot)?;
-        body(&points).map_err(|e| e.at_slot(slot))?;
+        body(
+            &points,
+            if self.snakes[slot].alive {
+                LIVING
+            } else {
+                DEAD
+            },
+        )
+        .map_err(|e| e.at_slot(slot))?;
         self.validate_mass(points.len(), fam)
             .map_err(|e| e.at_slot(slot))?;
         let snake = &mut self.snakes[slot];
@@ -551,9 +559,26 @@ impl Simulator {
         heading: f64,
     ) -> Result<(), SimError> {
         self.check_slot(slot)?;
-        point(head, "head").map_err(|e| e.at_slot(slot))?;
-        body(&points).map_err(|e| e.at_slot(slot))?;
-        finite(heading, "heading").map_err(|e| e.at_slot(slot))?;
+        point(
+            head,
+            if self.snakes[slot].alive {
+                LIVING
+            } else {
+                DEAD
+            },
+            "head",
+        )
+        .map_err(|e| e.at_slot(slot))?;
+        body(
+            &points,
+            if self.snakes[slot].alive {
+                LIVING
+            } else {
+                DEAD
+            },
+        )
+        .map_err(|e| e.at_slot(slot))?;
+        bounded(heading, MAGNITUDE, "heading").map_err(|e| e.at_slot(slot))?;
         if points.len() != self.snakes[slot].segments {
             return Err(SimError::state(
                 Constraint::LengthMismatch,
@@ -597,8 +622,8 @@ impl Simulator {
     fn validate_prey(&self, prey: &Prey) -> Result<(), SimError> {
         finite(prey.position.x, "prey.position.x")?;
         finite(prey.position.y, "prey.position.y")?;
-        finite(prey.heading, "prey.heading")?;
-        finite(prey.target_heading, "prey.targetHeading")?;
+        bounded(prey.heading, MAGNITUDE, "prey.heading")?;
+        bounded(prey.target_heading, MAGNITUDE, "prey.targetHeading")?;
         nonnegative(prey.speed, "prey.speed")?;
         if let Some(rule) = Constraint::positive(prey.size) {
             return Err(SimError::state(

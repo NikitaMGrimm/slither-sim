@@ -770,16 +770,19 @@ fn restored_kill_counts_saturate_when_one_tick_credits_several() {
 
 #[test]
 fn a_step_from_an_accepted_far_state_stays_exportable() {
-    let mut world = Simulator::new(
-        7,
-        Config {
+    let world = Simulator::new(slither_sim::WorldOptions {
+        seed: 7,
+        config: Config {
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Config::sandbox()
         },
-    )
+        population: slither_sim::InitialPopulation::Placed {
+            ids: vec!["a".into()],
+            placement: slither_sim::Placement::TestRing,
+        },
+    })
     .unwrap();
-    world.add("a", 0, 1).unwrap();
     let mut source = value(&world);
     source["config"]["radius"] = json!(1e150);
     source["state"]["radius"] = json!(1e150);
@@ -800,7 +803,7 @@ fn a_step_from_an_accepted_far_state_stays_exportable() {
             boost: false,
         })])
         .unwrap();
-    assert!(world.snakes[0].head.x > 1e150);
+    assert!(world.snakes()[0].head.x > 1e150);
     let saved = value(&world);
     let restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
     assert_eq!(value(&restored), saved);

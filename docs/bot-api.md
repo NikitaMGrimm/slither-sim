@@ -212,7 +212,8 @@ body length supplies segment count, and mass supplies display values. The old
 preserve speed/progress, boost, kiosk credit/timers, join order, kills and pit
 history. Pose correction retains segment count. Replay corrections allow finite
 overlaps and out-of-arena geometry within the checkpoint continuation envelope
-(coordinates and snake speed × dt at most 1e150 in magnitude); the 430-segment
+(positions at most 2e150 for living snakes and 3e150 for inactive snakes/food;
+headings and snake speed × dt at most 1e150 in magnitude). The 430-segment
 spawn limit is not a replay cap.
 
 `from_scenario(seed, config, Scenario { snakes, food, prey })` installs ordered

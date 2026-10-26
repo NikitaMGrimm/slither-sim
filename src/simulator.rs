@@ -1257,6 +1257,8 @@ impl Simulator {
             )
             .at_slot(index));
         }
+        self.validate_spawn(&body, heading)
+            .map_err(|e| e.at_slot(index))?;
         let floor = self.min_mass;
         if let Some(floor) = floor.filter(|floor| body.len() < floor.segments) {
             return Err(SimError::state(

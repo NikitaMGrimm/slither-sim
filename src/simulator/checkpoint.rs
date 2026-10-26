@@ -419,13 +419,13 @@ fn positive(value: f64, field: &str) -> Result<(), SimError> {
 }
 /// Largest accepted radius, heading and one tick of snake travel. Individually
 /// finite values near f64::MAX would overflow on the next step.
-const MAGNITUDE: f64 = 1e150;
+pub(super) const MAGNITUDE: f64 = 1e150;
 /// Living snakes lie within this. A tick moves a head at most one more
 /// MAGNITUDE before the boundary constrains or kills it, so dead snakes and
 /// their food stay within DEAD and continuation remains exportable. Squared
 /// distances between such points stay finite.
-const LIVING: f64 = 2. * MAGNITUDE;
-const DEAD: f64 = LIVING + MAGNITUDE;
+pub(super) const LIVING: f64 = 2. * MAGNITUDE;
+pub(super) const DEAD: f64 = LIVING + MAGNITUDE;
 fn bounded(value: f64, limit: f64, field: &str) -> Result<(), SimError> {
     finite(value, field)?;
     require(value.abs() <= limit, Constraint::OutOfRange, field)

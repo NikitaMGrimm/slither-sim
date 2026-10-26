@@ -105,7 +105,37 @@ fn numerical_import_and_correction_rejections_are_atomic() {
             })
             .is_err()
     );
+    let mut heading = life(&world);
+    heading.heading = f64::MAX;
+    assert!(world.import_life(0, heading).is_err());
+    assert!(
+        world
+            .insert_prey(ReplayPrey {
+                prey: Prey {
+                    id: 99,
+                    position: Point::default(),
+                    heading: -f64::MAX,
+                    target_heading: f64::MAX,
+                    speed: 0.,
+                    size: 1.
+                },
+                mode: PreyMode::Roaming,
+            })
+            .is_err()
+    );
     assert_eq!(bytes(&world), before);
+    // Valid boundary states remain importable and checkpointable, including
+    // dead bodies one tick beyond the living-position limit.
+    for (alive, x) in [(true, checkpoint::LIVING), (false, checkpoint::DEAD)] {
+        let mut imported = life(&world);
+        imported.alive = alive;
+        imported.head = Point { x, y: 0. };
+        imported.body = vec![imported.head; 2];
+        world.import_life(0, imported).unwrap();
+        let saved = bytes(&world);
+        let restored = Simulator::from_checkpoint(&saved, RestoreOptions::default()).unwrap();
+        assert_eq!(bytes(&restored), saved);
+    }
 }
 
 #[test]
