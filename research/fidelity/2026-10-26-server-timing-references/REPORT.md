@@ -150,6 +150,26 @@ Batch drift was observed: the later batch-3 delay quantiles exceed batches 1–2
 and even their masked values exceeded the first attempt's development envelope.
 The unfiltered comparison includes collector stalls on both sides.
 
+### Resolution amendment fixed before re-evaluation
+
+The exact no-floor rule has no passing allowance: `low-2` has frame-gap p50
+8 ms, while each of the other five has 7 ms. Their zero spread makes its LOO
+limit 7 ms for all three multipliers. At 0.5, second-3 also fails delay p90
+(1.1330000000016298 > 1.1325000000078944 ms); at 1 and 2 only frame-gap p50
+fails. The complete [no-floor LOO attempt](loo-without-resolution-floor.json)
+is preserved, not treated as a passing calibration.
+
+The owner authorized this amended rule before re-evaluation: use
+`max(observed spread, 1 ms)` **only for server frame-gap p50**, then select the
+smallest common allowance in the same fixed set **{0.5, 1, 2}** passing all four
+metrics for all six LOO comparisons. The server elapsed header has 1 ms
+resolution: an integer-valued quantile cannot express spread finer than one
+header unit. Receipt-clock anchor corrections and excess-delay quantiles are
+not quantized by that clock and receive **no floor**. Use the identical formula
+for the final six-capture envelope. This amendment does not supply a population
+false-reject guarantee; control remains only the LOO check on six captures with
+observed batch drift.
+
 ## Scheduler witnesses and model decision
 
 Selection is fixed by the existing held-out question: minimum clean motion gap,
