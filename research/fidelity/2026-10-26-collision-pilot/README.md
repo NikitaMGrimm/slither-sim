@@ -1,6 +1,7 @@
 # Collision pilot preparation
 
-Official pilots and scouting: **not executed**. This PR builds tooling and tests
+Official pilots: **not executed**. One official scouting attempt failed
+before any join (see below). This PR builds tooling and tests
 only against a loopback SlitherSim host. [Frozen method](plan.json),
 [local verification and limits](REPORT.md).
 

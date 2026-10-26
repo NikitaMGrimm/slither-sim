@@ -49,6 +49,8 @@ class CollisionPilotTests(unittest.TestCase):
             template = evidence.read_json(pilot.TEMPLATE)
             self.assertEqual({k: v for k, v in plan.items() if k != "capture"}, template)
             self.assertEqual(plan["capture"]["origin"], "http://slither.io")
+            bare = pilot.prepare(source, root / "bare", origin=None)
+            self.assertNotIn("origin", evidence.read_plan(bare)["capture"])
             self.assertEqual((study / "pilot-template.json").read_bytes(), pilot.TEMPLATE.read_bytes())
             self.assertEqual((study / "attempts.jsonl").read_bytes(), b"")
             command = collect.capture_command(study, root / "unused")

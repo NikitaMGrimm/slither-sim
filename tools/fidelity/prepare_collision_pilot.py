@@ -45,8 +45,9 @@ def prepare(selection_path, output, origin=OFFICIAL_ORIGIN):
     selection = evidence.read_json(selection_path)
     server = select(selection)
     plan = evidence.read_json(TEMPLATE)
-    plan["capture"] = {"server": server, "scenario": "paired-collision", "seconds": 600, "bots": 2,
-                       "origin": origin}
+    plan["capture"] = {"server": server, "scenario": "paired-collision", "seconds": 600, "bots": 2}
+    if origin is not None:
+        plan["capture"]["origin"] = origin
     evidence.validate(plan, "study-plan")
     with tempfile.TemporaryDirectory() as temporary:
         source = Path(temporary) / "plan.json"
