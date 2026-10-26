@@ -487,7 +487,7 @@ def e2e(executable, steps, hosted, directory):
             host_error = (directory / "host-stderr.txt").open("wb")
             config = directory / "host-config.json"
             config.write_text(json.dumps({"bind": "127.0.0.1:0", "seed": 7,
-                                          "maxClients": 1, "bots": 4,
+                                          "players": {"max": 1}, "bots": {"count": 4},
                                           "simulation": {"world": SANDBOX_WORLD}}), encoding="utf-8")
             host = subprocess.Popen([str(executable), "host", "--config", str(config)],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)

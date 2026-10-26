@@ -27,9 +27,10 @@ and shared minimap/leaderboard phases. Their default periods reproduce measured
 official means, not an exact recovered scheduler.
 
 Ping measures round-trip time. Native clients ping automatically after setup,
-with at most one outstanding. Leave artificial latency at zero on real hosts,
-as in the [server example](raw-server.md#configuration): sockets and processing
-already take time. [Same-tick replies](server-rules.md#packet-timing) normally
+with at most one outstanding. Hosts configure socket delay with `players.latency`
+and bot link/processing delay with `bots.latency`. Socket delay defaults to zero;
+real players already incur network and compute time.
+[Same-tick replies](server-rules.md#packet-timing) normally
 add up to one physics tick (7 ms by default); OS scheduling and load can add more.
 
 For virtual-time training, `latency.roundTripSeconds: [0.06]` models a 60 ms base
@@ -43,10 +44,12 @@ both delays.
 | --- | --- | --- |
 | `bind` | `"127.0.0.1:8766"` | Literal IP and port; `--bind` overrides it. |
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
-| `maxClients` | `4` | Reserved remote slots; at least 1. |
-| `bots` | `4` | Background food-seeking bots; clients + bots must be at most 65,535. |
-| `botThreads` | `2` | Background bot worker threads, separate from simulation and sockets; at least 1 when `bots > 0`. At most `bots` workers are started. |
-| `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false. |
+| `players.max` | `4` | Reserved socket slots; at least 1. |
+| `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
+| `bots.count` | `4` | Background food-seeking bots; players + bots must be at most 65,535. |
+| `bots.threads` | `2` | Background workers, separate from simulation and sockets; at least 1 when `bots.count > 0`. At most `bots.count` workers start. |
+| `bots.latency` | Zero added delay | Bot link and processing settings. |
+| `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false and `latency` must stay at its default. |
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
 
@@ -65,7 +68,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `minimapSide` | `136` | Received protocol-19 minimap resolution; 1–512, the stock client's clamp. Rasterization remains approximate. |
 | `leaderboardIntervalSeconds` | `3.008` | Positive finite period of the server-wide leaderboard clock; the first board waits for it. |
 | `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
-| `latency` | Zero added delay | Link and processing settings below. |
+| `latency` | Zero added delay | Link and processing for all simulator agents; on hosts use `players.latency` / `bots.latency` instead. |
 | `recordWire` | `false` | Retain wire records; drain regularly. Unavailable on the host. |
 
 Incremental updates send at most three new body anchors per snake per tick.
@@ -134,7 +137,7 @@ recipients is a lead, not a census. The
 [official-defaults report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-official-defaults/REPORT.md)
 records these choices' sources and caveats; official prey population is unresolved.
 
-Link and decision settings belong to `SimulationConfig`, which wraps either world:
+Decision settings belong to `SimulationConfig`, which wraps either world:
 
 ```rust
 use slither_sim::{Config, client::{HostConfig, SimulationConfig}};
@@ -291,11 +294,14 @@ approximation.
 
 ## LatencyConfig
 
-`SimulationConfig.latency` adds artificial delay to any real socket delay;
-default zero. Messages stay ordered. Virtual-time delivery and server input
-application use physics ticks; the host's socket thread releases outbound frames
-at due times between ticks. Processing settings apply to in-process bots;
-remote clients use real compute time.
+`SimulationConfig.latency` models link and processing delay for all virtual-time
+agents. Hosts use `players.latency` for added socket link delay and `bots.latency`
+for bot link and processing delay; all default to zero. Socket players use their
+own compute time, so their processing settings must be zero. Messages stay ordered.
+Virtual-time delivery and server input application use physics ticks; the host's
+socket thread releases outbound frames at due times between ticks.
+`LatencyConfig::measured_route()` values suit `players.latency` for local play
+that should feel like the retained home route.
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |

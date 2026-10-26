@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE]\n\n\
     Binary protocol-19 WebSocket server at /slither. Defaults bind loopback.\n\
-    FILE is a HostConfig JSON object; --bind overrides its bind address.\n\
+    FILE is a HostConfig JSON object with players and bots sections; --bind overrides bind.\n\
     See docs/raw-server.md for limits and VPS configuration.";
 
 fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {

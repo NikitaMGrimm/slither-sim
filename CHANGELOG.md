@@ -4,6 +4,11 @@
 
 ### Breaking
 
+- Host settings are grouped: migrate `maxClients` → `players.max`, `bots` →
+  `bots.count`, `botThreads` → `bots.threads`, and `simulation.latency` →
+  `bots.latency`. Sockets no longer receive the simulation's latency; use
+  `players.latency` for added socket link delay (processing must stay zero).
+  Legacy flat keys and non-default host `simulation.latency` are rejected.
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
   and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
   use `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot
@@ -108,7 +113,7 @@
   (`dt × 437.5 ≥ 126`). `serve` returns them on reset, the CLI prints them, and
   Python's `Session.reset` issues `UserWarning`s
   ([limits](docs/configuration.md#limits)).
-- Host `botThreads` (default 2) runs background bots on their own threads, apart
+- Host `bots.threads` (default 2) runs background bots on their own threads, apart
   from physics and sockets. The `host_load` example measures simulation load,
   deferred ticks and extra delivery delay
   ([hosting](docs/raw-server.md#embedding-and-load-checks)).
