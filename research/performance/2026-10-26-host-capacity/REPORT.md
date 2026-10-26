@@ -36,7 +36,10 @@ The grades were fixed before collection, and none was relaxed.
 | (b) Real time | Excess p99 ≤10 ms and no newly deferred ticks | **100** confirmed; 250 passed only the 120 s sweep |
 | (c) Falls behind | Deferred ticks and slowed world time | First at **500** |
 
-The 1,000-client hold depended on 750 meeting (b) and was not run.
+The 1,000-client hold depended on 750 meeting (b) and was not run. The
+grading code does not check trial validity itself, but no trial recorded a
+generator error, and every socket trial that passed a grade kept all its
+clients playing for the whole hold.
 
 ## Setup
 
@@ -168,7 +171,7 @@ authenticated AWS CLI. Credentials, keys, addresses and raw output stay in a
 separate scratch directory, and a new run refuses an existing one.
 
 ```sh
-python3 prepare.py /path/to/new/build --ref origin/main --build
+python3 prepare.py /path/to/new/build --ref 6bcb6f0b1057810bc7b31889c080ce9e3e57d6ae --build
 python3 smoke.py /path/to/new/build/target/release/examples /path/to/new/smoke
 python3 -m unittest discover -s . -p 'test_*.py'
 python3 aws_run.py /path/to/new/aws --repo /path/to/checkout --aws aws
