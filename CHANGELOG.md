@@ -125,9 +125,8 @@
 
 ### Fixed
 
-- Preserve pending growth when kiosk shrinkage debits clamped score, including
-  when the shrink rate is zero.
-
+- Kiosk shrinkage no longer deletes pending growth: it removes only mass the
+  score shows, and a zero shrink rate changes nothing.
 - `Config::deserialize` called directly from Rust now accepts presets, like JSON
   parsing ([presets](docs/configuration.md#presets)).
 - A world stopped by mass overflow stays stopped after a JSON round trip
