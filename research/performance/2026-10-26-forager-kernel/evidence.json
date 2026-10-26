@@ -1,0 +1,22 @@
+{
+  "access": "Raw samples and profiles are local-only in task scratch; no downloadable bundle is published.",
+  "sha256": {
+    "forager-conformance.json": "168c0f3d54f2df1958a6745e8a26b74100b2c0b8002a073ef40775229afe5cda",
+    "conformance.rs": "5309c12798b0f68d7e653191c37905b48da18a071c1cb14a9a72230df08086b3",
+    "measure.py": "99d3644fe214a36bcb6a0d47b9e4e3112a2f8892dff8b2bd09903124ecd9e6fe",
+    "baseline-results.tar.gz": "e475ce740f0f134c2d9c61a925384475a655f50048144d7a4d3e41036a7db818",
+    "comparison-results.tar.gz": "c35a95a614252f2b9f151a60a6c38fb2f70e3321539694761f962f49dd29f9cd"
+  },
+  "baselineBinarySha256": "6779770592c6888bf3fce8f81d982dc106bf7f503dd1204e85933f59f5753f6c",
+  "candidateBinarySha256": "41377ae2fd4cd1b9bb854a188ad12bf468e73c719451ce942d8baf535f130534",
+  "rawDirectory": "C:\\Users\\Nikita\\.t3\\scratch\\bot-kernel-speedup\\aws-02\\raw",
+  "cleanup": {
+    "nonterminatedInstances": 0,
+    "volumes": 0,
+    "addresses": 0,
+    "snapshots": 0,
+    "openOrActiveSpotRequests": 0,
+    "temporaryKeysRemaining": 0,
+    "temporaryGroupsRemaining": 0
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "perf-A1-all": [
+    "21.25%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::gather",
+    "14.89%  client::forager  libm.so.6                     [.] hypot",
+    "6.79%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::clearance",
+    "5.64%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::bot::kernel::Scene>::food",
+    "4.46%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::physics::swept_distance",
+    "2.16%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::decide",
+    "1.98%  client::forager  libm.so.6                     [.] 0x000000000007c2ed",
+    "1.81%  client::forager  libm.so.6                     [.] 0x00000000000791c7",
+    "1.70%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::client::forager::conformance::replay_benchmark::{closure#0} as core::ops::function::FnOnce<()>>::call_once",
+    "1.38%  client::forager  libm.so.6                     [.] atan2f32x",
+    "1.24%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::bot::kernel::Scene>::food::{closure#3}",
+    "1.01%  client::forager  libm.so.6                     [.] 0x00000000000791ca"
+  ],
+  "perf-A1-dense": [
+    "20.53%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::gather",
+    "7.41%  client::forager  libm.so.6                     [.] hypot",
+    "5.22%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::client::forager::conformance::decode",
+    "3.65%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::physics::swept_distance",
+    "3.40%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::clearance",
+    "2.31%  client::forager  libc.so.6                     [.] 0x00000000000ac84d",
+    "2.19%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <alloc::collections::btree::map::IntoIter<alloc::string::String, serde_json::value::Value>>::dying_next",
+    "2.19%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <serde_json::value::Value as serde_core::de::Deserialize>::deserialize::<&mut serde_json::de::Deserializer<serde_json::read::StrRead>>",
+    "1.82%  client::forager  libc.so.6                     [.] 0x00000000000a9bdb",
+    "1.70%  client::forager  slither_sim-8ea0bb8baf92c787  [.] core::ptr::drop_glue::<serde_json::value::Value>",
+    "1.22%  client::forager  libm.so.6                     [.] 0x000000000007c2ed",
+    "1.22%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::client::forager::conformance::replay_benchmark::{closure#0} as core::ops::function::FnOnce<()>>::call_once"
+  ],
+  "perf-A4-mean-all": [
+    "22.68%  client::forager  libm.so.6                     [.] hypot",
+    "13.82%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::gather",
+    "7.38%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::clearance",
+    "4.99%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::bot::kernel::Scene>::food",
+    "4.75%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::physics::swept_distance",
+    "4.25%  client::forager  libm.so.6                     [.] 0x000000000007c2ed",
+    "4.06%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::blocked_exits",
+    "2.01%  client::forager  libm.so.6                     [.] 0x000000000007c2f0",
+    "1.83%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::decide",
+    "1.63%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::bot::kernel::Scene>::food::{closure#3}",
+    "1.17%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::client::forager::conformance::replay_benchmark::{closure#0} as core::ops::function::FnOnce<()>>::call_once",
+    "1.09%  client::forager  libm.so.6                     [.] 0x00000000000791c7"
+  ],
+  "perf-A4-mean-dense": [
+    "19.73%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::gather",
+    "16.13%  client::forager  libm.so.6                     [.] hypot",
+    "5.36%  client::forager  libm.so.6                     [.] 0x000000000007c2ed",
+    "5.09%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::blocked_exits",
+    "2.42%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::client::forager::conformance::decode",
+    "2.29%  client::forager  libm.so.6                     [.] 0x000000000007c2f0",
+    "1.70%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <alloc::collections::btree::map::IntoIter<alloc::string::String, serde_json::value::Value>>::dying_next",
+    "1.57%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::bot::kernel::clearance",
+    "1.37%  client::forager  slither_sim-8ea0bb8baf92c787  [.] <slither_sim::bot::kernel::Scene>::food::{closure#3}",
+    "1.24%  client::forager  slither_sim-8ea0bb8baf92c787  [.] slither_sim::physics::swept_distance"
+  ]
+}
