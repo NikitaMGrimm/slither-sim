@@ -18,7 +18,7 @@
   },
   "planSha256": "05e465b04d626e9f87169de15f28849bb908715c08dfccdc194f131583095f61",
   "dataOrigin": "local-simulator",
-  "access": "Raw binaries, traces, samples and cloud metadata local-only under C:/Users/Nikita/.t3/scratch/host-opt-aws",
+  "access": "Raw binaries, traces, samples and cloud metadata local-only",
   "localFiles": {
     "generator-results.tar.gz": {
       "sha256": "4324b1a496f322f932082fdaff4f0399d3dcd3d72195fdb213c6abffe8863d95",
@@ -41,7 +41,7 @@
       "bytes": 12789
     }
   },
-  "rawAccess": "local-only; original archives remain unmodified in C:/Users/Nikita/.t3/scratch/host-opt-aws/attempt-1",
+  "rawAccess": "local-only; original attempt-1 archives remain unmodified",
   "capacityAndIdentityBinarySha256": {
     "bin-base/host_capacity_load": "b8f7b9f311824ad6e4ca0359e65b6544501c07f8dd56ced4bb6a962510f53960",
     "bin-base/host_probe": "14219f8f1140da7f9e2c35749d3492dd57af2c962e68d7dec0dc6508d58d9a26",

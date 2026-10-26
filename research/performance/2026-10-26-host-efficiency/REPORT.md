@@ -1,52 +1,58 @@
 # Host broadcast and frame ownership, 2026-10-26
 
-The combined change reduces host CPU per executed tick by 4.8% at 250 socket
-clients and 4.7% at 500 in matched native AWS holds. All six deterministic
-client traces match byte for byte. The 250-client candidate narrowly passes
-the 10 ms excess-p99 grade in one 300 s hold; 500 clients still fall behind.
+Three changes cut one-core host CPU per executed tick by 4.8% at 250 socket
+clients and 4.7% at 500 in matched native AWS holds, with byte-identical output
+in all six deterministic traces. The 250-client candidate narrowly passes the
+10 ms excess-p99 grade in one 300 s hold; 500 clients still fall behind.
 
-## Question and scope
+The traffic is synthetic simulator traffic. No outside game server was
+contacted, and no policy or mechanics code changed. The [plan](PLAN.md),
+including its follow-up section, was written before each round of timing.
 
-Reduce one-core host CPU without changing protocol-19 bytes, connection order,
-virtual delivery times or packet-family cadence. This is synthetic simulator
-traffic. No outside game server was contacted, and no policy or mechanics code
-was changed. The [plan](PLAN.md) was written before timing.
+## Changes
 
-The [native capacity profile](../2026-10-26-host-capacity/REPORT.md) measured
-`6bcb6f0`. The final comparison starts at main-at-launch `473e188`, including #113's
-spawn queue. The first run on `9480608` finished while #113 merged and is
-retained separately in [initial results](INITIAL-RESULTS.md); those samples
-are not pooled with the final comparison. See the [rebase plan](REBASE-PLAN.md).
+The [capacity study](../2026-10-26-host-capacity/REPORT.md) profiled 500
+clients at `6bcb6f0`: recipient encoding 24.77%, framing and flush 23.15%, food
+sectors 20.06% and socket service 15.16%. Those are bounds on the containing
+work, not predicted savings. The three changes are measured together; no gain is
+attributed to any one of them.
 
-## Candidate ranking
+1. **Stable food subscriptions.** `food_updates` used to take and rebuild each
+   recipient's sector vector and clone every sector `Arc` every tick. When a
+   recipient's sectors are unchanged it now keeps them in place. Pickups are
+   still processed for equal `Arc` pointers, and changed memberships still use
+   the original ordered merge.
+2. **Shared peer deltas.** Within one broadcast, recipients with identical prior
+   `KnownSnake` state for a peer snake now reuse one encoded delta instead of
+   repeating anchor recognition, trigonometry and encoding. The cache holds one
+   entry per snake, so divergent histories cost one miss each and storage stays
+   bounded. Own-snake packets bypass it. Every other input to the encoder is per
+   snake and fixed for the broadcast.
+3. **Owned frames.** `Open::send` cloned an already-owned delivery buffer before
+   handing it to tungstenite. It now overwrites the sequence header in place and
+   slices bare frames from the owned bytes. Tungstenite's own payload copy,
+   WebSocket headers and kernel writes remain.
 
-This is a risk-adjusted implementation ranking. Profile percentages are bounds
-on the containing work, not predictions of cycles saved; the categories include
-work that every candidate must still do. No individual contribution has an
-isolated speed measurement in this comparison.
+Deferred, with the reason:
 
-| Rank | Repeated work in current source | Expected saving and evidence | Risk / decision |
-| --- | --- | --- | --- |
-| 1 | `food_updates` takes and rebuilds each recipient's retained sector vector, merges unchanged subscriptions and clones every sector Arc every tick. | Removes this work on stable subscriptions, including empty sectors; plausibly a material part of the 9.94% food-updates self cost at 500 clients. Shared `FoodIndex` listings and dirty-sector rebuilding already exist, so rebuilding the entire world-food index would duplicate existing work. | Low: retain sector/offset order, preserve pickup processing even for equal Arc pointers, use the original merge when membership changes. Implemented. |
-| 2 | `changes` repeats anchor recognition, geometry/trigonometry and delta encoding for viewers with identical prior `KnownSnake` state. | Reuses completed deltas within the 24.77% recipient-encoding category, while still copying small packet buffers into each recipient's output. Benefit depends on shared visibility and histories; misses have a cache cost. | Moderate: cache the complete before/after state for only this snake and broadcast; own packets bypass it. One entry bounds divergent-history storage. Implemented. |
-| 3 | `Open::send` clones an already-owned delivery Vec, replaces/slices its two-byte header, then transfers it into `Message::Binary`. | Removes one payload-buffer copy/allocation in that path. It cannot remove tungstenite's subsequent `Frame::format_into_buf` payload copy, WebSocket headers or kernel writes. Expected smaller than the whole 23.15% framing/flush category. | Low: consume the popped queue entry, overwrite sequence bytes and slice bare Bytes; preserve the same write/flush/error paths. Implemented without a dependency. |
-| 4 | `Gateway::deliver` linearly searches sessions for each slot/generation delivery. | A generation-checked slot-to-session index could remove an O(sessions × deliveries) lookup; the profile does not isolate its cycle share, so no numerical saving is predicted. | Moderate: sessions compact after closes, upgrades are pending separately, and stale generations must stay rejected. Deferred to avoid crossing the admission/lifecycle changes during this bounded comparison. |
-| 5 | Changed/new sectors are diffed or encoded separately for recipients holding the same listing. | Could share sector-delta or initial `F` encodings; existing unchanged-Arc skipping already avoids pellet scans on most sectors. Remaining opportunity is a subset of food cost, especially maintenance, pickups and joins. | Moderate: previous listing, current physical/decorated listing and this broadcast's eater set must all agree. Deferred pending residual profiling. |
-| 6 | Every gateway pass attempts reads on idle sessions, scans queued delivery times and flushes every open socket. | Readiness could remove futile receives from the 15.16% socket-service category at 500 clients (35.11% at 100). Flushing is already after servicing all sockets, with a 1 ms idle ceiling; changing its policy could alter release latency. | Higher timing/lifecycle risk. The older WSL epoll ABBA experiment established no reliable gain. No new reactor/dependency, flush policy, sleep policy or handwritten framing is introduced. |
+- A generation-checked slot-to-session index for `Gateway::deliver`. The profile
+  does not isolate its share, and it would cross the admission changes.
+- Shared sector-delta or initial `F` encodings for recipients holding the same
+  listing. Unchanged-`Arc` skipping already avoids most pellet scans.
+- Readiness-driven socket service. An earlier WSL epoll comparison found no
+  reliable gain, and changing flush policy could alter release latency.
 
-Leaderboard rows, minimap construction, snake coverage candidates, prey report
-clocks and world food listings are already shared. Per-recipient histories,
-visibility membership, elapsed headers, session IDs and latency draws cannot
-simply be shared. This change leaves their owners and scheduling intact.
+Leaderboard rows, minimap, coverage candidates, report clocks and world food
+listings were already shared. Per-recipient histories, visibility, elapsed
+headers, session IDs and latency draws cannot be.
 
 ## Output identity
 
-Before any AWS timing, both independently built release binaries produced equal
-complete decompressed traces. Comparisons streamed every byte independently of
-the hashes. Every child exited successfully with a terminal report. Selected
-hashes and sizes are in `identity.json`; full JSONL/gzip files remain local-only.
+Independently built base and candidate release binaries produced equal complete
+decompressed traces before any timing. Comparisons streamed every byte; selected
+hashes and sizes are in [identity.json](identity.json).
 
-| Trace | Decisions / catalog window | Equal uncompressed bytes per revision |
+| Trace | Window | Equal uncompressed bytes per revision |
 | --- | --- | ---: |
 | portable | catalog | 17,204,000 |
 | protocol | catalog | 8,248,574 |
@@ -55,162 +61,128 @@ hashes and sizes are in `identity.json`; full JSONL/gzip files remain local-only
 | retained step_all | 384 decisions | 1,771,005,662 |
 | retained next_frame | 384 decisions | 1,745,484,172 |
 
-The client traces retain ordered wire records, actions, frames and world/event
-state. Retained modes include the manual reconnect at decision 192, persistent
-independent decoder replay and all eight slots. This proves identity for these
-finite traces; the retained public harness does not expose private backend RNG,
-queues or subscription state. It is not a universal proof over arbitrary input.
+Client traces hold ordered wire records, actions, frames and world and event
+state. The retained runs include a manual reconnect at decision 192, an
+independent decoder replay and all eight slots. They prove identity for these
+finite traces only, and do not expose private backend RNG, queues or
+subscription state.
 
-Focused regressions compare cached deltas to the uncached encoder for divergent
-histories, own/peer packet forms and full-resend fallback; preserve food storage
-while changing listings and equal-sized subscription sets; and compare actual
-WebSocket bytes in elapsed, bare and sequence modes, including sequence wrap
-and short/16-bit/64-bit payload lengths. Existing pickup, marker, report-clock,
-latency-order, reconnect, backpressure and fragmented-input tests remain in use.
+New regressions compare cached deltas with the uncached encoder across divergent
+histories, own and peer packet forms and full-resend fallback; keep food storage
+across changed listings and equal-sized subscription sets; and compare actual
+WebSocket bytes in elapsed, bare and sequence framing, including sequence wrap
+and all three payload-length forms. The full CONTRIBUTING Rust group passed on
+Windows before the rebase and on the AWS generator after it.
 
-The initial complete CONTRIBUTING Rust group passed on Windows with
-`CARGO_BUILD_JOBS=2`, `RUST_TEST_THREADS=4`, `RAYON_NUM_THREADS=4`, including all
-feature Clippy builds, default/core-only tests, doctests, C ABI tests and Python
-crate checking. The focused client protocol/server/contract/runner/transport
-tests and perf-baseline tests also passed. The rebased candidate's entire Rust
-group passed on native Linux AWS before identity and timing, including the
-merged spawn-queue tests and the new optimization regressions. No local timing
-sample is used; new heavy local commands honor the owner's quiet-window lock.
-The final documentation suite also passed on AWS after the holds, using an
-overlay of the report and changelog. The large final generator archive was
-hashed on AWS; the small server archive was hashed after download. Pins label
-the digest origin; the large local download was not rehashed during the owner's
-quiet window.
+## Method
 
-## Measurement method
+Base `473e188` and candidate `c63eef6` were built on the AWS generator with Rust
+1.99.0, locked dependencies, thin LTO, one codegen unit and line-table
+debuginfo, then copied out of the target directory and hashed
+([source pins](source-pins.json)).
 
-Base `473e188` and candidate `c63eef6` were built on the dedicated AWS generator
-with Rust 1.99.0, locked dependencies, release thin LTO, one codegen unit and
-line-table debuginfo. Binaries were copied out of mutable targets and hashed.
-The earlier comparison used base `9480608` and candidate `08b1fad`. Rebase over
-#113 changed runtime/admission and the Battledome harness, so it triggered a
-complete follow-up comparison rather than relabeling the first measurements.
+Operation timing ran on one pinned core of the otherwise idle c7a.4xlarge
+before any capacity load:
 
-`tools/perf_compare.py --base 473e188 --cases client-official-500
-client-battledome-64 official-100-step step-default --repeats 5 --no-profiles`
-ran on one pinned core of the otherwise quiet c7a.4xlarge, before any capacity
-load. The runner independently checks full-state parity, binds binaries to source
-and harness identities, warms up and times adjacent alternating pairs. The two
-physics rows are unaffected controls. Linux process CPU is unavailable in that
-runner; those results are operation wall times, separately from capacity CPU.
+```text
+tools/perf_compare.py --base 473e188 --cases client-official-500
+  client-battledome-64 official-100-step step-default --repeats 5 --no-profiles
+```
 
-Capacity uses #118's unchanged `host_probe.rs`, `host_capacity_load.rs`,
-`run_trial.py` and `analyze.py`, against the same c7a.medium/c7a.4xlarge pair in
-one zone. All host threads share the medium's single physical core. Eight
-generator shards run on separate generator cores. Each trial starts a fresh
-seed-7 default official world with N socket seats, zero bots, a 7 ms tick and
-15 s warmup. Base/candidate confirm-250 holds last 300 s; candidate/base
-sweep-500 holds last 120 s. Population, generator errors, CPU, deferred ticks
-and pooled nearest-rank excess p99 are retained. CPU/tick divides the host's
-sampled user+system CPU seconds by executed ticks; simulation busy-wall load
-includes preemption and is a different metric.
+The runner checks full-state parity, warms up and times five adjacent
+alternating pairs. The two physics rows are unaffected controls. These are wall
+times; the runner does not report Linux process CPU.
 
-Excess is receipt time minus the server's cumulative elapsed header and that
-connection's minimum within the hold. Fixed offsets cancel; world slowdown
-does not. This is not an official-server fidelity measurement. The original
-≤3 ms and ≤10 ms/no-deferral grades are unchanged.
+Capacity reused the capacity study's unchanged probe, load generator, trial
+runner and analysis on the same c7a.medium server and c7a.4xlarge generator in
+one zone. All host threads share the server's single core; eight load shards run
+on separate generator cores. Each hold starts a fresh seed-7 default official
+world with N socket seats, no bots, a 7 ms tick and 15 s warmup. 250-client
+holds last 300 s (base first); 500-client holds last 120 s (candidate first).
+CPU per tick divides sampled host user and system CPU by executed ticks. Excess
+is receipt time minus the server's elapsed header and that connection's minimum
+within the hold; it tracks host delay, not official-server fidelity. The ≤3 ms
+and ≤10 ms/no-deferral grades are unchanged from the capacity study.
 
-## Paired operation results
+## Results
 
-| Workload | Measured operations per child | Median base → candidate ms/operation | Median paired wall ratio | Five-pair range |
+| Workload | Operations per child | Median base → candidate ms/op | Median paired ratio | Five-pair range |
 | --- | ---: | ---: | ---: | ---: |
 | client-official-500 | 25 decisions | 42.627 → 40.038 | 0.9385 | 0.9362–0.9427 |
 | client-battledome-64 | 40 decisions | 11.618 → 11.269 | 0.9701 | 0.9666–0.9721 |
 | official-100-step | 1,000 ticks | 0.16659 → 0.16723 | 1.0053 | 0.9973–1.0129 |
 | step-default | 100,000 ticks | 0.0017333 → 0.0017501 | 1.0055 | 0.9941–1.0217 |
 
-The synthetic operations take about **6.2% less wall time** at official-500 and
-**3.0% less** at Battledome-64 in these five pairs. The unaffected controls have
-mixed pair ranges around 1; their small median shifts support no speed claim.
-These are descriptive paired ratios, not significance tests or isolated CPU
-savings. The comparison's four trace rows are also equal. Full raw per-child
-readings and the untallied warmup remain under the local `perf-combined/` result
-tree. The earlier pre-#113 Battledome result was under 1% and inconclusive; it
-is preserved with its different admission workload in the initial round.
-
-## Capacity results
+Client operations take about 6.2% less wall time at official-500 and 3.0% less
+at Battledome-64. The controls' pair ranges straddle 1 and support no speed
+claim. These are descriptive paired ratios, not significance tests
+([perf-results.json](perf-results.json)).
 
 | Hold | Revision | CPU ms/executed tick | Ticks/s | New deferred ticks | Excess p99 ms | Playing |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| confirm-250, 300 s | base | 3.710 | 142.850 | 0 | 11.696 | 250.000 |
-| confirm-250, 300 s | candidate | 3.534 | 142.880 | 0 | 9.938 | 250.000 |
-| sweep-500, 120 s | base | 7.023 | 138.500 | 520 | 3,782.955 | 499.796 |
-| sweep-500, 120 s | candidate | 6.690 | 142.400 | 76 | 740.637 | 499.903 |
+| 250, 300 s | base | 3.710 | 142.850 | 0 | 11.696 | 250.000 |
+| 250, 300 s | candidate | 3.534 | 142.880 | 0 | 9.938 | 250.000 |
+| 500, 120 s | base | 7.023 | 138.500 | 520 | 3,782.955 | 499.796 |
+| 500, 120 s | candidate | 6.690 | 142.400 | 76 | 740.637 | 499.903 |
 
-Selected reductions are in `capacity-results.json`; original receipt and
-resource samples remain local. One matched hold per variant does not establish
-a stable capacity cap or a statistical guarantee on the tail.
+At 250 clients both revisions keep world time and every client playing; the
+candidate passes the ≤10 ms grade and the base misses it on the tail. A p99
+just under 10 ms is not comfortable headroom. At 500 clients deferred ticks fall
+from 520 to 76 and excess p99 from 3.78 s to 0.74 s, but both revisions fall
+behind. This supports lower CPU cost, not 500-client real-time capacity.
 
-At 250 clients, host CPU per executed tick falls **4.8%**. The candidate narrowly
-passes the ≤10 ms/no-deferral grade in this hold; the base fails the tail grade
-while keeping world time. Both keep all 250 clients playing and report no
-generator error. A p99 just below 10 ms is not comfortable long-run headroom.
+No hold recorded a generator error or host CPU steal. The generator used under
+0.9 of one core across its eight shards. Selected reductions, including memory
+and resource figures, are in [capacity-results.json](capacity-results.json).
 
-At 500 clients CPU per tick falls **4.7%**, new deferred ticks fall from 520 to
-76, and excess p99 falls from 3.783 s to 0.741 s. Both variants still fall
-behind and fail the delivery grade. The result supports lower CPU cost, not
-500-client real-time capacity. Neither sweep reports a generator error.
-The host reports zero CPU steal in all final holds. The generator uses under
-0.90 of one core in aggregate across its eight shards on 16 cores; its sampled
-steal is below 0.001% of total capacity. Selected memory/resource figures remain
-in the JSON; lower CPU is not inferred from simulation busy-wall load.
+## First round before #113
 
-## Cost and cleanup
+The first complete round compared base `9480608` with candidate `08b1fad` on the
+same instance types. #113 merged during it and changed host admission and the
+Battledome harness, so the follow-up above repeated everything on the new main
+instead of relabeling these results. Its [identity](initial/identity.json),
+[operation](initial/perf-results.json), [capacity](initial/capacity-results.json),
+[pin](initial/source-pins.json) and [cost](initial/aws-summary.json) selections
+are kept separately and not pooled with the final comparison.
 
-[aws-summary.json](aws-summary.json) records the launch-quote lifetime estimate,
-ancillary allowance, before/after credit amounts and sanitized regional cleanup
-counts. This is an estimate, not an invoice; reported credit balances can lag.
-The initial round and zero-instance quota failure are included in the total.
-Both provisioned rounds use one-time Spot, 17 concurrent vCPUs, root-volume
-delete-on-termination and a verified 120-minute shutdown timer. Instance pairs
-never overlap. Keys and cloud-identifying metadata stay outside the repository.
-The total estimate is **$0.93**, including both rounds and $0.40 of ancillary
-allowances; the zero-instance quota failure adds no compute cost. Reported
-credits are **$118.77 before and after**. Final cleanup at **04:14:59 UTC**
-verified zero nonterminated instances, volumes, addresses, snapshots and
-open/active Spot requests, with the key pair and security groups deleted.
+All six traces matched there too. Official-500 operations had a median paired
+ratio of 0.9404; Battledome-64, under the old admission workload, 0.9928. At
+250 clients CPU per tick fell from 3.733 to 3.588 ms and excess p99 from 10.840
+to 9.619 ms. At 500 clients CPU per tick fell 6.9% and deferred ticks from 936 to
+68, and both revisions still fell behind.
 
-## Limits and evidence access
+## Cost, cleanup and attempts
 
-Five timing pairs are descriptive, and one capacity hold per revision/size is
-not a confidence interval or long-run tail guarantee. The three changes are
-measured together; no isolated gain is attributed to any one commit. This does
-not establish capacity for long snakes, clustering, boosting, slow readers,
-TLS, public Internet paths, mixed 500-bot/socket loads or macOS. The source is
-portable and Windows tests passed; Linux is the measured host platform.
-After all measurements, main advanced to `77f23d4` (#121, typed core errors).
-The PR's merge check is conflict-free; that later runtime is outside these
-performance pins. Cross-platform CI on the PR's merged checkout remains a
-separate integration check, not a new timing sample.
+Both rounds used one-time Spot instances, 17 concurrent vCPUs, root volumes
+deleted on termination and a verified 120-minute shutdown timer; instance pairs
+never overlapped. The estimated total is $0.93, including $0.40 of ancillary
+allowance; it is an estimate from launch quotes, not an invoice
+([aws-summary.json](aws-summary.json)). Final cleanup at 04:14:59 UTC verified
+no remaining instances, volumes, addresses, snapshots or Spot requests, and
+deleted the key pair and security groups.
 
-Raw samples, complete traces, build/test logs, immutable binary copies, source
-bundles and cloud metadata are local-only under
-`C:\Users\Nikita\.t3\scratch\host-opt-aws\`. Identifying cloud data and keys
-are excluded from Git. Selected results and hashes identify retained material;
-they do not make it publicly downloadable or establish universal performance.
+One launch between the rounds failed with `MaxSpotInstanceCountExceeded`,
+started no instances and was cleaned up; a later launch succeeded. The first
+lint run found a redundant `Bytes` conversion, removed before measurement. No
+timing result was selected or dropped for its speed.
 
-## Reproduction and retained attempts
+## Limits
 
-Use the source and harness pins in `source-pins.json`, independent release
-targets, and the trace commands from the [performance guide](../../../docs/performance.md).
-On one quiet dedicated AWS core, run the command above from the final candidate
-checkout. For capacity, use the unchanged tools in the adjacent
-[capacity study](../2026-10-26-host-capacity/REPORT.md), with `run_trial.py host`
-and `load`, a shared epoch, eight load shards, 15 s warmup and the stated hold
-duration. Bind a fresh world for every hold and preserve full receipts and
-telemetry before reduction with `analyze.py`.
+Five timing pairs and one capacity hold per revision and size are descriptive;
+they give no confidence interval or long-run tail guarantee. The holds do not
+cover long snakes, clustering, boosting, slow readers, TLS, Internet paths,
+mixed bot and socket loads, or macOS. Linux is the only measured platform.
+Main advanced to `77f23d4` (#121, typed core errors) after the measurements;
+that runtime is outside these pins.
 
-The first local lint run found a redundant Bytes conversion; it was removed
-before the candidate was measured, and the full Rust group passed on rerun.
-The first complete AWS round was superseded by #113's merge, not discarded;
-its traces, samples, pins, cost and cleanup are retained in
-[initial results](INITIAL-RESULTS.md). An immediate follow-up launch failed
-with `MaxSpotInstanceCountExceeded`, launched zero instances and cleaned up
-all temporary key/groups before inspection. A fresh bounded attempt after
-the quota-accounting delay succeeded. No timing result was selected or removed
-because of its speed, and no incomplete attempt supports a speed claim.
+Raw samples, complete traces, logs, binaries and cloud metadata remain
+local-only. Keys and identifying cloud data are excluded.
+
+## Reproduction
+
+Check out the pinned sources, build independent release targets and run the
+trace commands from the [performance guide](../../../docs/performance.md). Run
+the operation command above on one idle dedicated core. For capacity, use the
+capacity study's unchanged tools with `run_trial.py host` and `load`, a shared
+epoch, eight load shards, 15 s warmup, the stated hold and a fresh world per
+hold, then reduce full receipts and telemetry with `analyze.py`.

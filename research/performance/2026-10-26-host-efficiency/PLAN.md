@@ -68,5 +68,24 @@ Tag resources Project=slither-sim, Task=host-opt, ExpiresAt=UTC deadline. Record
 credits before/after. On error terminate before debugging. Always wait for
 termination, remove key/groups and verify regional resource inventories.
 
-Raw cloud metadata, keys, addresses, traces and samples stay under local-only
-`C:\Users\Nikita\.t3\scratch\host-opt-aws\`; publish only sanitized selections.
+Raw cloud metadata, keys, addresses, traces and samples stay local-only;
+publish only sanitized selections.
+
+## Follow-up after #113
+
+Written before the follow-up timing. #113 merged during the first capacity
+series and changed host admission and the Battledome harness; #119 and #120
+changed only evidence, tests and guides. The implementation rebased cleanly.
+
+Keep the first series as pre-#113 evidence pinned to base `9480608` and
+candidate `08b1fad`, with all samples, trace hashes and outcomes; do not present
+it as a comparison against current main. Repeat the same comparison on main
+`473e1882932356906cdb2f338b39bce0796667af` and combined candidate
+`c63eef61360d6291a7733bfaeeb3f77ac8e12f3b` (rebased commits `2a6731c`, `beb5714`
+and `c63eef6`), using the new main's harness for both revisions.
+
+Finish the first series and verify cleanup before launching another pair under
+the same bounds. Run the CONTRIBUTING Rust group on the AWS generator so the
+desktop stays quiet. Repeat the six trace comparisons, the five operation pairs,
+base/candidate confirm-250 and candidate/base sweep-500 with unchanged grades.
+Publish final claims from the follow-up only.

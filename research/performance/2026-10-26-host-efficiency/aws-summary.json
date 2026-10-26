@@ -23,9 +23,6 @@
     "totalUsdEstimate": 0.48,
     "targetUsd": 3,
     "hardCeilingUsd": 5,
-    "creditsBeforeUsd": 118.77,
-    "creditsAfterUsd": 118.77,
-    "creditReportingMayLag": true,
     "cleanupVerifiedUTC": "2026-10-26T03:38:02.241900+00:00",
     "cleanup": {
       "region": "eu-central-1",
@@ -61,9 +58,6 @@
     "totalUsdEstimate": 0.45,
     "targetUsd": 3,
     "hardCeilingUsd": 5,
-    "creditsBeforeUsd": 118.77,
-    "creditsAfterUsd": 118.77,
-    "creditReportingMayLag": true,
     "cleanupVerifiedUTC": "2026-10-26T04:14:59.313105+00:00",
     "cleanup": {
       "region": "eu-central-1",
@@ -92,9 +86,6 @@
   "totalUsdEstimate": 0.93,
   "targetUsd": 3,
   "hardCeilingUsd": 5,
-  "creditsBeforeUsd": 118.77,
-  "creditsAfterUsd": 118.77,
-  "creditReportingMayLag": true,
   "cleanup": {
     "region": "eu-central-1",
     "nonterminatedInstances": 0,

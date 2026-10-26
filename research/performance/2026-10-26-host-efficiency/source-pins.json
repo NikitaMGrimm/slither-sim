@@ -17,8 +17,8 @@
   },
   "planSha256": "05e465b04d626e9f87169de15f28849bb908715c08dfccdc194f131583095f61",
   "dataOrigin": "local-simulator",
-  "access": "Raw binaries, traces, samples and cloud metadata local-only under C:/Users/Nikita/.t3/scratch/host-opt-aws",
-  "rawAccess": "local-only; original archives remain unmodified in C:\\Users\\Nikita\\.t3\\scratch\\host-opt-aws\\attempt-3",
+  "access": "Raw binaries, traces, samples and cloud metadata local-only",
+  "rawAccess": "local-only; original attempt-3 archives remain unmodified",
   "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
   "comparisonRound": "Final after #113; initial/ pins preserve the prior round",
   "capacityAndIdentityBinarySha256": {
