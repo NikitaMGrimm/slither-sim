@@ -17,6 +17,8 @@
 //! floats), negative bin boundaries, 64-bin aliasing, signed zero, tiny vision,
 //! saturated cell casts, dead slots, mask errors, and insertion-order ties. These
 //! eight bounded fixtures do not establish parity for all such numerical cases.
+#[path = "support/state.rs"]
+mod checkpoint_state;
 use serde_json::{Value, json};
 use slither_sim::{
     Config, Food, Observation, PickupItem, Point, Simulator, physics, profiling::WorldStats,
@@ -275,10 +277,7 @@ fn verify_scalar(
 }
 
 fn snapshot(world: &Simulator) -> Result<Value, String> {
-    let mut state = serde_json::to_value(world).map_err(|e| e.to_string())?;
-    if let Some(outward) = state.get_mut("prey_outward").and_then(Value::as_array_mut) {
-        outward.sort_unstable_by_key(Value::as_u64);
-    }
+    let state = checkpoint_state::projection(world)?;
     let observations = world.observe_all();
     verify_scalar(world, &vec![true; world.snakes.len()], &observations)?;
     let pickups = world.pickup_events.as_ref().map(|events| {

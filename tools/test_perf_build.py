@@ -113,6 +113,8 @@ class Overlay(unittest.TestCase):
                 (checkout / "src").mkdir()
                 (checkout / "src/lib.rs").write_text(f"// {checkout.name} runtime\n")
             (source / "examples/perf_baseline.rs").write_text("// candidate harness\n")
+            (source / "src/simulator").mkdir()
+            (source / "src/simulator/checkpoint.rs").write_text("// candidate runtime API\n")
             (source / "tests/fixtures/nested").mkdir()
             (source / "tests/fixtures/nested/new.json").write_text("{}\n")
             (destination / "tests/fixtures/base-only.json").write_text("{}\n")
@@ -123,6 +125,9 @@ class Overlay(unittest.TestCase):
             self.assertEqual((destination / "examples/perf_baseline.rs").read_text(), "// candidate harness\n")
             self.assertTrue((destination / "tests/fixtures/base-only.json").exists())
             self.assertEqual((destination / "src/lib.rs").read_text(), "// baseline runtime\n")
+            self.assertFalse((destination / "src/simulator/checkpoint.rs").exists())
+            self.assertEqual((destination / "build.rs").read_bytes(), (source / "build.rs").read_bytes())
+            self.assertEqual((destination / "examples/support/state.rs").read_bytes(), (source / "examples/support/state.rs").read_bytes())
             self.assertEqual(result.record()["suite_changes"], list(result.suite_changes))
 
 
@@ -153,6 +158,11 @@ class Targets(unittest.TestCase):
                 checkout = root / label
                 checkout.mkdir()
                 (checkout / "Cargo.lock").write_text("# lock\n")
+                (checkout / "src").mkdir()
+                (checkout / "src/lib.rs").write_text("// synthetic runtime\n")
+                (checkout / "build.rs").write_text("// synthetic API selector\n")
+                (checkout / "examples/support").mkdir(parents=True)
+                (checkout / "examples/support/state.rs").write_text("// synthetic adapters\n")
                 snapshots.append(perf_build.Snapshot(label, checkout, label[0] * 40, "t" * 40, "fixture"))
                 stale = targets.path(label) / f"release/examples/perf_baseline{perf_build.SUFFIX}"
                 stale.parent.mkdir(parents=True)
@@ -183,6 +193,9 @@ class Targets(unittest.TestCase):
             record = json.loads((root / "baseline-identity.json").read_text())
             self.assertEqual((record["commit"], record["tree"], record["target_policy"]),
                              ("b" * 40, "t" * 40, targets.policy))
+            self.assertEqual(record["state_adapter"], "legacy-serde")
+            self.assertEqual(record["runtime_sources"]["src/lib.rs"], perf_build.digest(root / "baseline/src/lib.rs"))
+            self.assertEqual(record["state_adapter_sources"]["examples/support/state.rs"], perf_build.digest(root / "baseline/examples/support/state.rs"))
             self.assertEqual(record["binaries"][f"perf_baseline{perf_build.SUFFIX}"]["sha256"],
                              perf_build.digest(build.binaries["perf_baseline"]))
             build.verify()

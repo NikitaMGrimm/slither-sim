@@ -17,6 +17,9 @@ on:
       - rust-toolchain
       - rust-toolchain.toml
       - examples/perf_baseline.rs
+      - examples/perf_observation.rs
+      - examples/perf_client_retained.rs
+      - examples/support/state.rs
       - examples/fidelity_metrics.rs
       - tests/movement_turns.rs
       - tests/physics.rs

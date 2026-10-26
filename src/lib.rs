@@ -29,6 +29,7 @@ pub use kiosk::KioskConfig;
 pub use model::*;
 pub use physics::{SpeedModel, SpeedState};
 pub use prey::{Prey, PreyConfig, PreyMode};
+pub use simulator::checkpoint::{Checkpoint, EventRecording, RestoreOptions};
 pub use simulator::{
     AmbientFoodConfig, BoostAccounting, BoostFoodConfig, Config, DeathFoodConfig, FoodSpawnEvent,
     PickupEvent, PickupItem, PitConfig, Preset, Simulator,

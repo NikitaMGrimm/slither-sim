@@ -11,6 +11,9 @@
 //! Use the same example source, copied/pinned binaries and matched settings when
 //! comparing runtimes. Neither these workloads nor source hypotheses imply speedups.
 
+#[path = "support/state.rs"]
+#[cfg(feature = "networking")]
+mod checkpoint_state;
 #[cfg(feature = "networking")]
 mod retained {
     use serde_json::{Value, json};
@@ -217,12 +220,7 @@ mod retained {
     }
 
     fn snapshot(world: &Simulator) -> Result<Value, String> {
-        let mut state = serde_json::to_value(world).map_err(|e| e.to_string())?;
-        // Only this serialized internal HashSet is unordered. Preserve every
-        // gameplay array, including food, body anchors, deaths and event order.
-        if let Some(outward) = state.get_mut("prey_outward").and_then(Value::as_array_mut) {
-            outward.sort_unstable_by_key(Value::as_u64);
-        }
+        let state = crate::checkpoint_state::projection(world)?;
         let pickups = world.pickup_events.as_ref().map(|events| {
             events
                 .iter()
@@ -549,7 +547,7 @@ mod retained {
                 "actual sent background commands are preserved in wire, rather than substituting controls for seekers",
                 "frame anchor/food/prey counts exist only when observation is available; null after death/waiting is not zero; removed/private decoder anchor allocations are inaccessible",
                 "F/w count listing/exit packet occurrences, not private subscription cardinality; empty subscriptions emit no entry packet",
-                "only object keys and serialized prey_outward set are canonicalized; all ordered arrays retained"
+                "shared state adapters normalize checkpoint envelopes, slot grouping and field spelling; object keys and prey_outward set are sorted; all ordered arrays retained"
             ],
             "sourceHypotheses": [
                 "broadcast rebuilds sector-food maps; food_updates calls known.clone_from(current) even for unchanged maps (src/client/simulation.rs)",

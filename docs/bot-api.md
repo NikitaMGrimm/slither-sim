@@ -267,6 +267,27 @@ The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/50578c9ce90
 pins the original kernel, immutable parameters, bounded fixtures and validation
 limits. A4-mean is retained only as private test data and is not selectable.
 
+### Checkpoints
+
+Use `serde_json::to_vec(&world.checkpoint()?)` for exact core continuation;
+`Simulator` and its runtime controls no longer implement serde. Load with
+`Simulator::from_checkpoint(&bytes, RestoreOptions::default())`, or use
+`world.restore(&bytes, options)` to validate a complete candidate before replacing
+the current world. Export also validates public state. Load errors carry
+`UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
+
+The envelope is `slither-sim-checkpoint-v1`, with
+`rulesRevision: "slither-sim-rules-v1"`, producer provenance, today's flat Config
+and ordered slot/entity records. It includes RNG, timers and terminal causes;
+debug `snapshot` replies and old Simulator JSON are rejected. Unknown fields and
+missing companion records reject. Producer version/commit do not select rules.
+`RestoreOptions` chooses `EventRecording { pickups, food_births }` and, with the
+parallel feature, `parallel`; event buffers start empty and caches are rebuilt.
+Sessions, sockets and host/client delivery are outside the format.
+
+`ErrorCode`, `ErrorKind` and `Constraint` are non-exhaustive; include a wildcard
+arm when matching them outside the crate.
+
 ### In-process sessions
 
 `transport::Session` is the session `serve` runs, without the stream. JSON

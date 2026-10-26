@@ -78,7 +78,7 @@ pub enum SpeedModel {
 }
 
 /// Stored physical speed and boost progress. This hidden state is not a policy input.
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SpeedState {
     pub speed: f64,
     progress: f64,

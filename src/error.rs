@@ -5,6 +5,7 @@ use std::{error::Error, fmt};
 /// Stable numeric cause codes. Zero is reserved for no error; 18 and 19 for C boundaries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
+#[non_exhaustive]
 pub enum ErrorCode {
     InvalidRequest = 1,
     InvalidConfig = 2,
@@ -50,6 +51,7 @@ impl ErrorCode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Constraint {
     Missing,
     NonFinite,
@@ -85,6 +87,8 @@ impl Constraint {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum ErrorKind {
     InvalidRequest,
     InvalidConfig {
@@ -124,6 +128,7 @@ pub enum ErrorKind {
 /// A cause plus optional zero-based world/slot and field location.
 /// Strings are constructed only on failure, never on successful ticks.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimError {
     pub kind: ErrorKind,
     pub world: Option<usize>,

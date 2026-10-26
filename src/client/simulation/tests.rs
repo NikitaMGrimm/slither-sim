@@ -270,14 +270,14 @@ fn failed_ring_spawn_restores_the_existing_life() {
     // Config is public and may be changed after construction. Force the
     // early geometry error that used to bypass alive restoration.
     backend.world.config.spawn_radius = Some(100.0);
-    let before = serde_json::to_value(&backend.world).unwrap();
+    let before = format!("{:?}", backend.world);
     let life = backend.slots[0].life;
     let connections = backend.connections;
     assert_eq!(
         backend.reconnect_slot(0).unwrap_err(),
         "Spawn circle is too small for a new life's body"
     );
-    assert_eq!(serde_json::to_value(&backend.world).unwrap(), before);
+    assert_eq!(format!("{:?}", backend.world), before);
     assert_eq!(backend.slots[0].life, life);
     assert_eq!(backend.connections, connections);
     backend.world.snakes[0].alive = false;
@@ -2543,7 +2543,7 @@ fn recording_exhaustion_preserves_reconnect_state_and_allows_retry() {
         let s = &backend.slots[0];
         (
             backend.frame().unwrap(),
-            serde_json::to_value(&backend.world).unwrap(),
+            serde_json::to_value(backend.world.checkpoint().unwrap()).unwrap(),
             format!(
                 "{:?}",
                 (
@@ -2653,7 +2653,7 @@ fn reconnect_rechecks_record_room_after_queued_delivery() {
     connection.downlink.pop_front();
     let life = s.life;
     let connections = backend.connections;
-    let world = serde_json::to_value(&backend.world).unwrap();
+    let world = serde_json::to_value(backend.world.checkpoint().unwrap()).unwrap();
     let random = format!("{:?}", (&backend.random, &backend.spawn_random));
     let records = backend.slots[0].records.as_ref().unwrap().len();
 
@@ -2664,7 +2664,10 @@ fn reconnect_rechecks_record_room_after_queued_delivery() {
     assert_eq!(backend.frame().unwrap().status, ClientStatus::Playing);
     assert_eq!(backend.slots[0].life, life);
     assert_eq!(backend.connections, connections);
-    assert_eq!(serde_json::to_value(&backend.world).unwrap(), world);
+    assert_eq!(
+        serde_json::to_value(backend.world.checkpoint().unwrap()).unwrap(),
+        world
+    );
     assert_eq!(
         format!("{:?}", (&backend.random, &backend.spawn_random)),
         random
@@ -2850,7 +2853,7 @@ fn native_capacity_failure_keeps_all_slots_retryable() {
         let snapshot = |sim: &SimulatorBackend| {
             (
                 sim.time(),
-                serde_json::to_value(&sim.world).unwrap(),
+                serde_json::to_value(sim.world.checkpoint().unwrap()).unwrap(),
                 format!("{:?}", sim.random),
                 (0..2)
                     .map(|slot| {

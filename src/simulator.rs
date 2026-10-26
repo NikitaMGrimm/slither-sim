@@ -1,3 +1,4 @@
+pub mod checkpoint;
 use crate::bounds_index::BoundsIndex;
 use crate::food_grid::{EaterGrid, FoodCache};
 use crate::kiosk::{KioskConfig, KioskState};
@@ -604,7 +605,7 @@ pub fn population_radius(snakes: usize) -> f64 {
 /// It must not be applied to measured `radius_updates` replay.
 const RADIUS_RATE: f64 = 3.0 / 0.128;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 struct Random(u32);
 impl Random {
     fn next(&mut self) -> f64 {
@@ -612,7 +613,7 @@ impl Random {
         f64::from(self.0) / 4294967296.0
     }
 }
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default)]
 struct Boost {
     held: bool,
     active: bool,
@@ -652,10 +653,8 @@ pub struct FoodSpawnEvent {
     pub food: Food,
 }
 
-/// Serializes losslessly (JSON with exact floats), so a running world can move
-/// between processes. Per-step event buffers are not saved.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// A running world. Use the validated checkpoint boundary for exact continuation.
+#[derive(Clone, Debug)]
 pub struct Simulator {
     pub config: Config,
     /// Stable slots: use add(), never remove or reorder snakes during a run.
@@ -665,10 +664,8 @@ pub struct Simulator {
     pub prey: Vec<Prey>,
     pub deaths: Vec<DeathEvent>,
     /// Latest step only. None avoids event allocation/copying.
-    #[serde(skip)]
     pub pickup_events: Option<Vec<PickupEvent>>,
     /// Latest step only. Disabled by default.
-    #[serde(skip)]
     pub food_spawn_events: Option<Vec<FoodSpawnEvent>>,
     pub time: f64,
     death_times: Vec<Option<f64>>,
@@ -695,17 +692,12 @@ pub struct Simulator {
     radius_update_index: usize,
     /// Why the world stopped: a pickup whose gain would overflow the eater's
     /// mass, or non-finite prey motion. Validation rejects every later step.
-    #[serde(default)]
     failure: Option<SimError>,
-    #[serde(skip)]
     food_cache: FoodCache,
-    #[serde(skip)]
     eater_grid: EaterGrid,
-    #[serde(skip)]
     buffers: StepBuffers,
     /// Batch observation on the rayon pool; see `set_parallel`.
     #[cfg(feature = "parallel")]
-    #[serde(skip)]
     parallel: bool,
 }
 impl Simulator {
@@ -2339,7 +2331,7 @@ impl Simulator {
 
 /// Working memory kept between steps, so that small worlds do not pay for an
 /// allocation per buffer per tick. Every buffer is cleared before use and
-/// nothing in it outlives a step, so clones and deserialized worlds start empty.
+/// nothing in it outlives a step, so cloned and restored worlds start empty.
 #[derive(Default)]
 struct StepBuffers {
     alive: Vec<usize>,
@@ -2865,8 +2857,8 @@ mod slot_tests {
         let mut generated = Simulator::new(3, Config::sandbox()).unwrap();
         generated.add_slots(5).unwrap();
         assert_eq!(
-            serde_json::to_value(&generated).unwrap(),
-            serde_json::to_value(&checked).unwrap()
+            serde_json::to_value(generated.checkpoint().unwrap()).unwrap(),
+            serde_json::to_value(checked.checkpoint().unwrap()).unwrap()
         );
         // Caller-supplied IDs are still checked, and slots need an empty world.
         assert_eq!(

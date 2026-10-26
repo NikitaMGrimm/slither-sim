@@ -266,7 +266,7 @@ def append_event(study, event):
 
 
 def _source_files():
-    paths = [ROOT / name for name in ("Cargo.toml", "Cargo.lock", "pyproject.toml", "uv.lock", "LICENSE")]
+    paths = [ROOT / name for name in ("Cargo.toml", "Cargo.lock", "build.rs", "pyproject.toml", "uv.lock", "LICENSE")]
     for folder, suffixes in (("src", {".rs"}), ("schemas", {".json"}), ("tools/fidelity", {".py", ".mjs"}), ("examples", {".rs"})):
         paths.extend(path for path in (ROOT / folder).rglob("*") if path.suffix in suffixes and not path.name.startswith("test_") and ".test." not in path.name)
     return sorted(path for path in paths if path.is_file())
