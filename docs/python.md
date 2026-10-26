@@ -53,6 +53,12 @@ print(session.frame(1).time)
 | `request(message)` | Answers one JSON request, given as a dict, `str` or `bytes`, and returns the parsed reply dict with `protocol` and `result` or `error`. Use it for `info` and `snapshot`. |
 | `worlds`, `agents` | Session shape; 0 before the first reset. |
 
+Default/official resets size each arena for `agents` before creation and hold
+that radius, scaling food target/refill with area. Holding is a practical choice
+that omits real official waves. Sandbox, Battledome and explicit radii opt out
+unless `sizeToPopulation` is explicitly enabled; see
+[population sizing](configuration.md#population-sizing).
+
 `step` takes `worlds × agents` entries per argument, world-major: slot `s` of
 world `w` is entry `w × agents + s`. Headings are radians; only dead slots may
 use NaN for no action. Pass float64 heading and bool/uint8 boost buffers

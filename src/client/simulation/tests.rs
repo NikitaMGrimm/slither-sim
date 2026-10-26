@@ -14,6 +14,108 @@ use super::{
     snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
 };
 
+#[test]
+fn population_sized_backends_hold_across_death_and_respawn() {
+    let radius = 670. * 40_f64.sqrt();
+    for world in [
+        None,
+        Some(serde_json::json!({})),
+        Some(serde_json::json!({"preset": "official"})),
+    ] {
+        let mut input = serde_json::json!({"agents": 40});
+        if let Some(world) = world {
+            input["world"] = world;
+        }
+        let config: SimulationConfig = serde_json::from_value(input).unwrap();
+        let mut backend = SimulatorBackend::new(7, config).unwrap();
+        assert_eq!(backend.config().world.radius, radius);
+        assert_eq!(backend.world.config.radius, radius);
+        assert!(!backend.world.config.dynamic_radius);
+        assert_eq!(backend.world.config.food_count, 109 * 40);
+        assert!(
+            (backend.world.config.ambient_replenish_per_second
+                - Config::default().ambient_replenish_per_second * 40.)
+                .abs()
+                < 1e-9
+        );
+        for snake in &mut backend.world.snakes {
+            snake.alive = false;
+        }
+        backend
+            .world
+            .respawn(
+                0,
+                Point {
+                    x: radius - 1.,
+                    y: 0.,
+                },
+                0.,
+                2,
+            )
+            .unwrap();
+        backend.slots[0].control = Action::default();
+        backend.advance_ticks(1).unwrap();
+        assert!(!backend.world.snakes[0].alive);
+        assert_eq!(backend.world.config.radius, radius);
+        backend.reconnect_slot(0).unwrap();
+        backend.advance_ticks(1).unwrap();
+        assert!(backend.world.snakes[0].alive);
+        assert_eq!(backend.world.config.radius, radius);
+    }
+}
+
+#[test]
+fn fixed_backend_worlds_keep_their_radius_and_food_settings() {
+    for world in [
+        serde_json::json!({"preset": "battledome"}),
+        serde_json::json!({"preset": "sandbox"}),
+        serde_json::json!({"radius": 900}),
+        serde_json::json!({"preset": "official", "radius": 900}),
+        serde_json::json!({"sizeToPopulation": false}),
+        serde_json::json!({"radius": 9000, "sizeToPopulation": true}),
+    ] {
+        let config: SimulationConfig = serde_json::from_value(serde_json::json!({
+            "agents": 40, "world": world,
+        }))
+        .unwrap();
+        let expected = serde_json::to_value(&config.world).unwrap();
+        let backend = SimulatorBackend::new(7, config).unwrap();
+        assert_eq!(
+            serde_json::to_value(&backend.world.config).unwrap(),
+            expected
+        );
+        assert_eq!(
+            serde_json::to_value(&backend.config().world).unwrap(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn population_sizing_obeys_the_wire_radius_limit_with_a_fixed_boundary() {
+    let mut config = SimulationConfig {
+        agents: 2500,
+        ..Default::default()
+    };
+    assert!(!config.world.dynamic_radius);
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .contains("arena radii up to 32000")
+    );
+    assert!(
+        SimulatorBackend::new(7, config.clone())
+            .err()
+            .unwrap()
+            .contains("arena radii up to 32000")
+    );
+    config.world.size_to_population = false;
+    config.validate().unwrap();
+    config.world.dynamic_radius = true;
+    assert!(config.validate().is_err());
+}
+
 /// Original exhaustive admission, kept independent of the bounded scorer.
 fn exhaustive_spawn_pose(
     world: &Simulator,

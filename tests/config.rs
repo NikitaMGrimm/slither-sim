@@ -19,7 +19,7 @@ fn official_baseline_enables_current_models_and_nonzero_prey() {
     let config = Config::default();
     assert_eq!(config.radius, 670.);
     assert!(!config.dynamic_radius);
-    assert!(config.host_size_to_seats);
+    assert!(config.size_to_population);
     assert_eq!(config.food_count, 109);
     assert!((config.ambient_replenish_per_second - 1.6045635608990811).abs() < 1e-12);
     assert_eq!(config.prey.count, 1);
@@ -56,7 +56,7 @@ fn sandbox_changes_scene_size_and_population_settings_only() {
     for field in [
         "radius",
         "dynamicRadius",
-        "hostSizeToSeats",
+        "sizeToPopulation",
         "foodCount",
         "ambientReplenishPerSecond",
     ] {

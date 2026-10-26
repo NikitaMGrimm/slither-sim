@@ -10,6 +10,7 @@ fn config(radius: f64) -> SimulationConfig {
         agents: 2,
         world: Config {
             radius,
+            size_to_population: false,
             food_count: 0,
             ambient_replenish_per_second: 0.,
             ..Default::default()

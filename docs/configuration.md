@@ -53,15 +53,9 @@ both delays.
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
 
-For omitted/official worlds, the host enlarges a smaller starting radius to
-`670 × sqrt(maxClients + bots)`, including empty remote seats, and scales the
-food target and ambient attempt rate with area. For 484 seats this is 14,740
-units. The boundary then holds unless `dynamicRadius` is explicitly enabled;
-prey targets stay unchanged. This is a startup capacity policy, not an official
-radius law. `world.hostSizeToSeats` controls it independently of radius motion.
-Sandbox, Battledome and explicit JSON radii opt out; a larger radius is never
-shrunk. Rust callers choosing a custom radius should set `host_size_to_seats`
-false. Resolved configs retain the setting when serialized.
+The host applies [population sizing](#population-sizing) to
+`players.max + bots.count`, including empty remote seats. For 484 seats this is
+14,740 units.
 
 ## SimulationConfig
 
@@ -96,7 +90,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | --- | --- | --- |
 | `radius` | `670` | Positive finite arena radius. |
 | `dynamicRadius` | `false` | Opt into the provisional living-population controller (`670 × sqrt(living)`, capped at 23.4375 units/s); it is not faithful to official radius waves. |
-| `hostSizeToSeats` | `true` | Host only: enlarge the initial radius to fit all seats and scale food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. No effect in `serve` or virtual-time simulation. |
+| `sizeToPopulation` | `true` | Runtimes enlarge this arena to fit their population at creation, scaling food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. See [population sizing](#population-sizing). |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
 | `foodCount` | `109` | Refill target/startup placement attempts. Admission limits can reduce placement; memory bounds it. |
 | `ambientRefillCountsAllFood` | `false` | Count all pellets toward the refill target; otherwise count only ambient food. Does not cap death/boost drops. |
@@ -122,13 +116,29 @@ fit (for example, `size: 51, maxSize: 51.01`).
 set `dynamicRadius` false to prevent model changes between samples. See
 [rules and evidence limits](server-rules.md).
 
+### Population sizing
+
+The host, `serve`/Python/C ABI resets and `SimulatorBackend` enlarge a smaller
+initial radius to `670 × sqrt(population)` when `sizeToPopulation` is true.
+Population is all host seats (`players.max + bots.count`), `agents` per reset
+world, or `SimulationConfig.agents`. Food target and ambient attempt rate scale with area;
+prey targets stay unchanged. The boundary then holds unless `dynamicRadius` is
+explicitly enabled. This is a startup capacity policy, not an official radius law.
+
+Sandbox, Battledome and explicit JSON radii opt out unless `sizeToPopulation`
+is explicitly enabled. Larger radii are never shrunk. Rust callers choosing a
+custom fixed radius set `size_to_population` false. Resolved configs and
+checkpoints retain the flag. `Simulator::new` alone has no population argument
+and preserves the supplied radius; `Config::official(n)` selects that initial
+size directly. Adding or respawning snakes does not reapply startup sizing.
+
 ### Official and sandbox
 
 Both constructors return `Config`:
 
 | Constructor | Result |
 | --- | --- |
-| `Config::official(n)` | Holds radius `r = 670 × sqrt(max(n, 1))`; host seat sizing enabled; food target `floor(7πr² / 90,000)` and refill `0.1024πr² / 90,000` attempts/s (per 300×300 sector: about 7 pellets, 0.1024 attempts/s); prey target `max(1, round(πr² / 10,000,000))`. |
+| `Config::official(n)` | Holds radius `r = 670 × sqrt(max(n, 1))`; runtime population sizing enabled; food target `floor(7πr² / 90,000)` and refill `0.1024πr² / 90,000` attempts/s (per 300×300 sector: about 7 pellets, 0.1024 attempts/s); prey target `max(1, round(πr² / 10,000,000))`. |
 | `Config::sandbox()` | `Config::official(1)` with radius 1000, fixed boundary, food target 350, 5 ambient attempts/s and no prey. |
 
 `Config::default()`, omitted JSON fields, `SimulationConfig` and `host` use
@@ -144,7 +154,7 @@ found no tested predictive replacement. Enable `dynamicRadius` explicitly to
 experiment with the old living-population controller; food and prey targets
 stay fixed as it runs. One snake is a deliberately small start, not a typical
 official lobby; use `Config::official(n)` or explicit world fields for larger
-scenes. The host applies the separate startup sizing policy above.
+scenes. Runtimes with a known population apply the startup sizing policy above.
 
 Prey density is a working assumption, not a calibrated global population.
 Received density of about 0.04–0.18 per million square units near recorded
@@ -170,7 +180,7 @@ JSON `"preset"` selects a constructor's world: `"official"`
 (`Config::official(1)`), `"sandbox"` or `"battledome"`. Fields given beside it
 override it; nested objects such as `kiosk` merge field by field, and `null`
 clears optional settings. Changing `radius` does not rescale food and disables
-host seat sizing unless `hostSizeToSeats` is explicitly supplied. Without
+runtime population sizing unless `sizeToPopulation` is explicitly supplied. Without
 `preset`, omitted fields use `Config::official(1)`. Repeated keys keep their last
 value because configs pass through a JSON value. Replies and snapshots print
 resolved fields, not the preset name.

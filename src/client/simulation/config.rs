@@ -126,8 +126,7 @@ impl SimulationConfig {
             .map(|update| update.radius)
             .chain([self.world.radius])
             .chain(
-                self.world
-                    .dynamic_radius
+                (self.world.dynamic_radius || self.world.size_to_population)
                     .then(|| crate::simulator::population_radius(self.agents)),
             )
             .fold(0., f64::max);

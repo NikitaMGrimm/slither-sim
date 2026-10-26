@@ -15,14 +15,16 @@ The living-count controller remains available through `dynamicRadius: true`,
 explicitly provisional and not faithful. No tested population, EMA, clock or
 other load proxy supplies a predictive official replacement.
 
-Host startup capacity is independent of subsequent radius motion:
-`hostSizeToSeats` lets official worlds enlarge a smaller initial arena for
-`maxClients + bots`, scaling food target/refill with area. The host then holds
-that boundary by default. Sandbox, Battledome and explicit JSON radii opt out;
-an explicit flag overrides the choice. This avoids coupling capacity to the
-unfaithful controller or rewriting host JSON before world deserialization.
+Runtime startup capacity is independent of subsequent radius motion:
+`sizeToPopulation` lets official worlds enlarge a smaller initial arena for
+host seats (`players.max + bots.count`), reset agents per world, or
+simulation-backend agents, scaling food target/refill with area. Each runtime then holds that
+boundary by default. Sandbox, Battledome and explicit JSON radii opt out;
+an explicit flag overrides the choice. One shared `Config` helper owns this
+policy, avoiding coupling capacity to the unfaithful controller or rewriting
+runtime JSON before world deserialization.
 Resolved configs and checkpoints retain both settings. Rust callers selecting
-a custom fixed radius must set `host_size_to_seats: false`.
+a custom fixed radius must set `size_to_population: false`.
 
 For recorded fidelity replay, keep `dynamicRadius: false` and use measured
 `radiusUpdates`. This reproduces received samples, not unseen continuous motion

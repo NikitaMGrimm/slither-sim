@@ -512,7 +512,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
     for field in [
         "radius",
         "dynamicRadius",
-        "hostSizeToSeats",
+        "sizeToPopulation",
         "foodCount",
         "ambientRefillCountsAllFood",
         "ambientReplenishPerSecond",

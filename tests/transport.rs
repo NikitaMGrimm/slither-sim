@@ -196,7 +196,7 @@ fn frames_rebuild_the_core_observations() {
         let mut requests = vec![json!({"op":"reset","seed":7,"agents":agents,"config":config})];
         requests.extend(std::iter::repeat_n(step, steps));
         let replies = exchange(&requests);
-        let mut core = world(7, agents, config);
+        let mut core = world(7, agents, replies[0]["result"]["config"].clone());
         assert_frame_matches(&replies[0]["result"]["worlds"][0], &core);
         assert_eq!(replies[0]["result"]["worlds"][0]["ticks"], 0);
         let actions: Vec<_> = headings
@@ -322,7 +322,7 @@ fn snapshots_exclude_hidden_state() {
     for hidden in ["random", "boosts", "speeds", "joins", "kiosks"] {
         assert!(!snapshot.contains_key(hidden));
     }
-    let core = world(9, 2, json!({}));
+    let core = world(9, 2, replies[1]["result"]["config"].clone());
     assert_eq!(snapshot["snakes"], json!(core.snakes));
     assert_eq!(snapshot["food"], json!(core.food));
 }

@@ -137,11 +137,10 @@ pub struct Config {
     /// official radius waves. Disabled by default; see
     /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
     pub dynamic_radius: bool,
-    /// Let the host enlarge this arena to fit all seats, scaling food with area.
-    /// Independent of subsequent radius motion. Explicit JSON `radius` disables
-    /// this unless `hostSizeToSeats` is also supplied; Rust callers choosing a
-    /// fixed radius should set this to false.
-    pub host_size_to_seats: bool,
+    /// Runtimes enlarge this arena to fit their population at creation, scaling
+    /// food with area. Explicit JSON `radius` opts out unless `sizeToPopulation`
+    /// is also supplied; Rust callers choosing a fixed radius set this to false.
+    pub size_to_population: bool,
     pub vision: f64,
     /// Refill target; counts ambient pellets unless `ambient_refill_counts_all_food`.
     pub food_count: usize,
@@ -200,7 +199,7 @@ pub struct Config {
 struct ConfigWire {
     radius: f64,
     dynamic_radius: bool,
-    host_size_to_seats: bool,
+    size_to_population: bool,
     vision: f64,
     food_count: usize,
     #[serde(skip_serializing_if = "is_false")]
@@ -264,7 +263,7 @@ impl<'de> Deserialize<'de> for Config {
         // Preserve custom radii without changing the preset's other defaults.
         // Serialized configs include the flag, so resolved round trips retain it.
         let explicit_radius = fields.contains_key("radius");
-        let explicit_host_sizing = fields.contains_key("hostSizeToSeats");
+        let explicit_population_sizing = fields.contains_key("sizeToPopulation");
         let fields = match fields.remove("preset") {
             None => fields,
             Some(preset) => {
@@ -280,8 +279,8 @@ impl<'de> Deserialize<'de> for Config {
         };
         let mut config =
             ConfigWire::deserialize(Value::Object(fields)).map_err(D::Error::custom)?;
-        if explicit_radius && !explicit_host_sizing {
-            config.host_size_to_seats = false;
+        if explicit_radius && !explicit_population_sizing {
+            config.size_to_population = false;
         }
         Ok(config)
     }
@@ -319,6 +318,19 @@ fn official_food(radius: f64) -> (usize, f64) {
     ((7.0 * sectors) as usize, 0.1024 * sectors)
 }
 impl Config {
+    /// Startup capacity policy, independent of later boundary motion. Holding
+    /// the selected radius avoids death jitter but omits real official waves:
+    /// research/fidelity/2026-10-26-arena-radius/REPORT.md.
+    pub(crate) fn size_for_population(&mut self, population: usize) {
+        let radius = population_radius(population);
+        if self.size_to_population && self.radius > 0. && self.radius < radius {
+            let area = (radius / self.radius).powi(2);
+            self.radius = radius;
+            self.food_count = (self.food_count as f64 * area) as usize;
+            self.ambient_replenish_per_second *= area;
+        }
+    }
+
     /// Best-current official-server approximation, initialized for `snakes`.
     /// Includes provisional models; this is not an identified server preset.
     /// Holds a population-sized initial radius; this practical baseline omits
@@ -335,7 +347,7 @@ impl Config {
         Self {
             radius,
             dynamic_radius: false,
-            host_size_to_seats: true,
+            size_to_population: true,
             // A finite receipt approximation: the paired visibility census
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
             // Exact server entry/exit geometry and size scaling remain unknown.
@@ -373,7 +385,7 @@ impl Config {
         Self {
             radius: 1000.0,
             dynamic_radius: false,
-            host_size_to_seats: false,
+            size_to_population: false,
             food_count: 350,
             ambient_replenish_per_second: 5.0,
             prey: PreyConfig {
@@ -394,7 +406,7 @@ impl Config {
         Self {
             radius: RADIUS,
             dynamic_radius: false,
-            host_size_to_seats: false,
+            size_to_population: false,
             food_count,
             // Design choice: death/boost food already feeds snakes, so it also
             // fills the ambient target. Independent of minScore for custom worlds.

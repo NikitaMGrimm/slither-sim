@@ -28,7 +28,7 @@ use super::{
         RawSimulator,
     },
 };
-use crate::{Action, simulator::population_radius};
+use crate::Action;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -214,19 +214,7 @@ impl HostConfig {
             latency: self.bots.latency.clone(),
             ..self.simulation.clone()
         };
-        // Official worlds start at 670 units: too small for the host's seats.
-        // Startup sizing is independent of boundary motion; custom fixed worlds
-        // opt out. Holding this selected radius removes death jitter, but omits
-        // official waves: research/fidelity/2026-10-26-arena-radius/REPORT.md.
-        // Scale food target/rate with area to preserve their modeled density.
-        let world = &mut config.world;
-        let seats = population_radius(agents);
-        if world.host_size_to_seats && world.radius > 0. && world.radius < seats {
-            let area = (seats / world.radius).powi(2);
-            world.radius = seats;
-            world.food_count = (world.food_count as f64 * area) as usize;
-            world.ambient_replenish_per_second *= area;
-        }
+        config.world.size_for_population(agents);
         config.validate()?;
         Ok(config)
     }
@@ -2191,7 +2179,7 @@ mod tests {
             r#"{"world":{"preset":"official"}}"#,
         ] {
             let host: HostConfig = serde_json::from_str(&format!(
-                r#"{{"maxClients":4,"bots":480,"simulation":{simulation}}}"#
+                r#"{{"players":{{"max":4}},"bots":{{"count":480}},"simulation":{simulation}}}"#
             ))
             .unwrap();
             let mut config = host.world_config().unwrap().world;
@@ -2227,10 +2215,10 @@ mod tests {
             r#"{"preset":"sandbox"}"#,
             r#"{"radius":900,"dynamicRadius":false}"#,
             r#"{"preset":"official","radius":900}"#,
-            r#"{"hostSizeToSeats":false}"#,
+            r#"{"sizeToPopulation":false}"#,
         ] {
             let host: HostConfig = serde_json::from_str(&format!(
-                r#"{{"maxClients":4,"bots":480,"simulation":{{"world":{world}}}}}"#
+                r#"{{"players":{{"max":4}},"bots":{{"count":480}},"simulation":{{"world":{world}}}}}"#
             ))
             .unwrap();
             let original = serde_json::to_value(&host.simulation.world).unwrap();
@@ -2239,18 +2227,18 @@ mod tests {
                 serde_json::from_value(serde_json::to_value(host).unwrap()).unwrap(),
             ] {
                 let resolved = host.world_config().unwrap().world;
-                assert!(!resolved.host_size_to_seats);
+                assert!(!resolved.size_to_population);
                 assert_eq!(serde_json::to_value(resolved).unwrap(), original);
             }
         }
         // Callers may explicitly request startup sizing even with a radius.
         let host: HostConfig = serde_json::from_str(
-            r#"{"simulation":{"world":{"radius":900,"hostSizeToSeats":true,"dynamicRadius":true}}}"#,
+            r#"{"simulation":{"world":{"radius":900,"sizeToPopulation":true,"dynamicRadius":true}}}"#,
         )
         .unwrap();
         assert_eq!(
             host.world_config().unwrap().world.radius,
-            population_radius(8)
+            crate::simulator::population_radius(8)
         );
         assert!(host.world_config().unwrap().world.dynamic_radius);
     }

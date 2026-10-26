@@ -112,7 +112,8 @@ The host binds loopback by default. Stop it with Ctrl+C.
 ## Defaults and fidelity
 
 The default world, [`Config::official(1)`](docs/configuration.md#official-and-sandbox),
-holds a radius sized for one snake; the host sizes it for all seats at startup.
+holds its initial radius; the host, resets and simulation backend size it for
+their population at startup.
 Holding is a practical default that omits real official radius waves. It combines
 measured movement and protocol constants with provisional visibility, spawning and
 ecology models; it is not an exact official replica.

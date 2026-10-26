@@ -159,8 +159,9 @@ reported players), versus frequent death/respawn reversals in the local
 controller. Holding the initial radius beats the reported-count controller in
 94/114 connection forecasts (mean MAE 211 versus 520 units), but loses in 20 and
 suppresses real waves. No tested population, EMA, clock or load proxy identifies
-the official controller. Host seat sizing is a separate startup capacity policy;
-see [configuration](configuration.md#hostconfig).
+the official controller. Host, reset and simulation-backend population sizing
+is a separate startup capacity policy; see
+[configuration](configuration.md#population-sizing).
 
 ## Movement and geometry
 
