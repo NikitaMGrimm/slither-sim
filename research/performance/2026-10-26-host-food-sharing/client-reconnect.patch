@@ -8,8 +8,43 @@
                  "controller": Controller::Wander.definition(),
                  "lifecycle": {"reconnect": "timed reconnect_slot after the client reports death; refused admissions wait refusalRetryDecisions",
                      "operation": "reconnect admission plus step_all; controller and record drain excluded"},
-@@ -1476,11 +1477,18 @@
+@@ -1413,6 +1414,29 @@
+         );
+     }
+ 
++    #[test]
++    fn study_live_reconnect_refreshes_the_frame_before_controls() {
++        static CLIENT: ClientScenario = ClientScenario {
++            id: "client-battledome-64",
++            world: World::Battledome,
++            agents: 64,
++            warmup_decisions: 600,
++            refusal_retry_decisions: 24,
++            operation: op(4, 4, Full),
++        };
++        let report = run_client(
++            &super::tests::args(CLIENT.id, Driver::Client(&CLIENT), CLIENT.operation, 4),
++            &CLIENT,
++            &mut io::sink(),
++        )
++        .unwrap();
++        assert!(report["details"]["admissionCalls"].as_u64().unwrap() >= 1);
++        assert_eq!(
++            report["details"]["definition"]["studyForcedReconnectSlotAtStart"],
++            0
++        );
++    }
++
+     fn lifecycle_rates(counts: Lifecycle, decisions: usize) -> Value {
+         let mut value = counts.json();
+         value["refusalsPerDecision"] = json!(counts.deferred as f64 / decisions as f64);
+@@ -1474,13 +1498,20 @@
+             }
+             // Lives restart only after their client has seen the death, as a bot would.
              let admission_start = (measured && !args.trace).then(Instant::now);
++            let force_reconnect = measured
++                && decision == client.warmup_decisions
++                && client.id.starts_with("client-battledome-");
              let (mut reconnects, mut deferred) = (Vec::new(), Vec::new());
              for (slot, frame) in current_frames.iter().enumerate() {
 -                if decision >= retry_at[slot]
@@ -19,10 +54,7 @@
 -                    )
 +                // The study's steady Battledome window needs real admission work
 +                // even when the growing arena has no naturally dead clients.
-+                let forced = measured
-+                    && decision == client.warmup_decisions
-+                    && slot == 0
-+                    && client.id.starts_with("client-battledome-");
++                let forced = force_reconnect && slot == 0;
 +                if forced
 +                    || (decision >= retry_at[slot]
 +                        && matches!(
@@ -32,3 +64,15 @@
                  {
                      match backend.reconnect_slot(slot) {
                          Ok(()) => reconnects.push(slot),
+@@ -1502,6 +1533,11 @@
+                         Err(error) => return Err(error),
+                     }
+                 }
++            }
++            if force_reconnect {
++                // A live reconnect resets the client's connection state. Do not
++                // send a control from its previously received life.
++                current_frames[0] = backend.frame_for(0)?;
+             }
+             let admission = admission_start.map_or(0.0, |start| start.elapsed().as_secs_f64());
+             let mut actions = Controller::Wander.actions(backend.world(), tick);

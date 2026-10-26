@@ -65,3 +65,5 @@ client fixture: explicitly reconnect slot zero once at the first measured
 Battledome decision. Record it in definition metadata and retain the gate.
 Both arms use that overlay and the current growing preset. This adds real
 admission work rather than relaxing the gate; it does not change runtime rules.
+The first forced-reconnect smoke fails on a stale Playing frame. Refresh that
+one frame before controls, with a focused regression, before any timed pairs.
