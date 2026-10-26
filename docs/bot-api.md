@@ -263,7 +263,7 @@ One policy/adapter instance can be reused for sequential decisions across seats:
 scratch buffers retain no policy state. Keep each seat's received frame, sent
 commands and lifecycle separate. This heuristic does not guarantee safety;
 cross-platform floating-point identity is subject to OS math libraries.
-The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
+The [port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/50578c9ce90c36af19b3612e0657b1ad24bc03ea/research/bots/2026-10-26-forager-port/REPORT.md)
 pins the original kernel, immutable parameters, bounded fixtures and validation
 limits. A4-mean is retained only as private test data and is not selectable.
 

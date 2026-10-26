@@ -3,7 +3,7 @@
 //! A1 is the sole selectable release. Its parameters are immutable and private.
 //! The policy uses no hidden world state and retains only reusable scratch space.
 //! Historical defaults, A4-mean test data and port provenance are described in
-//! [the evidence note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md).
+//! [the evidence note](https://github.com/NikitaMGrimm/slither-sim/blob/50578c9ce90c36af19b3612e0657b1ad24bc03ea/research/bots/2026-10-26-forager-port/REPORT.md).
 // Preserve the frozen be3a035 control flow; see the port evidence linked above.
 #[allow(clippy::collapsible_if)]
 mod kernel;
