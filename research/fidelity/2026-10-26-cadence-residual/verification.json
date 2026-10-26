@@ -1,0 +1,272 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "id": "official-low-1",
+      "n": 40196,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "official-second-1",
+      "n": 31596,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "official-low-2",
+      "n": 29526,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "official-second-2",
+      "n": 25280,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "official-low-3",
+      "n": 38184,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "official-second-3",
+      "n": 30835,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "bots-0-r1",
+      "n": 0,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "bots-0-r2",
+      "n": 0,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "bots-0-r3",
+      "n": 0,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "bots-500-r1-retry2",
+      "n": 17147,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "bots-500-r2",
+      "n": 4425,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    },
+    {
+      "id": "bots-500-r3",
+      "n": 13071,
+      "csvAndRawFamilyCountsEqual": true,
+      "exposureReproduced": true
+    }
+  ],
+  "extra": {
+    "official-low-1": {
+      "tickProxyMeanMs": 7.019086210946676,
+      "exact7MultiplePct": 31.14489003880983,
+      "maxMotionPhaseShare": {
+        "n": 264,
+        "p50": 28.85885885885886,
+        "p95": 41.07142857142857
+      },
+      "receiptMinusHeaderMs": {
+        "n": 40196,
+        "p50": -0.14700000000000024,
+        "p95": 0.9409999999999998
+      },
+      "receiptOvershoot7Pct": 0.007463429196935018,
+      "meanPeersByExposure": 8.230251212461477
+    },
+    "official-second-1": {
+      "tickProxyMeanMs": 7.027315825118519,
+      "exact7MultiplePct": 72.72756045068996,
+      "maxMotionPhaseShare": {
+        "n": 210,
+        "p50": 28.685714285714287,
+        "p95": 41.34615384615385
+      },
+      "receiptMinusHeaderMs": {
+        "n": 31596,
+        "p50": 0.043999999999999595,
+        "p95": 0.9630000000000001
+      },
+      "receiptOvershoot7Pct": 0.0031649575895683,
+      "meanPeersByExposure": 8.001208470588235
+    },
+    "official-low-2": {
+      "tickProxyMeanMs": 7.024034299377499,
+      "exact7MultiplePct": 29.3266951161688,
+      "maxMotionPhaseShare": {
+        "n": 195,
+        "p50": 28.571428571428573,
+        "p95": 41.53846153846154
+      },
+      "receiptMinusHeaderMs": {
+        "n": 29526,
+        "p50": -0.009999999999999787,
+        "p95": 0.847999999999999
+      },
+      "receiptOvershoot7Pct": 0.0067736909842173,
+      "meanPeersByExposure": 7.66162948905453
+    },
+    "official-second-2": {
+      "tickProxyMeanMs": 7.033373581260565,
+      "exact7MultiplePct": 72.06091772151899,
+      "maxMotionPhaseShare": {
+        "n": 188,
+        "p50": 29.388422035480858,
+        "p95": 41.666666666666664
+      },
+      "receiptMinusHeaderMs": {
+        "n": 25280,
+        "p50": -0.004999999999999893,
+        "p95": 0.9000000000000004
+      },
+      "receiptOvershoot7Pct": 0.015822784810126583,
+      "meanPeersByExposure": 7.452828631177312
+    },
+    "official-low-3": {
+      "tickProxyMeanMs": 7.036667513980682,
+      "exact7MultiplePct": 45.41169076052797,
+      "maxMotionPhaseShare": {
+        "n": 272,
+        "p50": 29.4179477072658,
+        "p95": 42.27642276422764
+      },
+      "receiptMinusHeaderMs": {
+        "n": 38184,
+        "p50": 0.15299999999999958,
+        "p95": 0.9640000000000004
+      },
+      "receiptOvershoot7Pct": 0.01571338780641106,
+      "meanPeersByExposure": 7.927105128704199
+    },
+    "official-second-3": {
+      "tickProxyMeanMs": 7.040875688916105,
+      "exact7MultiplePct": 68.2146910977785,
+      "maxMotionPhaseShare": {
+        "n": 204,
+        "p50": 27.76270645495891,
+        "p95": 40.0
+      },
+      "receiptMinusHeaderMs": {
+        "n": 30835,
+        "p50": -0.03599999999999959,
+        "p95": 1.0310000000000006
+      },
+      "receiptOvershoot7Pct": 0.025944543538187124,
+      "meanPeersByExposure": 7.849420114851039
+    },
+    "bots-0-r1": {
+      "tickProxyMeanMs": null,
+      "exact7MultiplePct": null,
+      "maxMotionPhaseShare": {
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "receiptMinusHeaderMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "receiptOvershoot7Pct": null,
+      "meanPeersByExposure": null
+    },
+    "bots-0-r2": {
+      "tickProxyMeanMs": null,
+      "exact7MultiplePct": null,
+      "maxMotionPhaseShare": {
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "receiptMinusHeaderMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "receiptOvershoot7Pct": null,
+      "meanPeersByExposure": null
+    },
+    "bots-0-r3": {
+      "tickProxyMeanMs": null,
+      "exact7MultiplePct": null,
+      "maxMotionPhaseShare": {
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "receiptMinusHeaderMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "receiptOvershoot7Pct": null,
+      "meanPeersByExposure": null
+    },
+    "bots-500-r1-retry2": {
+      "tickProxyMeanMs": 7,
+      "exact7MultiplePct": 100.0,
+      "maxMotionPhaseShare": {
+        "n": 139,
+        "p50": 44.0,
+        "p95": 64.55696202531645
+      },
+      "receiptMinusHeaderMs": {
+        "n": 17147,
+        "p50": -0.0470000000000006,
+        "p95": 0.6319999999999997
+      },
+      "receiptOvershoot7Pct": 0.4024027526681052,
+      "meanPeersByExposure": 7.478707114182842
+    },
+    "bots-500-r2": {
+      "tickProxyMeanMs": 7,
+      "exact7MultiplePct": 100.0,
+      "maxMotionPhaseShare": {
+        "n": 38,
+        "p50": 40.270270270270274,
+        "p95": 63.095238095238095
+      },
+      "receiptMinusHeaderMs": {
+        "n": 4425,
+        "p50": -0.04499999999999993,
+        "p95": 0.7169999999999996
+      },
+      "receiptOvershoot7Pct": 0.4067796610169492,
+      "meanPeersByExposure": 6.641121192482178
+    },
+    "bots-500-r3": {
+      "tickProxyMeanMs": 7,
+      "exact7MultiplePct": 100.0,
+      "maxMotionPhaseShare": {
+        "n": 111,
+        "p50": 58.035714285714285,
+        "p95": 85.3932584269663
+      },
+      "receiptMinusHeaderMs": {
+        "n": 13071,
+        "p50": -0.04400000000000048,
+        "p95": 0.681
+      },
+      "receiptOvershoot7Pct": 0.4437303955320939,
+      "meanPeersByExposure": 7.022418097518724
+    }
+  },
+  "syntheticCadenceChecks": 3
+}

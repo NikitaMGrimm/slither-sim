@@ -124,6 +124,9 @@ cadence by its mix of views. It is not a causal proof or a fidelity pass.
 **The open gap:** with 6–10 peers, **67.99%** (r1) and **68.05%** (r2) of local
 gaps are ≤9 ms, versus **83.43%** official. Matching peer counts does not
 control for activity or scenario, and the cause of this residual is unknown.
+A [follow-up](../2026-10-26-cadence-residual/REPORT.md) attributes most of it to
+the local workload: less speed/boost and mass/body/food activity, amplified by
+concentrated report phases.
 The local zero-peer median remains **35 ms**; same-route official zero-peer
 coverage is inadequate.
 
