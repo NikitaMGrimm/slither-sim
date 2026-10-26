@@ -32,7 +32,8 @@ pub struct SimulationConfig {
     /// Seconds between minimaps on one server-wide clock; connections join its
     /// running phase. The default approximates the observed period.
     pub minimap_interval_seconds: f64,
-    pub minimap_side: usize,
+    /// None selects 256 for pit worlds and 136 otherwise; Some overrides it.
+    pub minimap_side: Option<usize>,
     /// Seconds between leaderboards on their own server-wide clock. The
     /// default approximates the observed period.
     pub leaderboard_interval_seconds: f64,
@@ -60,7 +61,7 @@ struct SimulationConfigWire {
     controlled_slot: usize,
     decision_ticks: usize,
     minimap_interval_seconds: f64,
-    minimap_side: usize,
+    minimap_side: Option<usize>,
     leaderboard_interval_seconds: f64,
     local_records: bool,
     latency: LatencyConfig,
@@ -93,9 +94,7 @@ impl Default for SimulationConfig {
             // models, not universal gaps. See the cadence-near-server fixture
             // and research/fidelity/2026-10-26-vps-timing/REPORT.md.
             minimap_interval_seconds: 2.504,
-            // Retained protocol-19 minimap receipts and the earlier browser
-            // bridge use 136 cells per side; 32 was a local backend shortcut.
-            minimap_side: 136,
+            minimap_side: None,
             leaderboard_interval_seconds: 3.008,
             local_records: false,
             latency: LatencyConfig::default(),
@@ -104,6 +103,12 @@ impl Default for SimulationConfig {
     }
 }
 impl SimulationConfig {
+    /// Effective stock minimap resolution, including the pit-world default.
+    pub fn minimap_side(&self) -> usize {
+        self.minimap_side
+            .unwrap_or(if self.world.pit.is_some() { 256 } else { 136 })
+    }
+
     /// Checks the world as backends and hosts run it, after sizing it for
     /// `agents`; see [`Config::size_to_population`].
     pub fn validate(&self) -> Result<(), String> {
@@ -155,7 +160,10 @@ impl SimulationConfig {
         {
             return Err("Leaderboard interval must be positive".into());
         }
-        if !(1..=crate::client::minimap::MAX_SIDE).contains(&self.minimap_side) {
+        if self
+            .minimap_side
+            .is_some_and(|side| !(1..=crate::client::minimap::MAX_SIDE).contains(&side))
+        {
             return Err(format!(
                 "Minimap side must be 1 through {}: the stock client clamps larger sides",
                 crate::client::minimap::MAX_SIDE

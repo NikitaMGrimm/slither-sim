@@ -137,7 +137,7 @@ HUD values are server reports and may include players outside local visibility.
 
 | Field | Meaning |
 | --- | --- |
-| `hud.leaderboard` | Own rank/row, population and entries with names, colors, mass and computed scores. |
+| `hud.leaderboard` | Own rank/row, population and entries with names, colors, wire score-table inputs and computed scores. |
 | `hud.record` | Reported record holder's mass, score, name and message. |
 | `hud.session` | Opaque snake/session IDs; these neither select self nor resume a life. |
 | `hud.snakes` | Known profiles, custom skins, cosmetics and optional kill reports with receipt ages. |
@@ -182,10 +182,12 @@ inside `config.world`:
 {"op":"simulation","seed":7,"config":{"world":{"preset":"battledome"}}}
 ```
 
-The frame still contains only decoded protocol reports. Pit geometry, the size
-floor and the rolling kill score are not transmitted; retain the chosen world
-config separately when a bot needs the mode rules. Reported kills count the
-current life, and leaderboard ranks use size scores.
+The frame still contains only decoded protocol reports. Pit geometry and the size
+floor are not transmitted; retain the chosen world config separately when a bot
+needs the mode rules. There is no separate per-slot rolling-kill field. Reported
+kills count the current life. Leaderboards in worlds with `killScoreSeconds`
+rank rolling kills; otherwise they rank size. The numeric column is the stock table score
+from the transmitted row, not the opponent's physical mass.
 
 Example [latency settings](configuration.md#latencyconfig):
 

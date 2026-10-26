@@ -52,8 +52,10 @@ Set `bots.count` to keep the world populated when nobody is online. Bots take
 their own seats, not player seats, and use CPU even with no players connected.
 The official arena grows and shrinks with occupied seats; see
 [population sizing](configuration.md#population-sizing) and
-[Battledome](configuration.md#battledome). Every setting is in the
-[configuration reference](configuration.md#hostconfig).
+[Battledome](configuration.md#battledome). Its stock leaderboard ranks rolling
+kills and its minimap defaults to 256 cells, showing inner-pit snakes and the
+pit outline. An explicit `simulation.minimapSide` overrides the size. Every
+setting is in the [configuration reference](configuration.md#hostconfig).
 
 ## Run as a service
 

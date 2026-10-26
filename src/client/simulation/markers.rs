@@ -3,8 +3,20 @@ use super::food::KnownFood;
 use crate::{client::encode, model::Point};
 use std::{collections::BTreeMap, f64::consts::TAU};
 
+type Sectors = BTreeMap<u16, Vec<([u8; 2], KnownFood)>>;
+
+// The stock client advances rapid food by 3 * elapsed_ms / (8 * 150),
+// reaching full size after 400 ms without lag. Hold both generations for 500 ms.
+// See research/battledome/2026-10-26-stock-presentation/REPORT.md for source pin.
+const FADE_SECONDS: f64 = 0.5;
+
 #[derive(Default)]
-pub(super) struct PitMarkers(BTreeMap<u16, Vec<([u8; 2], KnownFood)>>, f64);
+pub(super) struct PitMarkers {
+    sectors: Sectors,
+    radius: f64,
+    updated_at: f64,
+    previous: Option<(Sectors, f64)>,
+}
 
 impl PitMarkers {
     pub(super) fn new(radius: f64) -> Result<Self, String> {
@@ -42,21 +54,46 @@ impl PitMarkers {
                     },
                 ));
         }
-        Ok(Self(sectors, pit_radius))
+        Ok(Self {
+            sectors,
+            radius: pit_radius,
+            updated_at: 0.,
+            previous: None,
+        })
     }
 
     pub(super) fn radius(&self) -> f64 {
-        self.1
+        self.radius
     }
 
-    pub(super) fn needs_update(&self, radius: f64) -> bool {
-        // A shrinking edge may leave decorations at most one radial food cell
-        // outward, avoiding a rebuild and recipient diffs every 7 ms. Growth
-        // past the cached edge refreshes immediately so the ring stays outside.
-        // Protocol-19 food coordinates have 256 offsets per sector.
+    /// Keep a mature generation visible while a shrinking replacement fades in.
+    /// Growth replaces immediately: old points may be behind the lethal edge.
+    pub(super) fn update(&mut self, radius: f64, now: f64) -> Result<bool, String> {
         let cell = f64::from(encode::SECTOR_SIZE) / 256.;
-        let previous = self.radius();
-        radius > previous || (radius / cell).floor() != (previous / cell).floor()
+        let previous_radius = self.radius();
+        let growth = radius > previous_radius;
+        let shrink = radius < previous_radius
+            && now - self.updated_at >= FADE_SECONDS
+            && (radius / cell).floor() != (previous_radius / cell).floor();
+        let mut changed = false;
+        if self
+            .previous
+            .as_ref()
+            .is_some_and(|(_, expires)| now >= *expires)
+        {
+            self.previous = None;
+            changed = true;
+        }
+        if growth || shrink {
+            let mut next = Self::new(radius)?;
+            next.updated_at = now;
+            if shrink {
+                next.previous = Some((std::mem::take(&mut self.sectors), now + FADE_SECONDS));
+            }
+            *self = next;
+            changed = true;
+        }
+        Ok(changed)
     }
 
     pub(super) fn overlay(
@@ -64,10 +101,20 @@ impl PitMarkers {
         sector: u16,
         food: &[([u8; 2], KnownFood)],
     ) -> Option<Vec<([u8; 2], KnownFood)>> {
-        let markers = self.0.get(&sector)?;
+        let current = self.sectors.get(&sector);
+        let previous = self
+            .previous
+            .as_ref()
+            .and_then(|(sectors, _)| sectors.get(&sector));
+        if current.is_none() && previous.is_none() {
+            return None;
+        }
         // A stock cell holds one item. Reserve marker keys in browser listings;
         // keep colliding physical pellets in physics and the separate bot view.
-        let mut run = markers.clone();
+        let mut run = current.cloned().unwrap_or_default();
+        if let Some(previous) = previous {
+            run.extend_from_slice(previous);
+        }
         run.extend_from_slice(food);
         run.sort_by_key(|(key, _)| *key);
         run.dedup_by_key(|(key, _)| *key);
@@ -83,7 +130,7 @@ mod tests {
     fn pit_markers_are_unique_outside_the_edge_and_use_the_design_style() {
         for radius in [0.01, 1784., 31999.] {
             let markers = PitMarkers::new(radius).unwrap();
-            let count: usize = markers.0.values().map(Vec::len).sum();
+            let count: usize = markers.sectors.values().map(Vec::len).sum();
             if radius == 1784. {
                 assert_eq!(count, 749);
             }
@@ -92,7 +139,7 @@ mod tests {
                 f64::from(sector) * 300. + f64::from(offset) * (300. / 256.) - 32550.
             };
             let mut points = Vec::new();
-            for (&sector, entries) in &markers.0 {
+            for (&sector, entries) in &markers.sectors {
                 let [sx, sy] = sector.to_be_bytes();
                 for &([rx, ry], food) in entries {
                     assert_eq!(encode::food_key(food.point).unwrap(), [sx, sy, rx, ry]);

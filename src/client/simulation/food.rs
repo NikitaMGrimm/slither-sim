@@ -214,16 +214,11 @@ impl SimulatorBackend {
     /// shows its first shown pellet in world order. Only new and changed
     /// listings are rebuilt, from the index.
     pub(super) fn sync_food_sectors(&mut self) -> Result<(), String> {
-        // Shrink follows the wire grid rather than rebuilding every tick;
-        // unchanged decorated handles then skip each recipient's food diff.
-        let pit = self.world.pit_radius();
-        let pit_changed = self
-            .pit_markers
-            .as_ref()
-            .is_some_and(|m| pit.is_none_or(|radius| m.needs_update(radius)));
-        if pit_changed {
-            self.pit_markers = pit.map(super::markers::PitMarkers::new).transpose()?;
-        }
+        let now = self.time();
+        let pit_changed = match (&mut self.pit_markers, self.world.pit_radius()) {
+            (Some(markers), Some(radius)) => markers.update(radius, now)?,
+            _ => false,
+        };
         // Taken so an early error drops a partly filled table.
         let mut buckets = std::mem::take(&mut self.food_buckets);
         buckets.resize(1 << 16, u32::MAX);
@@ -377,7 +372,13 @@ fn sector_changes(
                 !old.decorative && eaters.contains_key(&food_identity(old.point))
             })
         {
-            packets.push(encode::food_add(key(*offset), food.style));
+            if food.decorative {
+                // F uses the stock rapid fade without mislabelling decorations
+                // as snake food. Ordinary f births fade too slowly for a live edge.
+                packets.extend(encode::food_sector(sector, &[(*offset, food.style)]));
+            } else {
+                packets.push(encode::food_add(key(*offset), food.style));
+            }
         }
     }
 }
@@ -439,8 +440,9 @@ mod tests {
             }
             for (offset, food) in &current.0 {
                 if previous.get(offset).is_none() {
-                    let key = [sector[0], sector[1], offset[0], offset[1]];
-                    assert!(packets.contains(&encode::food_add(key, food.style)));
+                    assert!(
+                        packets.contains(&encode::food_sector(sector, &[(*offset, food.style)])[0])
+                    );
                 }
             }
         }

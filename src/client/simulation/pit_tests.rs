@@ -434,7 +434,7 @@ fn pit_markers_move_on_the_socket_to_the_live_pit_edge() {
 }
 
 #[test]
-fn shrinking_pit_keeps_decorated_handles_until_a_wire_cell_change() {
+fn shrinking_pit_keeps_decorated_handles_until_a_replacement_can_fade_in() {
     use std::{f64::consts::FRAC_PI_2, sync::Arc};
     let mut config = config();
     config.agents = 80;
@@ -483,9 +483,10 @@ fn shrinking_pit_keeps_decorated_handles_until_a_wire_cell_change() {
             .any(|p| matches!(p[0], b'f' | b'F' | b'c' | b'<'))
     );
 
-    // A complete radial wire-cell crossing still changes listings and packets.
+    // A replacement waits at least 500 ms; the previous generation stays while
+    // the rapid F additions mature.
     let mut changes = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..90 {
         sim.advance_ticks(1).unwrap();
         changes.extend(pump(&mut sim, &mut state));
         if !Arc::ptr_eq(
@@ -499,12 +500,16 @@ fn shrinking_pit_keeps_decorated_handles_until_a_wire_cell_change() {
         &held,
         sim.backend.decorated_food_sectors[sector].as_ref().unwrap()
     ));
-    assert!(changes.iter().any(|p| matches!(p[0], b'f' | b'c' | b'<')));
+    assert!(
+        changes
+            .iter()
+            .any(|p| matches!(p[0], b'F' | b'f' | b'c' | b'<'))
+    );
     let cell = f64::from(encode::SECTOR_SIZE) / 256.;
     let live = sim.backend.world.pit_radius().unwrap();
     assert!(food(&state, sim.time()).iter().all(|f| {
         let offset = f.point().distance(Point::default()) - live;
-        offset > 0. && offset < 3. + cell + 1.
+        offset > 0. && offset < 3. + cell + 24.
     }));
 
     // Growth cannot wait for a bucket: a previously safe decoration could be
@@ -592,5 +597,239 @@ fn admission_checkpoints_reject_space_beyond_the_available_seats() {
             Simulator::from_checkpoint(&serde_json::to_vec(&saved).unwrap(), Default::default())
                 .is_err()
         );
+    }
+}
+
+#[test]
+fn pit_minimap_defaults_and_explicit_overrides() {
+    for (json, side) in [
+        (r#"{}"#, 136),
+        (r#"{"world":{"preset":"battledome"}}"#, 256),
+        (
+            r#"{"world":{"preset":"battledome"},"minimapSide":136}"#,
+            136,
+        ),
+        (r#"{"minimapSide":256}"#, 256),
+        (
+            r#"{"world":{"preset":"battledome"},"minimapSide":null}"#,
+            256,
+        ),
+    ] {
+        let config: SimulationConfig = serde_json::from_str(json).unwrap();
+        config.validate().unwrap();
+        assert_eq!(config.minimap_side(), side);
+        let roundtrip: SimulationConfig =
+            serde_json::from_value(serde_json::to_value(config).unwrap()).unwrap();
+        assert_eq!(roundtrip.minimap_side(), side);
+    }
+}
+
+#[test]
+fn pit_map_masks_outer_snakes_keeps_inner_cells_and_live_outline() {
+    let mut sim = RawSimulator::new(7, config(), 1).unwrap();
+    let world = &mut sim.backend.world;
+    let map = |world: &Simulator| crate::client::Minimap::from_world(world, 256).unwrap();
+    // Only an outer snake: its entire centerline is hidden.
+    world
+        .correct_pose(
+            0,
+            Point { x: 2700., y: 0. },
+            vec![Point { x: 2600., y: 0. }; 26],
+            0.,
+        )
+        .unwrap();
+    let outer = map(world);
+    world.retire(0).unwrap();
+    let outline = map(world);
+    assert_eq!(outer, outline);
+    world.respawn(0, Point::default(), 0., 26).unwrap();
+    let inner = map(world);
+    assert!(inner.cells.iter().zip(&outline.cells).any(|(&a, &b)| a > b));
+    // A centerline crossing the edge cannot paint cells wholly outside it.
+    world
+        .correct_pose(0, Point::default(), vec![Point { x: 2800., y: 0. }; 26], 0.)
+        .unwrap();
+    let crossing = map(world);
+    for y in 0..256 {
+        for x in 0..256 {
+            let near = |v: usize| (v as f64 - 128.).max(0.).max(128. - (v + 1) as f64);
+            if near(x).hypot(near(y)) > world.pit_radius().unwrap() / world.radius() * 128. {
+                assert_eq!(crossing.cells[y * 256 + x], 0);
+            }
+        }
+    }
+}
+
+#[test]
+fn rolling_kill_board_retains_dead_disconnected_seats_until_expiry() {
+    use super::broadcast::Board;
+    let mut config = config();
+    config.agents = 4;
+    config.world.kill_score_seconds = Some(0.5);
+    let mut sim = RawSimulator::new(7, config, 4).unwrap();
+    let mut reader = browser(&mut sim);
+    sim.connect(
+        1,
+        PlayerAppearance {
+            nickname: b"Scorer".to_vec(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    sim.connect(2, PlayerAppearance::default()).unwrap();
+    // Synthetic retained kill timestamps exercise the same checkpoint-backed
+    // rolling-score owner as collision credits, without depending on bot play.
+    let mut saved = serde_json::to_value(sim.backend.world.checkpoint().unwrap()).unwrap();
+    saved["state"]["slots"][0]["killTimes"] = serde_json::json!([0.]);
+    saved["state"]["slots"][1]["killTimes"] = serde_json::json!([0., 0.]);
+    sim.backend
+        .world
+        .restore(&serde_json::to_vec(&saved).unwrap(), Default::default())
+        .unwrap();
+    sim.disconnect(1).unwrap();
+    sim.backend.world.retire(2).unwrap();
+    let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
+    assert_eq!(board.order, [(2., 1), (1., 0)]);
+    sim.backend.next_leaderboard = 0;
+    sim.advance_ticks(1).unwrap();
+    pump(&mut sim, &mut reader);
+    let frame = reader.frame(sim.time()).unwrap();
+    let board = frame.hud.leaderboard.unwrap();
+    assert_eq!(board.rank, 2);
+    assert_eq!(
+        board
+            .entries
+            .iter()
+            .map(|e| e.score.unwrap())
+            .collect::<Vec<_>>(),
+        [2., 1.]
+    );
+    assert_eq!(frame.observation.unwrap().me.score, 400.);
+    // Reusing the reserved seat keeps its existing rolling points.
+    sim.connect(1, PlayerAppearance::default()).unwrap();
+    assert_eq!(sim.backend.world.kill_score(1), Some(2));
+    sim.disconnect(1).unwrap();
+    sim.advance_ticks(72).unwrap();
+    let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
+    assert_eq!(board.order, [(0., 0)]);
+}
+
+/// Stock food lifetime model: pinned client newFood starts fr=0;
+/// F uses rsp=3, f uses rsp=1, and fr += rsp * elapsed_ms / (8 * 150).
+/// This checks emitted bytes and fade lifetimes, not browser pixels.
+#[derive(Default)]
+struct MarkerAges(std::collections::BTreeMap<[u8; 4], (f64, f64)>);
+impl MarkerAges {
+    fn apply(&mut self, packets: &[Vec<u8>], now: f64) {
+        for p in packets {
+            match p[0] {
+                b'F' => {
+                    for row in p[3..].as_chunks::<4>().0 {
+                        let key = [p[1], p[2], row[1], row[2]];
+                        assert!(
+                            self.0.insert(key, (now, 3.)).is_none(),
+                            "duplicate stock food ID"
+                        );
+                    }
+                }
+                b'f' | b'b' => {
+                    let key = p[1..5].try_into().unwrap();
+                    assert!(
+                        self.0
+                            .insert(key, (now, if p[0] == b'b' { 3. } else { 1. }))
+                            .is_none()
+                    );
+                }
+                b'c' | b'<' => {
+                    self.0.remove::<[u8]>(&p[1..5]);
+                }
+                b'w' => self.0.retain(|key, _| key[..2] != p[1..3]),
+                _ => {}
+            }
+        }
+    }
+    fn mature(&self, now: f64) -> usize {
+        self.0
+            .values()
+            .filter(|&&(born, rsp)| (now - born) * rsp >= 1.2)
+            .count()
+    }
+}
+
+#[test]
+fn stock_pit_markers_survive_growth_shrink_and_settle_with_time_to_fade() {
+    let mut results = Vec::new();
+    for wall in [8960., 17900.] {
+        for joined in [0., 1., 3.5] {
+            let mut config = config();
+            config.agents = 65;
+            config.world.radius_updates = vec![
+                crate::RadiusUpdate {
+                    time: 0.7,
+                    radius: wall,
+                },
+                // A recorded settle sample isolates delivery after radius change
+                // without running minutes of redundant physics in this regression.
+                crate::RadiusUpdate {
+                    time: 3.,
+                    radius: 3584.,
+                },
+            ];
+            let mut sim = RawSimulator::new(7, config, 65).unwrap();
+            while sim.time() < joined {
+                sim.advance_ticks(1).unwrap();
+            }
+            assert!(sim.connect(0, PlayerAppearance::default()).unwrap());
+            assert!(sim.backend.slots[0].connection.decorations);
+            let mut state = ClientState::new();
+            state.new_connection(sim.time()).unwrap();
+            let mut ages = MarkerAges::default();
+            let mut shrink_min = usize::MAX;
+            let mut settled_min = usize::MAX;
+            for _ in 0..715 {
+                let head = Point {
+                    x: if sim.time() < 3. && sim.time() + sim.backend.world.config().dt >= 3. {
+                        1784.
+                    } else {
+                        sim.backend.world.pit_radius().unwrap()
+                    } + 100.,
+                    y: 0.,
+                };
+                // Synthetic viewport follows the actual ring; no food is injected.
+                let (body, heading) = sim
+                    .backend
+                    .world
+                    .spawn_body(head, std::f64::consts::FRAC_PI_2)
+                    .unwrap();
+                sim.backend
+                    .world
+                    .correct_pose(0, head, body, heading)
+                    .unwrap();
+                sim.backend.slots[0].control.heading = heading;
+                sim.advance_ticks(1).unwrap();
+                let now = sim.time();
+                ages.apply(&pump(&mut sim, &mut state), now);
+                let received = food(&state, now);
+                assert_eq!(received.len(), ages.0.len());
+                // Allow stock's initial fade after join and the growth jump.
+                if now > (joined + 0.6).max(1.3) && now < 2.95 {
+                    shrink_min = shrink_min.min(ages.mature(now));
+                }
+                if now > (joined + 0.6).max(3.6) {
+                    settled_min = settled_min.min(ages.mature(now));
+                }
+            }
+            println!(
+                "stock-marker wall={wall} join={joined} shrinking_mature_min={shrink_min} settled_mature_min={settled_min} final_food={}",
+                ages.0.len()
+            );
+            results.push((joined, shrink_min, settled_min));
+        }
+    }
+    for (joined, shrinking, settled) in results {
+        if joined < 3. {
+            assert!(shrinking >= 20, "no mature ring during shrink: {shrinking}");
+        }
+        assert!(settled >= 20, "no mature ring after settling: {settled}");
     }
 }

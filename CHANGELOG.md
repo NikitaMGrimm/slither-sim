@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Changed
+
+- Stock leaderboards rank exact rolling kills in worlds with `killScoreSeconds`,
+  including dead/disconnected seats with recent kills. Pit minimaps hide outer
+  snake cells and default to 256; other worlds keep 136. **Breaking Rust config:**
+  `SimulationConfig.minimap_side` is now `Option<usize>` (`None` selects the mode
+  default, `Some(side)` overrides it); JSON accepts an integer or `null`.
+- Pit-edge pellets remain visible during shrink: overlap marker generations
+  while replacements use the stock rapid fade. Growth still replaces the ring
+  immediately; the short outward trail does not change the lethal boundary.
+
 ## [0.6.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.1...v0.6.2) - 2026-10-26
 
 ### Added
