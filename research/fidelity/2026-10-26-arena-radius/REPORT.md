@@ -73,7 +73,7 @@ files are replaced with ordinal labels, retaining byte sizes and hashes.
 hashes, all directory-level direction scores, motion summaries and selected
 connection bins. [Tables](tables.json) retain figure summaries; the
 [forecast summary](free-run-summary.json) retains all 114 connection scores,
-including holding's 20 losses. No per-row series or endpoint identities are
+including forecast-origin holding's 20 losses. No per-row series or endpoint identities are
 included. Hashes establish consistency, not scientific validity.
 
 ## Figures 1–3 condensed: official motion
@@ -100,7 +100,10 @@ Neither is a universal maximum or a replacement cap.
 **Figure 2.** `run4-radius-long-20260927/bot0.jsonl.gz`, connection 4, lasts
 401.676 s with 2,135 radius rows: 12,926–14,611 (1,685 units, 12.4% of the
 13,631 start), while reported players span 447–505. One observed shrink run
-lasts 81.332 s and removes 1,685 units. Selected 30-second bins:
+lasts 79.302 s and removes 1,684 units (14,610→12,926 at 320,066→399,368 ms;
+largest adjacent report gap 389 ms). Runs break at gaps over one second;
+unobserved movement across those gaps remains in interval totals only.
+Selected 30-second bins:
 
 | Time (s) | First → last radius | Observed min–max | Reported players |
 | --- | --- | --- | --- |
@@ -190,12 +193,14 @@ Official radius moves farther with fewer observed reversals in this segment.
 
 **Figure 10. Causal forecasts.** Initialize at the first observed radius with a
 fresh count, run the exact scalar capped rule in 7 ms steps with only the last
-available reported count, and compare holding the same initial radius. Evaluate
+available reported count, and compare **forecast-origin holding** at that same
+observation. This is not the setup radius; they differ in 113/114 eligible
+connections. Evaluate
 received radius rows for up to 180 s; require at least 60 s per connection.
 Later stale counts are carried causally. MAE weights rows within a connection,
 then connections equally; true living/socket counts remain unobserved.
 
-| Directory / selection | Connections | Count-controller MAE | Hold MAE |
+| Directory / selection | Connections | Count-controller MAE | Forecast-origin hold MAE |
 | --- | --- | --- | --- |
 | run4-radius-long-20260927 | 4 | 1,230.1 | 131.4 |
 | fidelity-followup-20260927 | 2 | 547.7 | 139.7 |
@@ -203,21 +208,65 @@ then connections equally; true living/socket counts remain unobserved.
 | All eligible connections | 114 | 519.6 | 211.3 |
 | Excluding calibration directory | 113 | 515.1 | 210.9 |
 
-Holding wins in 94/114 connections, or 93/113 excluding calibration. It loses
+Forecast-origin holding wins in 94/114 connections, or 93/113 excluding calibration. It loses
 in 20 and suppresses real waves. These descriptive errors under this
 initialization/receipt sampling do not validate a constant-radius official law.
 No fitted parameters enter these two forecasts.
+
+## Review correction and offline rerun
+
+The analysis published at `39ce3c8` counted gaps over one second at the start
+of a new run, overstating observed durations. The corrected accounting closes
+the old run at the preceding observation and starts after the gap, preserving
+its endpoint delta only in interval totals. Isolated changes across a sparse
+gap no longer count as observed nonzero runs. Duration summaries change in
+250/263 connections: pooled nonzero run count 8,012→554, median 1.504→6.038 s,
+p95 8.763→26.705 s and maximum 81.332→79.302 s. The larger median reflects
+the removal of gap-only runs, not a change in recorded motion.
+
+The Figure 2 witness previously included a 2.030 s gap (318,036→320,066 ms,
+14,611→14,610) and reported 81.332 s / 1,685 units. Its corrected observed
+portion is 79.302 s / 1,684 units. The overall 12,926–14,611 range is unchanged.
+That connection's nonzero-run summary changes from 77 to 15 runs, median
+1.504→18.554 s, p95 23.221→79.302 s. These duration summaries use adjacent
+reports at most one second apart; they do not establish continuous hidden motion.
+
+The published `held_initial` / `held_initial_mae` and `hold_initial_*` labels
+actually described holding at the first usable-count forecast origin. They are
+now named `forecast_origin_hold` / `forecast_origin_hold_mae` and
+`forecast_origin_hold_*`, with origin time/radius retained per connection.
+No setup-radius baseline is added. Every prediction and error is unchanged:
+the 94/114 wins and 211.3-versus-519.6 mean MAE belong to forecast-origin
+holding, not setup-radius holding. The same distinction applies to the 93/113
+holdout wins and 210.9-versus-515.1 mean MAE.
+
+All 91 original archive hashes and the pinned historical source/decoder files
+were verified before rerunning extraction, every candidate/forecast and the
+independent byte audit offline. The same 53 completed archives and 263
+connections qualify; interval totals, cadence, ranges, direction windows and
+other model scores remain unchanged. Synthetic simulation output was reused
+unchanged; no simulator rerun or new capture was needed for these analysis fixes.
+[Review correction results](review-corrections.json) retain before/after duration
+summaries, the selected witness, and hashes of the previous published artifacts.
+Updated selected results and tables carry the corrected analysis script hash;
+their historical simulator/decoder source commit remains `8890b2e`.
+Rerun method pins now name the bundled `methods/*` files' LF bytes; earlier
+selected pins named the original `historical-tools/*` CRLF bytes. The method
+code is unchanged after newline normalization; both byte hashes are retained
+in the correction results.
 
 ## Reproduction and verification
 
 The source commit and source hashes are in [results.json](results.json);
 compressed archive hashes are in [source-inventory.json](source-inventory.json).
-The three method scripts ([global](methods/analyze-global-radius.py), [dynamics](methods/analyze-radius-dynamics.py), [motion](methods/analyze-radius-motion.py)) are exact historical copies matching those
-pins. `analyze.py` now reads those bundled methods and omits unused endpoint
+The three method scripts ([global](methods/analyze-global-radius.py), [dynamics](methods/analyze-radius-dynamics.py), [motion](methods/analyze-radius-motion.py)) retain the historical code with LF line endings, matching the rerun
+pins. `analyze.py` reads those bundled methods and omits unused endpoint
 group identifiers; `tabulate.py` takes an explicit output directory. Their
-numeric methods are unchanged. The standalone [driver](simulation/src/main.rs)
+originally retained numerical methods are unchanged except for the reviewed
+run-gap correction above; forecast calculations are only relabeled. The standalone [driver](simulation/src/main.rs)
 now opts into `dynamic_radius` explicitly and uses a relative dependency path.
-Selected artifacts are summaries of the original run, not a new capture.
+Selected artifacts now summarize the corrected offline rerun of the original
+recordings, not a new capture; simulation figures retain the original output.
 
 Raw inputs are restricted; reproduction of official-data results requires
 owner-provided access to the pinned archive tree. No download or collection
@@ -252,11 +301,18 @@ tests, the 790-sample radius replay regression and the synthetic driver's zero
 unexpected-death assertion. These establish decoding/replay/driver consistency,
 not a faithful controller. This implementation adds focused default/host and
 checkpoint regressions; the PR records its actual build/test results. No new
-official-data analysis or independent scientific review is claimed.
+capture or independent scientific review is claimed.
 
 Placement verification reran the explicit-opt-in driver: all 1,802 saved rows
 and the terminal summary match the original output exactly. The repackaged
 tabulator reproduces every table value, and the selector reproduces all selected
 JSON, including the redacted inventory. Every one of the 114 forecast row sets
 was checked against its retained MAE summary. Full raw-data analysis and byte
-audit were not rerun during placement; the checks above use retained outputs.
+audit were not rerun during initial placement; the review correction above
+subsequently reran both. Four synthetic analysis regressions cover long gaps,
+terminal gaps, direction changes and forecast-origin initialization and run in
+the tools CI group:
+
+```sh
+uv run --locked --offline --only-group tools python -B -m unittest discover -s tools/fidelity -p test_arena_radius_study.py
+```

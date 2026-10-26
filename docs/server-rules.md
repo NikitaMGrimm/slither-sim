@@ -153,7 +153,8 @@ observed slope as a cap. The retrospective, exploratory
 [radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md)
 finds sustained official waves (12,926–14,611 units over about 400 s at 447–505
 reported players), versus frequent death/respawn reversals in the local
-controller. Holding the initial radius beats the reported-count controller in
+controller. Forecast-origin holding (the first usable-count radius, not the
+setup radius) beats the reported-count controller in
 94/114 connection forecasts (mean MAE 211 versus 520 units), but loses in 20 and
 suppresses real waves. No tested population, EMA, clock or load proxy identifies
 the official controller, so official worlds hold their

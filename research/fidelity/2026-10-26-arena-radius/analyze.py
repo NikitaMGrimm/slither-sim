@@ -171,6 +171,11 @@ def connection_summary(c):
         if direction != last_sign or dt > 1000:
             if run_start is not None:
                 runs.append({'direction': last_sign, 'seconds': (a['S']-run_start)/1000, 'delta': run_delta})
+            if dt > 1000:
+                # The endpoint delta remains in interval totals, but the gap
+                # supplies neither duration nor movement to an observed run.
+                run_start, run_delta, last_sign = b['S'], 0, 0
+                continue
             run_start, run_delta, last_sign = a['S'], 0, direction
         run_delta += dr
     if intervals and run_start is not None:
@@ -241,6 +246,8 @@ def free_run(c):
     selected = [r for r in rows if r['S'] <= origin+180000]
     bi = max(0, bisect.bisect_right([b['S'] for b in boards], origin)-1)
     radius = selected[0]['radius']
+    # Forecast-origin holding, not the setup radius: both forecasts start only
+    # once a usable count report is causally available.
     fixed = radius
     time = origin
     preds = []
@@ -251,10 +258,11 @@ def free_run(c):
             target = 670*math.sqrt(max(1, boards[bi]['players']))
             radius += max(-3/128*7, min(3/128*7, target-radius))
             time += 7
-        preds.append({'S': r['S'], 'observed': r['radius'], 'reported_population_model': radius, 'held_initial': fixed})
-    return {'seconds': (selected[-1]['S']-origin)/1000, 'samples': len(selected),
+        preds.append({'S': r['S'], 'observed': r['radius'], 'reported_population_model': radius, 'forecast_origin_hold': fixed})
+    return {'forecast_origin_ms': origin, 'forecast_origin_radius': fixed,
+            'seconds': (selected[-1]['S']-origin)/1000, 'samples': len(selected),
             'population_model_mae': st.mean(abs(p['reported_population_model']-p['observed']) for p in preds),
-            'held_initial_mae': st.mean(abs(p['held_initial']-p['observed']) for p in preds),
+            'forecast_origin_hold_mae': st.mean(abs(p['forecast_origin_hold']-p['observed']) for p in preds),
             'population_model_end_error': preds[-1]['reported_population_model']-preds[-1]['observed'],
             'rows': preds}
 

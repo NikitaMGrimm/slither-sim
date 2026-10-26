@@ -87,6 +87,9 @@ comparison = {str(step): {'synthetic_0_180s': held_samples(samples, 'radius', 't
               for step in (.128, 1, 5)}
 source_pin = {v['label']: v['sha256'] for v in r['source_pins']}
 out = {'proxies': proxies, 'model_macro': model_macro, 'simulation_summary': summary,
+       'long_connection_nonzero_run_seconds': next(
+           c['nonzero_run_seconds'] for c in cs
+           if c['archive'] == 'run4-radius-long-20260927/bot0.jsonl.gz' and c['conn'] == 4),
        'simulation_bins_30s': simulation_bins, 'pulse_2s': pulse, 'comparison_sampling': comparison,
        'simulation_samples': {'min_radius': min(p['radius'] for p in samples),
                               'max_radius': max(p['radius'] for p in samples),
@@ -103,13 +106,13 @@ out = {'proxies': proxies, 'model_macro': model_macro, 'simulation_summary': sum
                    'growth_intervals': sum(p['growth'] for p in cs), 'shrink_intervals': sum(p['shrink'] for p in cs),
                    'same_intervals': sum(p['same'] for p in cs)},
        'free_run_all': {'connections': len(free_runs),
-                        'hold_initial_lower_mae': sum(v['held_initial_mae'] < v['population_model_mae'] for v in free_runs),
+                        'forecast_origin_hold_lower_mae': sum(v['forecast_origin_hold_mae'] < v['population_model_mae'] for v in free_runs),
                         'population_model_mean_connection_mae': st.mean(v['population_model_mae'] for v in free_runs),
-                        'hold_initial_mean_connection_mae': st.mean(v['held_initial_mae'] for v in free_runs)},
+                        'forecast_origin_hold_mean_connection_mae': st.mean(v['forecast_origin_hold_mae'] for v in free_runs)},
        'free_run_holdout': {'connections': len(holdout_free_runs),
-                            'hold_initial_lower_mae': sum(v['held_initial_mae'] < v['population_model_mae'] for v in holdout_free_runs),
+                            'forecast_origin_hold_lower_mae': sum(v['forecast_origin_hold_mae'] < v['population_model_mae'] for v in holdout_free_runs),
                             'population_model_mean_connection_mae': st.mean(v['population_model_mae'] for v in holdout_free_runs),
-                            'hold_initial_mean_connection_mae': st.mean(v['held_initial_mae'] for v in holdout_free_runs)},
+                            'forecast_origin_hold_mean_connection_mae': st.mean(v['forecast_origin_hold_mae'] for v in holdout_free_runs)},
        'pins': source_pin}
 with (STUDY/'tables.json').open('x', encoding='utf-8', newline='\n') as stream:
     json.dump(out, stream, indent=2, allow_nan=False)

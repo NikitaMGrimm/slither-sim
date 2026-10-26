@@ -124,6 +124,13 @@
     "target_variation": 41092.140588182156,
     "total_variation": 4114.386320400643
   },
+  "long_connection_nonzero_run_seconds": {
+    "n": 15,
+    "min": 1.014,
+    "median": 18.554,
+    "p95": 79.302,
+    "max": 79.302
+  },
   "simulation_bins_30s": [
     {
       "start_s": 0,
@@ -410,15 +417,15 @@
   },
   "free_run_all": {
     "connections": 114,
-    "hold_initial_lower_mae": 94,
+    "forecast_origin_hold_lower_mae": 94,
     "population_model_mean_connection_mae": 519.6270125906736,
-    "hold_initial_mean_connection_mae": 211.32016097063
+    "forecast_origin_hold_mean_connection_mae": 211.32016097063
   },
   "free_run_holdout": {
     "connections": 113,
-    "hold_initial_lower_mae": 93,
+    "forecast_origin_hold_lower_mae": 93,
     "population_model_mean_connection_mae": 515.0666834835473,
-    "hold_initial_mean_connection_mae": 210.87265010409675
+    "forecast_origin_hold_mean_connection_mae": 210.87265010409675
   },
   "pins": {
     "src/simulator.rs": "fd110e431195b88a5f74e283fb3297e5fe160e241bdfbe326ee795da3e7aeae6",
@@ -430,10 +437,10 @@
     "tests/fixtures/arena-radius-updates.json": "d3200c00ed54c14415d472747aa66fe15c71b149a55f406d0bd2e5536384ced7",
     "tools/fidelity/slither_protocol.py": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
     "uv.lock": "b73541db469e2d1d20744a177642e2e0dbe05e1ffeeeafd469bc809092467559",
-    "historical-tools/analyze-global-radius.py": "fd9cb60bec31a47f058b145c1f25a3ce5d3c2b796c327812c1b837f8896ad2c9",
-    "historical-tools/analyze-radius-dynamics.py": "761d2d530fefef6c331151e569adaab703bb97396955bb6ff6d088e28116a932",
-    "historical-tools/analyze-radius-motion.py": "0032ebfb74474cdc969d20c6e9ef88480485084934a5153eba7153eff4aa8405",
-    "analyze.py": "c462cc05cf4c618504f9fcbf4f6d4ec4c9b5edd2d22e3da7a2631fb154e4fe9a",
+    "methods/analyze-global-radius.py": "24b0ab56cda0f914d76c71a0c3862c5ac248681df322164a1f5213d55ab88816",
+    "methods/analyze-radius-dynamics.py": "41543d11562dbee890cb5c3b63d91a4f4dba76e61e60cd874f081fa5761fea80",
+    "methods/analyze-radius-motion.py": "da178e7b741d21ad2275a32323bffc181fafd0beb44f424817cde240c5faed1c",
+    "analyze.py": "a74cbc07b7f0c88fd66d567e8633be4b187bf6f1e04252fef75e0fc2ecf1a2c1",
     "PLAN.md": "b71d8754df76e093d40993c5f21df959cf0e869ae73b8ee4d2c533d391376496"
   }
 }
