@@ -113,10 +113,11 @@
   from physics and sockets. The `host_load` example measures simulation load,
   deferred ticks and extra delivery delay
   ([hosting](docs/raw-server.md#embedding-and-load-checks)).
-- `SimulationConfig.delivery` chooses when visible state is sent: `official`
-  (the default) keeps the measured pacing, and `responsive`, our own design and
-  the Battledome default in JSON configs, sends steering, speed and mass changes
-  in the next frame ([configuration](docs/configuration.md#simulationconfig)).
+- `SimulationConfig.delivery` chooses when visible state is sent. The default,
+  `responsive`, is our own design and sends steering, speed and mass changes in
+  the next frame; `official` keeps the measured pacing. Train bots meant for
+  official servers with `official`
+  ([configuration](docs/configuration.md#simulationconfig)).
 - A localhost-only host/capture/compare command records transport baselines and
   checks them against official-reference gates
   ([transport parity](docs/research-workflow.md#transport-parity)).
@@ -137,8 +138,8 @@
   apart, mass 84 ms apart, motion before mass in one frame, a 3 s prey gap);
   simulator cadence rules and defaults are unchanged
   ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
-- Gameplay updates go out every physics tick (7 ms by default) with measured
-  per-family pacing: motion and standalone mass changes at least 6 and 15 ticks
+- Gameplay updates go out every physics tick (7 ms by default). `official`
+  delivery uses measured per-family pacing: motion and standalone mass changes at least 6 and 15 ticks
   apart per snake, anchors at once, ambient food on the shared 504 ms maintenance cycle and
   prey corrections on one clock per prey. These are partial models
   ([packet timing](docs/server-rules.md#packet-timing)).

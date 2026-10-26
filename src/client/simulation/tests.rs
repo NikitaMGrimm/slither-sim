@@ -1787,7 +1787,11 @@ const ANCHORS: &[u8] = b"gn=+";
 
 #[test]
 fn motion_reports_share_one_gate_per_snake_and_lead_its_anchors() {
-    let mut sim = RawSimulator::new(5, raw_config(3), 3).unwrap();
+    let config = SimulationConfig {
+        delivery: DeliveryProfile::Official,
+        ..raw_config(3)
+    };
+    let mut sim = RawSimulator::new(5, config, 3).unwrap();
     let mut a = Remote::connect(&mut sim, 0, "A");
     let mut b = Remote::connect(&mut sim, 1, "B");
     let mut mover = Remote::connect(&mut sim, 2, "Mover");
@@ -1846,7 +1850,11 @@ fn motion_reports_share_one_gate_per_snake_and_lead_its_anchors() {
 
 #[test]
 fn standalone_mass_reports_wait_for_their_opportunity() {
-    let mut sim = RawSimulator::new(5, raw_config(2), 2).unwrap();
+    let config = SimulationConfig {
+        delivery: DeliveryProfile::Official,
+        ..raw_config(2)
+    };
+    let mut sim = RawSimulator::new(5, config, 2).unwrap();
     let mut a = Remote::connect(&mut sim, 0, "A");
     let mut mover = Remote::connect(&mut sim, 1, "Mover");
     run(&mut sim, &mut [(0, &mut a), (1, &mut mover)], 60);
@@ -1947,6 +1955,7 @@ fn prey_corrections_share_one_clock_across_viewers() {
 fn post_death_opponents_keep_the_live_broadcast_cadence() {
     for rtt in [0., 0.1] {
         let mut config = raw_config(2);
+        config.delivery = DeliveryProfile::Official;
         config.latency.round_trip_seconds = vec![rtt];
         config.minimap_interval_seconds = 0.01;
         let interval = MOTION_REPORT_TICKS as f64 * config.world.dt;

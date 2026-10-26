@@ -254,6 +254,9 @@ uv run --locked --only-group tools python tools/fidelity/transport_parity.py com
 uv run --locked --only-group tools python tools/fidelity/local_capture.py --config arena.json --seconds 60 --out outputs/local-transport
 ```
 
+Set `"delivery": "official"` under `simulation` in that host config; the default
+responsive pacing is not official behavior.
+
 `measure` accepts multiple captures, records input/decoder/census/tool SHA-256s
 and reports per-capture/setup-epoch and pooled statistics. `compare` prints four
 initial gates; exit 1 means failure (including insufficient samples), 2 invalid
