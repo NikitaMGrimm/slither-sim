@@ -411,6 +411,37 @@ impl Minimap {
         Ok(map)
     }
 
+    /// Live-radius map for the stock client's live-radius own-player marker.
+    /// The pit edge shares that projection; proportional growth keeps its cells.
+    pub fn from_world(world: &crate::Simulator, side: usize) -> Result<Self, String> {
+        let mut map = Self::from_snakes(
+            world.snakes(),
+            &Arena {
+                center: Point::default(),
+                radius: world.radius(),
+            },
+            side,
+        )?;
+        if let Some(pit) = world.pit_radius() {
+            let radius = pit / world.radius() * side as f64 / 2.;
+            let center = side as f64 / 2.;
+            for y in 0..side {
+                for x in 0..side {
+                    let near = |v: usize| (v as f64 - center).max(0.).max(center - (v + 1) as f64);
+                    let far = |v: usize| {
+                        (v as f64 - center)
+                            .abs()
+                            .max(((v + 1) as f64 - center).abs())
+                    };
+                    if near(x).hypot(near(y)) <= radius && far(x).hypot(far(y)) >= radius {
+                        map.cells[y * side + x] = 1;
+                    }
+                }
+            }
+        }
+        Ok(map)
+    }
+
     /// Simulator approximation: rasterize live body centerlines to a binary grid.
     /// The original server's aggregation rule is unavailable; this is not a food map.
     /// Returns an error unless `side` is in 1..=512.

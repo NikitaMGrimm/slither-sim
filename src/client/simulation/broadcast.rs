@@ -9,7 +9,7 @@ use super::{
 use crate::{
     Simulator,
     client::{Minimap, encode},
-    model::{Arena, Point, Snake},
+    model::Snake,
     physics,
     simulator::PickupItem,
 };
@@ -519,14 +519,7 @@ impl SimulatorBackend {
             return Ok(None);
         }
         if map.is_none() {
-            *map = Some(Minimap::from_snakes(
-                self.world.snakes(),
-                &Arena {
-                    center: Point::default(),
-                    radius: self.world.radius(),
-                },
-                self.config.minimap_side,
-            )?);
+            *map = Some(Minimap::from_world(&self.world, self.config.minimap_side)?);
         }
         let map = map.as_ref().expect("minimap was just constructed");
         let mut packet = encode::minimap(map);

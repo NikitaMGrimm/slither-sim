@@ -385,11 +385,12 @@ impl Simulator {
         self.check_join()?;
         self.reserve_slots(1)?;
         let slot = self.snakes.len();
+        let pit_entered = self.initial_pit_entry(snake.head, snake.alive);
         self.snakes.push(snake);
         self.boosts.push(Boost::default());
         self.speeds.push(speed);
         self.kiosks.push(KioskState::default());
-        self.pit_entered.push(false);
+        self.pit_entered.push(pit_entered);
         self.kill_times.push(VecDeque::new());
         self.death_times.push(None);
         self.joins.push(self.next_join);
@@ -537,12 +538,13 @@ impl Simulator {
         let (mut snake, speed) = self
             .replay_snake(String::new(), life)
             .map_err(|e| e.at_slot(slot))?;
+        let pit_entered = self.initial_pit_entry(snake.head, snake.alive);
         snake.id = std::mem::take(&mut self.snakes[slot].id);
         self.snakes[slot] = snake;
         self.speeds[slot] = speed;
         self.boosts[slot] = Boost::default();
         self.kiosks[slot] = KioskState::default();
-        self.pit_entered[slot] = false;
+        self.pit_entered[slot] = pit_entered;
         self.death_times[slot] = None;
         self.joins[slot] = self.next_join;
         self.next_join += 1;

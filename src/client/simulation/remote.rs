@@ -69,6 +69,29 @@ impl RawSimulator {
         }
     }
 
+    pub(crate) fn grow_for_waiters(
+        &mut self,
+        waiting: usize,
+        waited: f64,
+        permitted: bool,
+    ) -> bool {
+        let seats = self.backend.world.occupied() + waiting;
+        // Above the base population, a stalled queue receives more space at
+        // two and four seconds instead of weaker collision/departure checks.
+        // The live radius already checkpoints this temporary allowance.
+        let allowance =
+            if self.backend.world.config().min_score.is_none() || seats <= 32 || waited < 2. {
+                1.
+            } else if waited < 4. {
+                1.5
+            } else {
+                2.
+            };
+        self.backend
+            .world
+            .grow_for_seats(seats, allowance, permitted)
+    }
+
     /// Start a new session and life in `slot`, replacing any existing one and
     /// its in-flight messages. The server answers with setup once the connect
     /// arrives; the first broadcast after it begins with the slot's own snake.

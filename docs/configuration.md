@@ -54,7 +54,7 @@ both delays.
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
 
 The host applies [population sizing](#population-sizing) to `bots.count` at
-startup; reserved, disconnected player seats do not enlarge it. A host with no
+startup; reserved, disconnected player seats do not enlarge it. An official host with no
 bots starts at radius 670. Connected players then contribute to live occupancy.
 
 ## SimulationConfig
@@ -89,7 +89,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | Field | Default | Meaning / limits |
 | --- | --- | --- |
 | `radius` | `670` | Initial arena radius after startup sizing; positive, finite and at most `1e150`. Live radius is separate runtime state. |
-| `dynamicRadius` | `true` | Follow occupied seats (`670 × sqrt(max(occupied, 1))`): grow at once, shrink at at most 23.4375 units/s, moving only outside a 3% dead zone of the current radius. Food/refill/prey targets follow live area. A product model, not an identified official law. Sandbox, Battledome and explicit JSON `radius` default to false. |
+| `dynamicRadius` | `true` | Follow occupied seats (`670 × sqrt(max(occupied, 1))`): grow at once, shrink at at most 23.4375 units/s, moving only outside a 3% dead zone of the current radius. Food/refill/prey targets follow live area. A product model, not an identified official law. Sandbox and explicit JSON `radius` default to false; Battledome uses its [circular floor policy](#battledome). |
 | `sizeToPopulation` | `true` | Runtimes enlarge this arena to fit their population at creation, scaling food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. See [population sizing](#population-sizing). |
 | `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
 | `foodCount` | `109` | Refill target/startup placement attempts. Admission limits can reduce placement; memory bounds it. |
@@ -229,15 +229,48 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 
 | Setting | Value | Mode rule and rationale |
 | --- | --- | --- |
-| Outer wall | `radius: 3584`, `dynamicRadius: false` | Author-chosen fixed arena; inherited boundary behavior |
-| Pit | `pit.radius: 1784`; entry allowed, exit lethal | Author-chosen one-way boundary |
+| Outer wall | `radius: 3584`, `dynamicRadius: true` | Base size through 32 seats; grows above it using the seat controller described below |
+| Pit | Reference `pit.radius: 1784`; entry allowed, exit lethal | Scales with the live wall; the one-way rule is unchanged |
 | Size floor | `minScore: 400` | Permanent minimum size, including newborns |
-| Spawn band | `spawnRadius: 2684`, `spawnRadiusMax: 3400` | Outside the old ring; at least 2.12 s at maximum boost or 5.04 s at normal newborn speed before the 60-unit wall margin along a straight tangent |
+| Spawn band | Reference `spawnRadius: 2684`, `spawnRadiusMax: 3400` | Both radii scale with the wall; at base size the outer tangent leaves 2.12 s at maximum boost or 5.04 s at normal speed before the 60-unit wall margin |
 | Spawn body | 26 anchors, 42 units apart along its own circle, tangent heading | 400-unit body clearance and the circular safety checks below; wait when sampled poses fail |
 | Kill score | `killScoreSeconds: 900` | +1 per credited kill for 15 minutes; retained across lives so death does not erase recent kills |
 | Death food | Only the fraction of mass above `minScore`; pit and body deaths | Prevents free floor mass becoming food each life; wall deaths still drop none |
 | Prey | `prey.count: 0` | Snakes only |
-| Ambient food | `foodCount: 3138`, about 45.9 attempts/s; `ambientRefillCountsAllFood: true` | Death/boost pellets also fill the target; inherited admission caps |
+| Ambient food | Reference `foodCount: 3138`, about 45.9 attempts/s; `ambientRefillCountsAllFood: true` | Live target/refill follow area; death/boost pellets also fill the target, with inherited admission caps |
+
+Above 32 seats the wall target is `3584 × (1 + 1.5 × (seats / 32 - 1))`:
+4,928, 8,960 and 11,648 units at 40, 64 and 80 seats. Seats count living
+players, dead players who can respawn and, before a host spawn search, queued
+joins. Pit and spawn band scale with the wall, so newborns keep room for their
+whole body and a safe departure; above 32 seats the arena is less dense. Growth
+is immediate; shrinking runs at 23.4375 units/s and ignores changes within 3%
+of the live radius.
+
+After a spawn request has waited 2 seconds, the host may grow the wall to 1.5
+times the seat target, and after 4 seconds to twice it. Every strict safety
+check still applies. Before growing further, the host waits until the latest
+newborn has had its 3-second departure window, pausing admissions meanwhile.
+Waiting players come before bots, and at most one 4,096-candidate search runs
+per tick (14 ms after a failure). These limits bound work and space, not the
+worst-case wait: a crowd can still block every sampled pose. Queue age is host
+state; checkpoints store only the live radius.
+
+`dynamicRadius: false` restores the fixed arena with strict waiting. With
+growth on, the host accepts up to 105 configured seats so the largest allowance
+stays inside the 32,000-unit wire limit. Other worlds that set `dynamicRadius`,
+`spawnRadius` and `minScore` use the same controller and scale their pit and
+spawn radii with the wall; worlds missing any of them keep their geometry.
+
+In fresh 16–32-seat worlds the wall, pit, spawn band, food density and
+spawn-to-pit travel (about 4.9–8.8 s at normal speed) are unchanged. After a
+large population leaves, the arena shrinks gradually. The
+[local capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)
+compares fixed strict admission, fixed-arena relaxation and strict growth.
+
+When the growing pit passes over a snake that hasn't entered it, the snake can
+still leave. Crossing the edge inward, or starting inside, commits it to the
+one-way rule as before.
 
 The pit tests the head center's swept path each tick: after entering distance
 `< r`, reaching `r` kills with reason `pit` and no credited killer, including
@@ -281,10 +314,17 @@ Rust `Observation` omits the rolling score. Geometric frames carry pit
 geometry and the floor setting in [`rules`](bot-api.md#frames); `Observation`
 and portable `ClientFrame` omit them, so retain world config separately. Portable clients receive per-life kills and the size-based
 leaderboard, without rolling kill score or distinct pit death reason.
-The stock browser shows the pit edge as a ring of 749 decorative pellets:
+At the base size the stock browser shows the pit edge as 749 decorative pellets:
 centers 3 units outside the pit, about 15 units apart, palette 8, size byte 31
 (6.2). These are design choices. Markers cannot be eaten and follow normal
-sector delivery. Bots get only real food, including any pellet a marker hides in
+sector delivery. On radius changes the old decorations are removed and new
+ones follow the live pit edge. During shrink, their cached radius updates at
+food-grid steps (`300 / 256` units), leaving less than one cell of extra outward
+offset. Growth past the cached edge refreshes immediately. Unchanged listings
+keep their handles so recipients skip redundant food diffs. The minimap uses
+the live wall for both snakes and pit: proportional pit growth keeps its raster
+cells fixed while the stock
+own-player marker remains aligned. Bots get only real food, including any pellet a marker hides in
 the browser. The stock browser has no rolling kill-score display.
 
 ### Prey
@@ -518,7 +558,8 @@ measured range.
 
 `Simulator::rules()` and each geometric frame expose boundary mode, optional pit
 radius, minimum score, kill-score window and whether boost is free at that floor.
-They describe effective validated settings after overrides, and stay immutable
-for the world's lifetime. Live radius remains separate. Raw Rust bot drivers
+They describe effective validated settings after overrides. The pit radius is
+live geometry in circular floor worlds; the other settings remain fixed for
+the world's lifetime. Live wall radius remains separate. Raw Rust bot drivers
 use `geometric_context(slot)` for these rules plus their own rolling kill score;
 `Observation` and portable received-state frames are unchanged.

@@ -584,7 +584,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
     let sectors = std::f64::consts::PI * 3584.0 * 3584.0 / 90_000.0;
     assert_eq!(config.food_count, (7.0 * sectors) as usize);
     assert_eq!(config.ambient_replenish_per_second, 0.1024 * sectors);
-    assert_eq!((config.radius, config.dynamic_radius), (3584.0, false));
+    assert_eq!((config.radius, config.dynamic_radius), (3584.0, true));
     assert_eq!(config.pit, Some(PitConfig { radius: 1784.0 }));
     assert_eq!(config.kill_score_seconds, Some(900.0));
     assert_eq!(config.prey.count, 0);
@@ -1457,4 +1457,291 @@ fn direct_deserialize_uses_the_preset_aware_trait() {
     );
     assert_eq!(direct.radius, 4000.);
     assert_eq!(direct.pit, Config::battledome().pit);
+}
+
+#[test]
+fn seat_following_keeps_the_usual_battledome_geometry_and_grows_above_32() {
+    use slither_sim::{InitialPopulation, Placement, WorldOptions};
+    for seats in [16, 32, 40, 64, 80] {
+        let mut config = Config::battledome();
+        config.food_count = 0;
+        config.ambient_replenish_per_second = 0.;
+        let mut world = Simulator::new(WorldOptions {
+            config,
+            population: InitialPopulation::Placed {
+                ids: (0..seats).map(|i| i.to_string()).collect(),
+                placement: Placement::TestRing,
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let before = world.snakes()[0].head;
+        world.step(&straight(&world)).unwrap();
+        let factor = 1. + 1.5 * (seats.max(32) as f64 / 32. - 1.);
+        assert_eq!(world.radius(), 3584. * factor);
+        assert_eq!(world.pit_radius(), Some(1784. * factor));
+        assert_eq!(world.rules().pit_radius, world.pit_radius());
+        for u in [0., 0.5, 1.] {
+            let actual = spawn::spawn_distance(world.config(), world.radius(), u);
+            let reference = spawn::spawn_distance(world.config(), 3584., u);
+            assert_eq!(actual, reference * factor);
+        }
+        // Geometry changes don't teleport or stretch snakes.
+        assert!(world.snakes()[0].head.distance(before) < 2.);
+        assert_eq!(world.config().min_score, Some(400));
+        assert_eq!(world.config().kill_score_seconds, Some(900.));
+        if seats > 32 {
+            for slot in 32..seats {
+                world.retire(slot).unwrap();
+            }
+            let before = world.radius();
+            world.step(&straight(&world)).unwrap();
+            assert_eq!(world.radius(), before - 23.4375 * world.config().dt);
+            let saved = serde_json::to_vec(&world.checkpoint().unwrap()).unwrap();
+            let mut restored = Simulator::from_checkpoint(&saved, Default::default()).unwrap();
+            for _ in 0..100 {
+                let actions = straight(&world);
+                world.step(&actions).unwrap();
+                restored.step(&actions).unwrap();
+            }
+            assert_eq!(
+                serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+                serde_json::to_value(restored.checkpoint().unwrap()).unwrap()
+            );
+        }
+    }
+}
+
+#[cfg(feature = "networking")]
+#[test]
+fn the_pit_edge_keeps_its_minimap_cells_as_the_live_wall_grows() {
+    use slither_sim::{InitialPopulation, RadiusUpdate, WorldOptions, client::Minimap};
+    let mut config = Config::battledome();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.;
+    config.radius_updates = vec![RadiusUpdate {
+        time: 0.007,
+        radius: 8960.,
+    }];
+    let mut world = Simulator::new(WorldOptions {
+        config,
+        population: InitialPopulation::Empty,
+        ..Default::default()
+    })
+    .unwrap();
+    for side in [80, 136, 512] {
+        let initial = Minimap::from_world(&world, side).unwrap();
+        assert!(initial.cells.iter().any(|&c| c != 0));
+        for radius in [4928., 7168., 8960., 11648., 23296.] {
+            let mut config = world.config().clone();
+            config.radius_updates[0].radius = radius;
+            let mut grown = Simulator::new(WorldOptions {
+                config,
+                population: InitialPopulation::Empty,
+                ..Default::default()
+            })
+            .unwrap();
+            grown.step(&[]).unwrap();
+            assert_eq!(grown.radius(), radius);
+            assert_eq!(grown.pit_radius(), Some(1784. * (radius / 3584.)));
+            assert_eq!(
+                initial.cells,
+                Minimap::from_world(&grown, side).unwrap().cells
+            );
+        }
+        // A fixed physical edge would move inward in the live-radius raster.
+        let projected = |r: f64, wall: f64| ((r / wall + 1.) * side as f64 / 2.).floor();
+        assert_ne!(projected(1784., 3584.), projected(1784., 8960.));
+    }
+    // The player shares the live-radius projection, rather than the initial one.
+    world.step(&[]).unwrap();
+    let head = Point { x: 7000., y: 0. };
+    let (body, heading) = world.spawn_body(head, FRAC_PI_2).unwrap();
+    world.spawn("marker".into(), body, heading).unwrap();
+    let side = 136;
+    let index =
+        side / 2 * side + ((head.x / world.radius() + 1.) * side as f64 / 2.).floor() as usize;
+    assert_eq!(Minimap::from_world(&world, side).unwrap().cells[index], 1);
+}
+
+#[test]
+fn the_one_way_pit_tests_the_live_edge_after_growth() {
+    use slither_sim::{InitialPopulation, RadiusUpdate, WorldOptions};
+    let mut config = Config::battledome();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.;
+    config.radius_updates = vec![RadiusUpdate {
+        time: 0.,
+        radius: 7168.,
+    }];
+    let mut world = Simulator::new(WorldOptions {
+        config,
+        population: InitialPopulation::Empty,
+        ..Default::default()
+    })
+    .unwrap();
+    let head = Point { x: 2500., y: 0. };
+    let (body, heading) = world.spawn_body(head, FRAC_PI_2).unwrap();
+    world
+        .spawn("inside-live-pit".into(), body, heading)
+        .unwrap();
+    // Outside the reference pit, inside the live one. Outward travel must
+    // enter/exit the live boundary, even while it gradually follows the wall.
+    for _ in 0..1500 {
+        if !world.snakes()[0].alive {
+            break;
+        }
+        world
+            .step(&[Some(Action {
+                heading: 0.,
+                boost: false,
+            })])
+            .unwrap();
+    }
+    assert!(!world.snakes()[0].alive);
+    assert_eq!(world.deaths().len(), 1);
+    assert_eq!(world.deaths()[0].reason, DeathReason::Pit);
+    assert!(distance(world.snakes()[0].head) >= world.pit_radius().unwrap());
+    assert!(world.food().is_empty()); // floor deaths still drop nothing.
+}
+
+#[cfg(feature = "networking")]
+#[test]
+fn host_validation_reserves_wire_room_for_the_largest_queue_allowance() {
+    use slither_sim::client::SimulationConfig;
+    for (seats, accepted) in [(80, true), (105, true), (106, false)] {
+        let config = SimulationConfig {
+            agents: seats,
+            world: Config::battledome(),
+            ..Default::default()
+        };
+        assert_eq!(config.validate().is_ok(), accepted);
+    }
+    let mut fixed = Config::battledome();
+    fixed.dynamic_radius = false;
+    assert!(
+        SimulationConfig {
+            agents: 480,
+            world: fixed.clone(),
+            ..Default::default()
+        }
+        .validate()
+        .is_ok()
+    );
+    fixed.size_to_population = true;
+    assert!(
+        SimulationConfig {
+            agents: 800,
+            world: fixed,
+            ..Default::default()
+        }
+        .validate()
+        .is_ok()
+    );
+}
+
+#[test]
+fn a_growing_pit_does_not_count_as_a_newborn_entering_it() {
+    use slither_sim::{InitialPopulation, RadiusUpdate, WorldOptions};
+    let mut config = Config::battledome();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.;
+    config.radius_updates = vec![RadiusUpdate {
+        time: 0.007,
+        radius: 3000. * 3584. / 1784.,
+    }];
+    let mut world = Simulator::new(WorldOptions {
+        config,
+        population: InitialPopulation::Empty,
+        ..Default::default()
+    })
+    .unwrap();
+    let (body, heading) = world
+        .spawn_body(Point { x: 2900., y: 0. }, FRAC_PI_2)
+        .unwrap();
+    world.spawn("newborn".into(), body, heading).unwrap();
+    let outward = [Some(Action {
+        heading: 0.,
+        boost: false,
+    })];
+    world.step(&outward).unwrap();
+    assert!(distance(world.snakes()[0].head) < world.pit_radius().unwrap());
+    let saved = serde_json::to_vec(&world.checkpoint().unwrap()).unwrap();
+    let mut restored = Simulator::from_checkpoint(&saved, Default::default()).unwrap();
+    for _ in 0..500 {
+        world.step(&outward).unwrap();
+        restored.step(&outward).unwrap();
+        assert!(world.snakes()[0].alive, "{:?}", world.deaths());
+    }
+    assert!(distance(world.snakes()[0].head) > world.pit_radius().unwrap());
+    assert_eq!(
+        serde_json::to_value(world.checkpoint().unwrap()).unwrap(),
+        serde_json::to_value(restored.checkpoint().unwrap()).unwrap()
+    );
+    // Physical re-entry still commits this life to the ordinary one-way rule.
+    while distance(world.snakes()[0].head) >= world.pit_radius().unwrap() - 100. {
+        world
+            .step(&[Some(Action {
+                heading: PI,
+                boost: false,
+            })])
+            .unwrap();
+        assert!(world.snakes()[0].alive);
+    }
+    for _ in 0..1000 {
+        if !world.snakes()[0].alive {
+            break;
+        }
+        world.step(&outward).unwrap();
+    }
+    assert!(!world.snakes()[0].alive);
+    assert_eq!(world.deaths()[0].reason, DeathReason::Pit);
+}
+
+#[test]
+fn a_shrinking_edge_does_not_reenter_a_snake_engulfed_by_growth() {
+    use slither_sim::{InitialPopulation, RadiusUpdate, WorldOptions};
+    let mut config = Config::battledome();
+    config.food_count = 0;
+    config.ambient_replenish_per_second = 0.;
+    config.radius_updates = vec![RadiusUpdate {
+        time: 0.007,
+        radius: 3000. * 3584. / 1784.,
+    }];
+    let mut world = Simulator::new(WorldOptions {
+        config,
+        population: InitialPopulation::Empty,
+        ..Default::default()
+    })
+    .unwrap();
+    let (body, heading) = world
+        .spawn_body(Point { x: 2900., y: 0. }, FRAC_PI_2)
+        .unwrap();
+    world.spawn("engulfed".into(), body, heading).unwrap();
+    world
+        .step(&[Some(Action {
+            heading: 0.,
+            boost: false,
+        })])
+        .unwrap();
+    let old_pit = world.pit_radius().unwrap();
+    let next_pit = 1784. * ((world.radius() - 23.4375 * world.config().dt) / 3584.);
+    let half_step = slither_sim::physics::base_speed(26) * world.config().dt / 2.;
+    // This horizontal chord grazes the new edge, but begins inside the old one:
+    // the shrinking boundary moving past an unentered life is not re-entry.
+    let head = Point {
+        x: -half_step,
+        y: next_pit - 0.00001,
+    };
+    assert!(distance(head) < old_pit && distance(head) > next_pit);
+    let (body, _) = world.spawn_body(head, 0.).unwrap();
+    world.correct_pose(0, head, body, 0.).unwrap();
+    world
+        .step(&[Some(Action {
+            heading: 0.,
+            boost: false,
+        })])
+        .unwrap();
+    assert!(world.snakes()[0].alive, "{:?}", world.deaths());
+    assert!(distance(world.snakes()[0].head) > world.pit_radius().unwrap());
 }

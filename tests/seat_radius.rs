@@ -66,7 +66,7 @@ fn a_500_to_100_exodus_reaches_the_dead_zone_at_the_rate_limit() {
         serde_json::from_str(include_str!("fixtures/arena-seat-following-v2.json")).unwrap();
     assert_eq!(
         fixture["rulesRevision"],
-        slither_sim::simulator::checkpoint::RULES_REVISION
+        "slither-sim-rules-v2" // Historical scalar fixture; official seat control is unchanged.
     );
     let mut world = placed(quiet_config(500), 500);
     kill_every_seat(&mut world);
@@ -148,7 +148,6 @@ fn small_churn_is_absorbed_at_500_but_small_worlds_move() {
 fn fixed_presets_and_explicit_radii_ignore_seat_changes() {
     for config in [
         Config::sandbox(),
-        Config::battledome(),
         serde_json::from_str::<Config>(r#"{"radius":1200}"#).unwrap(),
         serde_json::from_str::<Config>(r#"{"preset":"official","radius":1200}"#).unwrap(),
     ] {
