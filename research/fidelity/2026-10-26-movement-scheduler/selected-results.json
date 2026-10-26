@@ -1,0 +1,45 @@
+{
+  "studyAudit": {
+    "status": "verified",
+    "issues": [],
+    "attempts": 6,
+    "captures": 6
+  },
+  "splitGates": {
+    "development": {
+      "batches": 3,
+      "eligible": 3,
+      "requiredEligible": 2,
+      "passed": true,
+      "motionUnder35": 340,
+      "hUnder100": 86
+    },
+    "heldout": {
+      "batches": 3,
+      "eligible": 3,
+      "requiredEligible": 2,
+      "passed": true,
+      "motionUnder35": 451,
+      "hUnder100": 107
+    }
+  },
+  "motionUnder35": 791,
+  "hUnder100": 193,
+  "transportGatesPassed": 24,
+  "selectedCandidate": null,
+  "verification": {
+    "status": "passed",
+    "frozenInputsUnchanged": true,
+    "scientificCodeUnchanged": true,
+    "developmentSealUnchanged": true,
+    "developmentSealPrecedesHeldout": true,
+    "sourceCopiesAndSyntheticBytesVerified": true,
+    "startIntervalsSeconds": [
+      1801.347169,
+      1801.354462,
+      1801.563119,
+      1801.547556,
+      1801.416905
+    ]
+  }
+}

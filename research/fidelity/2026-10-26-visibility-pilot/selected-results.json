@@ -1,0 +1,182 @@
+{
+  "studyAudit": {
+    "status": "incomplete",
+    "issues": [
+      "planned_attempts_missing"
+    ],
+    "attempts": 1,
+    "captures": 2
+  },
+  "gate": {
+    "result": "fail",
+    "reason": "All five endpoint-to-endpoint legs interrupted; zero qualified round trips",
+    "qualifiedRoundTrips": 0,
+    "requiredRoundTrips": 1,
+    "qualifiedLegs": 0,
+    "eligibleRouteQueries": 0,
+    "requiredQueries": 20,
+    "qualifiedPresent": 0,
+    "qualifiedAbsent": 0,
+    "qualifiedEntries": 0,
+    "requiredEntries": 1,
+    "qualifiedNondeathExits": 0,
+    "requiredNondeathExits": 1,
+    "sensitivityQualifiedQueries": {
+      "U/2": 0,
+      "U": 0,
+      "2U": 0
+    },
+    "sensitivityLimit": "No candidate-boundary scoring was performed. Every leg fails the prior interruption screen, independent of boundary buffer.",
+    "diagonal": "not attempted",
+    "scaling": "stopped",
+    "recommendation": "switch to P2 under its separate authorization",
+    "lifecycle": {
+      "reconstructedPeakConnections": 2,
+      "expectedPostDeathSocketErrors": 23,
+      "unexpectedSocketErrors": 0
+    },
+    "analysisStatus": "descriptive pilot only; no visibility-law fit or selection"
+  },
+  "members": [
+    {
+      "archiveAlias": "p1-member-1",
+      "archiveSha256": "1389a9d3305e54b983f41b75576df5d9080e05b3b4dd27e74324c9a7a1dd6800",
+      "status": "verified",
+      "issues": [],
+      "joins": 9,
+      "connections": 9,
+      "counts": {
+        "i": {
+          "frames": 42883,
+          "bytes": 1215990
+        },
+        "o": {
+          "frames": 3108,
+          "bytes": 3765
+        }
+      },
+      "commands": [
+        {
+          "tool": "packet_census.py",
+          "operation": "census",
+          "exitCode": 0
+        },
+        {
+          "tool": "transport_parity.py",
+          "operation": "measure",
+          "exitCode": 0
+        },
+        {
+          "tool": "transport_parity.py",
+          "operation": "compare",
+          "exitCode": 1
+        }
+      ]
+    },
+    {
+      "archiveAlias": "p1-member-2",
+      "archiveSha256": "eb52581f389677653e6447314f59cf483fb30de3af43325f7222ef2193bf7a29",
+      "status": "verified",
+      "issues": [],
+      "joins": 15,
+      "connections": 15,
+      "counts": {
+        "i": {
+          "frames": 40312,
+          "bytes": 1186869
+        },
+        "o": {
+          "frames": 2494,
+          "bytes": 3589
+        }
+      },
+      "commands": [
+        {
+          "tool": "packet_census.py",
+          "operation": "census",
+          "exitCode": 0
+        },
+        {
+          "tool": "transport_parity.py",
+          "operation": "measure",
+          "exitCode": 0
+        },
+        {
+          "tool": "transport_parity.py",
+          "operation": "compare",
+          "exitCode": 1
+        }
+      ]
+    }
+  ],
+  "descriptiveCounters": {
+    "gridQueries": 2401,
+    "excludedPairUnavailableDeadOrStale": 1637,
+    "freshPairQueries": 764,
+    "both-2-80-unboosted/absent": 597,
+    "freshPairPhase/rendezvous": 576,
+    "freshPairPhase/waiting": 2,
+    "both-2-80-unboosted/present": 167,
+    "freshPairPhase/crossing": 185,
+    "freshPairPhase/unknown": 1
+  },
+  "route": {
+    "endpointLegs": 5,
+    "nearFarNearSequences": 2,
+    "initialApproaches": 4,
+    "legs": [
+      {
+        "trial": 2,
+        "jsonlLine": 20188,
+        "startOffset": 800,
+        "endOffset": 2300,
+        "interrupted": true,
+        "pauseInterruptionCount": 42,
+        "avoidanceInterruptionCount": 9
+      },
+      {
+        "trial": 2,
+        "jsonlLine": 21564,
+        "startOffset": 2300,
+        "endOffset": 800,
+        "interrupted": true,
+        "pauseInterruptionCount": 45,
+        "avoidanceInterruptionCount": 9
+      },
+      {
+        "trial": 4,
+        "jsonlLine": 53671,
+        "startOffset": 800,
+        "endOffset": 2300,
+        "interrupted": true,
+        "pauseInterruptionCount": 65,
+        "avoidanceInterruptionCount": 110
+      },
+      {
+        "trial": 4,
+        "jsonlLine": 56099,
+        "startOffset": 2300,
+        "endOffset": 800,
+        "interrupted": true,
+        "pauseInterruptionCount": 64,
+        "avoidanceInterruptionCount": 146
+      },
+      {
+        "trial": 4,
+        "jsonlLine": 57910,
+        "startOffset": 800,
+        "endOffset": 2300,
+        "interrupted": true,
+        "pauseInterruptionCount": 46,
+        "avoidanceInterruptionCount": 138
+      }
+    ]
+  },
+  "sourceRevision": "7580d53baffa35d776af4fc22a9926220d33c672",
+  "sourceHashes": {
+    "pilot-result": "bd0f478610235bf8dd2353ced66872d94e33c0292454f7bbd128b692605fd572",
+    "route-inventory": "83d21b6f214efb20dc111d5d58a62a2bf41a151e283f6f3ea59bce6a68e5d3ed",
+    "descriptive-grid": "7be39860a5a0024941f5113d105e8f879ffb466233d3dce6938fea77fcb869e6",
+    "diagnostics": "b48a81415e4d08317a4939e9b377b58e25e91493ea1ec1be32e9cd245c765f43"
+  }
+}

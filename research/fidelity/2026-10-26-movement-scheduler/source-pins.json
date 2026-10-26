@@ -1,0 +1,26 @@
+{
+  "sourceRevision": "7580d53baffa35d776af4fc22a9926220d33c672",
+  "frozenProtocolSha256": "6d0f96c4a8984df96a8d1bb5c82d63d68ec0ebc90ef3718057f23f0914ed3ddf",
+  "freezeManifestSha256": "a675eb171dbdf958c918d4400021957abe418139d45f445b24c36b9a8636568f",
+  "originalSummaries": {
+    "ordinal-01-summary.json": "f7ea05f9adddfe94322f9f97ab64558d32479e98d9e531b4517a47d74cbfa70d",
+    "ordinal-02-summary.json": "a0af8ee078947ee62e3ce0e5890101865bf894da30e95e0052b361b25178bcf9",
+    "ordinal-03-summary.json": "c83c6f8e07a7852b973c51700e54c632c3c4411b29ba0cef97639b1504432f8b",
+    "ordinal-04-summary.json": "0ecc5c336b5839fa3c71f19c088fccb65d8cdf95a793c1e4817c15486c7ccc92",
+    "ordinal-05-summary.json": "26784bda7573528e6dc973e58039be2de2fef912e6a43c2f6a2131071929c4e7",
+    "ordinal-06-summary.json": "51dc5d8ee38bc6fe0dd2c34ada445e16086f5d5fa04c9370faa800a000d2e169"
+  },
+  "originalTooling": {
+    "analyze_p2.py": "b0db4c6c2efd1c7a659df619b1683c99b8dec78ec0088785fcc801b743203eb8",
+    "test_analyze_p2.py": "33396b0757b7fc56cb56ababcd6c7d55fbedfebe8712b25d64d98e2a11541057",
+    "check_analysis.py": "452a2019c97d44f12b891299bf0e6cdbd9473997f9dc9e6a24d0533f66c1af7e",
+    "make_summary.py": "991ac34be22fb561daef766167a358cb286d38412be6ad024e6cca6aa22fe349",
+    "final-verification.json": "a7b218d99108727b4eb243d0c6c88da1d87a63b787fa9a35d9939c4d0afd499e"
+  },
+  "decoderAndTools": {
+    "tests/fixtures/transport-official-near-server.json": "2b8beddc67962f62580705c8d1d8749d024285e6dffd3702a9e5ab2dd8b7f6ac",
+    "tools/fidelity/packet_census.py": "5a8604430478cf0b8e25c029d7b2c197847b2f1b5a5be55d1399a2cb51cb3d4e",
+    "tools/fidelity/slither_protocol.py": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+    "tools/fidelity/transport_parity.py": "843b7e9ac36c61ed8049269639ba7ad93369a741cc04ae496131ffe020af0282"
+  }
+}

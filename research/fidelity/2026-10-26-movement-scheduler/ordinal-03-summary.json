@@ -1,0 +1,554 @@
+{
+  "ordinal": 3,
+  "split": "development",
+  "captureAudit": "verified",
+  "integrityAbortGatePassed": true,
+  "unexpectedLifecycleEvents": [],
+  "joins": 6,
+  "connections": 6,
+  "archiveSha256": "7040326fdda306f4ee7b2c20ac7dbc49f08406c37421178c3380cd469a45edd0",
+  "coverage": {
+    "joinedSeconds": 579.3342349999999,
+    "isolatedChangedHeadingHolds": 1037,
+    "confirmedDirectionalBoostReflections": 30,
+    "creditedPickupMassPairs": 1804,
+    "rightCensoredPickups": 0,
+    "directionalSpeedResponsesIncludingConfounds": 67,
+    "motionEligible": true,
+    "massEligible": true,
+    "batchEligible": true
+  },
+  "counts": {
+    "motion-under42": 4087,
+    "h-under105": 944,
+    "order/body-anchor/motion-first": 2034,
+    "motion-under35": 80,
+    "motion-under40": 213,
+    "field-speed-under40": 72,
+    "order/mass-tail/motion-last": 1685,
+    "field-heading-under40": 177,
+    "unchanged-decoded-motion-tuple": 71,
+    "unchanged-tuple/direction-unchanged": 62,
+    "field-wanted-under40": 157,
+    "h-under100": 35,
+    "order/growth-anchor/motion-first": 235,
+    "order/mass-tail/motion-first": 1,
+    "reverse-same-frame-mass-motion": 1,
+    "unchanged-tuple/direction-changed": 9
+  },
+  "headingStatuses": {
+    "reflected": 4840,
+    "unchanged-or-small-change": 38,
+    "right-censored": 1
+  },
+  "gaps": {
+    "motion/other": {
+      "n": 43573,
+      "min": 18,
+      "p50": 43,
+      "p95": 196,
+      "max": 6364
+    },
+    "h/other": {
+      "n": 12755,
+      "min": 82,
+      "p50": 107,
+      "p95": 668,
+      "max": 9551
+    },
+    "motion/own": {
+      "n": 5801,
+      "min": 26,
+      "p50": 55,
+      "p95": 206,
+      "max": 1209
+    },
+    "h/own": {
+      "n": 1722,
+      "min": 14,
+      "p50": 156,
+      "p95": 1141,
+      "max": 13479
+    },
+    "prey/entry-to-first": {
+      "n": 41,
+      "min": 0,
+      "p50": 98,
+      "p95": 309,
+      "max": 325
+    },
+    "prey/repeat": {
+      "n": 976,
+      "min": 211,
+      "p50": 338,
+      "p95": 341,
+      "max": 357
+    }
+  },
+  "fieldGaps": {
+    "heading/other": {
+      "n": 39221,
+      "min": 18,
+      "p50": 43,
+      "p95": 204,
+      "max": 6364
+    },
+    "wanted/other": {
+      "n": 37385,
+      "min": 18,
+      "p50": 43,
+      "p95": 246,
+      "max": 6569
+    },
+    "speed/other": {
+      "n": 11682,
+      "min": 25,
+      "p50": 42,
+      "p95": 84,
+      "max": 24435
+    },
+    "heading/own": {
+      "n": 5681,
+      "min": 26,
+      "p50": 56,
+      "p95": 206,
+      "max": 1209
+    },
+    "wanted/own": {
+      "n": 4872,
+      "min": 26,
+      "p50": 56,
+      "p95": 362,
+      "max": 1829
+    },
+    "speed/own": {
+      "n": 396,
+      "min": 26,
+      "p50": 42,
+      "p95": 292,
+      "max": 64502
+    }
+  },
+  "motionGapByFieldMask": {
+    "other/hws": {
+      "n": 6605,
+      "min": 25,
+      "p50": 42,
+      "p95": 44,
+      "max": 519
+    },
+    "other/hw": {
+      "n": 30115,
+      "min": 18,
+      "p50": 44,
+      "p95": 153,
+      "max": 6364
+    },
+    "own/h": {
+      "n": 694,
+      "min": 186,
+      "p50": 205,
+      "p95": 207,
+      "max": 220
+    },
+    "own/hw": {
+      "n": 4706,
+      "min": 39,
+      "p50": 51,
+      "p95": 199,
+      "max": 1209
+    },
+    "other/h": {
+      "n": 995,
+      "min": 41,
+      "p50": 204,
+      "p95": 207,
+      "max": 221
+    },
+    "other/s": {
+      "n": 3618,
+      "min": 25,
+      "p50": 42,
+      "p95": 49,
+      "max": 1318
+    },
+    "other/hs": {
+      "n": 1535,
+      "min": 25,
+      "p50": 42,
+      "p95": 49,
+      "max": 205
+    },
+    "other/w": {
+      "n": 642,
+      "min": 28,
+      "p50": 84,
+      "p95": 313,
+      "max": 1366
+    },
+    "own/hws": {
+      "n": 166,
+      "min": 26,
+      "p50": 42,
+      "p95": 126,
+      "max": 1012
+    },
+    "own/s": {
+      "n": 120,
+      "min": 40,
+      "p50": 42,
+      "p95": 45,
+      "max": 57
+    },
+    "own/hs": {
+      "n": 115,
+      "min": 26,
+      "p50": 42,
+      "p95": 44,
+      "max": 58
+    },
+    "other/ws": {
+      "n": 63,
+      "min": 39,
+      "p50": 42,
+      "p95": 43,
+      "max": 48
+    }
+  },
+  "exceptionContexts": {
+    "motion-under35": {
+      "other": 78,
+      "phase/None": 78,
+      "boost/None": 78,
+      "fieldMask/s": 9,
+      "directionChanged/False": 74,
+      "sinceCreditedPickupMs/unknown": 78,
+      "sinceGrowthMs/unknown": 25,
+      "sinceTailMs/unknown": 50,
+      "fieldMask/hw": 53,
+      "sinceGrowthMs/earlier": 53,
+      "fieldMask/hws": 13,
+      "sinceTailMs/earlier": 30,
+      "own": 2,
+      "phase/recover_forage": 1,
+      "boost/False": 2,
+      "sinceCreditedPickupMs/earlier": 2,
+      "fieldMask/hs": 4,
+      "sinceGrowthMs/within-report-gap": 2,
+      "phase/right_boost": 1,
+      "fieldMask/w": 1,
+      "directionChanged/True": 6
+    },
+    "h-under100": {
+      "other": 32,
+      "phase/None": 32,
+      "boost/None": 32,
+      "fieldMask/None": 35,
+      "directionChanged/None": 35,
+      "sinceCreditedPickupMs/unknown": 32,
+      "sinceGrowthMs/earlier": 16,
+      "sinceTailMs/earlier": 20,
+      "sinceGrowthMs/within-report-gap": 9,
+      "sinceGrowthMs/unknown": 10,
+      "sinceTailMs/unknown": 15,
+      "own": 3,
+      "phase/forage_wait": 1,
+      "boost/False": 2,
+      "sinceCreditedPickupMs/earlier": 2,
+      "phase/left_boost": 1,
+      "boost/True": 1,
+      "sinceCreditedPickupMs/within-report-gap": 1,
+      "phase/right_boost": 1
+    }
+  },
+  "qualifiedInputStrata": {
+    "None/None": 1,
+    "small/forage_wait": 143,
+    "small/right_cruise": 8,
+    "small/reverse_left_cruise": 12,
+    "small/recover_forage": 89,
+    "medium/forage_wait": 92,
+    "medium/left_cruise": 4,
+    "medium/right_cruise": 5,
+    "medium/reverse_left_cruise": 7,
+    "medium/recover_forage": 82,
+    "large/forage_wait": 408,
+    "large/right_cruise": 15,
+    "large/reverse_left_cruise": 11,
+    "large/recover_forage": 19,
+    "complete/forage_wait": 89,
+    "small/straight_cruise": 5,
+    "small/left_cruise": 5,
+    "medium/straight_cruise": 1,
+    "large/straight_cruise": 4,
+    "large/left_cruise": 8,
+    "large/reverse_right_cruise": 6,
+    "large/left_boost": 5,
+    "large/right_boost": 3,
+    "small/left_boost": 1,
+    "small/right_boost": 2,
+    "large/straight_boost": 3,
+    "small/reverse_right_cruise": 1,
+    "small/straight_boost": 1,
+    "medium/reverse_right_cruise": 3,
+    "medium/right_boost": 1,
+    "medium/straight_boost": 1,
+    "medium/left_boost": 2
+  },
+  "boundedQualifiedCommands": 1037,
+  "reflectionDelayEndpointSummariesMs": {
+    "lower": {
+      "n": 1037,
+      "min": -0.6422038651071489,
+      "p50": 3.8069961733563105,
+      "p95": 19.79568866932823,
+      "max": 42.15012335510983
+    },
+    "upper": {
+      "n": 1037,
+      "min": 2.924006523051048,
+      "p50": 7.187855786542059,
+      "p95": 23.150944739274564,
+      "max": 46.02568472060375
+    }
+  },
+  "transport": [
+    {
+      "metric": "anchor_receipt_p50 (world units)",
+      "candidate": 0.81,
+      "upperLimit": 0.952,
+      "result": "PASS"
+    },
+    {
+      "metric": "anchor_receipt_p95 (world units)",
+      "candidate": 2.361,
+      "upperLimit": 2.494,
+      "result": "PASS"
+    },
+    {
+      "metric": "frame_server_p50 (ms)",
+      "candidate": 7.0,
+      "upperLimit": 9.0,
+      "result": "PASS"
+    },
+    {
+      "metric": "delay_p90 (ms)",
+      "candidate": 1.027,
+      "upperLimit": 1.183,
+      "result": "PASS"
+    }
+  ],
+  "diagnosticCommandStatus": [
+    {
+      "index": 1,
+      "exitCode": 0
+    },
+    {
+      "index": 2,
+      "exitCode": 0
+    },
+    {
+      "index": 3,
+      "exitCode": 0
+    }
+  ],
+  "candidates": {
+    "a": {
+      "motionUnderGate": 4087,
+      "hUnderGate": 944,
+      "packetStateMismatch": null,
+      "medianAbsoluteNextReportErrorMs": null,
+      "predictionWindowsScored": 0,
+      "unscoredMotionReportsMissingDirtyTime": 49704,
+      "unscoredMassReportsMissingDirtyTime": 17180,
+      "exclusion": "Authoritative field/direction dirty times and input application times between reports are not observed; no point dirty-time substitution or positive model selection from gap contradictions."
+    },
+    "b": {
+      "motionUnderGate": 213,
+      "hUnderGate": 35,
+      "packetStateMismatch": null,
+      "medianAbsoluteNextReportErrorMs": null,
+      "predictionWindowsScored": 0,
+      "unscoredMotionReportsMissingDirtyTime": 49704,
+      "unscoredMassReportsMissingDirtyTime": 17180,
+      "exclusion": "Authoritative field/direction dirty times and input application times between reports are not observed; no point dirty-time substitution or positive model selection from gap contradictions."
+    },
+    "c": {
+      "perFieldUnder40": {
+        "heading": 177,
+        "wanted": 157,
+        "speed": 72
+      },
+      "hUnderGate": 35,
+      "packetStateMismatch": null,
+      "medianAbsoluteNextReportErrorMs": null,
+      "predictionWindowsScored": 0,
+      "unscoredMotionReportsMissingDirtyTime": 49704,
+      "unscoredMassReportsMissingDirtyTime": 17180,
+      "exclusion": "Authoritative field/direction dirty times and input application times between reports are not observed; no point dirty-time substitution or positive model selection from gap contradictions."
+    },
+    "d": {
+      "motionPeriod": 42,
+      "massPeriod": 105,
+      "developmentOnlyPhaseFitRequired": true,
+      "packetStateMismatch": null,
+      "medianAbsoluteNextReportErrorMs": null,
+      "predictionWindowsScored": 0,
+      "unscoredMotionReportsMissingDirtyTime": 49704,
+      "unscoredMassReportsMissingDirtyTime": 17180,
+      "exclusion": "Authoritative field/direction dirty times and input application times between reports are not observed; no point dirty-time substitution or positive model selection from gap contradictions."
+    },
+    "e": {
+      "baseUnder40": 213,
+      "baseHUnder100": 35,
+      "observableBypassContext": {
+        "motion/no-observed-causal-bypass": 190,
+        "motion/observed-causal-bypass": 23,
+        "h/no-observed-causal-bypass": 26,
+        "h/observed-causal-bypass": 9
+      },
+      "limitation": "No observed causal bypass is not proof that authoritative higher-precision/direction state stayed unchanged between reports.",
+      "packetStateMismatch": null,
+      "medianAbsoluteNextReportErrorMs": null,
+      "predictionWindowsScored": 0,
+      "unscoredMotionReportsMissingDirtyTime": 49704,
+      "unscoredMassReportsMissingDirtyTime": 17180,
+      "exclusion": "Authoritative field/direction dirty times and input application times between reports are not observed; no point dirty-time substitution or positive model selection from gap contradictions."
+    }
+  },
+  "analysisSha256": "b0db4c6c2efd1c7a659df619b1683c99b8dec78ec0088785fcc801b743203eb8",
+  "crossCheck": {
+    "status": "passed",
+    "rawWitnessesChecked": 12,
+    "censusMotionPackets": 49704,
+    "decodedMotionPackets": 49704,
+    "excludedUnknownTargetMotionPackets": 0
+  },
+  "archiveAlias": "p2-ordinal-03",
+  "earliestWitnesses": {
+    "motion-under35": [
+      {
+        "archiveSha256": "7040326fdda306f4ee7b2c20ac7dbc49f08406c37421178c3380cd469a45edd0",
+        "jsonlLine": 122,
+        "connection": 1,
+        "life": 1,
+        "epoch": 1,
+        "serverMs": 884,
+        "receiptMs": 980.533,
+        "packetIndex": 0,
+        "entity": 358,
+        "incarnation": 1,
+        "own": false,
+        "fieldMask": "s",
+        "direction": null,
+        "phase": null,
+        "boostCommandState": null,
+        "sinceCreditedPickupMs": null,
+        "sinceGrowthMs": null,
+        "sinceTailMs": null,
+        "lastHeadingCommandByte": null,
+        "headingHoldSoFarMs": null,
+        "before": [
+          5.71868037723767,
+          5.71868037723767,
+          10.666666666666666
+        ],
+        "after": [
+          5.71868037723767,
+          5.71868037723767,
+          9.833333333333334
+        ],
+        "tupleUnchanged": false,
+        "ownActive": true,
+        "directionBefore": 1,
+        "directionAfter": 1,
+        "directionChanged": false,
+        "serverGapMs": 27,
+        "receiptGapMs": 25.94100000000003,
+        "coarseReceiptMaskClean": true
+      }
+    ],
+    "unchanged-tuple/direction-unchanged": [
+      {
+        "archiveSha256": "7040326fdda306f4ee7b2c20ac7dbc49f08406c37421178c3380cd469a45edd0",
+        "jsonlLine": 422,
+        "connection": 1,
+        "life": 1,
+        "epoch": 1,
+        "serverMs": 3130,
+        "receiptMs": 3226.606,
+        "packetIndex": 1,
+        "entity": 365,
+        "incarnation": 1,
+        "own": false,
+        "fieldMask": "w",
+        "direction": 2,
+        "phase": null,
+        "boostCommandState": null,
+        "sinceCreditedPickupMs": null,
+        "sinceGrowthMs": null,
+        "sinceTailMs": null,
+        "lastHeadingCommandByte": null,
+        "headingHoldSoFarMs": null,
+        "before": [
+          1.7426021750380885,
+          1.7426021750380885,
+          5.79
+        ],
+        "after": [
+          1.7426021750380885,
+          1.7426021750380885,
+          5.79
+        ],
+        "tupleUnchanged": true,
+        "ownActive": true,
+        "directionBefore": 2,
+        "directionAfter": 2,
+        "directionChanged": false,
+        "serverGapMs": 49,
+        "receiptGapMs": 48.388000000000375,
+        "coarseReceiptMaskClean": true
+      }
+    ],
+    "h-under100": [
+      {
+        "archiveSha256": "7040326fdda306f4ee7b2c20ac7dbc49f08406c37421178c3380cd469a45edd0",
+        "jsonlLine": 3633,
+        "connection": 1,
+        "life": 1,
+        "epoch": 1,
+        "serverMs": 25999,
+        "receiptMs": 26096.424,
+        "packetIndex": 0,
+        "entity": 358,
+        "own": false,
+        "family": "h",
+        "phase": null,
+        "boostCommandState": null,
+        "sinceCreditedPickupMs": null,
+        "sinceGrowthMs": 19257,
+        "sinceTailMs": 19343,
+        "lastHeadingCommandByte": null,
+        "headingHoldSoFarMs": null,
+        "beforeFam": 1.0,
+        "afterFam": 1.0,
+        "serverGapMs": 90
+      }
+    ],
+    "reverse-same-frame-mass-motion": [
+      {
+        "archiveSha256": "7040326fdda306f4ee7b2c20ac7dbc49f08406c37421178c3380cd469a45edd0",
+        "jsonlLine": 25361,
+        "connection": 1,
+        "life": 1,
+        "epoch": 1,
+        "entity": 324,
+        "serverMs": 157094,
+        "receiptMs": 157191.031,
+        "own": true,
+        "order": "mass-tail/motion-first",
+        "phase": "forage_wait"
+      }
+    ]
+  }
+}

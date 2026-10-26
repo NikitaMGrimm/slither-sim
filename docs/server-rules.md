@@ -114,12 +114,23 @@ coverage grid preserve wire selection/order as performance mechanisms, not rules
 The later [near-server study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md)
 retains clean held-out 24 ms motion, 84 ms mass, same-frame motion-before-mass
 and 3,044 ms repeat-prey witnesses. Decoder tests accept those exceptions;
-the fixed simulator release model is unchanged.
+the fixed simulator release model is unchanged. The later
+[movement study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-movement-scheduler/REPORT.md)
+adds 451 motion gaps below 35 ms and 107 standalone `h` gaps below 100 ms
+in three held-out invocations. These contradict literal wire-gap floors;
+unobserved dirty/application instants prevent replacement-scheduler selection.
 
 Each tick reads all inputs and pings received during it; pongs lead its frame.
 Official input reflection takes about one ping round trip (median 13.2 vs
 13.4 ms on one route); pings return in as little as 4.9 ms. Neither waits an extra
-tick, but the receive-to-send deadline is unknown. Pongs lead 81,830 of 81,843
+tick, but the receive-to-send deadline is unknown. The
+[movement study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-movement-scheduler/REPORT.md#input-reflection-bounds)
+adds per-invocation conditional wanted-angle reflection bounds: p50 lower
+endpoints 3.807–4.123 ms and upper endpoints 7.107–7.725 ms; p95 lower
+endpoints 19.222–21.979 ms and upper endpoints 22.651–25.512 ms. These are
+numerically below the earlier 13.2 ms route median at p50, but use a different
+clock-bound estimand and acquisition conditions; they establish neither a
+route speedup nor input application latency. Pongs lead 81,830 of 81,843
 official pong frames.
 
 Minimaps and leaderboards have independent server-wide clocks. Official periods

@@ -1,0 +1,38 @@
+{
+  "createdUtc": "2026-10-26T09:41:00.730819+00:00",
+  "developmentCoverageGatePassed": true,
+  "coverage": {
+    "requiredEligibleDevelopmentBatches": 2,
+    "eligibleDevelopmentBatches": 3,
+    "eligibleMotionBatches": 3,
+    "eligibleMassBatches": 3,
+    "passed": true
+  },
+  "selectedOutputSha256": "c6afe37ca40bebd7a46b2a035078123f20ff5e1bcc55a6ef6a86aca92b63da44",
+  "predictionsSha256": "3727abbd4e7a2103a8cd6262557d833dbd4db5c293d47d905ed944d7759542a3",
+  "codeFiles": {
+    "analyze_p2.py": "b0db4c6c2efd1c7a659df619b1683c99b8dec78ec0088785fcc801b743203eb8",
+    "test_analyze_p2.py": "33396b0757b7fc56cb56ababcd6c7d55fbedfebe8712b25d64d98e2a11541057",
+    "check_analysis.py": "452a2019c97d44f12b891299bf0e6cdbd9473997f9dc9e6a24d0533f66c1af7e",
+    "diagnose_ordinal.py": "5e8130ec1d5a2d0b5dd01d69935b192418ad1105be206d73b8678bc98f9dfdbc"
+  },
+  "files": {
+    "analysis-code-freeze.json": "ea8a12629040c971b118e1540e512c00e06ed590025da1e83d5b6dbe1ba08d84",
+    "development-predictions.json": "3727abbd4e7a2103a8cd6262557d833dbd4db5c293d47d905ed944d7759542a3",
+    "development-selection.json": "c6afe37ca40bebd7a46b2a035078123f20ff5e1bcc55a6ef6a86aca92b63da44",
+    "02-scheduler-movement-study/analysis/ordinal-01-p2-analysis-final.json": "6597c994ec3bb72e93edd355cf86db9fbcff64dfb439fbfda7f4a31223775573",
+    "02-scheduler-movement-study/analysis/ordinal-01-analysis-check-final.json": "07ae7d7c93a8c935d314f6d85f9645b10050ac7b2f41f41beaf0bf2594b21b41",
+    "02-scheduler-movement-study/analysis/ordinal-01-summary.json": "f7ea05f9adddfe94322f9f97ab64558d32479e98d9e531b4517a47d74cbfa70d",
+    "02-scheduler-movement-study/analysis/ordinal-01-integrity.json": "601c37c8c2cb87405c4d23fe89052de2ea2e0eeb7c42f55d7da45795f3c140e9",
+    "02-scheduler-movement-study/analysis/ordinal-02-p2-analysis-final.json": "d0c59b392c46900df3a6a4ce1b55955524bc2c4d4584dca698ced50960af9b92",
+    "02-scheduler-movement-study/analysis/ordinal-02-analysis-check-final.json": "59e46a1097b3e720d6d91ac519e891d1eb9f46d293359d63cabbf277cf86d3f6",
+    "02-scheduler-movement-study/analysis/ordinal-02-summary.json": "a0af8ee078947ee62e3ce0e5890101865bf894da30e95e0052b361b25178bcf9",
+    "02-scheduler-movement-study/analysis/ordinal-02-integrity.json": "91935e92a85c94438593f3147b7c76903f84095ca1d9d463e8689558b7c32430",
+    "02-scheduler-movement-study/analysis/ordinal-03-p2-analysis-final.json": "602a55616383efa29135e286c21ecda95027784fca86e615df2eea8f3594d8e4",
+    "02-scheduler-movement-study/analysis/ordinal-03-analysis-check-final.json": "e842292240a6ef07410b620381c3ed280639d280a55a6d29b0faf6a95c5caacb",
+    "02-scheduler-movement-study/analysis/ordinal-03-summary.json": "c83c6f8e07a7852b973c51700e54c632c3c4411b29ba0cef97639b1504432f8b",
+    "02-scheduler-movement-study/analysis/ordinal-03-integrity.json": "c31384f9d0266200bbe220e9f8e878f9cca2dedf3c041b5899f3c73bfc243202"
+  },
+  "heldoutOpened": false,
+  "next": "Held-out acquisition can proceed only if the coverage and integrity gates passed; use fixed code and preserve all missing/unscored outcomes."
+}
