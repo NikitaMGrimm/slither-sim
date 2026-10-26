@@ -299,9 +299,9 @@ agents. Hosts use `players.latency` for added socket link delay and `bots.latenc
 for bot link and processing delay; all default to zero. Socket players use their
 own compute time, so their processing settings must be zero. Messages stay ordered.
 Virtual-time delivery and server input application use physics ticks; the host's
-socket thread releases outbound frames
-at due times between ticks. `LatencyConfig::measured_route()` values suit
-`players.latency` for local play that should feel like the retained home route.
+socket thread releases outbound frames at due times between ticks.
+`LatencyConfig::measured_route()` values suit `players.latency` for local play
+that should feel like the retained home route.
 
 | Field | Default | Meaning / limits |
 | --- | --- | --- |

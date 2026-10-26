@@ -11,7 +11,7 @@ def main(binary, output):
     output.mkdir(parents=True, exist_ok=False)
     suffix = '.exe' if os.name == 'nt' else ''
     config = output/'config.json'
-    config.write_text(json.dumps({'bind':'127.0.0.1:8766','seed':7,'players':{'max':50},'bots':{'count':0,'threads':0}})+'\n')
+    config.write_text(json.dumps({'bind':'127.0.0.1:8766','seed':7,'maxClients':50,'bots':0,'botThreads':0})+'\n')
     epoch = time.time()+3
     children, logs = [], []
     def start(command, env=None):

@@ -170,9 +170,6 @@ The scripts need a checkout, Rust 1.99, Python 3.12+, OpenSSH and an
 authenticated AWS CLI. Credentials, keys, addresses and raw output stay in a
 separate scratch directory, and a new run refuses an existing one.
 
-For the pinned revision below, use the [study-era harness](https://github.com/NikitaMGrimm/slither-sim/tree/aeb3cfe/research/performance/2026-10-26-host-capacity);
-current config generators target the grouped host schema.
-
 ```sh
 python3 prepare.py /path/to/new/build --ref 6bcb6f0b1057810bc7b31889c080ce9e3e57d6ae --build
 python3 smoke.py /path/to/new/build/target/release/examples /path/to/new/smoke
