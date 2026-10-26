@@ -1,17 +1,8 @@
 --- a/examples/perf_baseline.rs
 +++ b/examples/perf_baseline.rs
-@@ -460,6 +460,7 @@
-             Driver::Client(client) => json!({
-                 "world": client.world.definition(), "config": client.world.config(),
-                 "agents": client.agents, "simulation": simulation_definition(self)?,
+@@ -462,0 +463 @@
 +                "studyForcedReconnectSlotAtStart": client.id.starts_with("client-battledome-").then_some(0),
-                 "controller": Controller::Wander.definition(),
-                 "lifecycle": {"reconnect": "timed reconnect_slot after the client reports death; refused admissions wait refusalRetryDecisions",
-                     "operation": "reconnect admission plus step_all; controller and record drain excluded"},
-@@ -1413,6 +1414,29 @@
-         );
-     }
- 
+@@ -1415,0 +1417,23 @@
 +    #[test]
 +    fn study_live_reconnect_refreshes_the_frame_before_controls() {
 +        static CLIENT: ClientScenario = ClientScenario {
@@ -35,18 +26,11 @@
 +        );
 +    }
 +
-     fn lifecycle_rates(counts: Lifecycle, decisions: usize) -> Value {
-         let mut value = counts.json();
-         value["refusalsPerDecision"] = json!(counts.deferred as f64 / decisions as f64);
-@@ -1474,13 +1498,20 @@
-             }
-             // Lives restart only after their client has seen the death, as a bot would.
-             let admission_start = (measured && !args.trace).then(Instant::now);
+@@ -1476,0 +1501,3 @@
 +            let force_reconnect = measured
 +                && decision == client.warmup_decisions
 +                && client.id.starts_with("client-battledome-");
-             let (mut reconnects, mut deferred) = (Vec::new(), Vec::new());
-             for (slot, frame) in current_frames.iter().enumerate() {
+@@ -1479,5 +1506,9 @@
 -                if decision >= retry_at[slot]
 -                    && matches!(
 -                        frame.status,
@@ -61,18 +45,9 @@
 +                            frame.status,
 +                            ClientStatus::Dead | ClientStatus::Disconnected
 +                        ))
-                 {
-                     match backend.reconnect_slot(slot) {
-                         Ok(()) => reconnects.push(slot),
-@@ -1502,6 +1533,11 @@
-                         Err(error) => return Err(error),
-                     }
-                 }
+@@ -1504,0 +1536,5 @@
 +            }
 +            if force_reconnect {
 +                // A live reconnect resets the client's connection state. Do not
 +                // send a control from its previously received life.
 +                current_frames[0] = backend.frame_for(0)?;
-             }
-             let admission = admission_start.map_or(0.0, |start| start.elapsed().as_secs_f64());
-             let mut actions = Controller::Wander.actions(backend.world(), tick);
