@@ -11,8 +11,9 @@
   Legacy flat keys and non-default host `simulation.latency` are rejected.
 - Official worlds now hold their initial population-sized radius; the provisional,
   unfaithful dynamic controller is opt-in. Hosts, resets and simulation backends
-  size official worlds for their population, while explicit fixed radii, sandbox
-  and Battledome stay unchanged
+  size official worlds for their population, scaling food with area and keeping
+  the official prey density (68 prey for 484 seats instead of 1), while explicit
+  fixed radii, sandbox and Battledome stay unchanged
   ([configuration](docs/configuration.md#population-sizing)).
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
   and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
