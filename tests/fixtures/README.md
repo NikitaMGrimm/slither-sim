@@ -38,12 +38,15 @@ decoder-derived transport quantiles, without raw gameplay bytes. See its
 [selection and limits](../../research/fidelity/2026-10-25-transport-parity/REPORT.md).
 
 [`transport-official-near-server.json`](transport-official-near-server.json) is
-the default server transport reference, derived offline from #111's four
-completed development batches. It pins protocol 19, source archive and analysis
-hashes, the frozen telemetry mask, burn-in and epoch admission; whole gaps and
-anchor windows must be clean. The original metric formulas and maximum eligible
-per-capture envelope are unchanged. It retains two held-out and six unfiltered
-summaries, without raw gameplay bytes or absolute one-way-delay claims.
+the default server transport reference, derived offline from all six completed
+#111 batches **unfiltered**, measured identically to candidates. It pins protocol
+19 and source/analysis hashes. The common spread allowance 1 is the smallest of
+{0.5, 1, 2} passing all six LOO comparisons; frame-gap p50 alone uses a 1 ms
+header-resolution spread floor. False-reject control is only that six-capture
+check, with observed batch drift and no population guarantee. Masked development
+and held-out summaries remain separate characterization; the original dev-only
+envelope and held-out exceedance stay in the report as the first attempt. No raw
+gameplay bytes or absolute one-way-delay claims are included.
 
 [`client-reporting-cadence-near-server.json`](client-reporting-cadence-near-server.json)
 pins clean server-header prey/HUD gaps from all six completed batches. Client

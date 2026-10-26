@@ -2,11 +2,13 @@
 
 ## Unreleased
 
-- Server transport checks now default to a clean near-server reference from
+- Server transport checks now default to an unfiltered near-server reference from
   existing #111 captures; nominal prey/HUD tests use its server-clock summaries.
   Retained home-route fixtures and latency examples stay labeled. Selected
   scheduler exceptions exercise decoder/client state; runtime defaults and
-  simulator cadence rules are unchanged
+  simulator cadence rules are unchanged. A six-capture leave-one-out check
+  selects the spread allowance, with a 1 ms header-resolution spread floor
+  only for frame-gap p50; masked characterization and the first attempt remain
   ([reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)).
 
 ### Breaking

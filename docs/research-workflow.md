@@ -258,14 +258,16 @@ uv run --locked --only-group tools python tools/fidelity/local_capture.py --conf
 and reports per-capture/setup-epoch and pooled statistics. `compare` prints four
 initial gates; exit 1 means failure (including insufficient samples), 2 invalid
 input. Optional `--tolerances FILE` supplies JSON with explanatory `comment`
-fields. Limits use the observed per-capture official envelope, requiring
-100 samples per gated statistic. The
+fields. Limits use `max + allowance * max(spread, floor)`, requiring 100 samples
+per gated statistic. The common allowance is the smallest of {0.5, 1, 2} passing
+all six leave-one-capture-out comparisons: 1. Only integer-header frame-gap p50
+uses a 1 ms spread floor; receipt-derived metrics have none. The
 [reference selection and limitations](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md)
-pin four completed #111 development batches with its frozen telemetry mask and
-epoch eligibility. Whole gaps and anchor windows must pass; filtering never
-bridges removed frames. Two held-out summaries and all six unfiltered summaries
-remain in the fixture. Community recordings are excluded; raw inputs require
-local access. `local_capture.py` defaults to this clean reference. Its
+pin all six completed #111 batches **unfiltered**, using the same measurement as
+`measure`/`local_capture` candidates. Masked development and held-out summaries
+remain separate server characterization, with whole-window masking and the
+first attempt's held-out exceedance retained. Community recordings are excluded;
+raw inputs require local access. `local_capture.py` defaults to this near-server reference. Its
 `--reference tests/fixtures/transport-official-reference.json` option retains the
 older home-route/collector envelope with its original labels and selection.
 
@@ -287,11 +289,12 @@ collector stalls. Reports retain `collector-timing` metadata and final counters
 (missing older metadata stays unknown), without summing repeated cumulative
 counters. No clock here identifies absolute one-way latency or guarantees
 stock-client playing equivalence. Unfiltered captures (including the retained
-home reference) can have collector stalls that widen their envelope. The clean
-reference uses the same +/-600-frame delay gauge before masking, not #111's
-slope-corrected +/-10-second gauge. Limits are exploratory development envelopes;
-the held-out delay p90 of 1.096 ms exceeds the 1.090 ms limit and is retained,
-without tuning the threshold.
+home reference) can have collector stalls that widen their envelope. Reference
+and candidate use the same +/-600-frame delay gauge, not #111's slope-corrected
++/-10-second gauge. False-reject control is only the LOO check over six captures;
+batch drift was observed, with no population error-rate guarantee or independent
+held-out validation. The original masked development envelope and its 1.096 ms
+held-out delay p90 exceeding 1.090 ms remain documented as the first attempt.
 
 `local_capture.py` starts `cargo run --release --locked -j 2 -- host --config FILE`,
 runs the headless collector, stops both process trees, then measures/compares.

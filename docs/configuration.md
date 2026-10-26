@@ -352,7 +352,8 @@ route and collector, not the server.
 No near-server latency profile is added: receipt excess does not identify
 one-way propagation, uplink variation or direction coupling, and no replacement
 fit has development/held-out validation. Runtime latency defaults stay zero.
-Server transport checks instead use the bounded clean reference described in the
+Server transport checks instead use all six unfiltered near-server batches,
+measured like candidates, with the LOO-selected envelope described in the
 [reference audit](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-server-timing-references/REPORT.md).
 The fixed motion/mass/prey release rules remain models; clean scheduler witnesses
 test that the decoder accepts their exceptions.

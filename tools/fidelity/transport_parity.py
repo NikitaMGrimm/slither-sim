@@ -17,7 +17,7 @@ import slither_protocol as sp
 
 
 ROOT = Path(__file__).resolve().parents[2]
-# Clean development corpus; the older transport-official-reference.json is a
+# Six completed, unfiltered near-server batches; the older transport-official-reference.json is a
 # retained home-route/collector case, not a server delivery envelope.
 DEFAULT_REFERENCE = ROOT / "tests/fixtures/transport-official-near-server.json"
 DEFAULT_TOLERANCES = Path(__file__).with_name("transport_tolerances.json")
@@ -322,7 +322,11 @@ def compare(reference, candidate, tolerances):
         if not values:
             raise ValueError(f"no eligible reference samples: {name}")
         low, high = min(values), max(values)
-        upper = high + limits["spreadAllowance"] * (high-low)
+        # The integer elapsed header has 1 ms resolution. Only frame-gap p50
+        # uses that spread floor; receipt-derived metrics remain continuous.
+        # See the fixed LOO rule and its retained no-floor failure:
+        # research/fidelity/2026-10-26-server-timing-references/REPORT.md
+        upper = high + limits["spreadAllowance"] * max(high-low, limits.get("spreadFloor", 0))
         actual = lookup(candidate["summary"], path)
         n = lookup(candidate["summary"], path.rsplit(".", 1)[0] + ".n")
         ok = n >= minimum and actual is not None and math.isfinite(actual) and actual <= upper

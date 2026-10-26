@@ -133,7 +133,8 @@ def build(raw, out):
         pin = next(r for r in pins['artifacts'] if Path(r['path']).name == name)
         if tp.pc.sha256(raw / name) != pin['sha256']:
             raise ValueError('analysis hash mismatch: ' + name)
-    captures, full_captures, total, all_cadence, witnesses = [], [], tp.Samples(), defaultdict(list), []
+    captures, full_captures = [], []
+    total, full_total, all_cadence, witnesses = tp.Samples(), tp.Samples(), defaultdict(list), []
     for row in selected['batches']:
         batch = row['batch']
         name = f"{batch['round']}/{batch['id']}/network0.jsonl.gz"
@@ -166,11 +167,16 @@ def build(raw, out):
         report['path'], report['batch'], report['split'] = name, batch['id'], batch['split']
         report['connectionSetupEpochs'] = len(report.pop('connections'))
         report['summary'] = compact(report['summary'])
-        # The calibration corpus is development only; heldout remains separate.
+        # Retain the masked development/held-out characterization separately
+        # from the default gate's symmetric, unfiltered six-batch corpus.
         captures.append(report)
         if batch['split'] == 'development': total.merge(samples)
-        full, _ = tp.measure_capture(path)
-        full_captures.append(dict(batch=batch['id'], summary=compact(full['summary'])))
+        full, full_samples = tp.measure_capture(path)
+        full['path'], full['batch'], full['split'] = name, batch['id'], batch['split']
+        full['connectionSetupEpochs'] = len(full.pop('connections'))
+        full['summary'] = compact(full['summary'])
+        full_captures.append(full)
+        full_total.merge(full_samples)
         gaps = cadence(frames, clean)
         for key, values in gaps.items(): all_cadence[key].extend(values)
         if batch['split'] == 'heldout':
@@ -186,11 +192,14 @@ def build(raw, out):
         dataOrigin='captured', summaryOnly=True, provenance=provenance,
         toolSha256=tp.pc.sha256(Path(tp.__file__)), censusSha256=tp.pc.sha256(Path(tp.pc.__file__)),
         decoderSha256=provenance['decoderSha256'],
-        selection='Four completed development batches only; #111 admitted epochs, 1 s burn-in and frozen clean telemetry mask. Whole gap/ten-anchor windows must be clean.',
-        definitions=dict(delay='Original transport metric: centered +/-600-frame minimum before filtering; no slope correction. Not #111 excess gauge.',
-            limits='Exploratory observed envelope, correlated samples; two endpoints, one collector/path setup. No renderer or one-way delay claim.'),
-        captures=[r for r in captures if r['split'] == 'development'], excluded=[], summary=compact(total.summary()),
-        heldoutCaptures=[r for r in captures if r['split'] == 'heldout'], unfilteredCaptures=full_captures)
+        selection='All six completed #111 second-continuation batches, unfiltered: same measurement as candidates, without telemetry masking, epoch admission or burn-in. Failed attempts excluded.',
+        definitions=dict(delay='Original transport metric: centered +/-600-post-setup-frame minimum; no slope correction. Not #111 excess gauge.',
+            limits='False-reject control is only the fixed allowance LOO check over six captures; batch drift observed. No population error-rate guarantee, independent validation, renderer or one-way delay claim.'),
+        captures=full_captures, excluded=[], summary=compact(full_total.summary()),
+        maskedSelection='First-attempt server characterization: #111 admitted epochs, 1 s burn-in and frozen clean telemetry mask. Whole gap/ten-anchor windows must be clean.',
+        maskedDevelopmentCaptures=[r for r in captures if r['split'] == 'development'],
+        maskedDevelopmentSummary=compact(total.summary()),
+        heldoutCaptures=[r for r in captures if r['split'] == 'heldout'])
     cadence_fixture = dict(schemaVersion=1, wireProtocol=19, clientContract=None, dataOrigin='captured',
         provenance=provenance, sources=[dict(archive=r['path'], archiveSha256=r['sha256'], split=r['split']) for r in captures],
         selection='All six completed batches; consecutive same-prey j, l and combined M/V gaps; reset at setup/connection and prey y; whole intervals pass frozen clean telemetry mask. No metric-value filtering.',

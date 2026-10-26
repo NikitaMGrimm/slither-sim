@@ -19,8 +19,8 @@ results, failures and labels; updating a current reference does not rewrite them
 | Item / consumer | Source | Server or route intent | Action |
 | --- | --- | --- | --- |
 | `transport-official-reference.json`; original transport-parity study | 53 admitted of 58 home headless archives, complete manifest/hashes in fixture | Former default server delivery envelope includes route/collector effects | Retain byte-for-byte as explicit home-route case; never relabel |
-| `local_capture.py --reference`; research-workflow compare example | Previously the home transport fixture | Server transport parity | Default/example now `transport-official-near-server.json`; explicit home override remains |
-| `transport_parity.py compare`; `transport_tolerances.json` four gates | Per-capture quantiles from caller-selected reference | Server delivery when using new default; route case when home supplied | Preserve metric formulas, minimum 100 samples and zero spread allowance; rederive clean development envelope below |
+| `local_capture.py --reference`; research-workflow compare example | Previously home, now all six unfiltered #111 captures | Server transport parity | Default/example now `transport-official-near-server.json`, measured identically to candidates; explicit home override remains |
+| `transport_parity.py compare`; `transport_tolerances.json` four gates | Per-capture quantiles from caller-selected reference | Server delivery when using new default; route case when home supplied | Preserve measurement formulas and minimum 100 samples; default allowance selected by six-capture LOO with a frame-header resolution floor. Retain rejected zero-allowance attempt below |
 | `transport_parity.py measure`; synthetic `test_transport_parity.py` | Caller-provided raw data; synthetic tests | Measurement contract, no built-in official corpus | Add optional whole-interval selection for offline builder; ordinary measurements unchanged; test mask/baseline/window boundaries and default override |
 | `client-reporting-cadence.json`; fixture-version test | Home `official-r1/bot0.jsonl.gz`, SHA-256 `dd65ff79bf5cb258cf0d72c35af22d07e9c6ff06068b6679e1ec011bafcb8a60`, first setup epoch | Server-header prey/leaderboard timing, not receipt-tail fit | Retain original labels/counts; stop using it as current simulator cadence reference |
 | `unchanged_prey_positions_still_correct_client_prediction`; new nominal HUD test | New all-six-batch clean server-header summary | Nominal server release model | Use `client-reporting-cadence-near-server.json`; compare prey period to median within one simulation tick, and HUD periods to medians; do not adopt observed extrema as universal gates |
@@ -57,9 +57,14 @@ their compressed SHA-256s and capture-quality audits, plus the pinned developmen
 and validation output hashes, before measuring. It reads existing local files
 only. All six archives verified; no earlier interrupted stream is admitted.
 
-The transport fixture keeps four development batches as its calibration
-`captures`, two held-out batches separately, and all six unfiltered summaries.
-For calibration and held-out summaries, admit #111's epochs with at least 1000
+The transport fixture's default `captures` and pooled `summary` use all six
+completed batches unfiltered, exactly as ordinary `measure` candidates do:
+no telemetry mask, burn-in or epoch admission. The default thus retains later
+batch drift and collector stalls instead of comparing an unmasked candidate
+with a masked reference. Four `maskedDevelopmentCaptures`, their pooled
+`maskedDevelopmentSummary`, and two masked `heldoutCaptures` remain separate
+server characterization, preserving the first attempt's values.
+For those masked summaries, admit #111's epochs with at least 1000
 post-burn-in frames and 30 seconds; require a full one-second burn-in before
 every selected interval. Use its frozen telemetry stall windows and recorded
 coverage. A gap needs both original adjacent receipts and the whole interval
@@ -107,9 +112,9 @@ final tool source pin; only the final derivation supplies committed fixtures.
 
 ## First attempt: masked development envelope
 
-The method is unchanged: each upper limit is the **maximum eligible per-capture
+In the first attempt, each upper limit was the **maximum eligible per-capture
 quantile**, at least **100 samples** per metric, plus zero times its spread.
-The corpus is now clean development data. No candidate simulator measurement
+The corpus was clean development data. No candidate simulator measurement
 was used to tune it. These are exploratory envelopes, not confidence bounds.
 
 | Metric | Old home upper limit | New clean development upper limit | Held-out low / second |
@@ -119,8 +124,8 @@ was used to tune it. These are exploratory envelopes, not confidence bounds.
 | Server frame-gap p50, ms | 14 | 8 | 7 / 7 |
 | Transport excess-delay p90, ms | 13.771 | 1.090 | 1.089 / 1.096 |
 
-Rounded display values only; `compare` uses full fixture precision. Low held-out
-passes all four gates. Second held-out exceeds the delay p90 envelope by
+Rounded display values only; `compare` used full fixture precision. Low held-out
+passed all four gates. Second held-out exceeded the delay p90 envelope by
 **0.006 ms**; the other three gates pass. Preserve that failure, without using
 held-out data to expand the envelope or claiming independent validation passed.
 Full unfiltered summaries preserve the effect of masked collector intervals.
@@ -170,6 +175,61 @@ for the final six-capture envelope. This amendment does not supply a population
 false-reject guarantee; control remains only the LOO check on six captures with
 observed batch drift.
 
+### LOO results and final default limits
+
+The [full-precision LOO record](loo-results.json) evaluates every metric for every
+capture against the other five. No fixture values are rounded before comparison.
+The amended rule selects **1** as the smallest passing allowance:
+
+| Common allowance | Passing captures, all four gates | Failures |
+| --- | ---: | --- |
+| 0.5 | 4 / 6 | low-2 frame-gap p50: 8 > 7.5 ms; second-3 delay p90: 1.1330000000016298 > 1.1325000000078944 ms |
+| 1 | 6 / 6 | None |
+| 2 | 6 / 6 | None; not selected |
+
+Each cell below is **candidate / LOO upper limit** at allowance 1. Values are
+rounded to six decimals for display only; all 24 full-precision comparisons pass.
+
+| Left-out capture | Anchor receipt p50, world units | Anchor receipt p95, world units | Server frame-gap p50, ms | Excess-delay p90, ms |
+| --- | ---: | ---: | ---: | ---: |
+| low-1 | 0.842392 / 0.901981 | 2.380348 / 2.494097 | 7 / 9 | 1.097000 / 1.183000 |
+| second-1 | 0.789007 / 0.952024 | 2.346752 / 2.494097 | 7 / 9 | 1.083000 / 1.179000 |
+| low-2 | 0.732759 / 0.895777 | 2.285097 / 2.475312 | 8 / 8 | 1.091000 / 1.183000 |
+| second-2 | 0.806730 / 0.952024 | 2.383583 / 2.494097 | 7 / 9 | 1.087000 / 1.183000 |
+| low-3 | 0.789503 / 0.952024 | 2.303883 / 2.494097 | 7 / 9 | 1.116000 / 1.183000 |
+| second-3 | 0.817370 / 0.952024 | 2.389597 / 2.482068 | 7 / 9 | 1.133000 / 1.149000 |
+
+The final default envelope uses all six unfiltered captures and allowance 1:
+
+| Metric | Unfiltered six-capture min / max | Final upper limit |
+| --- | ---: | ---: |
+| Anchor receipt p50, world units | 0.7327593815430546 / 0.8423917110865347 | 0.9520240406300147 |
+| Anchor receipt p95, world units | 2.28509703735277 / 2.3895972465891475 | 2.494097455825525 |
+| Server frame-gap p50, ms | 7 / 8 | 9 |
+| Excess-delay p90, ms | 1.0829999999841675 / 1.1330000000016298 | 1.1830000000190921 |
+
+**False-reject control is only the LOO check over these six captures. Batch drift
+was observed.** This is not a population error-rate guarantee, an exchangeable
+six-server sample or independent held-out validation. All six now calibrate the
+default; “heldout” labels in the fixture describe their historical #111 role.
+The masked server characterization and both failed first attempts remain intact.
+
+Reproduce the amended calibration offline after building the fixture:
+
+```sh
+uv run --locked --only-group tools python -B research/fidelity/2026-10-26-server-timing-references/calibrate.py --reference tests/fixtures/transport-official-near-server.json --out <new-loo-output.json>
+```
+
+`--frame-spread-floor 0` reproduces the unsuccessful no-floor rule and exits
+nonzero after preserving its failure table. The initial evaluator also stopped
+with `ValueError: no allowance in the fixed set passes all six captures and four
+gates`; it now writes failed trials before returning failure. New regressions
+run the actual default comparison for every left-out capture, reject a synthetic
+candidate far above each metric's envelope in turn, enforce the floor's scope,
+and preserve the original masked held-out exceedance with allowance zero.
+Cadence and scheduler fixtures are byte-for-byte unchanged from `d7dda29`;
+their original builder pins remain historical identities.
+
 ## Scheduler witnesses and model decision
 
 Selection is fixed by the existing held-out question: minimum clean motion gap,
@@ -209,13 +269,22 @@ runtime default.
 Focused tests cover mask/window selection, default/home override, original
 transport regressions, fixture labels, the three new Rust decoder tests (four
 witnesses), nominal prey/HUD periods and unchanged death-food regressions.
-The complete Rust group passed (format, four Clippy configurations, default/core
+On the initial implementation, the complete Rust group passed (format, four Clippy configurations, default/core
 tests and doctests, C ABI tests, Python crate check and basic example). The tools
 group passed: **197** general Python tests, **41 + 185** fidelity Python tests,
 **253** Node tests, local transport/bot/C ABI smoke checks, wheel build and **28**
 wheel tests (**one skipped**). All **7** documentation checks passed. The first
 documentation run identified a missing research-index link; added it and reran
-successfully. No required check remains unrun.
+successfully.
+
+After the transport-gate correction, all **8** reference/LOO regressions,
+**18** transport regressions and **7** documentation checks passed. The complete
+tools group passed again: **197** general Python tests, **41 + 189** fidelity
+Python tests, **253** Node tests, local smoke checks, wheel build and **28** wheel
+tests (**one skipped**). Rebuilt and audited all six existing raw streams;
+verified that the masked summaries and original unfiltered numerical values
+remain identical to `d7dda29`. No Rust sources changed in this correction, so
+the previously passed Rust group was not repeated. Heavy local work is finished.
 Local checks run with at most four logical CPUs, `CARGO_BUILD_JOBS=2`, Rust test
 threads/Rayon limited to two; explicit Cargo commands use `-j 2`. No external
 game server, new capture or long-running background worker is used.
