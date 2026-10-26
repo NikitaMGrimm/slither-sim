@@ -935,6 +935,10 @@ impl Gateway {
     /// Accept and service sockets, take the world's frames and send those due.
     /// An error is a host failure; client faults only close that client.
     fn poll(&mut self) -> Result<(), String> {
+        // Newly accepted sessions keep this poll's budget through first service.
+        for session in &mut self.sessions {
+            session.rearm();
+        }
         let now = Instant::now();
         self.accept(now);
         while let Ok(batch) = self.deliveries.try_recv() {
@@ -1033,6 +1037,14 @@ impl Gateway {
 }
 
 impl Session {
+    fn rearm(&mut self) {
+        match &mut self.stage {
+            Stage::Http(mid) => mid.get_mut().get_mut().rearm(),
+            Stage::Open(open) => open.socket.get_mut().rearm(),
+            Stage::Closed => {}
+        }
+    }
+
     fn joined(&self) -> bool {
         matches!(&self.stage, Stage::Open(open) if matches!(open.phase, Phase::Playing(_)))
     }
@@ -1041,17 +1053,14 @@ impl Session {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
-            Stage::Http(mut mid) => {
-                mid.get_mut().get_mut().rearm();
-                match mid.handshake() {
-                    Ok(socket) => Stage::Open(Box::new(Open::new(
-                        socket,
-                        self.physical_food.load(Ordering::Relaxed),
-                    ))),
-                    Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                    Err(HandshakeError::Failure(_)) => Stage::Closed,
-                }
-            }
+            Stage::Http(mid) => match mid.handshake() {
+                Ok(socket) => Stage::Open(Box::new(Open::new(
+                    socket,
+                    self.physical_food.load(Ordering::Relaxed),
+                ))),
+                Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
+                Err(HandshakeError::Failure(_)) => Stage::Closed,
+            },
             Stage::Open(mut open) => {
                 if open.service(gate, now, wall, age)? {
                     Stage::Open(open)
@@ -1086,7 +1095,6 @@ impl<S: io::Read + io::Write> Open<S> {
         wall: f64,
         age: Duration,
     ) -> Result<bool, String> {
-        self.socket.get_mut().rearm();
         if let Phase::Closing(deadline) = self.phase {
             return Ok(now < deadline && self.drain_close());
         }
@@ -1614,6 +1622,7 @@ mod tests {
     struct Readable {
         bytes: VecDeque<u8>,
         read: usize,
+        first_read: Option<usize>,
     }
 
     impl io::Read for Readable {
@@ -1621,7 +1630,12 @@ mod tests {
             if self.bytes.is_empty() {
                 return Err(io::ErrorKind::WouldBlock.into());
             }
-            let n = bytes.len().min(self.bytes.len());
+            let limit = if self.read == 0 {
+                self.first_read.unwrap_or(usize::MAX)
+            } else {
+                usize::MAX
+            };
+            let n = bytes.len().min(self.bytes.len()).min(limit);
             for byte in &mut bytes[..n] {
                 *byte = self.bytes.pop_front().unwrap();
             }
@@ -1639,19 +1653,62 @@ mod tests {
         }
     }
 
-    #[test]
-    fn fragmented_input_yields_and_resumes_within_raw_read_budget() {
-        let (mut gateway, _simulation) = pit_gateway();
+    fn fragmented_framing_request() -> Vec<u8> {
         let mut bytes = vec![2, 128, 0, 0, 0, 0];
         for _ in 0..100_000 {
             bytes.extend([0, 128, 0, 0, 0, 0]);
         }
         // Complete a framing request only after all the empty continuations.
         bytes.extend([128, 129, 0, 0, 0, 0, 1]);
+        bytes
+    }
+
+    #[test]
+    fn pipelined_upgrade_and_input_share_the_first_read_budget() {
+        let (mut gateway, _simulation) = pit_gateway();
+        let mut bytes = b"GET /slither HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n".to_vec();
+        let header_bytes = bytes.len();
+        bytes.extend(fragmented_framing_request());
+        let socket = tungstenite::accept_hdr_with_config(
+            ReadBudget::new(Readable {
+                bytes: bytes.into(),
+                read: 0,
+                first_read: Some(header_bytes),
+            }),
+            Upgrade(Arc::new(AtomicBool::new(false))),
+            Some(socket_config()),
+        )
+        .unwrap();
+        let mut open = Open::new(socket, false);
+        assert!(open.socket.get_ref().inner.read > 0);
+        let now = Instant::now();
+        // Acceptance and first service belong to the same gateway poll.
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+            .unwrap();
+        assert!(open.socket.get_ref().inner.read <= MAX_RAW_READ_BYTES);
+        assert_eq!(open.phase, Phase::Hello { framed: false });
+        // Later polls resume the parser and eventually complete the request.
+        for _ in 0..32 {
+            if open.phase == (Phase::Hello { framed: true }) {
+                break;
+            }
+            open.socket.get_mut().rearm();
+            open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+                .unwrap();
+        }
+        assert_eq!(open.phase, Phase::Hello { framed: true });
+        assert_eq!(open.framing, Framing::Bare);
+    }
+
+    #[test]
+    fn fragmented_input_yields_and_resumes_within_raw_read_budget() {
+        let (mut gateway, _simulation) = pit_gateway();
+        let bytes = fragmented_framing_request();
         let socket = WebSocket::from_raw_socket(
             ReadBudget::new(Readable {
                 bytes: bytes.into(),
                 read: 0,
+                first_read: None,
             }),
             tungstenite::protocol::Role::Server,
             Some(socket_config()),
@@ -1666,6 +1723,7 @@ mod tests {
             if open.phase == (Phase::Hello { framed: true }) {
                 break;
             }
+            open.socket.get_mut().rearm();
             open.service(&mut gateway.gate, now, 0., Duration::ZERO)
                 .unwrap();
         }
