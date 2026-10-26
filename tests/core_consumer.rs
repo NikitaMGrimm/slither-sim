@@ -20,6 +20,49 @@ fn empty_world() -> Simulator {
 }
 
 #[test]
+fn scenario_errors_identify_the_duplicate_or_invalid_slot() {
+    let mut source = empty_world();
+    source
+        .spawn(
+            "source".into(),
+            vec![Point::default(), Point { x: -42., y: 0. }],
+            0.,
+        )
+        .unwrap();
+    let life = slither_sim::ReplayLife::from_observed(
+        source.snakes()[0].clone(),
+        slither_sim::InitialSpeed::Infer(source.snakes()[0].speed),
+    );
+    let config = source.config().clone();
+    let duplicate = Simulator::from_scenario(
+        7,
+        config.clone(),
+        slither_sim::Scenario {
+            snakes: vec![("same".into(), life.clone()), ("same".into(), life.clone())],
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(duplicate.kind, slither_sim::ErrorKind::DuplicateId);
+    assert_eq!(duplicate.slot, Some(1));
+    assert_eq!(duplicate.field.as_deref(), Some("id"));
+
+    let mut invalid = life.clone();
+    invalid.heading = f64::NAN;
+    let replay = Simulator::from_scenario(
+        7,
+        config,
+        slither_sim::Scenario {
+            snakes: vec![("first".into(), life), ("second".into(), invalid)],
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(replay.slot, Some(1));
+    assert_eq!(replay.field.as_deref(), Some("heading"));
+}
+
+#[test]
 fn large_spawn_headings_preserve_orientation_and_can_turn() {
     for operation in ["spawn", "respawn", "respawn_body"] {
         let mut world = empty_world();

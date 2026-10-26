@@ -129,9 +129,9 @@ is explicitly enabled. This is a startup capacity policy, not an official radius
 Sandbox, Battledome and explicit JSON radii opt out unless `sizeToPopulation`
 is explicitly enabled. Larger radii are never shrunk. Rust callers choosing a
 custom fixed radius set `size_to_population` false. Resolved configs and
-checkpoints retain the flag. `Simulator::new` alone has no population argument
-and preserves the supplied radius; `Config::official(n)` selects that initial
-size directly. Adding or respawning snakes does not reapply startup sizing.
+checkpoints retain the flag. Core `Simulator::new(WorldOptions { .. })`
+construction preserves the supplied Config; `Config::official(n)` selects that
+initial size directly. Adding or respawning snakes does not reapply startup sizing.
 
 ### Official and sandbox
 

@@ -269,11 +269,21 @@ impl Simulator {
 
     pub fn from_scenario(seed: u32, config: Config, scenario: Scenario) -> Result<Self, SimError> {
         let mut world = Self::empty(seed, config)?;
+        let mut unique = HashSet::new();
+        unique
+            .try_reserve(scenario.snakes.len())
+            .map_err(|_| allocation())?;
+        for (slot, (id, _)) in scenario.snakes.iter().enumerate() {
+            if !unique.insert(id.as_str()) {
+                return Err(SimError::new(ErrorKind::DuplicateId, "Duplicate agent id")
+                    .at_slot(slot)
+                    .at_field("id"));
+            }
+        }
         world.reserve_slots(scenario.snakes.len())?;
-        for (id, life) in scenario.snakes {
-            world.check_id(&id)?;
-            let (snake, speed) = world.replay_snake(id, life)?;
-            world.push_life(snake, speed)?;
+        for (slot, (id, life)) in scenario.snakes.into_iter().enumerate() {
+            let (snake, speed) = world.replay_snake(id, life).map_err(|e| e.at_slot(slot))?;
+            world.push_life(snake, speed).map_err(|e| e.at_slot(slot))?;
         }
         world.replace_food(scenario.food)?;
         world.replace_prey(scenario.prey)?;

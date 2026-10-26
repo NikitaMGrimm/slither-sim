@@ -703,6 +703,37 @@ mod reset_tests {
     use super::*;
 
     #[test]
+    fn prepared_reset_sizes_before_validation_and_keeps_official_prey_density() {
+        let prepared = Session::prepare_reset(ResetOptions {
+            agents: NonZeroU32::new(484).unwrap(),
+            config: Config {
+                // This ring fits only after population sizing enlarges the default arena.
+                spawn_radius: Some(1000.),
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::default()
+            },
+            ..ResetOptions::default()
+        })
+        .unwrap();
+        assert_eq!(prepared.summary().config.radius, 14_740.);
+        assert_eq!(prepared.summary().config.prey.count, 68);
+        assert!(prepared.summary().config.size_to_population);
+        let mut typed = Session::new();
+        typed.commit_reset(prepared);
+        let mut json = Session::new();
+        let reply: serde_json::Value = serde_json::from_slice(&json.request(
+            br#"{"op":"reset","agents":484,"config":{"spawnRadius":1000,"foodCount":0,"ambientReplenishPerSecond":0}}"#,
+        ))
+        .unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(
+            typed.current.as_ref().unwrap().worlds[0].frame.encode(),
+            json.current.as_ref().unwrap().worlds[0].frame.encode()
+        );
+    }
+
+    #[test]
     fn maximum_config_radius_resets_and_checkpoints() {
         let mut session = Session::new();
         let reply: serde_json::Value = serde_json::from_slice(&session.request(

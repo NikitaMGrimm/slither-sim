@@ -25,7 +25,6 @@
   `update_mass` and the two-call speed import are removed. Flat config keys,
   default wire replies and contract IDs remain unchanged
   ([Rust API](docs/bot-api.md#rust-library)).
-
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
   and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
   use `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot
