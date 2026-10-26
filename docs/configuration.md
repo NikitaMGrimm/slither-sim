@@ -341,6 +341,9 @@ Against uniform jitter, held-out KS distance improves from 0.30 to 0.04, but
 p99 is overpredicted by about 30% and some correlation is missed. Base RTT assumes
 within-tick replies, as the host gives; even splitting and mirrored uplink are
 assumptions. Use only without a real path, for in-process bots or loopback players.
+A later [remote timing study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md)
+near the server saw almost none of these pauses, so they describe the fitted home
+route and collector, not the server.
 
 ## NetworkConfig
 
