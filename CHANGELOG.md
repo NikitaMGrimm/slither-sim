@@ -4,16 +4,21 @@
 
 ### Changed
 
-- Stock leaderboards rank exact rolling kills in worlds with `killScoreSeconds`,
-  including dead/disconnected seats with recent kills. Pit minimaps hide outer
-  snake cells and default to 256; other worlds keep 136. **Breaking Rust config:**
-  `SimulationConfig.minimap_side` is now `Option<usize>` (`None` selects the mode
-  default, `Some(side)` overrides it); JSON accepts an integer or `null`.
-- Pit-edge pellets remain visible during shrink: overlap marker generations
-  while replacements use the stock rapid fade. Growth still replaces the ring
-  immediately; the short outward trail does not change the lethal boundary.
+- **Breaking:** in worlds with `killScoreSeconds` (Battledome), the stock
+  leaderboard and own rank show rolling kills instead of size. Players who left
+  stay listed while their kills count; a new player in their seat starts at
+  zero. Pit worlds' minimaps show only snakes inside the pit and default to 256
+  cells (136 elsewhere), so `SimulationConfig.minimap_side` is now
+  `Option<usize>`; JSON accepts an integer or `null`.
 - Linux hosting resource guidance now includes real socket tests on one Zen 4
   and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
+
+### Fixed
+
+- The pit-edge pellet ring stays visible while the arena shrinks. Replacement
+  pellets used to restart the stock client's fade-in before it finished, so the
+  ring could stay nearly invisible
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-stock-presentation/REPORT.md)).
 
 ### Performance
 
