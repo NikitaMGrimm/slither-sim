@@ -76,8 +76,11 @@ in a fixed official-size world, or 80 socket clients with the Battledome preset.
 They run without bot workers. Each client sends a scripted circle command every
 100 ms and logs in again after death; a separate child process drains messages.
 Linux sampling pins all host threads to one logical CPU and the driver to a
-second. Samples connect every socket, warm for one second, then observe at least
-286 physics ticks with a 20-second progress timeout. They report process CPU over
+second. Samples open every socket, warm for one second, allow up to five additional
+untimed seconds for every slot to connect, then observe at least 286 physics
+ticks with a 20-second progress timeout and every socket connected at both
+measurement boundaries. Death reconnects and temporary capacity refusals wait
+100 ms before retrying while other clients continue draining; refusal counts remain. They report process CPU over
 that window, simulation busy wall, elapsed wall, tick/deferred counts, connected
 and living-client diagnostics. CPU excludes the child driver. Counts normalize
 to the requested ticks; raw actual counts remain. These rows support timing,

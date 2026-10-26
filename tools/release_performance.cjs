@@ -2,7 +2,7 @@
 const { marker: reportMarker, savedComment, bot } = require('./pr_report_comment.cjs');
 const marker = '<!-- slither-release-performance -->';
 const sha = /^[0-9a-f]{40}$/;
-const labels = new Set(['Faster', 'Slower', 'Within', 'Undecided', 'Unavailable']);
+const labels = new Set(['Faster', 'Slower', 'Within', 'Undecided', 'Unavailable', 'Redefined']);
 
 function releasePR(pr, repository) {
   return pr.state === 'open' && pr.user?.login === 'github-actions[bot]' &&
@@ -11,6 +11,7 @@ function releasePR(pr, repository) {
 
 function metricText(metric) {
   if (!metric || !labels.has(metric.label)) return 'Unavailable';
+  if (metric.label === 'Redefined') return 'Redefined (head only; see source)';
   const interval = metric.interval;
   if (!Number.isFinite(metric.change) || !Array.isArray(interval) || interval.length !== 2 || !interval.every(Number.isFinite)) {
     return `${metric.label} (interval unavailable)`;
@@ -36,14 +37,19 @@ function render({ baseline, candidate, rows, unavailable }) {
   const lines = [marker, '## Release performance evidence', '',
     `Published baseline: [${baseline.tag_name}](${baseline.html_url}) (\`${baseline.commit}\`) · pinned main candidate: \`${candidate}\`.`, '',
     'Advisory evidence from original PR merge previews since that release. Each row has its own baseline and uncertainty; percentages are never summed. These rows do not measure the accumulated shipped-tree change.', '',
-    '| PR | Evidence | step-default | official-100-bot |', '| --- | --- | --- | --- |'];
+    '| PR | Evidence | Host / historical canary | official-100-bot |', '| --- | --- | --- | --- |'];
   for (const row of rows) {
     const text = name => metricText(row.metrics.find(m => m.case === name));
-    lines.push(`| [#${row.pr.number}](${row.pr.html_url}) | [${row.status}](${row.url}) | ${text('step-default')} | ${text('official-100-bot')} |`);
+    const host = row.metrics.find(m => m.case === 'host-official-500');
+    const legacy = row.metrics.find(m => m.case === 'step-default');
+    const headline = host && host.label !== 'Unavailable' ? host : legacy && legacy.label !== 'Unavailable' ? legacy : host || legacy;
+    const unit = headline?.metric === 'cpuSeconds' ? 'CPU' : headline?.metric === 'wallSeconds' ? 'wall' : 'historical metric';
+    const hostText = headline ? `\`${headline.case}\` (${unit}): ${metricText(headline)}` : 'Unavailable';
+    lines.push(`| [#${row.pr.number}](${row.pr.html_url}) | [${row.status}](${row.url}) | ${hostText} | ${text('official-100-bot')} |`);
   }
   if (!rows.length) lines.push('| — | No merged PR comparisons in this release range | — | — |');
   if (unavailable) lines.push('', `⚠️ ${unavailable}`);
-  lines.push('', 'Faster / Slower / Within ±5% / Undecided / Unavailable retain their source meaning. Missing and failed results are not zero changes. Hosted labels remain conditional on the timing model; calibration is not established.', '',
+  lines.push('', 'Faster / Slower / Within ±5% / Undecided / Unavailable / Redefined retain their source meaning. Host rows replace the historical step canary; their workload and CPU/wall unit remain explicit. Missing and failed results are not zero changes. Hosted labels remain conditional on the timing model; calibration is not established.', '',
     'A direct previous-published-tag versus pinned release-candidate comparison requires an explicit on-demand measurement; this consolidation starts no measurements.', '',
     `<!-- slither-release-inputs: ${JSON.stringify({ baseline: baseline.tag_name, candidate, reports: rows.map(r => [r.pr.number, r.saved?.run ?? null, r.saved?.attempt ?? null, r.saved?.sequence ?? null, r.saved?.state ?? 'missing']) })} -->`, '');
   return lines.join('\n');

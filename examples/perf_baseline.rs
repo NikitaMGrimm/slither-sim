@@ -417,7 +417,7 @@ impl Driver {
         Ok(match self {
             Driver::Socket(clients, battledome) => json!({
                 "clients": clients, "config": socket_config(clients, battledome),
-                "warmupSeconds": 1, "driver": "separate socket-driver process; circle commands every 100 ms; reconnect on death",
+                "warmupSeconds": 1, "driver": "separate socket-driver process; circle commands every 100 ms; reconnect on death; capacity refusals retry after 100 ms; all clients connected at window boundaries; up to 5 s untimed admission wait",
                 "operation": "host process CPU and simulation busy wall time per completed physics tick",
             }),
             Driver::SharedPolicy => json!({
@@ -2258,6 +2258,51 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn head_configs_replace_runtime_defaults_in_a_fresh_process() {
+        let mut config = Config::official(100);
+        config.radius = 1234.;
+        config.dynamic_radius = false;
+        let path = std::env::temp_dir().join(format!(
+            "slither-perf-config-{}-{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        serde_json::to_writer(&mut file, &json!({"world:Official(100)": config})).unwrap();
+        drop(file);
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "tests::pinned_config_child", "--test-threads=1"])
+            .env("SLITHER_PERF_CONFIGS", &path)
+            .env("SLITHER_PERF_CONFIG_TEST_CHILD", "1")
+            .output()
+            .unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn pinned_config_child() {
+        if std::env::var_os("SLITHER_PERF_CONFIG_TEST_CHILD").is_none() {
+            return;
+        }
+        let config = World::Official(100).config();
+        assert_eq!(config.radius, 1234.);
+        assert!(!config.dynamic_radius);
+    }
 
     const MAX_TRACE_ITERATIONS: usize = 1000;
     /// PR CI times and traces every `ci` row within its job budget.

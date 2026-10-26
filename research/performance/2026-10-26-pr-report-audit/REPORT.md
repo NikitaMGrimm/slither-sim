@@ -148,3 +148,12 @@ observe 1.500 / 1.885, official-100-step 1.555 / 2.160 and official-100-bot
 operation cost from those values alone. The runner's `perf stat -e instructions`
 probe failed because hardware events were unavailable at its existing access
 policy; Valgrind was not installed. No runner security settings were changed.
+
+The [third PR run](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40379153116)
+at head `027d6e5` completed with both socket rows Unavailable. Retained stderr
+identified `Server is full` on replacement logins: dropping the old TCP session
+alone does not wait for physics to consume its disconnect and free the seat.
+The driver now retries deaths/capacity refusals after 100 ms, draining the other
+clients meanwhile. The exact requested connected count is still required at
+measurement boundaries, with a bounded untimed admission wait. This is a driver
+lifecycle correction, not evidence that the runner cannot support 500 clients.

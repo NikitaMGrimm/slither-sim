@@ -311,11 +311,21 @@ pub fn socket_driver() -> Result<(), String> {
     let (mut packets, mut bytes) = (0u64, 0u64);
     let mut lives: Vec<_> = (0..count).map(|_| LoadLife::default()).collect();
     let mut minimum_playing = count;
+    let mut retry_at = vec![started; count];
+    let mut reconnects = 0u64;
+    let mut refusals = 0u64;
     while !stop.load(Ordering::Relaxed) {
         let command = Instant::now() >= steer;
         for (i, connection) in sockets.iter_mut().enumerate() {
-            let mut socket = connection.take().ok_or("missing load socket")?;
+            let Some(mut socket) = connection.take() else {
+                if Instant::now() >= retry_at[i] {
+                    *connection = Some(connect_slot(i)?);
+                    reconnects += 1;
+                }
+                continue;
+            };
             let mut died = false;
+            let mut refused = false;
             for _ in 0..64 {
                 match socket.read() {
                     Ok(Message::Binary(data)) => {
@@ -326,6 +336,11 @@ pub fn socket_driver() -> Result<(), String> {
                         if died {
                             break;
                         }
+                    }
+                    Ok(Message::Close(Some(reason))) if reason.reason == "Server is full" => {
+                        refused = true;
+                        refusals += 1;
+                        break;
                     }
                     Ok(Message::Close(reason)) => {
                         return Err(format!("load socket {i} closed: {reason:?}"));
@@ -339,11 +354,12 @@ pub fn socket_driver() -> Result<(), String> {
                     Err(e) => return Err(e.to_string()),
                 }
             }
-            if died {
-                // Socket sessions keep their Playing generation after death.
-                // Reconnect through a new TCP session, as NetworkBackend does.
+            if died || refused {
+                // Disconnect commands must reach physics before the gateway can
+                // reuse a seat. Retry later while draining every other client.
                 drop(socket);
-                socket = connect_slot(i)?;
+                retry_at[i] = Instant::now() + Duration::from_millis(100);
+                continue;
             }
             if command {
                 let heading = ((started.elapsed().as_secs_f64() * 1.2
@@ -373,7 +389,8 @@ pub fn socket_driver() -> Result<(), String> {
     println!(
         "{}",
         serde_json::json!({"packets": packets, "bytes": bytes, "joins": lives.iter().map(|life| life.joins).sum::<u64>(), "deaths": lives.iter().map(|life| life.deaths).sum::<u64>(),
-        "playingAtEnd": lives.iter().filter(|life| life.playing).count(), "minimumPlaying": minimum_playing})
+        "playingAtEnd": lives.iter().filter(|life| life.playing).count(), "minimumPlaying": minimum_playing, "reconnects": reconnects, "refusals": refusals,
+        "connectedAtEnd": sockets.iter().filter(|s| s.is_some()).count()})
     );
     Ok(())
 }
@@ -433,13 +450,17 @@ pub fn benchmark(
             return Err("socket driver did not become ready".into());
         }
         thread::sleep(Duration::from_secs(1));
-        if host.players() != clients {
+        let admission_wait = Instant::now();
+        while host.players() != clients && admission_wait.elapsed() < Duration::from_secs(5) {
+            thread::sleep(Duration::from_millis(1));
+        }
+        let connected_before = host.players();
+        if connected_before != clients {
             return Err(format!(
-                "only {}/{} sockets connected",
-                host.players(),
-                clients
+                "only {connected_before}/{clients} sockets connected after warmup"
             ));
         }
+        let admission_wait_seconds = admission_wait.elapsed().as_secs_f64();
         let (before, busy, deferred, cpu, start) = (
             host.ticks(),
             host.simulation_seconds(),
@@ -447,7 +468,7 @@ pub fn benchmark(
             cpu_seconds(),
             Instant::now(),
         );
-        while host.ticks() - before < ticks as u64 {
+        while host.ticks() - before < ticks as u64 || host.players() != clients {
             if start.elapsed().as_secs_f64() > 20. {
                 return Err("socket host failed to complete tick window".into());
             }
@@ -483,7 +504,7 @@ pub fn benchmark(
             "mode": "timing", "iterations": ticks, "seed": 7,
             "timing": {"operations": ticks, "wallSeconds": wall * scale, "cpuSeconds": cpu.map(|v| v * scale),
                 "scope": "host CPU across simulation/socket threads, excluding child load generator; simulation busy wall separately; normalized to requested ticks"},
-            "details": {"clients": clients, "connected": connected, "actualTicks": actual,
+            "details": {"clients": clients, "connected": connected, "connectedBefore": connected_before, "admissionWaitSeconds": admission_wait_seconds, "actualTicks": actual,
                 "deferredTicks": deferred, "elapsedSeconds": elapsed, "driver": driver,
                 "hostCpu": std::env::var("SLITHER_LOAD_HOST_CPU").ok(), "driverCpu": std::env::var("SLITHER_LOAD_DRIVER_CPU").ok()}}),
         )

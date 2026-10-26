@@ -48,8 +48,9 @@ The PR timing budget covers six rows: `step-food`, `observe`,
 `host-battledome-80`. The socket rows reuse `host_load`, with no background bot
 workers, a separate load-generator process, one host CPU and a second driver CPU.
 Official uses a fixed official-size 500-seat world; Battledome uses its preset.
-Each sample warms for one second after connecting all sockets, then measures
-286 physics ticks. Connected/living counts, admissions, deaths, bytes, deferred
+Each sample warms for one second after opening all sockets, allows up to five
+additional untimed seconds for every slot to connect, then measures at least
+286 physics ticks, ending at a boundary with every socket connected. Connected/living counts, admissions, deaths, bytes, deferred
 ticks and actual tick counts stay in the raw record. This is a short synthetic
 load, not sustained capacity qualification or an 80-living-snake guarantee.
 
@@ -285,9 +286,11 @@ trigger it; see the [workflow_run documentation](https://docs.github.com/en/acti
 A separate bot-owned comment on the rolling `release-plz-*` PR consolidates merged
 PR reports since the latest published release tag, pinned to that tag's commit
 and the current main candidate. It preserves all outcome-label counts and exposes
-two preselected headline workloads (`step-default`, `official-100-bot`) with their
+two headline columns (`host-official-500`, with `step-default` retained for
+historical reports, and `official-100-bot`) with their
 own uncertainty and source links. Missing, historical, failed and incomplete
-reports stay explicit. Preview measurements are not relabeled as shipped-tree
+reports stay explicit. Redefined outcomes stay head-only; host workload names
+and CPU/wall units remain explicit. Preview measurements are not relabeled as shipped-tree
 measurements, and PR percentages are never summed.
 
 Cheap refreshes follow terminal PR reporting, merges, and completion of Release PR
