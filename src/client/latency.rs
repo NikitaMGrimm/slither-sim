@@ -69,6 +69,13 @@ impl LatencyConfig {
     }
     /// Fixed one-way delays, without variation or pauses.
     pub fn one_way(uplink_seconds: f64, downlink_seconds: f64) -> Self {
+        // Preserve invalid legs for validate instead of letting them cancel.
+        if [uplink_seconds, downlink_seconds]
+            .iter()
+            .any(|v| !v.is_finite() || *v < 0.)
+        {
+            return Self::fixed(f64::NAN);
+        }
         let round_trip = uplink_seconds + downlink_seconds;
         Self {
             uplink_share: if round_trip > 0. {
@@ -132,12 +139,13 @@ impl LatencyConfig {
         }
         self.variation.validate()?;
         self.pauses.validate()?;
-        // Delays are added to clocks; the largest possible draw must be finite.
+        // Preflight individual draws; accumulated OU states and clock additions
+        // still need runtime finiteness checks.
         let base = self.round_trip_seconds.iter().copied().fold(0., f64::max);
         let round_trip = base * (self.round_trip_spread * max_normal()).exp();
-        if !(round_trip + self.variation.largest()).is_finite() {
+        if !(round_trip + self.variation.initial_largest()).is_finite() {
             return Err(
-                "Largest delay (roundTripSeconds × exp(8.57 × roundTripSpread) + \
+                "Initial delay bound (roundTripSeconds × exp(8.57 × roundTripSpread) + \
                  medianSeconds × exp(12.1 × logSigma)) must be finite"
                     .into(),
             );
@@ -180,8 +188,9 @@ impl Variation {
         }
         Ok(())
     }
-    /// Largest draw: `√c·X + √(1−c)·Z` is at most `√2 × 8.57`, about 12.1.
-    fn largest(&self) -> f64 {
+    /// Bound for a fresh stationary state plus fast noise. Later OU states
+    /// accumulate innovations and are not bounded by a single normal draw.
+    fn initial_largest(&self) -> f64 {
         let normal = std::f64::consts::SQRT_2 * max_normal();
         if self.median_seconds > 0. {
             self.median_seconds * (self.log_sigma * normal).exp()
@@ -276,11 +285,24 @@ struct Stream {
     next_pause: Option<f64>,
 }
 impl Stream {
-    fn deliver(&mut self, config: &LatencyConfig, random: &mut Random, base: f64, at: f64) -> f64 {
-        let due = at + base + self.variation(&config.variation, random, at);
-        let held = self.hold(&config.pauses, random, due);
+    fn deliver(
+        &mut self,
+        config: &LatencyConfig,
+        random: &mut Random,
+        base: f64,
+        at: f64,
+    ) -> Result<f64, String> {
+        let variation = self.variation(&config.variation, random, at);
+        if !variation.is_finite() {
+            return Err("Latency variation must be finite".into());
+        }
+        let due = at + base + variation;
+        if !due.is_finite() {
+            return Err("Latency delivery time must be finite".into());
+        }
+        let held = self.hold(&config.pauses, random, due)?;
         self.last = self.last.max(held);
-        self.last
+        Ok(self.last)
     }
 
     fn variation(&mut self, variation: &Variation, random: &mut Random, at: f64) -> f64 {
@@ -309,14 +331,24 @@ impl Stream {
     /// When a message due at `due` leaves the pauses. Pauses are generated in
     /// start order; only the latest merged one matters, since an earlier pause
     /// ended before a message already delivered.
-    fn hold(&mut self, pauses: &Pauses, random: &mut Random, due: f64) -> f64 {
+    fn hold(&mut self, pauses: &Pauses, random: &mut Random, due: f64) -> Result<f64, String> {
         if !pauses.enabled() {
-            return due;
+            return Ok(due);
         }
         let gap = 1. / pauses.rate_per_second;
-        let mut next = *self
-            .next_pause
-            .get_or_insert_with(|| due + random.exponential(gap));
+        // A positive draw can round back onto a large clock. Never spin there.
+        let advance = |random: &mut Random, from: f64| {
+            let next = from + random.exponential(gap);
+            if next.is_finite() && next > from {
+                Ok(next)
+            } else {
+                Err("Latency pause start cannot advance the clock".to_string())
+            }
+        };
+        let mut next = match self.next_pause {
+            Some(next) => next,
+            None => advance(random, due)?,
+        };
         loop {
             let (start, end) = self.pause;
             let inside = start <= due && due < end;
@@ -324,17 +356,20 @@ impl Stream {
             if next > due && !(inside && next <= end) {
                 break;
             }
-            let length = random.exponential(pauses.mean_seconds);
+            let pause_end = next + random.exponential(pauses.mean_seconds);
+            if !pause_end.is_finite() {
+                return Err("Latency pause end must be finite".into());
+            }
             self.pause = if next <= end {
-                (start, end.max(next + length))
+                (start, end.max(pause_end))
             } else {
-                (next, next + length)
+                (next, pause_end)
             };
-            next += random.exponential(gap);
+            next = advance(random, next)?;
         }
         self.next_pause = Some(next);
         let (start, end) = self.pause;
-        if start <= due && due < end { end } else { due }
+        Ok(if start <= due && due < end { end } else { due })
     }
 
     /// Move every stored time `seconds` earlier.
@@ -392,7 +427,12 @@ impl Link {
         }
     }
     /// Arrival time at the server of a message the client sends at `sent`.
-    pub(crate) fn uplink(&mut self, config: &LatencyConfig, random: &mut Random, sent: f64) -> f64 {
+    pub(crate) fn uplink(
+        &mut self,
+        config: &LatencyConfig,
+        random: &mut Random,
+        sent: f64,
+    ) -> Result<f64, String> {
         let base = self.round_trip * config.uplink_share;
         self.uplink.deliver(config, random, base, sent)
     }
@@ -402,7 +442,7 @@ impl Link {
         config: &LatencyConfig,
         random: &mut Random,
         emitted: f64,
-    ) -> f64 {
+    ) -> Result<f64, String> {
         let base = self.round_trip * (1. - config.uplink_share);
         self.downlink.deliver(config, random, base, emitted)
     }
@@ -426,6 +466,97 @@ impl Link {
 mod tests {
     use super::*;
 
+    #[test]
+    fn cancelling_and_nonfinite_one_way_legs_are_rejected() {
+        for (up, down) in [(-1., 1.), (1., -1.), (f64::NAN, 0.), (0., f64::INFINITY)] {
+            assert!(
+                LatencyConfig::one_way(up, down).validate().is_err(),
+                "{up}, {down}"
+            );
+        }
+        for (up, down) in [(0., 0.), (0., 1.), (1., 0.), (0.1, 0.2)] {
+            LatencyConfig::one_way(up, down).validate().unwrap();
+        }
+    }
+
+    #[test]
+    fn unrepresentable_pause_progress_returns_an_error() {
+        const CHILD: &str = "SLITHER_PAUSE_PROGRESS_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let config = crate::client::SimulationConfig {
+                latency: LatencyConfig {
+                    pauses: Pauses {
+                        rate_per_second: 1.,
+                        mean_seconds: 0.01,
+                    },
+                    ..LatencyConfig::fixed(1e20)
+                },
+                ..Default::default()
+            };
+            config.validate().unwrap();
+            let error = crate::client::SimulatorBackend::new(1, config)
+                .err()
+                .expect("pause clock must fail explicitly");
+            assert!(
+                error.contains("pause") && error.contains("advance"),
+                "{error}"
+            );
+            return;
+        }
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "client::latency::tests::unrepresentable_pause_progress_returns_an_error",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .spawn()
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(status.success());
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                panic!("pause generation did not finish within watchdog deadline");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    #[test]
+    fn accumulated_ou_variation_and_due_times_must_be_finite() {
+        let config = LatencyConfig {
+            variation: Variation {
+                median_seconds: 1.,
+                log_sigma: 50.,
+                correlated_share: 1.,
+                correlation_seconds: 1.,
+            },
+            ..Default::default()
+        };
+        config.validate().unwrap();
+        // Scripted innovations within the individual draw bound reach this state.
+        let mut state = 8.;
+        for _ in 0..3 {
+            state = 0.8 * state + (1.0_f64 - 0.8 * 0.8).sqrt() * 8.;
+        }
+        assert!(state > max_normal());
+        let mut stream = Stream {
+            state,
+            state_at: Some(0.),
+            ..Default::default()
+        };
+        let result = stream.deliver(&config, &mut Random::new(1), 0., 0.);
+        assert!(result.unwrap_err().contains("variation"));
+        let mut stream = Stream::default();
+        let result = stream.deliver(&LatencyConfig::default(), &mut Random::new(1), 1e308, 1e308);
+        assert!(result.unwrap_err().contains("delivery time"));
+    }
+
     /// Deliveries of messages sent every `step` seconds for `seconds`.
     fn deliveries(config: &LatencyConfig, step: f64, seconds: f64) -> Vec<(f64, f64)> {
         let mut random = Random::new(5);
@@ -433,7 +564,7 @@ mod tests {
         (0..(seconds / step) as usize)
             .map(|i| {
                 let sent = i as f64 * step;
-                (sent, link.downlink(config, &mut random, sent))
+                (sent, link.downlink(config, &mut random, sent).unwrap())
             })
             .collect()
     }
@@ -511,15 +642,19 @@ mod tests {
         };
         let mut random = Random::new(152);
         let mut link = Link::connect(&config, &mut random);
-        link.uplink(&config, &mut random, 0.14);
-        link.downlink(&config, &mut random, 0.14);
+        link.uplink(&config, &mut random, 0.14).unwrap();
+        link.downlink(&config, &mut random, 0.14).unwrap();
         let (mut shifted, mut shifted_random) = (link.clone(), random.clone());
         shifted.shift(0.7);
         for at in [0.147, 1.106, 1.113, 1.5] {
-            let up = link.uplink(&config, &mut random, at);
-            let down = link.downlink(&config, &mut random, at);
-            let up_shifted = shifted.uplink(&config, &mut shifted_random, at - 0.7);
-            let down_shifted = shifted.downlink(&config, &mut shifted_random, at - 0.7);
+            let up = link.uplink(&config, &mut random, at).unwrap();
+            let down = link.downlink(&config, &mut random, at).unwrap();
+            let up_shifted = shifted
+                .uplink(&config, &mut shifted_random, at - 0.7)
+                .unwrap();
+            let down_shifted = shifted
+                .downlink(&config, &mut shifted_random, at - 0.7)
+                .unwrap();
             assert!((up - 0.7 - up_shifted).abs() < 1e-9, "{up} {up_shifted}");
             assert!(
                 (down - 0.7 - down_shifted).abs() < 1e-9,
