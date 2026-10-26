@@ -1,0 +1,168 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -126,4 +126,29 @@
+ ) -> io::Result<()> {
++
++    // Study-only counters on the CLI's diagnostic thread; game code is unchanged.
++    let epoch: f64 = std::env::var("STUDY_EPOCH_UNIX_S").unwrap().parse().unwrap();
++    let warmup: f64 = std::env::var("STUDY_WARMUP").unwrap().parse().unwrap();
++    let hold: f64 = std::env::var("STUDY_HOLD").unwrap().parse().unwrap();
++    let bound = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64();
++    let origin = Instant::now();
++    let start = epoch + warmup;
++    let end = start + hold;
++    let mut rows = Vec::new();
++    let mut next = bound;
++    let mut boundary = 0;
+     let mut previous = HostStats::sample(host);
+     while !host.is_finished() {
++        let now = bound + origin.elapsed().as_secs_f64();
++        if boundary < 2 && (now >= next || now >= if boundary == 0 { start } else { end }) {
++            let label = if boundary == 0 && now >= start { boundary = 1; "start" }
++                else if boundary == 1 && now >= end { boundary = 2; "end" } else { "sample" };
++            rows.push(serde_json::json!({"unix":now, "ticks":host.ticks(), "deferred":host.deferred_ticks(),
++                "simulationSeconds":host.simulation_seconds(), "players":host.players(), "boundary":label}));
++            next = now + 1.;
++        }
++        if now >= end + 2. {
++            let result = serde_json::json!({"boundUnix":bound, "holdStartUnix":start, "holdEndUnix":end, "rows":rows});
++            std::fs::write(std::env::var("STUDY_HOST_JSON").unwrap(), serde_json::to_vec(&result)?)?;
++            return Ok(());
++        }
+         // Bound failure detection latency even when reports are hours apart.
+@@ -132,3 +157,3 @@
+                 .saturating_sub(previous.at.elapsed())
+-                .min(Duration::from_millis(100)),
++                .min(Duration::from_millis(1)),
+         );
+@@ -168,3 +193,3 @@
+             let _ = report_host_stats(&running, interval, bot_slots, &mut io::stderr());
+-            running.wait()
++            running.stop()
+         } else {
+--- a/examples/host_capacity_load.rs
++++ b/examples/host_capacity_load.rs
+@@ -293,2 +293,3 @@
+         second_late_max: f64,
++        spawn_waits: Vec<Value>,
+     }
+@@ -355,2 +356,4 @@
+         deaths: u64,
++        request_at: Option<f64>,
++        request_respawn: bool,
+     }
+@@ -387,2 +390,4 @@
+                 deaths: 0,
++                request_at: None,
++                request_respawn: false,
+             }
+@@ -590,3 +595,5 @@
+             let now = ctx.now();
+-            if now - self.last_received > IDLE_TIMEOUT {
++            let waiting_spawn = std::env::var_os("STUDY_BATTLEDOME").is_some()
++                && self.challenged && !self.admitted;
++            if !waiting_spawn && now - self.last_received > IDLE_TIMEOUT {
+                 self.end(ctx, Cause::Error, "receive timeout", now);
+@@ -594,3 +601,3 @@
+             }
+-            if !self.admitted && now - self.opened_at > SETUP_TIMEOUT {
++            if !waiting_spawn && !self.admitted && now - self.opened_at > SETUP_TIMEOUT {
+                 self.end(ctx, Cause::Error, "setup timeout", now);
+@@ -637,2 +644,6 @@
+                 ctx.count("loginsSent");
++                if self.request_at.is_none() {
++                    self.request_at = Some(at);
++                    self.request_respawn = self.ever_admitted;
++                }
+             }
+@@ -715,2 +726,7 @@
+                 self.playing = true;
++                if let Some(requested) = self.request_at.take() {
++                    ctx.spawn_waits.push(json!({"client":self.id, "respawn":self.request_respawn,
++                        "requestSeconds":requested, "playingSeconds":now,
++                        "waitMs":(now-requested)*1000., "inHold":ctx.in_window(now)}));
++                }
+                 ctx.count("lifeStarts");
+@@ -857,2 +873,3 @@
+             second_late_max: 0.,
++            spawn_waits: Vec::new(),
+         };
+@@ -915,3 +932,4 @@
+                 .iter()
+-                .filter(|c| matches!(c.category(), 1 | 2))
++                .filter(|c| matches!(c.category(), 1 | 2)
++                    && !(std::env::var_os("STUDY_BATTLEDOME").is_some() && c.challenged))
+                 .count();
+@@ -938,2 +956,4 @@
+         let finished = ctx.now();
++        let pending_requests: Vec<Value> = clients.iter().filter_map(|c| c.request_at.map(|at|
++            json!({"client":c.id,"respawn":c.request_respawn,"ageMs":(finished-at)*1000.}))).collect();
+         // Preserve live processes through the external resource end sample.
+@@ -1007,2 +1027,4 @@
+             "tool": "host_capacity_load",
++            "spawnWaits": ctx.spawn_waits,
++            "pendingRequestsAtEnd": pending_requests,
+             "args": {
+--- a/scripts/run_trial.py
++++ b/scripts/run_trial.py
+@@ -9,3 +9,4 @@
+ import time
++import threading
+-
++
+ HZ = os.sysconf('SC_CLK_TCK') if os.name == 'posix' else 100
+@@ -22,2 +23,3 @@
+                 'rssBytes': int(stat[21]) * os.sysconf('SC_PAGE_SIZE'),
++                'hwmBytes': int(next((x.split()[1] for x in Path(prefix+'/status').read_text().splitlines() if x.startswith('VmHWM:')), '0')) * 1024,
+                 'fds': fds}
+@@ -57,2 +59,3 @@
+     children, handles, perf = [], [], None
++    stats_lines, readers = [], []
+     def launch(command, name, env=None):
+@@ -60,4 +63,15 @@
+         handles.append(log)
+-        p = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
++        p = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE if name == "host" else log, stderr=subprocess.STDOUT,
+                              start_new_session=True, env=env)
++        if name == "host":
++            def read_log():
++                for line in iter(p.stdout.readline, b''):
++                    text = line.decode('utf-8')
++                    if text.startswith('stats:'):
++                        stats_lines.append({'unix':time.time(), 'line':text.strip()})
++                    log.write(text)
++                log.flush()
++            reader = threading.Thread(target=read_log)
++            reader.start()
++            readers.append(reader)
+         children.append(p)
+@@ -66,9 +80,9 @@
+         if args.role == 'host':
+-            config = {'bind': '0.0.0.0:8766', 'seed': 7, 'maxClients': args.count, 'bots': args.bots,
+-                      'botThreads': 7 if args.bots else 0}
+-            if args.bots:
+-                config['simulation'] = {'latency': {'roundTripSeconds': [0.04]}}
++            config = {'bind': '0.0.0.0:8766', 'seed': 7, 'players': {'max': args.count},
++                      'bots': {'count': 0}, 'simulation': {'world': {'preset': args.preset}}}
+             (out / 'config.json').write_text(json.dumps(config) + '\n')
+-            p = launch([str(Path(args.bin).resolve()/'host_probe'), str(out/'config.json'), str(args.warmup), str(args.hold),
+-                        str(out/'host.json'), str(args.epoch)], 'host')
++            env = dict(os.environ, STUDY_EPOCH_UNIX_S=str(args.epoch), STUDY_WARMUP=str(args.warmup),
++                       STUDY_HOLD=str(args.hold), STUDY_HOST_JSON=str((out/'host.json').resolve()))
++            p = launch([str(Path(args.bin).resolve()/'slither-sim'), 'host', '--config', str(out/'config.json'),
++                        '--stats', '5'], 'host', env)
+         else:
+@@ -79,2 +93,4 @@
+                 env = dict(os.environ, STUDY_SERVER_IP=args.server, STUDY_EPOCH_UNIX_S=str(args.epoch))
++                if args.preset == 'battledome':
++                    env['STUDY_BATTLEDOME'] = '1'
+                 if args.watcher:
+@@ -131,2 +147,4 @@
+                                 '-F','comm,pid,tid,time,event,period,ip,sym,dso'],stdout=stacks,check=True,timeout=120)
++        for reader in readers: reader.join(timeout=5)
++        (out/'stats-lines.json').write_text(json.dumps(stats_lines)+'\n')
+         (out/'telemetry.json').write_text(json.dumps({'epoch':args.epoch, 'warmup':args.warmup, 'hold':args.hold,
+@@ -150,2 +168,3 @@
+     p.add_argument('--count', type=int, required=True)
++    p.add_argument('--preset', choices=['official', 'battledome'], default='official')
+     p.add_argument('--bots', type=int, default=0)
