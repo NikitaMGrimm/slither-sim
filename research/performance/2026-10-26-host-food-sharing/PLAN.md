@@ -44,3 +44,11 @@ limit explicitly. Kernel work is outside the profile shares.
 
 Keep the complete study <=20 KB: short report and selected results/reproduction
 material only. Raw stacks, holds, traces, logs and rejected code stay in scratch.
+
+Integration amendment before new measurements: main advanced through #176 to
+`48977ec`, changing the Battledome preset and moving pit-marker listings.
+Runtime `1285e69` integrates it and hints decorated-only changes too. Preserve
+the original completed series locally and at the historical record `e8074c0`;
+repeat checks, all traces, five instruction pairs and socket profiles against
+this new baseline. Keep the same budget/method and label the new growing-arena
+Battledome workload; do not attribute its admission changes to this optimization.
