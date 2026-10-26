@@ -73,7 +73,9 @@ A1 itself missed the old live p99 limit (22.240 > 20 µs), as well as stress p99
 Under the frozen control rule this made K5 inconclusive for adoption; A4 also
 missed all four old absolute limits. A4 costs about 1.77× A1 on the mean and
 roughly 2.2× on the tails (live p99 2.23×, p99.9 2.36×, stress p99 2.30×).
-Its 12.855 µs live mean satisfies the maintainer's revised < 15 µs gate; the
+Its 12.855 µs live mean satisfies the maintainer's revised < 15 µs gate. That
+gate was set after the results were known, so this timing is post-hoc,
+non-confirmatory evidence and adoption rests on the maintainer's decision. The
 larger tails remain a deployment consideration. These timings measure the
 private frozen-kernel harness on one platform, not this public port's runtime.
 
