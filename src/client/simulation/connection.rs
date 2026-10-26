@@ -160,7 +160,7 @@ impl SimulatorBackend {
             link: Link::connect(latency, &mut self.random),
             ..Default::default()
         };
-        let arrival = connection.link.uplink(latency, &mut self.random, now);
+        let arrival = connection.link.uplink(latency, &mut self.random, now)?;
         connection.uplink.push_back((arrival, Uplink::Connect));
         let s = &mut self.slots[slot];
         s.connection = connection;
@@ -178,6 +178,23 @@ impl SimulatorBackend {
         if self.slots[slot].remote {
             return Ok(());
         }
+        self.client_io_until(slot, now)?;
+        let s = &mut self.slots[slot];
+        if s.pinged_at.is_none_or(|at| at < now) {
+            s.pinged_at = Some(now);
+            if s.state.ping_due(now)? {
+                s.room([1])?;
+                s.uplink_room(1)?;
+                s.state.record_sent(&[251], now)?;
+                s.record(now, WireEvent::Send, &[251])?;
+                self.uplink(slot, now, Uplink::Message(vec![251]))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Deliveries and already-pending departures only; no new decisions or pings.
+    pub(super) fn client_io_until(&mut self, slot: usize, now: f64) -> Result<(), String> {
         loop {
             let s = &self.slots[slot];
             let frame = s
@@ -201,17 +218,6 @@ impl SimulatorBackend {
                 }
                 (_, Some(at)) => self.transmit(slot, at)?,
                 _ => break,
-            }
-        }
-        let s = &mut self.slots[slot];
-        if s.pinged_at.is_none_or(|at| at < now) {
-            s.pinged_at = Some(now);
-            if s.state.ping_due(now)? {
-                s.room([1])?;
-                s.uplink_room(1)?;
-                s.state.record_sent(&[251], now)?;
-                s.record(now, WireEvent::Send, &[251])?;
-                self.uplink(slot, now, Uplink::Message(vec![251]))?;
             }
         }
         Ok(())
@@ -244,7 +250,7 @@ impl SimulatorBackend {
         let connection = &mut self.slots[slot].connection;
         let arrival = connection
             .link
-            .uplink(&self.config.latency, &mut self.random, sent);
+            .uplink(&self.config.latency, &mut self.random, sent)?;
         connection.uplink.push_back((arrival, message));
         Ok(())
     }
@@ -278,21 +284,23 @@ impl SimulatorBackend {
         // the baseline stream exactly as physical packets would, even when a
         // browser hides a colliding pellet. Extra presentation frames share
         // the last physical release; marker-only releases sample clones.
-        let arrivals = physical.map(|packets| {
-            frame_groups(packets)
-                .iter()
-                .map(|_| {
-                    connection
-                        .link
-                        .downlink(&self.config.latency, &mut self.random, now)
-                })
-                .collect::<Vec<_>>()
-        });
+        let arrivals = physical
+            .map(|packets| {
+                frame_groups(packets)
+                    .iter()
+                    .map(|_| {
+                        connection
+                            .link
+                            .downlink(&self.config.latency, &mut self.random, now)
+                    })
+                    .collect::<Result<Vec<_>, String>>()
+            })
+            .transpose()?;
         let extra = if arrivals.as_ref().is_some_and(Vec::is_empty) && !groups.is_empty() {
             connection
                 .link
                 .clone()
-                .downlink(&self.config.latency, &mut self.random.clone(), now)
+                .downlink(&self.config.latency, &mut self.random.clone(), now)?
         } else {
             now
         };
@@ -310,7 +318,7 @@ impl SimulatorBackend {
                     .unwrap_or(extra),
                 None => connection
                     .link
-                    .downlink(&self.config.latency, &mut self.random, now),
+                    .downlink(&self.config.latency, &mut self.random, now)?,
             };
             let arrival = arrival.max(connection.presented_at);
             connection.presented_at = arrival;
@@ -520,6 +528,7 @@ mod tests {
                 .link
                 .clone()
                 .downlink(&actual.config.latency, &mut actual.random.clone(), now)
+                .unwrap()
                 .max(previous);
             actual
                 .emit_presented(0, now, &packets(2), Some(&[]))

@@ -302,12 +302,15 @@ remote clients use real compute time.
 | `processingJitterSeconds` | `0` | Uniform ± spread per decision, finite and nonnegative. |
 
 The generator's normal draw is at most about 8.57, exponential draws at most
-about 36.7 times their mean. Thus
+about 36.7 times their mean. Validation requires
 `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + medianSeconds ×
-exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` must
-be finite. Measured `processingSeconds` supplied with a decision replaces its
-modeled duration. Rust also provides `LatencyConfig::fixed(rtt)`,
-`LatencyConfig::one_way(uplink, downlink)` and `LatencyConfig::measured_route()`.
+exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` to be
+finite. That bounds single draws, not the accumulated correlated variation, so
+scheduling also returns an error if a delay or pause time stops being finite or a
+pause cannot advance the clock. Measured `processingSeconds` supplied with a
+decision replaces its modeled duration. Rust also provides
+`LatencyConfig::fixed(rtt)`, `LatencyConfig::one_way(uplink, downlink)` (both
+legs finite and nonnegative) and `LatencyConfig::measured_route()`.
 
 ### Variation and pauses
 
@@ -341,6 +344,9 @@ Against uniform jitter, held-out KS distance improves from 0.30 to 0.04, but
 p99 is overpredicted by about 30% and some correlation is missed. Base RTT assumes
 within-tick replies, as the host gives; even splitting and mirrored uplink are
 assumptions. Use only without a real path, for in-process bots or loopback players.
+A later [remote timing study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-vps-timing/REPORT.md)
+near the server saw almost none of these pauses, so they describe the fitted home
+route and collector, not the server.
 
 ## NetworkConfig
 

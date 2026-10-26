@@ -128,6 +128,15 @@
 - Construction preserves the configured initial radius (with recorded time-zero
   overrides), rejects initial ring bodies outside the arena without adding a slot,
   and reports hosted spawn failures as candidate-search exhaustion.
+- Kiosk shrinkage no longer deletes pending growth: it removes only mass the
+  score shows, and a zero shrink rate changes nothing.
+- Native commands with processing delay apply in the tick they arrive instead of
+  one tick later. Cancelling or non-finite one-way legs fail validation, and
+  latency scheduling returns an error instead of hanging or producing non-finite
+  times.
+- The host bounds raw socket reads per poll, so one long fragmented message
+  cannot stall other connections. A background bot whose decoder fails now only
+  reconnects that bot, and stopping no longer waits out a long physics tick.
 - `Config::deserialize` called directly from Rust now accepts presets, like JSON
   parsing ([presets](docs/configuration.md#presets)).
 - A world stopped by mass overflow stays stopped after a JSON round trip

@@ -2635,6 +2635,108 @@ fn rejected_departure_leaves_every_side_unchanged() {
 }
 
 #[test]
+fn pending_native_commands_apply_in_their_arrival_tick() {
+    for (processing, uplink) in [(0., 0.), (0.001, 0.), (0.007, 0.), (0.001, 0.007)] {
+        let mut backend = SimulatorBackend::new(
+            4,
+            SimulationConfig {
+                world: Config {
+                    food_count: 0,
+                    ambient_replenish_per_second: 0.,
+                    ..Config::sandbox()
+                },
+                record_wire: true,
+                latency: LatencyConfig {
+                    processing_seconds: [processing; 2],
+                    ..LatencyConfig::one_way(uplink, 0.)
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        while backend.frame().unwrap().status != ClientStatus::Playing {
+            backend.advance_ticks(1).unwrap();
+        }
+        let before = backend.slots[0].control.heading;
+        let action = Action {
+            heading: (before + 1.).rem_euclid(TAU),
+            boost: true,
+        };
+        let started = backend.time();
+        backend.send_to(0, action).unwrap();
+        backend.advance_ticks(1).unwrap();
+        let arrived = processing + uplink <= backend.world.config.dt;
+        assert_eq!(
+            backend.slots[0].control.boost, arrived,
+            "processing {processing}, uplink {uplink}"
+        );
+        assert_eq!(backend.slots[0].control.heading != before, arrived);
+        if !arrived {
+            backend.advance_ticks(1).unwrap();
+            assert!(backend.slots[0].control.boost);
+        }
+        let records = backend.drain_records(0).unwrap();
+        assert!(records.windows(2).all(|w| w[0].time <= w[1].time));
+        let sent = records
+            .iter()
+            .find(|r| r.event == WireEvent::Send && r.bytes == [253])
+            .unwrap();
+        assert!((sent.time - started - processing).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn pending_departure_keeps_earlier_receipts_before_measured_processing() {
+    let mut backend = SimulatorBackend::new(
+        4,
+        SimulationConfig {
+            world: Config {
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::sandbox()
+            },
+            record_wire: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    while backend.frame().unwrap().status != ClientStatus::Playing {
+        backend.advance_ticks(1).unwrap();
+    }
+    backend.drain_records(0).unwrap();
+    let at = backend.time();
+    backend.slots[0]
+        .connection
+        .downlink
+        .push_back((at + 0.0005, encode::frame(0, &[encode::pong()]).unwrap()));
+    backend.set_slot_processing_seconds(0, 0.001).unwrap();
+    backend
+        .send_to(
+            0,
+            Action {
+                heading: 1.,
+                boost: true,
+            },
+        )
+        .unwrap();
+    let life = backend.slots[0].life;
+    backend.advance_ticks(1).unwrap();
+    assert!(backend.slots[0].control.boost);
+    assert_eq!(backend.slots[0].life, life);
+    assert!(backend.slots[0].outbox.is_none());
+    let records = backend.drain_records(0).unwrap();
+    assert!(records.windows(2).all(|w| w[0].time <= w[1].time));
+    assert_eq!(records[0].event, WireEvent::Receive);
+    assert_eq!(records[0].time, at + 0.0005);
+    assert!(
+        records
+            .iter()
+            .filter(|r| r.event == WireEvent::Send && r.bytes != [251])
+            .all(|r| r.time == at + 0.001)
+    );
+}
+
+#[test]
 fn reviewed_spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
     let world = Config {
         radius: 100.5,

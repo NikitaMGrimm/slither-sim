@@ -1,0 +1,541 @@
+{
+  "clock": "performance.now milliseconds within each original collector process; raw frame times saved to0.001ms, metadata independently timestamped. JSONL lines are1-based.",
+  "interpretation": "In all three stopped-client streams the first death receipt and collector close request precede socket-error, death-observation-end and close1006. The wrapper stopped on that requested-close sequence. This establishes recorded order and wrapper classification, not the cause of the socket-error event. The original sibling has no death/close-request/error/close events and was aborted by its sibling. Raw archives are unchanged and stay quarantined.",
+  "streams": [
+    {
+      "label": "original-low",
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\round-1\\low-1\\network0.jsonl.gz",
+      "sha256": "6c1fba570dd61d0ee305142c75edb4b53cfd947c2cea1882a5b922559de6280b",
+      "counts": {
+        "connect": 1,
+        "received-death-packet": 2,
+        "death-observation-start": 1,
+        "death-observation-close-requested": 1,
+        "death-observation-end": 1,
+        "socket-error": 1,
+        "close": 1
+      },
+      "events": [
+        {
+          "line": 2,
+          "type": "meta",
+          "t": 116.304,
+          "wall": 1792971015139,
+          "event": "connect",
+          "server": {
+            "ip": "57.129.37.42",
+            "port": 444
+          },
+          "life": 1
+        },
+        {
+          "line": 3,
+          "type": "meta",
+          "t": 139.994,
+          "wall": 1792971015162,
+          "event": "open",
+          "server": {
+            "ip": "57.129.37.42",
+            "port": 444
+          },
+          "life": 1,
+          "connectDurationMs": 58.120942
+        },
+        {
+          "line": 8765,
+          "event": "received-death-packet",
+          "life": 1,
+          "t": 58529.562,
+          "serverMs": 58380,
+          "packetIndex": 3,
+          "packetHex": "7600",
+          "ownId": 33
+        },
+        {
+          "line": 8765,
+          "event": "received-death-packet",
+          "life": 1,
+          "t": 58529.562,
+          "serverMs": 58380,
+          "packetIndex": 4,
+          "packetHex": "73002101",
+          "ownId": 33
+        },
+        {
+          "line": 8766,
+          "type": "meta",
+          "t": 58529.835,
+          "wall": 1792971073552,
+          "event": "death-observation-start",
+          "life": 1,
+          "serverClock": 58380,
+          "durationMs": 1000
+        },
+        {
+          "line": 8917,
+          "type": "meta",
+          "t": 59543.924,
+          "wall": 1792971074566,
+          "event": "death-observation-close-requested",
+          "life": 1
+        },
+        {
+          "line": 8918,
+          "type": "meta",
+          "t": 59771.596,
+          "wall": 1792971074794,
+          "event": "socket-error",
+          "life": 1,
+          "message": ""
+        },
+        {
+          "line": 8919,
+          "type": "meta",
+          "t": 59772.45,
+          "wall": 1792971074795,
+          "event": "death-observation-end",
+          "life": 1,
+          "reason": "deadline",
+          "elapsedMs": 1242.8644829999976,
+          "serverElapsedMs": 1010,
+          "framesAfterDeath": 136
+        },
+        {
+          "line": 8920,
+          "type": "meta",
+          "t": 59772.516,
+          "wall": 1792971074795,
+          "event": "close",
+          "code": 1006,
+          "reason": "",
+          "life": 1
+        },
+        {
+          "line": 8921,
+          "type": "meta",
+          "t": 60073.078,
+          "wall": 1792971075096,
+          "collectorTiming": {
+            "targetTickMs": 25,
+            "ticks": 2370,
+            "lateTicks": 0,
+            "maxTickGapMs": 38.5340389999983
+          },
+          "requestedSeconds": 600,
+          "event": "capture-interrupted",
+          "reason": "Error: socket error 57.129.37.42:444; no retry",
+          "frames": 7652,
+          "joins": 1,
+          "maxSegments": 33,
+          "failures": 0,
+          "collectorEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "headlessEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "collectorSourcesUnchanged": true,
+          "integrity": {
+            "format": "sha256-jsonl-prefix-v1",
+            "sha256": "766f79c6ed45e0f2d831e5a574c5c3d609b5bcb348420158de52bcc5cdf8e518",
+            "lines": 8920,
+            "payloadBytes": 626178,
+            "counts": {
+              "i": {
+                "frames": 7652,
+                "bytes": 202252
+              },
+              "o": {
+                "frames": 676,
+                "bytes": 751
+              }
+            },
+            "backpressureWrites": 0,
+            "maxQueuedBytes": 3517,
+            "queueLimitBytes": 33554432
+          }
+        }
+      ]
+    },
+    {
+      "label": "original-second",
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\vps-copy\\round-1\\second-1\\network0.jsonl.gz",
+      "sha256": "82dad20cde89169666f000373c9077eb354c9afeb2bb546ab8b000bb057df21a",
+      "counts": {
+        "connect": 1,
+        "received-death-packet": 0,
+        "death-observation-start": 0,
+        "death-observation-close-requested": 0,
+        "death-observation-end": 0,
+        "socket-error": 0,
+        "close": 0
+      },
+      "events": [
+        {
+          "line": 2,
+          "type": "meta",
+          "t": 119.139,
+          "wall": 1792971015142,
+          "event": "connect",
+          "server": {
+            "ip": "198.244.231.35",
+            "port": 444
+          },
+          "life": 1
+        },
+        {
+          "line": 3,
+          "type": "meta",
+          "t": 160.123,
+          "wall": 1792971015183,
+          "event": "open",
+          "server": {
+            "ip": "198.244.231.35",
+            "port": 444
+          },
+          "life": 1,
+          "connectDurationMs": 42.204626000000005
+        },
+        {
+          "line": 7404,
+          "type": "meta",
+          "t": 60073.818,
+          "wall": 1792971075096,
+          "collectorTiming": {
+            "targetTickMs": 25,
+            "ticks": 2370,
+            "lateTicks": 0,
+            "maxTickGapMs": 39.59672700000374
+          },
+          "requestedSeconds": 600,
+          "event": "capture-interrupted",
+          "reason": "Error: socket error 57.129.37.42:444; no retry",
+          "frames": 6079,
+          "joins": 1,
+          "maxSegments": 28,
+          "failures": 0,
+          "collectorEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "headlessEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "collectorSourcesUnchanged": true,
+          "integrity": {
+            "format": "sha256-jsonl-prefix-v1",
+            "sha256": "60493ffad5ce88d7c23241a263cbc5dc895f8b9c24dc22c8910c6c455e2c700e",
+            "lines": 7403,
+            "payloadBytes": 499747,
+            "counts": {
+              "i": {
+                "frames": 6079,
+                "bytes": 129978
+              },
+              "o": {
+                "frames": 735,
+                "bytes": 810
+              }
+            },
+            "backpressureWrites": 0,
+            "maxQueuedBytes": 2865,
+            "queueLimitBytes": 33554432
+          }
+        }
+      ]
+    },
+    {
+      "label": "continuation-low",
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\continuation\\vps-copy\\round-1\\low-1\\network0.jsonl.gz",
+      "sha256": "8dc0acf450bb5d259e32fb539891a9156598e348f0f15e5b9fe715fc75a04254",
+      "counts": {
+        "connect": 1,
+        "received-death-packet": 2,
+        "death-observation-start": 1,
+        "death-observation-close-requested": 1,
+        "death-observation-end": 1,
+        "socket-error": 1,
+        "close": 1
+      },
+      "events": [
+        {
+          "line": 2,
+          "type": "meta",
+          "t": 176.116,
+          "wall": 1792971667712,
+          "event": "connect",
+          "server": {
+            "ip": "57.129.37.42",
+            "port": 444
+          },
+          "life": 1
+        },
+        {
+          "line": 3,
+          "type": "meta",
+          "t": 199.88,
+          "wall": 1792971667735,
+          "event": "open",
+          "server": {
+            "ip": "57.129.37.42",
+            "port": 444
+          },
+          "life": 1,
+          "connectDurationMs": 72.45028400000001
+        },
+        {
+          "line": 21938,
+          "event": "received-death-packet",
+          "life": 1,
+          "t": 183365.001,
+          "serverMs": 183152,
+          "packetIndex": 6,
+          "packetHex": "7600",
+          "ownId": 171
+        },
+        {
+          "line": 21938,
+          "event": "received-death-packet",
+          "life": 1,
+          "t": 183365.001,
+          "serverMs": 183152,
+          "packetIndex": 7,
+          "packetHex": "7300ab01",
+          "ownId": 171
+        },
+        {
+          "line": 21939,
+          "type": "meta",
+          "t": 183365.3,
+          "wall": 1792971850901,
+          "event": "death-observation-start",
+          "life": 1,
+          "serverClock": 183152,
+          "durationMs": 1000
+        },
+        {
+          "line": 22086,
+          "type": "meta",
+          "t": 184374.067,
+          "wall": 1792971851910,
+          "event": "death-observation-close-requested",
+          "life": 1
+        },
+        {
+          "line": 22087,
+          "type": "meta",
+          "t": 184459.638,
+          "wall": 1792971851995,
+          "event": "socket-error",
+          "life": 1,
+          "message": ""
+        },
+        {
+          "line": 22088,
+          "type": "meta",
+          "t": 184459.925,
+          "wall": 1792971851995,
+          "event": "death-observation-end",
+          "life": 1,
+          "reason": "deadline",
+          "elapsedMs": 1094.9081470000092,
+          "serverElapsedMs": 1006,
+          "framesAfterDeath": 132
+        },
+        {
+          "line": 22089,
+          "type": "meta",
+          "t": 184459.95,
+          "wall": 1792971851996,
+          "event": "close",
+          "code": 1006,
+          "reason": "",
+          "life": 1
+        },
+        {
+          "line": 22090,
+          "type": "meta",
+          "t": 184759.535,
+          "wall": 1792971852295,
+          "collectorTiming": {
+            "targetTickMs": 25,
+            "ticks": 7333,
+            "lateTicks": 0,
+            "maxTickGapMs": 30.26661900000181
+          },
+          "requestedSeconds": 600,
+          "event": "capture-interrupted",
+          "reason": "Error: socket error 57.129.37.42:444; endpoint stopped, no retry",
+          "frames": 18258,
+          "joins": 1,
+          "maxSegments": 75,
+          "failures": 0,
+          "collectorEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "headlessEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "collectorSourcesUnchanged": true,
+          "integrity": {
+            "format": "sha256-jsonl-prefix-v1",
+            "sha256": "0c50f741ead3e7fa306ffe2f84341dd680faa87fd29bfdacf916df138163115d",
+            "lines": 22089,
+            "payloadBytes": 1445237,
+            "counts": {
+              "i": {
+                "frames": 18258,
+                "bytes": 387349
+              },
+              "o": {
+                "frames": 2010,
+                "bytes": 2085
+              }
+            },
+            "backpressureWrites": 0,
+            "maxQueuedBytes": 11191,
+            "queueLimitBytes": 33554432
+          }
+        }
+      ]
+    },
+    {
+      "label": "continuation-second",
+      "path": "C:\\Users\\Nikita\\.t3\\scratch\\vps-capture-20261026\\continuation\\vps-copy\\round-1\\second-1\\network0.jsonl.gz",
+      "sha256": "7b07fe3555d96011f1b4af82e9978700a42aca25d4b4edbc4457fd45e006aae2",
+      "counts": {
+        "connect": 1,
+        "received-death-packet": 2,
+        "death-observation-start": 1,
+        "death-observation-close-requested": 1,
+        "death-observation-end": 1,
+        "socket-error": 1,
+        "close": 1
+      },
+      "events": [
+        {
+          "line": 2,
+          "type": "meta",
+          "t": 178.836,
+          "wall": 1792971667714,
+          "event": "connect",
+          "server": {
+            "ip": "198.244.231.35",
+            "port": 444
+          },
+          "life": 1
+        },
+        {
+          "line": 3,
+          "type": "meta",
+          "t": 220.124,
+          "wall": 1792971667756,
+          "event": "open",
+          "server": {
+            "ip": "198.244.231.35",
+            "port": 444
+          },
+          "life": 1,
+          "connectDurationMs": 42.46606700000001
+        },
+        {
+          "line": 13927,
+          "event": "received-death-packet",
+          "life": 1,
+          "t": 125643.057,
+          "serverMs": 125381,
+          "packetIndex": 1,
+          "packetHex": "7600",
+          "ownId": 275
+        },
+        {
+          "line": 13927,
+          "event": "received-death-packet",
+          "life": 1,
+          "t": 125643.057,
+          "serverMs": 125381,
+          "packetIndex": 2,
+          "packetHex": "73011301",
+          "ownId": 275
+        },
+        {
+          "line": 13928,
+          "type": "meta",
+          "t": 125643.357,
+          "wall": 1792971793179,
+          "event": "death-observation-start",
+          "life": 1,
+          "serverClock": 125381,
+          "durationMs": 1000
+        },
+        {
+          "line": 14059,
+          "type": "meta",
+          "t": 126650.746,
+          "wall": 1792971794186,
+          "event": "death-observation-close-requested",
+          "life": 1
+        },
+        {
+          "line": 14060,
+          "type": "meta",
+          "t": 126780.56,
+          "wall": 1792971794316,
+          "event": "socket-error",
+          "life": 1,
+          "message": ""
+        },
+        {
+          "line": 14061,
+          "type": "meta",
+          "t": 126781.349,
+          "wall": 1792971794317,
+          "event": "death-observation-end",
+          "life": 1,
+          "reason": "deadline",
+          "elapsedMs": 1138.2704209999938,
+          "serverElapsedMs": 1007,
+          "framesAfterDeath": 116
+        },
+        {
+          "line": 14062,
+          "type": "meta",
+          "t": 126781.397,
+          "wall": 1792971794317,
+          "event": "close",
+          "code": 1006,
+          "reason": "",
+          "life": 1
+        },
+        {
+          "line": 14063,
+          "type": "meta",
+          "t": 127082.807,
+          "wall": 1792971794618,
+          "collectorTiming": {
+            "targetTickMs": 25,
+            "ticks": 5038,
+            "lateTicks": 0,
+            "maxTickGapMs": 29.258650999996462
+          },
+          "requestedSeconds": 600,
+          "event": "capture-interrupted",
+          "reason": "Error: socket error 198.244.231.35:444; endpoint stopped, no retry",
+          "frames": 11339,
+          "joins": 1,
+          "maxSegments": 63,
+          "failures": 0,
+          "collectorEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "headlessEndSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+          "collectorSourcesUnchanged": true,
+          "integrity": {
+            "format": "sha256-jsonl-prefix-v1",
+            "sha256": "424e76f3ef27fa523dfabb8f41243581b51c1c449beee6ab1e40bca693286a17",
+            "lines": 14062,
+            "payloadBytes": 908494,
+            "counts": {
+              "i": {
+                "frames": 11339,
+                "bytes": 217214
+              },
+              "o": {
+                "frames": 1472,
+                "bytes": 1547
+              }
+            },
+            "backpressureWrites": 0,
+            "maxQueuedBytes": 2433,
+            "queueLimitBytes": 33554432
+          }
+        }
+      ]
+    }
+  ]
+}
