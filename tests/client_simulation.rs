@@ -57,6 +57,21 @@ fn delivery_defaults_to_responsive_for_every_world_and_explicit_choices_win() {
     assert_eq!(HostConfig::default().simulation.delivery, Responsive);
 }
 
+#[test]
+fn simulation_configs_are_objects_whose_repeated_keys_keep_the_last_value() {
+    for json in ["[]", "[{}]", "[{}, \"responsive\"]"] {
+        assert!(
+            serde_json::from_str::<SimulationConfig>(json).is_err(),
+            "{json}"
+        );
+        let host = format!(r#"{{"simulation":{json}}}"#);
+        assert!(serde_json::from_str::<HostConfig>(&host).is_err(), "{host}");
+    }
+    // Like the world config, input passes through a JSON object.
+    let config: SimulationConfig = serde_json::from_str(r#"{"agents":2,"agents":3}"#).unwrap();
+    assert_eq!(config.agents, 3);
+}
+
 fn config(agents: usize, latency: LatencyConfig) -> SimulationConfig {
     let mut config = SimulationConfig {
         agents,
