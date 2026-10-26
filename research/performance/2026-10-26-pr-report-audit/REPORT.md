@@ -43,8 +43,8 @@ New `host-official-500` and `host-battledome-80` rows target per-recipient
 encoding, visibility/food, physics and crowded admission through actual sockets.
 They reuse `host_load` with a separate process for the synthetic client driver;
 all host threads share one CPU and the driver uses a second. They use a short
-one-second warmup and 286-tick measurement window. CI must establish feasibility;
-500 is the target, not a local performance claim. They retain connected and
+one-second warmup and 286-tick measurement window. Hosted validation below establishes the short-window feasibility at 500;
+no local performance or sustained-capacity claim is made. They retain connected and
 living diagnostics rather than asserting every socket is always alive.
 
 Six timing rows replace ten. Ten deterministic state traces and the selected
@@ -157,3 +157,42 @@ The driver now retries deaths/capacity refusals after 100 ms, draining the other
 clients meanwhile. The exact requested connected count is still required at
 measurement boundaries, with a bounded untimed admission wait. This is a driver
 lifecycle correction, not evidence that the runner cannot support 500 clients.
+
+## Accepted host A/A samples and fixed metrics
+
+The [manual Host calibration](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40380779843)
+at `6ab29420e58276ee7a28360492bef82aba43c87e` and the
+[PR-hosted pilot](https://github.com/NikitaMGrimm/slither-sim/actions/runs/40381131394)
+at `bef51d566657b795e11c2446591a01cdf4f70808` each completed six counted A/A
+pairs plus one discarded warmup pair for both socket rows. All six report rows
+in the latter completed and resolved Within ±5%, with no report errors. The
+500-client row used eight comparison pairs; Battledome used twelve. Sampling
+consumed 202.82 seconds, excluding builds/traces and the diagnostic pilot.
+
+| Socket workload | Manual CPU / busy-wall log SD, % | PR pilot CPU / busy-wall log SD, % | Pooled CPU / busy-wall log SD, % | Fixed report metric |
+| --- | ---: | ---: | ---: | --- |
+| host-official-500 | 2.405 / 1.715 | 0.891 / 2.033 | 1.814 / 1.881 | Whole-host process CPU per physics tick. |
+| host-battledome-80 | 1.185 / 0.635 | 0.921 / 0.690 | 1.062 / 0.663 | Simulation busy wall per physics tick. |
+
+Pool within-job order-adjusted residual sums of squares over eight residual
+degrees of freedom; do not pool job intercepts. For 500 clients the ranking
+reverses between jobs, so there is no consistent quietest metric. CPU has a
+slightly smaller pooled SD and covers gateway work as well as simulation; that
+coverage motivates the choice. Battledome busy wall is quieter in both jobs.
+CPU and busy wall remain in every raw result, and CPU rows expose their busy-wall
+values in Details. No instruction-count metric was available.
+
+In the manual calibration's twelve counted 500-client processes, every endpoint
+had 500 connected sockets and 500 playing clients; the lowest observed playing
+count was 497 during churn. In Battledome every endpoint had 80 connected
+sockets, but only 15–16 playing clients (minimum 13), with the rest awaiting
+admission. This is intentionally 80 socket clients stressing admission, not a
+claim of 80 simultaneously living snakes. No client count reduction was needed.
+Median process times were 5.146 seconds for 500 and 3.109 seconds for Battledome.
+
+Both A/A jobs predate #168's host optimization; source revisions remain pinned
+above. The final branch is rebased onto #168 without editing its implementation.
+These short pilots establish tooling feasibility and describe their samples;
+they do not qualify sustained 500-player capacity or validate the timing model.
+Routine PRs use the fixed metric without a pilot. Recalibration remains a manual
+`Host` workflow group, avoiding repeated calibration cost on every PR.

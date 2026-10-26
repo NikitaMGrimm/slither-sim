@@ -346,6 +346,8 @@ def markdown(summary, heading, parity_rows=None):
     if changed:
         lines += [f"**Behavior changed** in {', '.join(f'`{case}`' for case in changed)}; "
                   "timings compare different outputs.", ""]
+    if any(row["reading"].startswith("Not applicable") for row in readings.values()):
+        lines += ["Socket scheduling has no canonical state trace; deterministic trace equality does not cover those rows.", ""]
     lines += ["| Workload | Iterations | Trace | Wall ratio | CPU ratio | Wall pair range |",
               "| --- | ---: | --- | ---: | ---: | ---: |"]
     for case, data in summary.items():
@@ -446,7 +448,8 @@ def run_base(args):
                    f"Pairs per workload: {args.repeats}.")
         (output / "summary.md").write_text(markdown(summary, heading, comparison["parity"]),
                                            encoding="utf-8", newline="\n")
-        comparison.update({"complete": True, "behavior": "changed" if changed else "equal",
+        untraced = any(row["reading"].startswith("Not applicable") for row in comparison["parity"])
+        comparison.update({"complete": True, "behavior": "changed" if changed else "partially checked" if untraced else "equal",
                            "exit_code": CHANGED if changed else 0})
         write_json(output / "comparison.json", comparison)
         return comparison["exit_code"]

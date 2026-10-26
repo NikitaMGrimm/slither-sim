@@ -80,7 +80,7 @@ those cases unavailable and labels the report incomplete.
 
 ## How results are decided
 
-New PR runs implement the metric extension of [statistics protocol v2](performance-statistics-v2.md#pr-metric-extension);
+New PR runs use the [fixed metric extension of protocol v2](performance-statistics-v2.md#pr-metric-extension);
 the frozen v1 contract and its evidence retain their historical allocation.
 `tools/perf_stats.py` cites its sections, and the sampler is
 `perf_compare.sequential`.
@@ -93,14 +93,22 @@ process CPU (simulation plus sockets, excluding the child driver), simulation
 busy wall time and elapsed wall time per completed tick. They normalize the
 observed tick count to the requested count and record both.
 
-Before comparison sampling, a bounded same-binary pilot takes six balanced A/A
-pairs plus one discarded warmup pair per row. For socket rows it selects CPU
-when its order-adjusted log residual SD is no greater than busy wall, otherwise
-busy wall; missing/incomplete CPU retains busy wall. The frozen comparison plan
-pins this choice before any baseline/head pairs. CPU rows are marked in the
-comment; their busy-wall values remain in Details. This pilot is diagnostic,
-not independent hosted calibration. Instruction counter probes retain availability
-and errors for `perf` and Cachegrind; neither is assumed installed or permitted.
+The report fixes `host-official-500` to process CPU per tick, covering all host
+threads. Its pooled A/A log residual SD was 1.81% for CPU versus 1.88% for busy
+wall, with the ranking reversed between jobs; this is no consistent noise win.
+CPU covers gateway work as well as simulation. `host-battledome-80` uses simulation
+busy wall, consistently quieter in both jobs (pooled 0.66% versus 1.06% for CPU).
+The [audit](../../research/performance/2026-10-26-pr-report-audit/REPORT.md) retains
+both jobs and their limits. CPU rows are marked; the same covered pairs' busy-wall
+values remain in Details. Raw results always retain both metrics. Instruction
+events were blocked and Valgrind was not installed; no security settings changed.
+
+Routine PRs run no metric-selection pilot. The manual calibration workflow's
+`Host` group measures the six current rows, sockets first, with six balanced A/A
+pairs plus one discarded warmup pair and a 240-second measurement cap. It retains
+CPU/wall noise, failures and instruction-counter availability. A maintainer can
+review new pilots before changing the report's fixed metric. The older A/B
+calibration groups and their historical plans remain available.
 
 **Sampling.** One observation is an adjacent pair of fresh baseline and PR
 processes for one workload. Both sides follow one plan frozen before sampling

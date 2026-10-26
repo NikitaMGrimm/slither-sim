@@ -1,4 +1,4 @@
-"""Bounded same-binary socket metric pilot, before freezing PR inference inputs.
+"""Manual same-binary metric pilot; never changes routine PR inference inputs.
 
 Six balanced fresh-process A/A pairs; one discarded warmup pair per workload.
 No CI decision is made from instruction counts without a working counter.

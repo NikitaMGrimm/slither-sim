@@ -38,6 +38,8 @@ RESULTS = {"Faster": "🟢 Faster", "Slower": "🔴 Slower", "Within": "⚪ With
 # Timing selection and deterministic regression coverage have separate purposes.
 REPORT_CASES = ("step-food", "observe", "official-100-step", "official-100-bot",
                 "host-official-500", "host-battledome-80")
+# Fixed from the two hosted A/A jobs in the row audit; no per-PR metric selection.
+REPORT_METRICS = {"host-official-500": "cpuSeconds"}
 TRACE_CASES = ("step-default", "step-food", "step-body", "observe", "portable", "protocol",
                "official-100-step", "official-100-bot", "battledome-32-step", "client-battledome-64")
 
@@ -257,10 +259,6 @@ def render(report):
         if result.get("metric") == "cpuSeconds":
             lines.append(f"- `{cell(row['case'])}` simulation busy wall: {result['baseline_busy_wall_ms']:.5f} → "
                          f"{result['candidate_busy_wall_ms']:.5f} ms/tick (diagnostic, same covered pairs).")
-    for name, data in report.get("metric_probe", {}).get("workloads", {}).items():
-        lines.append(f"- `{cell(name)}` metric: {cell(data['selected'])}; A/A order-adjusted log SD: "
-                     f"CPU {data.get('cpu_sd_percent')}%, operation/busy wall {data.get('wall_sd_percent')}%. "
-                     "Raw records retain CPU scope, wall time and elapsed time; socket units are ms/tick.")
     if traces:
         lines.append("- State trace windows (operations): " + ", ".join(
             f"`{cell(t['case'])}` {t.get('iterations', '—')}" for t in traces) + ".")
@@ -418,9 +416,6 @@ def collect(output, head, job_start):
                                      "reading": "Unavailable" if len(hashes) != 2
                                      else "Equal" if hashes["baseline"]["sha256"] == hashes["candidate"]["sha256"] else "Changed"})
         if "candidate" in suites and workloads:
-            from perf_report_probe import probe
-            report["metric_probe"] = probe(binaries["candidate"], suites["candidate"], output / "metric-probe",
-                                           deadline=job_start + JOB_TIMEOUT_SECONDS - RESERVE_SECONDS)
             measure(report, binaries, {label: builds[label].hashes[binaries[label].name] for label in binaries},
                     catalogs, {"baseline": (), **suites}, output / "performance", job_start)
         phases["finished"] = time.monotonic() - job_start
@@ -453,10 +448,9 @@ def measure(report, binaries, hashes, catalogs, suites, output, job_start):
                                  "n_attempted": 0}
         except Exception as error:
             report["errors"].append(f"{w.name} redefined head measurement: {error}")
-    metrics = {w.name: report.get("metric_probe", {}).get("workloads", {}).get(w.name, {}).get("selected", "wallSeconds") for w in matched}
     plan = {"plan": "slither-perf-sequential-v3", "seed": catalogs["candidate"].seed,
-            "metric": "operation wall time; socket metric fixed by retained A/A probe",
-            "metrics": metrics,
+            "metric": "fixed host CPU per tick for host-official-500; operation/busy wall for other rows",
+            "metrics": {w.name: REPORT_METRICS.get(w.name, "wallSeconds") for w in matched},
             "catalogs": {label: catalog.sha256 for label, catalog in catalogs.items()},
             "executables": hashes,
             "workloads": [{"name": w.name, "operation": w.operation, "definitionSha256": w.fingerprint,
