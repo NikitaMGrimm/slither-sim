@@ -754,8 +754,6 @@ pub struct FoodSpawnEvent {
 #[derive(Clone, Debug)]
 pub struct Simulator {
     config: Config,
-    /// Live boundary, independent of the configured initial radius.
-    radius: f64,
     /// Stable slots: checked operations never remove or reorder snakes.
     snakes: Vec<Snake>,
     food: Vec<Food>,
@@ -766,6 +764,8 @@ pub struct Simulator {
     /// Latest step only. Disabled by default.
     food_spawn_events: Option<Vec<FoodSpawnEvent>>,
     time: f64,
+    /// Live boundary, independent of the configured initial radius.
+    radius: f64,
     death_times: Vec<Option<f64>>,
     /// Join order of each slot's current life; collisions resolve oldest first.
     joins: Vec<u64>,
