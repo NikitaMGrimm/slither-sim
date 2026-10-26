@@ -75,6 +75,14 @@
           "path": "/home/ubuntu/study/perf-combined/bin-candidate/perf_baseline",
           "sha256": "389e8b285037b801a8b7e20e3ed32623d5d312f740c828b1a235ee8634486670"
         }
+      },
+      "snapshotOf": {
+        "commit": "c63eef61360d6291a7733bfaeeb3f77ac8e12f3b",
+        "addedUntrackedFiles": [
+          "examples/host_capacity_load.rs",
+          "examples/host_probe.rs"
+        ],
+        "note": "tools/perf_build.py freezes the working tree, including untracked files; the run copied the unchanged capacity examples (capacityHarnessHashes) into the candidate checkout before perf_compare. Rebuilding that tree on this commit with the fixed snapshot metadata reproduces this commit and tree exactly."
       }
     }
   },

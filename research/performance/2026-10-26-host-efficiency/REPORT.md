@@ -85,13 +85,17 @@ Operation timing ran on one pinned core of the otherwise idle c7a.4xlarge
 before any capacity load:
 
 ```text
-tools/perf_compare.py --base 473e188 --cases client-official-500
+taskset -c 0 python3 tools/perf_compare.py --base 473e188 --cases client-official-500
   client-battledome-64 official-100-step step-default --repeats 5 --no-profiles
+  --max-wall-seconds 1800 --output <new directory outside the checkout>
 ```
 
 The runner checks full-state parity, warms up and times five adjacent
 alternating pairs. The two physics rows are unaffected controls. These are wall
-times; the runner does not report Linux process CPU.
+times; the runner does not report Linux process CPU. The run had copied the two
+capacity examples into the candidate checkout, so the runner's working-tree
+snapshot `d4420fe` is `c63eef6` plus those unchanged files; the pins record how
+to reproduce it.
 
 Capacity reused the capacity study's unchanged probe, load generator, trial
 runner and analysis on the same c7a.medium server and c7a.4xlarge generator in
