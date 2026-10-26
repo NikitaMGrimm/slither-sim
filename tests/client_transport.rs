@@ -64,6 +64,14 @@ fn info_works_without_a_backend() {
 }
 
 #[test]
+fn simulation_requests_reject_array_configs() {
+    for config in [json!([]), json!([{}])] {
+        let reply = &exchange(&[json!({"op":"simulation","config":config})])[0];
+        assert!(reply.get("error").is_some(), "{reply}");
+    }
+}
+
+#[test]
 fn current_json_contract_rejects_removed_request_fields() {
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/client-contract-v2.json")).unwrap();

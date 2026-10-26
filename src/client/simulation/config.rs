@@ -18,8 +18,8 @@ pub enum DeliveryProfile {
     Responsive,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SimulationConfig {
     pub world: Config,
     /// When visible state is sent; independent of `latency`.
@@ -42,6 +42,40 @@ pub struct SimulationConfig {
     pub latency: LatencyConfig,
     /// Retain each slot's connect/send/receive/disconnect records for replay.
     pub record_wire: bool,
+}
+
+// Derived struct deserializers also accept positional arrays, which would
+// silently start defaults; `Deserialize` below admits objects only.
+#[derive(Deserialize)]
+#[serde(
+    remote = "SimulationConfig",
+    default = "SimulationConfig::default",
+    deny_unknown_fields,
+    rename_all = "camelCase"
+)]
+struct SimulationConfigWire {
+    world: Config,
+    delivery: DeliveryProfile,
+    agents: usize,
+    controlled_slot: usize,
+    decision_ticks: usize,
+    minimap_interval_seconds: f64,
+    minimap_side: usize,
+    leaderboard_interval_seconds: f64,
+    local_records: bool,
+    latency: LatencyConfig,
+    record_wire: bool,
+}
+
+impl<'de> Deserialize<'de> for SimulationConfig {
+    /// Input passes through `serde_json::Value`, so a repeated key keeps its
+    /// last value, as in the world [`Config`].
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let fields = serde_json::Map::deserialize(deserializer)?;
+        SimulationConfigWire::deserialize(serde_json::Value::Object(fields))
+            .map_err(D::Error::custom)
+    }
 }
 
 impl Default for SimulationConfig {
@@ -70,37 +104,40 @@ impl Default for SimulationConfig {
     }
 }
 impl SimulationConfig {
+    /// Checks the world as backends and hosts run it, after sizing it for
+    /// `agents`; see [`Config::size_to_population`].
     pub fn validate(&self) -> Result<(), String> {
-        self.world.validate().map_err(|error| error.to_string())?;
+        if !(1..=MAX_AGENTS).contains(&self.agents) || self.controlled_slot >= self.agents {
+            return Err(format!(
+                "Simulation needs 1 to {MAX_AGENTS} agents, since protocol-19 snake IDs, \
+                 leaderboard rank and population are u16, and a controlled slot among them"
+            ));
+        }
+        let mut world = self.world.clone();
+        world.size_for_population(self.agents);
+        world.validate().map_err(|error| error.to_string())?;
         // Live prey refill to `count`, and each needs one of the u16 wire IDs.
-        if self.world.prey.count > MAX_PREY {
+        if world.prey.count > MAX_PREY {
             return Err(format!(
                 "Protocol-19 prey IDs are u16: prey count must be at most {MAX_PREY}"
             ));
         }
         self.latency.validate()?;
         for speed in [
-            self.world.prey.cruise_speed,
-            self.world.prey.escape_speed,
-            self.world.prey.sprint_speed,
+            world.prey.cruise_speed,
+            world.prey.escape_speed,
+            world.prey.sprint_speed,
         ] {
             encode::speed_u16(speed).map_err(|error| format!("Prey {error}"))?;
         }
         // Appearances encode size in one byte of fifth-units. Check the spawn
         // grid, allowing range endpoints above 51 that still only produce 51.
-        if self
-            .world
+        if world
             .prey
             .size_steps()
             .is_some_and(|(_, upper)| upper > f64::from(u8::MAX))
         {
             return Err("Protocol-19 simulation supports prey sizes up to 51".into());
-        }
-        if !(1..=MAX_AGENTS).contains(&self.agents) || self.controlled_slot >= self.agents {
-            return Err(format!(
-                "Simulation needs 1 to {MAX_AGENTS} agents, since protocol-19 snake IDs, \
-                 leaderboard rank and population are u16, and a controlled slot among them"
-            ));
         }
         if self.decision_ticks == 0 {
             return Err("Decision ticks must be at least 1".into());
@@ -118,14 +155,13 @@ impl SimulationConfig {
                 crate::client::minimap::MAX_SIDE
             ));
         }
-        let largest = self
-            .world
+        let largest = world
             .radius_updates
             .iter()
             .map(|update| update.radius)
-            .chain([self.world.radius])
+            .chain([world.radius])
             .chain(
-                (self.world.dynamic_radius || self.world.size_to_population)
+                (world.dynamic_radius || world.size_to_population)
                     .then(|| crate::simulator::population_radius(self.agents)),
             )
             .fold(0., f64::max);
@@ -137,7 +173,7 @@ impl SimulationConfig {
             ));
         }
         // After the radius limit, whose message is clearer than setup's range error.
-        encode::setup(self.world.radius, self.world.prey.turn_rate)?;
+        encode::setup(world.radius, world.prey.turn_rate)?;
         Ok(())
     }
 
