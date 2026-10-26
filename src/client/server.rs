@@ -67,6 +67,10 @@ const WRITE_BUFFER_BYTES: usize = 16 << 10;
 const MAX_SEND_BUFFER_BYTES: usize = 1 << 20;
 /// Frames waiting for their delivery time on one connection, socket or bot.
 const MAX_QUEUED_FRAMES: usize = 4096;
+/// Host policy: an unadmitted bot waits a wall second after refusal instead of
+/// retrying every decision (normally 42 ms). Socket joins keep their own cadence.
+/// See research/performance/2026-10-25-battledome-spawn-cost/REPORT.md.
+const BOT_ADMISSION_RETRY_SECONDS: f64 = 1.;
 /// Connections that have not joined, including those being closed.
 const MAX_PENDING: usize = 32;
 /// Fairness budgets per poll, so one busy listener or socket cannot starve
@@ -1328,12 +1332,12 @@ impl Bots {
                     // A worker this far behind ends the session and rejoins,
                     // as a socket client reading too slowly is closed.
                     let _ = self.commands.send(Command::Disconnect { slot, generation });
-                    seat.close();
+                    seat.close(self.shared.clock.wall(Instant::now()));
                 } else {
                     seat.frames.extend(frames);
                 }
             }
-            Delivery::Closed { .. } => seat.close(),
+            Delivery::Closed { .. } => seat.close(self.shared.clock.wall(Instant::now())),
         }
     }
 }
@@ -1357,9 +1361,12 @@ impl Seat {
         }
     }
 
-    /// The world closed the session: drop what is in flight, including a
-    /// command still processing, and rejoin at the next decision.
-    fn close(&mut self) {
+    /// Drop in-flight work. Unadmitted bots back off; established lives retain
+    /// their normal next-decision rejoin after a closure or death.
+    fn close(&mut self, now: f64) {
+        if self.state.status() == ClientStatus::Waiting {
+            self.decide_at = self.decide_at.max(now + BOT_ADMISSION_RETRY_SECONDS);
+        }
         self.closed = true;
         self.frames.clear();
         self.outbox = None;
@@ -1456,7 +1463,7 @@ impl Seat {
     }
 
     /// Start a new session and life. A full world may refuse it; the bot
-    /// then retries at its next decision.
+    /// then backs off before its next decision.
     fn join(
         &mut self,
         at: f64,
@@ -1811,6 +1818,52 @@ mod tests {
     }
 
     #[test]
+    fn refused_bot_admission_waits_a_wall_second_before_retrying() {
+        let (commands, received) = mpsc::channel();
+        let latency = LatencyConfig::default();
+        let mut random = Random::new(1);
+        let mut seat = Seat::new(4, 0.042);
+        seat.join(0.1, &commands, &latency, &mut random).unwrap();
+        assert!(matches!(
+            received.try_recv().unwrap(),
+            Command::Connect { generation: 1, .. }
+        ));
+        seat.close(0.2);
+        seat.run(1.19, &commands, &latency, &mut random, 0.042)
+            .unwrap();
+        assert!(received.try_recv().is_err());
+        seat.run(1.2, &commands, &latency, &mut random, 0.042)
+            .unwrap();
+        assert!(matches!(
+            received.try_recv().unwrap(),
+            Command::Connect { generation: 2, .. }
+        ));
+        // A second refusal starts a fresh delay from its actual receipt time,
+        // including when the simulation has fallen behind the wall clock.
+        seat.close(2.);
+        seat.run(2.99, &commands, &latency, &mut random, 0.042)
+            .unwrap();
+        assert!(received.try_recv().is_err());
+        seat.run(3., &commands, &latency, &mut random, 0.042)
+            .unwrap();
+        assert!(matches!(
+            received.try_recv().unwrap(),
+            Command::Connect { generation: 3, .. }
+        ));
+        // A reported death keeps the ordinary next-decision rejoin cadence.
+        seat.state.receive_frame(&[0, 0, b'v', 0], 3.01).unwrap();
+        let next_decision = seat.decide_at;
+        seat.close(3.02);
+        assert_eq!(seat.decide_at, next_decision);
+        seat.run(3.1, &commands, &latency, &mut random, 0.042)
+            .unwrap();
+        assert!(matches!(
+            received.try_recv().unwrap(),
+            Command::Connect { generation: 4, .. }
+        ));
+    }
+
+    #[test]
     fn a_bot_seat_too_far_behind_ends_its_session() {
         let (commands, received) = mpsc::channel();
         let (_route, deliveries) = mpsc::channel();
@@ -1875,7 +1928,7 @@ mod tests {
             },
             0.01,
         ));
-        seat.close();
+        seat.close(0.6);
         seat.run(0.7, &commands, &latency, &mut random, 0.042)
             .unwrap();
     }

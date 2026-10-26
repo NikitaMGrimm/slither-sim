@@ -407,7 +407,12 @@ impl SimulatorBackend {
                 if self.world.body_is_clear(&body, 600.) {
                     return Ok((body, heading));
                 }
-                if let Some(margin) = self.world.spawn_margin(&body)
+                // A candidate's margin only decreases while scanning neighbors.
+                // Stop once it cannot beat zero (admission) or the incumbent;
+                // keep strict ties and all random draws unchanged. See:
+                // research/performance/2026-10-25-battledome-spawn-cost/REPORT.md.
+                let best = open.as_ref().map_or(0., |(best, ..)| best.max(0.));
+                if let Some(margin) = self.world.spawn_margin_bounded(&body, best)
                     && open.as_ref().is_none_or(|(best, ..)| margin > *best)
                 {
                     open = Some((margin, body, heading));
