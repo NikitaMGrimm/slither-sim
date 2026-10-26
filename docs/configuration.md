@@ -302,17 +302,15 @@ remote clients use real compute time.
 | `processingJitterSeconds` | `0` | Uniform ± spread per decision, finite and nonnegative. |
 
 The generator's normal draw is at most about 8.57, exponential draws at most
-about 36.7 times their mean. Validation checks that the initial-draw bound
+about 36.7 times their mean. Validation requires
 `max(roundTripSeconds) × exp(8.57 × roundTripSpread) + medianSeconds ×
-exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` are
-finite. This does not bound the accumulated OU state: with fixed decay `a` and
-innovations bounded by `M`, its limiting envelope is
-`M × sqrt((1 + a) / (1 - a))`. Scheduling returns an error if a computed variation
-or delivery time is non-finite, or a pause start cannot advance its clock.
-Measured `processingSeconds` supplied with a decision replaces its modeled
-duration. Rust also provides `LatencyConfig::fixed(rtt)`,
-`LatencyConfig::one_way(uplink, downlink)` and `LatencyConfig::measured_route()`.
-Both one-way legs must be finite and nonnegative; invalid legs fail validation.
+exp(12.1 × logSigma)` and `processingSeconds[1] + processingJitterSeconds` to be
+finite. That bounds single draws, not the accumulated correlated variation, so
+scheduling also returns an error if a delay or pause time stops being finite or a
+pause cannot advance the clock. Measured `processingSeconds` supplied with a
+decision replaces its modeled duration. Rust also provides
+`LatencyConfig::fixed(rtt)`, `LatencyConfig::one_way(uplink, downlink)` (both
+legs finite and nonnegative) and `LatencyConfig::measured_route()`.
 
 ### Variation and pauses
 

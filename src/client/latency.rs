@@ -69,7 +69,7 @@ impl LatencyConfig {
     }
     /// Fixed one-way delays, without variation or pauses.
     pub fn one_way(uplink_seconds: f64, downlink_seconds: f64) -> Self {
-        // Preserve invalid legs for validate instead of letting them cancel.
+        // NaN makes `validate` reject invalid legs instead of letting them cancel.
         if [uplink_seconds, downlink_seconds]
             .iter()
             .any(|v| !v.is_finite() || *v < 0.)
