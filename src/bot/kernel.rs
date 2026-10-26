@@ -578,6 +578,7 @@ pub(super) fn decide(
                         me.safe,
                         goal.crosses,
                         Some(ramp),
+                        |clearance| clearance < me.safe,
                     ) >= me.safe
                 })
         });
@@ -653,6 +654,7 @@ pub(super) fn decide(
                 me.safe,
                 goal.crosses,
                 None,
+                |clearance| clearance < me.safe,
             ) >= me.safe
         });
         if !any_clear {
@@ -1259,6 +1261,9 @@ impl Scene {
             occupied: [false; MAX_CELLS * MAX_CELLS],
             n,
         };
+        // Occupancy is read only by food(): multiplying a positive cell value
+        // by 1 leaves its bits unchanged. A boost regather discards its scene.
+        let mark_occupied = !boosting && p.occupied_factor != 1.0;
         // A boost-reach regather keeps the cruise scene's food.
         for food in o.food.iter().filter(|_| !boosting) {
             if let Some(i) = cell(food.point()) {
@@ -1350,10 +1355,12 @@ impl Scene {
                 } else {
                     enemy.head
                 };
-                for step in 0..=steps {
-                    let t = p.head_path_seconds * step as f64 / steps as f64;
-                    if let Some(i) = cell(path(view.lead + t)) {
-                        scene.occupied[i] = true;
+                if mark_occupied {
+                    for step in 0..=steps {
+                        let t = p.head_path_seconds * step as f64 / steps as f64;
+                        if let Some(i) = cell(path(view.lead + t)) {
+                            scene.occupied[i] = true;
+                        }
                     }
                 }
                 let middle = path(view.lead + p.lookahead_seconds / 2.0);
@@ -1382,14 +1389,16 @@ impl Scene {
             } else {
                 // The original straight-line forecast.
                 let head = view.head(enemy);
-                for step in 0..=steps {
-                    let q = forward(
-                        head,
-                        enemy.heading,
-                        enemy.speed * p.head_path_seconds * step as f64 / steps as f64,
-                    );
-                    if let Some(i) = cell(q) {
-                        scene.occupied[i] = true;
+                if mark_occupied {
+                    for step in 0..=steps {
+                        let q = forward(
+                            head,
+                            enemy.heading,
+                            enemy.speed * p.head_path_seconds * step as f64 / steps as f64,
+                        );
+                        if let Some(i) = cell(q) {
+                            scene.occupied[i] = true;
+                        }
                     }
                 }
                 let ahead = forward(head, enemy.heading, enemy.speed * p.lookahead_seconds);
@@ -1419,9 +1428,10 @@ impl Scene {
                 {
                     near.push(Obstacle::new(previous, point, width, k, false));
                 }
-                // A boost-reach regather keeps the cruise scene's occupancy.
-                if let Some(i) = cell(point).filter(|_| !boosting) {
-                    scene.occupied[i] = true;
+                if mark_occupied {
+                    if let Some(i) = cell(point) {
+                        scene.occupied[i] = true;
+                    }
                 }
                 previous = point;
                 previous2 = point2;
@@ -1998,8 +2008,9 @@ fn to_tip(path: &mut [(Point, f64)], me: &Me, p: &Params) {
 /// Clearance of the arc toward `heading` from the rim and nearby bodies,
 /// capped at `cap`. Only clearance below `safe` changes a cost, so callers pass
 /// `safe` and obstacles that provably cannot lower the running minimum are
-/// skipped; the result equals `min(cap, exact clearance)`. With `ramp` the
-/// arc accelerates to boost speed.
+/// skipped. `stop` may accept a partial minimum once further decreases cannot
+/// change the caller's decision; otherwise the result is the exact capped
+/// clearance. With `ramp` the arc accelerates to boost speed.
 #[allow(clippy::too_many_arguments)]
 fn clearance(
     o: &Observation,
@@ -2010,6 +2021,7 @@ fn clearance(
     cap: f64,
     crosses: Option<usize>,
     ramp: Option<&[f64; RAMP_SUBSTEPS]>,
+    stop: impl Fn(f64) -> bool,
 ) -> f64 {
     let (mut path, points, rim_heading) = arc(me, p, heading, ramp);
     let path = &mut path[..points];
@@ -2036,6 +2048,9 @@ fn clearance(
     }
     let arcs = &arcs[..points - 1];
     for obstacle in near {
+        if stop(clearance) {
+            break;
+        }
         // A cut-off crosses ahead of its victim's head by design: check the
         // arc against where the head has been by each moment, not its whole
         // path.
@@ -2141,7 +2156,13 @@ fn search(
             break;
         }
         let heading = goal.heading + offset;
-        let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp);
+        // The minimum can only decrease, so this exact cost expression can
+        // only increase. Equal costs keep the earlier arc. A stopped arc
+        // therefore cannot replace best (including its exact clearance).
+        let loses = |clearance: f64| {
+            offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight >= best.0
+        };
+        let clearance = clearance(o, me, p, near, heading, me.safe, goal.crosses, ramp, loses);
         let mut cost = offset.abs() + (me.safe - clearance).max(0.0) * p.danger_weight;
         // The exit cost only adds, so skip it where the arc already loses.
         if p.exit_weight > 0.0 && cost < best.0 {
@@ -2357,6 +2378,42 @@ mod tests {
         o
     }
 
+    /// A4's fractional occupancy penalty decides between two near-equal food
+    /// cells: the slightly richer north cell holds a far opponent's body. Bits
+    /// come from the kernel before occupancy skipping; factor 1 flips the choice.
+    #[test]
+    fn a4_food_choice_keeps_its_fractional_occupancy_penalty() {
+        let mut o = lone();
+        let food = |x, y, value| crate::Food {
+            x,
+            y,
+            value,
+            size: None,
+            origin: None,
+        };
+        o.food = vec![food(400.0, 200.0, 1.01), food(400.0, -200.0, 1.0)];
+        let mut enemy = o.me.clone();
+        enemy.id = "far-head-near-food-body".into();
+        enemy.head = Point {
+            x: 1800.0,
+            y: 1200.0,
+        };
+        enemy.body = vec![Point { x: 400.0, y: 200.0 }];
+        o.opponents.push(enemy);
+        let p = crate::bot::params::A4_MEAN;
+        assert!(p.occupied_factor < 1.0);
+        let decide_with =
+            |p: &Params| decide(&o, &Timing::default(), &[], p, &mut Scratch::default());
+        let penalized = decide_with(&p);
+        let identity = decide_with(&Params {
+            occupied_factor: 1.0,
+            ..p
+        });
+        assert_eq!(penalized.heading.to_bits(), 0xbfddac670561bb4f);
+        assert_eq!(identity.heading.to_bits(), 0x3fddac670561bb4f);
+        assert!(!penalized.boost && !identity.boost);
+    }
+
     fn pellet(x: f64, y: f64, value: f64) -> crate::Food {
         crate::Food {
             x,
@@ -2375,6 +2432,110 @@ mod tests {
             sweep_bounds: (Point::default(), Point::default()),
             pickup_radius: 0.0,
             uncertainty: 0.0,
+        }
+    }
+
+    #[test]
+    fn clearance_stops_at_a_cost_tie_before_a_later_obstacle() {
+        let o = lone();
+        let p = Params::default();
+        let mut me = Me::new(&o.me);
+        me.safe = p.safe;
+        let obstacles = [
+            Obstacle::new(me.head, me.head, 10.0, 0, false),
+            Obstacle::new(me.head, me.head, 20.0, 1, false),
+        ];
+        let cost = |c: f64| 0.3 + (me.safe - c).max(0.0) * p.danger_weight;
+        let beaten = cost(-10.0);
+        let stopped = clearance(&o, &me, &p, &obstacles, 0.0, me.safe, None, None, |c| {
+            cost(c) >= beaten
+        });
+        let complete = clearance(&o, &me, &p, &obstacles, 0.0, me.safe, None, None, |_| false);
+        assert_eq!(stopped.to_bits(), (-10.0_f64).to_bits());
+        assert_eq!(complete.to_bits(), (-20.0_f64).to_bits());
+        assert_eq!(cost(stopped), beaten);
+        assert!(cost(complete) > beaten);
+    }
+
+    #[test]
+    fn pruned_search_matches_exhaustive_fan_costs_bit_for_bit() {
+        let mut seed = 0xd8a4_2910_32cf_765b;
+        for p in [
+            Params::default(),
+            crate::bot::params::A1,
+            crate::bot::params::A4_MEAN,
+        ] {
+            for case in 0..128 {
+                let mut o = lone();
+                o.me.head.x = lcg(&mut seed) * 3000.0;
+                o.me.heading = lcg(&mut seed) * std::f64::consts::TAU;
+                let mut me = Me::new(&o.me);
+                me.safe = p.safe + p.safe_width_factor * me.width;
+                let near: Vec<_> = (0..48)
+                    .map(|i| {
+                        let from = Point {
+                            x: me.head.x + (lcg(&mut seed) - 0.5) * 800.0,
+                            y: (lcg(&mut seed) - 0.5) * 800.0,
+                        };
+                        let to = Point {
+                            x: from.x + (lcg(&mut seed) - 0.5) * 200.0,
+                            y: from.y + (lcg(&mut seed) - 0.5) * 200.0,
+                        };
+                        Obstacle::new(from, to, lcg(&mut seed) * 80.0, i, i % 3 == 0)
+                            .during(0.0, p.lookahead_seconds)
+                    })
+                    .collect();
+                let goal = Goal {
+                    heading: lcg(&mut seed) * std::f64::consts::TAU,
+                    rate: 1.0,
+                    boost: false,
+                    crosses: (case % 5 == 0).then_some(0),
+                };
+                let ramp = (case % 4 == 0).then(|| me.boost_ramp());
+                let max_offset = if case % 3 == 0 {
+                    BOOST_MAX_OFFSET
+                } else {
+                    f64::INFINITY
+                };
+                let actual = search(&o, &me, &p, &near, &near, &goal, ramp.as_ref(), max_offset);
+                // Score every eligible arc and every exit in full, without
+                // offset/cost pruning or the losing-clearance shortcut.
+                let mut expected = (f64::INFINITY, goal.heading, f64::NEG_INFINITY, 0.0);
+                for &offset in p.fan[..p.fan_len].iter().filter(|o| o.abs() < max_offset) {
+                    let heading = goal.heading + offset;
+                    let c = clearance(
+                        &o,
+                        &me,
+                        &p,
+                        &near,
+                        heading,
+                        me.safe,
+                        goal.crosses,
+                        ramp.as_ref(),
+                        |_| false,
+                    );
+                    let mut cost = offset.abs() + (me.safe - c).max(0.0) * p.danger_weight;
+                    if p.exit_weight > 0.0 {
+                        let (path, points, _) = arc(&me, &p, heading, ramp.as_ref());
+                        let (end, end_heading) = path[points - 1];
+                        cost = blocked_exits(
+                            &o,
+                            &me,
+                            &p,
+                            &near,
+                            end,
+                            end_heading,
+                            cost,
+                            f64::INFINITY,
+                        );
+                    }
+                    if cost < expected.0 {
+                        expected = (cost, heading, c, offset);
+                    }
+                }
+                let bits = |(a, b, c, d): (f64, f64, f64, f64)| [a, b, c, d].map(f64::to_bits);
+                assert_eq!(bits(actual), bits(expected), "case {case}");
+            }
         }
     }
 

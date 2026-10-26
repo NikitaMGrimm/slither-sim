@@ -5,7 +5,7 @@
 //! The policy uses no hidden world state and retains only reusable scratch space.
 //! See the [adoption evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-a4-adoption/REPORT.md)
 //! and [frozen port provenance](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md).
-// Preserve the frozen be3a035 control flow; see the port evidence linked above.
+// Preserve the frozen policy's decision bits; see the port evidence above.
 #[allow(clippy::collapsible_if)]
 mod kernel;
 mod params;
