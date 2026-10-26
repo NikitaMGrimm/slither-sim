@@ -1,4 +1,5 @@
 use super::{Bot, CONTRACT, ClientFrame, ClientStatus, ReceivedField, ReceivedMetadata};
+use crate::Action;
 
 /// Received-frame adapter for [`crate::bot::Forager`].
 ///
