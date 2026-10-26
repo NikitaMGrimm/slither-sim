@@ -14,11 +14,11 @@ pub use kernel::{Intent, MAX_SENT, Sent, Timing};
 
 use crate::{Action, Observation};
 
-/// SHA256 of the original frozen parameter manifest pinned by the adoption evidence.
-/// The shipped `bot/data/resolved.json` retains only its unchanged A4-mean entry;
-/// this identifies the source manifest, not the reduced file or a performance result.
+/// SHA256 of the shipped `bot/data/resolved.json` parameter manifest, not a
+/// performance result. It keeps only the A4-mean entry, unchanged from the
+/// two-policy manifest `ff7591be…a57a482` that the adoption evidence pins.
 pub const PARAMETER_MANIFEST_SHA256: &str =
-    "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482";
+    "94669e26cb399b3f7facb9de14da01df01823cecc90fd3a1e6f5970f2fa0490e";
 
 /// Reusable policy instance. Decisions carry no learned or per-seat state.
 #[derive(Clone, Debug)]

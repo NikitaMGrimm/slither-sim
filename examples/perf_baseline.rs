@@ -369,7 +369,7 @@ impl Driver {
             Driver::SharedPolicy => json!({
                 "config": Config::sandbox(), "simulation": simulation_definition(self)?,
                 "policy": "A4-mean",
-                "parameterManifestSha256": "ff7591bea57be7925878d1e7407a7a8ddaf7d37e6c2045180d1e666f3c57a482",
+                "parameterManifestSha256": "94669e26cb399b3f7facb9de14da01df01823cecc90fd3a1e6f5970f2fa0490e",
                 "operation": "all eight ForagerBot decisions plus step_all; record drain excluded",
                 "timing": "configured virtual processing only; no wall-time feedback",
             }),
