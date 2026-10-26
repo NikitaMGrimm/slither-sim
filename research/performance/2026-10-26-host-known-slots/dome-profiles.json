@@ -1,0 +1,89 @@
+{
+  "metric": "sampled user CPU only; physics includes admission; admission-inclusive share overlaps categories",
+  "seatCounts": {
+    "40": {
+      "base": {
+        "samples": 3008,
+        "phaseSharesPercent": {
+          "physics": 89.09574468085107,
+          "other/unknown": 3.3577127659574466,
+          "visibility/food-sector work": 2.859042553191489,
+          "per-recipient delta encoding": 1.5957446808510638,
+          "framing/flush": 1.163563829787234,
+          "socket service": 1.0305851063829787,
+          "allocation": 0.8976063829787234
+        },
+        "admissionInclusivePercent": 90.39228723404256
+      },
+      "candidate": {
+        "samples": 3415,
+        "phaseSharesPercent": {
+          "physics": 89.13616398243046,
+          "visibility/food-sector work": 3.162518301610542,
+          "other/unknown": 3.0161054172767203,
+          "per-recipient delta encoding": 1.8448023426061493,
+          "framing/flush": 1.171303074670571,
+          "allocation": 0.8784773060029283,
+          "socket service": 0.7906295754026355
+        },
+        "admissionInclusivePercent": 90.10248901903367
+      }
+    },
+    "64": {
+      "base": {
+        "samples": 3225,
+        "phaseSharesPercent": {
+          "physics": 88.06201550387597,
+          "other/unknown": 3.6589147286821704,
+          "visibility/food-sector work": 2.883720930232558,
+          "per-recipient delta encoding": 1.9844961240310077,
+          "framing/flush": 1.550387596899225,
+          "socket service": 1.0232558139534884,
+          "allocation": 0.8372093023255814
+        },
+        "admissionInclusivePercent": 89.36434108527132
+      },
+      "candidate": {
+        "samples": 3315,
+        "phaseSharesPercent": {
+          "physics": 88.41628959276018,
+          "visibility/food-sector work": 3.4389140271493215,
+          "other/unknown": 3.167420814479638,
+          "per-recipient delta encoding": 1.779788838612368,
+          "framing/flush": 1.4479638009049773,
+          "allocation": 0.8748114630467572,
+          "socket service": 0.8748114630467572
+        },
+        "admissionInclusivePercent": 89.56259426847662
+      }
+    },
+    "80": {
+      "base": {
+        "samples": 3158,
+        "phaseSharesPercent": {
+          "physics": 88.82203926535782,
+          "other/unknown": 3.103229892336922,
+          "visibility/food-sector work": 2.9449018366054465,
+          "framing/flush": 1.773274224192527,
+          "per-recipient delta encoding": 1.6149461684610513,
+          "socket service": 0.9499683343888538,
+          "allocation": 0.7916402786573781
+        },
+        "admissionInclusivePercent": 90.53198226725776
+      },
+      "candidate": {
+        "samples": 3032,
+        "phaseSharesPercent": {
+          "physics": 87.63192612137203,
+          "visibility/food-sector work": 3.3970976253298155,
+          "other/unknown": 3.1662269129287597,
+          "per-recipient delta encoding": 1.9788918205804749,
+          "framing/flush": 1.8469656992084433,
+          "allocation": 1.0883905013192612,
+          "socket service": 0.8905013192612137
+        },
+        "admissionInclusivePercent": 88.7203166226913
+      }
+    }
+  }
+}

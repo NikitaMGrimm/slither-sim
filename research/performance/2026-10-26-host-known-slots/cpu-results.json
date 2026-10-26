@@ -1,0 +1,76 @@
+{
+  "metric": "host process user+system CPU ms per executed physics tick",
+  "platform": "shared WSL2 Linux x86-64",
+  "hostLogicalCpus": 1,
+  "loadLogicalCpus": 3,
+  "warmupSeconds": 15,
+  "holdSeconds": 45,
+  "measuredPairs": 5,
+  "summary": "Arm medians and adjacent paired candidate/base ratios; discarded warmup and full holds retained in scratch.",
+  "workloads": {
+    "official-500": {
+      "baseMedianCpuMsPerTick": 7.028916428344455,
+      "candidateMedianCpuMsPerTick": 6.556198217914647,
+      "pairedRatios": [
+        0.9676269821179604,
+        0.9241222431142826,
+        1.1485943181348703,
+        0.9389686299377626,
+        0.8885023701274045
+      ],
+      "medianPairedRatio": 0.9389686299377626,
+      "pairedRatioRange": [
+        0.8885023701274045,
+        1.1485943181348703
+      ]
+    },
+    "battledome-40": {
+      "baseMedianCpuMsPerTick": 3.2031736154324824,
+      "candidateMedianCpuMsPerTick": 2.683571873055383,
+      "pairedRatios": [
+        0.7867897037396796,
+        1.0783640813734432,
+        0.9108266373593553,
+        0.8620689655172414,
+        0.774597766837119
+      ],
+      "medianPairedRatio": 0.8620689655172414,
+      "pairedRatioRange": [
+        0.774597766837119,
+        1.0783640813734432
+      ]
+    },
+    "battledome-64": {
+      "baseMedianCpuMsPerTick": 2.8589205164100178,
+      "candidateMedianCpuMsPerTick": 2.835588738528542,
+      "pairedRatios": [
+        0.9540508765641683,
+        0.8405835117294851,
+        1.2122617207624935,
+        1.0652930690392441,
+        1.179805278989723
+      ],
+      "medianPairedRatio": 1.0652930690392441,
+      "pairedRatioRange": [
+        0.8405835117294851,
+        1.2122617207624935
+      ]
+    },
+    "battledome-80": {
+      "baseMedianCpuMsPerTick": 3.1316116988176734,
+      "candidateMedianCpuMsPerTick": 3.046656298600311,
+      "pairedRatios": [
+        0.9658719027582984,
+        1.0231888595626915,
+        1.0112004823800413,
+        0.9352269789479912,
+        0.9335779236734988
+      ],
+      "medianPairedRatio": 0.9658719027582984,
+      "pairedRatioRange": [
+        0.9335779236734988,
+        1.0231888595626915
+      ]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+--- perf_baseline.rs
++++ perf_battledome.rs
+@@ -284,12 +284,28 @@
+         bot: Some(op(800, 3, Full)),
+     }),
+     Registration::Client(ClientScenario {
++        id: "client-battledome-40",
++        world: World::Battledome,
++        agents: 40,
++        warmup_decisions: 600,
++        refusal_retry_decisions: 24,
++        operation: op(40, 4, Ci),
++    }),
++    Registration::Client(ClientScenario {
+         id: "client-battledome-64",
+         world: World::Battledome,
+         agents: 64,
+         warmup_decisions: 600,
+         refusal_retry_decisions: 24,
+         operation: op(40, 4, Ci),
++    }),
++    Registration::Client(ClientScenario {
++        id: "client-battledome-80",
++        world: World::Battledome,
++        agents: 80,
++        warmup_decisions: 600,
++        refusal_retry_decisions: 24,
++        operation: op(40, 4, Ci),
+     }),
+     Registration::Client(ClientScenario {
+         id: "client-official-500",

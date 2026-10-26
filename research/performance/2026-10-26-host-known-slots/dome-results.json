@@ -1,0 +1,143 @@
+{
+  "summary": "Medians of five hold-level populations/quantiles; maxima and deferred counts across all five holds. Waits are client-observed login-to-setup, not internal queue times.",
+  "seatCounts": {
+    "40": {
+      "base": {
+        "playing": 32.713,
+        "waitingMean": 6.951,
+        "waitingFinal": 6,
+        "meanVisiblePeers": 5.516271524082413,
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 4.251178000002255,
+          "p99": 26.43564200000037,
+          "max": 217.45621100000062
+        },
+        "completedSpawnWaitMsDuringHold": {
+          "p50": 4758.942391999998,
+          "p99": 16578.782213,
+          "max": 20383.249733
+        },
+        "censoredSpawnWaitMsAtEnd": {
+          "p50": 1711.3593119999991,
+          "p99": 3541.9771699999956,
+          "max": 8361.089812999999
+        }
+      },
+      "candidate": {
+        "playing": 36.094,
+        "waitingMean": 3.595,
+        "waitingFinal": 6,
+        "meanVisiblePeers": 5.803555221868105,
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.2170960000003106,
+          "p99": 12.227950000000419,
+          "max": 43.5695859999978
+        },
+        "completedSpawnWaitMsDuringHold": {
+          "p50": 2945.1439540000024,
+          "p99": 16609.382719999998,
+          "max": 17250.564229
+        },
+        "censoredSpawnWaitMsAtEnd": {
+          "p50": 2231.5480000000034,
+          "p99": 4449.724453000002,
+          "max": 7836.028835999997
+        }
+      }
+    },
+    "64": {
+      "base": {
+        "playing": 34.104,
+        "waitingMean": 29.538,
+        "waitingFinal": 32,
+        "meanVisiblePeers": 5.575156237701692,
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.8756569999968633,
+          "p99": 12.930634999996983,
+          "max": 79.81545600000027
+        },
+        "completedSpawnWaitMsDuringHold": {
+          "p50": 21651.166584999995,
+          "p99": 35861.661496,
+          "max": 38586.333402000004
+        },
+        "censoredSpawnWaitMsAtEnd": {
+          "p50": 11749.055487,
+          "p99": 22733.555170000003,
+          "max": 23498.649869000004
+        }
+      },
+      "candidate": {
+        "playing": 35.038,
+        "waitingMean": 28.633,
+        "waitingFinal": 32,
+        "meanVisiblePeers": 5.786441558441559,
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.6870210000015504,
+          "p99": 10.736899999999878,
+          "max": 49.72271499999988
+        },
+        "completedSpawnWaitMsDuringHold": {
+          "p50": 22157.580629,
+          "p99": 36311.846465999995,
+          "max": 39201.040307
+        },
+        "censoredSpawnWaitMsAtEnd": {
+          "p50": 12763.622970999997,
+          "p99": 22582.056096000004,
+          "max": 24935.417612999998
+        }
+      }
+    },
+    "80": {
+      "base": {
+        "playing": 35.51,
+        "waitingMean": 44.133,
+        "waitingFinal": 48,
+        "meanVisiblePeers": 5.843442441314554,
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 4.035280000003695,
+          "p99": 12.95333400000527,
+          "max": 45.212383999998565
+        },
+        "completedSpawnWaitMsDuringHold": {
+          "p50": 33737.768498,
+          "p99": 48643.149105,
+          "max": 53503.595591
+        },
+        "censoredSpawnWaitMsAtEnd": {
+          "p50": 19554.866425,
+          "p99": 34285.842023,
+          "max": 37256.814339000004
+        }
+      },
+      "candidate": {
+        "playing": 35.962,
+        "waitingMean": 43.714,
+        "waitingFinal": 47,
+        "meanVisiblePeers": 6.003998022738507,
+        "deferredTicksTotal": 0,
+        "frameExcessMs": {
+          "p50": 3.99253900000258,
+          "p99": 18.848103999996965,
+          "max": 56.91545000000042
+        },
+        "completedSpawnWaitMsDuringHold": {
+          "p50": 33954.72449900001,
+          "p99": 50299.990248,
+          "max": 52614.971600000004
+        },
+        "censoredSpawnWaitMsAtEnd": {
+          "p50": 18319.528468,
+          "p99": 33670.343726,
+          "max": 35826.665091999996
+        }
+      }
+    }
+  }
+}
