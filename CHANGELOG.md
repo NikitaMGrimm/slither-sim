@@ -9,6 +9,10 @@
   `bots.latency`. Sockets no longer receive the simulation's latency; use
   `players.latency` for added socket link delay (processing must stay zero).
   Legacy flat keys and non-default host `simulation.latency` are rejected.
+- Official worlds now hold their initial population-sized radius; the provisional,
+  unfaithful dynamic controller is opt-in. Hosts still size official worlds for
+  all seats, while explicit fixed radii, sandbox and Battledome stay unchanged
+  ([configuration](docs/configuration.md#hostconfig)).
 - Rust continuation now uses validated `Simulator::checkpoint`, `from_checkpoint`
   and atomic `restore`; direct Simulator/runtime serde is removed. Checkpoints
   use `slither-sim-checkpoint-v1` / `slither-sim-rules-v1`; debug snapshots cannot

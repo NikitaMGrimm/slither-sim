@@ -1,0 +1,30 @@
+{
+  "original_study_files": {
+    "analyze.py": "c462cc05cf4c618504f9fcbf4f6d4ec4c9b5edd2d22e3da7a2631fb154e4fe9a",
+    "tabulate.py": "c89260f01f03edcc50d9d7ba7f5ddbbe25e52f444886059a2c5c572b193fcaec",
+    "verify.py": "8e2665f85da4de5ec5f9122176802bb6a3b4f6d8b59001939fd6d168ca4197d5",
+    "PLAN.md": "b71d8754df76e093d40993c5f21df959cf0e869ae73b8ee4d2c533d391376496",
+    "simulation/src/main.rs": "7a20c358f167769f9be943b2df6b8e01f199dd568e05f4d5e2adeda3001b36ab",
+    "simulation/Cargo.toml": "3be63f91952bc8eb72427ef9ce37efea5d50c3710276bc012ad24af3fb5da1af",
+    "simulation/Cargo.lock": "30379ec6a7c9a2016c6a5d7e1284dcafd61ed2c56e6eb4ccbb9e0d35143d2816"
+  },
+  "packaged_files": {
+    "analyze.py": "06b8301d3e995aed329e2cd1d92d6d95e8fdeeb6eecfb42200816b607b507093",
+    "free-run-summary.json": "32e6aa03d304f54c97e3ef168919a0412ae228d291c1d30a9ef8d6d66037907f",
+    "methods/analyze-global-radius.py": "24b0ab56cda0f914d76c71a0c3862c5ac248681df322164a1f5213d55ab88816",
+    "methods/analyze-radius-dynamics.py": "41543d11562dbee890cb5c3b63d91a4f4dba76e61e60cd874f081fa5761fea80",
+    "methods/analyze-radius-motion.py": "da178e7b741d21ad2275a32323bffc181fafd0beb44f424817cde240c5faed1c",
+    "PLAN.md": "b71d8754df76e093d40993c5f21df959cf0e869ae73b8ee4d2c533d391376496",
+    "REPORT.md": "fb0a43ff20bbc569e94a4fd78f07cd46fc10a899cf7e3cde551cb514d0338ea9",
+    "results.json": "122c2b543c890473dffcc2223bdc7e4ff5de9f9a3b45787da8e0bc2cdd01e38a",
+    "select_results.py": "4d0b4d9b1c002b124f4e013806d891f69bf90b97853087e4585b49eccc86b357",
+    "simulation/Cargo.lock": "30379ec6a7c9a2016c6a5d7e1284dcafd61ed2c56e6eb4ccbb9e0d35143d2816",
+    "simulation/Cargo.toml": "b6d2116fe3caa31b311a363efcfc9f4e87c2445b163bd6ee55fa2b93ff3096c2",
+    "simulation/src/main.rs": "c305ef4267094282881387baee343f461264abce8ff6c6f74b9535717216a463",
+    "source-inventory.json": "f771ae85bf1f6ec8a34c85f5934bd5d773f9c635d379bc3261fa40abca4b58d5",
+    "tables.json": "999331bd22a88807596089057f3baf726ad54694badf234fc00a30b3997d58eb",
+    "tabulate.py": "1842e285f71bd99ae418f76447629e6bd425200b796ca49d136e9ee4009fe43c",
+    "verification.json": "23de75c34467030c86f236d67ecdcbfb5ec57b4c886c41a4dabebd685a1455b2",
+    "verify.py": "8e2665f85da4de5ec5f9122176802bb6a3b4f6d8b59001939fd6d168ca4197d5"
+  }
+}

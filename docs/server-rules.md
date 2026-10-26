@@ -15,8 +15,11 @@ sandbox defaults and overrides. Neither is an exact official replica.
 size-floor, free-boost and food-budget rules and synthetic regressions. These
 are design choices, not official-server measurements.
 
-The radius controller, food admission limits, prey population, kiosk penalty and
-rim sliding are provisional. In particular:
+Initial population sizing, food admission limits, prey population, kiosk penalty
+and rim sliding are provisional. Official worlds hold their selected initial
+radius by default. This practical choice omits genuine official waves; it is
+not an identified official rule. The old living-population radius controller
+remains an explicit opt-in and is not faithful. In particular:
 
 - For measured radius replay, use [recorded samples](configuration.md#world-config).
 - [Food admission limits](configuration.md#food-admission-limits) count all origins
@@ -143,12 +146,21 @@ are models. Recipient arrivals/occupancy cannot identify rejected generation,
 global counts or startup seeding. A matched-sector check rejected the earlier
 ambient-replacement association; it supplies no refill retuning.
 
-The radius controller contradicts retained observations. In
+The opt-in radius controller contradicts retained observations. In
 `run4-radius-long-20260927/bot0.jsonl.gz` (SHA-256
 `3180b8201f51d5f4fe9732b6c69e85bab8ce49448742a2a72cfd228ef60613ef`),
 connection 4, server time 292,116→292,243 ms, radius grows 13,940→13,947 faster than
 the model's expansion cap. The replacement is unidentified; replay recorded
-`radiusUpdates` rather than adopting the fastest observed slope as a cap.
+`radiusUpdates` with `dynamicRadius: false` rather than adopting the fastest
+observed slope as a cap. The retrospective, exploratory
+[radius study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-arena-radius/REPORT.md)
+finds sustained official waves (12,926–14,611 units over about 400 s at 447–505
+reported players), versus frequent death/respawn reversals in the local
+controller. Holding the initial radius beats the reported-count controller in
+94/114 connection forecasts (mean MAE 211 versus 520 units), but loses in 20 and
+suppresses real waves. No tested population, EMA, clock or load proxy identifies
+the official controller. Host seat sizing is a separate startup capacity policy;
+see [configuration](configuration.md#hostconfig).
 
 ## Movement and geometry
 

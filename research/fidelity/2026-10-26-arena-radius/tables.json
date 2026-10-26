@@ -1,0 +1,439 @@
+{
+  "proxies": {
+    "players": {
+      "coefficient": 609.9104269411056,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7450980392156863,
+        "balanced_accuracy": 0.6446428571428571
+      },
+      "holdout_n": 2444,
+      "holdout_pooled_ba": 0.5192376864579894,
+      "holdout_directory_mean_ba": 0.5051217356787017
+    },
+    "visible_cache": {
+      "coefficient": 9577.407797781192,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.47058823529411764,
+        "balanced_accuracy": 0.5633928571428571
+      },
+      "holdout_n": 2444,
+      "holdout_pooled_ba": 0.5165594289963145,
+      "holdout_directory_mean_ba": 0.5097512269827391
+    },
+    "map_fraction": {
+      "coefficient": 45449.303084393905,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7647058823529411,
+        "balanced_accuracy": 0.74375
+      },
+      "holdout_n": 2444,
+      "holdout_pooled_ba": 0.5306123955472879,
+      "holdout_directory_mean_ba": 0.5257309828428279
+    },
+    "leader_mass": {
+      "coefficient": 255.74275199038217,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7254901960784313,
+        "balanced_accuracy": 0.6473214285714286
+      },
+      "holdout_n": 2444,
+      "holdout_pooled_ba": 0.4972418846987011,
+      "holdout_directory_mean_ba": 0.5052636778178239
+    },
+    "largest_mass": {
+      "coefficient": 696.4884369057429,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7254901960784313,
+        "balanced_accuracy": 0.6133928571428571
+      },
+      "holdout_n": 2444,
+      "holdout_pooled_ba": 0.48980369735086715,
+      "holdout_directory_mean_ba": 0.501421116377687
+    },
+    "persistence": {
+      "coefficient": null,
+      "train": {
+        "n": 51,
+        "expanding": 16,
+        "shrinking": 35,
+        "accuracy": 0.7647058823529411,
+        "balanced_accuracy": 0.74375
+      },
+      "holdout_n": 2444,
+      "holdout_pooled_ba": 0.803158478218271,
+      "holdout_directory_mean_ba": 0.7942581582255521
+    }
+  },
+  "model_macro": {
+    "majority": {
+      "directories": 39,
+      "mean_ba": 0.5,
+      "median_ba": 0.5
+    },
+    "last_direction": {
+      "directories": 39,
+      "mean_ba": 0.7942589743589744,
+      "median_ba": 0.8046
+    },
+    "instant_population": {
+      "directories": 39,
+      "mean_ba": 0.5051179487179487,
+      "median_ba": 0.5
+    },
+    "ema_population": {
+      "directories": 39,
+      "mean_ba": 0.511674358974359,
+      "median_ba": 0.5
+    },
+    "fixed_cycle": {
+      "directories": 39,
+      "mean_ba": 0.516825641025641,
+      "median_ba": 0.5227
+    },
+    "current_670": {
+      "directories": 39,
+      "mean_ba": 0.5304753969402419,
+      "median_ba": 0.5
+    }
+  },
+  "simulation_summary": {
+    "changed_ticks": 25097,
+    "deaths": 1406,
+    "direction_changes": 363,
+    "dt": 0.007,
+    "initial_radius": 14678.964541138452,
+    "living": 464,
+    "respawns": 1390,
+    "seconds": 180.00500000007605,
+    "summary": true,
+    "target_variation": 41092.140588182156,
+    "total_variation": 4114.386320400643
+  },
+  "simulation_bins_30s": [
+    {
+      "start_s": 0,
+      "end_s": 30,
+      "radius_first": 14678.964541138452,
+      "radius_last": 14443.23387062047,
+      "radius_min": 14388.43699562047,
+      "radius_max": 14678.964541138452,
+      "living_min": 456,
+      "living_max": 480,
+      "variation": 692.8087955179817,
+      "reversals": 49
+    },
+    {
+      "start_s": 30,
+      "end_s": 60,
+      "radius_first": 14445.53074562047,
+      "radius_last": 14418.851269598345,
+      "radius_min": 14387.574359908042,
+      "radius_max": 14478.822465932788,
+      "living_min": 456,
+      "living_max": 475,
+      "variation": 685.1417045972685,
+      "reversals": 55
+    },
+    {
+      "start_s": 60,
+      "end_s": 90,
+      "radius_first": 14416.554394598345,
+      "radius_last": 14500.550502365239,
+      "radius_min": 14409.499707098345,
+      "radius_max": 14516.519807064167,
+      "living_min": 459,
+      "living_max": 473,
+      "variation": 674.4775349019928,
+      "reversals": 62
+    },
+    {
+      "start_s": 90,
+      "end_s": 120,
+      "radius_first": 14498.089564865239,
+      "radius_last": 14452.408403432788,
+      "radius_min": 14395.941547408042,
+      "radius_max": 14498.089564865239,
+      "living_min": 457,
+      "living_max": 473,
+      "variation": 669.8336234819435,
+      "reversals": 72
+    },
+    {
+      "start_s": 120,
+      "end_s": 150,
+      "radius_first": 14450.111528432788,
+      "radius_last": 14387.642883401206,
+      "radius_min": 14370.908508401206,
+      "radius_max": 14497.433314865239,
+      "living_min": 456,
+      "living_max": 474,
+      "variation": 682.8065581131705,
+      "reversals": 64
+    },
+    {
+      "start_s": 150,
+      "end_s": 180,
+      "radius_first": 14388.955383401206,
+      "radius_last": 14410.455686837135,
+      "radius_min": 14339.341453871128,
+      "radius_max": 14431.119445901206,
+      "living_min": 452,
+      "living_max": 472,
+      "variation": 695.208728788286,
+      "reversals": 60
+    }
+  ],
+  "pulse_2s": [
+    {
+      "start_s": 280,
+      "first_radius": 13622,
+      "last_radius": 13635,
+      "rate": 7.3280721533258175,
+      "players_min": 474,
+      "players_max": 498
+    },
+    {
+      "start_s": 282,
+      "first_radius": 13637,
+      "last_radius": 13666,
+      "rate": 15.207131620346093,
+      "players_min": 474,
+      "players_max": 474
+    },
+    {
+      "start_s": 284,
+      "first_radius": 13668,
+      "last_radius": 13708,
+      "rate": 22.42152466367713,
+      "players_min": 471,
+      "players_max": 474
+    },
+    {
+      "start_s": 286,
+      "first_radius": 13711,
+      "last_radius": 13752,
+      "rate": 28.691392582225333,
+      "players_min": 471,
+      "players_max": 471
+    },
+    {
+      "start_s": 288,
+      "first_radius": 13804,
+      "last_radius": 13843,
+      "rate": 39.19597989949749,
+      "players_min": 471,
+      "players_max": 471
+    },
+    {
+      "start_s": 290,
+      "first_radius": 13849,
+      "last_radius": 13934,
+      "rate": 44.66631634261692,
+      "players_min": 471,
+      "players_max": 483
+    },
+    {
+      "start_s": 292,
+      "first_radius": 13940,
+      "last_radius": 14026,
+      "rate": 48.47801578354002,
+      "players_min": 483,
+      "players_max": 485
+    },
+    {
+      "start_s": 294,
+      "first_radius": 14032,
+      "last_radius": 14117,
+      "rate": 44.59601259181532,
+      "players_min": 485,
+      "players_max": 485
+    },
+    {
+      "start_s": 296,
+      "first_radius": 14123,
+      "last_radius": 14201,
+      "rate": 40.96638655462185,
+      "players_min": 485,
+      "players_max": 485
+    },
+    {
+      "start_s": 298,
+      "first_radius": 14205,
+      "last_radius": 14276,
+      "rate": 37.21174004192872,
+      "players_min": 485,
+      "players_max": 487
+    },
+    {
+      "start_s": 300,
+      "first_radius": 14281,
+      "last_radius": 14340,
+      "rate": 33.22072072072072,
+      "players_min": 487,
+      "players_max": 487
+    },
+    {
+      "start_s": 302,
+      "first_radius": 14344,
+      "last_radius": 14401,
+      "rate": 29.952706253284287,
+      "players_min": 474,
+      "players_max": 487
+    },
+    {
+      "start_s": 304,
+      "first_radius": 14404,
+      "last_radius": 14454,
+      "rate": 26.219192448872576,
+      "players_min": 474,
+      "players_max": 478
+    },
+    {
+      "start_s": 306,
+      "first_radius": 14457,
+      "last_radius": 14499,
+      "rate": 21.955044432828018,
+      "players_min": 478,
+      "players_max": 478
+    },
+    {
+      "start_s": 308,
+      "first_radius": 14502,
+      "last_radius": 14535,
+      "rate": 18.54974704890388,
+      "players_min": 478,
+      "players_max": 478
+    },
+    {
+      "start_s": 310,
+      "first_radius": 14537,
+      "last_radius": 14565,
+      "rate": 14.705882352941176,
+      "players_min": 478,
+      "players_max": 499
+    },
+    {
+      "start_s": 312,
+      "first_radius": 14567,
+      "last_radius": 14588,
+      "rate": 11.023622047244094,
+      "players_min": 499,
+      "players_max": 499
+    }
+  ],
+  "comparison_sampling": {
+    "0.128": {
+      "synthetic_0_180s": {
+        "samples": 1407,
+        "range": 339.6230872673241,
+        "total_variation": 3747.2338896927777,
+        "reversals": 181,
+        "max_age": 0.1040000000065433
+      },
+      "official_180_360s": {
+        "samples": 1407,
+        "range": 1220,
+        "total_variation": 3108,
+        "reversals": 5,
+        "max_age": 1996.0
+      }
+    },
+    "1": {
+      "synthetic_0_180s": {
+        "samples": 181,
+        "range": 339.6230872673241,
+        "total_variation": 2849.2814754427836,
+        "reversals": 71,
+        "max_age": 0.10000000000591314
+      },
+      "official_180_360s": {
+        "samples": 181,
+        "range": 1220,
+        "total_variation": 3108,
+        "reversals": 5,
+        "max_age": 1964
+      }
+    },
+    "5": {
+      "synthetic_0_180s": {
+        "samples": 37,
+        "range": 309.7216961552167,
+        "total_variation": 1151.1291466949533,
+        "reversals": 17,
+        "max_age": 0.10000000000002274
+      },
+      "official_180_360s": {
+        "samples": 37,
+        "range": 1220,
+        "total_variation": 3076,
+        "reversals": 5,
+        "max_age": 1964
+      }
+    }
+  },
+  "simulation_samples": {
+    "min_radius": 14339.341453871128,
+    "max_radius": 14678.964541138452,
+    "mean_living_at_10Hz": 464.46392896781356,
+    "min_living": 452,
+    "max_living": 480
+  },
+  "overall": {
+    "files": 91,
+    "complete_files": 53,
+    "excluded_files": 38,
+    "connections": 263,
+    "capture_directories": 40,
+    "recipient_seconds": 21088.518,
+    "z_packets": 41947,
+    "changed_connections": 257,
+    "both_direction_connections": 194,
+    "total_variation": 212442,
+    "growth_intervals": 19287,
+    "shrink_intervals": 22577,
+    "same_intervals": 77
+  },
+  "free_run_all": {
+    "connections": 114,
+    "hold_initial_lower_mae": 94,
+    "population_model_mean_connection_mae": 519.6270125906736,
+    "hold_initial_mean_connection_mae": 211.32016097063
+  },
+  "free_run_holdout": {
+    "connections": 113,
+    "hold_initial_lower_mae": 93,
+    "population_model_mean_connection_mae": 515.0666834835473,
+    "hold_initial_mean_connection_mae": 210.87265010409675
+  },
+  "pins": {
+    "src/simulator.rs": "fd110e431195b88a5f74e283fb3297e5fe160e241bdfbe326ee795da3e7aeae6",
+    "src/client/protocol.rs": "621e7461e6368bc7b881521a8f72578a8e01d1574a006684311bcd44a18e5cfd",
+    "docs/configuration.md": "222b8e1a8c3682e2c83950f46a3b952a167be97eb35d41308954b5253de6c4f5",
+    "docs/server-rules.md": "f869ad90c4dbac4aa79cf860d8dc469f4a9979336b09b6a26846df4e098c582a",
+    "docs/research-workflow.md": "f20319680a503b843dabb7681184abbc43989bb81c87394af8726351ce2a4de3",
+    "CONTRIBUTING.md": "e39bd1d121a714b2fe962f978b31e090a988b37da9ee801a8a962fdff7e612ff",
+    "tests/fixtures/arena-radius-updates.json": "d3200c00ed54c14415d472747aa66fe15c71b149a55f406d0bd2e5536384ced7",
+    "tools/fidelity/slither_protocol.py": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
+    "uv.lock": "b73541db469e2d1d20744a177642e2e0dbe05e1ffeeeafd469bc809092467559",
+    "historical-tools/analyze-global-radius.py": "fd9cb60bec31a47f058b145c1f25a3ce5d3c2b796c327812c1b837f8896ad2c9",
+    "historical-tools/analyze-radius-dynamics.py": "761d2d530fefef6c331151e569adaab703bb97396955bb6ff6d088e28116a932",
+    "historical-tools/analyze-radius-motion.py": "0032ebfb74474cdc969d20c6e9ef88480485084934a5153eba7153eff4aa8405",
+    "analyze.py": "c462cc05cf4c618504f9fcbf4f6d4ec4c9b5edd2d22e3da7a2631fb154e4fe9a",
+    "PLAN.md": "b71d8754df76e093d40993c5f21df959cf0e869ae73b8ee4d2c533d391376496"
+  }
+}

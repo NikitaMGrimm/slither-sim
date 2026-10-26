@@ -476,6 +476,7 @@ fn long_boost_steps_count_their_drops() {
 #[test]
 fn construction_keeps_the_configured_population_radius_until_a_tick() {
     let config = Config {
+        dynamic_radius: true,
         food_count: 0,
         ambient_replenish_per_second: 0.,
         ..Config::official(500)

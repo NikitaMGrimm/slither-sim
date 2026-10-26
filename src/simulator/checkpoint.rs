@@ -54,6 +54,7 @@ struct Envelope {
 struct ConfigRecord {
     radius: f64,
     dynamic_radius: bool,
+    host_size_to_seats: bool,
     vision: f64,
     food_count: usize,
     ambient_refill_counts_all_food: bool,
@@ -156,6 +157,7 @@ fn state_schema(raw: &Value) -> Result<(), SimError> {
         &[
             "radius",
             "dynamicRadius",
+            "hostSizeToSeats",
             "vision",
             "foodCount",
             "ambientRefillCountsAllFood",

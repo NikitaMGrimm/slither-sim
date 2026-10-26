@@ -1,0 +1,279 @@
+{
+  "status": "pass",
+  "independent_method": "standalone base64/framing and int.from_bytes; no decoder import",
+  "archives": 53,
+  "radius_values": 42210,
+  "leaderboard_values": 7011,
+  "distinct_endpoint_pairs": 5,
+  "duplicate_radius_timestamps": {
+    "conflict": 1,
+    "equal": 5
+  },
+  "files": [
+    {
+      "archive": "anchor-encoder-holdout-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 218,
+      "leaderboard_counts_equal": 77
+    },
+    {
+      "archive": "death-cell-prospective-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 700,
+      "leaderboard_counts_equal": 154
+    },
+    {
+      "archive": "death-cell-prospective-20260928/bot1.jsonl.gz",
+      "radius_values_equal": 797,
+      "leaderboard_counts_equal": 154
+    },
+    {
+      "archive": "death-window-validation-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 115,
+      "leaderboard_counts_equal": 59
+    },
+    {
+      "archive": "fidelity-followup-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 350,
+      "leaderboard_counts_equal": 97
+    },
+    {
+      "archive": "fidelity-motion-clock-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1840,
+      "leaderboard_counts_equal": 158
+    },
+    {
+      "archive": "fidelity-next-movement-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1402,
+      "leaderboard_counts_equal": 196
+    },
+    {
+      "archive": "fidelity-next-spawns-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 628,
+      "leaderboard_counts_equal": 48
+    },
+    {
+      "archive": "fidelity-paired-adaptive-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1534,
+      "leaderboard_counts_equal": 157
+    },
+    {
+      "archive": "fidelity-paired-adaptive-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 700,
+      "leaderboard_counts_equal": 151
+    },
+    {
+      "archive": "fidelity-paired-coil-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 941,
+      "leaderboard_counts_equal": 198
+    },
+    {
+      "archive": "fidelity-paired-coil-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 1286,
+      "leaderboard_counts_equal": 193
+    },
+    {
+      "archive": "fidelity-paired-collection-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 179,
+      "leaderboard_counts_equal": 116
+    },
+    {
+      "archive": "fidelity-paired-collection-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 181,
+      "leaderboard_counts_equal": 118
+    },
+    {
+      "archive": "fidelity-paired-gated-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1333,
+      "leaderboard_counts_equal": 156
+    },
+    {
+      "archive": "fidelity-paired-gated-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 795,
+      "leaderboard_counts_equal": 156
+    },
+    {
+      "archive": "fidelity-paired-rendezvous-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1114,
+      "leaderboard_counts_equal": 157
+    },
+    {
+      "archive": "fidelity-paired-rendezvous-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 364,
+      "leaderboard_counts_equal": 155
+    },
+    {
+      "archive": "fidelity-paired-shape-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1182,
+      "leaderboard_counts_equal": 157
+    },
+    {
+      "archive": "fidelity-paired-shape-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 801,
+      "leaderboard_counts_equal": 156
+    },
+    {
+      "archive": "fidelity-paired-small-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 695,
+      "leaderboard_counts_equal": 116
+    },
+    {
+      "archive": "fidelity-paired-small-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 1070,
+      "leaderboard_counts_equal": 119
+    },
+    {
+      "archive": "fidelity-prey-transitions-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 641,
+      "leaderboard_counts_equal": 78
+    },
+    {
+      "archive": "meander-shape-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 1019,
+      "leaderboard_counts_equal": 158
+    },
+    {
+      "archive": "meander-shape-20260928/bot1.jsonl.gz",
+      "radius_values_equal": 746,
+      "leaderboard_counts_equal": 157
+    },
+    {
+      "archive": "movement-20260927-first/bot0.jsonl.gz",
+      "radius_values_equal": 501,
+      "leaderboard_counts_equal": 57
+    },
+    {
+      "archive": "paired-prey-crossing-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 312,
+      "leaderboard_counts_equal": 153
+    },
+    {
+      "archive": "paired-prey-crossing-20260928/bot1.jsonl.gz",
+      "radius_values_equal": 259,
+      "leaderboard_counts_equal": 154
+    },
+    {
+      "archive": "paired-prey-crossing-refined-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 259,
+      "leaderboard_counts_equal": 156
+    },
+    {
+      "archive": "paired-prey-crossing-refined-20260928/bot1.jsonl.gz",
+      "radius_values_equal": 270,
+      "leaderboard_counts_equal": 156
+    },
+    {
+      "archive": "paired-prey-crossing-strict-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 457,
+      "leaderboard_counts_equal": 156
+    },
+    {
+      "archive": "paired-prey-crossing-strict-20260928/bot1.jsonl.gz",
+      "radius_values_equal": 420,
+      "leaderboard_counts_equal": 155
+    },
+    {
+      "archive": "paired-prey-overlap-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 226,
+      "leaderboard_counts_equal": 117
+    },
+    {
+      "archive": "paired-prey-overlap-20260927/bot1.jsonl.gz",
+      "radius_values_equal": 227,
+      "leaderboard_counts_equal": 118
+    },
+    {
+      "archive": "prey-boundary-validation-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1350,
+      "leaderboard_counts_equal": 100
+    },
+    {
+      "archive": "prey-controlled-20260927-first/bot0.jsonl.gz",
+      "radius_values_equal": 1551,
+      "leaderboard_counts_equal": 117
+    },
+    {
+      "archive": "prey-steering-validation-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 976,
+      "leaderboard_counts_equal": 99
+    },
+    {
+      "archive": "prey-width-confirmation-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 177,
+      "leaderboard_counts_equal": 95
+    },
+    {
+      "archive": "rim-angle-discovery-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 2257,
+      "leaderboard_counts_equal": 196
+    },
+    {
+      "archive": "rim-angle-validation-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1549,
+      "leaderboard_counts_equal": 135
+    },
+    {
+      "archive": "rim-boost-threshold-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1002,
+      "leaderboard_counts_equal": 116
+    },
+    {
+      "archive": "run3-large-radius-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1428,
+      "leaderboard_counts_equal": 119
+    },
+    {
+      "archive": "run3-single-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 42,
+      "leaderboard_counts_equal": 20
+    },
+    {
+      "archive": "run3-small-circle-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 1457,
+      "leaderboard_counts_equal": 186
+    },
+    {
+      "archive": "run4-radius-long-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 4914,
+      "leaderboard_counts_equal": 390
+    },
+    {
+      "archive": "run4-spawns-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 580,
+      "leaderboard_counts_equal": 150
+    },
+    {
+      "archive": "run5-long-circles-20260927/bot0.jsonl.gz",
+      "radius_values_equal": 85,
+      "leaderboard_counts_equal": 56
+    },
+    {
+      "archive": "speedprobe-grid-holdout-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 143,
+      "leaderboard_counts_equal": 78
+    },
+    {
+      "archive": "speedprobe-prepost-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 176,
+      "leaderboard_counts_equal": 77
+    },
+    {
+      "archive": "speedprobe-retained-holdout-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 139,
+      "leaderboard_counts_equal": 79
+    },
+    {
+      "archive": "speedprobe-sized-holdout-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 257,
+      "leaderboard_counts_equal": 113
+    },
+    {
+      "archive": "visibility-covariates-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 208,
+      "leaderboard_counts_equal": 112
+    },
+    {
+      "archive": "visibility-crossing-20260928/bot0.jsonl.gz",
+      "radius_values_equal": 357,
+      "leaderboard_counts_equal": 110
+    }
+  ]
+}
