@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { C, Trial, trialSpec, radius, quality, segmentDistance, parseArgs, validateOptions } from './slither-paired-collision.mjs';
+import { C, Trial, trialSpec, radius, quality, segmentDistance, parseArgs, validateOptions, CollisionBot } from './slither-paired-collision.mjs';
 
 const pose = (id, x, y) => ({ id, life: 1, x, y, heading: 0, speed: 180, segments: 8,
   fam: 0, boost: false, age: 200, peerAge: 200,
@@ -64,4 +64,16 @@ test('default network gate refuses every outside address before making a socket 
   assert.equal(validateOptions({ out: 'unused', server: '127.0.0.1:8766' }).local, true);
   assert.throws(() => parseArgs(['--allow-outside', 'true']), /yes/);
   assert.throws(() => parseArgs(['--out', 'a', '--out', 'b']), /repeated/);
+});
+
+test('a collision bot sends nothing before its snake exists', () => {
+  const sent = [];
+  const bot = new CollisionBot({ nick: 'probe' }, 0, { meta() {}, frame() {} });
+  bot.ws = { readyState: 1, send(bytes) { sent.push(Array.from(bytes)); }, close() {} };
+  bot.drive({ heading: 1, boost: false }, 1000);
+  assert.deepEqual(sent, []);
+  bot.world.self = 1;
+  bot.world.snakes.set(1, { id: 1, pts: [{ x: 0, y: 0 }], ang: 0, wang: 0, sp: 5.7, sct: 8, fam: 0, t: 0 });
+  bot.drive({ heading: 1, boost: false }, 1000);
+  assert.deepEqual(sent[0], [251]);
 });
