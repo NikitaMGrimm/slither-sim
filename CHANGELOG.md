@@ -59,6 +59,12 @@
   first official pilot failed feasibility without a qualified encounter
   ([execution](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/EXECUTION.md)).
 
+### Performance
+
+- Broadcasts enumerate only the snakes a recipient already knows, retaining
+  direct slot lookup and ascending packet order instead of scanning every
+  world slot per recipient.
+
 ### Fixed
 
 - Checkpoints reject a config value with a noncanonical JSON type, such as

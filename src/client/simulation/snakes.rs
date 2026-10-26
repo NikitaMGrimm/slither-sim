@@ -181,28 +181,40 @@ impl SnakeReports {
 
 /// What one connection has been told about each snake slot.
 #[derive(Clone, Debug, Default)]
-pub(super) struct KnownSnakes(Vec<Option<KnownSnake>>);
+pub(super) struct KnownSnakes {
+    by_slot: Vec<Option<KnownSnake>>,
+    /// Ascending occupied slots: broadcasts usually know only a few peers,
+    /// so enumerating them must not scan every world slot for every recipient.
+    slots: Vec<usize>,
+}
 impl KnownSnakes {
     pub(super) fn contains_key(&self, slot: usize) -> bool {
-        self.0.get(slot).is_some_and(Option::is_some)
+        self.by_slot.get(slot).is_some_and(Option::is_some)
     }
     pub(super) fn get_mut(&mut self, slot: usize) -> Option<&mut KnownSnake> {
-        self.0.get_mut(slot)?.as_mut()
+        self.by_slot.get_mut(slot)?.as_mut()
     }
     pub(super) fn remove(&mut self, slot: usize) -> Option<KnownSnake> {
-        self.0.get_mut(slot)?.take()
+        let known = self.by_slot.get_mut(slot)?.take()?;
+        let index = self
+            .slots
+            .binary_search(&slot)
+            .expect("occupied snake slot");
+        self.slots.remove(index);
+        Some(known)
     }
     pub(super) fn insert(&mut self, slot: usize, known: KnownSnake) {
-        if self.0.len() <= slot {
-            self.0.resize(slot + 1, None);
+        if self.by_slot.len() <= slot {
+            self.by_slot.resize(slot + 1, None);
         }
-        self.0[slot] = Some(known);
+        if self.by_slot[slot].is_none() {
+            let index = self.slots.binary_search(&slot).unwrap_err();
+            self.slots.insert(index, slot);
+        }
+        self.by_slot[slot] = Some(known);
     }
     pub(super) fn slots(&self) -> impl Iterator<Item = usize> + '_ {
-        self.0
-            .iter()
-            .enumerate()
-            .filter_map(|(slot, known)| known.as_ref().map(|_| slot))
+        self.slots.iter().copied()
     }
 }
 
@@ -392,6 +404,62 @@ pub(super) fn changes(
 mod tests {
     use super::*;
     use crate::{Config, Simulator};
+
+    #[test]
+    fn known_slots_match_ordered_map_through_replacement_removal_and_reuse() {
+        let mut known = KnownSnakes::default();
+        let mut reference = std::collections::BTreeMap::new();
+        let snake = |life| KnownSnake {
+            life,
+            front: Point::default(),
+            len: 1,
+            heading: 0,
+            wanted: 0,
+            speed: 0,
+            fam: 0,
+            kills: 0,
+        };
+        assert!(known.remove(500).is_none());
+        // Insert out of order, replace, remove twice, then reuse a high slot.
+        for (slot, insert) in [
+            (500, true),
+            (2, true),
+            (27, true),
+            (2, true),
+            (27, false),
+            (27, false),
+            (500, false),
+            (500, true),
+            (0, true),
+            (2, false),
+        ] {
+            if insert {
+                let value = snake(slot as u64 + reference.len() as u64);
+                known.insert(slot, value.clone());
+                reference.insert(slot, value);
+            } else {
+                assert_eq!(known.remove(slot), reference.remove(&slot));
+            }
+            assert_eq!(
+                known.slots().collect::<Vec<_>>(),
+                reference.keys().copied().collect::<Vec<_>>()
+            );
+            for slot in 0..=501 {
+                assert_eq!(known.contains_key(slot), reference.contains_key(&slot));
+                assert_eq!(known.get_mut(slot).as_deref(), reference.get(&slot));
+            }
+        }
+        let mut cloned = known.clone();
+        for slot in known.slots() {
+            cloned.get_mut(slot).unwrap().kills += 1;
+            assert_eq!(
+                cloned.remove(slot).unwrap().kills,
+                known.by_slot[slot].as_ref().unwrap().kills + 1
+            );
+        }
+        assert!(cloned.slots().next().is_none());
+        assert_eq!(known.slots().collect::<Vec<_>>(), [0, 500]);
+    }
 
     #[test]
     fn shared_deltas_preserve_distinct_histories_and_own_packet_types() {

@@ -1,0 +1,27 @@
+{
+  "metric": "sampled user CPU only; excludes kernel; categories are exclusive",
+  "base": {
+    "samples": 4542,
+    "phaseSharesPercent": {
+      "per-recipient delta encoding": 43.35094671950682,
+      "visibility/food-sector work": 24.988991633641568,
+      "physics": 18.119771025979745,
+      "framing/flush": 5.856450902686041,
+      "socket service": 3.9189784236019376,
+      "allocation": 2.4878907970057242,
+      "other/unknown": 1.2769704975781595
+    }
+  },
+  "candidate": {
+    "samples": 3930,
+    "phaseSharesPercent": {
+      "per-recipient delta encoding": 38.091603053435115,
+      "visibility/food-sector work": 28.040712468193384,
+      "physics": 19.567430025445294,
+      "framing/flush": 6.005089058524173,
+      "socket service": 4.020356234096692,
+      "allocation": 3.0279898218829517,
+      "other/unknown": 1.2468193384223918
+    }
+  }
+}

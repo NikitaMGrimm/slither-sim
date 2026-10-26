@@ -1,0 +1,83 @@
+diff --git a/research/performance/2026-10-26-host-capacity/host_capacity_load.rs b/outputs/host-single-core/host_players.rs
+index d1c5ba4..5c6d0d7 100644
+--- a/research/performance/2026-10-26-host-capacity/host_capacity_load.rs
++++ b/outputs/host-single-core/host_players.rs
+@@ -5 +5,3 @@
+-//! Keeps COUNT clients (1..=1000) on the explicit private/loopback study endpoint from
++//! Study adaptation: boost in staggered 3-second bursts every 8 seconds; retain
++//! pending spawn logins for the whole run and report completed/censored waits.
++//! Keeps COUNT clients (1..=1000) on the explicit loopback study endpoint from
+@@ -76 +78,9 @@ mod load {
+-    const CATEGORIES: [&str; 6] = ["idle", "connecting", "login", "setup", "playing", "dead"];
++    const CATEGORIES: [&str; 7] = [
++        "idle",
++        "connecting",
++        "login",
++        "setup",
++        "playing",
++        "dead",
++        "waiting",
++    ];
+@@ -293,0 +304,2 @@ mod load {
++        spawn_waits: Vec<(u64, u64, f64, f64, bool)>,
++        visible_peers: Vec<f32>,
+@@ -338,0 +351 @@ mod load {
++        login_sent_at: Option<f64>,
+@@ -371,0 +385 @@ mod load {
++                login_sent_at: None,
+@@ -409,0 +424 @@ mod load {
++                Link::Open(_) if !self.admitted && self.login_sent_at.is_some() => 6,
+@@ -496,0 +512 @@ mod load {
++            self.login_sent_at = None;
+@@ -591 +607,2 @@ mod load {
+-            if now - self.last_received > IDLE_TIMEOUT {
++            let waiting = self.login_sent_at.is_some() && !self.admitted;
++            if !waiting && now - self.last_received > IDLE_TIMEOUT {
+@@ -595 +612 @@ mod load {
+-            if !self.admitted && now - self.opened_at > SETUP_TIMEOUT {
++            if !waiting && !self.admitted && now - self.opened_at > SETUP_TIMEOUT {
+@@ -636,0 +654 @@ mod load {
++                self.login_sent_at = Some(at);
+@@ -640,0 +659,4 @@ mod load {
++                if let Some(start) = self.login_sent_at.take() {
++                    ctx.spawn_waits
++                        .push((self.id, self.connections, start, at, true));
++                }
+@@ -742,7 +764,11 @@ mod load {
+-            for packet in action_packets(
+-                Action {
+-                    heading,
+-                    boost: false,
+-                },
+-                self.boost,
+-            )? {
++            // Synthetic player-like bursts, fixed before measurement. Keep
++            // direction control independent of boost so both revisions use
++            // the same policy; this is not a claim about human play.
++            let boost = (now + self.id as f64 * 0.37).rem_euclid(8.) < 3.;
++            if ctx.in_window(now) {
++                ctx.visible_peers.push(observation.opponents.len() as f32);
++                if boost {
++                    ctx.count("boostControls");
++                }
++            }
++            for packet in action_packets(Action { heading, boost }, self.boost)? {
+@@ -751 +777 @@ mod load {
+-            self.boost = Some(false);
++            self.boost = Some(boost);
+@@ -756,0 +783,4 @@ mod load {
++            if let Some(start) = self.login_sent_at.take() {
++                ctx.spawn_waits
++                    .push((self.id, self.connections, start, now, false));
++            }
+@@ -828,2 +858,2 @@ mod load {
+-        if !ip.is_loopback() && !ip.is_private() {
+-            return Err("Only loopback or study private IPv4 is permitted".into());
++        if !ip.is_loopback() {
++            return Err("Only loopback IPv4 is permitted".into());
+@@ -857,0 +888,2 @@ mod load {
++            spawn_waits: Vec::new(),
++            visible_peers: Vec::new(),
+@@ -1052,0 +1085,2 @@ mod load {
++            "spawnWaits": {"definition": "client-observed login send to setup receipt; incomplete waits are censored at disconnect or hold end; includes loopback/service delay", "records": ctx.spawn_waits},
++            "visiblePeersAtControls": stats(&mut ctx.visible_peers),
