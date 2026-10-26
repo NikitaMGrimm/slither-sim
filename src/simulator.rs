@@ -317,6 +317,11 @@ fn official_food(radius: f64) -> (usize, f64) {
     let sectors = PI * radius * radius / SECTOR_AREA;
     ((7.0 * sectors) as usize, 0.1024 * sectors)
 }
+/// Official prey target for an arena of `radius`: one per ten million square
+/// units, at least one.
+fn official_prey(radius: f64) -> usize {
+    (PI * radius * radius / 10_000_000.0).round().max(1.0) as usize
+}
 impl Config {
     /// Startup capacity policy, independent of later boundary motion. Holding
     /// the selected radius avoids death jitter but omits real official waves:
@@ -325,6 +330,13 @@ impl Config {
         let radius = population_radius(population);
         if self.size_to_population && self.radius > 0. && self.radius < radius {
             let area = (radius / self.radius).powi(2);
+            // The official prey target floors at one, so scaling a one-snake
+            // world's single prey by area would overshoot its density.
+            self.prey.count = if self.prey.count == official_prey(self.radius) {
+                official_prey(radius)
+            } else {
+                (self.prey.count as f64 * area).round() as usize
+            };
             self.radius = radius;
             self.food_count = (self.food_count as f64 * area) as usize;
             self.ambient_replenish_per_second *= area;
@@ -342,7 +354,6 @@ impl Config {
     /// docs/configuration.md#official-and-sandbox.
     pub fn official(snakes: usize) -> Self {
         let radius = population_radius(snakes);
-        let area = PI * radius * radius;
         let (food_count, ambient_replenish_per_second) = official_food(radius);
         Self {
             radius,
@@ -360,7 +371,7 @@ impl Config {
             emit_boost_food: true,
             speed_model: SpeedModel::default(),
             prey: PreyConfig {
-                count: (area / 10_000_000.0).round().max(1.0) as usize,
+                count: official_prey(radius),
                 ..PreyConfig::default()
             },
             radius_updates: vec![],

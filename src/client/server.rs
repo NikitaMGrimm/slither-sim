@@ -2187,6 +2187,8 @@ mod tests {
             assert_eq!(config.radius, radius);
             assert!(!config.dynamic_radius);
             assert_eq!(config.food_count, 109 * 484);
+            assert_eq!(config.prey.count, 68);
+            assert_eq!(config.prey.count, crate::Config::official(484).prey.count);
             assert!(
                 (config.ambient_replenish_per_second
                     - crate::Config::official(484).ambient_replenish_per_second)
@@ -2241,6 +2243,19 @@ mod tests {
             crate::simulator::population_radius(8)
         );
         assert!(host.world_config().unwrap().world.dynamic_radius);
+    }
+
+    #[test]
+    fn population_sizing_keeps_custom_prey_density() {
+        for (prey, expected) in [(0, 0), (2, 968)] {
+            let host: HostConfig = serde_json::from_str(&format!(
+                r#"{{"players":{{"max":4}},"bots":{{"count":480}},"simulation":{{"world":{{"prey":{{"count":{prey}}}}}}}}}"#
+            ))
+            .unwrap();
+            let world = host.world_config().unwrap().world;
+            assert_eq!(world.radius, 14_740.);
+            assert_eq!(world.prey.count, expected);
+        }
     }
 
     fn shared(dt: f64, sockets: usize) -> Arc<Shared> {
