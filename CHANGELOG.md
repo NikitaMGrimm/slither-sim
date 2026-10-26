@@ -12,6 +12,8 @@
 - Pit-edge pellets remain visible during shrink: overlap marker generations
   while replacements use the stock rapid fade. Growth still replaces the ring
   immediately; the short outward trail does not change the lethal boundary.
+- Linux hosting resource guidance now includes real socket tests on one Zen 4
+  and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
 
 ## [0.6.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.1...v0.6.2) - 2026-10-26
 
