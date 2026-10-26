@@ -6,17 +6,6 @@
 
 ### Added
 
-- *(host)* report tick rate and load with --stats ([#175](https://github.com/NikitaMGrimm/slither-sim/pull/175))
-
-### Other
-
-- *(host)* share prey visibility bounds across recipients ([#174](https://github.com/NikitaMGrimm/slither-sim/pull/174))
-- *(fidelity)* show food and prey residuals in PR reports ([#173](https://github.com/NikitaMGrimm/slither-sim/pull/173))
-- *(protocol)* record legacy browser compatibility limits ([#171](https://github.com/NikitaMGrimm/slither-sim/pull/171))
-- *(performance)* focus PR reports on socket host costs ([#169](https://github.com/NikitaMGrimm/slither-sim/pull/169))
-
-### Added
-
 - `slither-sim host --stats SECONDS` prints the tick rate, deferred ticks,
   game-loop load and player count every SECONDS.
 - Evidence for browser mods that use an older login: an official server answers
