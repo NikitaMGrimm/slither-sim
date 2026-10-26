@@ -33,7 +33,7 @@ real players already incur network and compute time.
 [Same-tick replies](server-rules.md#packet-timing) normally
 add up to one physics tick (7 ms by default); OS scheduling and load can add more.
 
-For virtual-time training, `latency.roundTripSeconds: [0.06]` models a 60 ms base
+For virtual-time bot runs, `latency.roundTripSeconds: [0.06]` models a 60 ms base
 round trip, split evenly unless `uplinkShare` changes. Scheduling, variation and
 pauses affect measured RTT. Adding delay at both ends of a real connection adds
 both delays.
@@ -374,7 +374,7 @@ until their end; held frames arrive together.
 | `pauses.meanSeconds` | `0` | Mean exponential pause length. `ratePerSecond × meanSeconds` must be at most 1: merged pauses last `(e^(rate × mean) − 1) / rate` on average, so more covers nearly all time. |
 
 `LatencyConfig::measured_route()` is the retained home-route/collector example fitted
-on training sessions and checked on held-out ones by the
+on one set of sessions and checked on held-out ones by the
 [network path study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-network-path/REPORT.md):
 
 ```json
