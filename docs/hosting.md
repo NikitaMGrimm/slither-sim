@@ -10,7 +10,7 @@ Pick a version from [releases](https://github.com/NikitaMGrimm/slither-sim/relea
 and your platform (`x86_64-unknown-linux-gnu` or `aarch64-unknown-linux-gnu`):
 
 ```sh
-VERSION=v0.6.0
+VERSION=v0.6.2
 TARGET=x86_64-unknown-linux-gnu
 BASE=https://github.com/NikitaMGrimm/slither-sim/releases/download/$VERSION
 curl -fLO "$BASE/slither-sim-$TARGET.tar.gz"
@@ -87,6 +87,20 @@ Raise `LimitNOFILE` above 4096 for more than about 500 clients.
 
 An overloaded server [slows world time](raw-server.md#vps-use) rather than
 skipping physics. Watch CPU; memory stays small.
+
+To see the tick rate and load, add `--stats 5` to the `host` command. Every five
+seconds the log gets a line like:
+
+```text
+stats: ticks/s=142.86 deferred_ticks=0 simulation_load=41.2% players=40 bot_slots=0
+```
+
+- `ticks/s`: physics ticks run per second; 142.86 is full speed (one per 7 ms).
+- `deferred_ticks`: ticks that fell behind schedule in the interval.
+- `simulation_load`: share of one core used by the game loop, not counting
+  sockets and bots.
+- `players`: connected players, including those waiting to spawn.
+- `bot_slots`: configured background bots.
 
 ## Connect
 

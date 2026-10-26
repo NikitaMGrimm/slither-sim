@@ -66,6 +66,9 @@ zero. `bots.latency` independently models bot links and processing.
 `simulation.latency` must stay at its default. See
 [`LatencyConfig`](configuration.md#latencyconfig) for ordered delays.
 
+`--stats SECONDS` prints periodic [tick rate, load and population](hosting.md#run-as-a-service)
+to stderr; the interval must be positive and may include fractional seconds.
+
 ### Presets
 
 Select a world with `simulation.world.preset`; see
@@ -129,6 +132,7 @@ Keep the handle alive while serving.
 | `ticks()` / `deferred_ticks()` | Executed physics ticks / wall-clock ticks postponed under load. |
 | `simulation_seconds()` | Wall seconds spent running simulation ticks; divide its increase by elapsed wall time for simulation-thread load. |
 | `players()` | Connected socket players, excluding background bots. |
+| `is_finished()` | Whether a host thread has stopped; call `wait()` for its result. |
 | `wait()` | Consume the handle and block until a host thread fails; return its error. |
 | `stop()` | Consume the handle, stop and join all threads; report any earlier failure. |
 

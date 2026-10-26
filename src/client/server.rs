@@ -507,6 +507,11 @@ impl RunningHost {
         self.shared.players.load(Ordering::Relaxed)
     }
 
+    /// Whether a host thread has stopped. Call [`Self::wait`] for its result.
+    pub fn is_finished(&self) -> bool {
+        self.shared.stopped()
+    }
+
     /// Block until a thread fails, and return its error.
     pub fn wait(mut self) -> Result<(), String> {
         self.join()
@@ -2025,6 +2030,7 @@ mod tests {
             let host = Host::bind(config).unwrap().start().unwrap();
             thread::sleep(Duration::from_millis(100));
             assert_eq!(host.ticks(), 0);
+            assert!(!host.is_finished());
             match mode.as_str() {
                 "stop" => host.stop().unwrap(),
                 "drop" => drop(host),
@@ -2035,6 +2041,7 @@ mod tests {
                         .unwrap()
                         .replace("synthetic worker failure".into());
                     drop(StopOnExit(host.shared.clone()));
+                    assert!(host.is_finished());
                     assert_eq!(host.wait().unwrap_err(), "synthetic worker failure");
                 }
                 _ => panic!("unknown shutdown mode"),
