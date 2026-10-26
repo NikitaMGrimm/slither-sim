@@ -42,6 +42,32 @@ pub fn ring_slot(
 /// checkpoint boundary, preserving its RNG, speed, boost and kiosk histories.
 #[allow(dead_code)]
 pub fn reconfigure(world: &mut Simulator, config: Config) {
+    restore_with(world, config, |_| {});
+}
+
+/// Move the live radius as a measured update applied now would, keeping the
+/// initial Config radius. Checkpoints accept no other move of a fixed arena.
+#[allow(dead_code)]
+pub fn set_live_radius(world: &mut Simulator, radius: f64) {
+    let mut config = world.config().clone();
+    let time = world.time();
+    assert!(
+        config
+            .radius_updates
+            .iter()
+            .all(|update| update.time < time)
+    );
+    config
+        .radius_updates
+        .push(crate::RadiusUpdate { time, radius });
+    let applied = config.radius_updates.len();
+    restore_with(world, config, |state| {
+        state["radius"] = serde_json::json!(radius);
+        state["radiusUpdateIndex"] = serde_json::json!(applied);
+    });
+}
+
+fn restore_with(world: &mut Simulator, config: Config, edit: impl FnOnce(&mut serde_json::Value)) {
     let mut checkpoint = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
     let mut resolved = serde_json::to_value(&config).unwrap();
     for key in [
@@ -62,10 +88,8 @@ pub fn reconfigure(world: &mut Simulator, config: Config) {
         .unwrap()
         .entry("ambientRefillCountsAllFood")
         .or_insert(serde_json::json!(false));
-    if config.radius != world.config().radius {
-        checkpoint["state"]["radius"] = serde_json::json!(config.radius);
-    }
     checkpoint["config"] = resolved;
+    edit(&mut checkpoint["state"]);
     let options = RestoreOptions {
         events: EventRecording {
             pickups: world.pickup_events().is_some(),
