@@ -339,6 +339,7 @@ fn direct_login_accepts_timing_header_with_challenge_high_byte() {
 fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
+    let (initialize, start_setup) = mpsc::channel();
     let (begin, ready) = mpsc::channel();
     let (polled, next_poll) = mpsc::channel();
     let (written, write_done) = mpsc::channel();
@@ -353,6 +354,7 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
             .unwrap();
         let mut socket = tungstenite::accept(stream).unwrap();
         socket.read().unwrap();
+        start_setup.recv_timeout(Duration::from_secs(2)).unwrap();
         socket.send(framed(&setup())).unwrap();
         socket.send(framed(&appearance())).unwrap();
         ready.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -389,7 +391,18 @@ fn partial_messages_obey_deadlines_and_resume_from_buffered_bytes() {
         ..NetworkConfig::default()
     })
     .unwrap();
-    assert_eq!(backend.next_frame().unwrap().status, ClientStatus::Playing);
+    // A decision poll need not include login packets. Force that ordering once,
+    // then wait for decoded self appearance before exercising partial messages.
+    assert_eq!(backend.next_frame().unwrap().status, ClientStatus::Waiting);
+    initialize.send(()).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let frame = backend.next_frame().unwrap();
+        if frame.status == ClientStatus::Playing {
+            break;
+        }
+        assert!(Instant::now() < deadline, "No playing frame after setup");
+    }
     begin.send(()).unwrap();
     let started = Instant::now();
     let first = backend.next_frame().unwrap();
