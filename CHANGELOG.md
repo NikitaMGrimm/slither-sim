@@ -49,6 +49,11 @@
 
 ### Fixed
 
+- NTL's minimap marker uses the same live-radius projection as the map in
+  every game mode. Legacy clients now receive `M`/`V` by default; the dynamic
+  map-off request gets a full-server `U` projection instead. Precise can show
+  full minimap snapshots again.
+
 - A client that falls too far behind is disconnected instead of stopping the
   host. Each socket may queue up to 2 MiB of output, counted the same way for
   protocol 13 and 19; stock clients previously had a 4,096-frame limit.

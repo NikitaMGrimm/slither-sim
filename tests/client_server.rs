@@ -657,6 +657,34 @@ fn legacy_handshake_login_controls_and_reconnect_use_individual_protocol13_messa
     host.finish();
 }
 
+#[test]
+fn legacy_map_request_selects_live_or_full_server_projection() {
+    let mut settings = config(3, 0);
+    settings.simulation.minimap_interval_seconds = 0.05;
+    settings.simulation.minimap_side = Some(16);
+    let host = Running::start(settings);
+    for request in [&[99, 4][..], &[99][..], &[99, 3][..]] {
+        let mut client = Raw::connect(host.address, "/slither");
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        client.send(request);
+        assert_eq!(client.binary()[2], b'6');
+        client.send(b"CGLRYGPZKWJXMCTLEYTPMKJJ");
+        client.send(&[115, 12, 7, 0, 0, 255]);
+        let setup = client.binary();
+        assert_eq!(setup[25], 13);
+        let started = Instant::now();
+        loop {
+            let packet = client.binary();
+            if b"MVU".contains(&packet[2]) {
+                assert_eq!(packet[2], if request == [99, 3] { b'U' } else { b'M' });
+                break;
+            }
+            assert!(started.elapsed() < WAIT, "no negotiated minimap");
+        }
+    }
+    host.finish();
+}
+
 /// Synthetic format fixture, not third-party code or a recorded login.
 #[test]
 fn short_modern_login_uses_protocol19_after_the_shared_challenge() {

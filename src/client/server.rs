@@ -290,6 +290,7 @@ enum Command {
         session_id: bool,
         physical_food: bool,
         protocol13: bool,
+        full_minimap: bool,
     },
     /// A game command sent at wall time `sent`.
     Message {
@@ -606,6 +607,7 @@ struct PendingJoin {
     session_id: bool,
     physical_food: bool,
     protocol13: bool,
+    full_minimap: bool,
     requested_tick: u64,
     /// A new socket connection replaces the previous player's rolling score.
     reset_kills: bool,
@@ -733,6 +735,9 @@ impl Simulation {
                 self.last_spawn_tick = Some(self.ticks);
                 if join.protocol13 {
                     self.world.protocol13(slot);
+                    if join.full_minimap {
+                        self.world.full_minimap(slot);
+                    }
                 }
                 if join.physical_food {
                     self.world.physical_food(slot);
@@ -762,6 +767,7 @@ impl Simulation {
                 session_id,
                 physical_food,
                 protocol13,
+                full_minimap,
             } => {
                 let reset_kills = slot < self.max_clients
                     && (generation != self.generations[slot]
@@ -776,6 +782,7 @@ impl Simulation {
                     session_id,
                     physical_food,
                     protocol13,
+                    full_minimap,
                     requested_tick: self.ticks,
                     reset_kills,
                 };
@@ -1071,6 +1078,7 @@ struct Open<S = TcpStream> {
     framing: Framing,
     want_session_id: bool,
     legacy_reply: Option<Vec<u8>>,
+    full_minimap: bool,
     physical_food: bool,
     generation: u64,
     /// Frames from the world waiting for their delivery time, in order.
@@ -1261,6 +1269,7 @@ impl<S: io::Read + io::Write> Open<S> {
             framing: Framing::Elapsed,
             want_session_id: false,
             legacy_reply: None,
+            full_minimap: false,
             physical_food,
             generation: 0,
             queued: VecDeque::new(),
@@ -1343,6 +1352,9 @@ impl<S: io::Read + io::Write> Open<S> {
             // Client-derived: NTL's protocol toggle uses [99], and disabling
             // its dynamic map uses [99,3]. All share the same reply solver.
             (Phase::Hello { .. }, [99] | [99, 3 | 4]) => {
+                // Client-derived: NTL requests [99,3] with dynmm off. Its dot
+                // then uses setup grd, so only this connection needs a full map.
+                self.full_minimap = bytes == [99, 3];
                 let (challenge, reply) = legacy_challenge();
                 self.legacy_reply = Some(reply);
                 self.phase = Phase::Reply;
@@ -1406,6 +1418,7 @@ impl<S: io::Read + io::Write> Open<S> {
             session_id: self.want_session_id,
             physical_food: self.physical_food,
             protocol13: legacy_login(login),
+            full_minimap: self.full_minimap,
         });
         Ok(())
     }
@@ -1761,6 +1774,7 @@ impl Seat {
             session_id: false,
             physical_food: true,
             protocol13: false,
+            full_minimap: false,
         });
         Ok(())
     }
@@ -2483,6 +2497,7 @@ mod tests {
             session_id: false,
             physical_food: true,
             protocol13: false,
+            full_minimap: false,
         });
         for _ in 0..40 {
             step(&mut simulation);
@@ -2673,6 +2688,7 @@ mod tests {
                     session_id: false,
                     physical_food: true,
                     protocol13: false,
+                    full_minimap: false,
                 })
                 .unwrap();
         }
@@ -2821,6 +2837,7 @@ mod tests {
             session_id: false,
             physical_food: true,
             protocol13: false,
+            full_minimap: false,
         });
         simulation.apply_commands().unwrap();
     }
@@ -2931,6 +2948,7 @@ mod tests {
             session_id: false,
             physical_food: true,
             protocol13: false,
+            full_minimap: false,
             reset_kills: false,
         };
         simulation.waiting.push_back(request(0, 0));
@@ -2990,6 +3008,7 @@ mod tests {
                 session_id: false,
                 physical_food: true,
                 protocol13: false,
+                full_minimap: false,
             };
             if slot == 0 {
                 gate.send(command);
@@ -3057,6 +3076,7 @@ mod tests {
                 session_id: false,
                 physical_food: true,
                 protocol13: false,
+                full_minimap: false,
             };
             if slot == 0 {
                 gate.send(command);
@@ -3612,6 +3632,7 @@ mod tests {
                 session_id: false,
                 physical_food: true,
                 protocol13: false,
+                full_minimap: false,
             };
             if slot < simulation.max_clients {
                 gate.send(command);
