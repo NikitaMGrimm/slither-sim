@@ -33,7 +33,7 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v3`), `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v4`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
@@ -392,15 +392,15 @@ the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
 The envelope is `slither-sim-checkpoint-v2`, with
-`rulesRevision: "slither-sim-rules-v3"`, producer provenance, today's flat Config
+`rulesRevision: "slither-sim-rules-v4"`, producer provenance, today's flat Config
 and ordered slot/entity records. `config.radius` is the initial radius and
 `state.radius` is the live radius; loading preserves both. Config must pass the
 same validation as a new world's, and the live radius must equal `config.radius`
 until the dynamic controller, circular host admission or a recorded update
 could have moved it. Circular host admission may grow it before the first tick.
 Version 1 is rejected because it stored the live radius in Config and cannot recover the initial value.
-Rules v1/v2 are rejected: seat-following and live circular pit/spawn scaling
-change tick behavior. The host queue clock is not core checkpoint state. No
+Rules v1/v2/v3 are rejected: seat-following, live circular pit/spawn scaling and
+the pit-only food rules change tick behavior. The host queue clock is not core checkpoint state. No
 controller state is added; occupancy uses living state and death timestamps,
 and refill retains fractional credit in initial-area seconds.
 The checkpoint includes RNG, timers and terminal causes;

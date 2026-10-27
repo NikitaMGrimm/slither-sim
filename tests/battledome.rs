@@ -597,6 +597,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
         "sizeToPopulation",
         "foodCount",
         "ambientRefillCountsAllFood",
+        "foodOnlyInsidePit",
         "ambientReplenishPerSecond",
         "pit",
         "spawnRadius",
@@ -669,7 +670,7 @@ fn presets_select_a_base_that_explicit_fields_override() {
     );
     // An explicit radius does not rescale the preset's food.
     assert_eq!(custom.food_count, Config::battledome().food_count);
-    let open = parse(r#"{"preset":"battledome","pit":null}"#).unwrap();
+    let open = parse(r#"{"preset":"battledome","pit":null,"foodOnlyInsidePit":false}"#).unwrap();
     assert_eq!(open.pit, None);
     open.validate().unwrap();
 
@@ -784,6 +785,7 @@ fn mode_settings_reject_unreachable_rules() {
         (
             |c| {
                 c.pit = None;
+                c.food_only_inside_pit = false;
                 c.spawn_radius = Some(150.0);
             },
             "spawnRadius",
@@ -826,11 +828,13 @@ fn mode_settings_reject_unreachable_rules() {
     // Without a pit, any ring that holds the body and keeps the margin is valid.
     with(|c| {
         c.pit = None;
+        c.food_only_inside_pit = false;
         c.spawn_radius = Some(180.0);
     })
     .unwrap();
     with(|c| {
         c.pit = None;
+        c.food_only_inside_pit = false;
         c.min_score = None;
         c.spawn_radius = Some(22.0);
     })
@@ -1269,7 +1273,7 @@ fn kiosk_shrinking_stops_at_the_floor() {
 }
 
 #[test]
-fn battledome_floor_pit_and_wall_deaths_drop_nothing() {
+fn battledome_floor_pit_deaths_feed_the_pit_and_wall_deaths_drop_nothing() {
     let mut config = Config::battledome();
     config.food_count = 0;
     config.ambient_replenish_per_second = 0.0;
@@ -1298,8 +1302,14 @@ fn battledome_floor_pit_and_wall_deaths_drop_nothing() {
     let reasons: Vec<_> = deaths.iter().map(|death| death.reason).collect();
     assert_eq!(reasons, [DeathReason::Boundary, DeathReason::Pit]);
     assert_eq!(deaths[0].food, 0);
-    assert_eq!(deaths[1].food, 0);
-    assert!(world.food().is_empty());
+    assert!(deaths[1].food > 0);
+    assert_eq!(world.food().len(), deaths[1].food);
+    assert!(
+        world
+            .food()
+            .iter()
+            .all(|f| distance(f.point()) < world.pit_radius().unwrap())
+    );
 }
 
 #[test]
@@ -1603,7 +1613,13 @@ fn the_one_way_pit_tests_the_live_edge_after_growth() {
     assert_eq!(world.deaths().len(), 1);
     assert_eq!(world.deaths()[0].reason, DeathReason::Pit);
     assert!(distance(world.snakes()[0].head) >= world.pit_radius().unwrap());
-    assert!(world.food().is_empty()); // floor deaths still drop nothing.
+    assert!(!world.food().is_empty());
+    assert!(
+        world
+            .food()
+            .iter()
+            .all(|f| distance(f.point()) < world.pit_radius().unwrap())
+    );
 }
 
 #[cfg(feature = "networking")]

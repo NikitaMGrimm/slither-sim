@@ -4,6 +4,12 @@
 
 ### Changed
 
+- **Breaking:** Battledome enables `foodOnlyInsidePit`: ambient supply follows
+  pit area, floor-size deaths drop ordinary death food, and scattered death/boost
+  pellets outside the pit are discarded. Moving edges remove stranded food;
+  above-floor boost mass spent outside is lost. Disabled worlds keep their
+  previous food rules. Checkpoints use rules revision `slither-sim-rules-v4`
+  and reject v3 continuations.
 - **Breaking:** in worlds with `killScoreSeconds` (Battledome), the stock
   leaderboard and own rank show rolling kills instead of size. Players who left
   stay listed while their kills count; a new player in their seat starts at

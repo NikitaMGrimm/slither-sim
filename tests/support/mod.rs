@@ -70,6 +70,11 @@ pub fn reconfigure(world: &mut Simulator, config: Config) {
         .unwrap()
         .entry("ambientRefillCountsAllFood")
         .or_insert(serde_json::json!(false));
+    resolved
+        .as_object_mut()
+        .unwrap()
+        .entry("foodOnlyInsidePit")
+        .or_insert(serde_json::json!(false));
     if config.radius != world.config().radius {
         checkpoint["state"]["radius"] = serde_json::json!(config.radius);
     }
