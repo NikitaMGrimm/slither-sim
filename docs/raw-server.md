@@ -190,14 +190,18 @@ the [official catalog](https://github.com/NikitaMGrimm/slither-sim/blob/main/res
 observed the stock 27-byte challenge even for that request. Neither is authentication.
 
 Protocol 13 sends individual messages with elapsed headers by default, explicit
-snake IDs, coordinate-based body/food updates and full `U` minimaps. Protocol 19
-retains its bundles, angle bodies, sector food and `M`/`V` maps. Legacy `U` uses
-the same shared raster, including Battledome's pit, without a client delta base.
-Some browser mods only read `M` and therefore have no minimap on the legacy
-path. Their admission bytes also occur in clients that need `U`; the host keeps
-`U` without guessing a client identity. Client-derived admission facts and
-validation are recorded in the
-[compatibility note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-browser-admission/REPORT.md).
+snake IDs and coordinate-based body/food updates. Both protocols normally use
+the shared live-radius `M`/`V` minimaps. NTL keeps its dynamic own-player marker
+in that projection; sending `U` would switch the marker to setup `grd` instead.
+This applies to fixed and changing radii and to the Battledome pit raster.
+
+Only legacy `[99,3]` requests a full-server map: that connection receives `U`
+snapshots with occupied live-raster cells reprojected into the `grd` frame.
+This path has plain zero runs and no client delta base; it also tracks `z`.
+Clients that only read `M`, such as Precise, now show full snapshots but still
+ignore `V` deltas. Client-derived projection and asymmetric orientation checks
+are recorded in the
+[minimap correction note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-legacy-map-motion/REPORT.md).
 The first body update after appearance uses an absolute coordinate to establish
 the integer base; subsequent ordinary steps may use relative coordinates.
 
@@ -246,7 +250,7 @@ stock sockets.
   dead or disconnected seats by rolling kills ([Battledome](configuration.md#battledome)).
 - `k`: simulator collision-attributed kills.
 - `F`/`w` and birth/pickup deltas: [sector food delivery](server-rules.md#food-sector-delivery).
-- `M`/`V` (19), `U` (13): [global minimap](server-rules.md#client-delivery-and-spawning), with
+- `M`/`V` (19 and default 13), full-server `U` (13 after `[99,3]`): [global minimap](server-rules.md#client-delivery-and-spawning), with
   [per-connection encoding](server-rules.md#minimap-encoding). The stock client
   draws its own player marker; set resolution with `simulation.minimapSide`
   (`null`: 256 for pit worlds, 136 otherwise).

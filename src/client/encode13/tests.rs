@@ -350,7 +350,7 @@ fn captured_food_layouts_project_consistently_and_split_dense_listings() {
 }
 
 #[test]
-fn official_minimaps_and_deltas_keep_the_same_raster_in_u() {
+fn official_minimaps_and_deltas_keep_the_shared_bytes() {
     for version in [13, 19] {
         let mut encoder = Encoder::new(0);
         let mut decoder = MinimapDecoder::default();
@@ -361,8 +361,8 @@ fn official_minimaps_and_deltas_keep_the_same_raster_in_u() {
                 continue;
             }
             let expected = Minimap::packet(source.as_ref(), &p).unwrap();
-            let q = convert(&mut encoder, p);
-            assert_eq!(q[0], b'U');
+            let q = convert(&mut encoder, p.clone());
+            assert_eq!(q, p);
             let mut budget = usize::MAX;
             decoder.apply(&q, 0., &mut budget).unwrap();
             assert_eq!(decoder.shown.as_ref().unwrap().0, expected);
@@ -371,17 +371,144 @@ fn official_minimaps_and_deltas_keep_the_same_raster_in_u() {
         }
         assert!(count >= 1);
     }
-    for side in [1, 136, 512] {
-        let mut map = Minimap {
-            side,
-            cells: vec![0; side * side],
-            age_seconds: 0.,
-        };
-        map.cells[0] = 1;
-        let p = minimap(&map);
-        let mut decoder = MinimapDecoder::default();
-        let mut budget = usize::MAX;
-        decoder.apply(&p, 0., &mut budget).unwrap();
-        assert_eq!(decoder.shown.unwrap().0, map);
+}
+
+/// Independent reverse-cell reader from the documented client format, without
+/// calling the library decoder or adapter state. Synthetic asymmetric cells.
+fn client_cells(p: &[u8], side: usize, previous: &mut [u8]) {
+    if p[0] != b'V' {
+        previous.fill(0);
     }
+    let (mut at, mut scanned) = (if p[0] == b'V' { 1 } else { 3 }, 0);
+    while at < p.len() && scanned < side * side {
+        let byte = p[at];
+        at += 1;
+        if byte >= 128 {
+            scanned += if byte == 255 && p[0] != b'U' {
+                let count = 126 * usize::from(p[at]);
+                at += 1;
+                count
+            } else {
+                usize::from(byte - 128)
+            };
+        } else {
+            for bit in (0..7).rev() {
+                if scanned == side * side {
+                    break;
+                }
+                if byte & (1 << bit) != 0 {
+                    let cell = side * side - 1 - scanned;
+                    if p[0] == b'V' {
+                        previous[cell] ^= 1;
+                    } else {
+                        previous[cell] = 1;
+                    }
+                }
+                scanned += 1;
+            }
+        }
+    }
+}
+
+#[test]
+fn asymmetric_live_map_and_delta_align_with_the_dynamic_dot() {
+    let side = 256;
+    let mut map = Minimap {
+        side,
+        cells: vec![0; side * side],
+        age_seconds: 0.,
+    };
+    // At radius 2400, world (1200,-1600) projects to (192,42+2/3).
+    // The other points form an asymmetric L and a distant reference point.
+    for (x, y) in [(192, 42), (192, 43), (193, 43), (17, 209)] {
+        map.cells[y * side + x] = 1;
+    }
+    let mut encoder = Encoder::new(0);
+    let full = encode::minimap(&map);
+    let p = convert(&mut encoder, full.clone());
+    assert_eq!(p, full);
+    assert!(p.contains(&255), "exercise the extended-run path");
+    let mut received = vec![0; side * side];
+    client_cells(&p, side, &mut received);
+    assert_eq!(received, map.cells);
+    assert_eq!(received[42 * side + 192], 1);
+    assert_eq!(
+        received[(255 - 42) * side + 255 - 192],
+        0,
+        "no 180-degree rotation"
+    );
+    let mut next = map.clone();
+    next.cells[42 * side + 192] = 0;
+    next.cells[41 * side + 194] = 1;
+    let delta = encode::minimap_delta(&map, &next).unwrap();
+    let p = convert(&mut encoder, delta.clone());
+    assert_eq!(p, delta);
+    client_cells(&p, side, &mut received);
+    assert_eq!(received, next.cells);
+}
+
+#[test]
+fn default_live_map_is_unchanged_across_setup_and_radius_updates() {
+    let map = Minimap {
+        side: 8,
+        cells: (0..64).map(|i| u8::from(i == 13)).collect(),
+        age_seconds: 0.,
+    };
+    for radius in [1800., 1498., 32000.] {
+        let mut encoder = Encoder::new(0);
+        convert(&mut encoder, encode::setup(radius, 0.028).unwrap());
+        let full = encode::minimap(&map);
+        assert_eq!(convert(&mut encoder, full.clone()), full);
+        for radius in [1641., 1596., 1544.] {
+            let update = encode::radius(radius).unwrap();
+            assert_eq!(convert(&mut encoder, update.clone()), update);
+            let delta = encode::minimap_delta(&map, &map).unwrap();
+            assert_eq!(convert(&mut encoder, delta.clone()), delta);
+        }
+    }
+}
+
+#[test]
+fn non_dynamic_map_reprojects_live_cells_and_tracks_radius_and_delta_base() {
+    let side = 8;
+    let mut encoder = Encoder::new(0);
+    encoder.use_full_minimap();
+    convert(&mut encoder, encode::setup(16275., 0.028).unwrap());
+    let mut map = Minimap {
+        side,
+        cells: vec![0; 64],
+        age_seconds: 0.,
+    };
+    map.cells[side + 6] = 1;
+    let p = convert(&mut encoder, encode::minimap(&map));
+    assert_eq!(p[0], b'U');
+    let mut received = vec![0; 64];
+    client_cells(&p, side, &mut received);
+    assert_eq!(received.iter().sum::<u8>(), 1);
+    assert_eq!(
+        received[2 * side + 5],
+        1,
+        "half-radius map centered in grd frame"
+    );
+    let mut next = map.clone();
+    next.cells.fill(0);
+    next.cells[6 * side + 1] = 1;
+    let p = convert(&mut encoder, encode::minimap_delta(&map, &next).unwrap());
+    client_cells(&p, side, &mut received);
+    assert_eq!(received.iter().sum::<u8>(), 1);
+    assert_eq!(received[5 * side + 2], 1);
+    convert(&mut encoder, encode::radius(8138.).unwrap());
+    let p = convert(&mut encoder, encode::minimap_delta(&next, &next).unwrap());
+    client_cells(&p, side, &mut received);
+    assert_eq!(received.iter().sum::<u8>(), 1);
+    assert_eq!(
+        received[4 * side + 3],
+        1,
+        "radius update changes the projection"
+    );
+    // A fresh adapter defaults to dynamic maps, with no prior full-map state.
+    assert_eq!(
+        convert(&mut Encoder::new(0), encode::minimap(&map))[0],
+        b'M'
+    );
 }

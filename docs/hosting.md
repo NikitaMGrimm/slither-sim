@@ -113,7 +113,8 @@ open `wss` connections, which need the TLS proxy below.
 
 The NTL, Frontier and Precise slither browser mods connect when the host's
 `IP:PORT` is entered in their custom server field. NTL and Precise get
-protocol 13, Frontier gets 19, and Precise shows no minimap; see
+protocol 13 and Frontier gets 19. NTL's map tracks the live radius; Precise
+shows full minimap snapshots but ignores deltas. See
 [compatibility limits](raw-server.md#packet-compatibility).
 
 To check that a client can join, run the example bot from any machine with

@@ -1,5 +1,9 @@
 # Shared browser admission
 
+The later [projection correction](../2026-10-27-legacy-map-motion/REPORT.md)
+supersedes the minimap choice below. This run checked nonempty map pixels,
+not own-marker alignment; it missed that `U` disables NTL's live projection.
+
 ## Scope and source pins
 
 Client-derived compatibility, not official challenge behavior. Static survey

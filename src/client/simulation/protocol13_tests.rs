@@ -63,7 +63,7 @@ fn a_legacy_recipient_preserves_other_slots_bytes_times_and_world() {
             codes.insert(frame[2]);
         }
     }
-    for code in b"asUFlpv" {
+    for code in b"asMFlpv" {
         assert!(codes.contains(code), "missing {}", char::from(*code));
     }
     assert_eq!(
@@ -123,7 +123,7 @@ fn battledome_legacy_keeps_kill_board_pit_raster_and_edge_food() {
                 .any(|food| food[0] == 8 && food[5] == 31)),
         "edge ring must remain decorative food"
     );
-    let map_packet = packets.iter().find(|p| p[0] == b'U').unwrap();
+    let map_packet = packets.iter().find(|p| p[0] == b'M').unwrap();
     let mut decoder = MinimapDecoder::default();
     let mut budget = usize::MAX;
     decoder.apply(map_packet, 0., &mut budget).unwrap();

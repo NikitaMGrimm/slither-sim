@@ -163,6 +163,15 @@ impl RawSimulator {
             Some(Box::new(crate::client::encode13::Encoder::new(slot as u16)));
     }
 
+    pub(crate) fn full_minimap(&mut self, slot: usize) {
+        self.backend.slots[slot]
+            .connection
+            .legacy
+            .as_mut()
+            .expect("full minimap is only requested by protocol 13")
+            .use_full_minimap();
+    }
+
     /// Queue one client message sent now on the uplink; see `receive_at`.
     #[cfg(test)]
     pub(super) fn receive(&mut self, slot: usize, bytes: &[u8]) -> Result<(), String> {

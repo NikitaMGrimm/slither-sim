@@ -22,7 +22,7 @@ pub(crate) struct Encoder {
     own: u16,
     spacing: f64,
     fronts: BTreeMap<u16, Front>,
-    map: Option<Minimap>,
+    full_map: Option<FullMap>,
 }
 
 impl Encoder {
@@ -31,8 +31,16 @@ impl Encoder {
             own,
             spacing: crate::physics::ANCHOR_SPACING,
             fronts: BTreeMap::new(),
-            map: None,
+            full_map: None,
         }
+    }
+
+    pub(crate) fn use_full_minimap(&mut self) {
+        self.full_map = Some(FullMap {
+            grd: f64::from(encode::GRID_CENTER),
+            radius: f64::from(encode::GRID_CENTER),
+            previous: None,
+        });
     }
 
     pub(crate) fn packets(&mut self, packets: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
@@ -43,6 +51,10 @@ impl Encoder {
                     let mut p = p.clone();
                     p[23] = 13;
                     self.spacing = f64::from(p[24]);
+                    if let Some(map) = &mut self.full_map {
+                        map.grd = u24_at(&p, 1);
+                        map.radius = u24_at(&p, 27);
+                    }
                     out.push(p);
                 }
                 b's' if p.len() > 7 => out.push(self.appearance(p)?),
@@ -95,14 +107,27 @@ impl Encoder {
                     out.push(q);
                 }
                 b'M' | b'V' => {
-                    let map = Minimap::packet(self.map.as_ref(), p)?;
-                    out.push(minimap(&map));
-                    self.map = Some(map);
+                    // Client-derived: NTL 9.78's U/u handler disables dynmm,
+                    // scaling its own dot by setup grd instead of live radius.
+                    // Its Qm>=13 M/V decoder has the same reverse scan and 255
+                    // escape as 19. Keep the shared bytes and live projection.
+                    // See research/fidelity/2026-10-27-legacy-map-motion/REPORT.md.
+                    out.push(if let Some(map) = &mut self.full_map {
+                        map.packet(p)?
+                    } else {
+                        p.clone()
+                    });
+                }
+                b'z' => {
+                    if let Some(map) = &mut self.full_map {
+                        map.radius = u24_at(p, 1);
+                    }
+                    out.push(p.clone());
                 }
                 // Common catalog families, plus existing local score/record/rules
                 // presentation. Never forward a new 19-only layout silently.
                 b'e' | b'E' | b'3' | b'4' | b'5' | b'h' | b'r' | b'w' | b'y' | b'j' | b'l'
-                | b'k' | b'p' | b'z' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.clone()),
+                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.clone()),
                 _ => return Err(format!("No protocol-13 encoding for code {}", p[0])),
             }
         }
@@ -233,15 +258,48 @@ fn food_xy(key: [u8; 4]) -> [u16; 2] {
     [cell(key[0], key[2]), cell(key[1], key[3])]
 }
 
-/// Compatibility snapshot U: same reverse raster as the measured M, without
-/// its 255 escape or a delta base. This client-supported form avoids depending
-/// on a browser mod's modern-map flag. It is a compatibility choice, not an
-/// assertion that the official protocol-13 capture used U (it used M).
+/// Only [99,3] opts into this client-derived compatibility projection. NTL's
+/// dynamic-map-off dot uses grd, and its decoder has no extended runs or XOR
+/// base. Reproject occupied live cells into that frame, retaining coverage when
+/// several source cells collapse into one. No stock recipient uses this state.
+#[derive(Clone, Debug)]
+struct FullMap {
+    grd: f64,
+    radius: f64,
+    previous: Option<Minimap>,
+}
+
+impl FullMap {
+    fn packet(&mut self, p: &[u8]) -> Result<Vec<u8>, String> {
+        let source = Minimap::packet(self.previous.as_ref(), p)?;
+        let side = source.side;
+        let mut map = Minimap {
+            side,
+            cells: vec![0; side * side],
+            age_seconds: 0.,
+        };
+        let scale = self.radius / self.grd;
+        let edge = |cell: usize| {
+            (side as f64 / 2. + (cell as f64 - side as f64 / 2.) * scale).clamp(0., side as f64)
+        };
+        for (i, &set) in source.cells.iter().enumerate() {
+            if set == 0 {
+                continue;
+            }
+            let (x, y) = (i % side, i / side);
+            for row in edge(y).floor() as usize..edge(y + 1).ceil() as usize {
+                for col in edge(x).floor() as usize..edge(x + 1).ceil() as usize {
+                    map.cells[row * side + col] = 1;
+                }
+            }
+        }
+        self.previous = Some(source);
+        Ok(minimap(&map))
+    }
+}
+
+/// Full U in the grd projection, with plain zero runs and no delta base.
 fn minimap(map: &Minimap) -> Vec<u8> {
-    // Client-derived compatibility: NTL also reads U with its dynamic map off
-    // ([99,3]). Precise only reads M, but sends the same [99,4]/selector-12
-    // admission as NTL, so there is no supported distinction for an M profile.
-    // See research/fidelity/2026-10-27-browser-admission/REPORT.md.
     let mut q = vec![b'U'];
     q.extend((map.side as u16).to_be_bytes());
     let mut remaining = map.cells.len();

@@ -95,8 +95,11 @@ Protocol-19 connections retain their last queued bitmap. First/reconnected/resiz
 use full `M`; later maps use XOR `V` only when strictly shorter. Queuing advances
 that recipient's base. Both reconstruct the bitmap; this local shortest-encoding
 policy differs from some retained official choices.
-Protocol-13 browser connections receive full `U` snapshots of the same raster,
-including the pit outline and mask; they need no client-side XOR base.
+Default protocol-13 connections use the same live-radius `M`/`V` bytes,
+including the pit outline and mask. Only `[99,3]` asks for full-server `U`
+snapshots: those occupied cells are reprojected to setup `grd`, matching that
+client setting's own-player marker. This is client-derived compatibility;
+[orientation and projection evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-legacy-map-motion/REPORT.md).
 
 ### Packet timing
 
