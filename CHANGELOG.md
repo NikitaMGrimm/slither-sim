@@ -6,12 +6,15 @@
 
 - Hosts accept the NTL browser mod. Its legacy login gets protocol 13 on that
   connection: snakes, food, death and rejoin, and Battledome's kill board, pit
-  minimap and edge ring all work. Stock clients and bots still get protocol 19,
-  byte for byte as before.
+  minimap and edge ring all work. Its minimaps are the same `M`/`V` packets
+  protocol 19 gets, so NTL scales the map and its own-position dot to the live
+  arena in every mode. Stock clients and bots still get protocol 19, byte for
+  byte as before.
 - The Frontier and Precise slither browser mods can join hosts too. Frontier's
-  short login gets protocol 19; Precise gets protocol 13 but shows no minimap,
-  because it reads only `M` maps. NTL's other handshake requests (`[99]`, and
-  `[99,3]` with its dynamic minimap off) also work.
+  short login gets protocol 19; Precise gets protocol 13 and updates its
+  minimap only from full `M` maps, since it ignores `V` deltas. NTL's other
+  handshake requests also work: `[99]`, and `[99,3]` with its dynamic minimap
+  off, which gets a `U` map of the whole grid to match its dot.
 
 ### Changed
 
@@ -48,11 +51,6 @@
   and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
 
 ### Fixed
-
-- NTL's minimap marker uses the same live-radius projection as the map in
-  every game mode. Legacy clients now receive `M`/`V` by default; the dynamic
-  map-off request gets a full-server `U` projection instead. Precise can show
-  full minimap snapshots again.
 
 - A client that falls too far behind is disconnected instead of stopping the
   host. Each socket may queue up to 2 MiB of output, counted the same way for
