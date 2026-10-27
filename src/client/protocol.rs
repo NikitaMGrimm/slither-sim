@@ -331,6 +331,7 @@ enum Packet<'a> {
     Pong,
     GameOver,
     Radius(f64),
+    Rules(crate::WorldRules),
     Ignored,
 }
 impl Packet<'_> {
@@ -358,6 +359,7 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
     };
     let n = p.len();
     Ok(match code {
+        super::rules_packet::COMMAND => Packet::Rules(super::rules_packet::decode(p)?),
         b'a' => {
             if n < 25 {
                 return Err("Short setup packet".into());
@@ -721,6 +723,7 @@ struct Session {
     setup_receipt: Option<f64>,
     server_time: Option<f64>,
     setup: Option<Setup>,
+    rules: Option<crate::WorldRules>,
     sides: FastMap<u16, Side>,
     free_slots: Vec<usize>,
     slot_count: usize,
@@ -1362,6 +1365,7 @@ impl ClientState {
             Packet::Radius(radius) => {
                 session.setup.as_mut().ok_or("Missing setup")?.radius = radius;
             }
+            Packet::Rules(rules) => session.rules = Some(rules),
             Packet::Ignored => {}
         }
         Ok(())
@@ -1776,6 +1780,7 @@ impl ClientState {
             status,
             life: self.life,
             settings: session.setup.as_ref().map(|setup| setup.settings.clone()),
+            rules: session.rules,
             observation,
             received: self.metadata(now, server),
             minimap: session.minimap.shown.as_ref().map(|(map, at)| Minimap {

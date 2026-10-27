@@ -1,10 +1,10 @@
 //! Effective geometric rules, separate from limited observations and entity data.
 use crate::{BoundaryMode, ErrorKind, SimError, Simulator};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // Fields stay in alphabetical wire order: the canonical JSON writer otherwise
 // sorts them through scratch space on every encoded frame.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldRules {
     pub boundary_mode: BoundaryMode,

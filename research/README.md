@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Battledome | [Opt-in mode rules](battledome/2026-10-27-rules-extension/REPORT.md) | Pinned stock handler ignores the extension; loopback opt-in exclusion, exact live rules and shared Forager adapter regressions. |
 | Fidelity | [Protocol-13 message catalog](fidelity/2026-10-26-protocol13-catalog/REPORT.md) | Official legacy/stock captures, scrubbed wire-13/19 witnesses and an offline decoder; conditional timing and failed-attempt limits. |
 | Fidelity | [Legacy browser login](fidelity/2026-10-26-legacy-login/REPORT.md) | Two bounded official sessions: existing 27-byte challenge format, selector-12 login then protocol-13 setup; implementation stopped before changing the protocol-19 host. |
 | Performance | [One-core EPYC socket capacity](performance/2026-10-26-epyc-host/REPORT.md) | Sequential official 250/500 and Battledome 32/80 socket holds on one Zen 4 and one Zen 5 core; delivery grades, spawn waits, operator stats and cloud cleanup. |

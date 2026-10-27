@@ -44,8 +44,12 @@ reuse one `ForagerBot`; native background slots reuse one instance sequentially.
 Decisions read only delivered frames, including received timing and actual
 sent-command history.
 The runners send every returned action, including unchanged-heading boost toggles.
-The kernel retains scratch space but no per-seat state. Custom Battledome rules
-are not inferred from packets, and these runners add no mode-specific guard.
+The kernel retains scratch space but no per-seat state. The adapter reads the
+live pit from `frame.rules`, entering it after spawning and treating its edge
+as a lethal wall from inside. Host, native and socket bots use this same path.
+`ForagerBot::with_world_rules` has been removed; use `new()` and received rules.
+Rust callers constructing `ClientFrame` literals must initialize `rules`
+(`None` for unknown rules).
 Cost and playing-strength qualification on the current runtime is still pending.
 The [frozen port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
 describes parameter identity, conformance targets and limits.
@@ -110,6 +114,14 @@ computation has already elapsed. Invalid actions reject it before recording;
 later I/O or record-buffer errors cannot roll back sent bytes or advanced time.
 
 ## What the bot knows
+
+`rules` is an optional [world-rules object](bot-api.md#frames), received through
+the [SlitherSim extension](raw-server.md#slithersim-rules-extension).
+`null` means unknown (before setup or on servers without this extension);
+an object with `pitRadius: null` explicitly reports no pit. Reconnect clears it.
+Native clients receive it through the same encoder and decoder as socket bots.
+The additive response field keeps the `slither-client-v2` contract and JSON
+envelope unchanged; older frames deserialize with unknown rules.
 
 `ClientFrame.time` is local monotonic time. `observation.time` follows received
 server elapsed time; header-free connections use local receipt time since setup.
@@ -182,12 +194,13 @@ inside `config.world`:
 {"op":"simulation","seed":7,"config":{"world":{"preset":"battledome"}}}
 ```
 
-The frame still contains only decoded protocol reports. Pit geometry and the size
-floor are not transmitted; retain the chosen world config separately when a bot
-needs the mode rules. There is no separate per-slot rolling-kill field. Reported
-kills count the current life. Leaderboards in worlds with `killScoreSeconds`
-rank rolling kills; otherwise they rank size. The numeric column is the stock table score
-from the transmitted row, not the opponent's physical mass.
+The frame contains only decoded protocol reports. SlitherSim sends the exact live
+pit, floor and kill-score window in `rules`; no configuration side channel or
+scaling of the rounded wall radius is needed. There is no separate per-slot
+rolling-kill field. Reported kills count the current life. Leaderboards in worlds
+with `killScoreSeconds` rank rolling kills; otherwise they rank size. The numeric
+column is the stock table score from the transmitted row, not the opponent's
+physical mass.
 
 Example [latency settings](configuration.md#latencyconfig):
 

@@ -166,8 +166,11 @@ Every frame includes `rules`, even with no living slots:
 boosting free at that floor. Overrides are reflected directly; a preset name
 is not a rules identity. Radius remains separate runtime state;
 `rules.pitRadius` is the live pit radius and follows the wall in seat-following
-circular floor worlds. The other mode settings remain fixed until the world is replaced. Portable received-state
-frames contain only received information and do not invent simulated pit/floor metadata.
+circular floor worlds. The other mode settings remain fixed until the world is
+replaced. Portable received-state `ClientFrame.rules` optionally carries the same
+object through the [SlitherSim wire extension](raw-server.md#slithersim-rules-extension).
+It is unknown until received. Geometric JSON, Python and C ABI rule fields retain
+their existing meanings and layouts.
 
 Columns are arrays of equal length; row `r` is element `r` of each.
 
@@ -365,10 +368,11 @@ from the complete `ClientFrame` and returns `None` outside a compatible playing
 frame with an observation. Host bots, native background bots and the Rust
 examples use this default adapter; JSON operations are unchanged.
 
-Local host and native background bots use `ForagerBot::with_world_rules(&Config)`
-to enter the configured one-way pit and treat its edge as a wall from inside.
-The pit follows the live radius received in each frame. The adapter adds no
-fields to `ClientFrame`; network bots must obtain mode rules separately.
+Host, native and socket bots use `ForagerBot::new()` and read the exact live pit
+from `ClientFrame.rules` to enter the one-way pit and treat its edge as a wall
+from inside. The configuration constructor `with_world_rules` has been removed.
+`NetworkBackend` opts into rule reports automatically; other socket clients send
+the [physical-food header](raw-server.md#slithersim-rules-extension).
 Offline callers can supply the live pit radius to `Forager::decide_with_pit`.
 Without a pit these calls preserve the frozen A4 decisions.
 

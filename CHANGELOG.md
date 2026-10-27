@@ -10,6 +10,12 @@
   above-floor boost mass spent outside is lost. Disabled worlds keep their
   previous food rules. Checkpoints use rules revision `slither-sim-rules-v4`
   and reject v3 continuations.
+- **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
+  pit radius, size floor, kill-score window, boundary and free floor boost.
+  They are sent at setup and whenever they change, and surface as the optional
+  `ClientFrame.rules`. Host and socket bots read the same field, so
+  `ForagerBot::with_world_rules` is gone; use `new()`. Client JSON stays v2,
+  and stock browsers never receive the message.
 - **Breaking:** in worlds with `killScoreSeconds` (Battledome), the stock
   leaderboard and own rank show rolling kills instead of size. Players who left
   stay listed while their kills count; a new player in their seat starts at
@@ -18,6 +24,8 @@
   `Option<usize>`; JSON accepts an integer or `null`.
 - Host bots each wear their own stock skin, kept across lives, instead of all
   using skin 0. Their death pellets take that skin's colors.
+- Host bots have names such as `Mamba (bot)`, kept across lives, instead of
+  none. Official servers mark their bots with the same suffix.
 - Linux hosting resource guidance now includes real socket tests on one Zen 4
   and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
 

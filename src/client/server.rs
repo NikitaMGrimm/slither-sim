@@ -54,8 +54,8 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
-/// Automatic bot handshake: preserve physical food even at decorative wire keys.
-/// An HTTP header keeps the stock binary protocol and other servers unchanged.
+/// Automatic bot opt-in to physical food and the SlitherSim rules extension.
+/// Stock browser sockets never request this header.
 pub(crate) const PHYSICAL_FOOD_HEADER: &str = "x-slithersim-food";
 // The budgets and timeouts below are host resource policies, not protocol or
 // physics limits.
@@ -421,11 +421,11 @@ impl Host {
             routes.push(sender);
             let seats = (self.max_clients + worker..self.max_clients + self.bots)
                 .step_by(self.bot_threads)
-                .map(|slot| Seat::new(slot, self.decision_seconds))
+                .map(|slot| Seat::new(slot, slot - self.max_clients, self.decision_seconds))
                 .collect();
             let bots = Bots {
                 seats,
-                policy: ForagerBot::with_world_rules(self.world.backend_config()),
+                policy: ForagerBot::new(),
                 stride: self.bot_threads,
                 deliveries: receiver,
                 commands: commands.clone(),
@@ -1484,6 +1484,9 @@ struct Bots {
 /// matching the simulator's native background client.
 struct Seat {
     slot: usize,
+    /// Position among bot seats, which follow the player slots; picks the
+    /// seat's skin and name.
+    bot: usize,
     generation: u64,
     state: ClientState,
     /// Processing draws for this connection.
@@ -1559,9 +1562,10 @@ impl Bots {
 
 impl Seat {
     /// `decide_at` is relative to the start until the thread runs.
-    fn new(slot: usize, interval: f64) -> Self {
+    fn new(slot: usize, bot: usize, interval: f64) -> Self {
         Self {
             slot,
+            bot,
             generation: 0,
             state: ClientState::new(),
             link: Link::default(),
@@ -1711,8 +1715,9 @@ impl Seat {
             slot: self.slot,
             generation: self.generation,
             appearance: PlayerAppearance {
-                skin: bot_skin(self.slot),
-                ..PlayerAppearance::default()
+                nickname: bot_nickname(self.bot),
+                skin: bot_skin(self.bot),
+                custom_skin: Vec::new(),
             },
             session_id: false,
             physical_food: true,
@@ -1733,9 +1738,33 @@ impl Seat {
 /// Each bot seat keeps one stock skin across lives so the world isn't uniform.
 /// The pinned client offers skins 0..=64 (`max_skin_cv`) but its picker skips
 /// 42, an event skin, unless that event is active.
-fn bot_skin(slot: usize) -> u8 {
-    let skin = (slot % 64) as u8;
+fn bot_skin(bot: usize) -> u8 {
+    let skin = (bot % 64) as u8;
     if skin >= 42 { skin + 1 } else { skin }
+}
+
+/// Our own base names, at most 12 bytes so `bot_nickname` always fits.
+const BOT_NAMES: [&str; 64] = [
+    "Noodle", "Viper", "Mamba", "Ziggy", "Pixel", "Comet", "Biscuit", "Pretzel", "Wiggles",
+    "Sprout", "Nimbus", "Pebble", "Zephyr", "Juniper", "Marble", "Waffle", "Bandit", "Tango",
+    "Echo", "Maple", "Rocket", "Clover", "Gizmo", "Sunny", "Tofu", "Mochi", "Pickle", "Basil",
+    "Indigo", "Saffron", "Cobalt", "Ember", "Frost", "Hazel", "Jasper", "Kiwi", "Lumen", "Mango",
+    "Nova", "Olive", "Pepper", "Quill", "Rascal", "Sable", "Taffy", "Umber", "Velvet", "Willow",
+    "Yeti", "Zinc", "Acorn", "Bolt", "Cinder", "Dune", "Fennel", "Glimmer", "Hopper", "Inky",
+    "Jinx", "Koda", "Lark", "Moss", "Nugget", "Orbit",
+];
+
+/// Official servers label their bots by appending "(bot)" to an ordinary
+/// player name, as seen in 2026-10 live captures. Each seat keeps one name
+/// across lives so its rolling kills stay readable; seats past the list get a
+/// round number, keeping names distinct up to `MAX_AGENTS`.
+fn bot_nickname(bot: usize) -> Vec<u8> {
+    let name = BOT_NAMES[bot % BOT_NAMES.len()];
+    match bot / BOT_NAMES.len() {
+        0 => format!("{name} (bot)"),
+        round => format!("{name} {} (bot)", round + 1),
+    }
+    .into_bytes()
 }
 
 /// Stock-client login: protocol and client-version bytes, password, skin at
@@ -1788,6 +1817,7 @@ mod bot_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::simulation::MAX_AGENTS;
 
     #[test]
     fn owned_frames_preserve_websocket_bytes_and_sequence_wrap() {
@@ -1979,7 +2009,7 @@ mod tests {
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
         let mut policy = ForagerBot::new();
-        let mut seat = Seat::new(4, 1.);
+        let mut seat = Seat::new(4, 0, 1.);
         seat.join(0., &commands, &latency, &mut random).unwrap();
         let _ = received.recv().unwrap();
         seat.decide_at = 1.;
@@ -2034,7 +2064,7 @@ mod tests {
             }
         ));
         // A different seat on the same worker still runs normally.
-        let mut healthy = Seat::new(5, 1.);
+        let mut healthy = Seat::new(5, 0, 1.);
         healthy.join(0.1, &commands, &latency, &mut random).unwrap();
         healthy
             .run(0.1, &commands, &latency, &mut random, 1., &mut policy)
@@ -2540,7 +2570,7 @@ mod tests {
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
         let mut policy = ForagerBot::new();
-        let mut seat = Seat::new(4, 0.042);
+        let mut seat = Seat::new(4, 0, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         assert!(matches!(
             received.try_recv().unwrap(),
@@ -2757,7 +2787,7 @@ mod tests {
         let (_route, deliveries) = mpsc::channel();
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
-        let mut seat = Seat::new(4, 0.042);
+        let mut seat = Seat::new(4, 0, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         let mut bots = Bots {
             seats: vec![seat],
@@ -2799,7 +2829,7 @@ mod tests {
         };
         let mut random = Random::new(1);
         let mut policy = ForagerBot::new();
-        let mut seat = Seat::new(0, 0.042);
+        let mut seat = Seat::new(0, 0, 0.042);
         seat.join(0.5, &commands, &latency, &mut random).unwrap();
         // A world catching up on ticks stamps the setup before the join.
         let mut frame = vec![0, 0];
@@ -3168,6 +3198,34 @@ mod tests {
         assert_eq!(skins.len(), 64);
         assert!(skins.iter().all(|&skin| skin <= 64 && skin != 42));
         assert_eq!(bot_skin(64), bot_skin(0));
+    }
+
+    #[test]
+    fn bot_seats_have_distinct_stock_sized_names() {
+        let names: std::collections::BTreeSet<Vec<u8>> =
+            (0..MAX_AGENTS).map(bot_nickname).collect();
+        assert_eq!(names.len(), MAX_AGENTS);
+        assert!(names.iter().all(|name| name.len() <= MAX_NICKNAME));
+        assert_eq!(bot_nickname(0), b"Noodle (bot)");
+        assert_eq!(bot_nickname(64), b"Noodle 2 (bot)");
+    }
+
+    #[test]
+    fn first_bot_after_player_slots_gets_the_first_name_and_skin() {
+        let (commands, received) = mpsc::channel();
+        let mut seat = Seat::new(8, 0, 1.);
+        seat.join(
+            0.,
+            &commands,
+            &LatencyConfig::default(),
+            &mut Random::new(1),
+        )
+        .unwrap();
+        let Command::Connect { appearance, .. } = received.recv().unwrap() else {
+            panic!("expected a connect");
+        };
+        assert_eq!(appearance.nickname, b"Noodle (bot)");
+        assert_eq!(appearance.skin, 0);
     }
 
     #[test]

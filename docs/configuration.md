@@ -341,7 +341,8 @@ Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
 Rust `Observation` omits the rolling score. Geometric frames carry pit
 geometry and the floor setting in [`rules`](bot-api.md#frames); `Observation`
-and portable `ClientFrame` omit them, so retain world config separately. Portable
+omits them. Portable `ClientFrame.rules` receives the same live settings through
+the opt-in [SlitherSim extension](raw-server.md#slithersim-rules-extension). Portable
 clients receive per-life kills and the same leaderboard number column
 as the browser (rolling kills when enabled), without a distinct pit death reason.
 At the base size the stock browser shows the pit edge as 749 decorative pellets:
@@ -603,5 +604,7 @@ radius, minimum score, kill-score window and whether boost is free at that floor
 They describe effective validated settings after overrides. The pit radius is
 live geometry in circular floor worlds; the other settings remain fixed for
 the world's lifetime. Live wall radius remains separate. Raw Rust bot drivers
-use `geometric_context(slot)` for these rules plus their own rolling kill score;
-`Observation` and portable received-state frames are unchanged.
+use `geometric_context(slot)` for these rules plus their own rolling kill score.
+`Observation` omits them. Portable `ClientFrame.rules` carries the same values
+once a SlitherSim host reports them to an opted-in bot client, and stays unset
+until then ([rules extension](raw-server.md#slithersim-rules-extension)).

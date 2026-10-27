@@ -432,8 +432,8 @@ fn connect_socket(
         .as_str()
         .into_client_request()
         .map_err(|e| e.to_string())?;
-    // SlitherSim hosts omit decoration for bots, preserving real food at
-    // marker keys. Ordinary WebSocket servers can ignore this HTTP header.
+    // Opt into physical food and live mode rules on SlitherSim hosts.
+    // Ordinary WebSocket servers can ignore this HTTP header.
     request.headers_mut().insert(
         super::server::PHYSICAL_FOOD_HEADER,
         HeaderValue::from_static("physical"),

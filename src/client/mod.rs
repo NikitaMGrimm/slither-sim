@@ -38,6 +38,8 @@ pub use received::{
 pub use server::{BotConfig, Host, HostConfig, PlayerConfig, RunningHost};
 pub use simulation::{DeliveryProfile, SimulationConfig, SimulatorBackend};
 
+mod rules_packet;
+
 pub const CONTRACT: &str = "slither-client-v2";
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -100,6 +102,9 @@ pub struct ClientFrame {
     pub status: ClientStatus,
     pub life: u64,
     pub settings: Option<ServerSettings>,
+    /// Optional SlitherSim rules received on this connection; None on stock servers.
+    #[serde(default)]
+    pub rules: Option<crate::WorldRules>,
     pub observation: Option<Observation>,
     pub received: ReceivedMetadata,
     pub minimap: Option<Minimap>,
