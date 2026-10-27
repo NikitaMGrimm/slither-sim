@@ -54,6 +54,9 @@ use tungstenite::{
     protocol::{CloseFrame, WebSocketConfig, frame::coding::CloseCode},
 };
 
+#[cfg(windows)]
+mod wake;
+
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
 /// Automatic bot opt-in to physical food and the SlitherSim rules extension.
@@ -251,6 +254,8 @@ impl Clock {
 
 /// State every host thread can see.
 struct Shared {
+    #[cfg(windows)]
+    socket_wake: wake::Wake,
     clock: Clock,
     stop: AtomicBool,
     ticks: AtomicU64,
@@ -263,6 +268,12 @@ struct Shared {
 }
 
 impl Shared {
+    fn wake_socket(&self) -> Result<(), String> {
+        #[cfg(windows)]
+        self.socket_wake.notify().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     fn stopped(&self) -> bool {
         self.stop.load(Ordering::Relaxed)
     }
@@ -401,6 +412,8 @@ impl Host {
         let mut challenge = vec![0, 0, b'6'];
         challenge.extend(encoded);
         let shared = Arc::new(Shared {
+            #[cfg(windows)]
+            socket_wake: wake::Wake::new().map_err(|e| e.to_string())?,
             clock: Clock {
                 epoch: Instant::now(),
                 dt: self.world.dt(),
@@ -868,6 +881,7 @@ impl Simulation {
             }
             // A closed route means its thread ended and the host is stopping.
             let _ = routes[0].send(std::mem::take(&mut batches[0]));
+            shared.wake_socket()?;
             Ok(())
         })
     }
@@ -889,10 +903,13 @@ impl Simulation {
                 self.batches[route].push(delivery(slot, generation, frames, offset));
             }
         }
-        for (route, batch) in self.routes.iter().zip(&mut self.batches) {
+        for (index, (route, batch)) in self.routes.iter().zip(&mut self.batches).enumerate() {
             if !batch.is_empty() {
                 // A closed route means its thread ended and the host is stopping.
                 let _ = route.send(std::mem::take(batch));
+                if index == 0 {
+                    self.shared.wake_socket()?;
+                }
             }
         }
         Ok(())
@@ -1110,7 +1127,28 @@ impl Gateway {
                     _ => None,
                 })
                 .fold(f64::INFINITY, f64::min);
-            self.gate.shared.clock.sleep_until(next, MAX_IDLE);
+            // Measured loopback polling added ~1 ms after encoding a frame.
+            // Wake when a frame arrives instead of waiting out the poll sleep;
+            // future frames still wait for their modeled due time. Windows uses
+            // a high-resolution timer because channel timeouts delayed inputs.
+            // research/fidelity/2026-10-27-host-frame-timing/REPORT.md
+            if next.is_finite() {
+                self.gate.shared.clock.sleep_until(next, MAX_IDLE);
+            } else {
+                #[cfg(windows)]
+                self.gate
+                    .shared
+                    .socket_wake
+                    .wait(MAX_IDLE)
+                    .map_err(|e| e.to_string())?;
+                #[cfg(not(windows))]
+                if let Ok(batch) = self.deliveries.recv_timeout(MAX_IDLE) {
+                    let now = Instant::now();
+                    for delivery in batch {
+                        self.deliver(delivery, now);
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1965,6 +2003,37 @@ mod tests {
     }
 
     #[test]
+    fn notified_frames_keep_due_times_elapsed_bytes_and_order() {
+        use tungstenite::protocol::Role;
+        let socket = WebSocket::from_raw_socket(
+            ReadBudget::new(io::Cursor::new(Vec::new())),
+            Role::Server,
+            Some(socket_config()),
+        );
+        let mut open = Open::new(socket, false);
+        let (_, mut gate, _) = connected(LatencyConfig::default(), 0);
+        let first = vec![0, 7, b'p'];
+        let second = vec![0, 14, b'p'];
+        open.queued = VecDeque::from([(10., first.clone()), (11., second.clone())]);
+        open.queued_bytes = output_cost(&first) + output_cost(&second);
+        // A notification permits a poll; it never advances a frame's deadline.
+        gate.shared.wake_socket().unwrap();
+        open.send_due(&mut gate, Instant::now(), 9.).unwrap();
+        assert_eq!(open.queued.len(), 2);
+        open.send_due(&mut gate, Instant::now(), 10.).unwrap();
+        assert_eq!(open.queued.front(), Some(&(11., second.clone())));
+        assert_eq!(open.queued_bytes, output_cost(&second));
+        open.send_due(&mut gate, Instant::now(), 11.).unwrap();
+        assert!(open.queued.is_empty());
+        assert_eq!(open.queued_bytes, 0);
+        open.socket.flush().unwrap();
+        let bytes = open.socket.into_inner().inner.into_inner();
+        let mut client = WebSocket::from_raw_socket(io::Cursor::new(bytes), Role::Client, None);
+        assert_eq!(client.read().unwrap().into_data().as_ref(), &first);
+        assert_eq!(client.read().unwrap().into_data().as_ref(), &second);
+    }
+
+    #[test]
     fn largest_message_fits_behind_an_unflushed_batch() {
         let socket = WebSocket::from_raw_socket(
             ReadBudget::new(io::Cursor::new(Vec::new())),
@@ -2438,6 +2507,8 @@ mod tests {
 
     fn shared(dt: f64, sockets: usize) -> Arc<Shared> {
         Arc::new(Shared {
+            #[cfg(windows)]
+            socket_wake: wake::Wake::new().unwrap(),
             clock: Clock {
                 epoch: Instant::now(),
                 dt,

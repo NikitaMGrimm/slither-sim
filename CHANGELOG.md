@@ -52,6 +52,8 @@
 
 ### Fixed
 
+- The host socket thread wakes when encoded frames arrive instead of waiting
+  for its next input poll, reducing local delivery jitter without busy waiting.
 - A client that falls too far behind is disconnected instead of stopping the
   host. Each socket may queue up to 2 MiB of output, counted the same way for
   protocol 13 and 19; stock clients previously had a 4,096-frame limit.
