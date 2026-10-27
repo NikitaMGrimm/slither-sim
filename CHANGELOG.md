@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Collision-delay research tools and a retained official scouting study: no
+  near-zero server among 27 active entries, so latency compensation remains
+  inconclusive and simulator collision rules are unchanged.
+
 ### Changed
 
 - The hosting guide's resource table now comes from a recheck on current main.
