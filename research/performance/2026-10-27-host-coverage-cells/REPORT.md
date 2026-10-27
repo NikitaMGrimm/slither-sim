@@ -8,7 +8,7 @@ change rebuilds the index. Interrupted broadcasts discard only scratch state.
 No report/visibility rule, protocol, physics or socket-service changes.
 
 Measured runtime: `aee5421` -> `dbc21e6`, after #219. Delivery integrates main
-`4268f60` (#220/#221); the four coverage files remain identical to `dbc21e6`.
+`339041f` (#220/#221); the four coverage files remain identical to `dbc21e6`.
 [Selected results](results.json).
 WSL2 Linux x86-64, locked Rust 1.99 release/debug=1, thin LTO/one codegen unit;
 jobs/Rayon/tests one, at most two pinned CPUs. Offline official-500, seed 7,
