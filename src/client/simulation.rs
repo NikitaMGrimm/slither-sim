@@ -473,17 +473,16 @@ impl SimulatorBackend {
                 .spawn_body(head, heading)
                 .map_err(|error| error.to_string())?;
             let clear = if circular {
-                safety
-                    .get_or_insert_with(|| {
-                        spawn::Safety::new_excluding(
-                            &self.world,
-                            Some(slot),
-                            body.len(),
-                            spawn::CIRCULAR_CLEARANCE,
-                            spawn::HEAD_PATH_SECONDS,
-                        )
-                    })
-                    .clears(&body)
+                let query = safety.get_or_insert_with(|| {
+                    spawn::Safety::new_excluding(
+                        &self.world,
+                        Some(slot),
+                        body.len(),
+                        spawn::CIRCULAR_CLEARANCE,
+                        spawn::HEAD_PATH_SECONDS,
+                    )
+                });
+                query.head_is_clear(body[0]) && query.clears(&body)
             } else {
                 self.world
                     .body_is_clear_excluding(&body, spawn::CLEARANCE, Some(slot))
@@ -497,7 +496,10 @@ impl SimulatorBackend {
                     let query = floor.get_or_insert_with(|| {
                         spawn::Safety::departure_floor(&self.world, slot, body.len())
                     });
-                    if query.clears(&body) && query.clears_departures(body[0], heading) {
+                    if query.head_is_clear(body[0])
+                        && query.clears(&body)
+                        && query.clears_departures(body[0], heading)
+                    {
                         let incumbent = open.as_ref().map_or(0., |(margin, ..)| *margin);
                         let margin = query.body_margin(incumbent);
                         if margin > incumbent {

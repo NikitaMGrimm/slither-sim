@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Performance
+
+- Battledome spawn searches reject a candidate whose head lacks the required
+  runway before testing its whole body. Spawn choices are unchanged. A full
+  search takes 34M instead of 79M instructions at 64 seats (36M instead of 86M
+  at 80), and the 64- and 80-seat host fixtures run 27% fewer instructions
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-admission-heads/REPORT.md)).
+
 ## [0.7.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.2...v0.7.0) - 2026-10-27
 
 ### Breaking

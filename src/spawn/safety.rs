@@ -227,6 +227,24 @@ impl Safety {
         margin
     }
 
+    /// Every accepted departure needs this head runway. Check it before the
+    /// whole candidate body: a rejected head cannot be rescued by its tail.
+    /// Skipping those body tests changes neither accepted poses nor maximin scores.
+    pub(crate) fn head_is_clear(&self, head: Point) -> bool {
+        if !head.finite() {
+            return false;
+        }
+        let head_bounds = Bounds::between(head, head);
+        !self.obstacles.iter().any(|obstacle| {
+            !obstacle.valid
+                || (near(head_bounds, obstacle.bounds, obstacle.head_width)
+                    && obstacle
+                        .edges
+                        .iter()
+                        .any(|edge| segment_distance(head, edge.a, edge.b) <= obstacle.head_width))
+        })
+    }
+
     /// Reserve short normal-speed departures toward the middle and along the
     /// tangent. Initial body clearance alone does not keep a newborn from
     /// turning into an older body as it leaves spawn. These are custom design
@@ -237,18 +255,10 @@ impl Safety {
         if !radius.is_finite() || radius <= 0. || !heading.is_finite() {
             return false;
         }
-        let head_bounds = Bounds::between(head, head);
         // The head can travel this far in three seconds before steering is
         // known. Keep that runway from old bodies while allowing the harmless
         // trailing body to use the smaller whole-body clearance.
-        if self.obstacles.iter().any(|obstacle| {
-            !obstacle.valid
-                || (near(head_bounds, obstacle.bounds, obstacle.head_width)
-                    && obstacle
-                        .edges
-                        .iter()
-                        .any(|edge| segment_distance(head, edge.a, edge.b) <= obstacle.head_width))
-        }) {
+        if !self.head_is_clear(head) {
             return false;
         }
         let end_inward = Point {
@@ -513,6 +523,49 @@ mod tests {
     }
 
     #[test]
+    fn head_prefilter_keeps_the_inclusive_runway_threshold_for_both_tiers() {
+        let mut config = Config::sandbox();
+        config.food_count = 0;
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config,
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["old".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut old = world.snakes()[0].clone();
+        old.head = Point::default();
+        old.body.fill(old.head);
+        old.speed = 0.;
+        world
+            .import_life(
+                0,
+                crate::ReplayLife::from_observed(old, crate::InitialSpeed::Infer(0.)),
+            )
+            .unwrap();
+        for query in [
+            Safety::new(&world, 2, 600., 2.),
+            Safety::departure_floor(&world, 1, 2),
+        ] {
+            let width = query.obstacles[0].head_width;
+            for sign in [-1., 1.] {
+                for bits in [width.to_bits() - 1, width.to_bits(), width.to_bits() + 1] {
+                    assert_eq!(
+                        query.head_is_clear(Point {
+                            x: sign * f64::from_bits(bits),
+                            y: 0.,
+                        }),
+                        bits > width.to_bits()
+                    );
+                }
+            }
+            assert!(!query.head_is_clear(Point { x: f64::NAN, y: 0. }));
+        }
+    }
+
+    #[test]
     fn newborn_departures_reject_a_body_beyond_initial_clearance() {
         let mut config = Config::battledome();
         config.radius = 5000.;
@@ -610,6 +663,7 @@ mod tests {
             .unwrap();
         let mut query = Safety::new(&world, 26, 400., 2.);
         assert!(query.clears(&body));
+        assert!(!query.head_is_clear(body[0]));
         assert!(!query.clears_departures(body[0], heading));
     }
 }
