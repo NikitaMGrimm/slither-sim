@@ -1,0 +1,80 @@
+{
+  "source": "3c6fb18c17a5bb9dc593160578ff427b9c413df3",
+  "sourceArchiveSha256": "5b1dde3ac78ce0b352002e94b189dd2757cca24bda3d99aed8520eecb4c035e4",
+  "overlaySha256": "96476bb31fb1b3133cf4f6cdc92ef4bcc141adc09365cd5916666e3518de49f6",
+  "binarySha256": "d81f49dc47980905f216c1fdc4b817448e6fda6c4754a614055e54d252261438",
+  "binaryBytes": 3070976,
+  "runnerSha256": "e13e8a320887594dbfd0f1e438e6e2d334c322df1199fbba5d55f99e1c2866e7",
+  "analysisSha256": "79ab6a230539008751a8f8144c920f5983f80355f9d89d837dc8dab5062838f7",
+  "planSha256": "052502c45201666253c949d2d058a028e536f9d1f4cdc473be71705d80511236",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+  "build": "cargo build --offline --locked --release --example arena_fanout; default features; jobs1; affinity one logical CPU",
+  "pilots": [
+    {
+      "run": "pilot-01",
+      "outcome": "Unqualified: seeded food lacked presentation registration; pickup stopped host.",
+      "files": {
+        "client-0.log": "347d760a076de857d6b19f27801db0394fa287c63a5aa1ef353855806b3ded6a",
+        "client-40.log": "347d760a076de857d6b19f27801db0394fa287c63a5aa1ef353855806b3ded6a",
+        "clients-stopped": "8322e87d24582952e5c996da182de0eca66dd2bf58fba5ec56a325c656f21b38",
+        "config.json": "c20deee7f102c35c917b9c7c7663ab711cd049356c966ff479d096e0c20fd2b9",
+        "end.flag": "528fb442678179011d0663b72f2679c58c3986807329c14e5c8a021ee93587a4",
+        "gateway.json": "fe8675e0a1cef5d5aa2bc7d5ffc0dbc061ed986c92dd61ef0523811613066509",
+        "host.json": "bb421913335f7acb2d8761876a5f1a7682d74911bb6c3dcb11b42c7e6ca0caea",
+        "host.log": "135625cda98c37092b49c9e4e864274996b9cb2a0590743f7817fc1fcd949fa9",
+        "listening": "0bb8ce1d00edf91bbfdc978350044eb9fb51b6bdf27047623b3ff0e0f01ca731",
+        "seed-ready.json": "53db3ace11af8df89b1c38fe940159758e58c20126c85f71e05d22600d8c8a41",
+        "simulation.json": "6e66bb86db4a3cac6cc90e532b8b162c9355b760fd93667586461fad70389980"
+      }
+    },
+    {
+      "run": "pilot-02",
+      "outcome": "Unqualified: reconnect cue selected 15 rather than 16 zero-based wire IDs.",
+      "files": {
+        "burst.flag": "5d34d355ebbdc9c0afd9eec78745ef218508718a4029cf18aad231803ab2d1a5",
+        "client-0.log": "777293cac132326e85e0a1360584a94e82d4b25c36b36cdc627a01b2f1ebc5c5",
+        "client-40.log": "b582461c14673f9119bf1dd55d228e89c4c1d6f374be1a3c6d4894a6a9cc7c6d",
+        "clients-0.json": "e39c3a0f7f601a18d49ea3450d6679b23e6660df43ade4f325760b34735c902b",
+        "clients-40.json": "9526d2735996f676308fa984567899c07933eaee255308b8f792b6793b524daa",
+        "clients-stopped": "8322e87d24582952e5c996da182de0eca66dd2bf58fba5ec56a325c656f21b38",
+        "config.json": "c20deee7f102c35c917b9c7c7663ab711cd049356c966ff479d096e0c20fd2b9",
+        "end.flag": "528fb442678179011d0663b72f2679c58c3986807329c14e5c8a021ee93587a4",
+        "gateway.json": "f5bccb85ddeec3595baa95aa635df6c7e08169bb1b5f4355f6089a390f442590",
+        "host.json": "b6054e5528475d2ad576e71bf752dd29f85e16d4c5285b5cb069d60d94932c6c",
+        "host.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "listening": "0bb8ce1d00edf91bbfdc978350044eb9fb51b6bdf27047623b3ff0e0f01ca731",
+        "seed-ready.json": "19f9e4bab28c5d8ad0a20e082fd59f57284c467a6122467416f10424b887e393",
+        "simulation.json": "886e77a5b577c3d378b1ccc9826b86f711b48afe3e5dcf2e628b17cb6e32f55b"
+      }
+    },
+    {
+      "run": "pilot-03",
+      "outcome": "Qualified harness pilot only: 80 living, 16 large, 16 reconnects; 8-second holds are not final runs.",
+      "files": {
+        "burst.flag": "5d34d355ebbdc9c0afd9eec78745ef218508718a4029cf18aad231803ab2d1a5",
+        "client-0.log": "c99b55afe2a522ae5ab1c8778f97a40ef565d2ff12e3c9369b7bb0669c195c4d",
+        "client-40.log": "7142aa0e362e49c7007d609a85541106b5e69aaeec6eec38dc724713e7184a15",
+        "clients-0.json": "9303d068e743b95951586f547b52a4f672dab799830e0295376828a574c12d4c",
+        "clients-40.json": "35759c20bfa9390e1d5c2f179427363fe032dbef240b32772759a23b685befe8",
+        "clients-stopped": "8322e87d24582952e5c996da182de0eca66dd2bf58fba5ec56a325c656f21b38",
+        "config.json": "c20deee7f102c35c917b9c7c7663ab711cd049356c966ff479d096e0c20fd2b9",
+        "end.flag": "528fb442678179011d0663b72f2679c58c3986807329c14e5c8a021ee93587a4",
+        "gateway.json": "d0d70256bab8bf4349f98ae672f0987e6ba2dfdc3d46536b672115ec831c15fc",
+        "host.json": "8a70d1450628b81ce40f5000e4a1f8733d9dfd1839d33178fc6fa7646d15e6ca",
+        "host.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "listening": "0bb8ce1d00edf91bbfdc978350044eb9fb51b6bdf27047623b3ff0e0f01ca731",
+        "seed-ready.json": "3cd8907129f3ffe80e9f6a759d5181038128a91775bfb89a9fa5d5002f747ee4",
+        "simulation.json": "bd5568808bbb0c82fe51eec33614200620dff774077dba30ff2187e7f93fb4a2"
+      }
+    }
+  ],
+  "reproduction": "Frozen source archive + committed overlay applies cleanly and reproduces every measured source byte.",
+  "artifacts": {
+    "overlay.patch": "96476bb31fb1b3133cf4f6cdc92ef4bcc141adc09365cd5916666e3518de49f6",
+    "run.py": "e13e8a320887594dbfd0f1e438e6e2d334c322df1199fbba5d55f99e1c2866e7",
+    "analyze.py": "79ab6a230539008751a8f8144c920f5983f80355f9d89d837dc8dab5062838f7",
+    "PLAN.md": "052502c45201666253c949d2d058a028e536f9d1f4cdc473be71705d80511236"
+  },
+  "artifactLocation": "Local-only outputs/arena-vision-fanout; full diagnostic sources and logs are retained outside Git."
+}
