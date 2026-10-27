@@ -4,6 +4,11 @@
 
 ### Performance
 
+- Host broadcasts merge ordered snake candidates into shared scratch storage,
+  preserving delivery order while removing per-player sorting and allocation.
+  Synthetic official-500 fixtures use about 3% fewer user instructions across
+  stock, half-legacy and all-legacy connections
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-snake-candidates/REPORT.md)).
 - Battledome spawn searches reject a candidate whose head lacks the required
   runway before testing its whole body. Spawn choices are unchanged. A full
   search takes 34M instead of 79M instructions at 64 seats (36M instead of 86M
