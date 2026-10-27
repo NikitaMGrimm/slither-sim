@@ -639,7 +639,6 @@ impl SimulatorBackend {
             let known = connection.snakes.get_mut(i);
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
-                    let wanted = physics::quantize_heading(control);
                     let reports = &self.reports[i];
                     deltas[i].changes(
                         &mut packets,
@@ -647,7 +646,7 @@ impl SimulatorBackend {
                         id,
                         known,
                         snake,
-                        wanted,
+                        || physics::quantize_heading(control),
                         profile,
                         reports,
                     )?;

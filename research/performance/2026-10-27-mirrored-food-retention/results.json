@@ -1,0 +1,712 @@
+{
+  "base": "339041fec0ebde58e5da0b544a6ab2cc6c720850",
+  "candidate": "3e22127756da910488ac3f4dbb998806d87a749d",
+  "validated": "3e22127756da910488ac3f4dbb998806d87a749d",
+  "builds": {
+    "base": {
+      "runtimeCommit": "339041fec0ebde58e5da0b544a6ab2cc6c720850",
+      "archiveSha256": "849d2a34cf7a18a7c871d0f719186eb2d8992bdd4b1150e1573e7e74439a43bb",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "d19d8ef2b85a226d4df203d69962ba3045bfdb4b6d964b62b536c5e46d7de70e",
+      "binaries": {
+        "perf_battledome": "1aebbeec746e722855a28305cb644099c193d3b43e7569b43557d15b179e77dc",
+        "study_retention": "cad4a543bc2fe4ffed0ada71e9e5d90d7fb7a00850aa30e29b3ee824d0ec0a0d",
+        "perf_baseline": "50c3abb09fed06b6e658a7623603009453a4c62d3830493c491396f340097122",
+        "study_protocols": "d19d8ef2b85a226d4df203d69962ba3045bfdb4b6d964b62b536c5e46d7de70e",
+        "perf_client_retained": "8cdaa6d2f17e826cc8e061a1d5a562a8eb0a2edffcfea477487c4aa51609a4a3"
+      },
+      "retentionFixtureSha256": "076744d3f86aa0d8d2013e4d01c8173da15fd1c49999a85694222f45c8a39d8e"
+    },
+    "candidate": {
+      "runtimeCommit": "3e22127756da910488ac3f4dbb998806d87a749d",
+      "archiveSha256": "681b8aac62a333c6f5c28f94cb27441c9703a5681449a19287e81e9da36d1f54",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "d43e2ec3f57600f32a86137802b5af734b66b376abaef9d422361ec379710424",
+      "binaries": {
+        "perf_battledome": "72e8744553e017a152c3472cfeb33d9e9a059552b09a8a24f52362288123e557",
+        "study_retention": "405b873fbdd0abc51ec9db46a25cdeb0ad0f4c19efe3850d5afda85d57e6d5f1",
+        "perf_baseline": "6e9b278a527db2ed979acf943b7b1a99e75aaea22f3a53e0fd7b75c290ba361b",
+        "study_protocols": "d43e2ec3f57600f32a86137802b5af734b66b376abaef9d422361ec379710424",
+        "perf_client_retained": "c120bb0dc4c382583d7e0c0d2971ed4266bfd87bbc210c0510d7564a393424d5"
+      },
+      "retentionFixtureSha256": "076744d3f86aa0d8d2013e4d01c8173da15fd1c49999a85694222f45c8a39d8e"
+    }
+  },
+  "traces": {
+    "official": {
+      "official500": {
+        "equal": true,
+        "sha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "bytes": 37938956,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 9954005,
+          "case": "official500",
+          "forcedReconnect": true,
+          "frames": 317188,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-half": {
+        "equal": true,
+        "sha256": "f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb",
+        "bytes": 57556590,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10103063,
+          "case": "official500-half",
+          "forcedReconnect": true,
+          "frames": 664841,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 250,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-legacy": {
+        "equal": true,
+        "sha256": "e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3",
+        "bytes": 77137561,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10253767,
+          "case": "official500-legacy",
+          "forcedReconnect": true,
+          "frames": 1011810,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 500,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      }
+    },
+    "stock-traces": [
+      {
+        "case": "portable",
+        "equal": true,
+        "base": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "50c3abb09fed06b6e658a7623603009453a4c62d3830493c491396f340097122"
+        },
+        "candidate": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "6e9b278a527db2ed979acf943b7b1a99e75aaea22f3a53e0fd7b75c290ba361b"
+        }
+      },
+      {
+        "case": "protocol",
+        "equal": true,
+        "base": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "50c3abb09fed06b6e658a7623603009453a4c62d3830493c491396f340097122"
+        },
+        "candidate": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "6e9b278a527db2ed979acf943b7b1a99e75aaea22f3a53e0fd7b75c290ba361b"
+        }
+      },
+      {
+        "case": "client-official-500",
+        "equal": true,
+        "base": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "50c3abb09fed06b6e658a7623603009453a4c62d3830493c491396f340097122"
+        },
+        "candidate": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "6e9b278a527db2ed979acf943b7b1a99e75aaea22f3a53e0fd7b75c290ba361b"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "50c3abb09fed06b6e658a7623603009453a4c62d3830493c491396f340097122"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "6e9b278a527db2ed979acf943b7b1a99e75aaea22f3a53e0fd7b75c290ba361b"
+        }
+      },
+      {
+        "case": "retained-step_all",
+        "equal": true,
+        "base": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "8cdaa6d2f17e826cc8e061a1d5a562a8eb0a2edffcfea477487c4aa51609a4a3"
+        },
+        "candidate": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "c120bb0dc4c382583d7e0c0d2971ed4266bfd87bbc210c0510d7564a393424d5"
+        }
+      },
+      {
+        "case": "retained-next_frame",
+        "equal": true,
+        "base": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "8cdaa6d2f17e826cc8e061a1d5a562a8eb0a2edffcfea477487c4aa51609a4a3"
+        },
+        "candidate": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "c120bb0dc4c382583d7e0c0d2971ed4266bfd87bbc210c0510d7564a393424d5"
+        }
+      }
+    ],
+    "dome-traces": [
+      {
+        "case": "client-battledome-40",
+        "equal": true,
+        "base": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "1aebbeec746e722855a28305cb644099c193d3b43e7569b43557d15b179e77dc"
+        },
+        "candidate": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "72e8744553e017a152c3472cfeb33d9e9a059552b09a8a24f52362288123e557"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "1aebbeec746e722855a28305cb644099c193d3b43e7569b43557d15b179e77dc"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "72e8744553e017a152c3472cfeb33d9e9a059552b09a8a24f52362288123e557"
+        }
+      },
+      {
+        "case": "client-battledome-80",
+        "equal": true,
+        "base": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "1aebbeec746e722855a28305cb644099c193d3b43e7569b43557d15b179e77dc"
+        },
+        "candidate": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "72e8744553e017a152c3472cfeb33d9e9a059552b09a8a24f52362288123e557"
+        }
+      }
+    ],
+    "shrinking": {
+      "official500-shrink": {
+        "equal": true,
+        "summary": {
+          "alive": 9,
+          "case": "official500-shrink",
+          "endpointChecksum": 2793410975618890769,
+          "food": 53523,
+          "initialSeats": 500,
+          "kind": "report",
+          "occupied": 100,
+          "radius": 14486.186699248592,
+          "retired": 400,
+          "ticks": 3200
+        },
+        "records": {
+          "base": {
+            "sha256": "bfc58468d1fb337cb65c277894a48b21e88f4dfbd186a4ad62bdbcb30acee439",
+            "bytes": 16491544820,
+            "records": 3202,
+            "binarySha256": "cad4a543bc2fe4ffed0ada71e9e5d90d7fb7a00850aa30e29b3ee824d0ec0a0d"
+          },
+          "candidate": {
+            "sha256": "bfc58468d1fb337cb65c277894a48b21e88f4dfbd186a4ad62bdbcb30acee439",
+            "bytes": 16491544820,
+            "records": 3202,
+            "binarySha256": "405b873fbdd0abc51ec9db46a25cdeb0ad0f4c19efe3850d5afda85d57e6d5f1"
+          }
+        }
+      },
+      "battledome80-shrink": {
+        "equal": true,
+        "summary": {
+          "alive": 1,
+          "case": "battledome80-shrink",
+          "endpointChecksum": 5980869314489509557,
+          "food": 1755,
+          "initialSeats": 80,
+          "kind": "report",
+          "occupied": 16,
+          "radius": 5173.301567021736,
+          "retired": 64,
+          "ticks": 3200
+        },
+        "records": {
+          "base": {
+            "sha256": "1d68e28df9bcd88a3801f434b2c5a47eeca5438d9c8f2322c6bfcf213a93c671",
+            "bytes": 1006743467,
+            "records": 3202,
+            "binarySha256": "cad4a543bc2fe4ffed0ada71e9e5d90d7fb7a00850aa30e29b3ee824d0ec0a0d"
+          },
+          "candidate": {
+            "sha256": "1d68e28df9bcd88a3801f434b2c5a47eeca5438d9c8f2322c6bfcf213a93c671",
+            "bytes": 1006743467,
+            "records": 3202,
+            "binarySha256": "405b873fbdd0abc51ec9db46a25cdeb0ad0f4c19efe3850d5afda85d57e6d5f1"
+          }
+        }
+      }
+    }
+  },
+  "instructions": {
+    "instructions": {
+      "cases": {
+        "official500": {
+          "baseMedian": 11814096334,
+          "candidateMedian": 11818953569,
+          "pairedMedian": 1.0004109867673487,
+          "pairedRange": [
+            1.0002143188309092,
+            1.0004777965031288
+          ],
+          "warmupPairs": 1,
+          "measuredPairs": 5
+        },
+        "official500-half": {
+          "baseMedian": 12169458374,
+          "candidateMedian": 12174238852,
+          "pairedMedian": 1.0003782897806217,
+          "pairedRange": [
+            1.0002194653574183,
+            1.000459148023143
+          ],
+          "warmupPairs": 1,
+          "measuredPairs": 5
+        },
+        "official500-legacy": {
+          "baseMedian": 12517545715,
+          "candidateMedian": 12521599253,
+          "pairedMedian": 1.0003168007603318,
+          "pairedRange": [
+            1.0001698929909248,
+            1.0005826650794707
+          ],
+          "warmupPairs": 1,
+          "measuredPairs": 5
+        }
+      },
+      "rawSha256": "0f07750070648a4defe2ac441a2ab3bfdbfaabeaa520dd121eff02f1109c2628"
+    },
+    "shrink-instructions": {
+      "cases": {
+        "official500-shrink": {
+          "baseMedian": 39631651557,
+          "candidateMedian": 5775459850,
+          "pairedMedian": 0.14572841788955654,
+          "pairedRange": [
+            0.1457248925085969,
+            0.14574199415761602
+          ],
+          "warmupPairs": 1,
+          "measuredPairs": 5
+        },
+        "battledome80-shrink": {
+          "baseMedian": 368415775,
+          "candidateMedian": 233131297,
+          "pairedMedian": 0.6327940173846125,
+          "pairedRange": [
+            0.6327926467699355,
+            0.6327941642160111
+          ],
+          "warmupPairs": 1,
+          "measuredPairs": 5
+        }
+      },
+      "rawSha256": "730f924328f06fd9de322ca003ce4740451941f6136c84b6125c7d0004acafca"
+    }
+  },
+  "tickDistributions": {
+    "official500-shrink": {
+      "perTickAcrossRuns": "median of five matched measured runs per tick, after warmup pair",
+      "minimumScheduledPct": 100.0,
+      "subsets": {
+        "shrinking": {
+          "base": {
+            "n": 3020,
+            "mean": 12941950.85397351,
+            "p50": 1708726.5,
+            "p90": 26937659.3,
+            "p95": 27126374.7,
+            "p99": 40898656.62,
+            "min": 1359235.0,
+            "max": 41393137.0
+          },
+          "candidate": {
+            "n": 3020,
+            "mean": 1598118.5476821193,
+            "p50": 1511585.0,
+            "p90": 1985197.4,
+            "p95": 2070941.8999999997,
+            "p99": 2239425.16,
+            "min": 1359340.0,
+            "max": 2649320.0
+          },
+          "pairedTickRatios": {
+            "n": 3020,
+            "mean": 0.580839158874107,
+            "p50": 0.9999446420933428,
+            "p90": 1.0002739686269284,
+            "p95": 1.0004561267765568,
+            "p99": 1.0006164798266473,
+            "min": 0.035340020180977316,
+            "max": 1.0010738941962365
+          }
+        },
+        "culling": {
+          "base": {
+            "n": 1271,
+            "mean": 27813530.063729346,
+            "p50": 26718646.0,
+            "p90": 27181077.0,
+            "p95": 40649129.0,
+            "p99": 41069108.699999996,
+            "min": 26090420.0,
+            "max": 41393137.0
+          },
+          "candidate": {
+            "n": 1271,
+            "mean": 1789597.411487018,
+            "p50": 1794474.0,
+            "p90": 2081330.0,
+            "p95": 2151572.0,
+            "p99": 2337086.2999999975,
+            "min": 1369865.0,
+            "max": 2649320.0
+          },
+          "pairedTickRatios": {
+            "n": 1271,
+            "mean": 0.0650297440569375,
+            "p50": 0.0658153529434757,
+            "p90": 0.0764884925433308,
+            "p95": 0.07821741297419688,
+            "p99": 0.08277413612725244,
+            "min": 0.035340020180977316,
+            "max": 0.09559650317104626
+          }
+        },
+        "shrinking_without_cull": {
+          "base": {
+            "n": 1749,
+            "mean": 2134759.7873070324,
+            "p50": 1385708.0,
+            "p90": 1755192.6,
+            "p95": 2340638.1999999974,
+            "p99": 15397811.28,
+            "min": 1359235.0,
+            "max": 15626374.0
+          },
+          "candidate": {
+            "n": 1749,
+            "mean": 1458970.671240709,
+            "p50": 1383934.0,
+            "p90": 1655289.4000000001,
+            "p95": 1756758.5999999999,
+            "p99": 2029805.76,
+            "min": 1359340.0,
+            "max": 2482653.0
+          },
+          "pairedTickRatios": {
+            "n": 1749,
+            "mean": 0.9556783619802376,
+            "p50": 1.0001186908835145,
+            "p90": 1.000419318967628,
+            "p95": 1.0005297036681098,
+            "p99": 1.0006482956200486,
+            "min": 0.09120067166780954,
+            "max": 1.0010738941962365
+          }
+        },
+        "unchanged_radius": {
+          "base": {
+            "n": 180,
+            "mean": 2262495.211111111,
+            "p50": 1530369.0,
+            "p90": 3567057.1,
+            "p95": 3769455.599999999,
+            "p99": 4454107.78,
+            "min": 672446.0,
+            "max": 23935108.0
+          },
+          "candidate": {
+            "n": 180,
+            "mean": 2267872.822222222,
+            "p50": 1532863.5,
+            "p90": 3575975.8,
+            "p95": 3782413.6999999993,
+            "p99": 4463259.090000001,
+            "min": 673437.0,
+            "max": 23948267.0
+          },
+          "pairedTickRatios": {
+            "n": 180,
+            "mean": 1.0022864683790174,
+            "p50": 1.0022555289353985,
+            "p90": 1.002948190627025,
+            "p95": 1.0029831885068385,
+            "p99": 1.0030256107662607,
+            "min": 1.0005497781752228,
+            "max": 1.0034948902660206
+          }
+        }
+      },
+      "totalCulled": 1647,
+      "initialFood": 52827,
+      "aliveRange": [
+        9,
+        500
+      ],
+      "coldTick": {
+        "base": 23935108.0,
+        "candidate": 23948267.0
+      },
+      "physicalSha256": "94bb288bf37a854e047aa0013360d10f9e64f6615a6890a8a55b0ccca2a559cd"
+    },
+    "battledome80-shrink": {
+      "perTickAcrossRuns": "median of five matched measured runs per tick, after warmup pair",
+      "minimumScheduledPct": 100.0,
+      "subsets": {
+        "shrinking": {
+          "base": {
+            "n": 3008,
+            "mean": 109446.94381648937,
+            "p50": 64348.0,
+            "p90": 65577.8,
+            "p95": 885228.3000000002,
+            "p99": 941778.7299999999,
+            "min": 62284.0,
+            "max": 961195.0
+          },
+          "candidate": {
+            "n": 3008,
+            "mean": 64651.72539893617,
+            "p50": 64351.0,
+            "p90": 65548.0,
+            "p95": 66609.05,
+            "p99": 79407.2,
+            "min": 62292.0,
+            "max": 83892.0
+          },
+          "pairedTickRatios": {
+            "n": 3008,
+            "mean": 0.9514548955861908,
+            "p50": 1.0000960168991955,
+            "p90": 1.0001397993103234,
+            "p95": 1.000142092549614,
+            "p99": 1.0001554533018282,
+            "min": 0.07061088545719818,
+            "max": 1.0001599232368463
+          }
+        },
+        "culling": {
+          "base": {
+            "n": 159,
+            "mean": 920984.9874213836,
+            "p50": 923137.0,
+            "p90": 946775.2,
+            "p95": 950556.6,
+            "p99": 960499.46,
+            "min": 875702.0,
+            "max": 961195.0
+          },
+          "candidate": {
+            "n": 159,
+            "mean": 73416.16981132075,
+            "p50": 73161.0,
+            "p90": 81385.8,
+            "p95": 81766.5,
+            "p99": 83233.5,
+            "min": 64143.0,
+            "max": 83892.0
+          },
+          "pairedTickRatios": {
+            "n": 159,
+            "mean": 0.07970557193738902,
+            "p50": 0.0791034289079924,
+            "p90": 0.08713718038349272,
+            "p95": 0.08792135737824615,
+            "p99": 0.08900304207295051,
+            "min": 0.07061088545719818,
+            "max": 0.0897929086775158
+          }
+        },
+        "shrinking_without_cull": {
+          "base": {
+            "n": 2849,
+            "mean": 64155.77184977185,
+            "p50": 64248.0,
+            "p90": 65402.0,
+            "p95": 65573.2,
+            "p99": 66319.64,
+            "min": 62284.0,
+            "max": 67391.0
+          },
+          "candidate": {
+            "n": 2849,
+            "mean": 64162.59003159003,
+            "p50": 64257.0,
+            "p90": 65408.0,
+            "p95": 65579.8,
+            "p99": 66325.68,
+            "min": 62292.0,
+            "max": 67392.0
+          },
+          "pairedTickRatios": {
+            "n": 2849,
+            "mean": 1.0001064022412134,
+            "p50": 1.0001077768710835,
+            "p90": 1.000139879703455,
+            "p95": 1.0001425200715768,
+            "p99": 1.0001554533018282,
+            "min": 0.9999847922623031,
+            "max": 1.0001599232368463
+          }
+        },
+        "unchanged_radius": {
+          "base": {
+            "n": 192,
+            "mean": 36333.807291666664,
+            "p50": 27178.0,
+            "p90": 28324.9,
+            "p95": 28694.1,
+            "p99": 38777.24000000001,
+            "min": 26926.0,
+            "max": 1713529.0
+          },
+          "candidate": {
+            "n": 192,
+            "mean": 36364.953125,
+            "p50": 27174.0,
+            "p90": 28318.0,
+            "p95": 28686.1,
+            "p99": 38854.42000000001,
+            "min": 26924.0,
+            "max": 1720081.0
+          },
+          "pairedTickRatios": {
+            "n": 192,
+            "mean": 0.999902684467489,
+            "p50": 0.9998558072052747,
+            "p90": 0.99996296159117,
+            "p95": 0.9999629807870285,
+            "p99": 1.001852672935795,
+            "min": 0.9996037892158628,
+            "max": 1.0038236878395406
+          }
+        }
+      },
+      "totalCulled": 164,
+      "initialFood": 1851,
+      "aliveRange": [
+        1,
+        3
+      ],
+      "coldTick": {
+        "base": 1713529.0,
+        "candidate": 1720081.0
+      },
+      "physicalSha256": "0908c39a93a0f4983ad4315335348b35f6edbf6ec52ad11383b0f1f366fb1aba"
+    }
+  },
+  "minimumProcessCounterScheduledPct": 100.0,
+  "checks": {
+    "rustPassed": true,
+    "archiveSha256": "681b8aac62a333c6f5c28f94cb27441c9703a5681449a19287e81e9da36d1f54",
+    "rustLogSha256": "248787670c450ceb51b967fdad5e4d7b3a61af68bfbe164cbce0fb7bebad65ac",
+    "focusedLogSha256": "c3ca19f7616309d6a5e9d9781987bbfd971803512eb75fa2c0e9071e4302cd6f"
+  },
+  "negative": {
+    "runtime": "3e22127756da910488ac3f4dbb998806d87a749d",
+    "mutation": "omit mirrored cache removal before compaction",
+    "regressionFailed": true,
+    "logSha256": "d527cc32669ce6398d6b09ea522f660dc07cc3c8a66a663b9b4f399e4fe6067b"
+  },
+  "integration": {
+    "runtime": "dea716ef1ea01fe97f0e1bcefda5e725c7c858a9",
+    "main": "ef866d73259e35fe8659a1996d7b97c36d511e0b",
+    "coreMatchesMeasured": true,
+    "rustPassed": true,
+    "archiveSha256": "98ea11577c14c7c57a2d0b8c0693a96b405725f3abc9d5e55948d62c38a9527d",
+    "rustLogSha256": "1ca74c0403fc27646463651e8ce79289390fc7c4ad80bad8fe44605351dd0bbd",
+    "focusedLogSha256": "481641e5cfd2e0d37c79c99f85e16807702eb27a33c3d51913c5e0ee4e832877"
+  },
+  "documentationAndGuards": {
+    "passed": true,
+    "logSha256": "7e869fddbf822e9820e95e525c8886bcd3c1c3d03e1e7725e2d90b605a981078"
+  }
+}
