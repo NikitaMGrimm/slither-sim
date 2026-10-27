@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Tools for testing whether official servers compensate for latency when
+  judging collisions, and a first attempt. None of the 27 active official
+  servers was close to empty (the quietest had 61 players), so no controlled
+  encounter ran and the question stays open. Collision rules are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-collision-delay/REPORT.md)).
+
 ### Changed
 
 - The hosting guide's resource table now comes from a recheck on current main.

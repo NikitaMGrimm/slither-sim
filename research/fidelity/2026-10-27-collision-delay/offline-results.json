@@ -1,0 +1,727 @@
+{
+  "rawAccess": "local-only; complete captures and source snapshots retained outside Git",
+  "developmentAttempts": [
+    {
+      "alias": "local-01",
+      "dataOrigin": "local-simulator",
+      "description": "staging_timeout in all four slots; source changed during development; raw record clock regression",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 0,
+          "contact": 0,
+          "survival": 0,
+          "excluded": 2
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 0,
+          "contact": 0,
+          "survival": 0,
+          "excluded": 2
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-01-a",
+          "sha256": "0c3cd16065f420a9f73942dc276fa562b2acaef692c6848c3fe2aefdca4b7d4d",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        },
+        {
+          "alias": "local-01-b",
+          "sha256": "1c569028b56522cd192d144f31325a922b0272e83e619b008ae07115aa4c0dcb",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "alias": "local-02",
+      "dataOrigin": "local-simulator",
+      "description": "all four contacts, no survival coverage; raw record clock regression",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 2,
+          "survival": 0,
+          "excluded": 0
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 2,
+          "survival": 0,
+          "excluded": 0
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-02-a",
+          "sha256": "957e90d4bea549bd3811eccdea2c115361ba136d3ac2c083d47b4e1ba0ff184d",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        },
+        {
+          "alias": "local-02-b",
+          "sha256": "63200c20dd6fa82368dd6dfb7935920e3ec510618d18c03af0e676b707407d05",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "alias": "local-03",
+      "dataOrigin": "local-simulator",
+      "description": "150 ms wire contact/survival coverage passed; raw record clock regression",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-03-a",
+          "sha256": "26dc63970a87f2415b363aad1d68e4eca30e57fd7fa148a49b7e3e48861b9a81",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        },
+        {
+          "alias": "local-03-b",
+          "sha256": "8bdd3eac8271ccb7d03c5d8bf37bb7cf67bbb94a05cc0cad54a14351efb75e6b",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "alias": "local-04",
+      "dataOrigin": "local-simulator",
+      "description": "450 ms wire had no delayed survival; raw record clock regression",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 2,
+          "survival": 0,
+          "excluded": 0
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-04-a",
+          "sha256": "11713c98dccb7d4e484bcbff23a4eb53fe3a538cc65071718d7f66ab0b55c68c",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        },
+        {
+          "alias": "local-04-b",
+          "sha256": "2ce7f72e33d9c494493e6c96891bae68070b59467447da5c0941758a6bbd4384",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "alias": "local-05",
+      "dataOrigin": "local-simulator",
+      "description": "450 ms wire coverage passed; raw record clock regression",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-05-a",
+          "sha256": "a5978d0fc8d189dc696433cb304b1386a622820828f3a18ba30d38867df7c797",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        },
+        {
+          "alias": "local-05-b",
+          "sha256": "408bfba0ab6b12e303667bd31130e7d298b8c98c59c26dbd0f542791cf3735bf",
+          "status": "quarantine",
+          "issues": [
+            "invalid_archive:record clock regressed",
+            "missing_terminal_receipt",
+            "no_gameplay_setup",
+            "provenance_without_valid_integrity"
+          ],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "alias": "local-06",
+      "dataOrigin": "local-simulator",
+      "description": "450 ms wire coverage passed; terminal incoming frame counter mismatch",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-06-a",
+          "sha256": "5505a2777ec153ea186190bc98945459b003f2210e263f06939beb9d8d021e11",
+          "status": "quarantine",
+          "issues": [
+            "incoming_frame_count_mismatch"
+          ],
+          "warnings": [
+            "reconnected_split_lives_not_continuous_play"
+          ]
+        },
+        {
+          "alias": "local-06-b",
+          "sha256": "7d4c5d2bddbf0e09db0f95d6a05c77357e4efd4a2f4194f2e1effd0192c4d260",
+          "status": "quarantine",
+          "issues": [
+            "incoming_frame_count_mismatch"
+          ],
+          "warnings": [
+            "reconnected_split_lives_not_continuous_play"
+          ]
+        }
+      ]
+    },
+    {
+      "alias": "local-07",
+      "dataOrigin": "local-simulator",
+      "description": "450 ms wire coverage and standard audit passed",
+      "cells": [
+        {
+          "arm": "control",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        },
+        {
+          "arm": "delay",
+          "attempted": 2,
+          "collectorQualified": 2,
+          "contact": 1,
+          "survival": 1,
+          "excluded": 0
+        }
+      ],
+      "failure": null,
+      "archives": [
+        {
+          "alias": "local-07-a",
+          "sha256": "6917e9300a89670deb359fc512c0cfbabd96366520628bbcbb33581adcf1e3e1",
+          "status": "verified",
+          "issues": [],
+          "warnings": [
+            "reconnected_split_lives_not_continuous_play"
+          ]
+        },
+        {
+          "alias": "local-07-b",
+          "sha256": "78074fa930285658ed8ee056a102690f08127e2679631fd9b3b4bc0261ae0f20",
+          "status": "verified",
+          "issues": [],
+          "warnings": [
+            "reconnected_split_lives_not_continuous_play"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalPacketDerivedGeometry": [
+    {
+      "arm": "control",
+      "offset": -240,
+      "qualified": true,
+      "outcome": "survival",
+      "offsetRange": [
+        -233.07264389374572,
+        -197.33707647066126
+      ],
+      "geometrySamples": 16,
+      "maximumAnchorAgeMs": 231.21999999999753
+    },
+    {
+      "arm": "delay",
+      "offset": -240,
+      "qualified": true,
+      "outcome": "survival",
+      "offsetRange": [
+        -145.67956906737567,
+        -120.49423885967502
+      ],
+      "geometrySamples": 10,
+      "maximumAnchorAgeMs": 225.5370000000039
+    },
+    {
+      "arm": "delay",
+      "offset": 0,
+      "qualified": true,
+      "outcome": "contact",
+      "offsetRange": [
+        111.22319298983771,
+        146.0032571219358
+      ],
+      "geometrySamples": 11,
+      "maximumAnchorAgeMs": 244.09599999999045
+    },
+    {
+      "arm": "control",
+      "offset": 0,
+      "qualified": true,
+      "outcome": "contact",
+      "offsetRange": [
+        19.34953326537959,
+        56.29730121838837
+      ],
+      "geometrySamples": 11,
+      "maximumAnchorAgeMs": 231.44899999999325
+    }
+  ],
+  "localWireRtt95Ms": 50.5060000000085,
+  "timingLimit": "Shared desktop; a 10 percent total CPU sample and concurrent compilation contaminated timing. Two-logical-CPU affinity and two build/Rayon threads were used. No baseline latency or capacity claim.",
+  "controls": {
+    "dataOrigin": "synthetic local Simulator histories and analytical models",
+    "plannedSamplesPerArm": 12,
+    "oracleArchiveSha256": "34c30534ec22c7dfef2b1eea25ed07d6499badfebe9cfb2172d0063d8f2daaa4",
+    "cases": [
+      {
+        "delayMs": 147,
+        "wholeState": false,
+        "counts": {
+          "control": 12,
+          "delay": 12
+        },
+        "sensitivities": [
+          {
+            "floor": 2,
+            "verdict": "inconclusive",
+            "control": [
+              -102,
+              -38
+            ],
+            "delayed": [
+              -122,
+              -58
+            ],
+            "shift": [
+              -84,
+              44
+            ],
+            "expectedShift": -26.684487028301884,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 4,
+            "verdict": "inconclusive",
+            "control": [
+              -104,
+              -36
+            ],
+            "delayed": [
+              -124,
+              -56
+            ],
+            "shift": [
+              -88,
+              48
+            ],
+            "expectedShift": -26.684487028301884,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 8,
+            "verdict": "inconclusive",
+            "control": [
+              -108,
+              -32
+            ],
+            "delayed": [
+              -128,
+              -52
+            ],
+            "shift": [
+              -96,
+              56
+            ],
+            "expectedShift": -26.684487028301884,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          }
+        ]
+      },
+      {
+        "delayMs": 147,
+        "wholeState": true,
+        "counts": {
+          "control": 12,
+          "delay": 12
+        },
+        "sensitivities": [
+          {
+            "floor": 2,
+            "verdict": "inconclusive",
+            "control": [
+              -102,
+              -38
+            ],
+            "delayed": [
+              -102,
+              -38
+            ],
+            "shift": [
+              -64,
+              64
+            ],
+            "expectedShift": -26.684487028301884,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 4,
+            "verdict": "inconclusive",
+            "control": [
+              -104,
+              -36
+            ],
+            "delayed": [
+              -104,
+              -36
+            ],
+            "shift": [
+              -68,
+              68
+            ],
+            "expectedShift": -26.684487028301884,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 8,
+            "verdict": "inconclusive",
+            "control": [
+              -108,
+              -32
+            ],
+            "delayed": [
+              -108,
+              -32
+            ],
+            "shift": [
+              -76,
+              76
+            ],
+            "expectedShift": -26.684487028301884,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          }
+        ]
+      },
+      {
+        "delayMs": 448,
+        "wholeState": false,
+        "counts": {
+          "control": 12,
+          "delay": 12
+        },
+        "sensitivities": [
+          {
+            "floor": 2,
+            "verdict": "compensation",
+            "control": [
+              -102,
+              -38
+            ],
+            "delayed": [
+              -182,
+              -118
+            ],
+            "shift": [
+              -144,
+              -16
+            ],
+            "expectedShift": -81.32415094339622,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 4,
+            "verdict": "compensation",
+            "control": [
+              -104,
+              -36
+            ],
+            "delayed": [
+              -184,
+              -116
+            ],
+            "shift": [
+              -148,
+              -12
+            ],
+            "expectedShift": -81.32415094339622,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 8,
+            "verdict": "compensation",
+            "control": [
+              -108,
+              -32
+            ],
+            "delayed": [
+              -188,
+              -112
+            ],
+            "shift": [
+              -156,
+              -4
+            ],
+            "expectedShift": -81.32415094339622,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          }
+        ]
+      },
+      {
+        "delayMs": 448,
+        "wholeState": true,
+        "counts": {
+          "control": 12,
+          "delay": 12
+        },
+        "sensitivities": [
+          {
+            "floor": 2,
+            "verdict": "no compensation",
+            "control": [
+              -102,
+              -38
+            ],
+            "delayed": [
+              -102,
+              -38
+            ],
+            "shift": [
+              -64,
+              64
+            ],
+            "expectedShift": -81.32415094339622,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 4,
+            "verdict": "no compensation",
+            "control": [
+              -104,
+              -36
+            ],
+            "delayed": [
+              -104,
+              -36
+            ],
+            "shift": [
+              -68,
+              68
+            ],
+            "expectedShift": -81.32415094339622,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 8,
+            "verdict": "no compensation",
+            "control": [
+              -108,
+              -32
+            ],
+            "delayed": [
+              -108,
+              -32
+            ],
+            "shift": [
+              -76,
+              76
+            ],
+            "expectedShift": -81.32415094339622,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          }
+        ]
+      },
+      {
+        "delayMs": 450,
+        "model": "no rewind",
+        "counts": {
+          "control": 12,
+          "delay": 12
+        },
+        "sensitivities": [
+          {
+            "floor": 2,
+            "verdict": "no compensation",
+            "control": [
+              -102,
+              -38
+            ],
+            "delayed": [
+              -102,
+              -38
+            ],
+            "shift": [
+              -64,
+              64
+            ],
+            "expectedShift": -81.68720518867923,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 4,
+            "verdict": "no compensation",
+            "control": [
+              -104,
+              -36
+            ],
+            "delayed": [
+              -104,
+              -36
+            ],
+            "shift": [
+              -68,
+              68
+            ],
+            "expectedShift": -81.68720518867923,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          },
+          {
+            "floor": 8,
+            "verdict": "no compensation",
+            "control": [
+              -108,
+              -32
+            ],
+            "delayed": [
+              -108,
+              -32
+            ],
+            "shift": [
+              -76,
+              76
+            ],
+            "expectedShift": -81.68720518867923,
+            "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+          }
+        ]
+      }
+    ],
+    "interpretation": "The final fixed ladder detects specified 448 ms peer-only rewind at 12 samples per arm, at half/base/double floors. The smaller 147 ms cases remain inconclusive. Whole-state rewind is classified like current state; this limits the hypothesis, not a universal no-rewind result."
+  }
+}
