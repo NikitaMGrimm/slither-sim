@@ -8,7 +8,7 @@ use std::{
 };
 
 pub const FORMAT: &str = "slither-sim-checkpoint-v2";
-pub const RULES_REVISION: &str = "slither-sim-rules-v4";
+pub const RULES_REVISION: &str = "slither-sim-rules-v5";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EventRecording {
@@ -728,13 +728,11 @@ impl State {
             "state.radiusUpdateIndex",
         )?;
         // Host admission can grow a circular floor arena between ticks,
-        // including before tick one. The live radius is the saved allowance;
+        // including before tick one. The live radius records that growth;
         // no queued-request/controller state belongs in the core checkpoint.
         let admission_growth =
             config.dynamic_radius && config.spawn_radius.is_some() && config.min_score.is_some();
-        let admission_limit = (config.seat_radius(self.slots.len())
-            * if self.slots.len() > 32 { 2. } else { 1. })
-        .min(MAGNITUDE);
+        let admission_limit = config.seat_radius(self.slots.len()).min(MAGNITUDE);
         let grew_after = |radius: f64| {
             admission_growth && self.radius > radius && self.radius <= radius.max(admission_limit)
         };

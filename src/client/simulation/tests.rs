@@ -448,6 +448,13 @@ fn shrinking_food_cull(pit_only: bool) {
     assert_eq!(sector(&hidden), sector(&quiet));
     assert_eq!(sector(&outside[0]), sector(&edge));
     let listing = sim.backend.food_sectors[sector(&quiet)].clone().unwrap();
+    let edge_before = sim.backend.food_sectors[sector(&edge)].clone().unwrap();
+    let memberships: Vec<_> = sim
+        .backend
+        .slots
+        .iter()
+        .map(|slot| slot.connection.food_interest.revision().clone())
+        .collect();
     let colors = [&quiet, &edge].map(|food| sim.backend.food_presentation.color(food, 0));
     a.packets.clear();
     b.packets.clear();
@@ -461,6 +468,18 @@ fn shrinking_food_cull(pit_only: bool) {
     assert!(sim.backend.world.pickup_events().unwrap().is_empty());
     assert_eq!(sim.backend.food_index.count, 3);
     assert!(!sim.backend.food_index.stale);
+    // Radius motion changes food, not the retained view stencil. Exercise
+    // #188's unchanged-membership fast path while the culled listing refreshes.
+    for (slot, revision) in sim.backend.slots.iter().zip(&memberships) {
+        assert!(std::sync::Arc::ptr_eq(
+            revision,
+            slot.connection.food_interest.revision()
+        ));
+    }
+    assert!(!std::sync::Arc::ptr_eq(
+        &edge_before,
+        sim.backend.food_sectors[sector(&edge)].as_ref().unwrap()
+    ));
     // A full resynchronization would reveal the hidden birth early.
     assert!(std::sync::Arc::ptr_eq(
         &listing,

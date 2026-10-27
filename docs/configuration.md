@@ -240,34 +240,42 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 | Prey | `prey.count: 0` | Snakes only |
 | Ambient food | `foodOnlyInsidePit: true`; reference full-arena `foodCount: 3138`, about 45.9 attempts/s | Multiply target/rate by `(pit / wall)²`: about 24.8%, or 777 placement attempts and 11.38 attempts/s at base size. `ambientRefillCountsAllFood: true` counts death/boost pellets too; inherited admission caps remain |
 
-Above 32 seats the wall target is `3584 × (1 + 1.5 × (seats / 32 - 1))`:
-4,928, 8,960 and 11,648 units at 40, 64 and 80 seats. Seats count living
-players, dead players who can respawn and, before a host spawn search, queued
-joins. Pit and spawn band scale with the wall, so newborns keep room for their
-whole body and a safe departure; above 32 seats the arena is less dense. Growth
-is immediate; shrinking runs at 23.4375 units/s and ignores changes within 3%
-of the live radius.
+Battledome targets constant density above 32 seats:
+`3584 × sqrt(max(seats, 32) / 32)`, about 5,069 at 64 and 5,667 at 80.
+Seats count living players, retained dead players and, before host admission,
+queued joins. Queue age never enlarges the arena. Pit and spawn band scale with
+the wall. The existing controller grows immediately, shrinks at 23.4375 units/s
+and ignores changes within 3% of the live radius.
 
-After a spawn request has waited 2 seconds, the host may grow the wall to 1.5
-times the seat target, and after 4 seconds to twice it. Every strict safety
-check still applies. Before growing further, the host waits until the latest
-newborn has had its 3-second departure window, pausing admissions meanwhile.
-Waiting players come before bots, and at most one 4,096-candidate search runs
-per tick (14 ms after a failure). These limits bound work and space, not the
-worst-case wait: a crowd can still block every sampled pose. Queue age is host
-state; checkpoints store only the live radius.
+The host first searches up to 4,096 poses with the preferred exclusions below.
+Every chosen pose also clears outside heads' three-second inward routes by
+300 units. After a request waits two world seconds, at most the first 256 draws
+can also qualify for a directional fallback: 200-unit body/head clearance,
+300-unit forward head paths over one second, and a 300-unit three-second
+normal-speed runway toward the middle. Contact exclusions always dominate.
+If the strict search fails, the best minimum body-clearance fallback wins.
+This fallback reserves inward travel; it does not promise a clear three-second
+tangent departure or arbitrary later turns/boosting. These provisional choices
+have been approved in a 64-bot local playtest; the measurements below retain
+the limits of the spawn model.
 
-`dynamicRadius: false` restores the fixed arena with strict waiting. With
-growth on, the host accepts up to 105 configured seats so the largest allowance
-stays inside the 32,000-unit wire limit. Other worlds that set `dynamicRadius`,
-`spawnRadius` and `minScore` use the same controller and scale their pit and
-spawn radii with the wall; worlds missing any of them keep their geometry.
+Waiting sockets still precede bots. At most one bounded search runs per tick,
+with 14 ms between failed searches. Actual growth still waits for the latest
+newborn's three-second departure window. Work is bounded, but exhausting both
+tiers can still leave a request waiting. Initial simultaneous bot fills in the
+current pilot take up to about ten seconds at 80 seats; ordinary respawns are
+usually much faster. See the
+[admission record](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-arena-playtest/REPORT.md).
+
+`dynamicRadius: false` keeps the 3,584-unit arena with the same admission tiers.
+Other worlds with `dynamicRadius`, `spawnRadius` and `minScore` use this capped
+controller and proportional geometry; worlds missing any of them keep their
+geometry. The protocol radius check follows the normal seat target, with no
+queue allowance. Queue state remains outside core checkpoints.
 
 In fresh 16–32-seat worlds the wall, pit, spawn band, food density and
 spawn-to-pit travel (about 4.9–8.8 s at normal speed) are unchanged. After a
-large population leaves, the arena shrinks gradually. The
-[local capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)
-compares fixed strict admission, fixed-arena relaxation and strict growth.
+large population leaves, the arena shrinks gradually.
 
 When the growing pit passes over a snake that hasn't entered it, the snake can
 still leave. Crossing the edge inward, or starting inside, commits it to the
@@ -326,13 +334,16 @@ The [local spawn study](https://github.com/NikitaMGrimm/slither-sim/blob/main/re
 records safety, waiting and load limits. Admission does not grant collision immunity
 or predict later turns. The host serves waiting sockets before background bots.
 
-Every world with `spawnRadius` requires the whole newborn body to miss living
-heads' straight two-second paths by 600 units. Its head also keeps three seconds
-of normal travel plus contact margin from old bodies (about 627 units at the
-floor). Inward and tangent departure segments cover three seconds at normal
-newborn speed and must clear old bodies and projected paths by 400 units.
-Larger contact exclusions still apply. These custom checks preserve room to
-leave spawn while allowing the trailing body to use 400-unit clearance.
+In every world with `spawnRadius`, the strict tier requires the whole newborn
+body to miss living heads' straight two-second paths by 600 units. Its head also
+keeps three seconds of normal travel plus contact margin from old bodies (about
+627 units at the floor). Inward and tangent departure segments cover three
+seconds at normal newborn speed and must clear old bodies and projected paths by
+400 units. Larger contact exclusions still apply. These custom checks preserve
+room to leave spawn while allowing the trailing body to use 400-unit clearance.
+A request that has waited two seconds may instead use the
+[fallback tier](#battledome): 300-unit head paths over one second and only the
+inward departure, as described there.
 
 These rules have synthetic offline regressions in
 [`tests/battledome.rs`](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/battledome.rs),

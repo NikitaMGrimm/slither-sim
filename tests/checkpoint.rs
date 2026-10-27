@@ -1077,11 +1077,12 @@ fn old_rules_revision_is_rejected_atomically_without_changing_the_format() {
     let mut incumbent = world();
     let mut old = value(&incumbent);
     assert_eq!(old["format"], "slither-sim-checkpoint-v2");
-    assert_eq!(old["rulesRevision"], "slither-sim-rules-v4");
+    assert_eq!(old["rulesRevision"], "slither-sim-rules-v5");
     for revision in [
         "slither-sim-rules-v1",
         "slither-sim-rules-v2",
         "slither-sim-rules-v3",
+        "slither-sim-rules-v4",
     ] {
         old["rulesRevision"] = json!(revision);
         let error = rejects_atomic(&mut incumbent, &old);

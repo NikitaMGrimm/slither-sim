@@ -1,0 +1,50 @@
+{
+  "access": "local-only: outputs/pit-redesign",
+  "cohorts": {
+    "fixed": {
+      "sourceManifestSha256": "6fcb93b84d9118aebaa7874e5d4bcd83fde081a7efc9f617c534d5279f0f8369",
+      "binarySha256": "586f260b372aee295e694bcebc9e90b0ca30a5a0902f848d71adc038c375c289"
+    },
+    "density": {
+      "sourceManifestSha256": "23085201a5ab96133760946dc75339f27600204533495ca53cc91993837dc0ad",
+      "binarySha256": "57d4f4b8d56b84ed40a2af3e7fd0ad5f93b99045526cea3a250bc16aad887400"
+    },
+    "floor-fixed": {
+      "sourceManifestSha256": "8699a9d447100b9cb6932a654c2adee87766a799fdb97b6e369c14e80f2721b7",
+      "binarySha256": "f8fb11d44ff91f3414b700c1006c6e7154e7a068955d625d8e5a158ddc75eff7"
+    },
+    "floor2-fixed": {
+      "sourceManifestSha256": "9f278bfa7166ad8fe76d18eaf52247ad23b544910fc8ee61d4d1f784b9a6bef2",
+      "binarySha256": "8d8c5f251afed0687541ec6c68d5570e034d2b53a934a3cda7e670400de4f51e"
+    },
+    "floor2-density": {
+      "sourceManifestSha256": "fd473d50433059d570316a4ee6e0c69d1d88439e1b819327f30b2f7cdf45f6c8",
+      "binarySha256": "86ce56a7639dbab3df2cbf16d9caea2384abecec05427ed1730a4070b78b57f4"
+    }
+  },
+  "plans": {
+    "PLAN.md": "cb8f2cac622ba1f6c7ea6298a19bbb88392329bfa5dc32902f0730003b1bb03d",
+    "SCREEN.md": "c7a7a29ccc691576f7ce9e867654e12184f65de3b489fdbc8994578c125ecc04",
+    "MAXIMIN-PLAN.md": "2dc2ceff6f385bb2b7744cff7ad99fc00b97733ae44d6ae85f5c05b50458c13b",
+    "FLOOR2-PLAN.md": "56248e738d5f662f28eb5beb57970c02d77ba9b96452dff1f00e94a5045f904b",
+    "ATTEMPTS.md": "d926877ab5669698b4cf4269a481e0e4e89d56f3dc0a481bd3e5862185929074"
+  },
+  "attemptsSha256": "6415e20a282da5de72e59045f68be2e8b76ce2207bbb6ef131571628ffae898b",
+  "playableSourceTreeSha256": "9e2a7a0d8b27b109cd43fd3b6ce5cceb88897c22dd38dca5166b0601627f2af0",
+  "playableSourceHashMethod": "SHA-256 of UTF-8 lines: <file SHA-256> <path> LF; sorted git-tracked src/*, Cargo.toml, Cargo.lock, build.rs; unchanged file bytes",
+  "playableBinarySha256": "b9e61142884ca15cf75e1d9aa478afcc5eed9208fad11d34e90eef6c87bd887d",
+  "playableSmokeSha256": "9134dfbeb9ea99fce5365be182fc7146b4e2133f188c7c0780ee68a536b0443c",
+  "preFoodPlayable": {
+    "head": "56c8bd1fa0e077108f7e3f7717c97cce835f9aa7",
+    "playableSourceTreeSha256": "6f707f3d94477e039cb23ae89c63b71015afb658e992adfd383daa4c2f7502a7",
+    "playableBinarySha256": "f50779950ca8c40e8c0c9582f086f1bc62274d6d29c8966d6f35e26de5635468",
+    "playableSmokeSha256": "ced0ea2f968cbc831f6686264dd6d95e699475b1d878a35d997ff8af835296bf"
+  },
+  "prValidation": {
+    "base": "ac8552891db836ab43fdb15f18017179f1c445c4",
+    "approvedHead": "82c46fe8ffc55bcbc312e589cd8a6cd893c33e58",
+    "sourceTreeSha256": "b5bb2e2a5922ba230f70db53704c1ed4ad97d2cbe8c29cfad3a1efc91c23b417",
+    "traceIdentitySha256": "23a3f80c8c3bf7e20b794ecf72c482f80bddea6c9278861c039c2072ffc58786",
+    "tracePinsSha256": "b53a680d947c87f0abb963f02f478193ea480fe0f59a7cee323758861c41bfec"
+  }
+}

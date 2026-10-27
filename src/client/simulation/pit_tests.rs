@@ -374,29 +374,30 @@ fn pit_markers_socket_delivery_preserves_world_and_background_bots() {
 }
 
 #[test]
-fn stalled_circular_queues_grow_without_weakening_strict_admission() {
+fn queued_circular_seats_stop_at_the_constant_density_target() {
     let mut config = config();
     config.agents = 80;
     let mut sim = RawSimulator::new(7, config, 80).unwrap();
+    let target = 3584. * (40_f64 / 32.).sqrt();
     let before = serde_json::to_value(sim.backend.world.checkpoint().unwrap()).unwrap();
-    assert!(!sim.grow_for_waiters(40, 4., false));
+    assert!(!sim.grow_for_waiters(40, false));
     assert_eq!(
         serde_json::to_value(sim.backend.world.checkpoint().unwrap()).unwrap(),
         before
     );
-    sim.grow_for_waiters(40, 1.999, true);
-    assert_eq!(sim.backend.world.radius(), 4928.);
-    sim.grow_for_waiters(40, 2., true);
-    assert_eq!(sim.backend.world.radius(), 7392.);
-    sim.grow_for_waiters(40, 4., true);
-    assert_eq!(sim.backend.world.radius(), 9856.);
+    sim.grow_for_waiters(40, true);
+    assert_eq!(sim.backend.world.radius(), target);
+    sim.grow_for_waiters(40, true);
+    assert_eq!(sim.backend.world.radius(), target);
+    sim.grow_for_waiters(40, true);
+    assert_eq!(sim.backend.world.radius(), target);
     assert_eq!(
         sim.backend.world.pit_radius(),
-        Some(1784. * (9856. / 3584.))
+        Some(1784. * (target / 3584.))
     );
     assert_eq!(sim.backend.world.occupied(), 0);
-    sim.grow_for_waiters(0, 100., true);
-    assert_eq!(sim.backend.world.radius(), 9856.); // only the tick controller shrinks.
+    sim.grow_for_waiters(0, true);
+    assert_eq!(sim.backend.world.radius(), target); // only the tick controller shrinks.
     assert!(sim.connect(1, PlayerAppearance::default()).unwrap());
     assert!(sim.connect(0, PlayerAppearance::default()).unwrap());
     let newborn = sim.backend.world.snakes()[0].clone();
@@ -437,12 +438,12 @@ fn pit_markers_move_on_the_socket_to_the_live_pit_edge() {
 fn shrinking_pit_keeps_decorated_handles_until_a_replacement_can_fade_in() {
     use std::{f64::consts::FRAC_PI_2, sync::Arc};
     let mut config = config();
-    config.agents = 80;
+    config.agents = 160;
     config.world.radius_updates = vec![crate::RadiusUpdate {
         time: 0.,
         radius: 7168.,
     }];
-    let mut sim = RawSimulator::new(7, config, 80).unwrap();
+    let mut sim = RawSimulator::new(7, config, 160).unwrap();
     assert!(sim.connect(0, PlayerAppearance::default()).unwrap());
     let near_pit = |sim: &mut RawSimulator| {
         let head = Point {
@@ -514,7 +515,7 @@ fn shrinking_pit_keeps_decorated_handles_until_a_replacement_can_fade_in() {
 
     // Growth cannot wait for a bucket: a previously safe decoration could be
     // left behind the live edge. Move the viewport so it sees the new ring.
-    assert!(sim.grow_for_waiters(79, 0., true));
+    assert!(sim.grow_for_waiters(159, true));
     near_pit(&mut sim);
     sim.advance_ticks(1).unwrap();
     pump(&mut sim, &mut state);
@@ -541,7 +542,7 @@ fn queue_space_allowances_do_not_change_generic_circular_worlds() {
     config.world.radius = 5000.;
     config.world.size_to_population = false;
     let mut sim = RawSimulator::new(7, config, 80).unwrap();
-    sim.grow_for_waiters(80, 100., true);
+    sim.grow_for_waiters(80, true);
     assert_eq!(sim.backend.world.radius(), 5000.);
     assert_eq!(sim.backend.world.pit_radius(), Some(1784.));
 }
@@ -561,12 +562,12 @@ fn queue_growth_before_the_first_tick_restores_exactly() {
         if sample == Some(0.007) {
             sim.backend.world.step(&vec![None; 80]).unwrap();
         }
-        sim.grow_for_waiters(80, 4., true);
+        sim.grow_for_waiters(80, true);
         assert_eq!(
             sim.backend.world.time(),
             if sample == Some(0.007) { 0.007 } else { 0. }
         );
-        assert_eq!(sim.backend.world.radius(), 23296.);
+        assert_eq!(sim.backend.world.radius(), 3584. * (80_f64 / 32.).sqrt());
         let saved = serde_json::to_vec(&sim.backend.world.checkpoint().unwrap()).unwrap();
         let mut restored = Simulator::from_checkpoint(&saved, Default::default()).unwrap();
         assert_eq!(
@@ -591,7 +592,7 @@ fn admission_checkpoints_reject_space_beyond_the_available_seats() {
         config.agents = seats;
         let sim = RawSimulator::new(7, config, seats).unwrap();
         let mut saved = serde_json::to_value(sim.backend.world.checkpoint().unwrap()).unwrap();
-        let maximum = if seats == 1 { 3584_f64 } else { 23296_f64 };
+        let maximum = 3584. * (seats.max(32) as f64 / 32.).sqrt();
         saved["state"]["radius"] = serde_json::json!(maximum.next_up());
         assert!(
             Simulator::from_checkpoint(&serde_json::to_vec(&saved).unwrap(), Default::default())

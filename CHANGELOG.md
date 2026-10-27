@@ -16,8 +16,14 @@
   food, including floor-size snakes and pit-edge deaths, but only pellets that
   land inside the pit remain. Boost pellets follow the same rule, so boost mass
   spent outside the pit is lost. Food left outside a moving edge is removed.
-  Worlds without the setting keep their old food rules. Checkpoints move to
-  rules revision `slither-sim-rules-v4` and reject v3 continuations.
+  Worlds without the setting keep their old food rules.
+- **Breaking:** Battledome keeps its 3,584 radius up to 32 players and grows
+  above that so each player keeps the same space: about 5,069 at 64 seats and
+  5,667 at 80. The pit and spawn band scale with it. A spawn that finds no
+  strictly safe spot within two seconds takes the safest spot that still keeps
+  clear of bodies and of other snakes' paths to the middle.
+  `dynamicRadius: false` keeps the 3,584 arena. Checkpoints use rules revision
+  `slither-sim-rules-v5` and reject earlier continuations.
 - **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
   pit radius, size floor, kill-score window, boundary and free floor boost.
   They are sent at setup and whenever they change, and surface as the optional
@@ -89,19 +95,6 @@
 - PR comparisons focus timing on two regression canaries, official workloads and
   500/80-client socket hosts, retain ten state traces, and run both runtimes with
   the head workload configuration. Manual calibration retains CPU/wall noise.
-
-### Changed
-
-- **Breaking:** Battledome grows above 32 players so every spawn still passes
-  the strict safety checks. Wall, pit and spawn band scale together, reaching
-  3.25 times the base radius at 80 seats; a spawn queue waiting 2–4 seconds gets
-  up to twice that. Games of 16–32 players are unchanged. In local runs at 80
-  seats everyone spawned within 0.6 s and spawn search fell from 1.7 ms to under
-  0.01 ms per tick ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)). When the growing pit passes over a snake
-  that hasn't entered it, the snake can still leave. `dynamicRadius: false` keeps
-  the fixed arena ([configuration](docs/configuration.md#battledome)).
-- **Breaking:** checkpoints use rules revision `slither-sim-rules-v3` and reject
-  v1/v2. Frame `rules.pitRadius` follows the live pit in Battledome.
 
 ### Performance
 

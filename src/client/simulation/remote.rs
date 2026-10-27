@@ -46,6 +46,13 @@ impl RawSimulator {
     pub(super) fn time(&self) -> f64 {
         self.backend.time()
     }
+
+    /// Authoritative fixture edits for host admission regressions.
+    #[cfg(test)]
+    pub(crate) fn fixture_world(&mut self) -> &mut crate::Simulator {
+        &mut self.backend.world
+    }
+
     pub(crate) fn dt(&self) -> f64 {
         self.backend.world.config().dt
     }
@@ -69,44 +76,36 @@ impl RawSimulator {
         }
     }
 
-    pub(crate) fn grow_for_waiters(
-        &mut self,
-        waiting: usize,
-        waited: f64,
-        permitted: bool,
-    ) -> bool {
+    pub(crate) fn grow_for_waiters(&mut self, waiting: usize, permitted: bool) -> bool {
         let seats = self.backend.world.occupied() + waiting;
-        // Above the base population, a stalled queue receives more space at
-        // two and four seconds instead of weaker collision/departure checks.
-        // The live radius already checkpoints this temporary allowance.
-        let allowance =
-            if self.backend.world.config().min_score.is_none() || seats <= 32 || waited < 2. {
-                1.
-            } else if waited < 4. {
-                1.5
-            } else {
-                2.
-            };
-        self.backend
-            .world
-            .grow_for_seats(seats, allowance, permitted)
+        self.backend.world.grow_for_seats(seats, permitted)
     }
 
     /// Start a new session and life in `slot`, replacing any existing one and
     /// its in-flight messages. The server answers with setup once the connect
     /// arrives; the first broadcast after it begins with the slot's own snake.
     /// False leaves the session untouched while circular admission waits.
+    #[cfg(test)]
     pub(crate) fn connect(
         &mut self,
         slot: usize,
         appearance: PlayerAppearance,
+    ) -> Result<bool, String> {
+        self.connect_waited(slot, appearance, 0.)
+    }
+
+    pub(crate) fn connect_waited(
+        &mut self,
+        slot: usize,
+        appearance: PlayerAppearance,
+        waited: f64,
     ) -> Result<bool, String> {
         self.remote(slot)?;
         if appearance.nickname.len() > MAX_NICKNAME || appearance.custom_skin.len() > 255 {
             return Err("Nickname or custom skin is too long".into());
         }
         let b = &mut self.backend;
-        let (body, heading) = match b.spawn_pose(slot) {
+        let (body, heading) = match b.spawn_pose_waited(slot, waited) {
             Ok(pose) => pose,
             Err(reason) if reason == crate::spawn::WAITING => return Ok(false),
             Err(reason) => return Err(reason),
@@ -130,12 +129,22 @@ impl RawSimulator {
 
     /// A different socket player owns this seat. Clear the departed player's
     /// history only once admission succeeds; retries leave the board untouched.
+    #[cfg(test)]
     pub(crate) fn connect_new_player(
         &mut self,
         slot: usize,
         appearance: PlayerAppearance,
     ) -> Result<bool, String> {
-        let admitted = self.connect(slot, appearance)?;
+        self.connect_new_player_waited(slot, appearance, 0.)
+    }
+
+    pub(crate) fn connect_new_player_waited(
+        &mut self,
+        slot: usize,
+        appearance: PlayerAppearance,
+        waited: f64,
+    ) -> Result<bool, String> {
+        let admitted = self.connect_waited(slot, appearance, waited)?;
         if admitted {
             self.backend.world.reset_kill_score(slot);
         }

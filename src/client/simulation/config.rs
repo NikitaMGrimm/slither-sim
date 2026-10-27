@@ -174,18 +174,10 @@ impl SimulationConfig {
             .iter()
             .map(|update| update.radius)
             .chain([world.radius])
-            .chain((world.dynamic_radius || world.size_to_population).then(|| {
-                let allowance = if world.dynamic_radius
-                    && world.spawn_radius.is_some()
-                    && world.min_score.is_some()
-                    && self.agents > 32
-                {
-                    2.
-                } else {
-                    1.
-                };
-                world.seat_radius(self.agents) * allowance
-            }))
+            .chain(
+                (world.dynamic_radius || world.size_to_population)
+                    .then(|| world.seat_radius(self.agents)),
+            )
             .fold(0., f64::max);
         if largest > encode::MAX_RADIUS {
             return Err(format!(
