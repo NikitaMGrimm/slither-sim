@@ -4127,7 +4127,8 @@ fn arena_vision_delivers_distant_entities_and_refreshes_food_on_radius_changes()
             > initial.subscribed().len()
     );
     // Force a listing in a newly subscribed sector; the cached subscription
-    // union must include it, then retire it when the live wall culls the food.
+    // union must include it, then retire its sector when the wall shrinks.
+    // This fixed sandbox replay retains the physical pellet outside the wall.
     let edge = pellet(5000.);
     sim.backend.world.insert_food(edge.clone()).unwrap();
     sim.backend.broadcast().unwrap();
@@ -4148,6 +4149,80 @@ fn arena_vision_delivers_distant_entities_and_refreshes_food_on_radius_changes()
     let mut again = Remote::connect(&mut sim, 0, "Again");
     run(&mut sim, &mut [(0, &mut again), (1, &mut b)], 1);
     assert_eq!(again.frame(&sim).observation.unwrap().food.len(), 2);
+}
+
+#[test]
+fn arena_recipients_receive_wall_culls_in_still_subscribed_sectors() {
+    let mut config = raw_config(2);
+    config.world = Config {
+        vision: crate::Vision::Arena,
+        food_count: 0,
+        ambient_replenish_per_second: 0.,
+        radius_updates: vec![crate::RadiusUpdate {
+            time: 0.021,
+            radius: 670.,
+        }],
+        ..Config::official(4)
+    };
+    config.world.prey.count = 0;
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    let mut a = Remote::connect(&mut sim, 0, "A");
+    let mut b = Remote::connect(&mut sim, 1, "B");
+    for (slot, y) in [(0, -100.), (1, 100.)] {
+        sim.backend.world.retire(slot).unwrap();
+        sim.backend
+            .world
+            .respawn(slot, Point { x: 0., y }, 0., 2)
+            .unwrap();
+        sim.backend.slots[slot].control = Action::default();
+    }
+    let pellet = |x| Food {
+        x,
+        y: 0.,
+        value: 1.,
+        size: Some(2.),
+        origin: Some(Origin::Ambient),
+    };
+    let survivor = pellet(600.);
+    let culled = pellet(700.);
+    let key = encode::food_key(culled.point()).unwrap();
+    let sector = [key[0], key[1]];
+    let survivor_key = encode::food_key(survivor.point()).unwrap();
+    assert_eq!(sector, [survivor_key[0], survivor_key[1]]);
+    sim.backend
+        .world
+        .replace_food(vec![survivor.clone(), culled])
+        .unwrap();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 2);
+    assert!(sim.backend.world.config().dynamic_radius);
+    assert_eq!(sim.backend.world.food().len(), 2);
+    for (slot, remote) in [(0, &mut a), (1, &mut b)] {
+        assert!(
+            sim.backend.slots[slot]
+                .connection
+                .food_interest
+                .subscribed()
+                .contains(&sector)
+        );
+        assert_eq!(remote.frame(&sim).observation.unwrap().food.len(), 2);
+        remote.packets.clear();
+    }
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
+    assert_eq!(sim.backend.world.radius(), 670.);
+    assert_eq!(sim.backend.world.food(), &[survivor]);
+    assert!(sim.backend.world.pickup_events().unwrap().is_empty());
+    for (slot, remote) in [(0, &a), (1, &b)] {
+        assert!(
+            sim.backend.slots[slot]
+                .connection
+                .food_interest
+                .subscribed()
+                .contains(&sector)
+        );
+        assert!(remote.packets.contains(&encode::food_remove(key, None)));
+        assert!(!remote.packets.contains(&encode::sector_clear(sector)));
+        assert_eq!(remote.frame(&sim).observation.unwrap().food.len(), 1);
+    }
 }
 
 #[test]
