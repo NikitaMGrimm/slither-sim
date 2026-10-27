@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Fidelity | [Host frame timing](fidelity/2026-10-27-host-frame-timing/REPORT.md) | Windows/WSL2 loopback stage timings, retained official comparison and delivery-channel wakeup; no browser smoothness or native Linux qualification. |
 | Battledome | [Pit-only food](battledome/2026-10-27-pit-food/REPORT.md) | Owner-approved local play build, full floor-death drops filtered to the pit, and short matched 32/64-seat food-supply checks; no long-run equilibrium claim. |
 | Battledome | [Opt-in mode rules](battledome/2026-10-27-rules-extension/REPORT.md) | Pinned stock handler ignores the extension; loopback opt-in exclusion, exact live rules and shared Forager adapter regressions. |
 | Fidelity | [Legacy minimap projection](fidelity/2026-10-27-legacy-map-motion/REPORT.md) | Real-client asymmetric marker alignment and dynamic/full-server projections across radius modes. |

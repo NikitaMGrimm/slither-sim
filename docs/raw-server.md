@@ -109,6 +109,8 @@ serves plain `ws`. Game assets are not included.
 The simulation thread owns the world, physics and per-tick encoding. A separate
 socket thread owns the listener and nonblocking connections, releasing frames
 at latency-model due times between ticks. OS scheduling and load affect delivery.
+Newly encoded frames wake an idle socket thread. On Windows a per-host
+high-resolution timer also keeps its input polling responsive, without spinning.
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
 Remote output queues in both the simulation and socket thread each allow 2 MiB,
