@@ -7,7 +7,7 @@ mod observation_tests;
 #[cfg(test)]
 mod pit_food_tests;
 use crate::bounds_index::BoundsIndex;
-use crate::food_grid::{EaterGrid, FoodCache};
+use crate::food_grid::{EaterGrid, FoodCache, PelletIndex};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
 use crate::profiling::StepProfile;
@@ -1944,14 +1944,26 @@ impl Simulator {
         // first and then applied in the same reverse food order.
         hits.clear();
         if dense {
-            dense_hits::<PROFILE>(
-                &self.eater_grid,
-                &self.snakes,
-                eaters,
-                &self.food,
-                hits,
-                profile,
-            );
+            if let Some(pellets) = self.food_cache.pellets(&self.food) {
+                indexed_hits::<PROFILE>(
+                    &self.eater_grid,
+                    pellets,
+                    &self.snakes,
+                    eaters,
+                    &self.food,
+                    hits,
+                    profile,
+                );
+            } else {
+                dense_hits::<PROFILE>(
+                    &self.eater_grid,
+                    &self.snakes,
+                    eaters,
+                    &self.food,
+                    hits,
+                    profile,
+                );
+            }
         } else {
             let mut indexed_candidates = Vec::with_capacity(eaters.len());
             for (findex, f) in self.food.iter().enumerate().rev() {
@@ -2746,6 +2758,34 @@ fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
         || (a.y < -limit && b.y < -limit)
 }
 
+/// Query occupied eater cells, then restore the original reverse pellet order.
+fn indexed_hits<const PROFILE: bool>(
+    grid: &EaterGrid,
+    pellets: &PelletIndex,
+    snakes: &[Snake],
+    eaters: &[(usize, Point, f64, Bounds)],
+    food: &[Food],
+    hits: &mut Vec<(usize, usize)>,
+    profile: &mut StepProfile,
+) {
+    // Unique cells and one handle per pellet give at most one hit per pellet.
+    // Reuse the exact tests and eater order; sorting restores the original
+    // reverse-food event/mass/removal order before anything is applied.
+    for (cell, candidates) in grid.occupied() {
+        for findex in pellets.food(cell) {
+            if let Some(eater) = find_eater::<PROFILE>(
+                snakes,
+                food[findex].point(),
+                candidates.clone().map(|e| eaters[e]),
+                profile,
+            ) {
+                hits.push((findex, eater));
+            }
+        }
+    }
+    hits.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+}
+
 /// Visit food in reverse, recording each pellet's eater.
 fn dense_hits<const PROFILE: bool>(
     grid: &EaterGrid,
@@ -2843,6 +2883,18 @@ mod food_pickup_order_tests {
             &mut profile,
         );
         assert_eq!(hits, [(3, 1), (2, 0), (0, 1)]);
+        let mut cache = FoodCache::default();
+        let mut indexed = Vec::new();
+        indexed_hits::<false>(
+            &grid,
+            cache.pellets(&food).unwrap(),
+            &world.snakes,
+            &eaters,
+            &food,
+            &mut indexed,
+            &mut profile,
+        );
+        assert_eq!(indexed, hits);
         let scanned: Vec<_> = food
             .iter()
             .enumerate()

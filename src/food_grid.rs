@@ -44,6 +44,9 @@ impl Hasher for CellHasher {
     fn write_i64(&mut self, n: i64) {
         self.write_u64(n as u64);
     }
+    fn write_u32(&mut self, n: u32) {
+        self.write_u64(n.into());
+    }
     /// Derived `Hash` writes the `Axis` discriminant through this.
     fn write_isize(&mut self, n: isize) {
         self.write_u64(n as u64);
@@ -86,6 +89,8 @@ pub(crate) struct FoodCache {
     ambient: usize,
     /// At most three cell sizes: boost, death and ambient admission.
     grids: Vec<(u64, Counts)>,
+    /// Lazy, derived from the same bit-verified entries as the admission counts.
+    pellets: Option<PelletIndex>,
     /// Inside a step nothing else can edit food, so one comparison per step
     /// suffices while every internal edit is mirrored.
     open: bool,
@@ -124,6 +129,7 @@ impl FoodCache {
             self.entries.extend(food.iter().map(Entry::of));
             self.ambient = self.entries.iter().filter(|e| e.ambient).count();
             self.grids.clear();
+            self.pellets = None;
         }
         self.verified = self.open;
     }
@@ -164,6 +170,12 @@ impl FoodCache {
             *counts.entry(entry.cell(f64::from_bits(*key))).or_default() += 1;
         }
         self.entries.push(entry);
+        if self.entries.len() >= NONE as usize {
+            self.pellets = None;
+        }
+        if let Some(index) = &mut self.pellets {
+            index.push(entry, self.entries.len() - 1);
+        }
     }
     /// Mirror removing original food indices in strictly ascending order.
     pub(crate) fn remove(&mut self, food_len: usize, removed: impl Iterator<Item = usize>) {
@@ -172,11 +184,17 @@ impl FoodCache {
             self.entries.clear();
             self.ambient = 0;
             self.grids.clear();
+            self.pellets = None;
+            self.verified = false;
             return;
         }
         let (mut read, mut write) = (0, 0);
         for i in removed {
             let e = self.entries[i];
+            if let Some(index) = &mut self.pellets {
+                index.remove(i);
+                index.food_slots.copy_within(read..i, write);
+            }
             self.ambient -= usize::from(e.ambient);
             for (key, counts) in &mut self.grids {
                 let cell = e.cell(f64::from_bits(*key));
@@ -195,6 +213,111 @@ impl FoodCache {
         }
         self.entries.copy_within(read.., write);
         self.entries.truncate(write + self.entries.len() - read);
+        if let Some(index) = &mut self.pellets {
+            index.food_slots.copy_within(read.., write);
+            index.food_slots.truncate(self.entries.len());
+            // Stable handles keep cell lists intact across food compaction. Only
+            // their current food-array positions need to be refreshed.
+            for (i, &slot) in index.food_slots.iter().enumerate() {
+                index.slots[slot as usize].food = i as u32;
+            }
+        }
+    }
+
+    /// Lazily build the pellet index; cold restores and external edits rebuild
+    /// from the verified mirror. Larger arrays retain the original scan paths.
+    pub(crate) fn pellets(&mut self, food: &[Food]) -> Option<&PelletIndex> {
+        self.sync(food);
+        if food.len() >= NONE as usize {
+            return None;
+        }
+        if self.pellets.is_none() {
+            let mut index = PelletIndex::default();
+            for (i, &entry) in self.entries.iter().enumerate() {
+                index.push(entry, i);
+            }
+            self.pellets = Some(index);
+        }
+        self.pellets.as_ref()
+    }
+}
+
+const CELL_BIAS: i64 = 16384;
+
+/// Eater covers stay within +/-8193 cells (REGULAR/CELL plus rounding margin),
+/// so biased coordinates fit disjoint 16-bit fields and can never encode zero.
+fn pack_cell(x: i64, y: i64) -> u32 {
+    ((x + CELL_BIAS) as u32) | (((y + CELL_BIAS) as u32) << 16)
+}
+
+fn pellet_cell(entry: Entry) -> u32 {
+    let x = f64::from_bits(entry.x) / CELL;
+    let y = f64::from_bits(entry.y) / CELL;
+    if !(x.abs() <= REGULAR / CELL + 1.0 && y.abs() <= REGULAR / CELL + 1.0) {
+        // Such a pellet cannot win any regular eater's exact test, including
+        // NaN/inf (see EaterGrid::build). Zero is outside all regular covers.
+        return 0;
+    }
+    pack_cell(floor_small(x), floor_small(y))
+}
+
+/// Cell lists contain stable handles, not food-array indices. A handle stores
+/// its current array index and its position in its cell for constant-time
+/// deletion; freed handles are reused. Neither list order nor hashing selects
+/// a winner: pickup tests use the ordered eater list and hits are sorted later.
+#[derive(Clone, Default)]
+pub(crate) struct PelletIndex {
+    cells: HashMap<u32, Vec<u32>, BuildHasherDefault<CellHasher>>,
+    slots: Vec<PelletSlot>,
+    food_slots: Vec<u32>,
+    free: Vec<u32>,
+}
+
+#[derive(Clone)]
+struct PelletSlot {
+    food: u32,
+    cell: u32,
+    offset: usize,
+}
+
+impl PelletIndex {
+    fn push(&mut self, entry: Entry, food: usize) {
+        let cell = pellet_cell(entry);
+        let slot = self.free.pop().unwrap_or(self.slots.len() as u32);
+        let list = self.cells.entry(cell).or_default();
+        let value = PelletSlot {
+            food: food as u32,
+            cell,
+            offset: list.len(),
+        };
+        if slot as usize == self.slots.len() {
+            self.slots.push(value);
+        } else {
+            self.slots[slot as usize] = value;
+        }
+        list.push(slot);
+        self.food_slots.push(slot);
+    }
+    fn remove(&mut self, food: usize) {
+        let slot = self.food_slots[food];
+        let value = &self.slots[slot as usize];
+        let list = self.cells.get_mut(&value.cell).unwrap();
+        let offset = value.offset;
+        list.swap_remove(offset);
+        if let Some(&moved) = list.get(offset) {
+            self.slots[moved as usize].offset = offset;
+        }
+        if list.is_empty() {
+            self.cells.remove(&self.slots[slot as usize].cell);
+        }
+        self.free.push(slot);
+    }
+    pub(crate) fn food(&self, cell: u32) -> impl Iterator<Item = usize> + '_ {
+        self.cells
+            .get(&cell)
+            .into_iter()
+            .flatten()
+            .map(|&slot| self.slots[slot as usize].food as usize)
     }
 }
 
@@ -228,6 +351,20 @@ impl std::fmt::Debug for EaterGrid {
     }
 }
 impl EaterGrid {
+    /// Each occupied cell once, with its original ascending eater list.
+    pub(crate) fn occupied(&self) -> impl Iterator<Item = (u32, Candidates<'_>)> {
+        self.touched.iter().map(|&cell| {
+            let x = self.lo.0 + (cell as usize % self.width) as i64;
+            let y = self.lo.1 + (cell as usize / self.width) as i64;
+            (
+                pack_cell(x, y),
+                Candidates {
+                    nodes: &self.nodes,
+                    node: self.heads[cell as usize],
+                },
+            )
+        })
+    }
     /// Index `(center, radius)` circles. Returns false, leaving the grid unusable,
     /// when a circle is non-finite or too far out or the grid would exceed
     /// `max_cells` or the fixed limit.
@@ -331,6 +468,7 @@ fn floor_small(v: f64) -> i64 {
     t - i64::from(t as f64 > v)
 }
 
+#[derive(Clone)]
 pub(crate) struct Candidates<'a> {
     nodes: &'a [(u32, u32)],
     node: u32,
@@ -422,7 +560,7 @@ mod tests {
     }
 
     #[test]
-    fn occupancy_cache_matches_recounting_through_external_edits() {
+    fn occupancy_and_pellet_indexes_match_recounting_through_external_edits() {
         let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
         let mut cache = FoodCache::default();
         let mut food = Vec::new();
@@ -443,6 +581,7 @@ mod tests {
                 _ => {}
             }
             cache.begin();
+            cache.pellets(&food).unwrap();
             for _ in 0..20 {
                 match rng.below(4) {
                     0 => {
@@ -487,9 +626,53 @@ mod tests {
                         assert_eq!(cache.has_room(&food, &probe, size, max), count < max);
                     }
                 }
+                assert_pellet_index(&cache, &food);
             }
             cache.end();
+            assert_pellet_index(&cache.clone(), &food);
         }
+    }
+
+    fn assert_pellet_index(cache: &FoodCache, food: &[Food]) {
+        assert!(cache.entries == food.iter().map(Entry::of).collect::<Vec<_>>());
+        let index = cache.pellets.as_ref().unwrap();
+        assert_eq!(index.food_slots.len(), food.len());
+        assert_eq!(index.slots.len(), food.len() + index.free.len());
+        let mut seen = Vec::new();
+        let mut live = std::collections::HashSet::new();
+        for (&cell, slots) in &index.cells {
+            assert!(!slots.is_empty());
+            for (offset, &slot) in slots.iter().enumerate() {
+                assert!(live.insert(slot));
+                let value = &index.slots[slot as usize];
+                assert_eq!(value.offset, offset);
+                assert_eq!(value.cell, cell);
+                assert_eq!(index.food_slots[value.food as usize], slot);
+                assert_eq!(pellet_cell(Entry::of(&food[value.food as usize])), cell);
+                seen.push(value.food as usize);
+            }
+        }
+        seen.sort_unstable();
+        assert_eq!(seen, (0..food.len()).collect::<Vec<_>>());
+        let mut free = std::collections::HashSet::new();
+        for &slot in &index.free {
+            assert!(free.insert(slot));
+            assert!(!live.contains(&slot));
+        }
+    }
+
+    #[test]
+    fn stale_removal_drops_the_pellet_index_before_rebuilding() {
+        let mut rng = Rng(47);
+        let mut food: Vec<_> = (0..20).map(|_| pellet(&mut rng)).collect();
+        let mut cache = FoodCache::default();
+        cache.begin();
+        cache.pellets(&food).unwrap();
+        food.pop();
+        cache.remove(food.len(), std::iter::empty());
+        assert!(cache.pellets.is_none());
+        cache.pellets(&food).unwrap();
+        assert_pellet_index(&cache, &food);
     }
 
     #[test]
@@ -568,6 +751,11 @@ mod tests {
                 })
                 .collect();
             assert!(grid.build(circles.iter().copied(), MAX_CELLS));
+            let occupied: HashMap<_, Vec<_>> = grid
+                .occupied()
+                .map(|(cell, candidates)| (cell, candidates.collect()))
+                .collect();
+            assert_eq!(occupied.len(), grid.touched.len());
             for _ in 0..400 {
                 let (c, r) = circles[rng.below(circles.len())];
                 let angle = rng.unit() * std::f64::consts::TAU;
@@ -595,11 +783,86 @@ mod tests {
                     _ => {}
                 }
                 let listed: Vec<usize> = grid.candidates(p).into_iter().flatten().collect();
+                let cell = pellet_cell(Entry {
+                    x: p.x.to_bits(),
+                    y: p.y.to_bits(),
+                    ambient: false,
+                });
+                assert_eq!(occupied.get(&cell).cloned().unwrap_or_default(), listed);
                 assert!(listed.windows(2).all(|w| w[0] < w[1]));
                 for (e, &(center, radius)) in circles.iter().enumerate() {
                     if accepts(p, center, radius) && !p.x.is_nan() && !p.y.is_nan() {
                         assert!(listed.contains(&e), "{p:?} {center:?} {radius}");
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn packed_pellet_cells_preserve_regular_grid_boundary_candidates() {
+        let mut grid = EaterGrid::default();
+        for center in [
+            Point::default(),
+            Point {
+                x: REGULAR,
+                y: REGULAR,
+            },
+            Point {
+                x: -REGULAR,
+                y: -REGULAR,
+            },
+            Point {
+                x: REGULAR - 36.0,
+                y: -REGULAR + 36.0,
+            },
+        ] {
+            let radius = if center.x == REGULAR - 36.0 {
+                36.0
+            } else {
+                0.0
+            };
+            assert!(grid.build([(center, radius)].into_iter(), MAX_CELLS));
+            let occupied: HashMap<_, Vec<_>> = grid
+                .occupied()
+                .map(|(cell, c)| (cell, c.collect()))
+                .collect();
+            let coordinates = [
+                center.x,
+                center.x.next_up(),
+                center.x.next_down(),
+                center.x - radius,
+                center.x + radius,
+                -128.0,
+                -128.0f64.next_up(),
+                -128.0f64.next_down(),
+                -0.0,
+                -f64::from_bits(1),
+                f64::NAN,
+                f64::INFINITY,
+                -1e300,
+                1e300,
+            ];
+            for x in coordinates {
+                for y in [
+                    center.y,
+                    center.y.next_up(),
+                    center.y.next_down(),
+                    center.y - radius,
+                    center.y + radius,
+                ] {
+                    let p = Point { x, y };
+                    let cell = pellet_cell(Entry {
+                        x: x.to_bits(),
+                        y: y.to_bits(),
+                        ambient: false,
+                    });
+                    let expected: Vec<_> = grid.candidates(p).into_iter().flatten().collect();
+                    assert_eq!(
+                        occupied.get(&cell).cloned().unwrap_or_default(),
+                        expected,
+                        "{p:?} {center:?}"
+                    );
                 }
             }
         }
