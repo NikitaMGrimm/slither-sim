@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Performance | [Same-session c7a main recheck](performance/2026-10-27-c7a-main-recheck/REPORT.md) | Paired current-main/control official-500/375 holds and a nice +5 diagnostic; main passes 375, while 500 misses at both priorities. |
 | Performance | [Recipient packet-list reuse](performance/2026-10-27-host-packet-lists/REPORT.md) | Fifteen byte-identical traces and five alternating instruction pairs per official-500 stock/mixed/legacy fixture; 1.6–1.7% fewer instructions, no capacity claim. |
 | Fidelity | [NTL visibility sweep](fidelity/2026-10-27-ntl-vision/REPORT.md) | Pinned arena-vision candidate, five visibility settings and repeated real-client replays; normal-zoom 1500 is strongest tested, whole-food correction tails remain inconclusive. |
 | Fidelity | [Host frame timing](fidelity/2026-10-27-host-frame-timing/REPORT.md) | Windows/WSL2 loopback stage timings, retained official comparison and delivery-channel wakeup; no browser smoothness or native Linux qualification. |
