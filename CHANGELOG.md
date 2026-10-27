@@ -30,8 +30,11 @@
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-interest-refresh/REPORT.md)).
 - Food pickup derives pellet positions from live-bit ranks instead of updating
   every surviving pellet's position after removals, and uses exact integer
-  arithmetic for the bounded eater-cell covers. Output is byte-identical, and
-  the 500-player official fixture runs 2.3–2.4% fewer instructions with stock
+  arithmetic for the bounded eater-cell covers. Periodic index maintenance is
+  spread over 512 pellets per tick: measured batches stay below 0.28M
+  instructions, replacing a 25.5M-instruction official-500 rebuild spike.
+  Output is byte-identical, and
+  the 500-player official fixture runs 2.4–2.6% fewer instructions with stock
   and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-bitset-ranks/REPORT.md)).
 - Each tick, a snake's heading direction is computed once during movement and

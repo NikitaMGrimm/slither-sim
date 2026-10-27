@@ -1,11 +1,153 @@
 # Pellet positions from live-bit ranks, 2026-10-27
 
-Final main baseline is `4532a76f22958ae3abcca801e90edd30ed9f466f`, after
-#228, #229 and #227. Final runtime is
+Initial main baseline is `4532a76f22958ae3abcca801e90edd30ed9f466f`, after
+#228, #229 and #227. Initial measured runtime is
 `47e416a3eacc99163a3af12fa5eb11af317f9e28`.
-The delivery adds this record; production changes stay in `src/food_grid.rs`.
+The initial delivery adds this record; its production change is in
+`src/food_grid.rs`. The amendment also specializes pickup in `src/simulator.rs`.
 [Selected results and artifact identities](results.json).
 
+## Periodic rebuild amendment
+
+Published runtime: `9a3f6f5fe85184e42b32c2251480b94356c9210e`. The initial
+rank implementation (`8a756344`) did create a large periodic spike. A first
+three-pass in-place prototype still cost 2.55M on the standard official replay
+and 5.48M in the food-rich orbit stress. That rejected prototype and all raw
+arrays/binaries remain local-only; the original PR snapshot is retained below.
+The final change migrates at most
+**512 pellets per pickup query**, spreading both construction and old-cell
+deallocation across ticks.
+
+The new index always represents the live food prefix. Copied pellets leave the
+old cell lists but remain in its rank bits, so the old suffix still maps to
+full food positions. New births append to the old index. Removals mirror both
+rank maps and compact the new prefix; queries concatenate its cells with the
+remaining old cells, emitting each pellet once. Exact tests and the final
+descending hit sort are unchanged. When migration finishes, old cell lists are
+already empty, avoiding a final per-cell destructor spike.
+
+A temporary unconditional union iterator reduced the short replay's saving to
+1.74–1.88%. The final pickup helper dispatches once per phase: ordinary ticks use
+the original single-index iterator, and only active migrations use the union.
+Both instantiate the same exact tests and final descending sort.
+
+### Frozen long runs
+
+Each arm runs **60,000 ticks (420 virtual seconds)** at the default portable
+target, with current-thread user instructions at ≥99% scheduling. The baseline
+is `4532a76f`, the initial rank arm is `8a756344`, and the migrated arm is the
+published runtime above. Frozen base/initial-rank runs are reused unchanged for
+the final query specialization, checking source/fixture/probe/binary hashes;
+the final candidate is freshly built and run. Unpublished experiments stay in
+the local-only raw archive.
+
+The loop case extends the existing stock protocol fixture. Orbit stress adds a
+synthetic tangent controller with radial correction toward 65% of the food
+radius, sustaining food consumption/churn; Battledome uses that controller to
+enter its pit. Shrink holds 500 seats for 30,000 ticks, then retires four every
+12 ticks down to 100. All controls, reconnect admission and drains are outside
+the tick bracket. The bracket includes world, host broadcast and emission into
+queues; it excludes sockets/kernel work. Both raw frame order/timestamps and
+initial/final checkpoints/RNG endpoints match literally across all three arms
+for all four runs. Birth/food/radius/alive/map metadata also match at every tick.
+
+Births below are actual admitted food-birth events, excluding the initial food
+population. Gaps are observed **between rebuild starts**, not a stationary-rate
+prediction. Durations are the number of ticks occupied by a completed migration.
+
+| Case | Births/tick mean [max] | Rebuilds | Start gap median [range], ticks / seconds | Migration duration, ticks | Old atomic max / new batch max, M instructions |
+| --- | ---: | ---: | --- | --- | ---: |
+| Official 500, loop | 1.274 [66] | 1 | No second start; right-censored | 112–112 | 25.546 / 0.276 |
+| Official 500, orbit stress | 9.901 [83] | 3 | 17248 [16226–18270] / 120.736 [113.582–127.89] | 249–273 | 43.200 / 0.279 |
+| Battledome 80 seats | 2.621 [547] | 27 | 1962.5 [1571–2734] / 13.7375 [10.997–19.138] | 9–13 | 1.794 / 0.217 |
+| Official 500 → 100 shrink | 1.398 [66] | 2 | 45658 [45658–45658] / 319.606 [319.606–319.606] | 75–112 | 25.536 / 0.277 |
+
+The standard loop has one start at tick 8,607 (60.249 s), followed by 51,393
+right-censored ticks (359.751 s) without a second start. Its births drop to
+0.0204/tick over the last 10,000 ticks; extrapolating the short steady fixture’s
+early birth rate would overstate rebuild frequency. Every case exceeds 20k
+ticks, and Battledome supplies 27 completed rebuilds. The configured 80-seat
+Battledome run has 38–80 living players, not a claim of 80 continuously alive.
+
+### Whole host-tick instruction tails
+
+Units are M user instructions. p99/p99.9/max include **all 60,000 ticks**,
+including cold startup. The final column separately shows the maximum after
+tick 119. Quantiles use linear interpolation at `(n−1)q`; no attempt is removed.
+
+| Case | Arm | p99 | p99.9 | Max, all ticks | Max, tick ≥120 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Official 500, loop | Base | 9.104 | 10.131 | 175.499 | 18.949 |
+| Official 500, loop | Initial rank | 9.061 | 10.134 | 175.242 | 30.784 |
+| Official 500, loop | Migrated | 9.036 | 10.115 | 175.234 | 18.799 |
+| Official 500, orbit stress | Base | 25.889 | 28.496 | 175.404 | 34.069 |
+| Official 500, orbit stress | Initial rank | 25.239 | 27.737 | 175.100 | 55.376 |
+| Official 500, orbit stress | Migrated | 25.215 | 27.703 | 175.094 | 33.605 |
+| Battledome 80 seats | Base | 10.500 | 16.323 | 23.017 | 23.017 |
+| Battledome 80 seats | Initial rank | 10.484 | 16.298 | 22.979 | 22.979 |
+| Battledome 80 seats | Migrated | 10.484 | 16.295 | 22.982 | 22.982 |
+| Official 500 → 100 shrink | Base | 9.095 | 9.970 | 175.532 | 18.954 |
+| Official 500 → 100 shrink | Initial rank | 9.036 | 9.899 | 175.185 | 30.775 |
+| Official 500 → 100 shrink | Migrated | 9.013 | 9.869 | 175.179 | 18.791 |
+
+The largest whole-tick increase versus the base at the same maintenance tick
+is **0.511M instructions**, below the requested approximately 2M allowance.
+Cold index construction remains separate (18.12M instructions for official
+500); it is included in the startup-inclusive tail table. The common first
+official host tick is about 175M; cold index construction still uses a full build.
+p99/p99.9 are not uniformly lower: the change specifically removes the periodic
+single-tick rebuild spike. These are WSL2 instruction results, with no CPU-time
+or capacity claim.
+
+### Final whole-process pairs
+
+The final specialized candidate repeats one untallied warmup pair and five
+alternating pairs per protocol, with all counters 100% scheduled. Counts include
+construction, 1,080 ticks, clients and drains; they exclude socket/kernel work.
+All twelve standard full traces match literally. This supersedes the initial
+rank-only short-pair table retained below.
+
+| Official-500 clients | Base median | Candidate median | Median paired reduction [full range] |
+| --- | ---: | ---: | ---: |
+| Stock | 8,778,657,012 | 8,554,349,235 | 2.555% [2.554, 2.556%] |
+| Half protocol-13 | 9,134,883,406 | 8,908,245,852 | 2.481% [2.479, 2.483%] |
+| All protocol-13 | 9,476,421,969 | 9,251,833,814 | 2.370% [2.368, 2.371%] |
+
+### Amendment validation and reproduction
+
+The prefix/suffix edit oracle compares against a full recount after mixed
+removals on both sides of the frontier, births, cloning and emptying both
+halves. It also checks that completion restores a single index. A mutation
+that leaves a copied pellet in the old cell list fails that oracle. All 75
+food-focused tests, both pickup integration suites and the complete Linux Rust
+group pass on the final published runtime. Documentation and all twelve Python
+optimization guards pass separately.
+
+```sh
+STUDY=research/performance/2026-10-27-pellet-bitset-ranks
+python3 "$STUDY/long.py" "$PWD" /tmp/rebuild-long-new --cpu 2
+python3 "$STUDY/reproduce.py" build "$PWD" /tmp/rebuild-short-new --cpu 2 --candidate 9a3f6f5fe85184e42b32c2251480b94356c9210e
+python3 "$STUDY/reproduce.py" trace "$PWD" /tmp/rebuild-short-new --cpu 2 --candidate 9a3f6f5fe85184e42b32c2251480b94356c9210e
+python3 "$STUDY/reproduce.py" count "$PWD" /tmp/rebuild-short-new --cpu 2 --candidate 9a3f6f5fe85184e42b32c2251480b94356c9210e --perf /path/to/perf
+python3 "$STUDY/check.py" 9a3f6f5fe85184e42b32c2251480b94356c9210e /tmp/rebuild-check-new --cpu 2
+python3 "$STUDY/rebuild_mutation.py" "$PWD" /tmp/rebuild-mutation-new --cpu 2
+taskset -c 2 python3 "$STUDY/select_long.py" /tmp/rebuild-long-new /tmp/rebuild-short-new /tmp/rebuild-check-new /tmp/rebuild-check-new.log /tmp/rebuild-mutation-new
+```
+
+The check helper’s stdout must be retained in `/tmp/rebuild-check-new.log`.
+Earlier measurements used at most CPUs 2/3, with one Cargo/Rayon/test job.
+After the owner reduced the machine budget, final validation, artifact selection
+and cleanup run serially on CPU 2 with one Cargo/Rayon/test job. Full traces were
+compared before deletion under that storage policy; selected hashes and
+reproducers remain in Git, with losslessly compressed per-tick counters, logs,
+source snapshots and failed-attempt metadata retained locally outside Git.
+Task-owned Rust target directories are removed after verification. The initial
+Battledome preparation incorrectly required its forced reconnect to succeed;
+the final fixture records real refusals and
+uses the pit-entering controller instead. All entry points reject Python `-O`.
+Selected amendment data: [long-results.json](long-results.json).
+
+## Initial rank implementation record
 ## Collision feasibility gate
 
 Against post-#228 main `194d13047775cca92e2a7f5163e9fdd28e918073`, an
@@ -172,8 +314,11 @@ At most two logical CPUs, one job per Cargo/Rayon/test worker; counted children
 pinned to one. The machine is shared WSL2: no CPU-time, latency, native EPYC or
 capacity claim. 10k-snake/density scaling belongs to the separate research worker.
 
-Raw arrays, complete traces, rejected/unbuilt prototypes, executables and
-diagnostic overlays remain local-only outside Git. Digests verify artifact
-consistency, not capacity. All work is offline with no administrator/security
+At initial delivery, raw arrays, complete traces, rejected/unbuilt prototypes,
+executables and diagnostic overlays were retained locally outside Git. After
+the amendment's full comparisons, the owner's storage policy removed large
+trace payloads and Rust targets; compressed counters, hashes, logs and source
+snapshots remain. Digests verify artifact consistency, not capacity.
+All work is offline with no administrator/security
 changes. Every study entry point rejects Python optimization; the delegated
 historical helpers receive the same guard. No instruction pair is excluded.
