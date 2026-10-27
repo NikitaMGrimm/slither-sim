@@ -5,6 +5,7 @@ python3 select.py REPOSITORY RAW_OUTPUT VALIDATED_REF > results.json
 import hashlib
 import json
 from pathlib import Path
+import statistics
 import subprocess
 import sys
 import tarfile
@@ -51,6 +52,12 @@ for case, value in raw.items():
             fields=next(line.split(';') for line in stat.read_text().splitlines() if 'instructions:u' in line)
             assert int(fields[0])==row[arm]
             scheduled.append(float(fields[4]))
+        assert row['ratio']==row['candidate']/row['base']
+    measured=rows[1:]
+    assert value['baseMedian']==statistics.median(r['base'] for r in measured)
+    assert value['candidateMedian']==statistics.median(r['candidate'] for r in measured)
+    assert value['pairedMedian']==statistics.median(r['ratio'] for r in measured)
+    assert value['pairedRange']==[min(r['ratio'] for r in measured),max(r['ratio'] for r in measured)]
     result['instructions'][case]={'baseMedian':value['baseMedian'],'candidateMedian':value['candidateMedian'],
         'pairedMedian':value['pairedMedian'],'pairedRange':value['pairedRange'],'measuredPairs':5,'warmupPairs':1}
 assert len(raw)==3 and min(scheduled)>=99
