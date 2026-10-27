@@ -12,10 +12,9 @@
 
 ### Changed
 
-- The hosting guide's resource table now comes from a recheck on current main.
-  One Zen 4 core meets the delivery target with 250 official players and with
-  80 Battledome players, and still misses it at 375 and 500; one Zen 5 core
-  meets it at 500.
+- Refreshed the hosting guide's one-core EPYC measurements after indexed food
+  pickup and socket delivery, with current official-375/500 and Battledome-80
+  results and the same delivery target.
 
 ### Performance
 
