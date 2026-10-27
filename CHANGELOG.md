@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## [0.7.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.2...v0.7.0) - 2026-10-27
+
+### Added
+
+- *(battledome)* [**breaking**] preserve density with guarded spawn fallback ([#191](https://github.com/NikitaMGrimm/slither-sim/pull/191))
+- *(host)* support protocol-13 browser clients ([#190](https://github.com/NikitaMGrimm/slither-sim/pull/190))
+- *(battledome)* [**breaking**] keep food inside the pit and feed floor deaths ([#187](https://github.com/NikitaMGrimm/slither-sim/pull/187))
+- *(host)* name bot seats like official server bots ([#184](https://github.com/NikitaMGrimm/slither-sim/pull/184))
+- *(client)* [**breaking**] report live Battledome rules to socket bots ([#183](https://github.com/NikitaMGrimm/slither-sim/pull/183))
+- *(host)* give each bot seat its own stock skin ([#182](https://github.com/NikitaMGrimm/slither-sim/pull/182))
+- *(client)* [**breaking**] show Battledome kills and a visible pit ([#180](https://github.com/NikitaMGrimm/slither-sim/pull/180))
+- *(battledome)* [**breaking**] grow crowded arenas for safe spawns ([#176](https://github.com/NikitaMGrimm/slither-sim/pull/176))
+
+### Fixed
+
+- *(host)* wake socket delivery when frames are encoded ([#197](https://github.com/NikitaMGrimm/slither-sim/pull/197))
+- *(host)* align legacy minimaps with the player marker ([#196](https://github.com/NikitaMGrimm/slither-sim/pull/196))
+- *(host)* admit more browser mod clients ([#193](https://github.com/NikitaMGrimm/slither-sim/pull/193))
+- *(host)* cull food at moving arena edges ([#189](https://github.com/NikitaMGrimm/slither-sim/pull/189))
+- *(host)* number bot names from the first bot seat ([#185](https://github.com/NikitaMGrimm/slither-sim/pull/185))
+- *(bots)* keep Battledome foragers inside the live pit ([#181](https://github.com/NikitaMGrimm/slither-sim/pull/181))
+
+### Other
+
+- *(hosting)* name the browser mods that can join ([#194](https://github.com/NikitaMGrimm/slither-sim/pull/194))
+- *(host)* share minimap packets by recipient baseline ([#192](https://github.com/NikitaMGrimm/slither-sim/pull/192))
+- *(host)* avoid rebuilding the food-sector union each tick ([#188](https://github.com/NikitaMGrimm/slither-sim/pull/188))
+- *(host)* avoid repeated food scans for stable recipients ([#179](https://github.com/NikitaMGrimm/slither-sim/pull/179))
+- *(perf)* measure one-core EPYC socket capacity ([#178](https://github.com/NikitaMGrimm/slither-sim/pull/178))
+
 ### Added
 
 - Hosts accept the NTL browser mod. Its legacy login gets protocol 13 on that
