@@ -21,6 +21,9 @@ for p in sorted((root/"raw").glob("*/summary.json")):
     for key,value in fresh.items():
         if d[key]!=value:
             raise RuntimeError("reduction mismatch: "+p.parent.name+" / "+key)
+    if "diagnosticCpuClock" in d:
+        diagnostics=bench.module("diagnostics",root/"diagnostics.py")
+        bench.require(d["diagnosticCpuClock"]==diagnostics.cpu_clock(p.parent),"CPU/clock reduction mismatch")
     verified.append(d["attempt"])
     if d["label"]=="qualification":
         qualification.append((d["commit"],d["preset"],d["requested"]))
@@ -30,9 +33,11 @@ for p in sorted((root/"raw").glob("*/summary.json")):
     print("VERIFIED",d["label"],d["commit"][:7],d["preset"],d["requested"],flush=True)
 expected={(r,p,n) for r in [bench.BASE,bench.INDEX,bench.MAIN] for p,n in [("official",500),("official",375),("battledome",80)]}
 bench.require(len(qualification)==9 and set(qualification)==expected,"qualification census mismatch")
-for rev in [bench.BASE,bench.INDEX,bench.MAIN]:
+for rev in [bench.BASE,bench.INDEX,bench.MAIN,bench.CURRENT]:
+    if not (root/"bin"/rev/"pins.json").exists():
+        continue
     pins=json.loads((root/"bin"/rev/"pins.json").read_text())
     bench.require(bench.sha(root/"archives"/(rev+".tar"))==pins["archiveSha256"],"source archive changed")
     bench.require(bench.sha(root/"bin"/rev/"slither-sim")==pins["binarySha256"],"binary changed")
 bench.save(root/"verification.json",{"verifiedAttempts":verified,"qualificationRows":len(qualification),"exactReductionMatch":True,"sourceAndBinaryHashesMatch":True})
-print("All nine qualification rows and three valid smokes re-reduced exactly; hashes matched.",flush=True)
+print("All retained valid attempts re-reduced exactly; nine qualification rows and hashes matched.",flush=True)

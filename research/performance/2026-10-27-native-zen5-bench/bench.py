@@ -23,6 +23,7 @@ PERF = ROOT / "harness/research/performance"
 BASE = "4c2471ba9afff3609faae964cdaad49e3209da68"
 INDEX = "65ff713731cbd436bf5c19a25705fa77b0ebedcc"
 MAIN = "9960f4f84d1b831d4468486b1e0524710b7b9c45"
+CURRENT = "4cd6ce542b45e385d542d9423089d884bc314778"
 
 
 def require(ok, message):
@@ -181,7 +182,7 @@ def reduce_trial(out, count):
     return result
 
 
-def trial(revision, preset, count, hold=120, warmup=15, label="qualification"):
+def trial(revision, preset, count, hold=120, warmup=15, label="qualification", diagnostic=False):
     require(1 <= count <= 1000, "count must be 1..1000")
     require(not listening(), "bench port already in use; leave existing process untouched")
     bins = ROOT / "bin" / revision
@@ -197,6 +198,11 @@ def trial(revision, preset, count, hold=120, warmup=15, label="qualification"):
     epoch = time.time() + 8
     save(out / "attempt.json", {"commit": revision, "preset": preset, "count": count,
                                "hold": hold, "warmup": warmup, "label": label, "epoch": epoch})
+    worker = bins / "run_trial.py"
+    if diagnostic:
+        overlay = module("diagnostic_overlay", ROOT / "diagnostics.py")
+        worker = out / "diagnostic_worker.py"
+        overlay.worker_overlay(bins / "run_trial.py", worker)
     # Each per-trial bin dir uses the same frozen generator and the selected host.
     trial_bin = out / "bin"
     trial_bin.mkdir()
@@ -206,7 +212,7 @@ def trial(revision, preset, count, hold=120, warmup=15, label="qualification"):
     children, logs = [], []
     try:
         for role in ["host", "load"]:
-            command = [sys.executable, str(bins / "run_trial.py"), role, str(out / role),
+            command = [sys.executable, str(worker), role, str(out / role),
                        "--bin", str(trial_bin), "--count", str(count), "--preset", preset,
                        "--shards", "8", "--warmup", str(warmup), "--hold", str(hold), "--epoch", str(epoch)]
             log = (out / (role + "-worker.log")).open("w")
@@ -221,6 +227,8 @@ def trial(revision, preset, count, hold=120, warmup=15, label="qualification"):
             require(child.wait(timeout=max(1, epoch + warmup + hold + 60 - time.time())) == 0,
                     "worker failed; raw attempt retained")
         result = reduce_trial(out, count)
+        if diagnostic:
+            result["diagnosticCpuClock"] = overlay.cpu_clock(out)
         result.update(commit=revision, preset=preset, label=label, attempt=out.name)
         save(out / "summary.json", result)
         require(result["validTraffic"] and result["validAffinity"] and result["generatorHasHeadroom"],
@@ -264,6 +272,8 @@ def select():
             attempts.append({**json.loads(path.read_text()), "attempt": path.parent.name, "incomplete": True})
     harness_files = [ROOT / "bench.py", ROOT / "run.sh", ROOT / "verify.py", *(
         PERF / "2026-10-27-native-zen5-bench").glob("PLAN.md")]
+    harness_files.extend(ROOT / name for name in ["diagnostics.py", "DIAGNOSTICS.md"]
+                         if (ROOT / name).exists())
     for directory, names in [
         ("2026-10-26-host-capacity", ["host_capacity_load.rs", "run_trial.py", "analyze.py"]),
         ("2026-10-26-epyc-host", ["harness.patch", "analyze.py"]),
@@ -276,7 +286,8 @@ def select():
         "dataOrigin": "local-simulator", "rawAccess": "local-only; no public download",
         "seed": 7, "bots": 0, "shards": 8, "warmupSeconds": 15, "holdSeconds": 120,
         "grade": "excess p99 <=10 ms and zero newly deferred ticks, subject to traffic and occupancy",
-        "builds": [json.loads((ROOT / "bin" / rev / "pins.json").read_text()) for rev in [BASE, INDEX, MAIN]],
+        "builds": [json.loads((ROOT / "bin" / rev / "pins.json").read_text())
+                   for rev in [BASE, INDEX, MAIN, CURRENT] if (ROOT / "bin" / rev / "pins.json").exists()],
         "harnessSha256": {str(p.relative_to(ROOT)): sha(p) for p in harness_files},
         "retainedWrapperSha256": {p.name: sha(p) for p in sorted((ROOT / "retained").glob("*.py"))},
         "verification": json.loads((ROOT / "verification.json").read_text())
@@ -298,12 +309,19 @@ if __name__ == "__main__":
     p.add_argument("--count", type=int, default=500)
     sub.add_parser("suite")
     sub.add_parser("select")
+    sub.add_parser("diagnostic-suite")
     args = parser.parse_args()
     if args.action == "build":
         build(commit(args.commit))
     elif args.action == "trial":
-        trial(commit(args.commit), args.preset, args.count, label="rerun")
+        trial(commit(args.commit), args.preset, args.count, label="rerun", diagnostic=True)
     elif args.action == "suite":
         suite()
+    elif args.action == "diagnostic-suite":
+        trial(CURRENT, "official", 8, 8, 3, "smoke", diagnostic=True)
+        for revision in [BASE, INDEX, MAIN, MAIN, INDEX, BASE]:
+            trial(revision, "official", 500, label="rerun", diagnostic=True)
+        for preset, count in [("official", 500), ("official", 375), ("battledome", 80)]:
+            trial(CURRENT, preset, count, label="rerun", diagnostic=True)
     else:
         select()

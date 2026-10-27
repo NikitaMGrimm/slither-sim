@@ -1,0 +1,3445 @@
+{
+  "classification": "diagnostic; qualification rows unchanged",
+  "cpuClockByAttempt": [
+    {
+      "attempt": "20261027T200443.712881Z-qualification-4c2471b-official-500",
+      "commit": "4c2471ba9afff3609faae964cdaad49e3209da68",
+      "preset": "official",
+      "requested": 500,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 6.2139773655349435,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T200725.563095Z-qualification-65ff713-official-500",
+      "commit": "65ff713731cbd436bf5c19a25705fa77b0ebedcc",
+      "preset": "official",
+      "requested": 500,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 6.165886049682812,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T201006.241726Z-qualification-9960f4f-official-500",
+      "commit": "9960f4f84d1b831d4468486b1e0524710b7b9c45",
+      "preset": "official",
+      "requested": 500,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 5.046085637615214,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T201247.680871Z-qualification-9960f4f-official-375",
+      "commit": "9960f4f84d1b831d4468486b1e0524710b7b9c45",
+      "preset": "official",
+      "requested": 375,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 3.8120515662369474,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T201524.838299Z-qualification-65ff713-official-375",
+      "commit": "65ff713731cbd436bf5c19a25705fa77b0ebedcc",
+      "preset": "official",
+      "requested": 375,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 3.8441346322113974,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T201802.274551Z-qualification-4c2471b-official-375",
+      "commit": "4c2471ba9afff3609faae964cdaad49e3209da68",
+      "preset": "official",
+      "requested": 375,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 4.7596546493991365,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T202039.636330Z-qualification-4c2471b-battledome-80",
+      "commit": "4c2471ba9afff3609faae964cdaad49e3209da68",
+      "preset": "battledome",
+      "requested": 80,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 1.6409029924750627,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T202307.091980Z-qualification-65ff713-battledome-80",
+      "commit": "65ff713731cbd436bf5c19a25705fa77b0ebedcc",
+      "preset": "battledome",
+      "requested": 80,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 1.1993233389721751,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T202534.656338Z-qualification-9960f4f-battledome-80",
+      "commit": "9960f4f84d1b831d4468486b1e0524710b7b9c45",
+      "preset": "battledome",
+      "requested": 80,
+      "label": "qualification",
+      "combinedCpuMsPerExecutedTick": 1.2495624781239063,
+      "cpuClock": {
+        "status": "unavailable",
+        "reason": "original sampler retained combined CPU only",
+        "userMsPerExecutedTick": null,
+        "systemMsPerExecutedTick": null,
+        "observedCpu0Mhz": {
+          "count": 0
+        },
+        "cpu0StealPercent": null
+      }
+    },
+    {
+      "attempt": "20261027T203947.110084Z-rerun-4c2471b-official-500",
+      "commit": "4c2471ba9afff3609faae964cdaad49e3209da68",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 5.628536428863093,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17143,
+        "userMsPerExecutedTick": 3.5133873884384297,
+        "systemMsPerExecutedTick": 2.1151490404246633,
+        "totalMsPerExecutedTick": 5.628536428863093,
+        "resourceWindowSeconds": 119.99797058105469,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.03331667499583542
+      }
+    },
+    {
+      "attempt": "20261027T204227.441254Z-rerun-65ff713-official-500",
+      "commit": "65ff713731cbd436bf5c19a25705fa77b0ebedcc",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 5.153621495327103,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17120,
+        "userMsPerExecutedTick": 3.239485981308411,
+        "systemMsPerExecutedTick": 1.914135514018691,
+        "totalMsPerExecutedTick": 5.153621495327103,
+        "resourceWindowSeconds": 119.99765944480896,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.10763371419109125
+      }
+    },
+    {
+      "attempt": "20261027T204508.683507Z-rerun-9960f4f-official-500",
+      "commit": "9960f4f84d1b831d4468486b1e0524710b7b9c45",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 4.719402636798507,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17142,
+        "userMsPerExecutedTick": 2.6531326566328315,
+        "systemMsPerExecutedTick": 2.0662699801656745,
+        "totalMsPerExecutedTick": 4.719402636798507,
+        "resourceWindowSeconds": 119.99937462806702,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.07105426769695355
+      }
+    },
+    {
+      "attempt": "20261027T204749.671870Z-rerun-9960f4f-official-500",
+      "commit": "9960f4f84d1b831d4468486b1e0524710b7b9c45",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 4.783876801026658,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17143,
+        "userMsPerExecutedTick": 2.9580586828443094,
+        "systemMsPerExecutedTick": 1.8258181181823483,
+        "totalMsPerExecutedTick": 4.783876801026658,
+        "resourceWindowSeconds": 119.99697470664978,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.07395234182415776
+      }
+    },
+    {
+      "attempt": "20261027T205030.555090Z-rerun-65ff713-official-500",
+      "commit": "65ff713731cbd436bf5c19a25705fa77b0ebedcc",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 5.8148476782017156,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 16905,
+        "userMsPerExecutedTick": 3.5107956225968646,
+        "systemMsPerExecutedTick": 2.3040520556048505,
+        "totalMsPerExecutedTick": 5.8148476782017156,
+        "resourceWindowSeconds": 120.00414752960205,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.06972285166463309
+      }
+    },
+    {
+      "attempt": "20261027T205310.058873Z-rerun-4c2471b-official-500",
+      "commit": "4c2471ba9afff3609faae964cdaad49e3209da68",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 5.9058630201302895,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17039,
+        "userMsPerExecutedTick": 3.5019660778214683,
+        "systemMsPerExecutedTick": 2.403896942308821,
+        "totalMsPerExecutedTick": 5.9058630201302895,
+        "resourceWindowSeconds": 120.00210475921631,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.05167513564723107
+      }
+    },
+    {
+      "attempt": "20261027T205550.508407Z-rerun-4cd6ce5-official-500",
+      "commit": "4cd6ce542b45e385d542d9423089d884bc314778",
+      "preset": "official",
+      "requested": 500,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 4.708627428104766,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17143,
+        "userMsPerExecutedTick": 2.904975791868401,
+        "systemMsPerExecutedTick": 1.8036516362363644,
+        "totalMsPerExecutedTick": 4.708627428104766,
+        "resourceWindowSeconds": 119.99878096580505,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.05581692050075752
+      }
+    },
+    {
+      "attempt": "20261027T205831.420041Z-rerun-4cd6ce5-official-375",
+      "commit": "4cd6ce542b45e385d542d9423089d884bc314778",
+      "preset": "official",
+      "requested": 375,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 3.1908067432771383,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17143,
+        "userMsPerExecutedTick": 1.8030683077641019,
+        "systemMsPerExecutedTick": 1.3877384355130373,
+        "totalMsPerExecutedTick": 3.1908067432771388,
+        "resourceWindowSeconds": 120.00124096870422,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.03350083752093802
+      }
+    },
+    {
+      "attempt": "20261027T210108.141664Z-rerun-4cd6ce5-battledome-80",
+      "commit": "4cd6ce542b45e385d542d9423089d884bc314778",
+      "preset": "battledome",
+      "requested": 80,
+      "label": "rerun",
+      "combinedCpuMsPerExecutedTick": 1.0336580528495596,
+      "cpuClock": {
+        "status": "measured",
+        "executedTicks": 17143,
+        "userMsPerExecutedTick": 0.9671586070116083,
+        "systemMsPerExecutedTick": 0.06649944583795137,
+        "totalMsPerExecutedTick": 1.0336580528495596,
+        "resourceWindowSeconds": 119.99703764915466,
+        "observedCpu0Mhz": {
+          "count": 121,
+          "min": 2600.0,
+          "p50": 2600.0,
+          "p99": 2600.0,
+          "max": 2600.0
+        },
+        "cpu0StealPercent": 0.048057669203043656
+      }
+    }
+  ],
+  "original211Anomaly": {
+    "attempt": "20261027T200725.563095Z-qualification-65ff713-official-500",
+    "deferredTicks": 275,
+    "sampledDeferralIncrements": [
+      {
+        "label": "deferral increment",
+        "startSeconds": 49.047396183013916,
+        "endSeconds": 50.04750919342041,
+        "tickBusyMs": {
+          "count": 127,
+          "min": 5.42546,
+          "p50": 7.597639999999999,
+          "p99": 10.610279,
+          "max": 13.098538999999999
+        },
+        "tickStartGapMs": {
+          "count": 127,
+          "min": 5.42593,
+          "p50": 7.59793,
+          "p99": 10.610869,
+          "max": 13.099008999999999
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.28626441955566406,
+          "sampleEndOffsetSeconds": 0.2921717166900635,
+          "windowSeconds": 1.0060203075408936,
+          "cpuPercentOneCore": 100.39558768637906,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 42.4296875,
+          "rssMiBMax": 42.6796875,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9940157196671222,
+            "slither-simulat": 58.646927460360146,
+            "slither-sockets": 40.75464450635199
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.39558768637906
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.24434542655944824,
+          "sampleEndOffsetSeconds": 0.25089454650878906,
+          "windowSeconds": 1.006662130355835,
+          "cpuPercentOneCore": 107.28525166812818,
+          "aggregateStealPercent": 0.25,
+          "rssMiBMin": 267.80859375,
+          "rssMiBMax": 271.43359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 107.2852516681282
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 41.72204231538307,
+            "2": 38.74189643571307,
+            "3": 26.821312917032046
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 2
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 50.04750919342041,
+        "endSeconds": 51.04756689071655,
+        "tickBusyMs": {
+          "count": 128,
+          "min": 5.362569,
+          "p50": 7.545589,
+          "p99": 11.616759,
+          "max": 12.223118999999999
+        },
+        "tickStartGapMs": {
+          "count": 128,
+          "min": 5.363049,
+          "p50": 7.564528999999999,
+          "p99": 11.617249,
+          "max": 12.223789
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.2921717166900635,
+          "sampleEndOffsetSeconds": 0.29877734184265137,
+          "windowSeconds": 1.0066633224487305,
+          "cpuPercentOneCore": 99.33807835250003,
+          "aggregateStealPercent": 0.24330900243309003,
+          "rssMiBMin": 42.6796875,
+          "rssMiBMax": 42.6796875,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9933807835250013,
+            "slither-simulat": 56.62270466092505,
+            "slither-sockets": 41.72199290805019
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.33807835250003
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.25089454650878906,
+          "sampleEndOffsetSeconds": 0.25609469413757324,
+          "windowSeconds": 1.0052578449249268,
+          "cpuPercentOneCore": 92.51357795366964,
+          "aggregateStealPercent": 0.24509803921568626,
+          "rssMiBMin": 271.43359375,
+          "rssMiBMax": 274.55859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 92.51357795366962
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 36.80647725038473,
+            "2": 33.82216828413721,
+            "3": 21.88493241914768
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 15
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 51.04756689071655,
+        "endSeconds": 52.04850506782532,
+        "tickBusyMs": {
+          "count": 127,
+          "min": 5.14373,
+          "p50": 7.685308999999999,
+          "p99": 10.084099,
+          "max": 11.631979
+        },
+        "tickStartGapMs": {
+          "count": 127,
+          "min": 5.1442,
+          "p50": 7.685988999999999,
+          "p99": 10.084648999999999,
+          "max": 11.632539
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.29877734184265137,
+          "sampleEndOffsetSeconds": 0.3037455081939697,
+          "windowSeconds": 1.005906343460083,
+          "cpuPercentOneCore": 100.4069619966647,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 42.6796875,
+          "rssMiBMax": 44.36328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9941283366006365,
+            "slither-simulat": 58.65357185943749,
+            "slither-sockets": 40.75926180062572
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.4069619966647
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.25609469413757324,
+          "sampleEndOffsetSeconds": 0.26056981086730957,
+          "windowSeconds": 1.005413293838501,
+          "cpuPercentOneCore": 98.46696936145976,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 274.55859375,
+          "rssMiBMax": 277.68359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 98.46696936145976
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 37.79540238116627,
+            "2": 36.8007865290305,
+            "3": 23.870780451262988
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 15
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 52.04850506782532,
+        "endSeconds": 53.048885107040405,
+        "tickBusyMs": {
+          "count": 127,
+          "min": 4.880019,
+          "p50": 7.56949,
+          "p99": 11.07521,
+          "max": 11.42536
+        },
+        "tickStartGapMs": {
+          "count": 127,
+          "min": 4.880218999999999,
+          "p50": 7.548439999999999,
+          "p99": 11.07574,
+          "max": 11.46403
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.3037455081939697,
+          "sampleEndOffsetSeconds": 0.31121349334716797,
+          "windowSeconds": 1.0078480243682861,
+          "cpuPercentOneCore": 99.22130875106838,
+          "aggregateStealPercent": 0.24937655860349128,
+          "rssMiBMin": 44.36328125,
+          "rssMiBMax": 44.48828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.992213087510679,
+            "slither-simulat": 57.548359075619835,
+            "slither-sockets": 41.67294967544888
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.22130875106838
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.26056981086730957,
+          "sampleEndOffsetSeconds": 0.2662534713745117,
+          "windowSeconds": 1.00606369972229,
+          "cpuPercentOneCore": 126.23455158461276,
+          "aggregateStealPercent": 0.2506265664160401,
+          "rssMiBMin": 277.68359375,
+          "rssMiBMax": 281.43359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 126.23455158461276
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 55.66247943888452,
+            "2": 43.73480527340917,
+            "3": 26.837266872319077
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 16
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 53.048885107040405,
+        "endSeconds": 54.04987597465515,
+        "tickBusyMs": {
+          "count": 125,
+          "min": 5.263148999999999,
+          "p50": 7.649019999999999,
+          "p99": 11.679209,
+          "max": 12.649089
+        },
+        "tickStartGapMs": {
+          "count": 125,
+          "min": 5.263599,
+          "p50": 7.6738599999999995,
+          "p99": 11.679898999999999,
+          "max": 12.649649
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.31121349334716797,
+          "sampleEndOffsetSeconds": 0.317852258682251,
+          "windowSeconds": 1.007629632949829,
+          "cpuPercentOneCore": 100.2352418956983,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 44.48828125,
+          "rssMiBMax": 44.61328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9924281375811741,
+            "slither-simulat": 58.55326011728885,
+            "slither-sockets": 39.69712550324678
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.2352418956983
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.2662534713745117,
+          "sampleEndOffsetSeconds": 0.2726283073425293,
+          "windowSeconds": 1.0073657035827637,
+          "cpuPercentOneCore": 108.20300871107122,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 281.43359375,
+          "rssMiBMax": 284.43359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 109.19569686438378
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 46.65634320569125,
+            "2": 33.75139721262766,
+            "3": 27.79526829275231
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 18
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 54.04987597465515,
+        "endSeconds": 55.05079245567322,
+        "tickBusyMs": {
+          "count": 123,
+          "min": 5.337039,
+          "p50": 7.771519,
+          "p99": 13.909099,
+          "max": 16.261769
+        },
+        "tickStartGapMs": {
+          "count": 123,
+          "min": 5.337579,
+          "p50": 7.7321599999999995,
+          "p99": 13.909958999999999,
+          "max": 16.262389
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.317852258682251,
+          "sampleEndOffsetSeconds": 0.32271838188171387,
+          "windowSeconds": 1.0057826042175293,
+          "cpuPercentOneCore": 100.41931484644732,
+          "aggregateStealPercent": 0.5,
+          "rssMiBMin": 44.61328125,
+          "rssMiBMax": 44.61328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9942506420440358,
+            "slither-simulat": 57.66653723855386,
+            "slither-sockets": 40.76427632380545
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.41931484644732
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.2726283073425293,
+          "sampleEndOffsetSeconds": 0.27691054344177246,
+          "windowSeconds": 1.0051987171173096,
+          "cpuPercentOneCore": 93.51384795791547,
+          "aggregateStealPercent": 0.49504950495049505,
+          "rssMiBMin": 284.43359375,
+          "rssMiBMax": 287.55859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 92.51901978815044
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 36.808642281307165,
+            "2": 32.82932960224683,
+            "3": 23.875876074361475
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 19
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 55.05079245567322,
+        "endSeconds": 56.05159544944763,
+        "tickBusyMs": {
+          "count": 125,
+          "min": 4.2985,
+          "p50": 7.721079,
+          "p99": 10.494579,
+          "max": 12.661859
+        },
+        "tickStartGapMs": {
+          "count": 125,
+          "min": 4.29943,
+          "p50": 7.863378999999999,
+          "p99": 10.495218999999999,
+          "max": 12.662348999999999
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.32271838188171387,
+          "sampleEndOffsetSeconds": 0.32835817337036133,
+          "windowSeconds": 1.0064427852630615,
+          "cpuPercentOneCore": 99.35984584942128,
+          "aggregateStealPercent": 0.2518891687657431,
+          "rssMiBMin": 44.61328125,
+          "rssMiBMax": 44.86328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9935984584942137,
+            "slither-simulat": 57.62871059266488,
+            "slither-sockets": 41.731135256757106
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.35984584942128
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.27691054344177246,
+          "sampleEndOffsetSeconds": 0.2812182903289795,
+          "windowSeconds": 1.005110740661621,
+          "cpuPercentOneCore": 93.52203314246182,
+          "aggregateStealPercent": 0.2544529262086514,
+          "rssMiBMin": 287.55859375,
+          "rssMiBMax": 291.05859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 94.51694838865821
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 34.82203361687405,
+            "2": 37.806779355463355,
+            "3": 20.89322017012443
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 19
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 56.05159544944763,
+        "endSeconds": 57.05167102813721,
+        "tickBusyMs": {
+          "count": 124,
+          "min": 4.87627,
+          "p50": 7.731189,
+          "p99": 12.447068999999999,
+          "max": 12.815029
+        },
+        "tickStartGapMs": {
+          "count": 124,
+          "min": 4.876729999999999,
+          "p50": 7.731579,
+          "p99": 12.447669,
+          "max": 12.815679
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.32835817337036133,
+          "sampleEndOffsetSeconds": 0.33623337745666504,
+          "windowSeconds": 1.007950782775879,
+          "cpuPercentOneCore": 100.20330528624379,
+          "aggregateStealPercent": 0.25252525252525254,
+          "rssMiBMin": 44.86328125,
+          "rssMiBMax": 44.98828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9921119335271691,
+            "slither-simulat": 58.53460407810256,
+            "slither-sockets": 40.67658927461391
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.20330528624379
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.2812182903289795,
+          "sampleEndOffsetSeconds": 0.2884488105773926,
+          "windowSeconds": 1.0073060989379883,
+          "cpuPercentOneCore": 96.2964486190123,
+          "aggregateStealPercent": 0.2518891687657431,
+          "rssMiBMin": 291.05859375,
+          "rssMiBMax": 294.05859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 95.3037017260328
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 35.738888147262344,
+            "2": 33.753394361303194,
+            "3": 26.80416611044676
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 17
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 57.05167102813721,
+        "endSeconds": 58.051737785339355,
+        "tickBusyMs": {
+          "count": 124,
+          "min": 5.6181,
+          "p50": 8.01746,
+          "p99": 11.038419,
+          "max": 13.721969999999999
+        },
+        "tickStartGapMs": {
+          "count": 124,
+          "min": 5.6282,
+          "p50": 8.01508,
+          "p99": 11.039069,
+          "max": 13.72213
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.33623337745666504,
+          "sampleEndOffsetSeconds": 0.3429253101348877,
+          "windowSeconds": 1.006758689880371,
+          "cpuPercentOneCore": 100.32195501784238,
+          "aggregateStealPercent": 0.25,
+          "rssMiBMin": 44.98828125,
+          "rssMiBMax": 44.98828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9932866833449698,
+            "slither-simulat": 58.603914317353514,
+            "slither-sockets": 40.724754017143745
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.32195501784238
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.2884488105773926,
+          "sampleEndOffsetSeconds": 0.29391050338745117,
+          "windowSeconds": 1.005528450012207,
+          "cpuPercentOneCore": 104.42270429914278,
+          "aggregateStealPercent": 0.24937655860349128,
+          "rssMiBMin": 294.05859375,
+          "rssMiBMax": 297.05859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 104.42270429914278
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 42.76358366536318,
+            "2": 36.79657199112658,
+            "3": 24.862548642653028
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 21
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 58.051737785339355,
+        "endSeconds": 59.05230736732483,
+        "tickBusyMs": {
+          "count": 123,
+          "min": 5.994939,
+          "p50": 8.12224,
+          "p99": 11.714898999999999,
+          "max": 12.708909
+        },
+        "tickStartGapMs": {
+          "count": 123,
+          "min": 5.995399,
+          "p50": 8.12323,
+          "p99": 11.287768999999999,
+          "max": 12.709359
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.3429253101348877,
+          "sampleEndOffsetSeconds": 0.350818395614624,
+          "windowSeconds": 1.00846266746521,
+          "cpuPercentOneCore": 99.1608348292673,
+          "aggregateStealPercent": 0.75,
+          "rssMiBMin": 44.98828125,
+          "rssMiBMax": 45.11328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9916083482926684,
+            "slither-simulat": 57.513284200974866,
+            "slither-sockets": 40.65594227999961
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.1608348292673
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.29391050338745117,
+          "sampleEndOffsetSeconds": 0.29902100563049316,
+          "windowSeconds": 1.0056800842285156,
+          "cpuPercentOneCore": 108.3843676626219,
+          "aggregateStealPercent": 0.5037783375314862,
+          "rssMiBMin": 297.05859375,
+          "rssMiBMax": 300.30859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 109.37871965952667
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 38.779727879286796,
+            "2": 38.77972787928662,
+            "3": 30.82491190404848
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 19
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 59.05230736732483,
+        "endSeconds": 60.05291795730591,
+        "tickBusyMs": {
+          "count": 126,
+          "min": 5.15379,
+          "p50": 8.087729999999999,
+          "p99": 9.967338999999999,
+          "max": 10.169459999999999
+        },
+        "tickStartGapMs": {
+          "count": 126,
+          "min": 5.15409,
+          "p50": 8.08816,
+          "p99": 10.16978,
+          "max": 11.715048999999999
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.350818395614624,
+          "sampleEndOffsetSeconds": 0.36045312881469727,
+          "windowSeconds": 1.0102453231811523,
+          "cpuPercentOneCore": 99.9757164744525,
+          "aggregateStealPercent": 0.24813895781637718,
+          "rssMiBMin": 45.11328125,
+          "rssMiBMax": 45.11328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.989858578954971,
+            "slither-simulat": 58.401656158342874,
+            "slither-sockets": 39.59434315819866
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.9757164744525
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.29902100563049316,
+          "sampleEndOffsetSeconds": 0.30432796478271484,
+          "windowSeconds": 1.0059175491333008,
+          "cpuPercentOneCore": 103.38819527465901,
+          "aggregateStealPercent": 0.49627791563275436,
+          "rssMiBMin": 300.30859375,
+          "rssMiBMax": 303.55859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 102.39407801240269
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 35.788221441228025,
+            "2": 39.76469049025364,
+            "3": 27.835283343177338
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 17
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 60.05291795730591,
+        "endSeconds": 61.0535683631897,
+        "tickBusyMs": {
+          "count": 124,
+          "min": 4.5215,
+          "p50": 7.605179,
+          "p99": 11.613389,
+          "max": 14.920378999999999
+        },
+        "tickStartGapMs": {
+          "count": 124,
+          "min": 4.52194,
+          "p50": 7.6098289999999995,
+          "p99": 11.613809,
+          "max": 14.920909
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.36045312881469727,
+          "sampleEndOffsetSeconds": 0.36641573905944824,
+          "windowSeconds": 1.00661301612854,
+          "cpuPercentOneCore": 100.33647328389188,
+          "aggregateStealPercent": 0.2518891687657431,
+          "rssMiBMin": 45.11328125,
+          "rssMiBMax": 45.48828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.0,
+            "slither-simulat": 58.61239528465059,
+            "slither-sockets": 41.724077999242716
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.33647328389188
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.30432796478271484,
+          "sampleEndOffsetSeconds": 0.30942821502685547,
+          "windowSeconds": 1.0057506561279297,
+          "cpuPercentOneCore": 95.45109358376467,
+          "aggregateStealPercent": 0.2518891687657431,
+          "rssMiBMin": 303.55859375,
+          "rssMiBMax": 306.93359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 95.45109358376467
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 35.79416009391179,
+            "2": 36.78844231874248,
+            "3": 22.868491171110392
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 20
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 61.0535683631897,
+        "endSeconds": 62.053852796554565,
+        "tickBusyMs": {
+          "count": 128,
+          "min": 4.041099,
+          "p50": 7.4470089999999995,
+          "p99": 11.893479,
+          "max": 12.990578999999999
+        },
+        "tickStartGapMs": {
+          "count": 128,
+          "min": 4.041348999999999,
+          "p50": 7.447648999999999,
+          "p99": 11.893739,
+          "max": 12.990998999999999
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.36641573905944824,
+          "sampleEndOffsetSeconds": 0.3728623390197754,
+          "windowSeconds": 1.0067310333251953,
+          "cpuPercentOneCore": 99.33139705617666,
+          "aggregateStealPercent": 0.25510204081632654,
+          "rssMiBMin": 45.48828125,
+          "rssMiBMax": 45.48828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9933139705617676,
+            "slither-simulat": 57.6122102925823,
+            "slither-sockets": 41.71918676359402
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.33139705617666
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.30942821502685547,
+          "sampleEndOffsetSeconds": 0.3144207000732422,
+          "windowSeconds": 1.0052769184112549,
+          "cpuPercentOneCore": 100.4698289100491,
+          "aggregateStealPercent": 0.2564102564102564,
+          "rssMiBMin": 306.93359375,
+          "rssMiBMax": 310.30859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 100.46982891004909
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 35.811028126354195,
+            "2": 41.77953281407993,
+            "3": 22.87926796961497
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 14
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 62.053852796554565,
+        "endSeconds": 63.0545699596405,
+        "tickBusyMs": {
+          "count": 128,
+          "min": 5.1788989999999995,
+          "p50": 7.46106,
+          "p99": 13.130569,
+          "max": 14.387868999999998
+        },
+        "tickStartGapMs": {
+          "count": 128,
+          "min": 5.179069,
+          "p50": 7.482228999999999,
+          "p99": 13.130889,
+          "max": 14.388098999999999
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.3728623390197754,
+          "sampleEndOffsetSeconds": 0.377913236618042,
+          "windowSeconds": 1.005768060684204,
+          "cpuPercentOneCore": 100.42076692243758,
+          "aggregateStealPercent": 0.2557544757033248,
+          "rssMiBMin": 45.48828125,
+          "rssMiBMax": 45.48828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9942650190340312,
+            "slither-simulat": 57.66737110397359,
+            "slither-sockets": 41.75913079942944
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.42076692243758
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.3144207000732422,
+          "sampleEndOffsetSeconds": 0.31999993324279785,
+          "windowSeconds": 1.0062963962554932,
+          "cpuPercentOneCore": 95.39932802822624,
+          "aggregateStealPercent": 0.25510204081632654,
+          "rssMiBMin": 310.30859375,
+          "rssMiBMax": 313.30859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 95.39932802822625
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 35.77474801058489,
+            "2": 35.77474801058471,
+            "3": 23.849832007056648
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 15
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 63.0545699596405,
+        "endSeconds": 64.05493330955505,
+        "tickBusyMs": {
+          "count": 129,
+          "min": 5.126399,
+          "p50": 7.56863,
+          "p99": 11.284289,
+          "max": 12.164
+        },
+        "tickStartGapMs": {
+          "count": 129,
+          "min": 5.126549,
+          "p50": 7.57081,
+          "p99": 11.284709,
+          "max": 12.16415
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.377913236618042,
+          "sampleEndOffsetSeconds": 0.38599634170532227,
+          "windowSeconds": 1.008446455001831,
+          "cpuPercentOneCore": 99.1624290055325,
+          "aggregateStealPercent": 0.24813895781637718,
+          "rssMiBMin": 45.48828125,
+          "rssMiBMax": 45.73828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9916242900553259,
+            "slither-simulat": 57.51420882320939,
+            "slither-sockets": 40.656595892268335
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.1624290055325
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.31999993324279785,
+          "sampleEndOffsetSeconds": 0.3252871036529541,
+          "windowSeconds": 1.005650520324707,
+          "cpuPercentOneCore": 105.40441023763869,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 313.30859375,
+          "rssMiBMax": 316.68359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 105.4044102376387
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 41.76401160359259,
+            "2": 35.797724231651095,
+            "3": 27.842674402395005
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 14
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 64.05493330955505,
+        "endSeconds": 65.05509185791016,
+        "tickBusyMs": {
+          "count": 126,
+          "min": 5.4937499999999995,
+          "p50": 7.64863,
+          "p99": 11.720519999999999,
+          "max": 11.731549
+        },
+        "tickStartGapMs": {
+          "count": 126,
+          "min": 5.49425,
+          "p50": 7.59206,
+          "p99": 11.601358999999999,
+          "max": 11.72124
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.38599634170532227,
+          "sampleEndOffsetSeconds": 0.39269423484802246,
+          "windowSeconds": 1.0068564414978027,
+          "cpuPercentOneCore": 100.31221516520388,
+          "aggregateStealPercent": 0.0,
+          "rssMiBMin": 45.73828125,
+          "rssMiBMax": 45.73828125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9931902491604442,
+            "slither-simulat": 57.605034451305535,
+            "slither-sockets": 40.72080021557783
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 100.31221516520388
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.3252871036529541,
+          "sampleEndOffsetSeconds": 0.33228588104248047,
+          "windowSeconds": 1.007157325744629,
+          "cpuPercentOneCore": 111.20407620248835,
+          "aggregateStealPercent": 0.24691358024691357,
+          "rssMiBMin": 316.68359375,
+          "rssMiBMax": 319.80859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 111.20407620248835
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 46.665996263544244,
+            "2": 40.70863503841072,
+            "3": 23.829444900533396
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 16
+      },
+      {
+        "label": "deferral increment",
+        "startSeconds": 65.05509185791016,
+        "endSeconds": 66.05565357208252,
+        "tickBusyMs": {
+          "count": 132,
+          "min": 2.98521,
+          "p50": 7.4457189999999995,
+          "p99": 11.740719,
+          "max": 12.715269
+        },
+        "tickStartGapMs": {
+          "count": 132,
+          "min": 2.98595,
+          "p50": 7.47999,
+          "p99": 11.772269,
+          "max": 12.715848999999999
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.39269423484802246,
+          "sampleEndOffsetSeconds": 0.3990190029144287,
+          "windowSeconds": 1.0068864822387695,
+          "cpuPercentOneCore": 98.32290108799414,
+          "aggregateStealPercent": 0.5076142131979695,
+          "rssMiBMin": 45.73828125,
+          "rssMiBMax": 45.86328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 1.9863212341008698,
+            "slither-simulat": 53.630673320723496,
+            "slither-sockets": 44.69222776726994
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 98.32290108799414
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.33228588104248047,
+          "sampleEndOffsetSeconds": 0.3379483222961426,
+          "windowSeconds": 1.0062241554260254,
+          "cpuPercentOneCore": 113.29483533590343,
+          "aggregateStealPercent": 0.5037783375314862,
+          "rssMiBMin": 319.80859375,
+          "rssMiBMax": 324.05859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 113.29483533590346
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 43.72783118227863,
+            "2": 40.74638814712316,
+            "3": 28.820616006501652
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "deferredTicks": 18
+      }
+    ],
+    "windows": [
+      {
+        "label": "before",
+        "startSeconds": 34.047396183013916,
+        "endSeconds": 49.047396183013916,
+        "tickBusyMs": {
+          "count": 2122,
+          "min": 2.01622,
+          "p50": 4.4408199999999995,
+          "p99": 8.99251,
+          "max": 12.459589
+        },
+        "tickStartGapMs": {
+          "count": 2122,
+          "min": 3.69649,
+          "p50": 7.00047,
+          "p99": 9.04303,
+          "max": 12.460149
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.18606901168823242,
+          "sampleEndOffsetSeconds": 0.28626441955566406,
+          "windowSeconds": 15.100195407867432,
+          "cpuPercentOneCore": 85.29690942469081,
+          "aggregateStealPercent": 0.45279221868187153,
+          "rssMiBMin": 40.6796875,
+          "rssMiBMax": 42.4296875,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.5297944684763402,
+            "slither-simulat": 47.41660492863245,
+            "slither-sockets": 37.28428571902244
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 85.29690942469081
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.15579748153686523,
+          "sampleEndOffsetSeconds": 0.24434542655944824,
+          "windowSeconds": 15.088547945022583,
+          "cpuPercentOneCore": 100.73865328448774,
+          "aggregateStealPercent": 0.43646130602652344,
+          "rssMiBMin": 211.18359375,
+          "rssMiBMax": 267.80859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 100.73865328448775
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 37.71071955189048,
+            "2": 37.5118932625132,
+            "3": 25.51604047008407
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        }
+      },
+      {
+        "label": "deferral episode",
+        "startSeconds": 49.047396183013916,
+        "endSeconds": 66.05565357208252,
+        "tickBusyMs": {
+          "count": 2146,
+          "min": 2.98521,
+          "p50": 7.625019999999999,
+          "p99": 11.702568999999999,
+          "max": 16.261769
+        },
+        "tickStartGapMs": {
+          "count": 2146,
+          "min": 2.98595,
+          "p50": 7.628349,
+          "p99": 11.702869,
+          "max": 16.262389
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.28626441955566406,
+          "sampleEndOffsetSeconds": 0.3990190029144287,
+          "windowSeconds": 17.121011972427368,
+          "cpuPercentOneCore": 99.81886600816992,
+          "aggregateStealPercent": 0.25092250922509224,
+          "rssMiBMin": 42.4296875,
+          "rssMiBMax": 45.86328125,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.9929319614621931,
+            "slither-simulat": 57.7068692896851,
+            "slither-sockets": 41.177472519461546
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 99.81886600816992
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.24434542655944824,
+          "sampleEndOffsetSeconds": 0.3379483222961426,
+          "windowSeconds": 17.101860284805298,
+          "cpuPercentOneCore": 103.14667355616763,
+          "aggregateStealPercent": 0.26603606266627255,
+          "rssMiBMin": 267.80859375,
+          "rssMiBMax": 324.05859375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 103.14667355616763
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 40.171068442793185,
+            "2": 37.5397757500338,
+            "3": 25.435829363340655
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        }
+      },
+      {
+        "label": "after",
+        "startSeconds": 66.05565357208252,
+        "endSeconds": 81.05565357208252,
+        "tickBusyMs": {
+          "count": 2173,
+          "min": 2.0624599999999997,
+          "p50": 5.233019,
+          "p99": 9.43042,
+          "max": 16.193269
+        },
+        "tickStartGapMs": {
+          "count": 2173,
+          "min": 2.06342,
+          "p50": 6.999639999999999,
+          "p99": 9.43139,
+          "max": 16.194558999999998
+        },
+        "host": {
+          "sampleStartOffsetSeconds": 0.3990190029144287,
+          "sampleEndOffsetSeconds": -0.4956653118133545,
+          "windowSeconds": 14.105315685272217,
+          "cpuPercentOneCore": 92.16383589042032,
+          "aggregateStealPercent": 1.3772133786442498,
+          "rssMiBMin": 45.86328125,
+          "rssMiBMax": 49.48046875,
+          "threadCpuPercentOneCore": {
+            "slither-sim": 0.5671620670179716,
+            "slither-simulat": 52.604281715916834,
+            "slither-sockets": 38.92149684910828
+          },
+          "processCpuPercentByPinnedCore": {
+            "0": 92.16383589042032
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        },
+        "generator": {
+          "sampleStartOffsetSeconds": 0.3379483222961426,
+          "sampleEndOffsetSeconds": 0.45138120651245117,
+          "windowSeconds": 15.113432884216309,
+          "cpuPercentOneCore": 105.00592500446282,
+          "aggregateStealPercent": 1.3197460741730704,
+          "rssMiBMin": 324.05859375,
+          "rssMiBMax": 380.68359375,
+          "threadCpuPercentOneCore": {
+            "host_capacity_l": 105.07209130881344
+          },
+          "processCpuPercentByPinnedCore": {
+            "1": 39.36895108862973,
+            "2": 38.77345434947398,
+            "3": 26.863519566359102
+          },
+          "userSystemSplit": "unavailable in original retained telemetry"
+        }
+      }
+    ],
+    "samplingLimit": "counters and resources sampled about once per second; tick timings buffered per tick",
+    "missingObservations": [
+      "host user/system CPU split",
+      "CPU-0-specific steal",
+      "clock MHz"
+    ]
+  },
+  "sourceSha256": "40c5726604d7da13432e22c71f1ab856ab81db308617d337f9439ed486675eb4",
+  "rerunDeferralDiagnostics": [
+    {
+      "attempt": "20261027T205030.555090Z-rerun-65ff713-official-500",
+      "deferredTicks": 237,
+      "sampledDeferralIncrements": [
+        {
+          "label": "deferral increment",
+          "startSeconds": 32.0351300239563,
+          "endSeconds": 33.0355966091156,
+          "tickBusyMs": {
+            "count": 129,
+            "min": 5.48117,
+            "p50": 7.43073,
+            "p99": 10.53835,
+            "max": 11.606648999999999
+          },
+          "tickStartGapMs": {
+            "count": 129,
+            "min": 5.481669999999999,
+            "p50": 7.4358889999999995,
+            "p99": 10.53999,
+            "max": 11.637659
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.16237473487854004,
+            "sampleEndOffsetSeconds": 0.16818571090698242,
+            "windowSeconds": 1.0062775611877441,
+            "cpuPercentOneCore": 100.36992167527418,
+            "aggregateStealPercent": 0.24937655860349128,
+            "rssMiBMin": 41.03125,
+            "rssMiBMax": 41.40625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9937616007452891,
+              "slither-simulat": 57.63817284322705,
+              "slither-sockets": 40.74422563055694
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.36992167527418
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 61.61321924620813,
+            "systemCpuPercentOneCore": 38.7567024290664,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.14060282707214355,
+            "sampleEndOffsetSeconds": 0.14548397064208984,
+            "windowSeconds": 1.005347728729248,
+            "cpuPercentOneCore": 90.51594527897649,
+            "aggregateStealPercent": 0.24937655860349128,
+            "rssMiBMin": 201.859375,
+            "rssMiBMax": 205.484375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 90.5159452789765
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 34.81382510729874,
+              "2": 31.829782955244447,
+              "3": 23.872337216433316
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 58.68616232373209,
+            "systemCpuPercentOneCore": 31.829782955244497,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 11
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 33.0355966091156,
+          "endSeconds": 34.03654646873474,
+          "tickBusyMs": {
+            "count": 142,
+            "min": 3.3429089999999997,
+            "p50": 7.390409999999999,
+            "p99": 10.56743,
+            "max": 10.66368
+          },
+          "tickStartGapMs": {
+            "count": 142,
+            "min": 3.343079,
+            "p50": 7.392239,
+            "p99": 10.5677,
+            "max": 10.66495
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.16818571090698242,
+            "sampleEndOffsetSeconds": 0.17461895942687988,
+            "windowSeconds": 1.007383108139038,
+            "cpuPercentOneCore": 99.2671002641014,
+            "aggregateStealPercent": 0.2557544757033248,
+            "rssMiBMin": 41.40625,
+            "rssMiBMax": 41.53125,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.0,
+              "slither-simulat": 58.56758915581981,
+              "slither-sockets": 40.69951110828159
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.2671002641014
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 67.50162817958892,
+            "systemCpuPercentOneCore": 31.765472084512474,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.14548397064208984,
+            "sampleEndOffsetSeconds": 0.14977097511291504,
+            "windowSeconds": 1.0052368640899658,
+            "cpuPercentOneCore": 95.4998801072702,
+            "aggregateStealPercent": 0.2564102564102564,
+            "rssMiBMin": 205.484375,
+            "rssMiBMax": 209.234375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 95.4998801072702
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 37.802035875794445,
+              "2": 33.82287420465818,
+              "3": 23.87497002681757
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 58.692634649259745,
+            "systemCpuPercentOneCore": 36.80724545801036,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 1
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 34.03654646873474,
+          "endSeconds": 35.03663897514343,
+          "tickBusyMs": {
+            "count": 137,
+            "min": 4.4760789999999995,
+            "p50": 7.3910599999999995,
+            "p99": 12.734599999999999,
+            "max": 13.010489
+          },
+          "tickStartGapMs": {
+            "count": 137,
+            "min": 4.4766889999999995,
+            "p50": 7.391239,
+            "p99": 12.73552,
+            "max": 13.010879
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.17461895942687988,
+            "sampleEndOffsetSeconds": 0.18020129203796387,
+            "windowSeconds": 1.0056748390197754,
+            "cpuPercentOneCore": 100.43007548885737,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 41.53125,
+            "rssMiBMax": 41.65625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9943571830579895,
+              "slither-simulat": 58.667073800421306,
+              "slither-sockets": 40.768644505377544
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.43007548885737
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 71.59371718017506,
+            "systemCpuPercentOneCore": 28.836358308681586,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.14977097511291504,
+            "sampleEndOffsetSeconds": 0.15476274490356445,
+            "windowSeconds": 1.0050842761993408,
+            "cpuPercentOneCore": 87.55484697538593,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 209.234375,
+            "rssMiBMax": 213.234375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.55484697538593
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.82800905867172,
+              "2": 31.83812617286762,
+              "3": 21.888711743846592
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 51.73695503090994,
+            "systemCpuPercentOneCore": 35.81789194447612,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 6
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 35.03663897514343,
+          "endSeconds": 36.037126302719116,
+          "tickBusyMs": {
+            "count": 130,
+            "min": 5.23287,
+            "p50": 7.426248999999999,
+            "p99": 11.487288999999999,
+            "max": 12.31292
+          },
+          "tickStartGapMs": {
+            "count": 130,
+            "min": 5.23337,
+            "p50": 7.427509,
+            "p99": 11.537239,
+            "max": 12.343549999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.18020129203796387,
+            "sampleEndOffsetSeconds": 0.1863093376159668,
+            "windowSeconds": 1.0065953731536865,
+            "cpuPercentOneCore": 100.33823191891342,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 41.65625,
+            "rssMiBMax": 41.78125,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 1.9868956815626453,
+              "slither-simulat": 58.61342260609804,
+              "slither-sockets": 40.73136147203426
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.33823191891342
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 62.58721396922326,
+            "systemCpuPercentOneCore": 37.75101794969053,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.15476274490356445,
+            "sampleEndOffsetSeconds": 0.15938782691955566,
+            "windowSeconds": 1.0051124095916748,
+            "cpuPercentOneCore": 85.56256910103963,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 213.234375,
+            "rssMiBMax": 216.359375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 85.56256910103963
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 32.83214860853851,
+              "2": 31.837235014340312,
+              "3": 20.89318547816081
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 53.72533408669927,
+            "systemCpuPercentOneCore": 31.837235014340354,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 12
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 36.037126302719116,
+          "endSeconds": 37.03729462623596,
+          "tickBusyMs": {
+            "count": 142,
+            "min": 3.26964,
+            "p50": 7.1324,
+            "p99": 11.80109,
+            "max": 12.794569
+          },
+          "tickStartGapMs": {
+            "count": 142,
+            "min": 3.2700199999999997,
+            "p50": 7.145378999999999,
+            "p99": 11.801639999999999,
+            "max": 12.795949
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.1863093376159668,
+            "sampleEndOffsetSeconds": 0.1917128562927246,
+            "windowSeconds": 1.0055718421936035,
+            "cpuPercentOneCore": 99.44590312100935,
+            "aggregateStealPercent": 0.2570694087403599,
+            "rssMiBMin": 41.78125,
+            "rssMiBMax": 41.78125,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.0,
+              "slither-simulat": 57.67862381018526,
+              "slither-sockets": 41.767279310823746
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.44590312100935
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 68.61767315349658,
+            "systemCpuPercentOneCore": 30.828229967512772,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.15938782691955566,
+            "sampleEndOffsetSeconds": 0.16467022895812988,
+            "windowSeconds": 1.00545072555542,
+            "cpuPercentOneCore": 82.55004237442871,
+            "aggregateStealPercent": 0.2570694087403599,
+            "rssMiBMin": 216.359375,
+            "rssMiBMax": 219.734375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 83.54462119821707
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 30.831943537437187,
+              "2": 28.842785889860636,
+              "3": 22.875312947130887
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 46.74520471805001,
+            "systemCpuPercentOneCore": 35.8048376563787,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 9
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 37.03729462623596,
+          "endSeconds": 38.03787112236023,
+          "tickBusyMs": {
+            "count": 128,
+            "min": 4.81889,
+            "p50": 7.45569,
+            "p99": 10.95441,
+            "max": 13.742439
+          },
+          "tickStartGapMs": {
+            "count": 128,
+            "min": 4.81933,
+            "p50": 7.456259999999999,
+            "p99": 10.95505,
+            "max": 13.743969
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.1917128562927246,
+            "sampleEndOffsetSeconds": 0.19671940803527832,
+            "windowSeconds": 1.0055830478668213,
+            "cpuPercentOneCore": 100.43924289918635,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 41.78125,
+            "rssMiBMax": 42.15625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9944479494968974,
+              "slither-simulat": 58.67242902031688,
+              "slither-sockets": 39.77791797987608
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.43924289918635
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 70.60580441427973,
+            "systemCpuPercentOneCore": 29.833438484906967,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.16467022895812988,
+            "sampleEndOffsetSeconds": 0.16930437088012695,
+            "windowSeconds": 1.0052106380462646,
+            "cpuPercentOneCore": 82.56975887294583,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 219.734375,
+            "rssMiBMax": 223.234375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 81.57494250098254
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 28.849674786932937,
+              "2": 32.82894027478575,
+              "3": 20.891143811227142
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 51.73045134208648,
+            "systemCpuPercentOneCore": 30.839307530859124,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 8
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 38.03787112236023,
+          "endSeconds": 39.03857421875,
+          "tickBusyMs": {
+            "count": 127,
+            "min": 5.228949999999999,
+            "p50": 7.52342,
+            "p99": 12.439439,
+            "max": 12.570919
+          },
+          "tickStartGapMs": {
+            "count": 127,
+            "min": 5.2294599999999996,
+            "p50": 7.5239199999999995,
+            "p99": 12.478309,
+            "max": 12.609478999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.19671940803527832,
+            "sampleEndOffsetSeconds": 0.20310306549072266,
+            "windowSeconds": 1.0070867538452148,
+            "cpuPercentOneCore": 100.28927459761137,
+            "aggregateStealPercent": 0.24875621890547264,
+            "rssMiBMin": 42.15625,
+            "rssMiBMax": 42.15625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.0,
+              "slither-simulat": 58.584823774842384,
+              "slither-sockets": 40.711487707941345
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.28927459761137
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 67.52149180829291,
+            "systemCpuPercentOneCore": 32.76778278931846,
+            "cpu0StealPercent": 1.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.16930437088012695,
+            "sampleEndOffsetSeconds": 0.17386245727539062,
+            "windowSeconds": 1.0052611827850342,
+            "cpuPercentOneCore": 82.56560724850817,
+            "aggregateStealPercent": 0.25125628140703515,
+            "rssMiBMin": 223.234375,
+            "rssMiBMax": 226.359375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 83.56037360089991
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.82205598131653,
+              "2": 30.8377569241416,
+              "3": 17.905794343050044
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 46.754018562408305,
+            "systemCpuPercentOneCore": 35.811588686100045,
+            "cpu0StealPercent": 0.970873786407767,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 15
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 39.03857421875,
+          "endSeconds": 40.03943681716919,
+          "tickBusyMs": {
+            "count": 127,
+            "min": 5.24123,
+            "p50": 7.63422,
+            "p99": 11.95317,
+            "max": 13.918659
+          },
+          "tickStartGapMs": {
+            "count": 127,
+            "min": 5.24174,
+            "p50": 7.63474,
+            "p99": 11.99028,
+            "max": 13.962439
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.20310306549072266,
+            "sampleEndOffsetSeconds": 0.20795106887817383,
+            "windowSeconds": 1.0057106018066406,
+            "cpuPercentOneCore": 99.43218239955091,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 42.15625,
+            "rssMiBMax": 42.15625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.99432182399551,
+              "slither-simulat": 59.65930943973068,
+              "slither-sockets": 39.77287295982022
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.43218239955091
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 63.63659673571264,
+            "systemCpuPercentOneCore": 35.79558566383827,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.17386245727539062,
+            "sampleEndOffsetSeconds": 0.17966938018798828,
+            "windowSeconds": 1.006669521331787,
+            "cpuPercentOneCore": 90.39709464890755,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 226.359375,
+            "rssMiBMax": 229.359375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 89.40371998243597
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 35.76148799297444,
+              "2": 32.78136399355988,
+              "3": 21.854242662373224
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 57.61573065534766,
+            "systemCpuPercentOneCore": 32.78136399355997,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 17
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 40.03943681716919,
+          "endSeconds": 41.04045653343201,
+          "tickBusyMs": {
+            "count": 126,
+            "min": 5.130389999999999,
+            "p50": 7.499489,
+            "p99": 10.905358999999999,
+            "max": 12.951189
+          },
+          "tickStartGapMs": {
+            "count": 126,
+            "min": 5.13112,
+            "p50": 7.499918999999999,
+            "p99": 10.935409,
+            "max": 12.992719
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.20795106887817383,
+            "sampleEndOffsetSeconds": 0.21287250518798828,
+            "windowSeconds": 1.0059411525726318,
+            "cpuPercentOneCore": 99.40939362531917,
+            "aggregateStealPercent": 0.25839793281653745,
+            "rssMiBMin": 42.15625,
+            "rssMiBMax": 42.40625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9940939362531898,
+              "slither-simulat": 58.65154223893829,
+              "slither-sockets": 39.763757450127876
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.40939362531917
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 60.639730111444635,
+            "systemCpuPercentOneCore": 38.769663513874534,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.17966938018798828,
+            "sampleEndOffsetSeconds": 0.18395352363586426,
+            "windowSeconds": 1.0053038597106934,
+            "cpuPercentOneCore": 88.53044692936174,
+            "aggregateStealPercent": 0.2570694087403599,
+            "rssMiBMin": 229.359375,
+            "rssMiBMax": 232.984375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 88.53044692936174
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.82062017526175,
+              "2": 31.83117192965816,
+              "3": 22.878654824441824
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 53.71510263129811,
+            "systemCpuPercentOneCore": 34.81534429806351,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 17
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 41.04045653343201,
+          "endSeconds": 42.04053211212158,
+          "tickBusyMs": {
+            "count": 127,
+            "min": 5.24233,
+            "p50": 7.660729,
+            "p99": 11.063979999999999,
+            "max": 11.66816
+          },
+          "tickStartGapMs": {
+            "count": 127,
+            "min": 5.242789999999999,
+            "p50": 7.6182799999999995,
+            "p99": 11.06449,
+            "max": 11.70584
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.21287250518798828,
+            "sampleEndOffsetSeconds": 0.2187654972076416,
+            "windowSeconds": 1.0059685707092285,
+            "cpuPercentOneCore": 100.4007510182882,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 42.40625,
+            "rssMiBMax": 42.40625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9940668417652256,
+              "slither-simulat": 58.64994366414825,
+              "slither-sockets": 40.75674051237423
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.4007510182882
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 60.63807734767865,
+            "systemCpuPercentOneCore": 39.7626736706092,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.18395352363586426,
+            "sampleEndOffsetSeconds": 0.1900649070739746,
+            "windowSeconds": 1.0061869621276855,
+            "cpuPercentOneCore": 92.42815053311955,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 232.984375,
+            "rssMiBMax": 235.984375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 92.42815053311955
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 34.78478783504505,
+              "2": 32.797085673042346,
+              "3": 24.84627702503214
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 57.643362698074526,
+            "systemCpuPercentOneCore": 34.78478783504501,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 15
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 42.04053211212158,
+          "endSeconds": 43.0414502620697,
+          "tickBusyMs": {
+            "count": 124,
+            "min": 5.2892,
+            "p50": 8.01694,
+            "p99": 11.547309,
+            "max": 11.553419
+          },
+          "tickStartGapMs": {
+            "count": 124,
+            "min": 5.289569999999999,
+            "p50": 8.055508999999999,
+            "p99": 11.547839,
+            "max": 11.596269
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.2187654972076416,
+            "sampleEndOffsetSeconds": 0.22345185279846191,
+            "windowSeconds": 1.0056045055389404,
+            "cpuPercentOneCore": 99.44267298842931,
+            "aggregateStealPercent": 0.2570694087403599,
+            "rssMiBMin": 42.40625,
+            "rssMiBMax": 42.40625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9944267298842939,
+              "slither-simulat": 57.67675033328883,
+              "slither-sockets": 41.76592265514012
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.44267298842931
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 58.671177063173275,
+            "systemCpuPercentOneCore": 40.771495925256026,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.1900649070739746,
+            "sampleEndOffsetSeconds": 0.19425344467163086,
+            "windowSeconds": 1.0051066875457764,
+            "cpuPercentOneCore": 83.57321769006177,
+            "aggregateStealPercent": 0.25773195876288657,
+            "rssMiBMin": 235.984375,
+            "rssMiBMax": 238.984375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 83.57321769006178
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 32.83233552109567,
+              "2": 28.85265848823568,
+              "3": 21.88822368073042
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 51.73580142718106,
+            "systemCpuPercentOneCore": 31.837416262880637,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 19
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 43.0414502620697,
+          "endSeconds": 44.04248881340027,
+          "tickBusyMs": {
+            "count": 124,
+            "min": 6.0191799999999995,
+            "p50": 7.588299999999999,
+            "p99": 12.49101,
+            "max": 12.713828999999999
+          },
+          "tickStartGapMs": {
+            "count": 124,
+            "min": 6.019629999999999,
+            "p50": 7.657699,
+            "p99": 12.52258,
+            "max": 12.750349
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.22345185279846191,
+            "sampleEndOffsetSeconds": 0.22987866401672363,
+            "windowSeconds": 1.0074653625488281,
+            "cpuPercentOneCore": 100.2515855676425,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 42.40625,
+            "rssMiBMax": 42.65625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9925899561152749,
+              "slither-simulat": 58.562807410801156,
+              "slither-sockets": 39.70359824461082
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.2515855676425
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 71.46647684029962,
+            "systemCpuPercentOneCore": 28.785108727342863,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.19425344467163086,
+            "sampleEndOffsetSeconds": 0.19834351539611816,
+            "windowSeconds": 1.0051286220550537,
+            "cpuPercentOneCore": 87.55098409204379,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 238.984375,
+            "rssMiBMax": 242.484375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.55098409204379
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 31.836721488015897,
+              "2": 33.82651658101694,
+              "3": 21.887746023010948
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 56.70916015052841,
+            "systemCpuPercentOneCore": 30.841823941515468,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 20
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 44.04248881340027,
+          "endSeconds": 45.04330897331238,
+          "tickBusyMs": {
+            "count": 124,
+            "min": 5.105569,
+            "p50": 8.115499999999999,
+            "p99": 12.679079,
+            "max": 13.824439
+          },
+          "tickStartGapMs": {
+            "count": 124,
+            "min": 5.106159,
+            "p50": 8.115929999999999,
+            "p99": 12.713889,
+            "max": 13.865618999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.22987866401672363,
+            "sampleEndOffsetSeconds": 0.23609280586242676,
+            "windowSeconds": 1.0070343017578125,
+            "cpuPercentOneCore": 100.29449823476806,
+            "aggregateStealPercent": 0.24937655860349128,
+            "rssMiBMin": 42.65625,
+            "rssMiBMax": 42.65625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9930148340076073,
+              "slither-simulat": 59.580890040456524,
+              "slither-sockets": 39.72059336030447
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.29449823476806
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 69.51103838053272,
+            "systemCpuPercentOneCore": 30.783459854235673,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.19834351539611816,
+            "sampleEndOffsetSeconds": 0.20389747619628906,
+            "windowSeconds": 1.0063741207122803,
+            "cpuPercentOneCore": 86.44896386884841,
+            "aggregateStealPercent": 0.24813895781637718,
+            "rssMiBMin": 242.484375,
+            "rssMiBMax": 245.609375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 86.44896386884842
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.78465254644658,
+              "2": 30.803653792348243,
+              "3": 21.860657530053594
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 55.64531007650009,
+            "systemCpuPercentOneCore": 30.80365379234829,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 17
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 45.04330897331238,
+          "endSeconds": 46.04428505897522,
+          "tickBusyMs": {
+            "count": 119,
+            "min": 5.852259999999999,
+            "p50": 8.442209,
+            "p99": 12.264268999999999,
+            "max": 12.297799
+          },
+          "tickStartGapMs": {
+            "count": 119,
+            "min": 5.863049999999999,
+            "p50": 8.444739,
+            "p99": 12.264828999999999,
+            "max": 12.330389
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.23609280586242676,
+            "sampleEndOffsetSeconds": 0.24138331413269043,
+            "windowSeconds": 1.0062665939331055,
+            "cpuPercentOneCore": 99.37724317085677,
+            "aggregateStealPercent": 0.25773195876288657,
+            "rssMiBMin": 42.65625,
+            "rssMiBMax": 42.78125,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.993772431708563,
+              "slither-simulat": 58.63257347080547,
+              "slither-sockets": 40.74466970005129
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.37724317085677
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 62.60766319763966,
+            "systemCpuPercentOneCore": 36.769579973217105,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.20389747619628906,
+            "sampleEndOffsetSeconds": 0.20821905136108398,
+            "windowSeconds": 1.0052976608276367,
+            "cpuPercentOneCore": 87.53626257078113,
+            "aggregateStealPercent": 0.25839793281653745,
+            "rssMiBMin": 245.609375,
+            "rssMiBMax": 248.359375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.53626257078113
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 34.81555897701516,
+              "2": 31.83136820755677,
+              "3": 20.889335386209197
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 53.71543385025215,
+            "systemCpuPercentOneCore": 33.82082872052903,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 24
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 46.04428505897522,
+          "endSeconds": 47.044790506362915,
+          "tickBusyMs": {
+            "count": 115,
+            "min": 5.541119999999999,
+            "p50": 8.48057,
+            "p99": 12.624569,
+            "max": 14.422248999999999
+          },
+          "tickStartGapMs": {
+            "count": 115,
+            "min": 5.5417499999999995,
+            "p50": 8.48425,
+            "p99": 12.671659,
+            "max": 14.422858999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.24138331413269043,
+            "sampleEndOffsetSeconds": 0.24687409400939941,
+            "windowSeconds": 1.0059962272644043,
+            "cpuPercentOneCore": 100.39799083009369,
+            "aggregateStealPercent": 0.2564102564102564,
+            "rssMiBMin": 42.78125,
+            "rssMiBMax": 43.03125,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9940395131692403,
+              "slither-simulat": 59.64237079015451,
+              "slither-sockets": 39.761580526769436
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.39799083009369
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 64.61256835600042,
+            "systemCpuPercentOneCore": 35.78542247409256,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.20821905136108398,
+            "sampleEndOffsetSeconds": 0.21428704261779785,
+            "windowSeconds": 1.0065734386444092,
+            "cpuPercentOneCore": 87.42531505551425,
+            "aggregateStealPercent": 0.2564102564102564,
+            "rssMiBMin": 248.359375,
+            "rssMiBMax": 251.484375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.42531505551426
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 32.78449314581792,
+              "2": 32.784493145817834,
+              "3": 21.856328763878498
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 54.640821909696456,
+            "systemCpuPercentOneCore": 32.784493145817876,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 29
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 47.044790506362915,
+          "endSeconds": 48.04569959640503,
+          "tickBusyMs": {
+            "count": 131,
+            "min": 2.9655199999999997,
+            "p50": 7.738049999999999,
+            "p99": 10.581759,
+            "max": 12.732059
+          },
+          "tickStartGapMs": {
+            "count": 131,
+            "min": 2.9655799999999997,
+            "p50": 7.753419,
+            "p99": 10.582379,
+            "max": 12.776809
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.24687409400939941,
+            "sampleEndOffsetSeconds": 0.25379133224487305,
+            "windowSeconds": 1.007826328277588,
+            "cpuPercentOneCore": 99.22344474856463,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 43.03125,
+            "rssMiBMax": 44.62109375,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9922344474856472,
+              "slither-simulat": 57.54959795416732,
+              "slither-sockets": 40.681612346911514
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.22344474856463
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 63.50300463908142,
+            "systemCpuPercentOneCore": 35.72044010948321,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.21428704261779785,
+            "sampleEndOffsetSeconds": 0.21846532821655273,
+            "windowSeconds": 1.0050873756408691,
+            "cpuPercentOneCore": 90.53939210208087,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 251.484375,
+            "rssMiBMax": 255.359375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 90.53939210208088
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 34.82284311618488,
+              "2": 32.83296636668872,
+              "3": 22.88358261920727
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 51.73679548690321,
+            "systemCpuPercentOneCore": 38.802596615177485,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 17
+        }
+      ],
+      "windows": [
+        {
+          "label": "before",
+          "startSeconds": 17.0351300239563,
+          "endSeconds": 32.0351300239563,
+          "tickBusyMs": {
+            "count": 2110,
+            "min": 1.638259,
+            "p50": 3.3355989999999998,
+            "p99": 9.165118999999999,
+            "max": 12.726719
+          },
+          "tickStartGapMs": {
+            "count": 2110,
+            "min": 4.431579999999999,
+            "p50": 7.00113,
+            "p99": 9.165719,
+            "max": 12.727839
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.06510734558105469,
+            "sampleEndOffsetSeconds": 0.16237473487854004,
+            "windowSeconds": 15.097267389297485,
+            "cpuPercentOneCore": 79.28587135235865,
+            "aggregateStealPercent": 0.20477815699658702,
+            "rssMiBMin": 39.390625,
+            "rssMiBMax": 41.03125,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.3974229140469106,
+              "slither-simulat": 44.44512922091282,
+              "slither-sockets": 34.44331921739891
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 79.28587135235865
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 47.49203822860581,
+            "systemCpuPercentOneCore": 31.793833123752833,
+            "cpu0StealPercent": 0.0691085003455425,
+            "observedCpu0Mhz": {
+              "count": 16,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.057160377502441406,
+            "sampleEndOffsetSeconds": 0.14060282707214355,
+            "windowSeconds": 15.083442449569702,
+            "cpuPercentOneCore": 87.44688120168671,
+            "aggregateStealPercent": 0.20491803278688525,
+            "rssMiBMin": 146.234375,
+            "rssMiBMax": 201.859375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.44688120168671
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 32.817442149230416,
+              "2": 32.287059245808514,
+              "3": 22.342379806647777
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 52.309013849985455,
+            "systemCpuPercentOneCore": 35.13786735170125,
+            "cpu0StealPercent": 0.0691085003455425,
+            "observedCpu0Mhz": {
+              "count": 16,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          }
+        },
+        {
+          "label": "deferral episode",
+          "startSeconds": 32.0351300239563,
+          "endSeconds": 48.04569959640503,
+          "tickBusyMs": {
+            "count": 2052,
+            "min": 2.9655199999999997,
+            "p50": 7.499489,
+            "p99": 11.80109,
+            "max": 14.422248999999999
+          },
+          "tickStartGapMs": {
+            "count": 2052,
+            "min": 2.9655799999999997,
+            "p50": 7.50221,
+            "p99": 11.801639999999999,
+            "max": 14.422858999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.16237473487854004,
+            "sampleEndOffsetSeconds": 0.25379133224487305,
+            "windowSeconds": 16.101986169815063,
+            "cpuPercentOneCore": 99.92556092342491,
+            "aggregateStealPercent": 0.14292520247737017,
+            "rssMiBMin": 41.03125,
+            "rssMiBMax": 44.62109375,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.8694579570714407,
+              "slither-simulat": 58.56420382274062,
+              "slither-sockets": 40.49189914361281
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.92556092342491
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 65.3335550599397,
+            "systemCpuPercentOneCore": 34.592005863485184,
+            "cpu0StealPercent": 0.062034739454094295,
+            "observedCpu0Mhz": {
+              "count": 17,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.14060282707214355,
+            "sampleEndOffsetSeconds": 0.21846532821655273,
+            "windowSeconds": 16.08843207359314,
+            "cpuPercentOneCore": 87.57845348476636,
+            "aggregateStealPercent": 0.14310701224359992,
+            "rssMiBMin": 201.859375,
+            "rssMiBMax": 255.359375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.57845348476636
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.62664537633683,
+              "2": 31.8862644696133,
+              "3": 22.065543638816223
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 53.8274951865207,
+            "systemCpuPercentOneCore": 33.750958298245656,
+            "cpu0StealPercent": 0.062150403977625855,
+            "observedCpu0Mhz": {
+              "count": 17,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          }
+        },
+        {
+          "label": "after",
+          "startSeconds": 48.04569959640503,
+          "endSeconds": 63.04569959640503,
+          "tickBusyMs": {
+            "count": 2174,
+            "min": 1.8933099999999998,
+            "p50": 4.75884,
+            "p99": 9.480559999999999,
+            "max": 13.527249
+          },
+          "tickStartGapMs": {
+            "count": 2174,
+            "min": 1.8933799999999998,
+            "p50": 7.00075,
+            "p99": 9.48111,
+            "max": 13.527679
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.25379133224487305,
+            "sampleEndOffsetSeconds": 0.34540438652038574,
+            "windowSeconds": 15.091613054275513,
+            "cpuPercentOneCore": 85.41167835169358,
+            "aggregateStealPercent": 0.18726591760299627,
+            "rssMiBMin": 44.62109375,
+            "rssMiBMax": 47.59765625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.4638337846872421,
+              "slither-simulat": 49.36516708457076,
+              "slither-sockets": 35.51641551319453
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 85.41167835169358
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 52.14816979269422,
+            "systemCpuPercentOneCore": 33.263508558999355,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 16,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.21846532821655273,
+            "sampleEndOffsetSeconds": 0.2991504669189453,
+            "windowSeconds": 15.080685138702393,
+            "cpuPercentOneCore": 92.30349862736898,
+            "aggregateStealPercent": 0.1874254557846311,
+            "rssMiBMin": 255.359375,
+            "rssMiBMax": 312.484375,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 92.30349862736898
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.68547220021799,
+              "2": 34.81274193920166,
+              "3": 23.80528448794933
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 57.09289678029074,
+            "systemCpuPercentOneCore": 35.21060184707825,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 16,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          }
+        }
+      ],
+      "samplingLimit": "counters and resources sampled about once per second; tick timings buffered per tick",
+      "missingObservations": []
+    },
+    {
+      "attempt": "20261027T205310.058873Z-rerun-4c2471b-official-500",
+      "deferredTicks": 88,
+      "sampledDeferralIncrements": [
+        {
+          "label": "deferral increment",
+          "startSeconds": 115.11440300941467,
+          "endSeconds": 116.11513781547546,
+          "tickBusyMs": {
+            "count": 95,
+            "min": 8.147189,
+            "p50": 10.532779999999999,
+            "p99": 19.075339,
+            "max": 19.075339
+          },
+          "tickStartGapMs": {
+            "count": 95,
+            "min": 8.147699,
+            "p50": 10.533489999999999,
+            "p99": 19.076739,
+            "max": 19.076739
+          },
+          "host": {
+            "sampleStartOffsetSeconds": -0.419780969619751,
+            "sampleEndOffsetSeconds": -0.41445207595825195,
+            "windowSeconds": 1.00606369972229,
+            "cpuPercentOneCore": 98.40331186517024,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 48.4765625,
+            "rssMiBMax": 48.6015625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9939728471229377,
+              "slither-simulat": 53.67453374463851,
+              "slither-sockets": 43.734805273408995
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 98.40331186517024
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 62.620289368745986,
+            "systemCpuPercentOneCore": 35.78302249642567,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": -0.48162150382995605,
+            "sampleEndOffsetSeconds": -0.4764242172241211,
+            "windowSeconds": 1.005932092666626,
+            "cpuPercentOneCore": 87.48105427944013,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 514.00390625,
+            "rssMiBMax": 517.12890625,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 87.48105427944013
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 31.811292465250844,
+              "2": 34.793601133868236,
+              "3": 20.876160680321046
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 57.65796759326742,
+            "systemCpuPercentOneCore": 29.823086686172783,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 14
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 116.11513781547546,
+          "endSeconds": 117.1158721446991,
+          "tickBusyMs": {
+            "count": 96,
+            "min": 4.75639,
+            "p50": 10.33114,
+            "p99": 17.968819,
+            "max": 17.968819
+          },
+          "tickStartGapMs": {
+            "count": 96,
+            "min": 4.756889999999999,
+            "p50": 10.35036,
+            "p99": 18.013319,
+            "max": 18.013319
+          },
+          "host": {
+            "sampleStartOffsetSeconds": -0.41445207595825195,
+            "sampleEndOffsetSeconds": -0.40782833099365234,
+            "windowSeconds": 1.0073580741882324,
+            "cpuPercentOneCore": 99.26956716020152,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 48.6015625,
+            "rssMiBMax": 48.6015625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.0,
+              "slither-simulat": 55.59095760971237,
+              "slither-sockets": 44.671305222090965
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.26956716020152
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 61.54713163932398,
+            "systemCpuPercentOneCore": 37.72243552087683,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": -0.4764242172241211,
+            "sampleEndOffsetSeconds": -0.47187352180480957,
+            "windowSeconds": 1.0052850246429443,
+            "cpuPercentOneCore": 87.53736288000073,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 517.12890625,
+            "rssMiBMax": 519.37890625,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 88.53210564000074
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 32.82651108000032,
+              "2": 32.826511080000145,
+              "3": 21.884340720000274
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 52.72136628000026,
+            "systemCpuPercentOneCore": 34.81599660000039,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 48
+        },
+        {
+          "label": "deferral increment",
+          "startSeconds": 117.1158721446991,
+          "endSeconds": 118.11625266075134,
+          "tickBusyMs": {
+            "count": 122,
+            "min": 4.5761899999999995,
+            "p50": 7.40966,
+            "p99": 12.420019,
+            "max": 17.275419
+          },
+          "tickStartGapMs": {
+            "count": 122,
+            "min": 4.57639,
+            "p50": 7.411519999999999,
+            "p99": 12.421078999999999,
+            "max": 17.309618999999998
+          },
+          "host": {
+            "sampleStartOffsetSeconds": -0.40782833099365234,
+            "sampleEndOffsetSeconds": -0.40144991874694824,
+            "windowSeconds": 1.0067589282989502,
+            "cpuPercentOneCore": 100.32193125980329,
+            "aggregateStealPercent": 0.24752475247524752,
+            "rssMiBMin": 48.6015625,
+            "rssMiBMax": 48.6015625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.9932864481168601,
+              "slither-simulat": 54.63075464642768,
+              "slither-sockets": 43.70460371714158
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 100.32193125980329
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 62.577046231363084,
+            "systemCpuPercentOneCore": 37.7448850284402,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": -0.47187352180480957,
+            "sampleEndOffsetSeconds": -0.46686387062072754,
+            "windowSeconds": 1.0053901672363281,
+            "cpuPercentOneCore": 93.49604070466725,
+            "aggregateStealPercent": 0.24937655860349128,
+            "rssMiBMin": 519.37890625,
+            "rssMiBMax": 522.00390625,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 93.49604070466744
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 33.81771685062433,
+              "2": 35.8069943124259,
+              "3": 23.87132954161703
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 50.72657527593667,
+            "systemCpuPercentOneCore": 42.76946542873058,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 2,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "deferredTicks": 26
+        }
+      ],
+      "windows": [
+        {
+          "label": "before",
+          "startSeconds": 100.11440300941467,
+          "endSeconds": 115.11440300941467,
+          "tickBusyMs": {
+            "count": 2137,
+            "min": 2.38378,
+            "p50": 5.94288,
+            "p99": 10.622219,
+            "max": 15.805048999999999
+          },
+          "tickStartGapMs": {
+            "count": 2137,
+            "min": 3.016019,
+            "p50": 7.00015,
+            "p99": 10.616458999999999,
+            "max": 15.806408999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": 0.48633646965026855,
+            "sampleEndOffsetSeconds": -0.419780969619751,
+            "windowSeconds": 14.09388256072998,
+            "cpuPercentOneCore": 95.57338045040679,
+            "aggregateStealPercent": 0.1432408236347359,
+            "rssMiBMin": 47.6015625,
+            "rssMiBMax": 48.4765625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.4966693861565312,
+              "slither-simulat": 53.214577088199775,
+              "slither-sockets": 41.86213397605053
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 95.57338045040679
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 59.17460972207812,
+            "systemCpuPercentOneCore": 36.398770728328664,
+            "cpu0StealPercent": 0.07215007215007214,
+            "observedCpu0Mhz": {
+              "count": 15,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": 0.4361240863800049,
+            "sampleEndOffsetSeconds": -0.48162150382995605,
+            "windowSeconds": 14.082254409790039,
+            "cpuPercentOneCore": 99.27387755671457,
+            "aggregateStealPercent": 0.14334348683031714,
+            "rssMiBMin": 461.37890625,
+            "rssMiBMax": 514.00390625,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 99.20286619937787
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 36.712871743076846,
+              "2": 37.2809626017705,
+              "3": 25.280043211867216
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 61.56684681092385,
+            "systemCpuPercentOneCore": 37.70703074579073,
+            "cpu0StealPercent": 0.07220216606498195,
+            "observedCpu0Mhz": {
+              "count": 15,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          }
+        },
+        {
+          "label": "deferral episode",
+          "startSeconds": 115.11440300941467,
+          "endSeconds": 118.11625266075134,
+          "tickBusyMs": {
+            "count": 313,
+            "min": 4.5761899999999995,
+            "p50": 9.94125,
+            "p99": 15.835979,
+            "max": 19.075339
+          },
+          "tickStartGapMs": {
+            "count": 313,
+            "min": 4.57639,
+            "p50": 9.95102,
+            "p99": 15.876078999999999,
+            "max": 19.076739
+          },
+          "host": {
+            "sampleStartOffsetSeconds": -0.419780969619751,
+            "sampleEndOffsetSeconds": -0.40144991874694824,
+            "windowSeconds": 3.0201807022094727,
+            "cpuPercentOneCore": 99.33180480907288,
+            "aggregateStealPercent": 0.0835421888053467,
+            "rssMiBMin": 48.4765625,
+            "rssMiBMax": 48.6015625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.6622120320604864,
+              "slither-simulat": 54.63249264499004,
+              "slither-sockets": 44.03710013202225
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.33180480907288
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 62.247931013685985,
+            "systemCpuPercentOneCore": 37.08387379538712,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 4,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": -0.48162150382995605,
+            "sampleEndOffsetSeconds": -0.46686387062072754,
+            "windowSeconds": 3.0166072845458984,
+            "cpuPercentOneCore": 89.50452429894065,
+            "aggregateStealPercent": 0.08375209380234507,
+            "rssMiBMin": 514.00390625,
+            "rssMiBMax": 522.00390625,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 89.83602253708493
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 32.81832557627823,
+              "2": 34.475816766999365,
+              "3": 22.21038195566307
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 53.70271457936442,
+            "systemCpuPercentOneCore": 35.80180971957624,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 4,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          }
+        },
+        {
+          "label": "after",
+          "startSeconds": 118.11625266075134,
+          "endSeconds": 120.0,
+          "tickBusyMs": {
+            "count": 288,
+            "min": 3.08588,
+            "p50": 6.387849,
+            "p99": 10.16455,
+            "max": 11.527809
+          },
+          "tickStartGapMs": {
+            "count": 288,
+            "min": 3.08608,
+            "p50": 6.3889689999999995,
+            "p99": 10.16485,
+            "max": 11.528908999999999
+          },
+          "host": {
+            "sampleStartOffsetSeconds": -0.40144991874694824,
+            "sampleEndOffsetSeconds": 0.00483250617980957,
+            "windowSeconds": 2.290029764175415,
+            "cpuPercentOneCore": 99.99870027124152,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 48.6015625,
+            "rssMiBMax": 48.8515625,
+            "threadCpuPercentOneCore": {
+              "slither-sim": 0.4366755470359911,
+              "slither-simulat": 57.204496661714565,
+              "slither-sockets": 42.35752806249104
+            },
+            "processCpuPercentByPinnedCore": {
+              "0": 99.99870027124152
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 65.50133205539859,
+            "systemCpuPercentOneCore": 34.497368215843224,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 4,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          },
+          "generator": {
+            "sampleStartOffsetSeconds": -0.46686387062072754,
+            "sampleEndOffsetSeconds": 0.0018048286437988281,
+            "windowSeconds": 2.3524160385131836,
+            "cpuPercentOneCore": 112.6501416677512,
+            "aggregateStealPercent": 0.0,
+            "rssMiBMin": 522.00390625,
+            "rssMiBMax": 531.25390625,
+            "threadCpuPercentOneCore": {
+              "host_capacity_l": 112.22504679353321
+            },
+            "processCpuPercentByPinnedCore": {
+              "1": 45.06005666710047,
+              "2": 38.2585386796136,
+              "3": 29.331546321037138
+            },
+            "userSystemSplit": "measured",
+            "userCpuPercentOneCore": 64.61442088112516,
+            "systemCpuPercentOneCore": 48.03572078662598,
+            "cpu0StealPercent": 0.0,
+            "observedCpu0Mhz": {
+              "count": 4,
+              "min": 2600.0,
+              "p50": 2600.0,
+              "p99": 2600.0,
+              "max": 2600.0
+            }
+          }
+        }
+      ],
+      "samplingLimit": "counters and resources sampled about once per second; tick timings buffered per tick",
+      "missingObservations": []
+    }
+  ],
+  "awsUserSystemSplit": [
+    {
+      "source": "research/performance/2026-10-27-epyc-host-recheck/selected-results.json",
+      "sourceSha256": "1b42986b56a6ef302c8980fd3ac7cc0198dfaf7ae7fcfc8ff40bf1ac7d557cc7",
+      "splitFields": [],
+      "status": "unavailable"
+    },
+    {
+      "source": "research/performance/2026-10-27-epyc-index-recheck/selected-results.json",
+      "sourceSha256": "e3b3ca91cf2c59c808069eda12344eae1d8d4cf8eb8091b7259cf00530dc66be",
+      "splitFields": [],
+      "status": "unavailable"
+    }
+  ]
+}
