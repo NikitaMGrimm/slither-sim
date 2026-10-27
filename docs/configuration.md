@@ -580,5 +580,7 @@ radius, minimum score, kill-score window and whether boost is free at that floor
 They describe effective validated settings after overrides. The pit radius is
 live geometry in circular floor worlds; the other settings remain fixed for
 the world's lifetime. Live wall radius remains separate. Raw Rust bot drivers
-use `geometric_context(slot)` for these rules plus their own rolling kill score;
-`Observation` and portable received-state frames are unchanged.
+use `geometric_context(slot)` for these rules plus their own rolling kill score.
+`Observation` omits them. Portable `ClientFrame.rules` carries the same values
+once a SlitherSim host reports them to an opted-in bot client, and stays unset
+until then ([rules extension](raw-server.md#slithersim-rules-extension)).

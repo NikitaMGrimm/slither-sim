@@ -4,11 +4,12 @@
 
 ### Changed
 
-- **Breaking (Rust):** portable bots learn the exact live pit, size floor and
-  kill-score window from SlitherSim rule reports. Host and socket Foragers use
-  the same received rules; `ForagerBot::with_world_rules` is removed in favor of
-  `new()`. The optional frame field preserves client JSON v2; stock browser
-  connections receive no extension packets.
+- **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
+  pit radius, size floor, kill-score window, boundary and free floor boost.
+  They are sent at setup and whenever they change, and surface as the optional
+  `ClientFrame.rules`. Host and socket bots read the same field, so
+  `ForagerBot::with_world_rules` is gone; use `new()`. Client JSON stays v2,
+  and stock browsers never receive the message.
 - **Breaking:** in worlds with `killScoreSeconds` (Battledome), the stock
   leaderboard and own rank show rolling kills instead of size. Players who left
   stay listed while their kills count; a new player in their seat starts at
