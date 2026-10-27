@@ -132,6 +132,20 @@ impl RawSimulator {
         Ok(true)
     }
 
+    /// A different socket player owns this seat. Clear the departed player's
+    /// history only once admission succeeds; retries leave the board untouched.
+    pub(crate) fn connect_new_player(
+        &mut self,
+        slot: usize,
+        appearance: PlayerAppearance,
+    ) -> Result<bool, String> {
+        let admitted = self.connect(slot, appearance)?;
+        if admitted {
+            self.backend.world.reset_kill_score(slot);
+        }
+        Ok(admitted)
+    }
+
     pub(crate) fn physical_food(&mut self, slot: usize) {
         self.backend.slots[slot].connection.decorations = false;
     }

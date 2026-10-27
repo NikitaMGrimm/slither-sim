@@ -426,6 +426,36 @@ pub(crate) fn prey_removal(id: u16, eater: Option<u16>) -> Vec<u8> {
 pub(crate) fn display_score(segments: usize, fam: u32) -> f64 {
     physics::score(segments, f64::from(fam) / U24)
 }
+/// Largest integer representable by the leaderboard-only inverse below.
+pub(crate) fn max_leaderboard_points() -> usize {
+    display_score(physics::MAX_SEGMENTS, U24 as u32 - 1) as usize
+}
+
+/// Encode an integer, saturated at the stock table maximum, into leaderboard
+/// score-table inputs only. Segment
+/// index 1 permits 0..9; gameplay newborns still start at two or more segments.
+/// Bisection on the actual quantized table avoids rounding a kill up or down.
+/// See docs/raw-server.md#presentation for the leaderboard-only scope.
+pub(crate) fn leaderboard_points(target: usize) -> Result<(usize, u32), String> {
+    let target = target.min(max_leaderboard_points()) as f64;
+    let max_fam = U24 as u32 - 1;
+    let segments = (1..=physics::MAX_SEGMENTS)
+        .find(|&segments| display_score(segments, max_fam) >= target)
+        .ok_or("Kill leaderboard points are outside stock tables")?;
+    let (mut low, mut high) = (0, max_fam);
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if display_score(segments, middle) < target {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    if display_score(segments, low) != target {
+        return Err("Kill leaderboard points are not exactly representable".into());
+    }
+    Ok((segments, low))
+}
 /// Display-table index past which the stock client repeats its last entry.
 const SCORE_LAST_INDEX: usize = physics::MAX_SEGMENTS + 2048;
 /// Own score credit `R`: segments the stock client adds before scoring.
@@ -1035,5 +1065,36 @@ mod tests {
         assert_eq!(segment_credit(top + 1e6, 400, fam), 255);
         assert_eq!(segment_credit(top, 400, fam), 255);
         assert_eq!(segment_credit(shown(429), 400, fam), 29);
+    }
+    #[test]
+    fn battledome_leaderboard_inverse_is_exact_in_the_stock_decoder() {
+        use crate::client::ClientState;
+        let mut state = ClientState::new();
+        state.new_connection(0.).unwrap();
+        state
+            .receive_frame(&frame(0, &[setup(3584., 4.).unwrap()]).unwrap(), 0.)
+            .unwrap();
+        let max = max_leaderboard_points();
+        for target in [0, 1, 2, 10, 255, 1000, max - 1, max, max + 1, usize::MAX] {
+            let (segments, fam) = leaderboard_points(target).unwrap();
+            assert_eq!(display_score(segments, fam), target.min(max) as f64);
+            let mut rows = Vec::new();
+            leaderboard_row(&mut rows, segments, fam, 0, b"Kills").unwrap();
+            state
+                .receive_frame(&frame(0, &[leaderboard(1, 1, 1, &rows)]).unwrap(), 0.)
+                .unwrap();
+            assert_eq!(
+                state.frame(0.).unwrap().hud.leaderboard.unwrap().entries[0].score,
+                Some(target.min(max) as f64)
+            );
+        }
+        // Exhaust small counts and sample the whole supported range, including
+        // the high-segment quantization where a fam step is largest.
+        for target in (0..=10_000).chain((0..=4096).map(|i| max * i / 4096)) {
+            let (segments, fam) = leaderboard_points(target).unwrap();
+            assert_eq!(display_score(segments, fam), target as f64);
+        }
+        assert_eq!(leaderboard_points(max + 1), leaderboard_points(max));
+        assert_eq!(leaderboard_points(usize::MAX), leaderboard_points(max));
     }
 }

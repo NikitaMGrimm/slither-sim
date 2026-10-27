@@ -176,13 +176,16 @@ not authentication or resumed lives. Challenge and direct logins are accepted.
 
 ### Reports and game-over
 
-- `l`: top ten living snakes, recipient rank and population, after the recipient's
-  own snake appears; see [report clocks](server-rules.md#packet-timing).
+- `l`: top ten, recipient rank and population, after the recipient's own snake
+  appears; see [report clocks](server-rules.md#packet-timing). It ranks living
+  snakes by size, or, with `killScoreSeconds`, living seats and recently scoring
+  dead or disconnected seats by rolling kills ([Battledome](configuration.md#battledome)).
 - `k`: simulator collision-attributed kills.
 - `F`/`w` and birth/pickup deltas: [sector food delivery](server-rules.md#food-sector-delivery).
 - `M`/`V`: [global minimap](server-rules.md#client-delivery-and-spawning), with
   [per-connection encoding](server-rules.md#minimap-encoding). The stock client
-  draws its own player marker; set resolution with `simulation.minimapSide`.
+  draws its own player marker; set resolution with `simulation.minimapSide`
+  (`null`: 256 for pit worlds, 136 otherwise).
 - Scores: stock setup table and quantized mass, with own `R` credits when needed.
   Leaderboard/record credits do not alter opponent geometry; rounding and the
   one-byte credit range limit precision.
@@ -218,11 +221,24 @@ IDs. The wire exposes the first co-located pellet; physics consumes co-located
 pellets newest first, before ambient refill.
 
 In a world with a pit, stock clients also receive its edge as decorative
-pellets. A marker hides any real pellet at the same wire position, and pickups
-never remove a marker. Socket bots that want only real food send the WebSocket
+pellets. Shrinking rings overlap for 0.5 simulation seconds while rapid `F`
+additions fade in; growth replaces the ring immediately. The short outward trail
+is decorative and does not move the lethal edge. A marker hides any real pellet
+at the same wire position, and pickups never remove a marker. Socket bots that
+want only real food send the WebSocket
 upgrade header `X-SlitherSim-Food: physical`; portable bots do this
 automatically. In-process clients and host bots always get real food. See
 [pit presentation](configuration.md#battledome).
+
+Worlds with `killScoreSeconds` use exact rolling kill counts for the stock
+leaderboard number column and own rank. They include living seats plus dead or
+disconnected seats with unexpired kills; population in that packet is the ranked
+seat count. Ties use slot order. A newly admitted socket connection clears the
+prior occupant's kills; same-connection respawns and bot lives retain theirs.
+Displayed kill counts saturate at the stock table maximum; ranks use actual kills.
+Own length and local records still show size; stock labels are unchanged. Pit
+minimaps show the pit outline and inner snake cells, using the live wall projection
+so the stock own-player marker stays aligned, including outside the pit.
 
 ## Stock browser client
 

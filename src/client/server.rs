@@ -602,6 +602,8 @@ struct PendingJoin {
     session_id: bool,
     physical_food: bool,
     requested_tick: u64,
+    /// A new socket connection replaces the previous player's rolling score.
+    reset_kills: bool,
 }
 
 impl Simulation {
@@ -716,7 +718,12 @@ impl Simulation {
 
     fn join(&mut self, join: &PendingJoin) -> Result<bool, String> {
         let slot = join.slot;
-        match self.world.connect(slot, join.appearance.clone()) {
+        let admitted = if join.reset_kills {
+            self.world.connect_new_player(slot, join.appearance.clone())
+        } else {
+            self.world.connect(slot, join.appearance.clone())
+        };
+        match admitted {
             Ok(false) => return Ok(false),
             Ok(true) => {
                 self.last_spawn_tick = Some(self.ticks);
@@ -748,6 +755,11 @@ impl Simulation {
                 session_id,
                 physical_food,
             } => {
+                let reset_kills = slot < self.max_clients
+                    && (generation != self.generations[slot]
+                        || self.waiting.iter().any(|join| {
+                            join.slot == slot && join.generation == generation && join.reset_kills
+                        }));
                 self.generations[slot] = generation;
                 let join = PendingJoin {
                     slot,
@@ -756,6 +768,7 @@ impl Simulation {
                     session_id,
                     physical_food,
                     requested_tick: self.ticks,
+                    reset_kills,
                 };
                 if self.world.waits_for_spawn() {
                     // A bot has reset its decoder for this generation. Retire
@@ -2584,6 +2597,7 @@ mod tests {
             appearance: PlayerAppearance::default(),
             session_id: false,
             physical_food: true,
+            reset_kills: false,
         };
         simulation.waiting.push_back(request(0, 0));
         simulation.admit_waiting().unwrap();
@@ -3135,5 +3149,48 @@ mod tests {
         login[25] = 25;
         assert!(parse_login(&login).is_err());
         assert!(parse_login(&login[..27]).is_err());
+    }
+
+    #[test]
+    fn rolling_kill_reset_follows_socket_ownership_not_respawn_or_bot_generation() {
+        let (mut simulation, gate, _) = connected(LatencyConfig::default(), 0);
+        let config = SimulationConfig {
+            world: crate::Config::battledome(),
+            agents: 2,
+            ..Default::default()
+        };
+        simulation.world = RawSimulator::new(7, config, 2).unwrap();
+        simulation.generations = vec![0; 2];
+        let queue = |simulation: &mut Simulation, slot, generation| {
+            let command = Command::Connect {
+                slot,
+                generation,
+                appearance: PlayerAppearance::default(),
+                session_id: false,
+                physical_food: true,
+            };
+            if slot < simulation.max_clients {
+                gate.send(command);
+            } else {
+                gate.commands.send(command).unwrap();
+            }
+            let command = simulation.commands.try_recv().unwrap();
+            simulation.apply(command).unwrap();
+            simulation
+                .waiting
+                .iter()
+                .find(|join| join.slot == slot)
+                .unwrap()
+                .reset_kills
+        };
+        assert!(queue(&mut simulation, 0, 2));
+        // A retried request must retain the pending reset until admission.
+        assert!(queue(&mut simulation, 0, 2));
+        let first = simulation.waiting.pop_front().unwrap();
+        assert!(simulation.join(&first).unwrap());
+        assert!(!queue(&mut simulation, 0, 2), "same connection respawn");
+        assert!(queue(&mut simulation, 0, 3), "new socket owner");
+        assert!(!queue(&mut simulation, 1, 1), "first bot life");
+        assert!(!queue(&mut simulation, 1, 2), "later bot life");
     }
 }

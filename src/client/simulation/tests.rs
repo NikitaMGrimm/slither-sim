@@ -1403,7 +1403,7 @@ fn minimap_deltas_use_each_recipients_last_sent_bitmap() {
     // A new side cannot use an old-size delta; a dead slot before this
     // recipient must not prevent its full replacement snapshot.
     sim.backend.world.retire(0).unwrap();
-    sim.backend.config.minimap_side = 80;
+    sim.backend.config.minimap_side = Some(80);
     send_minimaps(&mut sim, &[0, 1]);
     assert!(first.pump(&mut sim, 0).is_empty());
     assert!(
@@ -3306,7 +3306,7 @@ fn aggregate_broadcasts_fit_transport_limits_and_preserve_packet_order() {
 #[test]
 fn oversized_packets_travel_alone_in_stream_order() {
     let config = SimulationConfig {
-        minimap_side: 512,
+        minimap_side: Some(512),
         record_wire: true,
         ..Default::default()
     };

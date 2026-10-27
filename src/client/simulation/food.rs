@@ -239,16 +239,11 @@ impl SimulatorBackend {
     pub(super) fn sync_food_sectors(&mut self) -> Result<FoodChanges, String> {
         let eaten = eaten_sectors(&self.food_eaters);
         let mut changed = eaten.clone();
-        // Shrink follows the wire grid rather than rebuilding every tick;
-        // unchanged decorated handles then skip each recipient's food diff.
-        let pit = self.world.pit_radius();
-        let pit_changed = self
-            .pit_markers
-            .as_ref()
-            .is_some_and(|m| pit.is_none_or(|radius| m.needs_update(radius)));
-        if pit_changed {
-            self.pit_markers = pit.map(super::markers::PitMarkers::new).transpose()?;
-        }
+        let now = self.time();
+        let pit_changed = match (&mut self.pit_markers, self.world.pit_radius()) {
+            (Some(markers), Some(radius)) => markers.update(radius, now)?,
+            _ => false,
+        };
         // Taken so an early error drops a partly filled table.
         let mut buckets = std::mem::take(&mut self.food_buckets);
         buckets.resize(1 << 16, u32::MAX);
@@ -298,8 +293,8 @@ impl SimulatorBackend {
                         .overlay(index, &physical.0)
                         .map_or_else(|| physical.clone(), |run| Arc::new(SectorFood(run))),
                 );
-                // Pit motion can replace only the decorated listing; recipients
-                // with stable physical food still need this transition's hint.
+                // Pit motion or timed retirement can replace only the decorated
+                // listing; stable recipients need a hint for either transition.
                 changed.insert(index.to_be_bytes());
             }
         }
@@ -436,7 +431,13 @@ fn sector_changes(
                 !old.decorative && eaters.contains_key(&food_identity(old.point))
             })
         {
-            packets.push(encode::food_add(key(*offset), food.style));
+            if food.decorative {
+                // F uses the stock rapid fade without mislabelling decorations
+                // as snake food. Ordinary f births fade too slowly for a live edge.
+                packets.extend(encode::food_sector(sector, &[(*offset, food.style)]));
+            } else {
+                packets.push(encode::food_add(key(*offset), food.style));
+            }
         }
     }
 }
@@ -593,6 +594,135 @@ mod tests {
     }
 
     #[test]
+    fn stable_pit_recipient_matches_full_walk_for_overlap_and_timed_retirement() {
+        use crate::{Config, RadiusUpdate, client::SimulationConfig};
+        const SHRINK: usize = 72;
+        const RETIRE: usize = 144;
+        let mut world = Config::battledome();
+        world.food_count = 0;
+        world.ambient_replenish_per_second = 0.;
+        // Script one inward step then hold the live edge, isolating retirement
+        // without another pit move or physical-food event supplying its hint.
+        world.radius_updates = (0..=160)
+            .map(|tick| RadiusUpdate {
+                time: tick as f64 * world.dt,
+                radius: if tick < SHRINK { 8960. } else { 8900. },
+            })
+            .collect();
+        let mut backend = SimulatorBackend::new(
+            7,
+            SimulationConfig {
+                world,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut interest = SectorInterest::default();
+        interest.advance(Point { x: 4560., y: 0. }, 0., 0.);
+        backend.slots[0].connection.setup = true;
+        backend.slots[0].connection.food_interest = interest.clone();
+        let mut known = KnownSectors::default();
+        let mut reference = BTreeMap::new();
+        let mut physical = Vec::new();
+        for tick in 0..=160 {
+            if tick > 0 {
+                let heading = backend.world.snakes()[0].heading;
+                backend
+                    .world
+                    .step(&[Some(crate::Action {
+                        heading,
+                        boost: false,
+                    })])
+                    .unwrap();
+                backend.tick += 1;
+            }
+            let changes = backend.sync_food_sectors().unwrap();
+            assert!(backend.world.food().is_empty() && changes.eaten.is_empty());
+            if tick == 0 {
+                physical = interest
+                    .subscribed()
+                    .iter()
+                    .map(|sector| {
+                        let index = usize::from(u16::from_be_bytes(*sector));
+                        (index, backend.food_sectors[index].as_ref().unwrap().clone())
+                    })
+                    .collect();
+            } else {
+                // Prove the recipient takes the stable-revision path and has
+                // no changed physical listing to accidentally cover a lost hint.
+                assert!(Arc::ptr_eq(
+                    known.subscription_revision.as_ref().unwrap(),
+                    interest.revision()
+                ));
+                assert!(Arc::ptr_eq(
+                    known.food_revision.as_ref().unwrap(),
+                    &changes.previous
+                ));
+                for (index, held) in &physical {
+                    assert!(Arc::ptr_eq(
+                        held,
+                        backend.food_sectors[*index].as_ref().unwrap()
+                    ));
+                }
+            }
+            let mut actual = Vec::new();
+            let mut expected = Vec::new();
+            food_updates(
+                &mut actual,
+                &mut known,
+                &interest,
+                &backend.decorated_food_sectors,
+                &changes,
+                &backend.food_eaters,
+            );
+            reference_updates(
+                &mut expected,
+                &mut reference,
+                interest.subscribed(),
+                &backend.decorated_food_sectors,
+                &backend.food_eaters,
+            );
+            assert_eq!(actual, expected, "tick={tick}");
+            match tick {
+                0 => assert!(actual.iter().any(|p| p[0] == b'F')),
+                SHRINK => {
+                    assert!(!changes.changed.is_empty());
+                    assert!(
+                        actual.iter().any(|p| p[0] == b'F'),
+                        "new ring needs rapid additions"
+                    );
+                    assert!(
+                        actual.iter().all(|p| p[0] == b'F'),
+                        "old ring must remain during overlap"
+                    );
+                }
+                RETIRE => {
+                    assert!(!changes.changed.is_empty());
+                    assert!(
+                        actual.iter().any(|p| p[0] == b'c'),
+                        "old ring must retire without pit motion"
+                    );
+                    assert!(actual.iter().all(|p| p[0] == b'c'));
+                }
+                _ => assert!(actual.is_empty(), "quiet tick={tick}"),
+            }
+            for (sector, held) in &known.entries {
+                assert!(Arc::ptr_eq(held, &reference[sector]));
+            }
+        }
+        let settled =
+            super::super::markers::PitMarkers::new(backend.world.pit_radius().unwrap()).unwrap();
+        for (sector, held) in &known.entries {
+            assert_eq!(
+                held.0,
+                settled
+                    .overlay(u16::from_be_bytes(*sector), &[])
+                    .unwrap_or_default()
+            );
+        }
+    }
+
+    #[test]
     fn shrinking_markers_only_send_changes_to_their_wire_cells() {
         let old = super::super::markers::PitMarkers::new(1784.).unwrap();
         let next_radius = 1784. * ((3584. - 23.4375 * 0.007) / 3584.);
@@ -626,8 +756,9 @@ mod tests {
             }
             for (offset, food) in &current.0 {
                 if previous.get(offset).is_none() {
-                    let key = [sector[0], sector[1], offset[0], offset[1]];
-                    assert!(packets.contains(&encode::food_add(key, food.style)));
+                    assert!(
+                        packets.contains(&encode::food_sector(sector, &[(*offset, food.style)])[0])
+                    );
                 }
             }
         }
