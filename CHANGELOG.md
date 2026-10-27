@@ -19,11 +19,11 @@
 
 ### Performance
 
-- Protocol-13 broadcasts reuse converted packet buffers when framing them,
-  while preserving frame boundaries and elapsed headers. The 500-player
-  official fixture uses 2.3% fewer instructions with all protocol-13 clients
-  and 1.2% fewer with half; stock clients use 0.1% more
-  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-owned-legacy-frames/REPORT.md)).
+- Food pickup removes eaten pellets by moving whole ranges of surviving
+  pellets, instead of filtering the food list through a per-pellet mask.
+  Output is byte-identical, and the 500-player official fixture runs 4.1–4.4%
+  fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-food-compaction/REPORT.md)).
 - Simulation ticks no longer compare the food cache with every pellet when no
   untracked food edit happened since the last comparison. Debug builds still
   check the skipped comparison. Output is byte-identical, and the 500-player
@@ -46,6 +46,11 @@
   byte-identical, and the 500-player official fixture runs 3.5–3.9% fewer
   instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-delivery-index/REPORT.md)).
+- Protocol-13 broadcasts reuse converted packet buffers when framing them,
+  while preserving frame boundaries and elapsed headers. The 500-player
+  official fixture uses 2.3% fewer instructions with all protocol-13 clients
+  and 1.2% fewer with half; stock clients use 0.1% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-owned-legacy-frames/REPORT.md)).
 - Food pickup removes eaten pellets from its occupancy cache by index and
   copies the surviving ranges, instead of scanning the whole cache twice.
   Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
