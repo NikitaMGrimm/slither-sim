@@ -194,11 +194,15 @@ impl FoodCache {
         if self.entries.len() >= NONE as usize {
             self.pellets = None;
         }
-        if self
-            .pellets
-            .as_ref()
-            .is_some_and(|index| index.slots.len() >= NONE as usize)
-        {
+        if self.pellets.as_ref().is_some_and(|index| {
+            index.slots.len() >= NONE as usize
+                || index.slots.len()
+                    >= PelletIndex::rebuild_threshold(self.entries.len()).saturating_mul(2)
+        }) {
+            // Sparse/no-eater ticks never query the index, so retired handles
+            // could otherwise grow indefinitely. Leave twice the dense-query
+            // threshold so regular queries migrate incrementally first; dropping
+            // here discards both layers and the next dense query builds anew.
             self.pellets = None;
         }
         if let Some(index) = &mut self.pellets {
@@ -286,7 +290,7 @@ impl FoodCache {
         }
         if let Some(index) = &mut self.pellets {
             if index.growing.is_none()
-                && index.slots.len() >= food.len().max(4096).saturating_mul(2)
+                && index.slots.len() >= PelletIndex::rebuild_threshold(food.len())
             {
                 index.start_rebuild();
             }
@@ -361,6 +365,10 @@ struct PelletSlot {
 }
 
 impl PelletIndex {
+    fn rebuild_threshold(food_len: usize) -> usize {
+        food_len.max(4096).saturating_mul(2)
+    }
+
     fn refresh(&mut self, first: usize) {
         if first < self.live.len() {
             let mut count = self.prefixes[first];
@@ -957,6 +965,43 @@ mod tests {
         }
         for v in [-0.0, 0.0, -f64::MIN_POSITIVE, f64::MIN_POSITIVE] {
             assert_eq!(floor_small(v), v.floor() as i64);
+        }
+    }
+
+    #[test]
+    fn sparse_churn_bounds_handles_without_pellet_queries() {
+        for migrating in [false, true] {
+            let mut rng = Rng(47);
+            let mut food: Vec<_> = (0..64).map(|_| pellet(&mut rng)).collect();
+            let mut cache = FoodCache::default();
+            cache.begin();
+            cache.pellets(&food).unwrap();
+            if migrating {
+                let index = cache.pellets.as_mut().unwrap();
+                index.start_rebuild();
+                index.advance_rebuild(&cache.entries, 17);
+            }
+            let bound = PelletIndex::rebuild_threshold(food.len() + 1) * 2;
+            let mut dropped = false;
+            // No pellets() calls during churn: both the ordinary index and an
+            // unfinished migration must stay bounded without a dense query.
+            for _ in 0..bound * 2 {
+                let f = pellet(&mut rng);
+                cache.push(&f);
+                food.push(f);
+                cache.remove(food.len(), std::iter::once(0));
+                food.remove(0);
+                if let Some(index) = &cache.pellets {
+                    assert!(index.slots.len() <= bound);
+                } else {
+                    dropped = true;
+                }
+            }
+            assert!(dropped);
+            assert_eq!(food.len(), 64);
+            cache.pellets(&food).unwrap();
+            assert_pellet_index(&cache, &food);
+            cache.end();
         }
     }
 

@@ -185,6 +185,10 @@ for name,folder,names in [
     assert sha(pilots/'base/binary')==data['binarySha256']['base']
     identity=equal_streams(candidate_folder/'trace',pilots/'base/trace',open)
     assert identity['sha256']==result['profiles']['base']['coarse']['traceSha256']
+    source_hashes={n:sha(candidate_folder/'source/src'/n) for n in names}
+    if name=='collision_memberships':
+        for n,digest in source_hashes.items():
+            assert digest==data['overlaySha256'][n], n
     result['pilots'][name]={**{k:v for k,v in data.items() if k!='pairs'},
-        'sourceSha256':{n:sha(candidate_folder/'source/src'/n) for n in names}}
-print(json.dumps(result,indent=2))
+        'sourceSha256':source_hashes}
+print(json.dumps(result,indent=2,allow_nan=False))
