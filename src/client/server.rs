@@ -459,6 +459,7 @@ impl Host {
         let gateway = Gateway {
             listener: self.listener,
             sessions: Vec::new(),
+            session_by_slot: vec![None; self.max_clients],
             #[cfg(target_os = "linux")]
             readiness: readiness::Readiness::default(),
             gate: Gate {
@@ -1001,6 +1002,7 @@ fn socket_config() -> WebSocketConfig {
 struct Gateway {
     listener: TcpListener,
     sessions: Vec<Session>,
+    session_by_slot: Vec<Option<usize>>,
     #[cfg(target_os = "linux")]
     readiness: readiness::Readiness,
     gate: Gate,
@@ -1214,31 +1216,51 @@ impl Gateway {
                 session.stage = Stage::Closed;
             }
         }
-        self.sessions
-            .retain(|session| !matches!(session.stage, Stage::Closed));
+        self.retain_sessions();
         let players = self.gate.occupied.iter().filter(|&&used| used).count();
         self.gate.shared.players.store(players, Ordering::Relaxed);
         Ok(())
+    }
+
+    fn retain_sessions(&mut self) {
+        self.session_by_slot.fill(None);
+        let mut index = 0;
+        // Only service creates slot owners, and deliveries run outside it.
+        // Rebuild while compacting so both newly joined and moved sessions are
+        // indexed before the next delivery, without another session scan.
+        self.sessions.retain(|session| {
+            if matches!(session.stage, Stage::Closed) {
+                return false;
+            }
+            if let Stage::Open(open) = &session.stage
+                && let Phase::Playing(slot) = open.phase
+            {
+                self.session_by_slot[slot] = Some(index);
+            }
+            index += 1;
+            true
+        });
     }
 
     /// Queue a delivery on its session. Deliveries for a session that already
     /// ended are dropped.
     fn deliver(&mut self, delivery: Delivery, now: Instant) {
         let (slot, generation) = delivery.session();
-        let Some(open) = self
-            .sessions
-            .iter_mut()
-            .find_map(|session| match &mut session.stage {
-                Stage::Open(open)
-                    if open.phase == Phase::Playing(slot) && open.generation == generation =>
-                {
-                    Some(open)
-                }
-                _ => None,
-            })
+        let Some(&Some(index)) = self.session_by_slot.get(slot) else {
+            return;
+        };
+        let Some(Session {
+            stage: Stage::Open(open),
+            ..
+        }) = self.sessions.get_mut(index)
         else {
             return;
         };
+        // The indexed session may have closed earlier in this delivery batch.
+        // Generations also fence delayed frames and closes after slot reuse.
+        if open.phase != Phase::Playing(slot) || open.generation != generation {
+            return;
+        }
         match delivery {
             Delivery::Frames { frames, .. } => {
                 let used = frames.iter().fold(open.queued_bytes, |used, (_, bytes)| {
@@ -3385,6 +3407,7 @@ mod tests {
         let gateway = Gateway {
             listener,
             sessions: Vec::new(),
+            session_by_slot: vec![None],
             #[cfg(target_os = "linux")]
             readiness: readiness::Readiness::default(),
             gate: Gate {
@@ -3412,6 +3435,184 @@ mod tests {
             deferred: 0,
         };
         (gateway, simulation)
+    }
+
+    #[test]
+    fn delivery_index_preserves_queues_across_compaction_close_and_slot_reuse() {
+        fn session(phase: Phase, generation: u64) -> (Session, TcpStream) {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let peer = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (stream, _) = listener.accept().unwrap();
+            stream.set_nonblocking(true).unwrap();
+            let mut open = Open::new(
+                WebSocket::from_raw_socket(
+                    ReadBudget::new(stream),
+                    tungstenite::protocol::Role::Server,
+                    Some(socket_config()),
+                ),
+                false,
+            );
+            open.phase = phase;
+            open.generation = generation;
+            (
+                Session {
+                    accepted: Instant::now(),
+                    physical_food: Arc::new(AtomicBool::new(false)),
+                    stage: Stage::Open(Box::new(open)),
+                },
+                peer,
+            )
+        }
+        fn open(gateway: &Gateway, index: usize) -> &Open {
+            let Stage::Open(open) = &gateway.sessions[index].stage else {
+                panic!("expected open session")
+            };
+            open
+        }
+        let (mut gateway, _simulation) = pit_gateway();
+        gateway.session_by_slot.resize(2, None);
+        gateway.gate.occupied = vec![true, true];
+        gateway.gate.generations = vec![3, 8];
+        gateway.gate.shared = shared(0.007, 2);
+        let (mut ended, _ended_peer) = session(Phase::Playing(0), 2);
+        ended.stage = Stage::Closed;
+        let (other, _other_peer) = session(Phase::Playing(1), 8);
+        let (hello, _hello_peer) = session(Phase::Hello { framed: false }, 0);
+        let (current, _current_peer) = session(Phase::Playing(0), 3);
+        gateway.sessions = vec![ended, other, hello, current];
+        gateway.retain_sessions();
+        assert_eq!(gateway.sessions.len(), 3);
+        assert_eq!(gateway.session_by_slot, [Some(2), Some(0)]);
+        let now = Instant::now();
+        // Arrival order, including each batch's internal order, is unchanged.
+        let mut frames = vec![(200., vec![0, 7, b'p']), (100., vec![0, 8, b'p'])];
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 3,
+                frames: frames.clone(),
+            },
+            now,
+        );
+        let later = (50., vec![0, 9, b'p']);
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 3,
+                frames: vec![later.clone()],
+            },
+            now,
+        );
+        frames.push(later);
+        for slot in [0, 1, 2, usize::MAX] {
+            gateway.deliver(
+                Delivery::Frames {
+                    slot,
+                    generation: 2,
+                    frames: frames.clone(),
+                },
+                now,
+            );
+            gateway.deliver(
+                Delivery::Closed {
+                    slot,
+                    generation: 2,
+                    reason: "obsolete".into(),
+                },
+                now,
+            );
+        }
+        assert_eq!(
+            open(&gateway, 2).queued.iter().cloned().collect::<Vec<_>>(),
+            frames
+        );
+        assert_eq!(
+            open(&gateway, 2).queued_bytes,
+            frames.iter().map(|(_, f)| output_cost(f)).sum::<usize>()
+        );
+        assert!(open(&gateway, 0).queued.is_empty());
+        assert_eq!(open(&gateway, 0).phase, Phase::Playing(1));
+        gateway.deliver(
+            Delivery::Closed {
+                slot: 0,
+                generation: 3,
+                reason: "ended".into(),
+            },
+            now,
+        );
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 3,
+                frames: frames.clone(),
+            },
+            now,
+        );
+        assert!(
+            open(&gateway, 2).queued.is_empty(),
+            "close fences the rest of its batch"
+        );
+        assert_eq!(gateway.gate.occupied, [false, true]);
+        let (replacement, _replacement_peer) = session(Phase::Playing(0), 4);
+        gateway.sessions.push(replacement);
+        gateway.gate.occupied[0] = true;
+        gateway.gate.generations[0] = 4;
+        gateway.retain_sessions();
+        assert_eq!(gateway.session_by_slot, [Some(3), Some(0)]);
+        gateway.deliver(
+            Delivery::Closed {
+                slot: 0,
+                generation: 3,
+                reason: "late".into(),
+            },
+            now,
+        );
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 3,
+                frames: frames.clone(),
+            },
+            now,
+        );
+        assert!(open(&gateway, 3).queued.is_empty());
+        assert_eq!(open(&gateway, 3).phase, Phase::Playing(0));
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 4,
+                frames: frames.clone(),
+            },
+            now,
+        );
+        assert_eq!(
+            open(&gateway, 3).queued.iter().cloned().collect::<Vec<_>>(),
+            frames
+        );
+        // Overflow ends only this owner; following frames cannot revive it.
+        let Stage::Open(target) = &mut gateway.sessions[3].stage else {
+            unreachable!()
+        };
+        target.queued_bytes = MAX_REMOTE_OUTPUT_BYTES;
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 4,
+                frames: frames.clone(),
+            },
+            now,
+        );
+        gateway.deliver(
+            Delivery::Frames {
+                slot: 0,
+                generation: 4,
+                frames,
+            },
+            now,
+        );
+        assert!(open(&gateway, 3).queued.is_empty());
+        assert_eq!(gateway.gate.occupied, [false, true]);
+        assert_eq!(open(&gateway, 0).phase, Phase::Playing(1));
     }
 
     #[test]
@@ -3555,6 +3756,7 @@ mod tests {
                 physical_food: Arc::new(AtomicBool::new(physical_food)),
                 stage: Stage::Open(Box::new(open)),
             });
+            gateway.retain_sessions();
             simulation.apply_commands().unwrap();
             assert!(simulation.world.take(0).unwrap().is_empty());
             step(&mut simulation);
