@@ -51,6 +51,22 @@ pub(super) struct KnownSnake {
 #[derive(Clone, Default)]
 pub(super) struct SnakeDeltaCache(Option<SnakeDelta>);
 
+/// Packet caches and candidate storage are private to one broadcast. Recipients
+/// finish using the candidate list before the next one reuses its allocation.
+pub(super) struct SnakeBroadcast {
+    pub(super) deltas: Vec<SnakeDeltaCache>,
+    pub(super) candidates: Vec<usize>,
+}
+
+impl SnakeBroadcast {
+    pub(super) fn new(slots: usize) -> Self {
+        Self {
+            deltas: vec![SnakeDeltaCache::default(); slots],
+            candidates: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct SnakeDelta {
     before: KnownSnake,
@@ -213,8 +229,28 @@ impl KnownSnakes {
         }
         self.by_slot[slot] = Some(known);
     }
+    #[cfg(test)]
     pub(super) fn slots(&self) -> impl Iterator<Item = usize> + '_ {
         self.slots.iter().copied()
+    }
+
+    /// CoverageGrid and known slots are ascending and unique. Merge them once,
+    /// instead of sorting the same nearby candidates for every recipient.
+    /// Copy the membership before updates: removals and appearances mutate it.
+    pub(super) fn candidates(&self, nearby: &[usize], out: &mut Vec<usize>) {
+        out.clear();
+        out.reserve(nearby.len() + self.slots.len());
+        let mut known = self.slots.iter().copied().peekable();
+        for &slot in nearby {
+            while let Some(slot) = known.next_if(|&known| known < slot) {
+                out.push(slot);
+            }
+            if known.peek() == Some(&slot) {
+                known.next();
+            }
+            out.push(slot);
+        }
+        out.extend(known);
     }
 }
 
@@ -404,6 +440,45 @@ pub(super) fn changes(
 mod tests {
     use super::*;
     use crate::{Config, Simulator};
+
+    #[test]
+    fn candidate_merge_matches_sorted_union_and_reuses_storage() {
+        let slots = [0, 1, 2, 7, 31, 63, 64, 500];
+        let snake = KnownSnake {
+            life: 1,
+            front: Point::default(),
+            len: 1,
+            heading: 0,
+            wanted: 0,
+            speed: 0,
+            fam: 0,
+            kills: 0,
+        };
+        let mut out = Vec::with_capacity(2 * slots.len());
+        let allocation = out.as_ptr();
+        for shown in 0..1usize << slots.len() {
+            let mut known = KnownSnakes::default();
+            for (bit, &slot) in slots.iter().enumerate().rev() {
+                if shown & (1 << bit) != 0 {
+                    known.insert(slot, snake.clone());
+                }
+            }
+            for nearby in 0..1usize << slots.len() {
+                let nearby: Vec<_> = slots
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, &slot)| (nearby & (1 << bit) != 0).then_some(slot))
+                    .collect();
+                let mut expected = nearby.clone();
+                expected.extend(known.slots());
+                expected.sort_unstable();
+                expected.dedup();
+                known.candidates(&nearby, &mut out);
+                assert_eq!(out, expected);
+                assert_eq!(out.as_ptr(), allocation);
+            }
+        }
+    }
 
     #[test]
     fn known_slots_match_ordered_map_through_replacement_removal_and_reuse() {

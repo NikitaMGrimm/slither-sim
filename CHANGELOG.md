@@ -19,6 +19,12 @@
 
 ### Performance
 
+- Host broadcasts build each player's list of nearby and already shown snakes
+  by merging two sorted lists into reused storage, instead of allocating and
+  sorting a new list for every player. Output is byte-identical, and the
+  500-player official fixture runs about 3% fewer instructions with stock and
+  protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-snake-candidates/REPORT.md)).
 - Battledome spawn searches reject a candidate whose head lacks the required
   runway before testing its whole body. Spawn choices are unchanged. A full
   search takes 34M instead of 79M instructions at 64 seats (36M instead of 86M
