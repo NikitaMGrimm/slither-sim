@@ -160,6 +160,9 @@ in order: `build`, `trace`, `count`, `ticks`, `idle`, `memory`, `latency`,
 Optional `--target-root DIR` reuses only task-owned Cargo caches; executable
 copies remain separately pinned. Controls are diagnostic source snapshots,
 never runtime edits in this PR. Build requires a C compiler and `patch`.
+After measurement, review made the six borrowed-fixture edits in `build` fail
+unless each anchor occurs exactly once. Each did, so the generated fixture is
+unchanged; the `harness` hash in selected results identifies the measured script.
 Python checks use explicit exceptions; the historical overlay's assertions
 are converted before execution. Optimized-Python reducer checks are supported.
 

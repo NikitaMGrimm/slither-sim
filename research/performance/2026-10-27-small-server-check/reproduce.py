@@ -32,6 +32,11 @@ def require(ok, message):
         raise RuntimeError(message)
 
 
+def swap(text, old, new):
+    require(text.count(old) == 1, f"fixture anchor: {old!r}")
+    return text.replace(old, new)
+
+
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -103,12 +108,12 @@ def build():
     let count: usize = count.parse().unwrap();
     let legacy = 0;
 ''' + fixture[end:]
-        fixture = fixture.replace("world: crate::Config::official(count),", 'world: if preset == "battledome" { crate::Config::battledome() } else { crate::Config::official(count) },')
-        fixture = fixture.replace("// Current official-500 configuration; no custom geometry or admission policy.", "// Preserve the host's seat-based preset initialization.")
-        fixture = fixture.replace("    for slot in 0..count {\n        assert!", "    let mut initial_refused = 0;\n    for slot in 0..count {\n        assert!", 1)
-        fixture = fixture.replace('        assert!(sim.connect_waited(slot, profile(slot), 2.).unwrap(), "initial slot {slot}");', '        if !sim.connect_waited(slot, profile(slot), 2.).unwrap() { initial_refused += 1; }')
-        fixture = fixture.replace('"frames":frames,"bytes":bytes,', '"initialRefused":initial_refused,"frames":frames,"bytes":bytes,')
-        fixture = fixture.replace('if tick == 720 { sim.disconnect(0).unwrap(); }', 'if tick == 720 { sim.disconnect(0).unwrap(); forced = true; }')
+        fixture = swap(fixture, "world: crate::Config::official(count),", 'world: if preset == "battledome" { crate::Config::battledome() } else { crate::Config::official(count) },')
+        fixture = swap(fixture, "// Current official-500 configuration; no custom geometry or admission policy.", "// Preserve the host's seat-based preset initialization.")
+        fixture = swap(fixture, "    for slot in 0..count {\n        assert!", "    let mut initial_refused = 0;\n    for slot in 0..count {\n        assert!")
+        fixture = swap(fixture, '        assert!(sim.connect_waited(slot, profile(slot), 2.).unwrap(), "initial slot {slot}");', '        if !sim.connect_waited(slot, profile(slot), 2.).unwrap() { initial_refused += 1; }')
+        fixture = swap(fixture, '"frames":frames,"bytes":bytes,', '"initialRefused":initial_refused,"frames":frames,"bytes":bytes,')
+        fixture = swap(fixture, 'if tick == 720 { sim.disconnect(0).unwrap(); }', 'if tick == 720 { sim.disconnect(0).unwrap(); forced = true; }')
         # Battledome can refuse simultaneous admissions at these sizes. Keep its
         # real admission policy and all retry work; report actual population.
         with (source / "src/client/simulation.rs").open("a") as stream:
