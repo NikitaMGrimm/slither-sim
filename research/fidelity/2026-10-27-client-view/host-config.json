@@ -1,0 +1,17 @@
+{
+  "bind": "127.0.0.1:18766",
+  "seed": 7,
+  "players": { "max": 1, "latency": {} },
+  "bots": { "count": 128, "threads": 1, "latency": {} },
+  "simulation": {
+    "delivery": "official",
+    "world": {
+      "radius": 12000,
+      "dynamicRadius": false,
+      "sizeToPopulation": false,
+      "foodCount": 12000,
+      "ambientReplenishPerSecond": 80,
+      "prey": { "count": 80 }
+    }
+  }
+}
