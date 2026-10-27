@@ -30,8 +30,14 @@
     "ATTEMPTS.md": "d926877ab5669698b4cf4269a481e0e4e89d56f3dc0a481bd3e5862185929074"
   },
   "attemptsSha256": "6415e20a282da5de72e59045f68be2e8b76ce2207bbb6ef131571628ffae898b",
-  "playableSourceTreeSha256": "6f707f3d94477e039cb23ae89c63b71015afb658e992adfd383daa4c2f7502a7",
+  "playableSourceTreeSha256": "9e2a7a0d8b27b109cd43fd3b6ce5cceb88897c22dd38dca5166b0601627f2af0",
   "playableSourceHashMethod": "SHA-256 of UTF-8 lines: <file SHA-256> <path> LF; sorted git-tracked src/*, Cargo.toml, Cargo.lock, build.rs; unchanged file bytes",
-  "playableBinarySha256": "f50779950ca8c40e8c0c9582f086f1bc62274d6d29c8966d6f35e26de5635468",
-  "playableSmokeSha256": "ced0ea2f968cbc831f6686264dd6d95e699475b1d878a35d997ff8af835296bf"
+  "playableBinarySha256": "b9e61142884ca15cf75e1d9aa478afcc5eed9208fad11d34e90eef6c87bd887d",
+  "playableSmokeSha256": "9134dfbeb9ea99fce5365be182fc7146b4e2133f188c7c0780ee68a536b0443c",
+  "preFoodPlayable": {
+    "head": "56c8bd1fa0e077108f7e3f7717c97cce835f9aa7",
+    "playableSourceTreeSha256": "6f707f3d94477e039cb23ae89c63b71015afb658e992adfd383daa4c2f7502a7",
+    "playableBinarySha256": "f50779950ca8c40e8c0c9582f086f1bc62274d6d29c8966d6f35e26de5635468",
+    "playableSmokeSha256": "ced0ea2f968cbc831f6686264dd6d95e699475b1d878a35d997ff8af835296bf"
+  }
 }

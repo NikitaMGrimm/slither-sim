@@ -16,7 +16,7 @@ Area per seat is constant above 32, rather than decreasing crowd density.
 The owner subsequently liked a separately played 64-bot setup with wall 5,069,
 pit 2,523 and spawn band 3,796–4,808. That matches this policy's 64-seat geometry
 and supports constant density over the slower fixed-size screen. That setup
-also used separately owned pit-only food; this branch does not yet include it.
+also used pit-only food, now included here from merged #187.
 This is a feel signal, not independent safety or capacity validation.
 
 Preferred admission retains 400 body, 600/2s forward-head exclusion and the 3s
@@ -85,7 +85,7 @@ later main food-sharing/presentation merges and the full-arc bot correction; the
 directional v2 pilots include #180 and the #181 hard-arc correction. They are
 distinct cohorts; none is relabeled as a later-source run. Subsequent main host
 changes are integrated on the playable branch; these rows do not qualify that
-final source. No personal or machine data is needed to identify the artifacts.
+final source. Every gameplay row also predates pit-only food (#187).
 
 The first fixture attempt omitted the real startup Seat::join call, admitted
 no bots and failed on empty wait quantiles. It contributes no gameplay or timing
@@ -101,15 +101,15 @@ uses density at 64/80 with that corrected directional policy. No compact-body,
 immunity or extra-growth design was adopted. Planned remaining directional
 seeds and held-out seeds 71/101 have not run; no adoption gate is claimed.
 
-Incremental wall culling is also included in this branch and is being split
-into its own infrastructure PR. It mirrors physical wall removals into the food
+Incremental culling is included and split into infrastructure PR #189.
+It mirrors physical wall/pit food removals into the food
 index and presentation before births/pickups, retaining unchanged sector handles
 and hidden ambient births. Focused regressions cover real wall movement and food
 diffs. The main food-generation and ecology_at_radius helpers are untouched.
 
-Rules revision is v5 on this play branch, reserved after the separately owned
-pit-only-food v4 change; no checkpoint shape changed. Reconcile the two branches
-before any future integration. This branch currently uses main's food rules.
+This branch is rebased onto pit-only food (#187, main f18dde6, rules-v4).
+Arena sizing advances the combined rules identity to v5; format stays v2.
+Core food generation/ecology calculations remain those merged in #187.
 
 ## Local play config
 
@@ -125,16 +125,17 @@ study smoke tests use 127.0.0.1:18876. The owner controls the local play server.
 
 ## Validation of this playable source
 
-Formatting and all five Clippy configurations passed. All-target tests passed
-with default, core-only, bot-only and networking features, plus both doctest
-configurations, C ABI tests, the Python-crate check and the basic example.
-All seven documentation checks passed. The final sequential checks and release
-build used one-core affinity, build jobs 1, Rayon 1 and test threads 1 after the
-resource correction; the earlier measured cohorts above used two CPUs.
+Before #187, the full Rust group and seven docs checks passed. After rebasing:
+all five Clippy configurations, the library, Battledome, checkpoint, seat-radius,
+world-rules and socket integration tests pass; release build and docs pass.
+Feature runtime suites were not repeated after the rebase. Final checks use
+one-core affinity, jobs 1, Rayon 1 and test threads 1; older cohorts used two CPUs.
 
-Two separate 21-second CLI smoke runs used default seed and the config above,
-64 then 80 bots, on loopback 18876, one core. Four five-second stats samples:
+Historical pre-food 21-second CLI smoke runs, 64 then 80 bots, one core:
 64 bots: load 14.8/37.9/4.4/4.8%; 80 bots: 35.4/32.9/4.2/5.0%.
-Every interval had zero deferred ticks and about 142.7–143.0 ticks/s.
-This confirms CLI startup, not alive-seat counts, long-run load or shrink cost.
+Zero deferred ticks, about 142.7–143.0 ticks/s. Prior head and hashes are retained.
+Fresh post-food smoke runs use the same 21s/default-seed/config/loopback-18876
+protocol, sequentially on one core. Four five-second load samples:
+64 bots: 28.4/11.0/2.9/3.6%. 80 bots: 36.3/33.3/4.0/8.8%. All intervals had zero deferred ticks.
+These confirm startup, not alive-seat counts, long-run load or shrink cost.
 Binary/log hashes are in source-pins; full logs remain local-only.
