@@ -111,7 +111,10 @@ pointed at it with the [console snippet](raw-server.md#stock-browser-client);
 browser mods need their own server setting. Pages served over HTTPS can only
 open `wss` connections, which need the TLS proxy below.
 
-Some browser mods can connect by entering the host's `IP:PORT` in their custom server field; see [compatibility limits](raw-server.md#packet-compatibility), including minimap support.
+The NTL, Frontier and Precise slither browser mods connect when the host's
+`IP:PORT` is entered in their custom server field. NTL and Precise get
+protocol 13, Frontier gets 19, and Precise shows no minimap; see
+[compatibility limits](raw-server.md#packet-compatibility).
 
 To check that a client can join, run the example bot from any machine with
 Python 3.11+ and a `slither-sim` binary:
