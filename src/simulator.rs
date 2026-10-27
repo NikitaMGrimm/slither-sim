@@ -1572,6 +1572,7 @@ impl Simulator {
             fallen,
             eaters,
             hits,
+            retained_food: _,
             prey: prey_buffers,
         } = &mut buffers;
         let c = &self.config;
@@ -1592,9 +1593,9 @@ impl Simulator {
                 .map(|s| head_tip(s.head, s.heading, s.segments)),
         );
         boundary_deaths.clear();
-        // Public food edits reset the cache; pushes/pickups below are mirrored.
-        // Radius/pit retention above can only change its length. Reuse the prior
-        // verification when that ownership invariant and length still hold.
+        // Public food edits reset the cache; radius retention and the internal
+        // pushes/pickups are mirrored. Reuse verification while that ownership
+        // invariant and the mirrored length still hold.
         self.food_cache.begin_mirrored(&self.food);
         for &i in alive.iter() {
             let a = actions[i].expect("validated action");
@@ -2139,17 +2140,35 @@ impl Simulator {
             // stranded pellets inward or leave them suppressing total-food refill.
             // docs/configuration.md#battledome and pit_food_tests
             let radius = self.food_radius();
-            self.food
-                .retain(|f| f.point().distance_lt(Point::default(), radius));
+            self.retain_food(radius);
         } else if self.config.dynamic_radius && self.radius < previous {
             // Stranded pellets must not suppress live-area refill. Fixed replay
             // keeps its historical retention; all food origins leave with this
-            // model's wall. Removing items fails the next mirrored span's length
-            // guard, forcing cache verification before it is used again.
+            // model's wall. Mirror removals to preserve the warm cache.
             // Use squared distances except at numerically ambiguous boundaries.
-            self.food
-                .retain(|f| f.point().distance_lt(Point::default(), self.radius));
+            self.retain_food(self.radius);
         }
+    }
+
+    fn retain_food(&mut self, radius: f64) {
+        let removed = &mut self.buffers.retained_food;
+        removed.clear();
+        removed.extend(
+            self.food.iter().enumerate().filter_map(|(i, f)| {
+                (!f.point().distance_lt(Point::default(), radius)).then_some(i)
+            }),
+        );
+        if !removed.is_empty() {
+            // Keep retain's strict boundary and survivor order, but mirror the
+            // ascending original indices before compaction. Warm counts and
+            // stable pellet handles then survive a moving wall; cold/reset
+            // caches still undergo their normal verification on the next use.
+            // research/performance/2026-10-27-mirrored-food-retention/REPORT.md
+            self.food_cache
+                .remove(self.food.len(), removed.iter().copied());
+            compact_food(&mut self.food, removed.iter().copied());
+        }
+        removed.clear();
     }
 
     fn apply_radius_updates(&mut self, through: f64) {
@@ -2664,6 +2683,8 @@ struct StepBuffers {
     fallen: Vec<bool>,
     eaters: Vec<(usize, Point, f64, Bounds)>,
     hits: Vec<(usize, usize)>,
+    /// Ascending original indices pruned by a moving outer wall or pit edge.
+    retained_food: Vec<usize>,
     prey: PreyBuffers,
 }
 #[derive(Default)]
@@ -2956,6 +2977,142 @@ mod food_pickup_order_tests {
         .unwrap();
         restored.food_cache.begin_mirrored(&restored.food);
         assert_eq!(restored.food_cache.ambient(&restored.food), 1);
+    }
+
+    #[test]
+    fn radius_retention_preserves_warm_handles_and_matches_recounts() {
+        for pit_only in [false, true] {
+            let mut config = if pit_only {
+                Config::battledome()
+            } else {
+                Config::official(32)
+            };
+            config.radius = 3584.;
+            config.food_count = 0;
+            config.ambient_replenish_per_second = 0.;
+            config.prey.count = 0;
+            let radii = [3500., 3000., 2500., 3600., 2200.];
+            config.radius_updates = radii
+                .iter()
+                .enumerate()
+                .map(|(i, &radius)| RadiusUpdate {
+                    time: (i + 1) as f64 * config.dt,
+                    radius,
+                })
+                .collect();
+            let mut world = Simulator::new(WorldOptions {
+                seed: 47,
+                config,
+                population: InitialPopulation::Empty,
+            })
+            .unwrap();
+            let mut food = Vec::new();
+            for radius in radii {
+                let edge = if pit_only {
+                    1784. * (radius / 3584.)
+                } else {
+                    radius
+                };
+                for distance in [0., edge.next_down(), edge, edge.next_up(), 3700.] {
+                    for sign in [-1., 1.] {
+                        food.push(Food {
+                            x: sign * distance,
+                            y: 0.,
+                            value: food.len() as f64 + 1.,
+                            size: Some(1.),
+                            origin: [
+                                None,
+                                Some(Origin::Ambient),
+                                Some(Origin::Boost),
+                                Some(Origin::Death),
+                            ][food.len() % 4],
+                        });
+                    }
+                }
+            }
+            let probes = food.clone();
+            world.replace_food(food).unwrap();
+            world.food_cache.begin_mirrored(&world.food);
+            world.food_cache.pellets(&world.food).unwrap();
+            for size in [40., 75., 128.] {
+                world
+                    .food_cache
+                    .has_room(&world.food, &probes[0], size, usize::MAX);
+            }
+            world.food_cache.end();
+            for tick in 0..radii.len() {
+                let before = world.food.clone();
+                let previous = world.radius;
+                let (matched, handles, free, grids) = world.food_cache.retention_state();
+                assert!(matched);
+                assert_eq!(grids, 3);
+                let mut cold = world.clone();
+                cold.food_cache = FoodCache::default();
+                world.update_radius((tick + 1) as f64 * world.config.dt);
+                cold.update_radius((tick + 1) as f64 * cold.config.dt);
+                let mut expected = before.clone();
+                if (pit_only && world.radius != previous) || (!pit_only && world.radius < previous)
+                {
+                    let radius = world.food_radius();
+                    expected.retain(|f| f.point().distance_lt(Point::default(), radius));
+                }
+                assert_eq!(
+                    serde_json::to_vec(&world.food).unwrap(),
+                    serde_json::to_vec(&expected).unwrap()
+                );
+                assert_eq!(world.food, cold.food);
+                let removed = before.len() - expected.len();
+                assert_eq!(
+                    world.food_cache.retention_state(),
+                    (true, handles, free + removed, 3)
+                );
+                world.food_cache.begin_mirrored(&world.food);
+                world.food_cache.pellets(&world.food).unwrap();
+                assert_eq!(
+                    world.food_cache.ambient(&world.food),
+                    world
+                        .food
+                        .iter()
+                        .filter(|f| f.origin == Some(Origin::Ambient))
+                        .count()
+                );
+                for size in [40., 75., 128.] {
+                    for probe in &probes {
+                        let cell = crate::food_grid::food_cell(probe.x, probe.y, size);
+                        let count = world
+                            .food
+                            .iter()
+                            .filter(|f| crate::food_grid::food_cell(f.x, f.y, size) == cell)
+                            .count();
+                        for max in [0, count, count + 1] {
+                            assert_eq!(
+                                world.food_cache.has_room(&world.food, probe, size, max),
+                                count < max
+                            );
+                        }
+                    }
+                }
+                // Verification, occupancy grids and freed handles survive the
+                // next access; rebuilding would lose the old free-list holes.
+                assert_eq!(
+                    world.food_cache.retention_state(),
+                    (true, handles, free + removed, 3)
+                );
+                world.food_cache.end();
+            }
+            let (_, handles, free, _) = world.food_cache.retention_state();
+            let remaining = world.food.len();
+            world.retain_food(0.);
+            assert!(world.food.is_empty());
+            world.food_cache.begin_mirrored(&world.food);
+            assert_eq!(world.food_cache.ambient(&world.food), 0);
+            world.food_cache.pellets(&world.food).unwrap();
+            assert_eq!(
+                world.food_cache.retention_state(),
+                (true, handles, free + remaining, 3)
+            );
+            world.food_cache.end();
+        }
     }
 
     #[test]
