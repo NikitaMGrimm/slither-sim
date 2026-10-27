@@ -17,10 +17,13 @@
   land inside the pit remain. Boost pellets follow the same rule, so boost mass
   spent outside the pit is lost. Food left outside a moving edge is removed.
   Worlds without the setting keep their old food rules.
-- **Breaking:** Battledome keeps its 3,584-unit base through 32 seats, then
-  scales radius with the square root of seats. Spawns try strict checks first,
-  then a fallback preserving contact clearance and inward routes after two seconds.
-  Checkpoints use rules revision `slither-sim-rules-v5`; format stays v2.
+- **Breaking:** Battledome keeps its 3,584 radius up to 32 players and grows
+  above that so each player keeps the same space: about 5,069 at 64 seats and
+  5,667 at 80. The pit and spawn band scale with it. A spawn that finds no
+  strictly safe spot within two seconds takes the safest spot that still keeps
+  clear of bodies and of other snakes' paths to the middle.
+  `dynamicRadius: false` keeps the 3,584 arena. Checkpoints use rules revision
+  `slither-sim-rules-v5` and reject earlier continuations.
 - **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
   pit radius, size floor, kill-score window, boundary and free floor boost.
   They are sent at setup and whenever they change, and surface as the optional
