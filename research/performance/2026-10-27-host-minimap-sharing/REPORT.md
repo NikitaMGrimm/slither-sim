@@ -47,7 +47,7 @@ kernel. All population/lifecycle summaries match.
 | dome64 /100 | 8.489% | 8.475–8.513% |
 | dome80 /100 | 9.082% | 9.040–9.100% |
 
-The predeclared supplement reaches six map opportunities; official100 reaches
+The predeclared supplement reaches six map opportunities; official500 /100 reaches
 only its first full map. Dense fixtures include 600 warmup decisions.
 These are descriptive fixture results, not live CPU savings.
 
