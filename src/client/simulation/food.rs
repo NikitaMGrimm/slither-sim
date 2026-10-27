@@ -778,14 +778,19 @@ mod tests {
                 let want = reference_sync_food_sectors(&mut reference).unwrap();
                 assert_eq!(got.changed, want.changed, "pit={pit} tick={tick}");
                 assert_eq!(got.eaten, want.eaten, "pit={pit} tick={tick}");
-                assert_eq!(
-                    actual.food_sectors, reference.food_sectors,
-                    "physical pit={pit} tick={tick}"
-                );
-                assert_eq!(
-                    actual.decorated_food_sectors, reference.decorated_food_sectors,
-                    "decorated pit={pit} tick={tick}"
-                );
+                for (name, actual, reference) in [
+                    ("physical", &actual.food_sectors, &reference.food_sectors),
+                    (
+                        "decorated",
+                        &actual.decorated_food_sectors,
+                        &reference.decorated_food_sectors,
+                    ),
+                ] {
+                    assert_eq!(actual.len(), reference.len());
+                    for (sector, (actual, reference)) in actual.iter().zip(reference).enumerate() {
+                        assert_eq!(actual, reference, "{name} pit={pit} tick={tick} sector={sector}");
+                    }
+                }
             }
         }
     }
