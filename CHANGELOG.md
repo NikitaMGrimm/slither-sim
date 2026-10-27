@@ -48,6 +48,9 @@
 
 ### Performance
 
+- Host food-sector listings track subscription changes incrementally instead
+  of rebuilding the union of every client's subscriptions each tick. Packet
+  bytes and order are unchanged.
 - Host food updates reuse each broadcast's changed sectors for every recipient
   instead of rescanning per recipient. Output is byte-identical; the official
   500-client fixture runs 6.5% fewer instructions
