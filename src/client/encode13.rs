@@ -1,0 +1,277 @@
+//! Recipient-only protocol-13 wire adapter. Shared simulation, visibility, report
+//! clocks and protocol-19 packet preparation stay unchanged. No adapter is
+//! allocated for stock clients or bots.
+//!
+//! Layout evidence: tests/fixtures/protocol-catalog-13.json and
+//! research/fidelity/2026-10-26-protocol13-catalog/REPORT.md (#177).
+//! The adapter follows the *encoded* front anchors, including rounding, so an
+//! angle-only 19 step becomes the same position in 13 without accumulating a
+//! second quantization error. It never feeds presentation state into physics.
+use super::{Minimap, encode};
+use crate::model::Point;
+use std::{collections::BTreeMap, f64::consts::TAU};
+
+#[derive(Clone, Debug)]
+struct Front {
+    source: Point,
+    sent: Option<[u16; 2]>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Encoder {
+    own: u16,
+    spacing: f64,
+    fronts: BTreeMap<u16, Front>,
+    map: Option<Minimap>,
+}
+
+impl Encoder {
+    pub(crate) fn new(own: u16) -> Self {
+        Self {
+            own,
+            spacing: crate::physics::ANCHOR_SPACING,
+            fronts: BTreeMap::new(),
+            map: None,
+        }
+    }
+
+    pub(crate) fn packets(&mut self, packets: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
+        let mut out = Vec::with_capacity(packets.len());
+        for p in packets {
+            match p[0] {
+                b'a' => {
+                    let mut p = p.clone();
+                    p[23] = 13;
+                    self.spacing = f64::from(p[24]);
+                    out.push(p);
+                }
+                b's' if p.len() > 7 => out.push(self.appearance(p)?),
+                b's' => {
+                    self.fronts.remove(&u16_at(p, 1));
+                    out.push(p.clone());
+                }
+                b'd' | b'7' => {
+                    let mut q = vec![if p[0] == b'd' { b'e' } else { b'E' }];
+                    q.extend(self.own.to_be_bytes());
+                    q.extend_from_slice(&p[1..]);
+                    out.push(q);
+                }
+                b'e' | b'E' | b'3' | b'4' | b'5' if p.len() <= 3 => {
+                    let mut q = vec![p[0]];
+                    q.extend(self.own.to_be_bytes());
+                    q.extend_from_slice(&p[1..]);
+                    out.push(q);
+                }
+                b'g' | b'G' | b'n' | b'N' | b'=' | b'+' => out.push(self.anchor(p)?),
+                b'F' => {
+                    // 13 has no sector header; split before the six-byte tuples
+                    // exceed the common frame-length limit (8191 bytes).
+                    for chunk in p[3..].chunks(1365 * 4) {
+                        let mut q = vec![b'F'];
+                        for food in chunk.as_chunks::<4>().0 {
+                            let xy = food_xy([p[1], p[2], food[1], food[2]]);
+                            q.push(food[0]);
+                            q.extend(xy[0].to_be_bytes());
+                            q.extend(xy[1].to_be_bytes());
+                            q.push(food[3]);
+                        }
+                        out.push(q);
+                    }
+                }
+                b'f' | b'b' => {
+                    let xy = food_xy([p[1], p[2], p[3], p[4]]);
+                    let mut q = vec![p[0], p[5]];
+                    q.extend(xy[0].to_be_bytes());
+                    q.extend(xy[1].to_be_bytes());
+                    q.push(p[6]);
+                    out.push(q);
+                }
+                b'c' | b'<' => {
+                    let xy = food_xy([p[1], p[2], p[3], p[4]]);
+                    let mut q = vec![b'c'];
+                    q.extend(xy[0].to_be_bytes());
+                    q.extend(xy[1].to_be_bytes());
+                    q.extend_from_slice(&p[5..]);
+                    out.push(q);
+                }
+                b'M' | b'V' => {
+                    let map = Minimap::packet(self.map.as_ref(), p)?;
+                    out.push(minimap(&map));
+                    self.map = Some(map);
+                }
+                // Common catalog families, plus existing local score/record/rules
+                // presentation. Never forward a new 19-only layout silently.
+                b'e' | b'E' | b'3' | b'4' | b'5' | b'h' | b'r' | b'w' | b'y' | b'j' | b'l'
+                | b'k' | b'p' | b'z' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.clone()),
+                _ => return Err(format!("No protocol-13 encoding for code {}", p[0])),
+            }
+        }
+        Ok(out)
+    }
+
+    fn appearance(&mut self, p: &[u8]) -> Result<Vec<u8>, String> {
+        let id = u16_at(p, 1);
+        let custom = 23 + usize::from(p[22]);
+        let body = custom + 2 + usize::from(p[custom]);
+        let mut last = Point {
+            x: u24_at(p, body) / 5.,
+            y: u24_at(p, body + 3) / 5.,
+        };
+        for delta in p[body + 6..p.len() - 2].as_chunks::<2>().0 {
+            last.x += (f64::from(delta[0]) - 127.) / 2.;
+            last.y += (f64::from(delta[1]) - 127.) / 2.;
+        }
+        let angle = f64::from(u16_at(p, p.len() - 2)) * TAU / 65536.;
+        let front = Point {
+            x: last.x + angle.cos() * self.spacing,
+            y: last.y + angle.sin() * self.spacing,
+        };
+        let mut q = p[..p.len() - 2].to_vec();
+        for delta in [front.x - last.x, front.y - last.y] {
+            let byte = (delta * 2.).round() + 127.;
+            if !(0. ..=255.).contains(&byte) {
+                return Err("Protocol-13 appearance step exceeds half-unit byte".into());
+            }
+            q.push(byte as u8);
+        }
+        // The appearance front is on a half-unit grid; the first integer
+        // anchor uses absolute g/n to establish an unambiguous relative base.
+        self.fronts.insert(
+            id,
+            Front {
+                source: front,
+                sent: None,
+            },
+        );
+        Ok(q)
+    }
+
+    fn anchor(&mut self, p: &[u8]) -> Result<Vec<u8>, String> {
+        let grow = matches!(p[0], b'n' | b'N' | b'+');
+        let own = matches!(p[0], b'G' | b'N')
+            || p[0] == b'=' && p.len() == 7
+            || p[0] == b'+' && p.len() == 10;
+        let (id, at) = if own {
+            (self.own, 1)
+        } else {
+            (u16_at(p, 1), 3)
+        };
+        let front = self
+            .fronts
+            .get_mut(&id)
+            .ok_or("Protocol-13 anchor before appearance")?;
+        let absolute = matches!(p[0], b'=' | b'+');
+        let point = if absolute {
+            Point {
+                x: f64::from(u16_at(p, at + 2)),
+                y: f64::from(u16_at(p, at + 4)),
+            }
+        } else {
+            let angle = f64::from(u16_at(p, at)) * TAU / 65536.;
+            Point {
+                x: front.source.x + angle.cos() * self.spacing,
+                y: front.source.y + angle.sin() * self.spacing,
+            }
+        };
+        let xy = [coordinate(point.x)?, coordinate(point.y)?];
+        let delta = front.sent.map(|sent| {
+            [
+                i32::from(xy[0]) - i32::from(sent[0]),
+                i32::from(xy[1]) - i32::from(sent[1]),
+            ]
+        });
+        // Absolute corrections also reset the browser's quantized base. Ordinary
+        // ~42-unit steps fit the relative form; large corrections use g/n.
+        let relative =
+            !absolute && delta.is_some_and(|delta| delta.iter().all(|d| (-128..=127).contains(d)));
+        let mut q = vec![match (relative, grow) {
+            (true, false) => b'G',
+            (true, true) => b'N',
+            (false, false) => b'g',
+            (false, true) => b'n',
+        }];
+        q.extend(id.to_be_bytes());
+        if relative {
+            q.extend(delta.expect("relative base").map(|d| (d + 128) as u8));
+        } else {
+            q.extend(xy[0].to_be_bytes());
+            q.extend(xy[1].to_be_bytes());
+        }
+        if grow {
+            q.extend_from_slice(&p[p.len() - 3..]);
+        }
+        *front = Front {
+            source: point,
+            sent: Some(xy),
+        };
+        Ok(q)
+    }
+}
+
+fn u16_at(p: &[u8], at: usize) -> u16 {
+    u16::from_be_bytes([p[at], p[at + 1]])
+}
+fn u24_at(p: &[u8], at: usize) -> f64 {
+    f64::from(u32::from_be_bytes([0, p[at], p[at + 1], p[at + 2]]))
+}
+fn coordinate(value: f64) -> Result<u16, String> {
+    if value.is_finite() && (0. ..=65535.).contains(&value.round()) {
+        Ok(value.round() as u16)
+    } else {
+        Err("Protocol-13 coordinate outside u16".into())
+    }
+}
+
+/// Project the shared 300/256 food grid onto the legacy integer grid. The step
+/// is >1, so rounding cannot merge adjacent keys; births and removals use the
+/// same projection, including decorative pit pellets.
+fn food_xy(key: [u8; 4]) -> [u16; 2] {
+    let cell = |sector: u8, offset: u8| {
+        u16::from(sector) * encode::SECTOR_SIZE
+            + ((u32::from(offset) * u32::from(encode::SECTOR_SIZE) + 128) / 256) as u16
+    };
+    [cell(key[0], key[2]), cell(key[1], key[3])]
+}
+
+/// Compatibility snapshot U: same reverse raster as the measured M, without
+/// its 255 escape or a delta base. This client-supported form avoids depending
+/// on a browser mod's modern-map flag. It is a compatibility choice, not an
+/// assertion that the official protocol-13 capture used U (it used M).
+fn minimap(map: &Minimap) -> Vec<u8> {
+    let mut q = vec![b'U'];
+    q.extend((map.side as u16).to_be_bytes());
+    let mut remaining = map.cells.len();
+    while remaining > 0 {
+        let zeros = map.cells[..remaining]
+            .iter()
+            .rev()
+            .take_while(|&&v| v == 0)
+            .count();
+        if zeros == remaining {
+            break;
+        }
+        if zeros >= 7 {
+            let mut left = zeros;
+            while left > 0 {
+                let skip = left.min(127);
+                q.push(128 + skip as u8);
+                left -= skip;
+            }
+            remaining -= zeros;
+        } else {
+            let mut byte = 0;
+            for bit in (0..7).rev() {
+                if remaining == 0 {
+                    break;
+                }
+                remaining -= 1;
+                byte |= u8::from(map.cells[remaining] != 0) << bit;
+            }
+            q.push(byte);
+        }
+    }
+    q
+}
+
+#[cfg(test)]
+mod tests;

@@ -587,6 +587,68 @@ fn stock_default_login_uses_bare_messages_and_routes_controls() {
 }
 
 #[test]
+fn legacy_handshake_login_controls_and_reconnect_use_individual_protocol13_messages() {
+    let host = Running::start(config(1, 0));
+    for (selector, request_session) in [(12, true), (11, false)] {
+        let mut client = Raw::connect(host.address, "/slither");
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        if request_session {
+            client.send(&[4]);
+        }
+        client.send(&[99, 4]);
+        let challenge = client.binary();
+        assert_eq!(&challenge[..3], &[0, 0, b'6']);
+        client.send(b"CGLRYGPZKWJXMCTLEYTPMKJJ");
+        // Synthetic legacy layout; no third-party client bytes or code.
+        let mut login = vec![b's', selector, 7, 6];
+        login.extend(b"Legacy");
+        login.extend([0, 255, 9, 8]);
+        client.send(&login);
+        let setup = client.binary();
+        assert_eq!(setup[2], b'a');
+        assert_eq!(setup[25], 13);
+        let start = Instant::now();
+        loop {
+            let message = client.binary();
+            assert!(message[2] >= 32, "legacy clients cannot split bundles");
+            if message[2] == b's' && message.len() > 9 {
+                let p = &message[2..];
+                assert_eq!(p[15], 7);
+                assert_eq!(&p[22..33], b"\x06Legacy\x02\x09\x08\x00");
+                break;
+            }
+            assert!(start.elapsed() < WAIT);
+        }
+        for control in [&[100][..], &[253], &[254], &[252, 10], &[251]] {
+            client.send(control);
+        }
+        let mut session = false;
+        loop {
+            let message = client.binary();
+            assert!(message[2] >= 32);
+            session |= message[2] == b'S';
+            if message[2] == b'p' {
+                break;
+            }
+            assert!(start.elapsed() < WAIT);
+        }
+        assert_eq!(session, request_session);
+        let mut close = Raw::frame(&[]);
+        close[0] = 0x88;
+        client.write(&close);
+        // Give the socket thread its close before reclaiming the single seat.
+        client.closed();
+        let closing = Instant::now();
+        let retire_tick = host.host.ticks();
+        while host.host.players() != 0 || host.host.ticks() < retire_tick + 2 {
+            assert!(closing.elapsed() < WAIT, "close did not free the seat");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+    host.finish();
+}
+
+#[test]
 fn sequence_framing_and_native_reply_are_supported() {
     let host = Running::start(config(1, 0));
     let mut client = Raw::connect(host.address, "/slither");

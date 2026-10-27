@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Some browser mods can join hosts using the legacy handshake and protocol 13,
+  including food, death/rejoin and Battledome's kill board, pit map and edge ring.
+  Stock protocol-19 clients and bots keep their existing wire output.
+
 ### Changed
 
 - **Breaking:** Battledome food stays inside the pit (`foodOnlyInsidePit`).

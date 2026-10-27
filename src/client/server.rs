@@ -1,4 +1,4 @@
-//! Raw protocol-19 WebSocket host: remote clients and in-process bots share
+//! Raw protocol-13/19 WebSocket host: remote clients and in-process bots share
 //! one real-time world.
 //!
 //! Three thread roles share one wall-clock schedule: simulation owns physics
@@ -18,7 +18,8 @@
 //! Login accepts optional one-byte framing requests, `[99, 0]`, a `6` challenge
 //! generated from a fixed literal, a 27-byte reply and `s` login. The challenge
 //! provides stock-client compatibility, not authentication. A direct `s` login
-//! is also accepted.
+//! is also accepted. Legacy `[99,4]` uses a client-compatible 24-letter challenge;
+//! selectors 11/12 at login choose protocol-13 output for that connection.
 use super::{
     Bot, ClientState, ClientStatus, ForagerBot, SimulationConfig, challenge,
     latency::{LatencyConfig, Link, Random},
@@ -286,6 +287,7 @@ enum Command {
         appearance: PlayerAppearance,
         session_id: bool,
         physical_food: bool,
+        protocol13: bool,
     },
     /// A game command sent at wall time `sent`.
     Message {
@@ -346,7 +348,7 @@ impl Delivery {
     }
 }
 
-/// A bound protocol-19 server. `start` serves it on its own threads; `run`
+/// A bound protocol-13/19 server. `start` serves it on its own threads; `run`
 /// serves it until a failure.
 pub struct Host {
     listener: TcpListener,
@@ -601,6 +603,7 @@ struct PendingJoin {
     appearance: PlayerAppearance,
     session_id: bool,
     physical_food: bool,
+    protocol13: bool,
     requested_tick: u64,
     /// A new socket connection replaces the previous player's rolling score.
     reset_kills: bool,
@@ -727,6 +730,9 @@ impl Simulation {
             Ok(false) => return Ok(false),
             Ok(true) => {
                 self.last_spawn_tick = Some(self.ticks);
+                if join.protocol13 {
+                    self.world.protocol13(slot);
+                }
                 if join.physical_food {
                     self.world.physical_food(slot);
                 }
@@ -754,6 +760,7 @@ impl Simulation {
                 appearance,
                 session_id,
                 physical_food,
+                protocol13,
             } => {
                 let reset_kills = slot < self.max_clients
                     && (generation != self.generations[slot]
@@ -767,6 +774,7 @@ impl Simulation {
                     appearance,
                     session_id,
                     physical_food,
+                    protocol13,
                     requested_tick: self.ticks,
                     reset_kills,
                 };
@@ -1055,6 +1063,7 @@ struct Open<S = TcpStream> {
     phase: Phase,
     framing: Framing,
     want_session_id: bool,
+    legacy_reply: Option<Vec<u8>>,
     physical_food: bool,
     generation: u64,
     /// Frames from the world waiting for their delivery time, in order.
@@ -1239,6 +1248,7 @@ impl<S: io::Read + io::Write> Open<S> {
             phase: Phase::Hello { framed: false },
             framing: Framing::Elapsed,
             want_session_id: false,
+            legacy_reply: None,
             physical_food,
             generation: 0,
             queued: VecDeque::new(),
@@ -1317,9 +1327,20 @@ impl<S: io::Read + io::Write> Open<S> {
                 let challenge = gate.challenge.clone();
                 self.send(challenge)
             }
+            (Phase::Hello { .. }, [99, 4]) => {
+                let (challenge, reply) = legacy_challenge();
+                self.legacy_reply = Some(reply);
+                self.phase = Phase::Reply;
+                self.send(challenge)
+            }
             (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(gate, bytes),
             (Phase::Hello { .. }, _) => Err("Expected a login request".into()),
-            (Phase::Reply, _) if gate.replies.iter().any(|reply| reply == bytes) => {
+            (Phase::Reply, _)
+                if self.legacy_reply.as_ref().map_or_else(
+                    || gate.replies.iter().any(|reply| reply == bytes),
+                    |reply| reply == bytes,
+                ) =>
+            {
                 self.phase = Phase::Login;
                 Ok(())
             }
@@ -1369,6 +1390,7 @@ impl<S: io::Read + io::Write> Open<S> {
             appearance,
             session_id: self.want_session_id,
             physical_food: self.physical_food,
+            protocol13: legacy_login(login),
         });
         Ok(())
     }
@@ -1721,6 +1743,7 @@ impl Seat {
             },
             session_id: false,
             physical_food: true,
+            protocol13: false,
         });
         Ok(())
     }
@@ -1767,26 +1790,61 @@ fn bot_nickname(bot: usize) -> Vec<u8> {
     .into_bytes()
 }
 
-/// Stock-client login: protocol and client-version bytes, password, skin at
-/// 24, nickname length at 25, nickname, two reserved bytes, custom skin.
+/// These legacy selectors describe the login layout, not the output version.
+fn legacy_login(bytes: &[u8]) -> bool {
+    matches!(bytes.get(1), Some(11 | 12))
+}
+
+/// Stock: skin/name length at 24/25; legacy: at 2/3. Both end with the name,
+/// two reserved bytes and custom skin. Stock bytes are interpreted as before.
 fn parse_login(bytes: &[u8]) -> Result<PlayerAppearance, String> {
-    if bytes.len() < 28 || bytes[0] != b's' {
+    let (skin, name) = if legacy_login(bytes) {
+        (2, 3)
+    } else {
+        (24, 25)
+    };
+    if bytes.len() < name + 3 || bytes[0] != b's' {
         return Err("Truncated login".into());
     }
-    let length = usize::from(bytes[25]);
+    let length = usize::from(bytes[name]);
     if length > MAX_NICKNAME {
         return Err("Nickname longer than 24 bytes".into());
     }
-    let end = 26 + length;
+    let start = name + 1;
+    let end = start + length;
     let custom = bytes.get(end + 2..).ok_or("Truncated login")?;
     if custom.len() > MAX_CUSTOM_SKIN {
         return Err("Custom skin longer than 255 bytes".into());
     }
     Ok(PlayerAppearance {
-        nickname: bytes[26..end].to_vec(),
-        skin: bytes[24],
+        nickname: bytes[start..end].to_vec(),
+        skin: bytes[skin],
         custom_skin: custom.to_vec(),
     })
+}
+
+/// Client-derived compatibility profile: some browser mods parse a single
+/// quoted 24-letter literal. Official #177 captures instead returned the stock
+/// 27-copy source even for [4], [99,4]. This deliberately serves the supported
+/// client syntax, not an invented claim about official behavior. The generated
+/// source is fixed data, never executed; the challenge is not authentication.
+fn legacy_challenge() -> (Vec<u8>, Vec<u8>) {
+    let source = b"var a = 'ABCDEFGHIJKLMNOPQRSTUVWX';";
+    let mut framed = vec![0, 0, b'6'];
+    let mut key = 23_u8;
+    for byte in source {
+        for nibble in [byte >> 4, byte & 15] {
+            framed.push(b'a' + (nibble + key) % 26);
+            key = (key + 17) % 26;
+        }
+    }
+    let mut reply = Vec::with_capacity(24);
+    let mut rotation = 2;
+    for letter in 0..24 {
+        reply.push(b'A' + (letter + rotation) % 26);
+        rotation = (rotation + 3 + letter) % 26;
+    }
+    (framed, reply)
 }
 
 /// Encoded challenge source and its two accepted replies.
@@ -2397,6 +2455,7 @@ mod tests {
             appearance: PlayerAppearance::default(),
             session_id: false,
             physical_food: true,
+            protocol13: false,
         });
         for _ in 0..40 {
             step(&mut simulation);
@@ -2538,6 +2597,7 @@ mod tests {
                     appearance: PlayerAppearance::default(),
                     session_id: false,
                     physical_food: true,
+                    protocol13: false,
                 })
                 .unwrap();
         }
@@ -2638,6 +2698,7 @@ mod tests {
             appearance: PlayerAppearance::default(),
             session_id: false,
             physical_food: true,
+            protocol13: false,
             reset_kills: false,
         };
         simulation.waiting.push_back(request(0, 0));
@@ -2696,6 +2757,7 @@ mod tests {
                 appearance: PlayerAppearance::default(),
                 session_id: false,
                 physical_food: true,
+                protocol13: false,
             };
             if slot == 0 {
                 gate.send(command);
@@ -2762,6 +2824,7 @@ mod tests {
                 appearance: PlayerAppearance::default(),
                 session_id: false,
                 physical_food: true,
+                protocol13: false,
             };
             if slot == 0 {
                 gate.send(command);
@@ -3193,6 +3256,58 @@ mod tests {
     }
 
     #[test]
+    fn legacy_login_boundaries_and_selector_choose_the_wire_profile() {
+        for selector in [11, 12] {
+            for length in [0, MAX_NICKNAME] {
+                let name = vec![b'x'; length];
+                let custom = vec![7; MAX_CUSTOM_SKIN];
+                let mut login = vec![b's', selector, 23, length as u8];
+                login.extend(&name);
+                login.extend([0, 255]);
+                login.extend(&custom);
+                let parsed = parse_login(&login).unwrap();
+                assert!(legacy_login(&login));
+                assert_eq!(parsed.nickname, name);
+                assert_eq!(parsed.skin, 23);
+                assert_eq!(parsed.custom_skin, custom);
+                login.push(0);
+                assert!(parse_login(&login).is_err());
+                for end in 0..length + 6 {
+                    assert!(parse_login(&login[..end]).is_err(), "length {end}");
+                }
+            }
+            assert!(parse_login(&[b's', selector, 0, 25, 0, 0]).is_err());
+        }
+        assert!(!legacy_login(&[b's', 30]));
+    }
+
+    #[test]
+    fn legacy_challenge_is_fixed_data_with_the_observed_client_reply() {
+        let (challenge, reply) = legacy_challenge();
+        assert_eq!(&challenge[..3], &[0, 0, b'6']);
+        let mut key = 23;
+        let source: Vec<u8> = challenge[3..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| {
+                let mut byte = 0;
+                for &letter in pair {
+                    let nibble = (letter - b'a' + 26 - key) % 26;
+                    assert!(nibble < 16);
+                    byte = (byte << 4) | nibble;
+                    key = (key + 17) % 26;
+                }
+                byte
+            })
+            .collect();
+        assert_eq!(source, b"var a = 'ABCDEFGHIJKLMNOPQRSTUVWX';");
+        // Client-derived local-sandbox observation, not an official capture.
+        assert_eq!(reply, b"CGLRYGPZKWJXMCTLEYTPMKJJ");
+        assert_ne!(reply, challenge_parts().unwrap().1[1]);
+    }
+
+    #[test]
     fn bot_seats_wear_distinct_pickable_stock_skins() {
         let skins: std::collections::BTreeSet<u8> = (0..64).map(bot_skin).collect();
         assert_eq!(skins.len(), 64);
@@ -3245,6 +3360,7 @@ mod tests {
                 appearance: PlayerAppearance::default(),
                 session_id: false,
                 physical_food: true,
+                protocol13: false,
             };
             if slot < simulation.max_clients {
                 gate.send(command);

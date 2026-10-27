@@ -41,6 +41,8 @@ pub(super) enum Uplink {
 /// Server and transport state of one connection.
 #[derive(Clone, Debug, Default)]
 pub(super) struct Connection {
+    /// Legacy sockets alone allocate a wire adapter; shared reports stay 19.
+    pub(super) legacy: Option<Box<crate::client::encode13::Encoder>>,
     /// Opened by a connect; a closed remote slot has no session.
     pub(super) open: bool,
     pub(super) link: Link,
@@ -309,7 +311,24 @@ impl SimulatorBackend {
         packets: &[Vec<u8>],
         physical: Option<&[Vec<u8>]>,
     ) -> Result<(), String> {
-        let groups = frame_groups(packets);
+        let converted;
+        let (packets, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
+            converted = legacy.packets(packets)?;
+            // Keep the shared latency RNG on the original physical grouping,
+            // even if six-byte legacy food or U maps require more frames.
+            (converted.as_slice(), Some(physical.unwrap_or(packets)))
+        } else {
+            (packets, physical)
+        };
+        // Legacy browser clients read one command after the elapsed header;
+        // they do not split the protocol-19 length-prefixed broadcast bundles.
+        // The 13 catalog witnesses use individual messages. Keep the physical
+        // grouping below for latency draws, independent of presentation frames.
+        let groups = if self.slots[slot].connection.legacy.is_some() {
+            packets.chunks(1).collect()
+        } else {
+            frame_groups(packets)
+        };
         let latency = self.player_latency.for_slot(slot, &self.config.latency);
         let connection = &mut self.slots[slot].connection;
         if connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {

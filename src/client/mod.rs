@@ -8,6 +8,7 @@ use std::time::Instant;
 
 pub mod challenge;
 mod encode;
+mod encode13;
 mod fast_hash;
 mod forager;
 pub use forager::ForagerBot;

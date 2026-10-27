@@ -60,6 +60,8 @@ mod markers;
 #[cfg(test)]
 mod pit_tests;
 mod prey_visibility;
+#[cfg(test)]
+mod protocol13_tests;
 mod remote;
 #[cfg(test)]
 mod rules_tests;

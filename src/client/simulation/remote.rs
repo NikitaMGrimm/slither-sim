@@ -147,6 +147,13 @@ impl RawSimulator {
         self.backend.slots[slot].connection.rules_enabled = true;
     }
 
+    /// Called after admission and before the queued connect emits setup. A
+    /// reconnect gets a new adapter, including fresh anchor and minimap bases.
+    pub(crate) fn protocol13(&mut self, slot: usize) {
+        self.backend.slots[slot].connection.legacy =
+            Some(Box::new(crate::client::encode13::Encoder::new(slot as u16)));
+    }
+
     /// Queue one client message sent now on the uplink; see `receive_at`.
     #[cfg(test)]
     pub(super) fn receive(&mut self, slot: usize, bytes: &[u8]) -> Result<(), String> {
