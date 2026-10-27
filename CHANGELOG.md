@@ -19,6 +19,11 @@
 
 ### Performance
 
+- Collision and prey indexing avoid repeated floor operations when assigning
+  spatial cells. Output is byte-identical, and the offline official 500-player
+  fixture uses 1.46–1.55% fewer process instructions with stock and protocol-13
+  clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-monotone-bounds-cells/REPORT.md)).
 - Food pickup updates the stored positions only of pellets after the first
   eaten one, since earlier pellets don't move. Output is byte-identical, and
   the 500-player official fixture runs 1.4–1.5% fewer instructions with stock
