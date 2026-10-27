@@ -30,8 +30,8 @@
 
 ### Performance
 
-- The host reuses each player's update packet list when no pong or minimap
-  needs to precede it, avoiding another allocation and packet-list copy.
+- When a player's update has no pong or minimap in front of it, the host sends
+  the update's packet list as it is instead of copying it into a new list.
   Output is byte-identical, and the 500-player official fixture runs 1.6–1.7%
   fewer instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-packet-lists/REPORT.md)).
