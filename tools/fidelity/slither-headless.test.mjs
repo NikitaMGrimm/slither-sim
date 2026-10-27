@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { getEventListeners } from 'node:events';
+import { getEventListeners, once } from 'node:events';
 import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -45,30 +45,36 @@ test('collector CLIs accept an explicit HTTP origin and reject discovery options
   }
 });
 
-test('native WebSocket sends the configured Origin to a loopback server', { timeout: 5000 }, async t => {
+test('native WebSocket sends the configured Origin to a loopback server', async t => {
+  // This checks headers, not native WebSocket startup speed. The tools runner
+  // bounds the suite; cancellation must also stop pending handshakes/reconnects.
   const server = createServer(), sockets = new Set();
-  let receive;
-  server.on('upgrade', (request, socket) => {
+  server.on('connection', socket => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
     socket.on('error', error => {
       // The client stops once the upgrade headers have been inspected.
       if (error.code !== 'ECONNRESET') throw error;
     });
-    receive(request);
+  });
+  server.on('upgrade', (request, socket) => {
     socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
   });
   t.after(() => {
     for (const socket of sockets) socket.destroy();
     return new Promise(resolve => server.close(resolve));
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const listening = once(server, 'listening', { signal: t.signal });
+  server.listen(0, '127.0.0.1');
+  await listening;
   for (const origin of [null, 'http://localhost:8080']) {
-    const incoming = new Promise(resolve => { receive = resolve; });
+    t.signal.throwIfAborted();
+    const incoming = once(server, 'upgrade', { signal: t.signal });
     const bot = new Bot({ scenario: 'forage', origin }, 0, { meta() {}, frame() {} });
+    t.after(() => bot.stop());
     try {
       bot.connect({ ip: '127.0.0.1', port: server.address().port });
-      const request = await incoming;
+      const [request] = await incoming;
       assert.equal(request.url, '/slither');
       assert.equal(request.headers.origin ?? null, origin);
     } finally { bot.stop(); }
