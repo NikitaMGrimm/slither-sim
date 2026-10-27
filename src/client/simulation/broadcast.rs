@@ -286,7 +286,7 @@ impl SimulatorBackend {
                 slot.processing_override = None;
             }
         }
-        self.broadcast_with(early, hand_over)?;
+        self.broadcast_with(early, hand_over, false)?;
         for slot in 0..self.slots.len() {
             self.client_until(slot, now)?;
         }
@@ -312,10 +312,15 @@ impl SimulatorBackend {
     /// A broadcast between physics ticks, as diagnostic tests issue.
     #[cfg(test)]
     pub(super) fn broadcast(&mut self) -> Result<(), String> {
-        self.broadcast_with(0, &mut |_| Ok(()))
+        self.broadcast_with(0, &mut |_| Ok(()), true)
     }
 
-    fn broadcast_with(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
+    fn broadcast_with(
+        &mut self,
+        early: usize,
+        hand_over: &mut EarlyFrames,
+        advance_interest: bool,
+    ) -> Result<(), String> {
         self.legacy_maps.clear();
         let now = self.time();
         // Ambient births reach the wire at the shared food maintenance, with
@@ -348,14 +353,17 @@ impl SimulatorBackend {
             self.prey_eaters.clear();
             return Ok(());
         }
-        // Dead clients still render the world during the stock death fade;
-        // withholding deltas leaves opponents extrapolating stale motion.
-        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
-            if slot.connection.setup {
-                // Also covers explicit diagnostic broadcasts between physics ticks.
-                slot.connection
-                    .food_interest
-                    .advance(snake.head, snake.heading, now);
+        // Normal ticks already advance every subscription before entering this
+        // function, including before a broadcast can fail. Standalone broadcasts
+        // still need the refresh after an edited pose, even at the same time.
+        // Dead clients keep their subscriptions for the rendered death fade.
+        if advance_interest {
+            for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
+                if slot.connection.setup {
+                    slot.connection
+                        .food_interest
+                        .advance(snake.head, snake.heading, now);
+                }
             }
         }
         let food_changes = self.sync_food_sectors()?;
@@ -806,4 +814,101 @@ pub(super) fn clock_due(next: &mut u64, now: f64, interval: f64) -> bool {
         *next = current.saturating_add(1);
     }
     due
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Config,
+        client::{SimulationConfig, visibility::SectorInterest},
+        model::Point,
+    };
+
+    fn backend() -> SimulatorBackend {
+        let mut config = SimulationConfig {
+            agents: 2,
+            world: Config::sandbox(),
+            ..Default::default()
+        };
+        config.world.radius = 6000.;
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        config.world.prey.count = 0;
+        let mut backend = SimulatorBackend::new(7, config).unwrap();
+        backend.advance_ticks(4).unwrap();
+        assert!(backend.slots.iter().all(|s| s.connection.setup));
+        backend
+    }
+
+    fn place(backend: &mut SimulatorBackend, slot: usize, x: f64) {
+        let snake = &backend.world.snakes()[slot];
+        let shift = x - snake.head.x;
+        let body = snake
+            .body
+            .iter()
+            .map(|p| Point {
+                x: p.x + shift,
+                y: p.y - snake.head.y,
+            })
+            .collect();
+        backend
+            .world
+            .correct_pose(slot, Point { x, y: 0. }, body, snake.heading)
+            .unwrap();
+    }
+
+    fn interests(backend: &SimulatorBackend) -> Vec<SectorInterest> {
+        backend
+            .slots
+            .iter()
+            .map(|s| s.connection.food_interest.clone())
+            .collect()
+    }
+
+    fn check_advanced(backend: &SimulatorBackend, mut previous: Vec<SectorInterest>) {
+        for ((previous, slot), snake) in previous
+            .iter_mut()
+            .zip(&backend.slots)
+            .zip(backend.world.snakes())
+        {
+            previous.advance(snake.head, snake.heading, backend.time());
+            assert_eq!(
+                format!("{:?}", slot.connection.food_interest),
+                format!("{previous:?}")
+            );
+        }
+    }
+
+    #[test]
+    fn tick_and_standalone_broadcast_keep_subscription_history() {
+        let mut backend = backend();
+        for x in [1000., -1000., 0., 1000.] {
+            place(&mut backend, 0, x);
+            let previous = interests(&backend);
+            backend.advance().unwrap();
+            check_advanced(&backend, previous);
+            let time = backend.time();
+            place(&mut backend, 0, x + 500.);
+            let previous = interests(&backend);
+            backend.broadcast().unwrap();
+            assert_eq!(backend.time(), time);
+            check_advanced(&backend, previous);
+        }
+    }
+
+    #[test]
+    fn interrupted_tick_advances_even_later_recipients_subscriptions() {
+        let mut backend = backend();
+        place(&mut backend, 0, 1000.);
+        place(&mut backend, 1, -1000.);
+        backend.slots[0].connection.pongs = 1;
+        backend.slots[0]
+            .connection
+            .downlink
+            .resize(super::super::connection::MAX_IN_FLIGHT, (f64::MAX, vec![0]));
+        let previous = interests(&backend);
+        assert_eq!(backend.advance().unwrap_err(), "Downlink queue is full");
+        check_advanced(&backend, previous);
+    }
 }
