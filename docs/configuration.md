@@ -334,13 +334,16 @@ The [local spawn study](https://github.com/NikitaMGrimm/slither-sim/blob/main/re
 records safety, waiting and load limits. Admission does not grant collision immunity
 or predict later turns. The host serves waiting sockets before background bots.
 
-Every world with `spawnRadius` requires the whole newborn body to miss living
-heads' straight two-second paths by 600 units. Its head also keeps three seconds
-of normal travel plus contact margin from old bodies (about 627 units at the
-floor). Inward and tangent departure segments cover three seconds at normal
-newborn speed and must clear old bodies and projected paths by 400 units.
-Larger contact exclusions still apply. These custom checks preserve room to
-leave spawn while allowing the trailing body to use 400-unit clearance.
+In every world with `spawnRadius`, the strict tier requires the whole newborn
+body to miss living heads' straight two-second paths by 600 units. Its head also
+keeps three seconds of normal travel plus contact margin from old bodies (about
+627 units at the floor). Inward and tangent departure segments cover three
+seconds at normal newborn speed and must clear old bodies and projected paths by
+400 units. Larger contact exclusions still apply. These custom checks preserve
+room to leave spawn while allowing the trailing body to use 400-unit clearance.
+A request that has waited two seconds may instead use the
+[fallback tier](#battledome): 300-unit head paths over one second and only the
+inward departure, as described there.
 
 These rules have synthetic offline regressions in
 [`tests/battledome.rs`](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/battledome.rs),
