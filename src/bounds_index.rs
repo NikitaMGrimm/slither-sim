@@ -121,8 +121,8 @@ impl BoundsIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::{collision_distance, head_tip, strikes};
     use crate::Point;
+    use crate::physics::{collision_distance, head_tip, strikes};
 
     #[test]
     fn filtered_candidates_match_exhaustive_on_numeric_boundaries() {
