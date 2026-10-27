@@ -26,6 +26,12 @@ def cpu(pid, tid=None):
 
 def run(mode, arm, pair):
     d = out / f'{mode}-{pair}-{arm}'
+    if d.exists():
+        # An earlier attempt failed before selected.json; keep it for inspection.
+        n = 1
+        while d.with_name(f'{d.name}-failed-{n}').exists():
+            n += 1
+        d.rename(d.with_name(f'{d.name}-failed-{n}'))
     d.mkdir()
     bins = root / arm / 'bin'
     warmup, hold, port = 10, 12, 18777
