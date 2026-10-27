@@ -19,10 +19,10 @@
 
 ### Performance
 
-- Food pickup updates its occupancy cache from consumed-pellet indices instead
-  of scanning every cached pellet twice. Output is byte-identical, and the
-  offline official 500-player fixture uses 4.0–4.2% fewer process instructions
-  with stock, half protocol-13 and all protocol-13 clients
+- Food pickup removes eaten pellets from its occupancy cache by index and
+  copies the surviving ranges, instead of scanning the whole cache twice.
+  Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
+  fewer instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pickup-cache/REPORT.md)).
 - Linux hosts ask the kernel once per gateway pass which sockets have input,
   and stop reading a socket that has none until it does. Before, every pass
