@@ -1264,6 +1264,57 @@ fn interrupted_broadcast_resumes_food_diffs_for_later_recipients() {
 }
 
 #[test]
+fn coverage_finds_an_edited_pose_after_an_interrupted_broadcast() {
+    let mut config = raw_config(2);
+    config.world.radius = 6000.;
+    config.world.vision = 1500.;
+    let mut backend = SimulatorBackend::new(7, config).unwrap();
+    backend.advance_ticks(4).unwrap();
+    let place = |backend: &mut SimulatorBackend, slot: usize, x: f64| {
+        let snake = &backend.world.snakes()[slot];
+        let shift = x - snake.head.x;
+        let body = snake
+            .body
+            .iter()
+            .map(|p| Point {
+                x: p.x + shift,
+                y: p.y - snake.head.y,
+            })
+            .collect();
+        backend
+            .world
+            .correct_pose(slot, Point { x, y: 0. }, body, snake.heading)
+            .unwrap();
+    };
+    place(&mut backend, 0, 0.);
+    place(&mut backend, 1, 4000.);
+    backend.broadcast().unwrap();
+    assert!(!backend.slots[0].connection.snakes.contains_key(1));
+    backend.slots[0].connection.pongs = 1;
+    backend.slots[0]
+        .connection
+        .downlink
+        .resize(super::connection::MAX_IN_FLIGHT, (f64::MAX, vec![0]));
+    assert_eq!(backend.broadcast().unwrap_err(), "Downlink queue is full");
+    backend.slots[0].connection.downlink.clear();
+    place(&mut backend, 1, 100.);
+    backend.broadcast().unwrap();
+    assert!(backend.slots[0].connection.snakes.contains_key(1));
+    assert!(
+        backend.slots[0]
+            .connection
+            .downlink
+            .iter()
+            .any(|(_, frame)| {
+                protocol::split_frame(frame)
+                    .unwrap()
+                    .iter()
+                    .any(|p| p[0] == b's' && p.len() > 7 && p[1..3] == 1u16.to_be_bytes())
+            })
+    );
+}
+
+#[test]
 fn hosted_and_native_snakes_use_finite_whole_body_coverage() {
     let mut config = raw_config(3);
     config.world.radius = 6000.;

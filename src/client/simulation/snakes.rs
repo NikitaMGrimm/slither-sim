@@ -258,30 +258,96 @@ impl KnownSnakes {
 /// `covered` rejects a head outside a snake's bounds widened by the vision
 /// reach, so the cell holding a head lists every snake that can cover it.
 /// Testing all snakes for each of ~500 connections every tick cost ~2.3 ms.
+#[derive(Default)]
 pub(super) struct CoverageGrid {
     cell: f64,
     cells: HashMap<(i64, i64), Vec<usize>>,
+    spans: Vec<Option<CoverageSpan>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct CoverageSpan {
+    first: (i64, i64),
+    last: (i64, i64),
+}
+
+impl CoverageSpan {
+    fn cells(self) -> impl Iterator<Item = (i64, i64)> {
+        (self.first.0..=self.last.0)
+            .flat_map(move |x| (self.first.1..=self.last.1).map(move |y| (x, y)))
+    }
+
+    fn contains(self, (x, y): (i64, i64)) -> bool {
+        self.first.0 <= x && x <= self.last.0 && self.first.1 <= y && y <= self.last.1
+    }
 }
 impl CoverageGrid {
     pub(super) fn new(snakes: &[Snake], bounds: &[[f64; 4]], vision: f64) -> Self {
+        let mut grid = Self::default();
+        grid.update(snakes, bounds, vision);
+        grid
+    }
+
+    /// Cache only integer cell membership, never the exact coverage decision.
+    /// Bounds are recomputed every broadcast, including diagnostic broadcasts
+    /// and externally edited poses. Most moves keep the same widened cells.
+    pub(super) fn update(&mut self, snakes: &[Snake], bounds: &[[f64; 4]], vision: f64) {
         let reach = vision + 1.;
-        let mut grid = Self {
-            cell: reach.max(256.),
-            cells: HashMap::new(),
-        };
+        let cell = reach.max(256.);
+        if self.cell.to_bits() != cell.to_bits() {
+            self.cells.clear();
+            self.spans.clear();
+            self.cell = cell;
+        }
+        while self.spans.len() > bounds.len() {
+            let slot = self.spans.len() - 1;
+            let old = self.spans.pop().expect("coverage slot");
+            self.change(slot, old, None);
+        }
+        self.spans.resize(bounds.len(), None);
         for (slot, &[x0, y0, x1, y1]) in bounds.iter().enumerate() {
-            if !snakes[slot].alive {
+            let next = snakes[slot].alive.then(|| CoverageSpan {
+                first: self.key(x0 - reach, y0 - reach),
+                last: self.key(x1 + reach, y1 + reach),
+            });
+            let old = self.spans[slot];
+            if old == next {
                 continue;
             }
-            let (left, top) = grid.key(x0 - reach, y0 - reach);
-            let (right, bottom) = grid.key(x1 + reach, y1 + reach);
-            for x in left..=right {
-                for y in top..=bottom {
-                    grid.cells.entry((x, y)).or_default().push(slot);
+            self.change(slot, old, next);
+            self.spans[slot] = next;
+        }
+    }
+
+    fn change(&mut self, slot: usize, old: Option<CoverageSpan>, next: Option<CoverageSpan>) {
+        if let Some(old) = old {
+            for key in old
+                .cells()
+                .filter(|&key| !next.is_some_and(|span| span.contains(key)))
+            {
+                let slots = self.cells.get_mut(&key).expect("coverage cell");
+                let index = slots.binary_search(&slot).expect("coverage cell slot");
+                slots.remove(index);
+                // Do not retain cells left behind as snakes roam the world.
+                if slots.is_empty() {
+                    self.cells.remove(&key);
                 }
             }
         }
-        grid
+        if let Some(next) = next {
+            for key in next
+                .cells()
+                .filter(|&key| !old.is_some_and(|span| span.contains(key)))
+            {
+                let slots = self.cells.entry(key).or_default();
+                // Fresh builds append slots in world order. Preserve that order
+                // when an existing slot moves into an already occupied cell.
+                let index = slots
+                    .binary_search(&slot)
+                    .expect_err("new coverage cell slot");
+                slots.insert(index, slot);
+            }
+        }
     }
 
     fn key(&self, x: f64, y: f64) -> (i64, i64) {
@@ -440,6 +506,128 @@ pub(super) fn changes(
 mod tests {
     use super::*;
     use crate::{Config, Simulator};
+
+    fn fresh_coverage_cells(
+        snakes: &[Snake],
+        bounds: &[[f64; 4]],
+        vision: f64,
+    ) -> HashMap<(i64, i64), Vec<usize>> {
+        let reach = vision + 1.;
+        let cell = reach.max(256.);
+        let key = |x: f64, y: f64| ((x / cell).floor() as i64, (y / cell).floor() as i64);
+        let mut cells: HashMap<_, Vec<_>> = HashMap::new();
+        for (slot, &[x0, y0, x1, y1]) in bounds.iter().enumerate() {
+            if snakes[slot].alive {
+                let (left, top) = key(x0 - reach, y0 - reach);
+                let (right, bottom) = key(x1 + reach, y1 + reach);
+                for x in left..=right {
+                    for y in top..=bottom {
+                        cells.entry((x, y)).or_default().push(slot);
+                    }
+                }
+            }
+        }
+        cells
+    }
+
+    #[test]
+    fn incremental_coverage_matches_fresh_world_order_through_moves_and_lifetimes() {
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["template".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let template = world.snakes()[0].clone();
+        let mut grid = CoverageGrid::default();
+        for step in 0..512 {
+            let count = [0, 1, 12, 7, 3, 9, 2, 0][step / 32 % 8];
+            let mut snakes = vec![template.clone(); count];
+            let vision = [0., 42., 255., 255.5, 1500., f64::INFINITY, f64::NAN][step / 16 % 7];
+            let bounds: Vec<_> = (0..count)
+                .map(|slot| {
+                    snakes[slot].alive = (step / 4 + slot) % 5 != 0;
+                    let x = ((slot * 73 + step / 4 * 17) % 129) as f64 * 128. - 8192.;
+                    let y = ((slot * 31 + step / 4 * 11) % 101) as f64 * 128. - 6400.;
+                    let width = ((slot + step / 4) % 4) as f64 * 256.;
+                    let height = ((slot * 3 + step / 4) % 3) as f64 * 256.;
+                    [x, y, x + width, y + height]
+                })
+                .collect();
+            grid.update(&snakes, &bounds, vision);
+            let expected = fresh_coverage_cells(&snakes, &bounds, vision);
+            assert_eq!(grid.cells, expected, "step {step}");
+            assert_eq!(grid.spans.len(), count);
+            let cell = (vision + 1.).max(256.);
+            for point in [
+                Point { x: 0., y: -0. },
+                Point { x: -256., y: 256. },
+                Point {
+                    x: 4096.,
+                    y: -4096.,
+                },
+                Point {
+                    x: f64::INFINITY,
+                    y: f64::NAN,
+                },
+            ] {
+                let key = (
+                    (point.x / cell).floor() as i64,
+                    (point.y / cell).floor() as i64,
+                );
+                assert_eq!(
+                    grid.near(point),
+                    expected.get(&key).map_or(&[][..], Vec::as_slice)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn incremental_coverage_preserves_float_cell_boundaries_and_discards_empty_cells() {
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["template".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut snakes = vec![world.snakes()[0].clone(); 3];
+        let mut grid = CoverageGrid::default();
+        for x in [
+            (-512_f64).next_up(),
+            -512.,
+            (-512_f64).next_down(),
+            -0.,
+            0.,
+            256_f64.next_down(),
+            256.,
+            256_f64.next_up(),
+            f64::MAX,
+            f64::MIN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
+            let bounds = [[x, 0., x, 0.]; 3];
+            for active in 0..8 {
+                for (slot, snake) in snakes.iter_mut().enumerate() {
+                    snake.alive = active & (1 << slot) != 0;
+                }
+                grid.update(&snakes, &bounds, 0.);
+                assert_eq!(grid.cells, fresh_coverage_cells(&snakes, &bounds, 0.));
+                assert!(grid.cells.values().all(|slots| !slots.is_empty()));
+            }
+        }
+        grid.update(&[], &[], 1500.);
+        assert!(grid.cells.is_empty());
+        assert!(grid.near(Point::default()).is_empty());
+    }
 
     #[test]
     fn candidate_merge_matches_sorted_union_and_reuses_storage() {
