@@ -2807,6 +2807,7 @@ mod tests {
             appearance: PlayerAppearance::default(),
             session_id: false,
             physical_food: true,
+            protocol13: false,
         });
         simulation.apply_commands().unwrap();
     }
