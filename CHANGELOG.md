@@ -4,6 +4,12 @@
 
 ### Added
 
+- A study that replays official and local recordings through SlitherClient,
+  a Rust port of the stock client, and measures how much its predictions of
+  other snakes get corrected. It maps the client's motion formulas against the
+  simulator's and ranks the remaining fidelity gaps; the comparison is not
+  matched, so it makes no parity claim, and game behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-client-view/REPORT.md)).
 - The hosting guide explains how to build the server for the machine's own
   CPU. In our tests its game output matched the portable build exactly, and
   its median cycle count was 3.5–4.5% lower on one shared development machine;
@@ -18,9 +24,9 @@
 ### Changed
 
 - The hosting guide's resource table now reflects this release's performance
-  work. One Zen 4 core runs 500 official players at 67% CPU instead of 87%,
-  but still misses the delivery target at 375 and 500. It meets the target
-  with 80 Battledome players, and one Zen 5 core meets it at 500.
+  work. One Zen 4 server core now meets the delivery target with 375 official
+  players at 46% CPU; 500 players use 61% CPU but still miss it. One Zen 5
+  core meets the target at 500, and one Zen 4 core with 80 Battledome players.
 
 ### Performance
 
