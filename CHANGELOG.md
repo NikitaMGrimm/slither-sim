@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- The hosting guide's resource table now comes from a recheck on current main.
+  One Zen 4 core meets the delivery target with 250 official players and with
+  80 Battledome players, and still misses it at 375 and 500; one Zen 5 core
+  meets it at 500.
+
 ### Performance
 
 - Battledome spawn searches reject a candidate whose head lacks the required
