@@ -19,9 +19,11 @@
 
 ### Performance
 
-- Simulation ticks reuse the food cache's verification while all edits remain
-  tracked. Output is byte-identical, and the offline official 500-player fixture
-  uses 5.5–5.9% fewer process instructions with stock and protocol-13 clients
+- Simulation ticks no longer compare the food cache with every pellet when no
+  untracked food edit happened since the last comparison. Debug builds still
+  check the skipped comparison. Output is byte-identical, and the 500-player
+  official fixture runs 5.5–5.9% fewer instructions with stock and protocol-13
+  clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-food-mirror-reuse/REPORT.md)).
 - Host food delivery checks only the changed food sectors inside each
   player's subscribed range, instead of every changed sector in the world.
