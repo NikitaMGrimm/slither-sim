@@ -41,7 +41,10 @@ fn fixtures(version: u8) -> Vec<Vec<u8>> {
 }
 
 fn convert(encoder: &mut Encoder, p: Vec<u8>) -> Vec<u8> {
-    encoder.packets(&[p]).unwrap().remove(0)
+    encoder
+        .packets(&[p], &mut FullMapCache::default())
+        .unwrap()
+        .remove(0)
 }
 
 #[test]
@@ -269,7 +272,10 @@ fn first_anchor_is_absolute_then_relative_steps_do_not_drift() {
     assert!(!encoder.fronts.contains_key(&9));
     assert!(
         encoder
-            .packets(&[encode::anchor(true, 9, 0, None)])
+            .packets(
+                &[encode::anchor(true, 9, 0, None)],
+                &mut FullMapCache::default()
+            )
             .is_err()
     );
 }
@@ -335,7 +341,9 @@ fn captured_food_layouts_project_consistently_and_split_dense_listings() {
         5000
     ];
     let source = encode::food_sector([108, 109], &foods);
-    let out = encoder.packets(&source).unwrap();
+    let out = encoder
+        .packets(&source, &mut FullMapCache::default())
+        .unwrap();
     assert!(
         out.iter()
             .all(|p| encode::frameable(p) && (p.len() - 1) % 6 == 0)
@@ -511,4 +519,228 @@ fn non_dynamic_map_reprojects_live_cells_and_tracks_radius_and_delta_base() {
         convert(&mut Encoder::new(0), encode::minimap(&map))[0],
         b'M'
     );
+}
+
+fn full_map_reference(state: &mut FullMap, p: &[u8]) -> Result<Vec<u8>, String> {
+    let source = Minimap::packet(state.previous.as_deref(), p)?;
+    let output = state.project(&source);
+    state.previous = Some(Arc::new(source));
+    Ok(output)
+}
+
+#[test]
+fn shared_full_maps_match_uncached_histories_and_projection_parameters() {
+    let map = |bits: u8| Minimap {
+        side: 2,
+        cells: (0..4).map(|i| (bits >> i) & 1).collect(),
+        age_seconds: 0.,
+    };
+    for old in 0..16 {
+        for next in 0..16 {
+            let before = map(old);
+            let after = map(next);
+            let packets = [
+                encode::minimap(&before),
+                encode::minimap_delta(&before, &after).unwrap(),
+                encode::minimap_delta(&after, &after).unwrap(),
+                encode::minimap(&after),
+            ];
+            let mut states: Vec<_> = [(32., 16.), (32., 16.), (32., 8.), (16., 16.), (32., 16.)]
+                .into_iter()
+                .map(|(grd, radius)| FullMap {
+                    grd,
+                    radius,
+                    previous: None,
+                })
+                .collect();
+            let mut controls = states.clone();
+            let mut cache = FullMapCache::default();
+            for (step, p) in packets.iter().enumerate() {
+                cache.clear();
+                if step == 1 {
+                    let different = Minimap {
+                        cells: before.cells.iter().map(|v| v ^ 1).collect(),
+                        ..before.clone()
+                    };
+                    states[4].previous = Some(Arc::new(different.clone()));
+                    controls[4].previous = Some(Arc::new(different));
+                }
+                if step == 2 {
+                    // A skipped update and a separately allocated equal map
+                    // must retain their own XOR baselines.
+                    states[2].previous = Some(Arc::new(before.clone()));
+                    controls[2].previous = Some(Arc::new(before.clone()));
+                    states[3].previous = Some(Arc::new(after.clone()));
+                    controls[3].previous = Some(Arc::new(after.clone()));
+                    states[4].previous = Some(Arc::new(after.clone()));
+                    controls[4].previous = Some(Arc::new(after.clone()));
+                }
+                for i in [0, 2, 4, 1, 3] {
+                    assert_eq!(
+                        states[i].packet(p, &mut cache),
+                        full_map_reference(&mut controls[i], p)
+                    );
+                    assert_eq!(
+                        states[i].previous.as_deref(),
+                        controls[i].previous.as_deref()
+                    );
+                }
+                assert_eq!(cache.cached_packets(), [3, 4, 4, 3][step]);
+                assert!(Arc::ptr_eq(
+                    states[0].previous.as_ref().unwrap(),
+                    states[1].previous.as_ref().unwrap()
+                ));
+            }
+        }
+    }
+}
+
+#[test]
+fn full_map_cache_distinguishes_input_bytes_and_preserves_failed_states() {
+    let before = Minimap {
+        side: 3,
+        cells: vec![0; 9],
+        age_seconds: 0.,
+    };
+    let mut a = before.clone();
+    a.cells[1] = 1;
+    let mut b = before.clone();
+    b.cells[7] = 1;
+    let source = Arc::new(before.clone());
+    let state = FullMap {
+        grd: 16.,
+        radius: 16.,
+        previous: Some(source.clone()),
+    };
+    let mut states = [state.clone(), state.clone(), state.clone()];
+    let mut cache = FullMapCache::default();
+    for (i, after) in [&a, &b, &a].into_iter().enumerate() {
+        let p = encode::minimap_delta(&before, after).unwrap();
+        let mut reference = state.clone();
+        assert_eq!(
+            states[i].packet(&p, &mut cache),
+            full_map_reference(&mut reference, &p)
+        );
+    }
+    assert_eq!(cache.cached_packets(), 2);
+    assert!(Arc::ptr_eq(
+        states[0].previous.as_ref().unwrap(),
+        states[2].previous.as_ref().unwrap()
+    ));
+    assert!(!Arc::ptr_eq(
+        states[0].previous.as_ref().unwrap(),
+        states[1].previous.as_ref().unwrap()
+    ));
+    let mut fresh = FullMap {
+        previous: None,
+        ..state.clone()
+    };
+    for p in [vec![b'V'], vec![b'M', 0, 0], vec![b'M']] {
+        let mut reference = fresh.clone();
+        assert_eq!(
+            fresh.packet(&p, &mut cache),
+            full_map_reference(&mut reference, &p)
+        );
+        assert!(fresh.previous.is_none());
+        assert_eq!(cache.cached_packets(), 2);
+    }
+    let full = encode::minimap(&a);
+    assert_eq!(fresh.packet(&full, &mut cache).unwrap(), state.project(&a));
+}
+
+#[test]
+fn full_map_cache_retains_baseline_identity_until_clear() {
+    let map = Minimap {
+        side: 1,
+        cells: vec![1],
+        age_seconds: 0.,
+    };
+    let previous = Arc::new(map.clone());
+    let weak = Arc::downgrade(&previous);
+    let mut state = FullMap {
+        grd: 16.,
+        radius: 8.,
+        previous: Some(previous),
+    };
+    let mut cache = FullMapCache::default();
+    state.packet(&encode::minimap(&map), &mut cache).unwrap();
+    assert!(weak.upgrade().is_some());
+    cache.clear();
+    assert!(weak.upgrade().is_none());
+    let delta = encode::minimap_delta(&map, &map).unwrap();
+    let mut reference = state.clone();
+    assert_eq!(
+        state.packet(&delta, &mut cache),
+        full_map_reference(&mut reference, &delta)
+    );
+}
+
+#[test]
+fn different_full_map_histories_converge_on_one_current_snapshot() {
+    let a = Minimap {
+        side: 3,
+        cells: vec![0; 9],
+        age_seconds: 0.,
+    };
+    let b = Minimap {
+        side: 3,
+        cells: vec![1; 9],
+        age_seconds: 0.,
+    };
+    let current = Minimap {
+        side: 3,
+        cells: (0..9).map(|i| u8::from(i == 1 || i == 7)).collect(),
+        age_seconds: 0.,
+    };
+    let mut states = [
+        FullMap {
+            grd: 16.,
+            radius: 16.,
+            previous: Some(Arc::new(a.clone())),
+        },
+        FullMap {
+            grd: 16.,
+            radius: 16.,
+            previous: Some(Arc::new(b.clone())),
+        },
+        FullMap {
+            grd: 16.,
+            radius: 8.,
+            previous: None,
+        },
+    ];
+    let mut cache = FullMapCache::default();
+    for (i, p) in [
+        encode::minimap_delta(&a, &current).unwrap(),
+        encode::minimap_delta(&b, &current).unwrap(),
+        encode::minimap(&current),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let mut reference = states[i].clone();
+        assert_eq!(
+            states[i].packet(p, &mut cache),
+            full_map_reference(&mut reference, p)
+        );
+    }
+    assert_eq!(cache.cached_packets(), 3);
+    assert_eq!(cache.snapshots.len(), 1);
+    assert_eq!(cache.snapshots[0].projected.len(), 2);
+    assert!(states.windows(2).all(|pair| Arc::ptr_eq(
+        pair[0].previous.as_ref().unwrap(),
+        pair[1].previous.as_ref().unwrap()
+    )));
+    cache.clear();
+    let delta = encode::minimap_delta(&current, &a).unwrap();
+    for state in &mut states[..2] {
+        state.packet(&delta, &mut cache).unwrap();
+    }
+    assert_eq!(
+        cache.cached_packets(),
+        1,
+        "equal histories share the next decode too"
+    );
+    assert_eq!(cache.snapshots.len(), 1);
+    assert_eq!(cache.snapshots[0].projected.len(), 1);
 }

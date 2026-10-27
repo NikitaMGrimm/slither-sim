@@ -4,6 +4,57 @@ use crate::client::{
 };
 
 #[test]
+fn full_map_cache_is_shared_only_for_the_current_broadcast() {
+    for full in [0, 1, 2] {
+        let mut config = SimulationConfig {
+            agents: 3,
+            world: crate::Config::sandbox(),
+            minimap_interval_seconds: 0.021,
+            ..Default::default()
+        };
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        let mut sim = RawSimulator::new(7, config, 3).unwrap();
+        for slot in 0..3 {
+            sim.connect(slot, PlayerAppearance::default()).unwrap();
+            sim.protocol13(slot);
+            if slot < full {
+                sim.backend.slots[slot]
+                    .connection
+                    .legacy
+                    .as_mut()
+                    .unwrap()
+                    .use_full_minimap();
+            }
+        }
+        let mut saw_map = false;
+        for _ in 0..32 {
+            sim.advance_ticks(1).unwrap();
+            for slot in 0..3 {
+                for (_, frame) in sim.take(slot).unwrap() {
+                    for p in split_frame(&frame).unwrap() {
+                        if b"MVU".contains(&p[0]) {
+                            saw_map = true;
+                            assert_eq!(p[0] == b'U', slot < full);
+                        }
+                    }
+                }
+            }
+            if saw_map {
+                break;
+            }
+        }
+        assert!(saw_map);
+        assert_eq!(
+            sim.backend.legacy_maps.cached_packets(),
+            usize::from(full > 0)
+        );
+        sim.advance_ticks(1).unwrap();
+        assert_eq!(sim.backend.legacy_maps.cached_packets(), 0);
+    }
+}
+
+#[test]
 fn a_legacy_recipient_preserves_other_slots_bytes_times_and_world() {
     let mut config = SimulationConfig {
         agents: 3,

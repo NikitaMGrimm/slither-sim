@@ -9,7 +9,41 @@
 //! second quantization error. It never feeds presentation state into physics.
 use super::{Minimap, encode};
 use crate::model::Point;
-use std::{collections::BTreeMap, f64::consts::TAU};
+use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
+
+/// One broadcast's full-map conversions. Input bytes and the exact projection
+/// and XOR baseline all matter: skipped maps and reconnects can differ.
+#[derive(Default)]
+pub(crate) struct FullMapCache {
+    entries: BTreeMap<(u64, u64, usize), Vec<FullMapPacket>>,
+    snapshots: Vec<FullMapSnapshot>,
+}
+
+struct FullMapPacket {
+    // Retain the identity strongly so a replaced baseline cannot reuse its
+    // address while this cache still names it.
+    _previous: Option<Arc<Minimap>>,
+    input: Vec<u8>,
+    snapshot: usize,
+    output: Arc<Vec<u8>>,
+}
+
+struct FullMapSnapshot {
+    source: Arc<Minimap>,
+    projected: BTreeMap<(u64, u64), Arc<Vec<u8>>>,
+}
+
+impl FullMapCache {
+    pub(crate) fn clear(&mut self) {
+        self.entries.clear();
+        self.snapshots.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn cached_packets(&self) -> usize {
+        self.entries.values().map(Vec::len).sum()
+    }
+}
 
 #[derive(Clone, Debug)]
 struct Front {
@@ -43,7 +77,11 @@ impl Encoder {
         });
     }
 
-    pub(crate) fn packets(&mut self, packets: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
+    pub(crate) fn packets(
+        &mut self,
+        packets: &[Vec<u8>],
+        maps: &mut FullMapCache,
+    ) -> Result<Vec<Vec<u8>>, String> {
         let mut out = Vec::with_capacity(packets.len());
         for p in packets {
             match p[0] {
@@ -113,7 +151,7 @@ impl Encoder {
                     // escape as 19. Keep the shared bytes and live projection.
                     // See research/fidelity/2026-10-27-legacy-map-motion/REPORT.md.
                     out.push(if let Some(map) = &mut self.full_map {
-                        map.packet(p)?
+                        map.packet(p, maps)?
                     } else {
                         p.clone()
                     });
@@ -266,12 +304,61 @@ fn food_xy(key: [u8; 4]) -> [u16; 2] {
 struct FullMap {
     grd: f64,
     radius: f64,
-    previous: Option<Minimap>,
+    previous: Option<Arc<Minimap>>,
 }
 
 impl FullMap {
-    fn packet(&mut self, p: &[u8]) -> Result<Vec<u8>, String> {
-        let source = Minimap::packet(self.previous.as_ref(), p)?;
+    fn packet(&mut self, p: &[u8], cache: &mut FullMapCache) -> Result<Vec<u8>, String> {
+        let key = (
+            self.grd.to_bits(),
+            self.radius.to_bits(),
+            self.previous
+                .as_ref()
+                .map_or(0, |map| Arc::as_ptr(map) as usize),
+        );
+        if let Some(packet) = cache
+            .entries
+            .get(&key)
+            .and_then(|entries| entries.iter().find(|entry| entry.input == p))
+        {
+            self.previous = Some(cache.snapshots[packet.snapshot].source.clone());
+            return Ok(packet.output.as_ref().clone());
+        }
+        let decoded = Minimap::packet(self.previous.as_deref(), p)?;
+        // Different old XOR bases can decode to the same current snapshot.
+        // Intern it so reconnects do not permanently fragment later sharing.
+        let snapshot = cache.snapshots.iter().position(|snapshot| {
+            let old = &snapshot.source;
+            old.side == decoded.side
+                && old.age_seconds.to_bits() == decoded.age_seconds.to_bits()
+                && old.cells == decoded.cells
+        });
+        let snapshot = snapshot.unwrap_or_else(|| {
+            cache.snapshots.push(FullMapSnapshot {
+                source: Arc::new(decoded),
+                projected: BTreeMap::new(),
+            });
+            cache.snapshots.len() - 1
+        });
+        let FullMapSnapshot { source, projected } = &mut cache.snapshots[snapshot];
+        let output = projected
+            .entry((key.0, key.1))
+            .or_insert_with(|| Arc::new(self.project(source)))
+            .clone();
+        let next = source.clone();
+        // Cache only successful decoding. A bad delta must still fail without
+        // advancing this recipient or poisoning another recipient's baseline.
+        cache.entries.entry(key).or_default().push(FullMapPacket {
+            _previous: self.previous.clone(),
+            input: p.to_vec(),
+            snapshot,
+            output: output.clone(),
+        });
+        self.previous = Some(next);
+        Ok(output.as_ref().clone())
+    }
+
+    fn project(&self, source: &Minimap) -> Vec<u8> {
         let side = source.side;
         let mut map = Minimap {
             side,
@@ -293,8 +380,7 @@ impl FullMap {
                 }
             }
         }
-        self.previous = Some(source);
-        Ok(minimap(&map))
+        minimap(&map)
     }
 }
 

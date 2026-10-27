@@ -316,6 +316,7 @@ impl SimulatorBackend {
     }
 
     fn broadcast_with(&mut self, early: usize, hand_over: &mut EarlyFrames) -> Result<(), String> {
+        self.legacy_maps.clear();
         let now = self.time();
         // Ambient births reach the wire at the shared food maintenance, with
         // sector cleanup; see `FoodIndex`.
