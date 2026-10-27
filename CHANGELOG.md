@@ -19,6 +19,11 @@
 
 ### Performance
 
+- Protocol-13 broadcasts reuse converted packet buffers when framing them,
+  while preserving frame boundaries and elapsed headers. The 500-player
+  official fixture uses 2.3% fewer instructions with all protocol-13 clients
+  and 1.2% fewer with half; stock clients use 0.1% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-owned-legacy-frames/REPORT.md)).
 - Host food delivery checks only the changed food sectors inside each
   player's subscribed range, instead of every changed sector in the world.
   Output is byte-identical, and the 500-player official fixture runs 6.4–6.8%

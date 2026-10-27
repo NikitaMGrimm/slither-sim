@@ -1,0 +1,41 @@
+{
+  "base": "587b597d86185c994b067a9a18ee94a7f95f957e",
+  "candidate": "b1040389b1376a139c9d77b7d3aa3d9e11dd4d68",
+  "pairs": 5,
+  "warmupPairs": 1,
+  "instructions": {
+    "official500": {"baseMedian":13844404102,"candidateMedian":13858315670,"pairedMedian":1.001053144,"pairedRange":[1.000855653,1.001280419]},
+    "official500-half": {"baseMedian":14371064666,"candidateMedian":14206072276,"pairedMedian":0.98842581,"pairedRange":[0.987808161,0.988723933]},
+    "official500-legacy": {"baseMedian":14892449936,"candidateMedian":14552302418,"pairedMedian":0.977159453,"pairedRange":[0.976895412,0.977178775]},
+    "official500-fullmap": {"baseMedian":15910897112,"candidateMedian":15570718546,"pairedMedian":0.978534747,"pairedRange":[0.978413471,0.978799184]}
+  },
+  "traces": {
+    "official500": [37938956,"22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209"],
+    "official500-half": [57556590,"f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb"],
+    "official500-legacy": [77137561,"e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3"],
+    "official500-fullmap": [76502561,"627ea5f8336073f428bf2904a47b62def6bc2a5689a4ff9f660d4743dd114d72"],
+    "stock-traces/portable": [17260699,"fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e"],
+    "stock-traces/protocol": [8343664,"a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"],
+    "stock-traces/client-official-500": [82283668,"f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e"],
+    "stock-traces/client-battledome-64": [35965725,"55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7"],
+    "stock-traces/retained-step_all": [1772204756,"2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08"],
+    "stock-traces/retained-next_frame": [1736165882,"de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07"],
+    "dome-traces/client-battledome-40": [25201354,"e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420"],
+    "dome-traces/client-battledome-64": [35965725,"55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7"],
+    "dome-traces/client-battledome-80": [52296445,"f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab"]
+  },
+  "traceColumns": ["uncompressedBytes","sha256"],
+  "binarySha256": {
+    "base": "ddd9744e8a3fb2126a023d3dff018a63feb89f5a08bd2fe275c2360e543692f4",
+    "candidate": "347b76322dbac0ee32281e101fc95d9b6f84a3eff94014a8800bd7b5f22c846b"
+  },
+  "steadyTickCost": {
+    "base": {"ticks":853,"cases":{"official500":11852754,"official500-half":12244308,"official500-legacy":12622665},"extra":{"halfExtra":{"median":1561.526,"range":[1549.175,1572.872]},"allExtra":{"median":1539.822,"range":[1535.038,1544.825]}}},
+    "candidate": {"ticks":853,"cases":{"official500":11863524,"official500-half":12103642,"official500-legacy":12334858},"extra":{"halfExtra":{"median":957.939,"range":[950.005,966.226]},"allExtra":{"median":937.986,"range":[935.32,946.698]}}}
+  },
+  "loopback": {
+    "none": {"hostMedian":[11807895.251,11759761.139],"pairedMedian":1.001653544,"pairedRange":[0.985084012,1.030260157],"socketMedian":[916970.202,924354.198],"framesOfferedPerSecond":[54427.417,54189.417],"writeAttemptsPerSecond":[53956.5,54009.417],"aliveMeanRange":[499.033,499.367],"generatorBusyMaxPercent":58.242},
+    "half": {"hostMedian":[12388138.47,12216566.918],"pairedMedian":0.991787457,"pairedRange":[0.961394723,0.99408367],"socketMedian":[1063094.513,1020926.929],"framesOfferedPerSecond":[86023.0,86043.417],"writeAttemptsPerSecond":[54367.5,54166.0],"aliveMeanRange":[499.158,499.634],"generatorBusyMaxPercent":60.842},
+    "all": {"hostMedian":[12884460.34,12498271.933],"pairedMedian":0.971088785,"pairedRange":[0.953176689,0.982652633],"socketMedian":[1199106.101,1118162.435],"framesOfferedPerSecond":[117189.417,117948.667],"writeAttemptsPerSecond":[53253.917,53771.333],"aliveMeanRange":[498.856,499.316],"generatorBusyMaxPercent":62.0}
+  }
+}
