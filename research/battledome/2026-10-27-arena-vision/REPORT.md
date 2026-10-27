@@ -320,3 +320,29 @@ The load driver splits frames and tracks its own life; it does not render or
 fully decode every distant body/food entry. The earlier stock-client checks
 remain the semantic/client-health evidence.
 No production source, policy, contracts or configuration defaults changed.
+
+## Split-view integration checks
+
+The subsequent split rebases onto `0434834` (including ordered snake merging
+#204, gateway readiness #205 and NTL evidence #206). The ascending/unique arena
+candidate list is covered through its merge with known dead slots. Caller
+regressions decode all food with 1500-range snakes/prey, and local food with
+arena snakes; host bots retain local food under every tested snake cap.
+Geometric batch/single observations, preset/config round-trips and checkpoint
+continuations cover both food modes. Two historical marker viewport fixtures
+now explicitly select local food instead of relying on numeric vision to do so.
+
+The full CONTRIBUTING Rust group passed (all 15 commands); documentation 7/7,
+fixture versions 14/14, and Python semantic tests 37/37 passed. Python used a
+fresh cargo-built abi3 extension because maturin was unavailable offline;
+wheel packaging was not tested. Four canonical traces against `0434834` match
+byte for byte: portable/protocol/geometric at 32 operations and stock official
+500 at one operation. The geometric JSON envelope intentionally remains v6;
+these payload traces do not contain that envelope.
+
+[Verification pins](split-verification.json) identify the distinct final
+executables, source and trace digests. An initial shared-target comparison
+reused one Cargo executable for both arms and is excluded; its manifest and
+full outputs remain local-only alongside the final, separately built traces.
+These checks add no timing, NTL rendering, natural-player capacity or playtest
+qualification for the split setting.

@@ -1,0 +1,95 @@
+{
+  "baseline": "0434834bcebcaa21423c63f77c68e4eb5fa4f579",
+  "candidateProductionSource": "7c6cc735d94a589e9bda5f593ed48e7f0bfe0e90",
+  "testedSourceManifestSha256": "8374330ae71c83f91a047f825456c46893469a8c8d6c33d3944162cb4b26a1c0",
+  "contracts": {
+    "geometric": "slither-sim-json-v6",
+    "checkpointFormat": "slither-sim-checkpoint-v2",
+    "rulesRevision": "slither-sim-rules-v5",
+    "portable": "slither-client-v2",
+    "cAbi": "slither-sim-abi-v3"
+  },
+  "limits": "Offline, at most two logical CPUs; jobs1, Rayon2, test threads2. Finite deterministic fixtures, not new gameplay/client-performance measurements.",
+  "checks": {
+    "rustGroup": "all 15 commands passed; format, five Clippy variants, default/core/bot/network tests, doctests, C ABI, Python crate check, basic example",
+    "documentation": 7,
+    "fixtureVersions": 14,
+    "pythonNative": {
+      "passed": 37,
+      "skipped": 0,
+      "method": "Fresh cargo-built abi3 extension, existing generated package wrapper and current stub. Wheel packaging not exercised: maturin was unavailable offline."
+    }
+  },
+  "traceComparison": {
+    "base": "0434834bcebcaa21423c63f77c68e4eb5fa4f579",
+    "candidateSource": "7c6cc735d94a589e9bda5f593ed48e7f0bfe0e90",
+    "baseBinarySha256": "1c32fa5060c54b5ce7ece4543838be078539af1950b2bff567bb8410c458965a",
+    "candidateBinarySha256": "0021739e0998f868eb3b61c80bbf5587167d2a2904e5a215d6490c986db5490d",
+    "rows": [
+      {
+        "case": "portable",
+        "base": {
+          "bytes": 17260572,
+          "sha256": "63ade78e5b5b30af1fcea9cf6213fd6989a5ba680ccf51c54b7423c62c516b2c"
+        },
+        "candidate": {
+          "bytes": 17260572,
+          "sha256": "63ade78e5b5b30af1fcea9cf6213fd6989a5ba680ccf51c54b7423c62c516b2c"
+        },
+        "byteIdentical": true,
+        "onlyGeometricEnvelopeChanged": false
+      },
+      {
+        "case": "protocol",
+        "base": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"
+        },
+        "candidate": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"
+        },
+        "byteIdentical": true,
+        "onlyGeometricEnvelopeChanged": false
+      },
+      {
+        "case": "observe",
+        "base": {
+          "bytes": 210431960,
+          "sha256": "4a4ca511a76c3a1cb5c081b3c48e17b65807d83df51ad235f0191c5cf9a924c6"
+        },
+        "candidate": {
+          "bytes": 210431960,
+          "sha256": "4a4ca511a76c3a1cb5c081b3c48e17b65807d83df51ad235f0191c5cf9a924c6"
+        },
+        "byteIdentical": true,
+        "onlyGeometricEnvelopeChanged": false
+      },
+      {
+        "case": "stock-official-500",
+        "base": {
+          "bytes": 82283625,
+          "sha256": "f2baac880190289159bace1ce4ebc2ca741802a8757570a1796cc89301163fc7"
+        },
+        "candidate": {
+          "bytes": 82283625,
+          "sha256": "f2baac880190289159bace1ce4ebc2ca741802a8757570a1796cc89301163fc7"
+        },
+        "byteIdentical": true,
+        "onlyGeometricEnvelopeChanged": false
+      }
+    ]
+  },
+  "rawLogSha256": {
+    "rust-check": "0bf0aac92d60ac7849fe1c15a51c640912d791f052a79ed9c579ab4451897859",
+    "python-native-tests": "9f8751bfd6df6e1bfce4e678e71aa6ca4b0644f3544fe29871fbccd18ad949f4",
+    "base-release-build": "095627110d0eb2b11d587dfca01e628251c65b97c772592cebaca960d0229df4",
+    "candidate-release-build": "ee3a7b44ef82868fd5a9391045eded5812033de2a182aed2e3472757bf87aac3"
+  },
+  "harnessSha256": "2e409b7b1a5ff7b8494c7f488cc2a5ce17278da0d2fa390577c368557200c9bc",
+  "excludedSharedTargetComparison": {
+    "reason": "Shared Cargo output reused the same executable for both arms; no valid parity comparison. Retained outside Git, replaced by separately built final arms with distinct binary hashes.",
+    "manifestSha256": "c8f801ade4742d8c6c8a97b0248d4571328bd0cd493323ed3c45df3954b084b5"
+  },
+  "retention": "Full sources, builds, traces, scripts and failed comparison remain local-only under outputs/arena-vision-split."
+}
