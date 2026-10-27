@@ -19,6 +19,12 @@
 
 ### Performance
 
+- Linux hosts ask the kernel once per gateway pass which sockets have input,
+  and stop reading a socket that has none until it does. Before, every pass
+  tried a read on every open socket. With 500 stock or protocol-13 players,
+  socket-thread instructions fell by 18–21% and whole-host instructions by
+  2.9–3.9%. Other platforms are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-socket-readiness/REPORT.md)).
 - Host broadcasts build each player's list of nearby and already shown snakes
   by merging two sorted lists into reused storage, instead of allocating and
   sorting a new list for every player. Output is byte-identical, and the
