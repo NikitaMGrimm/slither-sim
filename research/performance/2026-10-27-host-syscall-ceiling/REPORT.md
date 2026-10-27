@@ -65,11 +65,15 @@ A 10 ms delivery claim requires a host experiment.
 
 ## Reproduction, validation and limits
 
-Use [micro.c](micro.c): `gcc -O3 -pthread micro.c -o micro`, then `micro null 5000000` and
-`micro send ADDRESS 8766 389 38900 389000`, with `micro sink 8766 389 OUT.json` on the separate receiver.
+Use [micro.c](micro.c): `gcc -O3 -pthread micro.c -o micro`, then `./micro null 5000000` and
+`./micro send ADDRESS 8766 389 38900 389000`, with `./micro sink 8766 389 OUT.json` on the separate receiver.
+Start the sink first; it exits only after all expected connections close, so an aborted sender leaves it
+waiting until the host timer and without `OUT.json`.
 Sender CPU 0, receiver CPUs 0–3; setup/teardown excluded, fresh sockets each repetition.
 One portable C binary was compiled on the generator for both cores; host load follows #232.
 [count_window.py](count_window.py) runs perf; [analyze.py](analyze.py) reduces small tick/count files and ceilings.
+The plan's `strace -c -f` fallback was not needed because perf counted the hold. It records no per-thread
+split, so [analyze.py](analyze.py) accepts only perf records; a fallback record would be host-wide diagnostics only.
 
 Two analysis tests, seven documentation tests, C warning/syntax checks and public identifier audits passed.
 Rust checks not rerun.
