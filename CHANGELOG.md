@@ -19,6 +19,10 @@
 
 ### Performance
 
+- Food pickup compacts the physical food array by ordered survivor ranges.
+  Output is byte-identical, and the offline official 500-player fixture uses
+  4.1–4.4% fewer process instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-food-compaction/REPORT.md)).
 - Simulation ticks no longer compare the food cache with every pellet when no
   untracked food edit happened since the last comparison. Debug builds still
   check the skipped comparison. Output is byte-identical, and the 500-player
