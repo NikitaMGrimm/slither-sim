@@ -44,8 +44,8 @@ pub(super) struct Record {
     version: u64,
 }
 
-/// Living snakes ranked once per broadcast that needs a leaderboard: wire
-/// display score descending, then slot ascending.
+/// Rank living seats by size, or living/recently scoring seats by rolling kills.
+/// Ties use slot order; a newly admitted socket player clears the prior history.
 pub(super) struct Board {
     /// `(display score, slot)` in rank order.
     pub(super) order: Vec<(f64, usize)>,
@@ -54,17 +54,34 @@ pub(super) struct Board {
 }
 impl Board {
     pub(super) fn new(world: &Simulator, profiles: &[PlayerAppearance]) -> Result<Self, String> {
+        let kill_points = world.config().kill_score_seconds.is_some();
         let mut order: Vec<(f64, usize)> = world
             .snakes()
             .iter()
             .enumerate()
-            .filter(|(_, snake)| snake.alive)
-            .map(|(slot, snake)| (wire_score(snake), slot))
+            .filter(|&(slot, snake)| {
+                snake.alive || kill_points && world.kill_score(slot).unwrap_or(0) > 0
+            })
+            .map(|(slot, snake)| {
+                (
+                    if kill_points {
+                        world.kill_score(slot).unwrap_or(0) as f64
+                    } else {
+                        wire_score(snake)
+                    },
+                    slot,
+                )
+            })
             .collect();
         order.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
         let mut rows = Vec::new();
         for &(_, slot) in order.iter().take(LEADERBOARD_ROWS) {
-            let (segments, fam, _) = represented(&world.snakes()[slot]);
+            let (segments, fam) = if kill_points {
+                encode::leaderboard_points(world.kill_score(slot).unwrap_or(0))?
+            } else {
+                let (segments, fam, _) = represented(&world.snakes()[slot]);
+                (segments, fam)
+            };
             let (color, name) = match profiles.get(slot) {
                 Some(profile) => (profile.skin, profile.nickname.clone()),
                 None => (0, slot.to_string().into_bytes()),
@@ -369,7 +386,12 @@ impl SimulatorBackend {
             }
             if !alive && !was_over {
                 let snake = &self.world.snakes()[slot];
-                let rank = board.as_ref().unwrap().rank(wire_score(snake), slot);
+                let score = if self.world.config().kill_score_seconds.is_some() {
+                    self.world.kill_score(slot).unwrap_or(0) as f64
+                } else {
+                    wire_score(snake)
+                };
+                let rank = board.as_ref().unwrap().rank(score, slot);
                 self.slots[slot].connection.final_rank = Some(rank);
             }
             // Official frames lead with pongs (81,830 of 81,843 pong frames),
@@ -518,7 +540,10 @@ impl SimulatorBackend {
             return Ok(None);
         }
         if map.is_none() {
-            *map = Some(Minimap::from_world(&self.world, self.config.minimap_side)?);
+            *map = Some(Minimap::from_world(
+                &self.world,
+                self.config.minimap_side(),
+            )?);
         }
         let map = map.as_ref().expect("minimap was just constructed");
         let mut packet = encode::minimap(map);
@@ -742,6 +767,7 @@ impl SimulatorBackend {
             let (row, rank) = match board.order.iter().position(|&(_, i)| i == slot) {
                 Some(index) if index < LEADERBOARD_ROWS => (index as u8 + 1, index + 1),
                 Some(index) => (0, index + 1),
+                None if self.world.config().kill_score_seconds.is_some() => (0, 0),
                 None => (0, connection.final_rank.unwrap_or(0)),
             };
             packets.push(encode::leaderboard(

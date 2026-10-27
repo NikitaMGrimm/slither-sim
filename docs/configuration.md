@@ -69,7 +69,7 @@ Used directly by `SimulatorBackend`, or nested under `HostConfig.simulation`.
 | `controlledSlot` | `0` | Bot-controlled slot, less than `agents`; overridden by the host. |
 | `decisionTicks` | `6` | Physics ticks per bot decision, at least 1. |
 | `minimapIntervalSeconds` | `2.504` | Positive finite period of the server-wide minimap clock. |
-| `minimapSide` | `136` | Received protocol-19 minimap resolution; 1–512, the stock client's clamp. Rasterization remains approximate. |
+| `minimapSide` | `null` (automatic) | Received protocol-19 minimap resolution: 256 for pit worlds, 136 otherwise. An integer 1–512 overrides it. The stock client draws at side + 24 pixels; rasterization remains approximate. |
 | `leaderboardIntervalSeconds` | `3.008` | Positive finite period of the server-wide leaderboard clock; the first board waits for it. |
 | `localRecords` | `false` | Opt into world-run records and victory-message entry; official qualification rules are unknown. |
 | `latency` | Zero added delay | Link and processing for all simulator agents; on hosts use `players.latency` / `bots.latency` instead. |
@@ -286,8 +286,13 @@ smaller final pellet for a fraction. A floor-size death drops nothing.
 These are [offline-tested design choices](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-25-food-balance/REPORT.md).
 
 A kill at time `t` counts while `world.time < t + killScoreSeconds`, separately
-from per-life `kills` and size `score`, without changing the size-based
-leaderboard. The preset defines no deadline, winner or automatic episode reset.
+from per-life `kills` and size `score`. Worlds with `killScoreSeconds` rank
+the stock leaderboard and own rank by rolling kills, descending with slot-order
+ties. Living seats and dead or disconnected seats with unexpired kills are ranked;
+unused seats and dead seats with zero kills are absent. A newly admitted socket
+connection starts at zero and replaces the prior occupant's board entry.
+Respawns by the same connection and bot lives retain recent kills. The preset
+defines no deadline, winner or automatic episode reset.
 A new world clears the rolling score.
 
 The [local spawn study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-safe-spawn/REPORT.md)
@@ -312,20 +317,33 @@ Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
 Rust `Observation` omits the rolling score. Geometric frames carry pit
 geometry and the floor setting in [`rules`](bot-api.md#frames); `Observation`
-and portable `ClientFrame` omit them, so retain world config separately. Portable clients receive per-life kills and the size-based
-leaderboard, without rolling kill score or distinct pit death reason.
+and portable `ClientFrame` omit them, so retain world config separately. Portable
+clients receive per-life kills and the same leaderboard number column
+as the browser (rolling kills when enabled), without a distinct pit death reason.
 At the base size the stock browser shows the pit edge as 749 decorative pellets:
 centers 3 units outside the pit, about 15 units apart, palette 8, size byte 31
 (6.2). These are design choices. Markers cannot be eaten and follow normal
-sector delivery. On radius changes the old decorations are removed and new
-ones follow the live pit edge. During shrink, their cached radius updates at
-food-grid steps (`300 / 256` units), leaving less than one cell of extra outward
-offset. Growth past the cached edge refreshes immediately. Unchanged listings
-keep their handles so recipients skip redundant food diffs. The minimap uses
+sector delivery. Growth past the cached edge replaces decorations immediately.
+During shrink, the ring refreshes at most twice per simulation second, after
+crossing a radial food-grid cell (`300 / 256` units). The previous ring remains
+for another 0.5 s while rapid-food `F` packets let replacements fade in. This
+leaves an outward trail of about one second of pit motion, plus the 3-unit
+offset and grid rounding; it does not move the lethal boundary. After settling,
+the old ring retires and the cached edge stays within one cell. Unchanged
+listings keep their handles so recipients skip redundant food diffs. The
+[offline fade regression](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-stock-presentation/REPORT.md)
+checks growth, shrink and settled views. The minimap uses
 the live wall for both snakes and pit: proportional pit growth keeps its raster
-cells fixed while the stock
-own-player marker remains aligned. Bots get only real food, including any pellet a marker hides in
-the browser. The stock browser has no rolling kill-score display.
+cells fixed while the stock own-player marker remains aligned. Snake cells
+wholly outside the pit are hidden; cells intersecting the edge keep the outline.
+Pit worlds default to a 256-cell map (280 pixels in the stock browser), and
+worlds without a pit stay at 136 (160 pixels). Set `minimapSide` explicitly
+to override either default. Bots get only real food, including any pellet a
+marker hides in the browser. Leaderboard kill counts use exact integers within
+the stock score-table range; larger displayed counts saturate at its largest
+exactly representable integer. Ranks still use actual rolling kills. Own length,
+physical mass, per-life kills and optional local size records keep their existing
+meanings. Stock labels are unchanged.
 
 ### Prey
 
@@ -511,7 +529,7 @@ Bounds have three kinds, with rationale beside the owning checks.
 | Wire prey speeds, turn rate, size | Their `u16`/`u8` packet fields; see [SimulationConfig](#simulationconfig). |
 | Wire prey `count ≤ 65,536`; at most 65,536 prey live | Protocol-19 prey IDs are `u16`; each living prey keeps a unique one. A retired ID is free at once, since every connection receives its removal before any reuse in the same broadcast. |
 | `customSkin` ≤ 255 bytes | Appearances give its length in one byte. |
-| `minimapSide ≥ 1`, positive intervals, `decisionTicks ≥ 1` | Empty maps and zero periods have no meaning. |
+| Explicit `minimapSide ≥ 1`, positive intervals, `decisionTicks ≥ 1` | Empty maps and zero periods have no meaning. |
 
 Finite values, nonnegative delays, probabilities in 0–1 and ordered ranges follow
 from field meanings.

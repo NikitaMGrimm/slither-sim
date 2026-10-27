@@ -630,7 +630,7 @@ fn unsupported_configurations_are_rejected() {
     reject(|c| c.world.radius = 40_000.);
     reject(|c| c.agents = 0);
     reject(|c| c.controlled_slot = 1);
-    reject(|c| c.minimap_side = 513);
+    reject(|c| c.minimap_side = Some(513));
     reject(|c| c.leaderboard_interval_seconds = 0.);
     reject(|c| c.leaderboard_interval_seconds = -1.);
     reject(|c| c.leaderboard_interval_seconds = f64::NAN);

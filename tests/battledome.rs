@@ -1553,7 +1553,8 @@ fn the_pit_edge_keeps_its_minimap_cells_as_the_live_wall_grows() {
         let projected = |r: f64, wall: f64| ((r / wall + 1.) * side as f64 / 2.).floor();
         assert_ne!(projected(1784., 3584.), projected(1784., 8960.));
     }
-    // The player shares the live-radius projection, rather than the initial one.
+    // The stock own-player marker uses the live-radius projection separately;
+    // this outer snake no longer paints the pit-only bitmap.
     world.step(&[]).unwrap();
     let head = Point { x: 7000., y: 0. };
     let (body, heading) = world.spawn_body(head, FRAC_PI_2).unwrap();
@@ -1561,7 +1562,7 @@ fn the_pit_edge_keeps_its_minimap_cells_as_the_live_wall_grows() {
     let side = 136;
     let index =
         side / 2 * side + ((head.x / world.radius() + 1.) * side as f64 / 2.).floor() as usize;
-    assert_eq!(Minimap::from_world(&world, side).unwrap().cells[index], 1);
+    assert_eq!(Minimap::from_world(&world, side).unwrap().cells[index], 0);
 }
 
 #[test]

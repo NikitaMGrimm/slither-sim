@@ -182,7 +182,7 @@ mod retained {
             controlled_slot: 0,
             decision_ticks: TICKS,
             minimap_interval_seconds: 2.5,
-            minimap_side: 136,
+            minimap_side: Some(136),
             leaderboard_interval_seconds: 3.0,
             latency: LatencyConfig::one_way(0.0, 0.0),
             record_wire: true,

@@ -412,7 +412,8 @@ impl Minimap {
     }
 
     /// Live-radius map for the stock client's live-radius own-player marker.
-    /// The pit edge shares that projection; proportional growth keeps its cells.
+    /// Pit worlds hide snake cells outside the pit and retain its edge;
+    /// proportional growth keeps the outline cells in the same projection.
     pub fn from_world(world: &crate::Simulator, side: usize) -> Result<Self, String> {
         let mut map = Self::from_snakes(
             world.snakes(),
@@ -433,7 +434,10 @@ impl Minimap {
                             .abs()
                             .max(((v + 1) as f64 - center).abs())
                     };
-                    if near(x).hypot(near(y)) <= radius && far(x).hypot(far(y)) >= radius {
+                    let nearest = near(x).hypot(near(y));
+                    if nearest > radius {
+                        map.cells[y * side + x] = 0;
+                    } else if far(x).hypot(far(y)) >= radius {
                         map.cells[y * side + x] = 1;
                     }
                 }
