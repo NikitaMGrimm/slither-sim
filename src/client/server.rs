@@ -2733,6 +2733,162 @@ mod tests {
         ));
     }
 
+    fn fenced_spawn(gap: f64) -> (Simulation, Gate, Receiver<Vec<Delivery>>) {
+        let (mut simulation, gate, deliveries) = connected(LatencyConfig::default(), 0);
+        let mut world = crate::Config::battledome();
+        world.dynamic_radius = false;
+        world.spawn_radius_max = None;
+        world.food_count = 0;
+        world.ambient_replenish_per_second = 0.;
+        simulation.world = RawSimulator::new(
+            7,
+            SimulationConfig {
+                agents: 2,
+                world,
+                ..Default::default()
+            },
+            2,
+        )
+        .unwrap();
+        simulation.ticks = 0;
+        simulation.generations = vec![0; 2];
+        simulation.next_spawn_tick = 0;
+        simulation.last_spawn_tick = None;
+        place_spawn_fence(&mut simulation, gap);
+        (simulation, gate, deliveries)
+    }
+
+    fn place_spawn_fence(simulation: &mut Simulation, gap: f64) {
+        let world = simulation.world.fixture_world();
+        let radius = world.config().spawn_radius.unwrap() + gap;
+        let body: Vec<_> = (0..=64)
+            .map(|i| {
+                let angle = std::f64::consts::TAU * i as f64 / 64.;
+                crate::Point {
+                    x: radius * angle.cos(),
+                    y: radius * angle.sin(),
+                }
+            })
+            .collect();
+        // A closed replay body blankets the single spawn circle: every strict
+        // pose is within 400 of it. Gap 350 leaves inward fallback corridors;
+        // gap 150 blocks even the 200-unit fallback body floor.
+        world
+            .import_life(
+                1,
+                crate::ReplayLife {
+                    head: body[0],
+                    speed: crate::InitialSpeed::Infer(crate::physics::base_speed(body.len())),
+                    body,
+                    heading: std::f64::consts::FRAC_PI_2,
+                    fam: 0.,
+                    kills: 0,
+                    alive: true,
+                },
+            )
+            .unwrap();
+    }
+
+    fn advance_fenced_spawn(simulation: &mut Simulation, until: u64, gap: f64) {
+        // Advance real physics/world ticks, holding only the synthetic obstacle
+        // pose fixed. Admission is polled at the threshold boundaries below.
+        while simulation.ticks < until {
+            simulation.advance_tick().unwrap();
+            simulation.ticks += 1;
+            simulation.hand_over().unwrap();
+            place_spawn_fence(simulation, gap);
+        }
+    }
+
+    fn request_fenced_spawn(simulation: &mut Simulation, gate: &Gate, generation: u64) {
+        gate.send(Command::Connect {
+            slot: 0,
+            generation,
+            appearance: PlayerAppearance::default(),
+            session_id: false,
+            physical_food: true,
+        });
+        simulation.apply_commands().unwrap();
+    }
+
+    #[test]
+    fn fallback_clock_admits_only_after_two_world_seconds() {
+        let (mut simulation, gate, _deliveries) = fenced_spawn(350.);
+        // A nonzero request tick also distinguishes request age from world age.
+        advance_fenced_spawn(&mut simulation, 16, 350.);
+        let requested = simulation.ticks;
+        let ready = requested + (2. / simulation.world.dt()).ceil() as u64;
+        request_fenced_spawn(&mut simulation, &gate, 2);
+        assert_eq!(simulation.waiting.len(), 1, "no fallback at request time");
+
+        advance_fenced_spawn(&mut simulation, ready - 1, 350.);
+        simulation.apply_commands().unwrap();
+        assert_eq!(
+            simulation.waiting.len(),
+            1,
+            "no fallback before two seconds"
+        );
+        assert!(!simulation.world.fixture_world().snakes()[0].alive);
+
+        // A failed search retains the normal 14ms retry interval.
+        let attempt = simulation.next_spawn_tick.max(ready);
+        advance_fenced_spawn(&mut simulation, attempt, 350.);
+        simulation.apply_commands().unwrap();
+        assert!(
+            simulation.waiting.is_empty(),
+            "fallback must admit after the gate"
+        );
+        assert_eq!(simulation.last_spawn_tick, Some(attempt));
+        let world = simulation.world.fixture_world();
+        let body = &world.snakes()[0].body;
+        assert!(world.snakes()[0].alive);
+        assert!(!world.body_is_clear_excluding(body, 400., Some(0)));
+        assert!(world.body_is_clear_excluding(body, 200., Some(0)));
+    }
+
+    #[test]
+    fn fallback_clock_restarts_when_a_waiting_socket_reconnects() {
+        let (mut simulation, gate, _deliveries) = fenced_spawn(150.);
+        advance_fenced_spawn(&mut simulation, 16, 150.);
+        let old_requested = simulation.ticks;
+        request_fenced_spawn(&mut simulation, &gate, 2);
+        let old_ready = old_requested + (2. / simulation.world.dt()).ceil() as u64 + 2;
+        advance_fenced_spawn(&mut simulation, old_ready, 150.);
+        simulation.apply_commands().unwrap();
+        assert_eq!(simulation.waiting.len(), 1, "tight fence blocks both tiers");
+        assert!((simulation.ticks - old_requested) as f64 * simulation.world.dt() > 2.);
+
+        // Replace the socket through the same command path as a real reconnect.
+        // The world now offers fallback-only poses, so stale age would admit it.
+        gate.send(Command::Disconnect {
+            slot: 0,
+            generation: 2,
+        });
+        place_spawn_fence(&mut simulation, 350.);
+        let reconnected = simulation.ticks;
+        request_fenced_spawn(&mut simulation, &gate, 3);
+        let ready = reconnected + (2. / simulation.world.dt()).ceil() as u64;
+        assert_eq!(simulation.waiting.len(), 1);
+        assert_eq!(simulation.waiting[0].generation, 3);
+
+        advance_fenced_spawn(&mut simulation, ready - 1, 350.);
+        simulation.apply_commands().unwrap();
+        assert_eq!(
+            simulation.waiting.len(),
+            1,
+            "reconnect must start a fresh two-second fallback wait"
+        );
+        assert!(!simulation.world.fixture_world().snakes()[0].alive);
+
+        let attempt = simulation.next_spawn_tick.max(ready);
+        advance_fenced_spawn(&mut simulation, attempt, 350.);
+        simulation.apply_commands().unwrap();
+        assert!(simulation.waiting.is_empty());
+        assert!(simulation.world.fixture_world().snakes()[0].alive);
+        assert_eq!(simulation.generations[0], 3);
+        assert_eq!(simulation.last_spawn_tick, Some(attempt));
+    }
+
     #[test]
     fn queued_expansion_leaves_recent_births_their_departure_window() {
         let (mut simulation, _gate, _deliveries) = connected(LatencyConfig::default(), 0);

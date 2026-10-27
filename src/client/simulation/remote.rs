@@ -46,6 +46,13 @@ impl RawSimulator {
     pub(super) fn time(&self) -> f64 {
         self.backend.time()
     }
+
+    /// Authoritative fixture edits for host admission regressions.
+    #[cfg(test)]
+    pub(crate) fn fixture_world(&mut self) -> &mut crate::Simulator {
+        &mut self.backend.world
+    }
+
     pub(crate) fn dt(&self) -> f64 {
         self.backend.world.config().dt
     }
