@@ -42,6 +42,8 @@ Release/thin LTO, networking-only build, locked dependencies, Rust 1.99.0
 (`b940084d7`, 2026-09-28), Windows. The runner restricts itself and inherited
 build/run processes to two available logical CPUs, with one Cargo job and one
 test/Rayon thread. No CPU timing or performance claim is made.
+Collection finished before the owner's later one-core limit. Subsequent checks
+used one-core affinity; the four selected games were already sequential.
 
 ## Observed supply
 
@@ -100,7 +102,8 @@ failed gameplay attempt was excluded.
 ## Reproduction and retained evidence
 
 Run from a checkout with a fresh output directory (runner supports Windows and
-Linux affinity APIs):
+Linux affinity APIs). Under a one-core budget, launch it from a parent already
+restricted to one CPU; the frozen runner honors a narrower inherited mask.
 
 ```sh
 python research/battledome/2026-10-27-pit-food/run.py --main 5eb0736 --candidate 010b2d4 --output outputs/pit-food-sanity-new
@@ -113,6 +116,16 @@ copies, binaries and stdout/stderr are local-only under
 `outputs/pit-food-sanity-20261027-v1`, not downloadable from this repository.
 Selected results include the pilot and all selected attempt outcomes. No
 outside game server is contacted.
+
+## Code verification
+
+The focused pit-food, Battledome, ambient, checkpoint and world-rules suites
+passed (84 cases), followed by all 15 steps of `python tools/check.py rust`.
+Main's later test-only #186 was then merged: runtime `src/` still matches the
+measured candidate. Both configurations of `tests/client_network.rs` passed
+(6 each), as did all 104 headless-tool tests, formatting and 7 documentation
+tests. These follow-up checks ran on one core. No gameplay source changed after
+the owner-approved build plus main, and no additional balance rule was added.
 
 ## Limits and decision
 
