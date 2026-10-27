@@ -1,6 +1,7 @@
 """Matched drain-only stock/legacy handshake and controls overlay."""
 from pathlib import Path
 import sys
+if not __debug__:raise SystemExit('run without -O: the checks are asserts')
 path=Path(sys.argv[1]);t=path.read_text()
 def replace(before,after):
     global t

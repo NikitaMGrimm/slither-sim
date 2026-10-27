@@ -3,6 +3,9 @@ import hashlib, json, os, resource, signal, statistics, subprocess, sys, time
 from pathlib import Path
 from thread_counter import Counter
 
+if not __debug__:
+    raise SystemExit("run without -O: the checks are asserts")
+
 root = Path(sys.argv[1]).resolve()
 out = root / 'pairs'
 out.mkdir(exist_ok=True)

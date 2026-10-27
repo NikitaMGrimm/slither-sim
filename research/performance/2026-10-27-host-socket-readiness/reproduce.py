@@ -1,6 +1,7 @@
 """Linux x86-64 frozen host builds or fixed-work idle instruction pairs."""
 import argparse,hashlib,json,os,shutil,statistics,subprocess,tarfile
 from pathlib import Path
+if not __debug__:raise SystemExit('run without -O: the checks are asserts')
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('mode',choices=['build','idle']);p.add_argument('repository',type=Path);p.add_argument('output',type=Path)
 p.add_argument('--base',default='46e00fae6f2c70abff6868e59f40ab74365b3a2d')
