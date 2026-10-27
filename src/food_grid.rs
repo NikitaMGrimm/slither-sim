@@ -165,16 +165,18 @@ impl FoodCache {
         }
         self.entries.push(entry);
     }
-    /// Mirror removing every pellet whose `removed` flag is set.
-    pub(crate) fn remove(&mut self, removed: &[bool]) {
-        if removed.len() != self.entries.len() {
+    /// Mirror removing original food indices in strictly ascending order.
+    pub(crate) fn remove(&mut self, food_len: usize, removed: impl Iterator<Item = usize>) {
+        if food_len != self.entries.len() {
             // Already stale; the next comparison rebuilds.
             self.entries.clear();
             self.ambient = 0;
             self.grids.clear();
             return;
         }
-        for (e, _) in self.entries.iter().zip(removed).filter(|(_, r)| **r) {
+        let (mut read, mut write) = (0, 0);
+        for i in removed {
+            let e = self.entries[i];
             self.ambient -= usize::from(e.ambient);
             for (key, counts) in &mut self.grids {
                 let cell = e.cell(f64::from_bits(*key));
@@ -185,13 +187,14 @@ impl FoodCache {
                     }
                 }
             }
+            // Pickup already supplies ordered indices. Copy survivor ranges rather
+            // than testing every cached pellet twice; retain their original order.
+            self.entries.copy_within(read..i, write);
+            write += i - read;
+            read = i + 1;
         }
-        let mut i = 0;
-        self.entries.retain(|_| {
-            let keep = !removed[i];
-            i += 1;
-            keep
-        });
+        self.entries.copy_within(read.., write);
+        self.entries.truncate(write + self.entries.len() - read);
     }
 }
 
@@ -449,7 +452,13 @@ mod tests {
                     }
                     1 if !food.is_empty() => {
                         let removed: Vec<bool> = food.iter().map(|_| rng.below(5) == 0).collect();
-                        cache.remove(&removed);
+                        cache.remove(
+                            food.len(),
+                            removed
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(i, &r)| r.then_some(i)),
+                        );
                         let mut i = 0;
                         food.retain(|_| {
                             i += 1;
@@ -480,6 +489,54 @@ mod tests {
                 }
             }
             cache.end();
+        }
+    }
+
+    #[test]
+    fn ordered_removal_preserves_survivors_and_all_occupancy_counts() {
+        for removed in [
+            vec![],
+            vec![0],
+            vec![7],
+            vec![0, 1, 3, 4, 7],
+            (0..8).collect(),
+        ] {
+            let food: Vec<_> = (0..8)
+                .map(|i| Food {
+                    x: (i / 2) as f64 * 75.0,
+                    y: 0.0,
+                    value: i as f64,
+                    size: Some(1.0),
+                    origin: Some(if i % 2 == 0 {
+                        Origin::Ambient
+                    } else {
+                        Origin::Boost
+                    }),
+                })
+                .collect();
+            let mut cache = FoodCache::default();
+            for size in [40.0, 75.0, 128.0] {
+                cache.has_room(&food, &food[0], size, usize::MAX);
+            }
+            cache.remove(food.len(), removed.iter().copied());
+            let survivors: Vec<_> = food
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !removed.contains(i))
+                .map(|(_, f)| Entry::of(f))
+                .collect();
+            assert!(cache.entries == survivors, "removed {removed:?}");
+            assert_eq!(
+                cache.ambient,
+                survivors.iter().filter(|e| e.ambient).count()
+            );
+            for (key, actual) in &cache.grids {
+                let mut expected = Counts::default();
+                for &e in &survivors {
+                    *expected.entry(e.cell(f64::from_bits(*key))).or_default() += 1;
+                }
+                assert_eq!(*actual, expected, "removed {removed:?}");
+            }
         }
     }
 
