@@ -211,7 +211,9 @@ impl FoodCache {
             return;
         }
         let (mut read, mut write) = (0, 0);
+        let mut first_removed = food_len;
         for i in removed {
+            first_removed = first_removed.min(i);
             let e = self.entries[i];
             if let Some(index) = &mut self.pellets {
                 index.remove(i);
@@ -238,9 +240,10 @@ impl FoodCache {
         if let Some(index) = &mut self.pellets {
             index.food_slots.copy_within(read.., write);
             index.food_slots.truncate(self.entries.len());
-            // Stable handles keep cell lists intact across food compaction. Only
-            // their current food-array positions need to be refreshed.
-            for (i, &slot) in index.food_slots.iter().enumerate() {
+            // Stable compaction leaves the prefix before the first removal in
+            // place. Only the remaining handles can have a new food position;
+            // no removals means the entire prefix stays unchanged.
+            for (i, &slot) in index.food_slots.iter().enumerate().skip(first_removed) {
                 index.slots[slot as usize].food = i as u32;
             }
         }
@@ -681,6 +684,58 @@ mod tests {
             assert!(free.insert(slot));
             assert!(!live.contains(&slot));
         }
+    }
+
+    #[test]
+    fn removal_boundaries_keep_positions_correct_through_handle_reuse() {
+        let pellet = |i| Food {
+            x: i as f64,
+            y: 0.0,
+            value: i as f64 + 1.0,
+            size: None,
+            origin: Some(Origin::Ambient),
+        };
+        let mut food: Vec<_> = (0..40).map(pellet).collect();
+        let mut cache = FoodCache::default();
+        cache.begin();
+        cache.pellets(&food).unwrap();
+        fn remove(cache: &mut FoodCache, food: &mut Vec<Food>, removed: &[usize]) {
+            let first = removed.first().copied().unwrap_or(food.len());
+            let prefix = cache.pellets.as_ref().unwrap().food_slots[..first].to_vec();
+            cache.remove(food.len(), removed.iter().copied());
+            let mut i = 0;
+            food.retain(|_| {
+                let keep = removed.binary_search(&i).is_err();
+                i += 1;
+                keep
+            });
+            assert_eq!(cache.pellets.as_ref().unwrap().food_slots[..first], prefix);
+            assert_pellet_index(cache, food);
+            assert_pellet_index(&cache.clone(), food);
+        }
+        // Shared cells also exercise repair of a swapped cell-list entry.
+        remove(&mut cache, &mut food, &[29, 32, 39]);
+        assert_eq!(cache.pellets.as_ref().unwrap().free.len(), 3);
+        for i in 40..50 {
+            let f = pellet(i);
+            cache.push(&f);
+            food.push(f);
+        }
+        assert_pellet_index(&cache, &food);
+        remove(&mut cache, &mut food, &[0, 10, 22, 46]);
+        let last = food.len() - 1;
+        remove(&mut cache, &mut food, &[last]);
+        remove(&mut cache, &mut food, &[]);
+        let all: Vec<_> = (0..food.len()).collect();
+        remove(&mut cache, &mut food, &all);
+        for i in 0..40 {
+            let f = pellet(i);
+            cache.push(&f);
+            food.push(f);
+        }
+        let middle: Vec<_> = (15..35).collect();
+        remove(&mut cache, &mut food, &middle);
+        cache.end();
     }
 
     #[test]
