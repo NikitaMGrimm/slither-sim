@@ -114,9 +114,17 @@ impl FoodCache {
     /// Start an owned span: every non-mirrored edit must reset the cache or
     /// change the food length. Simulator food APIs reset it; radius/pit retention
     /// only removes items. Thus unchanged length preserves the prior comparison.
-    pub(crate) fn begin_mirrored(&mut self, food_len: usize) {
+    /// Debug builds check that invariant before reusing verification.
+    pub(crate) fn begin_mirrored(&mut self, food: &[Food]) {
         self.open = true;
-        self.verified = self.matched && self.entries.len() == food_len;
+        self.verified = self.matched && self.entries.len() == food.len();
+        #[cfg(debug_assertions)]
+        if self.verified {
+            assert!(
+                self.entries.iter().copied().eq(food.iter().map(Entry::of)),
+                "reused food verification does not match the food list"
+            );
+        }
         self.matched = self.verified;
     }
     pub(crate) fn end(&mut self) {
@@ -694,7 +702,7 @@ mod tests {
         let mut rng = Rng(29);
         let mut food: Vec<_> = (0..64).map(|_| pellet(&mut rng)).collect();
         let mut cache = FoodCache::default();
-        cache.begin_mirrored(food.len());
+        cache.begin_mirrored(&food);
         assert!(!cache.verified);
         cache.pellets(&food).unwrap();
         for size in [40.0, 75.0, 128.0] {
@@ -702,7 +710,7 @@ mod tests {
         }
         for _ in 0..8 {
             cache.end();
-            cache.begin_mirrored(food.len());
+            cache.begin_mirrored(&food);
             assert!(cache.verified);
             let f = pellet(&mut rng);
             cache.push(&f);
@@ -726,11 +734,25 @@ mod tests {
             cache.end();
             // Stable retention outside the span changes every later food index.
             food.remove(0);
-            cache.begin_mirrored(food.len());
+            cache.begin_mirrored(&food);
             assert!(!cache.verified && !cache.matched);
             cache.pellets(&food).unwrap();
             assert_pellet_index(&cache, &food);
         }
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "reused food verification does not match the food list")]
+    fn owned_span_rejects_unmirrored_same_length_edits() {
+        let mut rng = Rng(47);
+        let mut food = vec![pellet(&mut rng)];
+        let mut cache = FoodCache::default();
+        cache.begin_mirrored(&food);
+        cache.pellets(&food).unwrap();
+        cache.end();
+        food[0].x += 1.0;
+        cache.begin_mirrored(&food);
     }
 
     #[test]
@@ -738,7 +760,7 @@ mod tests {
         let mut rng = Rng(47);
         let mut food: Vec<_> = (0..16).map(|_| pellet(&mut rng)).collect();
         let mut cache = FoodCache::default();
-        cache.begin_mirrored(food.len());
+        cache.begin_mirrored(&food);
         cache.pellets(&food).unwrap();
         cache.end();
         food[0].x = 1234.0;

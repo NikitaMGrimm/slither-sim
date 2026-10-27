@@ -1596,7 +1596,7 @@ impl Simulator {
         // Public food edits reset the cache; pushes/pickups below are mirrored.
         // Radius/pit retention above can only change its length. Reuse the prior
         // verification when that ownership invariant and length still hold.
-        self.food_cache.begin_mirrored(self.food.len());
+        self.food_cache.begin_mirrored(&self.food);
         for &i in alive.iter() {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
@@ -2863,14 +2863,14 @@ mod food_pickup_order_tests {
         }
         // Same length defeats a length-only check; the API must reset the cache.
         world.replace_food(food).unwrap();
-        world.food_cache.begin_mirrored(world.food.len());
+        world.food_cache.begin_mirrored(&world.food);
         assert_eq!(world.food_cache.ambient(&world.food), 0);
         world.food_cache.end();
         let mut added = world.remove_food(0).unwrap();
         added.origin = Some(Origin::Ambient);
         added.x = 1234.0;
         world.insert_food(added).unwrap();
-        world.food_cache.begin_mirrored(world.food.len());
+        world.food_cache.begin_mirrored(&world.food);
         assert_eq!(world.food_cache.ambient(&world.food), 1);
         world.food_cache.end();
         let mut restored = Simulator::from_checkpoint(
@@ -2878,7 +2878,7 @@ mod food_pickup_order_tests {
             checkpoint::RestoreOptions::default(),
         )
         .unwrap();
-        restored.food_cache.begin_mirrored(restored.food.len());
+        restored.food_cache.begin_mirrored(&restored.food);
         assert_eq!(restored.food_cache.ambient(&restored.food), 1);
     }
 
