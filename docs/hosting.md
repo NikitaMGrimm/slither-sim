@@ -111,7 +111,7 @@ pointed at it with the [console snippet](raw-server.md#stock-browser-client);
 browser mods need their own server setting. Pages served over HTTPS can only
 open `wss` connections, which need the TLS proxy below.
 
-Some browser mods use an older connection sequence that this server doesn't support yet.
+Some browser mods can connect by entering the host's `IP:PORT` in their custom server field.
 
 To check that a client can join, run the example bot from any machine with
 Python 3.11+ and a `slither-sim` binary:

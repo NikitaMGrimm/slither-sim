@@ -21,12 +21,12 @@ use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
 /// Official candidate budget. A failed random search does not prove that no
 /// legal pose exists; circular worlds use their larger cached-query budget.
 const SPAWN_ATTEMPTS: usize = 64;
-/// Undelivered messages per remote connection, counting both directions. Each
-/// uplink message yields at most one downlink frame (a pong), so this cap leaves
-/// the rest of `connection::MAX_IN_FLIGHT` for broadcasts while the host drains.
+/// Undelivered input messages per remote connection. Output has a separate byte
+/// budget: legacy messages must not consume the client's input allowance.
 pub(super) const REMOTE_IN_FLIGHT: usize = connection::MAX_IN_FLIGHT / 2;
 /// Largest framed message a connection is sent.
 pub(super) const MAX_FRAME_BYTES: usize = connection::MAX_FRAME_BYTES;
+pub(crate) use connection::{MAX_REMOTE_OUTPUT_BYTES, output_cost};
 /// Snake IDs are the slots, sent as u16, so 65,536 would fit; but the
 /// leaderboard's u16 rank and living population must also count every snake.
 pub(crate) const MAX_AGENTS: usize = u16::MAX as usize;
@@ -60,6 +60,8 @@ mod markers;
 #[cfg(test)]
 mod pit_tests;
 mod prey_visibility;
+#[cfg(test)]
+mod protocol13_tests;
 mod remote;
 #[cfg(test)]
 mod rules_tests;

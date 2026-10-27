@@ -102,7 +102,10 @@ scatter and tail-first ordering, not network jitter; it remains unchanged.
 explicit text/identity ranges are replaced without changing lengths. A `selection`
 extracts a payload with synthetic transport reframing; archive/frame hashes and
 indices retain provenance. The [catalog](../../research/fidelity/2026-10-26-protocol13-catalog/REPORT.md)
-owns limits; `tools/fidelity/protocol_catalog.py` decodes offline. No runtime support is added.
+owns limits; `tools/fidelity/protocol_catalog.py` decodes offline. Host encoder
+regressions in `src/client/encode13/tests.rs` use these witnesses for layout,
+quantization and raster checks. Synthetic inverse inputs and compatibility `U`
+maps are labeled in those tests; scrubbed values are not official encoder constants.
 
 `forager-conformance.json` contains full selected synthetic/local client frames
 with binary64 bit encoding. Compact independent Windows x86_64 MSVC and Linux

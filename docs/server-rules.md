@@ -91,10 +91,12 @@ selected entry witnesses. Decoding other packet forms does not require emitting 
 
 ### Minimap encoding
 
-Each connection retains its last queued bitmap. First/reconnected/resized maps
+Protocol-19 connections retain their last queued bitmap. First/reconnected/resized maps
 use full `M`; later maps use XOR `V` only when strictly shorter. Queuing advances
 that recipient's base. Both reconstruct the bitmap; this local shortest-encoding
 policy differs from some retained official choices.
+Protocol-13 browser connections receive full `U` snapshots of the same raster,
+including the pit outline and mask; they need no client-side XOR base.
 
 ### Packet timing
 

@@ -3,7 +3,7 @@ name = "slither-sim"
 version.workspace = true
 edition = "2024"
 rust-version = "1.99"
-description = "Headless Slither.io simulator for custom protocol-19 servers and bot development"
+description = "Headless Slither.io simulator for custom servers and bot development"
 repository = "https://github.com/NikitaMGrimm/slither-sim"
 readme = "README.md"
 license = "MIT"
@@ -33,6 +33,8 @@ include = [
     "/tests/fixtures/client-presentation.json",
     "/tests/fixtures/client-reporting-cadence.json",
     "/tests/fixtures/client-reporting-cadence-near-server.json",
+    "/tests/fixtures/protocol-catalog-13.json",
+    "/tests/fixtures/protocol-catalog-19.json",
     "/docs/*.md",
     # CHANGELOG.md links this guide.
     "/docs/maintainers/releasing.md",

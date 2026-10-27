@@ -1,4 +1,4 @@
-# Protocol-19 WebSocket server
+# Protocol-13/19 WebSocket server
 
 `slither-sim host` serves a shared world at `ws://127.0.0.1:8766/slither` for
 custom servers and socket-based bots. For virtual time without sockets, use
@@ -111,6 +111,11 @@ socket thread owns the listener and nonblocking connections, releasing frames
 at latency-model due times between ticks. OS scheduling and load affect delivery.
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
+Remote output queues in both the simulation and socket thread each allow 2 MiB,
+charging payload bytes plus a 64-byte allowance per message. Exceeding this
+host resource policy closes only that connection, for either protocol; legacy
+single messages do not share the virtual client's 4,096-frame limit. Input
+commands have their own separate bound.
 
 `bots.threads` runs background Forager clients using A4-mean. Each
 decodes its slot's frames, decides every `decisionTicks × dt` with staggered phases, models processing delay,
@@ -156,14 +161,16 @@ records exploratory results from one shared Windows desktop.
 
 ## Packet compatibility
 
-The native simulator's encoder uses protocol-19 layouts; world values,
-compression and schedules can differ from official sessions. See
+Stock clients and bots use protocol 19. A legacy login selects protocol 13
+for that connection in the same world; world values, compression and schedules
+can differ from official sessions. See
 [mechanics and delivery limits](server-rules.md), [presentation](#presentation) and
 [protocol sources](provenance.md#protocol-references).
 
 | Direction | Supported messages |
 | --- | --- |
 | Client to host | Login, appearance, headings 0–250, ping 251, keyboard 252, boost 253/254, bounded victory text; framing/session negotiation before login. |
+| Legacy login | `[115, selector, skin, nameLength, name…, 0, reserved, custom skin…]`, selector 11 or 12, name up to 24 bytes and custom skin up to 255 bytes; selects protocol 13. Stock login offsets and protocol-19 output are unchanged. |
 | Host to client | Setup/radius, snakes, motion, body/growth/tail/mass, sector food, prey, minimap, pongs, game-over, leaderboard, kills, record and requested session IDs. |
 | Additional messages decoded by `ClientState` | Alternate gameplay encodings, compressed food, own score credits, minimap formats/deltas, team scores and team layers. |
 | Not provided by the host | Team gameplay, accounts, persistent daily records, administrative/debug services and unspecified extensions. |
@@ -173,6 +180,18 @@ and neither selects two-byte elapsed milliseconds. A second framing request is
 rejected. Optional `[4]` requests `S` after self appearance and may accompany
 framing in either order; repeated requests are rejected. IDs identify connections,
 not authentication or resumed lives. Challenge and direct logins are accepted.
+Stock `[99,0]` keeps its existing challenge. Legacy `[99,4]` (optionally after
+`[4]`) receives an encoded single-quoted 24-letter assignment and accepts its
+rotated 24-byte reply. This compatibility choice serves some browser mods;
+the [official catalog](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-protocol13-catalog/REPORT.md)
+observed the stock 27-byte challenge even for that request. Neither is authentication.
+
+Protocol 13 sends individual messages with elapsed headers by default, explicit
+snake IDs, coordinate-based body/food updates and full `U` minimaps. Protocol 19
+retains its bundles, angle bodies, sector food and `M`/`V` maps. Legacy `U` uses
+the same shared raster, including Battledome's pit, without a client delta base.
+The first body update after appearance uses an absolute coordinate to establish
+the integer base; subsequent ordinary steps may use relative coordinates.
 
 ### SlitherSim rules extension
 
@@ -219,7 +238,7 @@ stock sockets.
   dead or disconnected seats by rolling kills ([Battledome](configuration.md#battledome)).
 - `k`: simulator collision-attributed kills.
 - `F`/`w` and birth/pickup deltas: [sector food delivery](server-rules.md#food-sector-delivery).
-- `M`/`V`: [global minimap](server-rules.md#client-delivery-and-spawning), with
+- `M`/`V` (19), `U` (13): [global minimap](server-rules.md#client-delivery-and-spawning), with
   [per-connection encoding](server-rules.md#minimap-encoding). The stock client
   draws its own player marker; set resolution with `simulation.minimapSide`
   (`null`: 256 for pit worlds, 136 otherwise).
@@ -276,6 +295,13 @@ Displayed kill counts saturate at the stock table maximum; ranks use actual kill
 Own length and local records still show size; stock labels are unchanged. Pit
 minimaps show the pit outline and inner snake cells, using the live wall projection
 so the stock own-player marker stays aligned, including outside the pit.
+
+Legacy browser connections receive the same decoration, kill leaderboard and
+pit minimap through their own wire layouts.
+
+Some browser mods can connect by entering the host's `IP:PORT` in their custom
+server field. The host serves plain `ws`; use an HTTP page for clients that
+only open plain WebSockets.
 
 ## Stock browser client
 

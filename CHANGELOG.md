@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Hosts accept the NTL browser mod. Its legacy login gets protocol 13 on that
+  connection: snakes, food, death and rejoin, and Battledome's kill board, pit
+  minimap and edge ring all work. Stock clients and bots still get protocol 19,
+  byte for byte as before.
+
 ### Changed
 
 - **Breaking:** Battledome food stays inside the pit (`foodOnlyInsidePit`).
@@ -32,6 +39,9 @@
 
 ### Fixed
 
+- A client that falls too far behind is disconnected instead of stopping the
+  host. Each socket may queue up to 2 MiB of output, counted the same way for
+  protocol 13 and 19; stock clients previously had a 4,096-frame limit.
 - Food removed by moving arena boundaries updates the affected sectors without
   rebuilding the whole food index or revealing waiting ambient births before
   their scheduled update. Survivor colors stay unchanged.

@@ -470,7 +470,12 @@ impl Raw {
         match b[1] & 0x7f {
             126 if b.len() >= 4 => Some((b[0] & 15, 4, usize::from(b[2]) << 8 | usize::from(b[3]))),
             126 => None,
-            127 => panic!("unexpectedly large server frame"),
+            127 if b.len() >= 10 => Some((
+                b[0] & 15,
+                10,
+                usize::try_from(u64::from_be_bytes(b[2..10].try_into().unwrap())).unwrap(),
+            )),
+            127 => None,
             n => Some((b[0] & 15, 2, usize::from(n))),
         }
     }
@@ -584,6 +589,161 @@ fn stock_default_login_uses_bare_messages_and_routes_controls() {
         assert!(start.elapsed() < WAIT, "no pong");
     }
     host.finish();
+}
+
+#[test]
+fn legacy_handshake_login_controls_and_reconnect_use_individual_protocol13_messages() {
+    let host = Running::start(config(1, 0));
+    for (selector, request_session) in [(12, true), (11, false)] {
+        let mut client = Raw::connect(host.address, "/slither");
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        if request_session {
+            client.send(&[4]);
+        }
+        client.send(&[99, 4]);
+        let challenge = client.binary();
+        assert_eq!(&challenge[..3], &[0, 0, b'6']);
+        client.send(b"CGLRYGPZKWJXMCTLEYTPMKJJ");
+        // Synthetic legacy layout; no third-party client bytes or code.
+        let mut login = vec![b's', selector, 7, 6];
+        login.extend(b"Legacy");
+        login.extend([0, 255, 9, 8]);
+        client.send(&login);
+        let setup = client.binary();
+        assert_eq!(setup[2], b'a');
+        assert_eq!(setup[25], 13);
+        let start = Instant::now();
+        loop {
+            let message = client.binary();
+            assert!(message[2] >= 32, "legacy clients cannot split bundles");
+            if message[2] == b's' && message.len() > 9 {
+                let p = &message[2..];
+                assert_eq!(p[15], 7);
+                assert_eq!(&p[22..33], b"\x06Legacy\x02\x09\x08\x00");
+                break;
+            }
+            assert!(start.elapsed() < WAIT);
+        }
+        for control in [&[100][..], &[253], &[254], &[252, 10], &[251]] {
+            client.send(control);
+        }
+        let mut session = false;
+        loop {
+            let message = client.binary();
+            assert!(message[2] >= 32);
+            session |= message[2] == b'S';
+            if message[2] == b'p' {
+                break;
+            }
+            assert!(start.elapsed() < WAIT);
+        }
+        assert_eq!(session, request_session);
+        let mut close = Raw::frame(&[]);
+        close[0] = 0x88;
+        client.write(&close);
+        // Give the socket thread its close before reclaiming the single seat.
+        client.closed();
+        let closing = Instant::now();
+        let retire_tick = host.host.ticks();
+        while host.host.players() != 0 || host.host.ticks() < retire_tick + 2 {
+            assert!(closing.elapsed() < WAIT, "close did not free the seat");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+    host.finish();
+}
+
+#[test]
+fn dense_legacy_prey_burst_keeps_its_socket_and_the_host_alive() {
+    let mut config = config(2, 0);
+    config.simulation.world.radius = 1000.;
+    config.simulation.world.food_count = 0;
+    config.simulation.world.ambient_replenish_per_second = 0.;
+    config.simulation.world.prey.count = 5000;
+    let host = Running::start(config);
+    let mut legacy = Raw::connect(host.address, "/slither");
+    assert!(legacy.status().starts_with("HTTP/1.1 101"));
+    legacy.send(&[115, 12, 7, 0, 0, 255]);
+    let setup = legacy.binary();
+    assert_eq!(setup[2], b'a');
+    assert_eq!(setup[25], 13);
+    let mut prey = std::collections::BTreeSet::new();
+    let started = Instant::now();
+    // A few prey can be eaten before their first appearance. Still require
+    // comfortably more individual frames than the former 4,096-frame limit.
+    while prey.len() < 4500 {
+        let frame = legacy.binary();
+        assert!(frame[2] >= 32, "legacy messages remain individual");
+        if frame[2] == b'y' && frame.len() == 22 {
+            prey.insert(u16::from_be_bytes([frame[3], frame[4]]));
+        }
+        assert!(
+            started.elapsed() < WAIT,
+            "incomplete prey listing: {}",
+            prey.len()
+        );
+    }
+    legacy.send(&[251]);
+    while legacy.binary()[2] != b'p' {
+        assert!(started.elapsed() < WAIT, "legacy socket stopped responding");
+    }
+    let mut stock = network(host.url(), "Healthy", Handshake::Direct);
+    until(&mut stock, "other stock recipient", |frame| {
+        frame.status == ClientStatus::Playing && frame.timing.ping_seconds.is_some()
+    });
+    assert!(!host.host.is_finished());
+    stock.disconnect();
+    assert!(host.finish() > 0);
+}
+
+#[test]
+fn oversized_legacy_cull_disconnects_that_player_while_stock_still_gets_pongs() {
+    let mut config = config(2, 0);
+    config.simulation.world.radius = 1000.;
+    config.simulation.world.food_count = 100_000;
+    config.simulation.world.ambient_food.enabled = false;
+    config.simulation.world.ambient_replenish_per_second = 0.;
+    config.simulation.world.dynamic_radius = true;
+    config.simulation.world.size_to_population = false;
+    config.simulation.world.radius_updates = vec![slither_sim::RadiusUpdate {
+        time: 0.5,
+        radius: 100.,
+    }];
+    let host = Running::start(config);
+    let mut stock = Raw::connect(host.address, "/slither");
+    assert!(stock.status().starts_with("HTTP/1.1 101"));
+    stock.send(&stock_login(b"Healthy", 0, &[]));
+    let mut stock_writer = stock.stream.try_clone().unwrap();
+    // Keep this healthy recipient reading while the other socket receives its
+    // large listing/cull. All threads inherit the test process's CPU affinity.
+    let reader = std::thread::spawn(move || {
+        let started = Instant::now();
+        loop {
+            let frame = stock.binary();
+            if packets(&frame[2..]).iter().any(|p| p == b"p") {
+                return;
+            }
+            assert!(started.elapsed() < WAIT, "stock did not receive its pong");
+        }
+    });
+    let mut legacy = Raw::connect(host.address, "/slither");
+    assert!(legacy.status().starts_with("HTTP/1.1 101"));
+    legacy.send(&[115, 12, 7, 0, 0, 255]);
+    let started = Instant::now();
+    let reason = loop {
+        if let Some((8, payload)) = legacy.next() {
+            break String::from_utf8(payload[2..].to_vec()).unwrap();
+        }
+        assert!(
+            started.elapsed() < WAIT,
+            "over-budget legacy session stayed open"
+        );
+    };
+    assert_eq!(reason, "Client output queue is full");
+    assert!(!host.host.is_finished());
+    stock_writer.write_all(&Raw::frame(&[251])).unwrap();
+    reader.join().unwrap();
+    assert!(host.finish() > 0);
 }
 
 #[test]

@@ -16,6 +16,13 @@ use std::{
 /// Messages in flight per direction of one connection before the run fails.
 /// A local resource budget; the protocol has no such field.
 pub(super) const MAX_IN_FLIGHT: usize = 4096;
+/// Remote output policy, shared by the world and socket queues. Count payload
+/// bytes plus a fixed allocation/frame allowance, rather than penalizing 13's
+/// individual messages against 19's bundles. Exhaustion closes that recipient.
+pub(crate) const MAX_REMOTE_OUTPUT_BYTES: usize = 2 << 20;
+pub(crate) fn output_cost(frame: &[u8]) -> usize {
+    frame.len().saturating_add(64)
+}
 /// Fit the native client's 1 MiB message limit, leaving room for the largest
 /// unmasked WebSocket header.
 pub(super) const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
@@ -41,11 +48,17 @@ pub(super) enum Uplink {
 /// Server and transport state of one connection.
 #[derive(Clone, Debug, Default)]
 pub(super) struct Connection {
+    /// Legacy sockets alone allocate a wire adapter; shared reports stay 19.
+    pub(super) legacy: Option<Box<crate::client::encode13::Encoder>>,
     /// Opened by a connect; a closed remote slot has no session.
     pub(super) open: bool,
     pub(super) link: Link,
     pub(super) uplink: VecDeque<(f64, Uplink)>,
     pub(super) downlink: VecDeque<(f64, Vec<u8>)>,
+    pub(super) downlink_bytes: usize,
+    /// Why this remote recipient's output stopped. `RawSimulator::take`
+    /// reports it to the host's per-session close path.
+    pub(super) output_fault: Option<String>,
     /// The server has received the connect and sent setup.
     pub(super) setup: bool,
     /// Game over was sent; afterwards only pings and victory text are accepted.
@@ -86,6 +99,23 @@ pub(super) struct Connection {
     /// The client asked for its session ID; `session_pending` until it is sent.
     pub(super) session_requested: bool,
     pub(super) session_pending: bool,
+}
+
+impl Connection {
+    pub(super) fn take_downlink(&mut self) -> Vec<(f64, Vec<u8>)> {
+        self.downlink_bytes = 0;
+        self.downlink.drain(..).collect()
+    }
+
+    /// Stop a remote recipient's output without aborting the shared tick: an
+    /// output fault belongs to that client, so the host closes only its session.
+    fn fail_output(&mut self, reason: String) {
+        self.output_fault = Some(reason);
+        self.setup = false;
+        self.downlink.clear();
+        self.downlink_bytes = 0;
+        self.uplink.clear();
+    }
 }
 
 pub(super) struct Slot {
@@ -309,10 +339,40 @@ impl SimulatorBackend {
         packets: &[Vec<u8>],
         physical: Option<&[Vec<u8>]>,
     ) -> Result<(), String> {
-        let groups = frame_groups(packets);
+        if self.slots[slot].connection.output_fault.is_some() {
+            return Ok(());
+        }
+        let remote = self.slots[slot].remote;
+        let converted;
+        let (packets, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
+            converted = match legacy.packets(packets) {
+                Ok(converted) => converted,
+                // A conversion fault is this recipient's, like an overflow.
+                Err(reason) if remote => {
+                    let reason = format!("Protocol-13 output failed: {reason}");
+                    self.slots[slot].connection.fail_output(reason);
+                    return Ok(());
+                }
+                Err(reason) => return Err(reason),
+            };
+            // Keep the shared latency RNG on the original physical grouping,
+            // even if six-byte legacy food or U maps require more frames.
+            (converted.as_slice(), Some(physical.unwrap_or(packets)))
+        } else {
+            (packets, physical)
+        };
+        // Legacy browser clients read one command after the elapsed header;
+        // they do not split the protocol-19 length-prefixed broadcast bundles.
+        // The 13 catalog witnesses use individual messages. Keep the physical
+        // grouping below for latency draws, independent of presentation frames.
+        let groups = if self.slots[slot].connection.legacy.is_some() {
+            packets.chunks(1).collect()
+        } else {
+            frame_groups(packets)
+        };
         let latency = self.player_latency.for_slot(slot, &self.config.latency);
         let connection = &mut self.slots[slot].connection;
-        if connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
+        if !remote && connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
             return Err("Downlink queue is full".into());
         }
         // Decorations must not consume extra shared latency RNG draws: that
@@ -342,6 +402,16 @@ impl SimulatorBackend {
             let elapsed = target.saturating_sub(connection.header_ms).min(65535);
             connection.header_ms += elapsed;
             let bytes = encode::frame(elapsed as u16, group)?;
+            if remote {
+                let used = connection
+                    .downlink_bytes
+                    .saturating_add(output_cost(&bytes));
+                if used > MAX_REMOTE_OUTPUT_BYTES {
+                    connection.fail_output("Client output queue is full".into());
+                    return Ok(());
+                }
+                connection.downlink_bytes = used;
+            }
             let arrival = match &arrivals {
                 Some(arrivals) => arrivals
                     .get(index)

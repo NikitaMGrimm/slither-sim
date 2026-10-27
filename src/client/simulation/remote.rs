@@ -147,6 +147,13 @@ impl RawSimulator {
         self.backend.slots[slot].connection.rules_enabled = true;
     }
 
+    /// Called after admission and before the queued connect emits setup. A
+    /// reconnect gets a new adapter, including fresh anchor and minimap bases.
+    pub(crate) fn protocol13(&mut self, slot: usize) {
+        self.backend.slots[slot].connection.legacy =
+            Some(Box::new(crate::client::encode13::Encoder::new(slot as u16)));
+    }
+
     /// Queue one client message sent now on the uplink; see `receive_at`.
     #[cfg(test)]
     pub(super) fn receive(&mut self, slot: usize, bytes: &[u8]) -> Result<(), String> {
@@ -174,7 +181,7 @@ impl RawSimulator {
             return Err("Send time must be finite".into());
         }
         let connection = &self.backend.slots[slot].connection;
-        if connection.uplink.len() + connection.downlink.len() >= REMOTE_IN_FLIGHT {
+        if connection.uplink.len() >= REMOTE_IN_FLIGHT {
             return Err("Remote connection has too many undelivered messages".into());
         }
         self.backend.uplink(slot, sent, message)
@@ -186,11 +193,11 @@ impl RawSimulator {
     /// slot has none.
     pub(crate) fn take(&mut self, slot: usize) -> Result<Vec<(f64, Vec<u8>)>, String> {
         self.remote(slot)?;
-        Ok(self.backend.slots[slot]
-            .connection
-            .downlink
-            .drain(..)
-            .collect())
+        let connection = &mut self.backend.slots[slot].connection;
+        if let Some(reason) = &connection.output_fault {
+            return Err(reason.clone());
+        }
+        Ok(connection.take_downlink())
     }
 
     /// Server payloads delivered by now, in order. Each is one WebSocket message.
@@ -198,10 +205,13 @@ impl RawSimulator {
     pub(super) fn drain(&mut self, slot: usize) -> Result<Vec<Vec<u8>>, String> {
         self.open(slot)?;
         let now = self.time();
-        let downlink = &mut self.backend.slots[slot].connection.downlink;
+        let connection = &mut self.backend.slots[slot].connection;
+        let downlink = &mut connection.downlink;
         let mut delivered = Vec::new();
         while downlink.front().is_some_and(|(at, _)| *at <= now) {
-            delivered.push(downlink.pop_front().unwrap().1);
+            let bytes = downlink.pop_front().unwrap().1;
+            connection.downlink_bytes -= super::output_cost(&bytes);
+            delivered.push(bytes);
         }
         Ok(delivered)
     }
