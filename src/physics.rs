@@ -184,6 +184,26 @@ pub fn pickup_circle(head: Point, heading: f64, speed: f64, segments: usize) -> 
         36.0 + 19.0 * sc,
     )
 }
+/// The same pickup geometry with this heading's `(cos, sin)` already computed.
+/// Keep the arithmetic order of `pickup_circle`; food and prey share the result
+/// within a step because pickups change fam, not the head, speed or segments.
+/// research/performance/2026-10-27-core-heading-geometry/REPORT.md
+pub(crate) fn pickup_circle_directed(
+    head: Point,
+    (cos, sin): (f64, f64),
+    speed: f64,
+    segments: usize,
+) -> (Point, f64) {
+    let sc = scale(segments) - 1.0;
+    let lead = speed * SPEED_UNIT_SECONDS * (7.55 + 1.8 * sc);
+    (
+        Point {
+            x: head.x + cos * lead,
+            y: head.y + sin * lead,
+        },
+        36.0 + 19.0 * sc,
+    )
+}
 /// How far ahead of a head center another snake's centerline is lethal: the head's
 /// tip plus the probe's extension by the body radius (see [`strikes`]).
 pub fn collision_distance(head_segments: usize, body_segments: usize) -> f64 {
@@ -294,6 +314,29 @@ pub fn advance(
             y: head.y + next.sin() * speed * dt,
         },
         next,
+    )
+}
+/// Advance with the original operation order, retaining the direction already
+/// needed for displacement. Later core phases reuse it for the unchanged heading.
+/// The public `advance` remains the independent reference for bit-exact tests.
+pub(crate) fn advance_directed(
+    head: Point,
+    heading: f64,
+    target: f64,
+    speed: f64,
+    turn: f64,
+    dt: f64,
+) -> (Point, f64, (f64, f64)) {
+    let d = target - heading;
+    let next = heading + d.sin().atan2(d.cos()).clamp(-turn * dt, turn * dt);
+    let direction = (next.cos(), next.sin());
+    (
+        Point {
+            x: head.x + direction.0 * speed * dt,
+            y: head.y + direction.1 * speed * dt,
+        },
+        next,
+        direction,
     )
 }
 pub fn append_anchor(body: &mut Vec<Point>, anchor: Point, grow: bool) {
@@ -517,5 +560,93 @@ impl Bounds {
             || self.min.x > other.max.x + r
             || self.max.y < other.min.y - r
             || self.min.y > other.max.y + r)
+    }
+}
+
+#[cfg(test)]
+mod directed_geometry_tests {
+    use super::*;
+
+    fn point_bits(point: Point) -> (u64, u64) {
+        (point.x.to_bits(), point.y.to_bits())
+    }
+
+    #[test]
+    fn directed_geometry_matches_public_oracles_bit_for_bit() {
+        let angles = [0.0, -0.0, PI, -PI, TAU, -TAU, 1e6, -1e6, 1e100, -1e100];
+        let coordinates = [
+            0.0,
+            -0.0,
+            128.0f64.next_down(),
+            128.0,
+            128.0f64.next_up(),
+            -128.0f64.next_down(),
+            -128.0,
+            -128.0f64.next_up(),
+            -((1u64 << 20) as f64),
+            (1u64 << 20) as f64,
+            -1e7,
+            1e7,
+        ];
+        let sizes = [2, 3, 106, 430, 512, 10_000, usize::MAX];
+        let mut random = 0x6a09_e667_f3bc_c909u64;
+        let mut unit = || {
+            random ^= random << 13;
+            random ^= random >> 7;
+            random ^= random << 17;
+            (random >> 11) as f64 / (1u64 << 53) as f64
+        };
+        for i in 0..65_536 {
+            let heading = if i < 4096 {
+                angles[i % angles.len()]
+            } else {
+                (unit() - 0.5) * 1e6
+            };
+            let head = Point {
+                x: coordinates[i % coordinates.len()],
+                y: (unit() - 0.5) * 2e7,
+            };
+            let target = if i < 4096 {
+                angles[(i / angles.len()) % angles.len()]
+            } else {
+                (unit() - 0.5) * TAU * 4.0
+            };
+            let speed = [0.0, base_speed(2), BOOST_SPEED, 1000.0][i % 4];
+            let turn = [0.0, turn_rate(2), turn_rate(430)][i % 3];
+            let dt = [0.0, LOOP_SECONDS, LOOP_SECONDS * 4.0, 1.0][i % 4];
+            let segments = sizes[i % sizes.len()];
+            let expected = advance(head, heading, target, speed, turn, dt);
+            let actual = advance_directed(head, heading, target, speed, turn, dt);
+            assert_eq!(
+                point_bits(actual.0),
+                point_bits(expected.0),
+                "motion case {i}"
+            );
+            assert_eq!(actual.1.to_bits(), expected.1.to_bits(), "heading case {i}");
+            assert_eq!(
+                (actual.2.0.to_bits(), actual.2.1.to_bits()),
+                (expected.1.cos().to_bits(), expected.1.sin().to_bits()),
+                "direction case {i}"
+            );
+            let expected_tip = head_tip(expected.0, expected.1, segments);
+            let body_radius = BODY_RADIUS * scale(segments);
+            let actual_tip = Point {
+                x: actual.0.x + actual.2.0 * body_radius,
+                y: actual.0.y + actual.2.1 * body_radius,
+            };
+            assert_eq!(
+                point_bits(actual_tip),
+                point_bits(expected_tip),
+                "tip case {i}"
+            );
+            let expected = pickup_circle(expected.0, expected.1, speed, segments);
+            let actual = pickup_circle_directed(actual.0, actual.2, speed, segments);
+            assert_eq!(
+                point_bits(actual.0),
+                point_bits(expected.0),
+                "circle case {i}"
+            );
+            assert_eq!(actual.1.to_bits(), expected.1.to_bits(), "radius case {i}");
+        }
     }
 }

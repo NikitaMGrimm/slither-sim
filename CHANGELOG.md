@@ -24,11 +24,16 @@
 
 ### Performance
 
-- The host refreshes each player's retained food subscriptions once per tick,
-  preserving standalone broadcasts and interrupted-tick behavior. Output is
-  byte-identical, and the 500-player official fixture runs 1.9–2.1% fewer
-  instructions with stock and protocol-13 clients
+- Each player's food-sector subscription is updated once per tick instead of
+  twice. Output is byte-identical, and the 500-player official fixture runs
+  1.9–2.1% fewer instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-interest-refresh/REPORT.md)).
+- Each tick, a snake's heading direction is computed once during movement and
+  reused for its collision and pickup checks, and prey reuse the pickup circles
+  already computed for food. Output is byte-identical, and the 500-player
+  official fixture runs 2.6–2.8% fewer instructions with stock and protocol-13
+  clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-core-heading-geometry/REPORT.md)).
 - Each tick, the host rebuilds shared food listings only for sectors whose
   food changed or that a player started watching, instead of checking every
   watched sector; a moving Battledome pit still refreshes them all. Output is
