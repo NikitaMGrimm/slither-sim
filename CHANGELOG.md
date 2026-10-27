@@ -4,6 +4,13 @@
 
 ### Changed
 
+- **Breaking:** Battledome food stays inside the pit (`foodOnlyInsidePit`).
+  Ambient food spawns only there, scaled to the pit's area. Every death drops
+  food, including floor-size snakes and pit-edge deaths, but only pellets that
+  land inside the pit remain. Boost pellets follow the same rule, so boost mass
+  spent outside the pit is lost. Food left outside a moving edge is removed.
+  Worlds without the setting keep their old food rules. Checkpoints move to
+  rules revision `slither-sim-rules-v4` and reject v3 continuations.
 - **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
   pit radius, size floor, kill-score window, boundary and free floor boost.
   They are sent at setup and whenever they change, and surface as the optional

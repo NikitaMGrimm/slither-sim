@@ -1,0 +1,477 @@
+{
+  "dataOrigin": "local-simulator",
+  "analysisSha256": "7fc789eb1837e0ed21666eacc7e37a82d5abc09ba6e198e9a442d3c9cb216e8c",
+  "runs": [
+    {
+      "name": "main-32",
+      "arm": "main",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 300.0060000001618,
+      "ticks": 42858,
+      "pending": 0,
+      "config": {
+        "ambientFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 2
+        },
+        "ambientRefillCountsAllFood": true,
+        "ambientReplenishPerSecond": 45.913808855665195,
+        "boostFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 9
+        },
+        "boundaryMode": "sliding",
+        "deathFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 22
+        },
+        "dt": 0.007,
+        "dynamicRadius": true,
+        "emitBoostFood": true,
+        "foodCount": 3138,
+        "foodIndex": true,
+        "killScoreSeconds": 900.0,
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "recoveryPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "shrinkPerSecond": 0.005519633948746724,
+          "stationaryRadius": 800.0
+        },
+        "minScore": 400,
+        "pit": {
+          "radius": 1784.0
+        },
+        "prey": {
+          "count": 0,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "fleeHalfWidth": 320.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0,
+          "size": 6.0,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625
+        },
+        "radius": 3584.0,
+        "radiusUpdates": [],
+        "sizeToPopulation": false,
+        "spawnRadius": 2684.0,
+        "spawnRadiusMax": 3400.0,
+        "speedModel": "retained_progress",
+        "vision": 1500.0
+      },
+      "initialFood": 3041,
+      "minimumFood": 2607,
+      "maximumFood": 3466,
+      "endFood": 3244,
+      "endTarget": 3138,
+      "lateSampledMinimumFood": 3134,
+      "lateSampledMaximumFood": 3456,
+      "lateMeanFood": 3202.2131147540986,
+      "previousMinuteMeanFood": 3153.633333333333,
+      "endInside": 189,
+      "endOutside": 3055,
+      "maximumSampledOutside": 3107,
+      "endInsideNutrition": 59.9063746758157,
+      "endOutsideNutrition": 397.2273478599983,
+      "endLiving": 32,
+      "endMeanScore": 622.0,
+      "endMedianScore": 488.5,
+      "endMaxScore": 1309.0,
+      "kills": 93,
+      "killsPerMinute": 18.59962800742982,
+      "deaths": 93,
+      "deathsWithFood": 93,
+      "rawResultSha256": "d5106369bbb6434cda2ebdd76080b742c4d4076c1f7610f75c93ac961efbdb82"
+    },
+    {
+      "name": "pit-food-32",
+      "arm": "pit-food",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 300.0060000001618,
+      "ticks": 42858,
+      "pending": 0,
+      "config": {
+        "ambientFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 2
+        },
+        "ambientRefillCountsAllFood": true,
+        "ambientReplenishPerSecond": 45.913808855665195,
+        "boostFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 9
+        },
+        "boundaryMode": "sliding",
+        "deathFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 22
+        },
+        "dt": 0.007,
+        "dynamicRadius": true,
+        "emitBoostFood": true,
+        "foodCount": 3138,
+        "foodIndex": true,
+        "foodOnlyInsidePit": true,
+        "killScoreSeconds": 900.0,
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "recoveryPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "shrinkPerSecond": 0.005519633948746724,
+          "stationaryRadius": 800.0
+        },
+        "minScore": 400,
+        "pit": {
+          "radius": 1784.0
+        },
+        "prey": {
+          "count": 0,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "fleeHalfWidth": 320.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0,
+          "size": 6.0,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625
+        },
+        "radius": 3584.0,
+        "radiusUpdates": [],
+        "sizeToPopulation": false,
+        "spawnRadius": 2684.0,
+        "spawnRadiusMax": 3400.0,
+        "speedModel": "retained_progress",
+        "vision": 1500.0
+      },
+      "initialFood": 744,
+      "minimumFood": 101,
+      "maximumFood": 1457,
+      "endFood": 648,
+      "endTarget": 777,
+      "lateSampledMinimumFood": 475,
+      "lateSampledMaximumFood": 1405,
+      "lateMeanFood": 877.4590163934427,
+      "previousMinuteMeanFood": 696.5166666666667,
+      "endInside": 648,
+      "endOutside": 0,
+      "maximumSampledOutside": 0,
+      "endInsideNutrition": 285.09897905999946,
+      "endOutsideNutrition": 0.0,
+      "endLiving": 32,
+      "endMeanScore": 1510.59375,
+      "endMedianScore": 903.5,
+      "endMaxScore": 6505.0,
+      "kills": 120,
+      "killsPerMinute": 23.999520009586863,
+      "deaths": 122,
+      "deathsWithFood": 122,
+      "rawResultSha256": "fe0cde461c02127f59235bc0bfaacdb53a178e0446746d8281a9a4cb2860df37"
+    },
+    {
+      "name": "main-64",
+      "arm": "main",
+      "seats": 64,
+      "seed": 7,
+      "seconds": 300.0060000001618,
+      "ticks": 42858,
+      "pending": 0,
+      "config": {
+        "ambientFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 2
+        },
+        "ambientRefillCountsAllFood": true,
+        "ambientReplenishPerSecond": 45.913808855665195,
+        "boostFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 9
+        },
+        "boundaryMode": "sliding",
+        "deathFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 22
+        },
+        "dt": 0.007,
+        "dynamicRadius": true,
+        "emitBoostFood": true,
+        "foodCount": 3138,
+        "foodIndex": true,
+        "killScoreSeconds": 900.0,
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "recoveryPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "shrinkPerSecond": 0.005519633948746724,
+          "stationaryRadius": 800.0
+        },
+        "minScore": 400,
+        "pit": {
+          "radius": 1784.0
+        },
+        "prey": {
+          "count": 0,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "fleeHalfWidth": 320.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0,
+          "size": 6.0,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625
+        },
+        "radius": 3584.0,
+        "radiusUpdates": [],
+        "sizeToPopulation": false,
+        "spawnRadius": 2684.0,
+        "spawnRadiusMax": 3400.0,
+        "speedModel": "retained_progress",
+        "vision": 1500.0
+      },
+      "initialFood": 3041,
+      "minimumFood": 3041,
+      "maximumFood": 64006,
+      "endFood": 29540,
+      "endTarget": 29540,
+      "lateSampledMinimumFood": 29540,
+      "lateSampledMaximumFood": 37579,
+      "lateMeanFood": 33486.983606557376,
+      "previousMinuteMeanFood": 42078.333333333336,
+      "endInside": 929,
+      "endOutside": 28611,
+      "maximumSampledOutside": 44390,
+      "endInsideNutrition": 115.77797685190075,
+      "endOutsideNutrition": 3726.323272067051,
+      "endLiving": 64,
+      "endMeanScore": 1464.59375,
+      "endMedianScore": 1483.5,
+      "endMaxScore": 2635.0,
+      "kills": 7,
+      "killsPerMinute": 1.3999720005592338,
+      "deaths": 8,
+      "deathsWithFood": 8,
+      "rawResultSha256": "fd8756fc57814a9a542d1750d9d60f56497e5aaa088946dd3c06ff746b86019b"
+    },
+    {
+      "name": "pit-food-64",
+      "arm": "pit-food",
+      "seats": 64,
+      "seed": 7,
+      "seconds": 300.0060000001618,
+      "ticks": 42858,
+      "pending": 0,
+      "config": {
+        "ambientFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 2
+        },
+        "ambientRefillCountsAllFood": true,
+        "ambientReplenishPerSecond": 45.913808855665195,
+        "boostFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 9
+        },
+        "boundaryMode": "sliding",
+        "deathFood": {
+          "cellSize": 75.0,
+          "enabled": true,
+          "maxPerCell": 22
+        },
+        "dt": 0.007,
+        "dynamicRadius": true,
+        "emitBoostFood": true,
+        "foodCount": 3138,
+        "foodIndex": true,
+        "foodOnlyInsidePit": true,
+        "killScoreSeconds": 900.0,
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "recoveryPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "shrinkPerSecond": 0.005519633948746724,
+          "stationaryRadius": 800.0
+        },
+        "minScore": 400,
+        "pit": {
+          "radius": 1784.0
+        },
+        "prey": {
+          "count": 0,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "fleeHalfWidth": 320.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0,
+          "size": 6.0,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625
+        },
+        "radius": 3584.0,
+        "radiusUpdates": [],
+        "sizeToPopulation": false,
+        "spawnRadius": 2684.0,
+        "spawnRadiusMax": 3400.0,
+        "speedModel": "retained_progress",
+        "vision": 1500.0
+      },
+      "initialFood": 744,
+      "minimumFood": 744,
+      "maximumFood": 12752,
+      "endFood": 4544,
+      "endTarget": 7319,
+      "lateSampledMinimumFood": 4544,
+      "lateSampledMaximumFood": 7506,
+      "lateMeanFood": 5894.131147540984,
+      "previousMinuteMeanFood": 8871.183333333332,
+      "endInside": 4544,
+      "endOutside": 0,
+      "maximumSampledOutside": 0,
+      "endInsideNutrition": 475.5937149599969,
+      "endOutsideNutrition": 0.0,
+      "endLiving": 64,
+      "endMeanScore": 1839.03125,
+      "endMedianScore": 1830.0,
+      "endMaxScore": 3154.0,
+      "kills": 5,
+      "killsPerMinute": 0.9999800003994527,
+      "deaths": 5,
+      "deathsWithFood": 5,
+      "rawResultSha256": "75b533b913570463611513e4736a5ca5fa84d24bf6ac74f33bafa57d0084ea28"
+    }
+  ],
+  "sourcePins": {
+    "fixtureSha256": "643fd6bcbb224c549d2f7e9593d8bd218eff900c5a45e3b6f0c7578444a6f12a",
+    "planSha256": "11acb84af2fee5083895f52dc8357ac93d335013e2411c349ec46286322cf16a",
+    "runnerSha256": "278b6e8635a9b669b905d1bfff0a703128d0dc60cac807a45d73a6707ea712b0",
+    "sources": {
+      "main": {
+        "commit": "5eb0736ee3650687adff5b5c431c33994bf75bb9",
+        "rustSourceManifestSha256": "8cbeb31bfacce0e943638fd8375afe6fb5ee121a3dda5d1199cfaa33626ab9b4",
+        "binarySha256": "341926cde0b9489e427f8ab93b842b5382251dfa7e2651607730867f32c7bb49"
+      },
+      "pit-food": {
+        "commit": "010b2d48a2b8387745b232b1faee8b4984f78692",
+        "rustSourceManifestSha256": "23cb057ab52c2a441b395a8ea7f06a005e9fcfd8bf7ee0f874794087d14e719a",
+        "binarySha256": "4b08268ffe747e47e3a18a533523248a01ee76c5c6edce8babb98b9adb6fe7d2"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "name": "pilot-main-32",
+      "arm": "main",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 2,
+      "event": "reserved"
+    },
+    {
+      "name": "pilot-main-32",
+      "arm": "main",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 2,
+      "event": "completed",
+      "exit": 0,
+      "resultSha256": "aecf9bb6faecaa53bf60796380360599224827c0ea71e89bee79a7f89a3221eb"
+    },
+    {
+      "name": "main-32",
+      "arm": "main",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 300,
+      "event": "reserved"
+    },
+    {
+      "name": "main-32",
+      "arm": "main",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 300,
+      "event": "completed",
+      "exit": 0,
+      "resultSha256": "d5106369bbb6434cda2ebdd76080b742c4d4076c1f7610f75c93ac961efbdb82"
+    },
+    {
+      "name": "pit-food-32",
+      "arm": "pit-food",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 300,
+      "event": "reserved"
+    },
+    {
+      "name": "pit-food-32",
+      "arm": "pit-food",
+      "seats": 32,
+      "seed": 7,
+      "seconds": 300,
+      "event": "completed",
+      "exit": 0,
+      "resultSha256": "fe0cde461c02127f59235bc0bfaacdb53a178e0446746d8281a9a4cb2860df37"
+    },
+    {
+      "name": "pit-food-64",
+      "arm": "pit-food",
+      "seats": 64,
+      "seed": 7,
+      "seconds": 300,
+      "event": "reserved"
+    },
+    {
+      "name": "pit-food-64",
+      "arm": "pit-food",
+      "seats": 64,
+      "seed": 7,
+      "seconds": 300,
+      "event": "completed",
+      "exit": 0,
+      "resultSha256": "75b533b913570463611513e4736a5ca5fa84d24bf6ac74f33bafa57d0084ea28"
+    },
+    {
+      "name": "main-64",
+      "arm": "main",
+      "seats": 64,
+      "seed": 7,
+      "seconds": 300,
+      "event": "reserved"
+    },
+    {
+      "name": "main-64",
+      "arm": "main",
+      "seats": 64,
+      "seed": 7,
+      "seconds": 300,
+      "event": "completed",
+      "exit": 0,
+      "resultSha256": "fd8756fc57814a9a542d1750d9d60f56497e5aaa088946dd3c06ff746b86019b"
+    }
+  ]
+}

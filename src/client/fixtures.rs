@@ -88,6 +88,11 @@ fn restore_with(world: &mut Simulator, config: Config, edit: impl FnOnce(&mut se
         .unwrap()
         .entry("ambientRefillCountsAllFood")
         .or_insert(serde_json::json!(false));
+    resolved
+        .as_object_mut()
+        .unwrap()
+        .entry("foodOnlyInsidePit")
+        .or_insert(serde_json::json!(false));
     checkpoint["config"] = resolved;
     edit(&mut checkpoint["state"]);
     let options = RestoreOptions {

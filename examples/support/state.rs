@@ -83,6 +83,9 @@ fn project(value: Value) -> Result<Value, String> {
             config.remove(key);
         }
     }
+    if config.get("foodOnlyInsidePit") == Some(&Value::Bool(false)) {
+        config.remove("foodOnlyInsidePit");
+    }
     if config.get("ambientRefillCountsAllFood") == Some(&Value::Bool(false)) {
         config.remove("ambientRefillCountsAllFood");
     }

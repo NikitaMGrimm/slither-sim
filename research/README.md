@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Battledome | [Pit-only food](battledome/2026-10-27-pit-food/REPORT.md) | Owner-approved local play build, full floor-death drops filtered to the pit, and short matched 32/64-seat food-supply checks; no long-run equilibrium claim. |
 | Battledome | [Opt-in mode rules](battledome/2026-10-27-rules-extension/REPORT.md) | Pinned stock handler ignores the extension; loopback opt-in exclusion, exact live rules and shared Forager adapter regressions. |
 | Fidelity | [Protocol-13 message catalog](fidelity/2026-10-26-protocol13-catalog/REPORT.md) | Official legacy/stock captures, scrubbed wire-13/19 witnesses and an offline decoder; conditional timing and failed-attempt limits. |
 | Fidelity | [Legacy browser login](fidelity/2026-10-26-legacy-login/REPORT.md) | Two bounded official sessions: existing 27-byte challenge format, selector-12 login then protocol-13 setup; implementation stopped before changing the protocol-19 host. |

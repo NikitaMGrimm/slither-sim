@@ -4,6 +4,8 @@ mod initialization;
 mod initialization_tests;
 #[cfg(test)]
 mod observation_tests;
+#[cfg(test)]
+mod pit_food_tests;
 use crate::bounds_index::BoundsIndex;
 use crate::food_grid::{EaterGrid, FoodCache};
 use crate::kiosk::{KioskConfig, KioskState};
@@ -156,6 +158,10 @@ pub struct Config {
     /// Count every pellet toward the refill target. A custom ecology choice,
     /// enabled by Battledome; independent of a snake's size floor.
     pub ambient_refill_counts_all_food: bool,
+    /// Custom pit ecology: scale ambient supply by pit area, use full death
+    /// budgets and discard ambient/death/boost pellets outside the live pit.
+    /// Requires `pit`; disabled worlds retain their original food rules.
+    pub food_only_inside_pit: bool,
     /// Initial-area ambient attempts/s below target; seat-following scales this rate.
     pub ambient_replenish_per_second: f64,
     /// Physics step. The server loop is ~7 ms; larger steps trade event resolution for speed.
@@ -191,7 +197,8 @@ pub struct Config {
     pub kill_score_seconds: Option<f64>,
     /// Least displayed score: new lives start at the least mass that displays
     /// it, and boosting or the kiosk penalty spend only mass above that floor;
-    /// boosting at the floor is free. Death food excludes the free floor mass.
+    /// boosting at the floor is free. Death food excludes free floor mass unless
+    /// `food_only_inside_pit` selects full, spatially filtered death budgets.
     /// Requires `spawn_radius`, the ring that new bodies lie along. Read when a
     /// world is created.
     pub min_score: Option<u32>,
@@ -213,6 +220,8 @@ struct ConfigWire {
     food_count: usize,
     #[serde(skip_serializing_if = "is_false")]
     ambient_refill_counts_all_food: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    food_only_inside_pit: bool,
     ambient_replenish_per_second: f64,
     dt: f64,
     food_index: bool,
@@ -422,6 +431,7 @@ impl Config {
             vision: 1500.0,
             food_count,
             ambient_refill_counts_all_food: false,
+            food_only_inside_pit: false,
             ambient_replenish_per_second,
             dt: LOOP_SECONDS,
             food_index: true,
@@ -480,6 +490,7 @@ impl Config {
             // fills the ambient target. Independent of minScore for custom worlds.
             // research/battledome/2026-10-25-food-balance/REPORT.md
             ambient_refill_counts_all_food: true,
+            food_only_inside_pit: true,
             ambient_replenish_per_second,
             prey: PreyConfig {
                 count: 0,
@@ -585,6 +596,13 @@ impl Config {
     /// Pit, spawn ring and kill-score window: only the limits the rules need.
     fn validate_mode(&self) -> Result<(), SimError> {
         let pit = self.pit.as_ref().map(|pit| pit.radius);
+        if self.food_only_inside_pit && pit.is_none() {
+            return Err(SimError::config(
+                Constraint::Missing,
+                "pit",
+                "foodOnlyInsidePit requires pit",
+            ));
+        }
         if pit.is_some_and(|pit| !(pit > 0.0 && pit.is_finite() && pit < self.radius)) {
             return Err(SimError::config(
                 Constraint::positive(pit.unwrap()).unwrap_or(Constraint::OutOfRange),
@@ -932,6 +950,11 @@ impl Simulator {
                 world.config.prey.count,
             )
         };
+        let food = if world.config.food_only_inside_pit {
+            (food as f64 * world.food_area_fraction()) as usize
+        } else {
+            food
+        };
         let startup = if admits { food } else { 0 };
         world.food.try_reserve(startup).map_err(|_| {
             SimError::new(
@@ -948,12 +971,14 @@ impl Simulator {
         // candidate is not retried, so crowded small worlds can start below it.
         for _ in 0..startup {
             let f = world.new_food();
-            if admit_ambient_food(
-                &f,
-                &world.config.ambient_food,
-                &mut world.food_cache,
-                &world.food,
-            ) {
+            if world.food_position_allowed(f.point())
+                && admit_ambient_food(
+                    &f,
+                    &world.config.ambient_food,
+                    &mut world.food_cache,
+                    &world.food,
+                )
+            {
                 world.food_cache.push(&f);
                 world.food.push(f);
             }
@@ -988,11 +1013,12 @@ impl Simulator {
     /// have no local fit citation; recipient coverage and admission censor counts.
     /// This is a model choice, not a recovered generation law.
     fn new_food(&mut self) -> Food {
+        let radius = self.food_radius();
         let a = self.random.next() * TAU;
         let r = loop {
             let f = self.random.next().sqrt();
             if self.random.next() * 0.217 <= 0.217 - 0.172 * f {
-                break f * (self.radius - 20.0).max(0.0);
+                break f * (radius - 20.0).max(0.0);
             }
         };
         let size = ((3.0 + self.random.next() * 6.4) * 5.0).round() / 5.0;
@@ -1403,6 +1429,22 @@ impl Simulator {
             .map(|pit| pit.radius * self.config.circular_scale(self.radius))
     }
 
+    fn food_radius(&self) -> f64 {
+        if self.config.food_only_inside_pit {
+            self.pit_radius().unwrap().min(self.radius)
+        } else {
+            self.radius
+        }
+    }
+
+    fn food_area_fraction(&self) -> f64 {
+        (self.food_radius() / self.radius).powi(2)
+    }
+
+    fn food_position_allowed(&self, point: Point) -> bool {
+        !self.config.food_only_inside_pit || point.distance_lt(Point::default(), self.food_radius())
+    }
+
     fn initial_pit_entry(&self, head: Point, alive: bool) -> bool {
         // Moving pits count physical entry, so a life explicitly initialized
         // inside must start entered. Outside newborns are not trapped when
@@ -1614,7 +1656,13 @@ impl Simulator {
                         let x = tail.x + (self.random.next() - 0.5) * jitter;
                         let y = tail.y + (self.random.next() - 0.5) * jitter;
                         let pellet = Self::pellet(Point { x, y }, size, Origin::Boost);
-                        if c.emit_boost_food {
+                        if c.emit_boost_food
+                            && (!c.food_only_inside_pit
+                                || pellet.point().distance_lt(
+                                    Point::default(),
+                                    pit_radius.unwrap().min(self.radius),
+                                ))
+                        {
                             // Earlier admitted drops in this same step share the capacity.
                             let admitted = !c.boost_food.enabled
                                 || self.food_cache.has_room(
@@ -1977,6 +2025,11 @@ impl Simulator {
         } else {
             self.config.food_count
         };
+        let target = if self.config.food_only_inside_pit {
+            (target as f64 * self.food_area_fraction()) as usize
+        } else {
+            target
+        };
         let replenish = self.config.ambient_replenish_per_second;
         // Store credit in initial-area seconds. Weight only this tick's earned
         // credit by live area, so boundary motion never creates/discards credit
@@ -1985,6 +2038,13 @@ impl Simulator {
             dt * (self.radius / self.config.radius).powi(2)
         } else {
             dt
+        };
+        // Keep the original interval/credit units for checkpoint continuation;
+        // only new credit is reduced by the live pit's share of arena area.
+        let refill_dt = if self.config.food_only_inside_pit {
+            refill_dt * self.food_area_fraction()
+        } else {
+            refill_dt
         };
         if replenish == 0.0 {
             self.ambient_clock = 0.0;
@@ -2016,12 +2076,14 @@ impl Simulator {
                     if refill_count < target {
                         let f = self.new_food();
                         // Cell occupancy includes every origin.
-                        if admit_ambient_food(
-                            &f,
-                            &self.config.ambient_food,
-                            &mut self.food_cache,
-                            &self.food,
-                        ) {
+                        if self.food_position_allowed(f.point())
+                            && admit_ambient_food(
+                                &f,
+                                &self.config.ambient_food,
+                                &mut self.food_cache,
+                                &self.food,
+                            )
+                        {
                             if let Some(events) = &mut self.food_spawn_events {
                                 events.push(FoodSpawnEvent {
                                     source: None,
@@ -2066,7 +2128,14 @@ impl Simulator {
         // Tick comparisons retain their tolerance; construction uses exact zero
         // so a near-future recorded sample cannot affect the initial frame.
         self.apply_radius_updates(time + 1e-9);
-        if self.config.dynamic_radius && self.radius < previous {
+        if self.config.food_only_inside_pit && self.radius != previous {
+            // Custom pit food disappears at a moving lethal edge; never move
+            // stranded pellets inward or leave them suppressing total-food refill.
+            // docs/configuration.md#battledome and pit_food_tests
+            let radius = self.food_radius();
+            self.food
+                .retain(|f| f.point().distance_lt(Point::default(), radius));
+        } else if self.config.dynamic_radius && self.radius < previous {
             // Stranded pellets must not suppress live-area refill. Fixed replay
             // keeps its historical retention; all food origins leave with this
             // model's wall. The food cache resynchronizes at the next begin().
@@ -2468,24 +2537,31 @@ impl Simulator {
     }
     fn death_food(&mut self, index: usize) -> usize {
         let s = &self.snakes[index];
-        // Custom floor rule, not an official fit: free spawn mass must not
-        // become food on each death. Map the earned fraction of continuous
+        // Legacy custom floor rule, preserved when pit-only food is disabled:
+        // map the earned fraction of continuous
         // mass to the same fraction of the ordinary death-food nutrition.
         // Keep normal size/scatter, selecting evenly spaced sites when the
         // cumulative budget crosses an integer in tail-first emission order.
         // The final site carries any fractional nutrition, sqrt-scaled in size.
         // Admission still discards rejected shares rather than redistributing.
         // research/battledome/2026-10-25-food-balance/REPORT.md
+        // Pit-only mode instead drops the ordinary full-body budget, including
+        // floor-size deaths, then discards outside positions; owner-directed
+        // design in docs/configuration.md#battledome, tests in pit_food_tests.
         let site_count = 2 * s.body.len() + 1;
-        let budget = self.min_mass.map(|floor| {
-            let mass = s.segments as f64 + s.fam;
-            let earned = floor.excess(s.segments, s.fam);
-            site_count as f64 * (earned / mass)
-        });
+        let budget = self
+            .min_mass
+            .filter(|_| !self.config.food_only_inside_pit)
+            .map(|floor| {
+                let mass = s.segments as f64 + s.fam;
+                let earned = floor.excess(s.segments, s.fam);
+                site_count as f64 * (earned / mass)
+            });
         if budget == Some(0.0) {
             return 0;
         }
         let density = &self.config.death_food;
+        let food_radius = self.config.food_only_inside_pit.then(|| self.food_radius());
         // Occupancy counts current food, including earlier deaths this same tick.
         let outside_step = !self.food_cache.is_open();
         if outside_step {
@@ -2529,6 +2605,13 @@ impl Simulator {
                 size,
                 Origin::Death,
             );
+            // Filter the scattered, quantized position, retaining the ordinary
+            // full-body budget and RNG draws. Rejected shares are discarded.
+            if food_radius
+                .is_some_and(|radius| !pellet.point().distance_lt(Point::default(), radius))
+            {
+                continue;
+            }
             if density.enabled
                 && !self.food_cache.has_room(
                     &self.food,

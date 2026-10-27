@@ -175,8 +175,9 @@ lifecycle counts, population statistics and warmup results.
 Every mode checks warmup plus the default trace window, or the whole run if it is
 shorter. That deterministic prefix must contain a body death, a respawn and, when
 enabled in a world without a size floor, a death-food pellet. Otherwise the
-harness exits non-zero with the counts. A floor-size death correctly drops no
-food, so size-floor worlds skip that requirement. Pit deaths are reported
+harness exits non-zero with the counts. Size-floor worlds skip the death-food
+requirement: legacy floor budgets or the pit-position filter can reject a drop.
+Pit deaths are reported
 separately.
 
 Population depletion is reported, not fatal. `population` gives the minimum,

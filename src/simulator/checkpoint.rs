@@ -8,7 +8,7 @@ use std::{
 };
 
 pub const FORMAT: &str = "slither-sim-checkpoint-v2";
-pub const RULES_REVISION: &str = "slither-sim-rules-v3";
+pub const RULES_REVISION: &str = "slither-sim-rules-v4";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EventRecording {
@@ -58,6 +58,7 @@ struct ConfigRecord {
     vision: f64,
     food_count: usize,
     ambient_refill_counts_all_food: bool,
+    food_only_inside_pit: bool,
     ambient_replenish_per_second: f64,
     dt: f64,
     food_index: bool,
