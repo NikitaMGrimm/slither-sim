@@ -24,6 +24,11 @@
 
 ### Performance
 
+- Core physics reuses the current heading direction for collision and pickup
+  geometry, and shares food's pickup circle with prey. Output is byte-identical;
+  the official-500 fixture runs 2.59–2.79% fewer instructions across stock and
+  protocol-13 clients, with no WSL2 CPU-time or capacity claim
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-core-heading-geometry/REPORT.md)).
 - Each tick, the host rebuilds shared food listings only for sectors whose
   food changed or that a player started watching, instead of checking every
   watched sector; a moving Battledome pit still refreshes them all. Output is
