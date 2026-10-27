@@ -24,12 +24,19 @@
 
 ### Performance
 
-- Moving arena and pit edges now mirror food removals into the warm cache.
-  Fourteen traces remain byte-identical. Synthetic shrinking-seat replays use
-  85.43% fewer process instructions in official mode and 36.72% fewer in
-  Battledome; normal official-500 controls increase by 0.032–0.041%.
-  WSL2 instruction results make no CPU-time or capacity claim
+- When the arena or Battledome pit shrinks, pellets left outside it are
+  removed from the food cache directly instead of forcing a full rebuild on
+  the next tick. Output is byte-identical. In an official test where players
+  leave over time, ticks that remove pellets drop from a median of 26.7M to
+  1.8M instructions, and the whole run uses 85% fewer instructions (37% fewer
+  in Battledome); steady 500-player ticks cost 0.03–0.04% more
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-mirrored-food-retention/REPORT.md)).
+- Snakes a player already sees that haven't changed since that player's last
+  update are skipped before any packet work, and a snake's wanted heading is
+  computed only when a packet needs it. Output is byte-identical, and the
+  500-player official fixture runs 3.1–3.4% fewer instructions with stock and
+  protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-snake-noops/REPORT.md)).
 - The grid that finds which snakes each player might see is kept between
   ticks, and only snakes that moved into different cells are updated, instead
   of rebuilding it every tick. The exact visibility test and packet order are
