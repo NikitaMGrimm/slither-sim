@@ -359,21 +359,43 @@ fn shrinking_food_and_surplus_prey_leave_both_decoded_client_views_without_picku
 
 #[test]
 fn a_shrinking_wall_culls_edge_food_without_resynchronizing_quiet_sectors() {
+    shrinking_food_cull(false);
+}
+
+#[test]
+fn a_shrinking_pit_culls_edge_food_without_resynchronizing_quiet_sectors() {
+    shrinking_food_cull(true);
+}
+
+fn shrinking_food_cull(pit_only: bool) {
     let mut config = SimulationConfig {
         agents: 2,
         ..Default::default()
     };
     config.world = Config::official(4);
+    if pit_only {
+        config.world.radius = 2680.;
+        config.world.size_to_population = false;
+        config.world.spawn_radius = Some(2000.);
+        config.world.min_score = Some(10);
+        config.world.pit = Some(crate::PitConfig { radius: 1340. });
+        config.world.food_only_inside_pit = true;
+    }
     config.world.food_count = 0;
     config.world.ambient_replenish_per_second = 0.;
     config.world.prey.count = 0;
     config.world.radius_updates = vec![crate::RadiusUpdate {
         time: 0.021,
-        radius: 670.,
+        radius: if pit_only { 1340. } else { 670. },
     }];
     let mut sim = RawSimulator::new(7, config, 2).unwrap();
     let mut a = Remote::connect(&mut sim, 0, "Observer A");
     let mut b = Remote::connect(&mut sim, 1, "Observer B");
+    if pit_only {
+        for slot in 0..2 {
+            sim.physical_food(slot);
+        }
+    }
     for (slot, y) in [(0, -100.), (1, 100.)] {
         sim.backend.world.retire(slot).unwrap();
         sim.backend
@@ -430,7 +452,11 @@ fn a_shrinking_wall_culls_edge_food_without_resynchronizing_quiet_sectors() {
     a.packets.clear();
     b.packets.clear();
     run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
-    assert_eq!(sim.backend.world.radius(), 670.);
+    assert_eq!(
+        sim.backend.world.radius(),
+        if pit_only { 1340. } else { 670. }
+    );
+    assert_eq!(sim.backend.world.food_radius(), 670.);
     assert_eq!(sim.backend.world.food().len(), 3);
     assert!(sim.backend.world.pickup_events().unwrap().is_empty());
     assert_eq!(sim.backend.food_index.count, 3);

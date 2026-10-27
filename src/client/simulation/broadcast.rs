@@ -227,10 +227,12 @@ impl SimulatorBackend {
         self.world
             .step(&actions)
             .map_err(|error| error.to_string())?;
-        // A shrinking dynamic wall removes outside food before the tick's
-        // births and pickups. Mirror it so only edge sectors change.
-        if self.world.config().dynamic_radius && self.world.radius() < radius {
-            let culled = self.food_index.cull(self.world.radius());
+        // Mirror update_radius's food removal before births and pickups,
+        // including the smaller live pit edge in pit-only food worlds.
+        if (self.world.config().food_only_inside_pit && self.world.radius() != radius)
+            || (self.world.config().dynamic_radius && self.world.radius() < radius)
+        {
+            let culled = self.food_index.cull(self.world.food_radius());
             self.food_presentation.cull(&culled);
         }
         let births = self.world.food_spawn_events().unwrap_or(&[]);

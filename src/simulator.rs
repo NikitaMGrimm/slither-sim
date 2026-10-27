@@ -1429,7 +1429,7 @@ impl Simulator {
             .map(|pit| pit.radius * self.config.circular_scale(self.radius))
     }
 
-    fn food_radius(&self) -> f64 {
+    pub(crate) fn food_radius(&self) -> f64 {
         if self.config.food_only_inside_pit {
             self.pit_radius().unwrap().min(self.radius)
         } else {

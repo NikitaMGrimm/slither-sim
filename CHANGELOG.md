@@ -32,7 +32,7 @@
 
 ### Fixed
 
-- Food removed by shrinking dynamic walls updates the affected sectors without
+- Food removed by moving arena boundaries updates the affected sectors without
   rebuilding the whole food index or revealing waiting ambient births before
   their scheduled update. Survivor colors stay unchanged.
 - Battledome background bots head into the pit after spawning and treat its
