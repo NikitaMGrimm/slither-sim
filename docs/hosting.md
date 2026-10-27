@@ -187,11 +187,12 @@ breaking changes can rename settings, and unknown settings stop startup.
 ## Resource use
 
 One real AMD EPYC server core, with test clients on a separate machine, no bots
-and no TLS. Each row is one short test. The Zen 4 official rows use two-minute
-holds from the [latest recheck](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-c7a-main-recheck/REPORT.md).
-The Battledome row uses five minutes and the Zen 5 row uses two minutes from the
-[earlier study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-epyc-index-recheck/REPORT.md).
-Memory is the host process's peak. CPU is the average share of one core.
+and no TLS. The Zen 4 official rows are two-minute tests of this version
+([method and results](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-c7a-main-recheck/REPORT.md));
+the Battledome and Zen 5 rows come from an
+[earlier revision](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-epyc-index-recheck/REPORT.md)
+(five and two minutes). Memory is the host process's peak. CPU is the average
+share of one core.
 
 | Server core | Mode | Clients | Playing (mean) | CPU | Memory | Delivery target |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
@@ -202,9 +203,7 @@ Memory is the host process's peak. CPU is the average share of one core.
 
 The delivery target is no newly deferred ticks and at most 10 ms of extra delay
 for 99% of received frames. A missed target can occur even below 100% average
-CPU. An [earlier revision](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-epyc-host-recheck/REPORT.md)
-met it with 250 official players on the Zen 4 core, at 49% CPU.
-These short synthetic tests are sizing examples, not a capacity
+CPU. These short synthetic tests are sizing examples, not a capacity
 guarantee; bots, TLS, larger snakes and longer sessions can add work.
 
 Playing counts exclude clients waiting to spawn. The study reports those waits

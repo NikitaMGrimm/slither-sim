@@ -18,9 +18,9 @@
 ### Changed
 
 - The hosting guide's resource table now reflects this release's performance
-  work. In the latest test, one Zen 4 core meets the delivery target with 375
-  official players; 500 still misses at 61% CPU. The earlier 80-player
-  Battledome and 500-player Zen 5 passes remain listed.
+  work. One Zen 4 server core now meets the delivery target with 375 official
+  players at 46% CPU; 500 players use 61% CPU but still miss it. One Zen 5
+  core meets the target at 500, and one Zen 4 core with 80 Battledome players.
 
 ### Performance
 
