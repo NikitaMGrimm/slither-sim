@@ -19,11 +19,10 @@
 
 ### Performance
 
-- Recipient prey visibility skips distant prey through shared x-axis cells,
-  keeping the exact distance test and world order. All twelve traces remain
-  byte-identical; the official-500 fixture uses 2.23% fewer instructions with
-  stock clients, 2.10% with half protocol-13 and 2.07% with all protocol-13.
-  These WSL2 instruction counts make no CPU-time or capacity claim
+- Each player's prey visibility check looks only at prey in nearby x-axis
+  strips instead of every prey in the world; the exact distance test and world
+  order are unchanged. Output is byte-identical, and the 500-player official
+  fixture runs 2.1–2.2% fewer instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-prey-cells/REPORT.md)).
 - Collision and prey lookups number their grid cells by truncating instead of
   calling `floor`; the cells only need to keep their order, and the exact tests
