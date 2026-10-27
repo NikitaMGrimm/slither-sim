@@ -24,6 +24,12 @@
 
 ### Performance
 
+- The grid that finds which snakes each player might see is kept between
+  ticks, and only snakes that moved into different cells are updated, instead
+  of rebuilding it every tick. The exact visibility test and packet order are
+  unchanged. Output is byte-identical, and the 500-player official fixture
+  runs 11.6–12.1% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-coverage-cells/REPORT.md)).
 - Each player's prey visibility check looks only at prey in nearby x-axis
   strips instead of every prey in the world; the exact distance test and world
   order are unchanged. Output is byte-identical, and the 500-player official
@@ -78,11 +84,6 @@
   minimap tick takes 13M instead of 351M instructions and the whole fixture
   runs 7.2% fewer; clients that don't opt in are unaffected
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-full-map-sharing/REPORT.md)).
-- Snake coverage keeps unchanged cell memberships between broadcasts instead
-  of rebuilding the grid each tick. Exact visibility tests and wire order are
-  unchanged; the 500-player official fixture runs 11.6–12.1% fewer instructions
-  with stock and protocol-13 clients
-  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-coverage-cells/REPORT.md)).
 - Food pickup removes eaten pellets from its occupancy cache by index and
   copies the surviving ranges, instead of scanning the whole cache twice.
   Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
