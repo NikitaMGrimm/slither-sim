@@ -103,4 +103,3 @@ if a.mode=='count':
         v=rows[1:];result[case]={'baseMedian':statistics.median(r['base'] for r in v),'candidateMedian':statistics.median(r['candidate'] for r in v),'pairedMedian':statistics.median(r['ratio'] for r in v),'pairedRange':[min(r['ratio'] for r in v),max(r['ratio'] for r in v)],'pairs':rows}
         (out/'selected.json').write_text(json.dumps(result,indent=2)+'\n');print('COUNT',case,flush=True)
     rehash()
-
