@@ -1711,8 +1711,9 @@ impl Seat {
             slot: self.slot,
             generation: self.generation,
             appearance: PlayerAppearance {
+                nickname: bot_nickname(self.slot),
                 skin: bot_skin(self.slot),
-                ..PlayerAppearance::default()
+                custom_skin: Vec::new(),
             },
             session_id: false,
             physical_food: true,
@@ -1736,6 +1737,30 @@ impl Seat {
 fn bot_skin(slot: usize) -> u8 {
     let skin = (slot % 64) as u8;
     if skin >= 42 { skin + 1 } else { skin }
+}
+
+/// Our own base names, at most 12 bytes so `bot_nickname` always fits.
+const BOT_NAMES: [&str; 64] = [
+    "Noodle", "Viper", "Mamba", "Ziggy", "Pixel", "Comet", "Biscuit", "Pretzel", "Wiggles",
+    "Sprout", "Nimbus", "Pebble", "Zephyr", "Juniper", "Marble", "Waffle", "Bandit", "Tango",
+    "Echo", "Maple", "Rocket", "Clover", "Gizmo", "Sunny", "Tofu", "Mochi", "Pickle", "Basil",
+    "Indigo", "Saffron", "Cobalt", "Ember", "Frost", "Hazel", "Jasper", "Kiwi", "Lumen", "Mango",
+    "Nova", "Olive", "Pepper", "Quill", "Rascal", "Sable", "Taffy", "Umber", "Velvet", "Willow",
+    "Yeti", "Zinc", "Acorn", "Bolt", "Cinder", "Dune", "Fennel", "Glimmer", "Hopper", "Inky",
+    "Jinx", "Koda", "Lark", "Moss", "Nugget", "Orbit",
+];
+
+/// Official servers label their bots by appending "(bot)" to an ordinary
+/// player name, as seen in 2026-10 live captures. Each seat keeps one name
+/// across lives so its rolling kills stay readable; seats past the list get a
+/// round number, keeping names distinct up to `MAX_AGENTS`.
+fn bot_nickname(slot: usize) -> Vec<u8> {
+    let name = BOT_NAMES[slot % BOT_NAMES.len()];
+    match slot / BOT_NAMES.len() {
+        0 => format!("{name} (bot)"),
+        round => format!("{name} {} (bot)", round + 1),
+    }
+    .into_bytes()
 }
 
 /// Stock-client login: protocol and client-version bytes, password, skin at
@@ -1788,6 +1813,7 @@ mod bot_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::simulation::MAX_AGENTS;
 
     #[test]
     fn owned_frames_preserve_websocket_bytes_and_sequence_wrap() {
@@ -3168,6 +3194,16 @@ mod tests {
         assert_eq!(skins.len(), 64);
         assert!(skins.iter().all(|&skin| skin <= 64 && skin != 42));
         assert_eq!(bot_skin(64), bot_skin(0));
+    }
+
+    #[test]
+    fn bot_seats_have_distinct_stock_sized_names() {
+        let names: std::collections::BTreeSet<Vec<u8>> =
+            (0..MAX_AGENTS).map(bot_nickname).collect();
+        assert_eq!(names.len(), MAX_AGENTS);
+        assert!(names.iter().all(|name| name.len() <= MAX_NICKNAME));
+        assert_eq!(bot_nickname(0), b"Noodle (bot)");
+        assert_eq!(bot_nickname(64), b"Noodle 2 (bot)");
     }
 
     #[test]

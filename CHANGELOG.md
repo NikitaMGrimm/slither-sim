@@ -18,6 +18,8 @@
   `Option<usize>`; JSON accepts an integer or `null`.
 - Host bots each wear their own stock skin, kept across lives, instead of all
   using skin 0. Their death pellets take that skin's colors.
+- Host bots have names such as `Mamba (bot)`, kept across lives, instead of
+  none. Official servers mark their bots with the same suffix.
 - Linux hosting resource guidance now includes real socket tests on one Zen 4
   and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
 
