@@ -137,8 +137,9 @@ impl KnownSectors {
 /// itself is unchanged (a replacement may occupy the same wire cell).
 #[derive(Default)]
 pub(super) struct FoodChanges {
-    /// Changed listing handles plus every sector touched by a pickup.
-    pub(super) changed: BTreeSet<[u8; 2]>,
+    /// Changed listing handles plus every sector touched by a pickup, sorted
+    /// and unique so each recipient can skip hints outside its held range.
+    pub(super) changed: Vec<[u8; 2]>,
     pub(super) eaten: BTreeSet<[u8; 2]>,
     // Sparse hints cover just this transition. A recipient skipped by an early
     // broadcast error must fall back to the full diff against its older view.
@@ -398,7 +399,7 @@ impl SimulatorBackend {
         let current = Arc::new(());
         let previous = std::mem::replace(&mut self.food_revision, current.clone());
         Ok(FoodChanges {
-            changed,
+            changed: changed.into_iter().collect(),
             eaten,
             previous,
             current,
@@ -438,10 +439,19 @@ pub(super) fn food_updates(
                 }
             }
         };
-        // Both collections are ascending. Sparse changes avoid a full recipient
-        // scan; dense maintenance retains the original linear walk.
-        if changes.changed.len() < known.entries.len() {
-            for sector in &changes.changed {
+        // Most shared hints belong to other views. Both collections are sorted,
+        // so exclude sectors outside this recipient's range before choosing the
+        // sparse search or dense walk. Holes within the range still need lookup.
+        let changed = match (known.entries.first(), known.entries.last()) {
+            (Some((first, _)), Some((last, _))) => {
+                let start = changes.changed.partition_point(|sector| sector < first);
+                let end = changes.changed.partition_point(|sector| sector <= last);
+                &changes.changed[start..end]
+            }
+            _ => &[],
+        };
+        if changed.len() < known.entries.len() {
+            for sector in changed {
                 if let Ok(index) = known.entries.binary_search_by_key(sector, |(key, _)| *key) {
                     update(*sector, &mut known.entries[index].1);
                 }
@@ -707,6 +717,97 @@ mod tests {
     }
 
     #[test]
+    fn ranged_hints_match_full_walk_for_every_subscription_and_change_subset() {
+        // Include byte boundaries, holes and both extrema. A changed key can
+        // lie outside a view, at either endpoint, or in an unsubscribed hole.
+        let keys = [
+            [0, 0],
+            [0, 1],
+            [0, 255],
+            [1, 0],
+            [127, 255],
+            [255, 254],
+            [255, 255],
+        ];
+        let old = Arc::new(SectorFood::default());
+        let new = Arc::new(SectorFood(vec![(
+            [2, 3],
+            KnownFood {
+                point: Point::default(),
+                decorative: false,
+                style: encode::FoodStyle {
+                    color: 3,
+                    size: 20,
+                    snake_food: false,
+                },
+            },
+        )]));
+        let mut sectors = vec![None; 1 << 16];
+        let eaters = BTreeMap::new();
+        for changed_mask in 0..1 << keys.len() {
+            let changes = FoodChanges {
+                changed: keys
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &key)| (changed_mask & (1 << i) != 0).then_some(key))
+                    .collect(),
+                ..Default::default()
+            };
+            for (i, key) in keys.iter().enumerate() {
+                sectors[usize::from(u16::from_be_bytes(*key))] =
+                    Some(if changed_mask & (1 << i) != 0 {
+                        new.clone()
+                    } else {
+                        old.clone()
+                    });
+            }
+            for held_mask in 0..1 << keys.len() {
+                let subscribed = keys
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &key)| (held_mask & (1 << i) != 0).then_some(key))
+                    .collect();
+                let interest = SectorInterest::from_subscribed(subscribed);
+                let mut known = KnownSectors {
+                    entries: interest
+                        .subscribed()
+                        .iter()
+                        .map(|&key| (key, old.clone()))
+                        .collect(),
+                    subscription_revision: Some(interest.revision().clone()),
+                    food_revision: Some(changes.previous.clone()),
+                };
+                let mut reference = known.entries.iter().cloned().collect();
+                let mut actual = Vec::new();
+                let mut expected = Vec::new();
+                food_updates(
+                    &mut actual,
+                    &mut known,
+                    &interest,
+                    &sectors,
+                    &changes,
+                    &eaters,
+                );
+                reference_updates(
+                    &mut expected,
+                    &mut reference,
+                    interest.subscribed(),
+                    &sectors,
+                    &eaters,
+                );
+                assert_eq!(actual, expected, "held={held_mask}, changed={changed_mask}");
+                assert!(Arc::ptr_eq(
+                    known.food_revision.as_ref().unwrap(),
+                    &changes.current
+                ));
+                for (sector, listing) in &known.entries {
+                    assert!(Arc::ptr_eq(listing, &reference[sector]));
+                }
+            }
+        }
+    }
+
+    #[test]
     fn sparse_and_dense_updates_match_full_walk_for_both_food_streams() {
         let point = |i: u8| Point {
             x: -32_245.,
@@ -753,7 +854,7 @@ mod tests {
                 // A decoration at the pickup's physical point must remain visible.
                 foods.push(([7, 8], item(i, 5, true)));
                 decorated[index] = Some(Arc::new(SectorFood(foods)));
-                changes.changed.insert([1, i]);
+                changes.changed.push([1, i]);
             }
             if step % 9 == 0 {
                 interest = SectorInterest::from_subscribed(
@@ -773,6 +874,8 @@ mod tests {
             };
             changes.eaten = eaten_sectors(&eaters);
             changes.changed.extend(changes.eaten.iter().copied());
+            changes.changed.sort_unstable();
+            changes.changed.dedup();
             for (stream, (held, oracle, table)) in [
                 (&mut known, &mut reference, &physical),
                 (&mut shown, &mut shown_reference, &decorated),
@@ -1138,7 +1241,7 @@ mod tests {
             &interest,
             &sectors,
             &FoodChanges {
-                changed: BTreeSet::from([[0, 1]]),
+                changed: vec![[0, 1]],
                 previous: initial.current.clone(),
                 ..Default::default()
             },
