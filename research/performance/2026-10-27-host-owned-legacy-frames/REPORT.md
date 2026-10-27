@@ -5,8 +5,8 @@ room; otherwise allocate the final size once, avoiding reallocate+shift copies.
 Stock bundles retain their encoder. No persistent conversion cache or changes
 to report gates, frame boundaries, elapsed allocation, or physical latency draws.
 Measured runtime: `587b597` -> `b104038` (before #212). Delivery integrates
-`32d4cbc` with identical framing files; four raw traces and the full Rust group
-also pass at `47485d2`. Performance counts remain pinned to the measured arms.
+`40ce9fa` with identical framing files; four raw traces and the full Rust group
+also pass at `8d2a059`. The later `5220e7f` integration changes research only. Performance counts remain pinned to the measured arms.
 [Selected pins, paired summaries and thirteen trace hashes](results.json).
 
 ## Profile

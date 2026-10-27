@@ -39,10 +39,10 @@
     "all": {"hostMedian":[12884460.34,12498271.933],"pairedMedian":0.971088785,"pairedRange":[0.953176689,0.982652633],"socketMedian":[1199106.101,1118162.435],"framesOfferedPerSecond":[117189.417,117948.667],"writeAttemptsPerSecond":[53253.917,53771.333],"aliveMeanRange":[498.856,499.316],"generatorBusyMaxPercent":62.0}
   },
   "delivery": {
-    "commit": "47485d2a517f42e44357fd1252ddfacc84d6e4ac",
+    "commit": "8d2a059e162bcf9fef7562e683ff5ca6f89104e1",
     "framingFilesIdentical": true,
     "rawTraceCount": 4,
     "rawTracesEqualMeasuredArms": true,
-    "binarySha256": "75d7d17a8a5840bbeaa6d888b5f2acf14f05ae90bc4662294fae4a4fb200ac1d"
+    "binarySha256": "81b1eee85f649fe326cf1eeb1ad3d74d27397c376f7a7432ed485cd47a1f1b84"
   }
 }
