@@ -24,6 +24,12 @@
 
 ### Performance
 
+- On Linux, the host keeps socket readiness registrations between gateway
+  passes instead of rescanning every descriptor in the kernel. Service order
+  and flush points are unchanged. Three native 500-player official pairs use
+  2.5–5.2% less host CPU per tick; one candidate hold has an unresolved delivery
+  stall, so this does not establish a latency or capacity improvement
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-epoll-readiness/REPORT.md)).
 - Each player's food-sector subscription is updated once per tick instead of
   twice. Output is byte-identical, and the 500-player official fixture runs
   1.9–2.1% fewer instructions with stock and protocol-13 clients
