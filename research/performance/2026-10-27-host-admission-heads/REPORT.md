@@ -3,6 +3,7 @@
 Keep. Main `368abe4` (#196) → measured runtime `dcb7fcb`.
 Delivery integrates main `3a530e0` (#197). Counts and socket holds predate it;
 four additional stock/legacy integration traces match the same main hashes.
+The final branch also includes release-only #198, with no further source change.
 Check the existing head-runway predicate before full-body collision tests.
 Accepted poses, RNG draws/order, 4096/256 budgets, strict preference, fallback
 scores/ties and errors stay unchanged. Body construction remains; scoring still

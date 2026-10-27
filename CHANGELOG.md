@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Performance
+
+- Circular spawn searches check the required head runway before testing the
+  full candidate body. Spawn clearances, sampled poses and fallback choices
+  stay unchanged.
+
 ## [0.7.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.2...v0.7.0) - 2026-10-27
 
 ### Breaking
@@ -82,9 +88,6 @@
 
 ### Performance
 
-- Circular spawn searches check the required head runway before testing the
-  full candidate body. Spawn clearances, sampled poses and fallback choices
-  stay unchanged.
 - Hosts encode each minimap once, and reuse each delta for every player who
   holds the same previous map, instead of encoding both per player. Minimap
   ticks were a large spike: with 500 players they took 291 million
