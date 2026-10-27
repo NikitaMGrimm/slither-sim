@@ -33,12 +33,12 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v4`), `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v5`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
 `u32::MAX` means no slot). `maxWorlds` is the platform's `usize::MAX`;
-`worlds × agents` must fit `usize`, with memory limiting practical world counts.
+`worlds Ã— agents` must fit `usize`, with memory limiting practical world counts.
 
 ### reset
 
@@ -48,7 +48,7 @@ observation `precision`. Representation limits: `maxAgents` and
 
 All fields except `op` are optional. Defaults: seed 1, one world, four agents,
 six decision ticks and `Config::official(1)`. Every world shares `agents`,
-`decisionTicks` and `config`; world `w` uses seed `seed + w` (wrapping at 2³²).
+`decisionTicks` and `config`; world `w` uses seed `seed + w` (wrapping at 2Â³Â²).
 `config` and nested objects use camelCase [world settings](configuration.md#world-config)
 with defaults for omitted fields and an optional [`preset`](configuration.md#presets),
 such as `{"preset":"battledome"}`. Replies print resolved fields.
@@ -270,7 +270,7 @@ preserve speed/progress, boost, kiosk credit/timers, join order, kills and pit
 history. Pose correction retains segment count. Replay corrections allow finite
 overlaps and out-of-arena geometry within the checkpoint continuation envelope
 (positions at most 2e150 for living snakes and 3e150 for inactive snakes/food;
-headings and snake speed × dt at most 1e150 in magnitude). The 430-segment
+headings and snake speed Ã— dt at most 1e150 in magnitude). The 430-segment
 spawn limit is not a replay cap.
 
 `from_scenario(seed, config, Scenario { snakes, food, prey })` installs ordered
@@ -285,7 +285,7 @@ enables step-local pickup/birth telemetry, retaining capacity when already enabl
 
 Use `observe_all_into` or `observe_selected_into` to reuse a buffer's vectors
 and avoid most per-call allocation, with the same observations as `observe_all`
-and `observe_selected`. Windows bot loops ran 1.8–3.5× faster with
+and `observe_selected`. Windows bot loops ran 1.8â€“3.5Ã— faster with
 `observe_all_into` than `observe_all`; see [workloads](performance-workloads.md).
 
 Set `default-features = false` on a path or Git dependency for the core alone:
@@ -321,7 +321,7 @@ Before embedding:
 | `spawn_body(head, heading)` | The configured new-life body and heading at `head`. With `spawnRadius`, its anchors lie along the circle through `head`, turning the way `heading` leans, heading along it; an error if that circle cannot hold them. Otherwise two straight segments behind `heading`. Check it with `body_is_clear`. |
 | `set_ambient_rate(attempts_per_second)` | Change initial-area refill rate while preserving fractional placement credit; seat-following scales it with live area. Zero discards pending credit and disables refill. |
 
-Supplied bodies are head-first, one anchor per segment, with 2–430 finite points.
+Supplied bodies are head-first, one anchor per segment, with 2â€“430 finite points.
 Respawn requires all points inside the arena; it does not enforce clearance or
 reject self-intersections. Call `body_is_clear` separately for spawn exclusion.
 The straight-body `spawn_is_clear` and `respawn` methods remain available.
@@ -344,7 +344,7 @@ propagation and prose matching with `SimError` (or a boxed `std::error::Error`)
 and checks on `kind`/`code()`. Causes carry optional zero-based `world`/`slot`
 and string `field` locations, a `Constraint` where applicable, and
 `expected`/`actual` counts for action shape errors. Config fields use JSON names,
-with indexed paths for radius samples. `ErrorCode` numeric values 1–17 and
+with indexed paths for radius samples. `ErrorCode` numeric values 1â€“17 and
 `as_str()` names are stable; message wording is diagnostic. `Display`/`Error`
 retain human messages and chained causes. Successful steps allocate no error
 strings. JSON, C and Python error handling is unchanged by the radius split;
@@ -396,15 +396,16 @@ the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
 The envelope is `slither-sim-checkpoint-v2`, with
-`rulesRevision: "slither-sim-rules-v4"`, producer provenance, today's flat Config
+`rulesRevision: "slither-sim-rules-v5"`, producer provenance, today's flat Config
 and ordered slot/entity records. `config.radius` is the initial radius and
 `state.radius` is the live radius; loading preserves both. Config must pass the
 same validation as a new world's, and the live radius must equal `config.radius`
 until the dynamic controller, circular host admission or a recorded update
 could have moved it. Circular host admission may grow it before the first tick.
 Version 1 is rejected because it stored the live radius in Config and cannot recover the initial value.
-Rules v1/v2/v3 are rejected: seat-following, live circular pit/spawn scaling and
-the pit-only food rules change tick behavior. The host queue clock is not core checkpoint state. No
+Rules v1/v2/v3/v4 are rejected: seat-following, live circular pit/spawn scaling,
+pit-only food and constant-density arena sizing change tick behavior.
+The host queue clock is not core checkpoint state. No
 controller state is added; occupancy uses living state and death timestamps,
 and refill retains fractional credit in initial-area seconds.
 The checkpoint includes RNG, timers and terminal causes;
@@ -432,7 +433,7 @@ requests and typed steps act on the same worlds and may be mixed.
 | `Session::prepare_reset(options)` | Build an opaque `PreparedReset` without changing any session; inspect `summary()` before committing. |
 | `commit_reset(prepared)` | Install prepared worlds and frames without failure or allocation, returning the summary. |
 | `request(line)` | Answers one JSON request line with exactly the reply line `serve` writes, both without the newline. Errors become error replies. |
-| `step(&headings, &boosts)` | Steps every world like a JSON `step` without writing JSON. Both slices hold `worlds × agents` entries, world-major: slot `s` of world `w` is entry `w × agents + s`. |
+| `step(&headings, &boosts)` | Steps every world like a JSON `step` without writing JSON. Both slices hold `worlds Ã— agents` entries, world-major: slot `s` of world `w` is entry `w Ã— agents + s`. |
 | `frame(w)` | World `w`'s current frame as a `FrameRef` of read-only columns, after any reset or step; `None` before reset or for unknown worlds. |
 | `worlds()`, `agents()` | Session shape; 0 before the first reset. |
 

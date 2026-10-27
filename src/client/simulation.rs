@@ -170,7 +170,7 @@ impl SimulatorBackend {
             for slot in 0..config.agents {
                 world.retire(slot).map_err(|error| error.to_string())?;
             }
-            world.grow_for_seats(population, 1., true);
+            world.grow_for_seats(population, true);
         }
         world.record_events(crate::EventRecording {
             pickups: true,
@@ -436,19 +436,25 @@ impl SimulatorBackend {
     /// clear every contact range, or the first tick could kill the newborn or
     /// its neighbor. Failure exhausts the configured candidate search, which
     /// does not establish that no legal pose exists. Circular worlds instead
-    /// require full body/head-path clearance and wait without a tight fallback.
+    /// prefer full body/head-path clearance. Hosted floor-mode requests can
+    /// use a bounded directional maximin fallback after waiting two seconds.
     /// Evidence:
     /// research/fidelity/2026-10-25-spawn-admission/REPORT.md.
     fn spawn_pose(&mut self, slot: usize) -> Result<(Vec<Point>, f64), String> {
+        self.spawn_pose_waited(slot, 0.)
+    }
+
+    fn spawn_pose_waited(&mut self, slot: usize, waited: f64) -> Result<(Vec<Point>, f64), String> {
         let circular = self.world.config().spawn_radius.is_some();
         let mut safety = None;
+        let mut floor = None;
         let mut open: Option<(f64, Vec<Point>, f64)> = None;
         let attempts = if circular {
             spawn::CIRCULAR_ATTEMPTS
         } else {
             SPAWN_ATTEMPTS
         };
-        for _ in 0..attempts {
+        for attempt in 0..attempts {
             let distance = spawn::spawn_distance(
                 self.world.config(),
                 self.world.radius(),
@@ -487,6 +493,18 @@ impl SimulatorBackend {
                 return Ok((body, heading));
             }
             if circular {
+                if waited >= 2. && attempt < 256 && self.world.config().min_score.is_some() {
+                    let query = floor.get_or_insert_with(|| {
+                        spawn::Safety::departure_floor(&self.world, slot, body.len())
+                    });
+                    if query.clears(&body) && query.clears_departures(body[0], heading) {
+                        let incumbent = open.as_ref().map_or(0., |(margin, ..)| *margin);
+                        let margin = query.body_margin(incumbent);
+                        if margin > incumbent {
+                            open = Some((margin, body, heading));
+                        }
+                    }
+                }
                 continue;
             }
             // A candidate's margin only decreases while scanning neighbors.
@@ -503,6 +521,9 @@ impl SimulatorBackend {
             }
         }
         if circular {
+            if let Some((_, body, heading)) = open {
+                return Ok((body, heading));
+            }
             return Err(spawn::WAITING.into());
         }
         match open {

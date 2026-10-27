@@ -16,8 +16,13 @@
   food, including floor-size snakes and pit-edge deaths, but only pellets that
   land inside the pit remain. Boost pellets follow the same rule, so boost mass
   spent outside the pit is lost. Food left outside a moving edge is removed.
-  Worlds without the setting keep their old food rules. Checkpoints move to
-  rules revision `slither-sim-rules-v4` and reject v3 continuations.
+  Worlds without the setting keep their old food rules.
+- **Breaking, playtest:** Battledome keeps its 3,584-unit base through 32 seats
+  and scales with the square root of seats above it. Waiting spawns use a bounded
+  maximin fallback with inward departure protection after two seconds.
+  Checkpoints use rules revision `slither-sim-rules-v5` and reject earlier rules;
+  frame `rules.pitRadius` follows the live pit. The floor, pit and scoring rules
+  are unchanged. This branch is for owner playtesting before a redesign PR.
 - **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
   pit radius, size floor, kill-score window, boundary and free floor boost.
   They are sent at setup and whenever they change, and surface as the optional
@@ -47,8 +52,8 @@
   their scheduled update. Survivor colors stay unchanged.
 - Battledome background bots head into the pit after spawning and treat its
   edge as a lethal wall once inside, instead of dying on it. In three local
-  three-minute runs with 64 bots, they spent 87–97% of their time in the pit
-  (previously 15–18%) and never died at its edge (previously 18–23 times a
+  three-minute runs with 64 bots, they spent 87â€“97% of their time in the pit
+  (previously 15â€“18%) and never died at its edge (previously 18â€“23 times a
   minute) ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-pit-aware-bots/REPORT.md)).
   Bots in worlds without a pit decide exactly as before.
 - The pit-edge pellet ring stays visible while the arena shrinks. Replacement
@@ -89,19 +94,6 @@
 - PR comparisons focus timing on two regression canaries, official workloads and
   500/80-client socket hosts, retain ten state traces, and run both runtimes with
   the head workload configuration. Manual calibration retains CPU/wall noise.
-
-### Changed
-
-- **Breaking:** Battledome grows above 32 players so every spawn still passes
-  the strict safety checks. Wall, pit and spawn band scale together, reaching
-  3.25 times the base radius at 80 seats; a spawn queue waiting 2–4 seconds gets
-  up to twice that. Games of 16–32 players are unchanged. In local runs at 80
-  seats everyone spawned within 0.6 s and spawn search fell from 1.7 ms to under
-  0.01 ms per tick ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)). When the growing pit passes over a snake
-  that hasn't entered it, the snake can still leave. `dynamicRadius: false` keeps
-  the fixed arena ([configuration](docs/configuration.md#battledome)).
-- **Breaking:** checkpoints use rules revision `slither-sim-rules-v3` and reject
-  v1/v2. Frame `rules.pitRadius` follows the live pit in Battledome.
 
 ### Performance
 
@@ -192,8 +184,8 @@
 
 ### Breaking
 
-- Host settings are grouped: `maxClients` → `players.max`, `bots` →
-  `bots.count`, `botThreads` → `bots.threads` and `simulation.latency` →
+- Host settings are grouped: `maxClients` â†’ `players.max`, `bots` â†’
+  `bots.count`, `botThreads` â†’ `bots.threads` and `simulation.latency` â†’
   `bots.latency`. Sockets no longer inherit the simulation's latency;
   `players.latency` sets their added link delay, with zero processing. Flat keys
   and a non-default host `simulation.latency` are rejected
@@ -242,7 +234,7 @@
   `1e150`, matching checkpoints. Validation messages changed.
 - Sliding boundaries need `dt` below 16 / 437.5 s (about 36.57 ms), so a
   boosting minimum-size snake cannot pass its contact lead; this replaces the
-  32 ms cap. Hard boundaries accept steps up to about 6.3 × 10¹³ s.
+  32 ms cap. Hard boundaries accept steps up to about 6.3 Ã— 10Â¹Â³ s.
   `maxPerCell: 0` admits no food, and kiosk rates, prey speeds, prey turn rate
   and nutrition factor may be zero ([limits](docs/configuration.md#limits)).
 - Ticks long enough for a snake to outrun the incremental body window warn
@@ -298,7 +290,7 @@
   arena with a one-way pit, a permanent 400-point size floor (boosting at it is
   free and drops nothing; death food returns only mass above it), a 15-minute
   rolling kill score, no prey, and ambient refill that counts all food. Newborns
-  start in an outer 2,684–3,400-unit band once body, head path and departure are
+  start in an outer 2,684â€“3,400-unit band once body, head path and departure are
   clear; waiting socket players go before background bots. Other rules follow
   the official preset. New world settings: `pit`, `spawnRadius`,
   `spawnRadiusMax`, `killScoreSeconds`, `minScore` and
@@ -316,9 +308,9 @@
   `snake_kill_score` in Python and the C ABI, and `Simulator::kill_score` in
   Rust ([frames](docs/bot-api.md#frames)).
 - `Config::warnings`, `SimulationConfig::warnings` and `HostConfig::warnings`
-  flag valid but unmeasured settings: a `dt` outside the measured 6.94–7.07 ms
+  flag valid but unmeasured settings: a `dt` outside the measured 6.94â€“7.07 ms
   loop, or ticks long enough to outrun the incremental body window
-  (`dt × 437.5 ≥ 126`). `serve` returns them on reset, the CLI prints them, and
+  (`dt Ã— 437.5 â‰¥ 126`). `serve` returns them on reset, the CLI prints them, and
   Python's `Session.reset` issues `UserWarning`s
   ([limits](docs/configuration.md#limits)).
 - Host `bots.threads` (default 2) runs background bots on their own threads,
@@ -395,7 +387,7 @@
   non-finite times.
 - Native recording failures leave pending decisions and client clocks intact,
   and rejected sends no longer suppress a later boost change.
-- Unrepresentable `serve` columns, `worlds × agents` products and host client
+- Unrepresentable `serve` columns, `worlds Ã— agents` products and host client
   counts return errors instead of panicking. A failed reset keeps the previous
   session; a failed step frame ends it ([session errors](docs/bot-api.md)).
 - A world stopped by mass overflow stays stopped after checkpoint restore
@@ -416,7 +408,7 @@
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-efficiency/REPORT.md)).
 - The host hands players' frames to the socket thread before encoding bots'
   frames. With 480 localhost bots, mean ping fell from about 8.3 to 7.1 ms and
-  p99 from 17–19 to 11–13 ms
+  p99 from 17â€“19 to 11â€“13 ms
   ([host load checks](docs/raw-server.md#embedding-and-load-checks)).
 - Crowded hosts spend far less time choosing spawn positions: candidates stop
   being scored once they cannot win, and the chosen pose is unchanged. A
@@ -425,10 +417,10 @@
   their own join timing
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-25-battledome-spawn-cost/REPORT.md)).
 - Batch observations (`observe_all_into`, `observe_selected_into`, transport
-  frames and `serve`) are 16–19% faster sequentially and 5–12% faster in
+  frames and `serve`) are 16â€“19% faster sequentially and 5â€“12% faster in
   parallel in the 96- and 128-snake benchmark worlds, with identical results.
   Synthetic worst cases are slower: up to 15% when food clusters away from
-  observers, 2.5–4% with sparse or narrow food
+  observers, 2.5â€“4% with sparse or narrow food
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-24-observation-food-index/REPORT.md)).
 - A [native Linux capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-capacity/REPORT.md)
   finds that one core keeps official-like delivery for 100 socket clients and
@@ -454,11 +446,11 @@
 - `slither-sim serve` speaks `slither-sim-json-v2`, and v1 is removed. Replies
   carry one frame per world: everything any living slot sees, once, in columns,
   with each slot's view as row indices into them. With 128 living snakes, replies
-  are about 12× smaller, the server answers about twice as fast and Python's
-  `json.loads` is about 11× faster.
+  are about 12Ã— smaller, the server answers about twice as fast and Python's
+  `json.loads` is about 11Ã— faster.
 - To migrate, send one `{"heading":[...],"boost":[...]}` step entry per world
   (`null` headings for dead slots) and read `result.worlds[w].views[slot]`.
-  `observe` and `elapsedSeconds` are removed (use `ticks × config.dt`), and
+  `observe` and `elapsedSeconds` are removed (use `ticks Ã— config.dt`), and
   `snapshot` takes `world`. See the [bot API](docs/bot-api.md).
 - Frames round coordinates to 0.01 world units, headings to 0.0001 rad and speeds
   to 0.01 units/s; other numbers stay exact. Real players mostly receive coarser
@@ -504,7 +496,7 @@
 ### Added
 
 - List benchmark workloads with `perf_baseline --list` from one registration table.
-  New synthetic steady-state workloads cover sandbox, official worlds at 30–500
+  New synthetic steady-state workloads cover sandbox, official worlds at 30â€“500
   snakes, a dense no-prey arena standing in for a future Battle Dome, and an
   official in-process client path, with deaths, death food and respawns inside the
   measured and traced windows. The six historical cases and their traces are unchanged.
@@ -521,7 +513,7 @@
 - Refill a caller-owned buffer with `Simulator::observe_all_into` and
   `observe_selected_into`. Observations are identical to `observe_all` and
   `observe_selected`, but reuse the previous call's vectors; on Windows, bot
-  loops that observe every decision ran 1.8–3.5× faster than with `observe_all`.
+  loops that observe every decision ran 1.8â€“3.5Ã— faster than with `observe_all`.
   `slither-sim serve` keeps one such buffer per session.
 
 ## [0.3.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.2.1...v0.3.0) - 2026-10-23

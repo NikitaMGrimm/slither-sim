@@ -1487,7 +1487,7 @@ fn seat_following_keeps_the_usual_battledome_geometry_and_grows_above_32() {
         .unwrap();
         let before = world.snakes()[0].head;
         world.step(&straight(&world)).unwrap();
-        let factor = 1. + 1.5 * (seats.max(32) as f64 / 32. - 1.);
+        let factor = (seats.max(32) as f64 / 32.).sqrt();
         assert_eq!(world.radius(), 3584. * factor);
         assert_eq!(world.pit_radius(), Some(1784. * factor));
         assert_eq!(world.rules().pit_radius, world.pit_radius());
@@ -1624,9 +1624,9 @@ fn the_one_way_pit_tests_the_live_edge_after_growth() {
 
 #[cfg(feature = "networking")]
 #[test]
-fn host_validation_reserves_wire_room_for_the_largest_queue_allowance() {
+fn host_validation_uses_constant_density_without_queue_allowances() {
     use slither_sim::client::SimulationConfig;
-    for (seats, accepted) in [(80, true), (105, true), (106, false)] {
+    for (seats, accepted) in [(80, true), (480, true), (2551, true), (2552, false)] {
         let config = SimulationConfig {
             agents: seats,
             world: Config::battledome(),

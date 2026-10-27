@@ -364,13 +364,12 @@ impl Config {
     }
 
     /// Circular arenas keep their reference size through 32 occupied seats.
-    /// Above it, add perimeter and band area for complete newborn bodies and
-    /// departure room using the existing radius controller.
-    /// Custom mode choice: research/battledome/2026-10-26-spawn-capacity/REPORT.md.
+    /// Above it, preserve area per seat. Queue age never increases this target.
+    /// Provisional mode choice, iterated through local playtesting.
+    /// research/battledome/2026-10-27-arena-playtest/REPORT.md
     pub(crate) fn seat_radius(&self, seats: usize) -> f64 {
         if self.dynamic_radius && self.spawn_radius.is_some() && self.min_score.is_some() {
-            (self.radius * (1. + 1.5 * (seats.max(32) as f64 / 32. - 1.)))
-                .min(checkpoint::MAGNITUDE)
+            (self.radius * (seats.max(32) as f64 / 32.).sqrt()).min(checkpoint::MAGNITUDE)
         } else {
             population_radius(seats)
         }
@@ -1461,12 +1460,12 @@ impl Simulator {
     /// population/controller state. Shrink still belongs to update_radius.
     #[cfg(feature = "networking")]
     /// False leaves the radius untouched when a recent host birth holds growth.
-    pub(crate) fn grow_for_seats(&mut self, seats: usize, allowance: f64, permitted: bool) -> bool {
+    pub(crate) fn grow_for_seats(&mut self, seats: usize, permitted: bool) -> bool {
         if self.config.dynamic_radius
             && self.config.spawn_radius.is_some()
             && self.config.min_score.is_some()
         {
-            let target = (self.config.seat_radius(seats) * allowance).min(checkpoint::MAGNITUDE);
+            let target = self.config.seat_radius(seats).min(checkpoint::MAGNITUDE);
             if target - self.radius > RADIUS_DEAD_ZONE * self.radius {
                 if !permitted {
                     return false;

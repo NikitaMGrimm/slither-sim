@@ -27,6 +27,8 @@ struct Obstacle {
     bounds: Bounds,
     body_width: f64,
     path: Edge,
+    inward: Option<Edge>,
+    inward_width: f64,
     path_width: f64,
     departure_width: f64,
     departure_path_width: f64,
@@ -41,6 +43,7 @@ pub(crate) struct Safety {
     wall_limit: f64,
     segments: usize,
     departure_distance: f64,
+    inward_only: bool,
 }
 
 fn near(a: Bounds, b: Bounds, width: f64) -> bool {
@@ -100,6 +103,21 @@ impl Safety {
                     bounds,
                     body_width: contact.max(clearance),
                     path,
+                    inward: world
+                        .pit_radius()
+                        .filter(|&pit| s.head.distance(Point::default()) > pit)
+                        .map(|_| {
+                            let radius = s.head.distance(Point::default());
+                            let travel = (s.speed * super::DEPARTURE_SECONDS).min(radius);
+                            Edge::new(
+                                s.head,
+                                Point {
+                                    x: s.head.x * (1. - travel / radius),
+                                    y: s.head.y * (1. - travel / radius),
+                                },
+                            )
+                        }),
+                    inward_width: contact.max(300.),
                     path_width: contact.max(super::CLEARANCE),
                     departure_width: contact.max(super::CIRCULAR_CLEARANCE),
                     departure_path_width: contact.max(super::DEPARTURE_PATH_CLEARANCE),
@@ -114,7 +132,25 @@ impl Safety {
             wall_limit: world.radius() - crate::simulator::SPAWN_WALL_MARGIN,
             segments,
             departure_distance: super::DEPARTURE_SECONDS * base_speed(segments),
+            inward_only: false,
         }
+    }
+
+    /// A hard corridor floor after the preferred policy exhausts its search.
+    /// Reserve actual three-second inward travel rather than a full
+    /// travel-length circle around a head that will leave the spawn band.
+    /// Provisional: research/battledome/2026-10-27-arena-playtest/REPORT.md
+    pub(crate) fn departure_floor(world: &Simulator, excluded: usize, segments: usize) -> Self {
+        let mut safety = Self::new_excluding(world, Some(excluded), segments, 200., 1.);
+        safety.inward_only = true;
+        for obstacle in &mut safety.obstacles {
+            let contact = obstacle.body_width.min(obstacle.path_width);
+            obstacle.path_width = contact.max(300.);
+            obstacle.departure_width = contact.max(300.);
+            obstacle.departure_path_width = contact.max(300.);
+            obstacle.head_width = obstacle.body_width;
+        }
+        safety
     }
 
     pub(crate) fn clears(&mut self, body: &[Point]) -> bool {
@@ -147,6 +183,15 @@ impl Safety {
             {
                 return false;
             }
+            if obstacle.inward.as_ref().is_some_and(|path| {
+                near(bounds, path.bounds, obstacle.inward_width)
+                    && self.candidate.iter().any(|e| {
+                        near(e.bounds, path.bounds, obstacle.inward_width)
+                            && swept_distance(e.a, e.b, path.a, path.b) <= obstacle.inward_width
+                    })
+            }) {
+                return false;
+            }
             !near(bounds, obstacle.bounds, obstacle.body_width)
                 || self.candidate.iter().all(|e| {
                     !near(e.bounds, obstacle.bounds, obstacle.body_width)
@@ -156,6 +201,30 @@ impl Safety {
                         })
                 })
         })
+    }
+
+    /// Maximin score for the last accepted candidate, with losing poses
+    /// stopping at the incumbent. All hard path/runway checks run separately.
+    pub(crate) fn body_margin(&self, stop_at: f64) -> f64 {
+        let mut margin = f64::INFINITY;
+        for edge in &self.candidate {
+            for obstacle in &self.obstacles {
+                if !near(edge.bounds, obstacle.bounds, margin + obstacle.body_width) {
+                    continue;
+                }
+                for other in &obstacle.edges {
+                    if near(edge.bounds, other.bounds, margin + obstacle.body_width) {
+                        margin = margin.min(
+                            swept_distance(edge.a, edge.b, other.a, other.b) - obstacle.body_width,
+                        );
+                        if margin <= stop_at {
+                            return margin;
+                        }
+                    }
+                }
+            }
+        }
+        margin
     }
 
     /// Reserve short normal-speed departures toward the middle and along the
@@ -190,20 +259,27 @@ impl Safety {
             x: head.x + heading.cos() * self.departure_distance,
             y: head.y + heading.sin() * self.departure_distance,
         };
-        [end_inward, end_tangent].into_iter().all(|end| {
-            let query = Bounds::between(head, end);
-            self.obstacles.iter().all(|obstacle| {
-                let width = obstacle.departure_width;
-                (!near(query, obstacle.path.bounds, obstacle.departure_path_width)
-                    || swept_distance(head, end, obstacle.path.a, obstacle.path.b)
-                        > obstacle.departure_path_width)
-                    && (!near(query, obstacle.bounds, width)
-                        || obstacle.edges.iter().all(|other| {
-                            !near(query, other.bounds, width)
-                                || swept_distance(head, end, other.a, other.b) > width
-                        }))
+        [end_inward, end_tangent]
+            .into_iter()
+            .take(if self.inward_only { 1 } else { 2 })
+            .all(|end| {
+                let query = Bounds::between(head, end);
+                self.obstacles.iter().all(|obstacle| {
+                    let width = obstacle.departure_width;
+                    (!near(query, obstacle.path.bounds, obstacle.departure_path_width)
+                        || swept_distance(head, end, obstacle.path.a, obstacle.path.b)
+                            > obstacle.departure_path_width)
+                        && obstacle.inward.as_ref().is_none_or(|path| {
+                            !near(query, path.bounds, obstacle.inward_width)
+                                || swept_distance(head, end, path.a, path.b) > obstacle.inward_width
+                        })
+                        && (!near(query, obstacle.bounds, width)
+                            || obstacle.edges.iter().all(|other| {
+                                !near(query, other.bounds, width)
+                                    || swept_distance(head, end, other.a, other.b) > width
+                            }))
+                })
             })
-        })
     }
 }
 
@@ -224,6 +300,77 @@ mod tests {
                 body.windows(2)
                     .all(|e| swept_distance(e[0], e[1], s.head, end) > width)
             })
+    }
+
+    fn guarded_reference(world: &Simulator, body: &[Point], clearance: f64, horizon: f64) -> bool {
+        reference(world, body, clearance, horizon)
+            && world.snakes().iter().filter(|s| s.alive).all(|s| {
+                let r = s.head.distance(Point::default());
+                if !world.pit_radius().is_some_and(|pit| r > pit) {
+                    return true;
+                }
+                let travel = (s.speed * 3.).min(r);
+                let end = Point {
+                    x: s.head.x * (1. - travel / r),
+                    y: s.head.y * (1. - travel / r),
+                };
+                let width = (collision_distance(s.segments, body.len()) + 40.).max(300.);
+                body.windows(2)
+                    .all(|e| swept_distance(e[0], e[1], s.head, end) > width)
+            })
+    }
+
+    #[test]
+    fn preferred_spawns_cannot_cut_an_older_heads_inward_route() {
+        let mut config = Config::battledome();
+        config.food_count = 0;
+        config.ambient_replenish_per_second = 0.;
+        let mut world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config,
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["old".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let angle = 0.25_f64;
+        let head = Point {
+            x: 3400. * angle.cos(),
+            y: 3400. * angle.sin(),
+        };
+        let (body, heading) = world
+            .spawn_body(head, angle + std::f64::consts::FRAC_PI_2)
+            .unwrap();
+        let mut old = world.snakes()[0].clone();
+        old.head = head;
+        old.body = body;
+        old.heading = heading;
+        old.speed = crate::physics::BOOST_SPEED;
+        world
+            .import_life(
+                0,
+                crate::ReplayLife::from_observed(
+                    old,
+                    crate::InitialSpeed::Infer(crate::physics::BOOST_SPEED),
+                ),
+            )
+            .unwrap();
+        let angle = 0.4_f64;
+        let (body, _) = world
+            .spawn_body(
+                Point {
+                    x: 2684. * angle.cos(),
+                    y: 2684. * angle.sin(),
+                },
+                angle + std::f64::consts::FRAC_PI_2,
+            )
+            .unwrap();
+        assert!(reference(&world, &body, 400., 2.));
+        assert!(
+            !Safety::new(&world, 26, 400., 2.).clears(&body),
+            "a preferred pose must also leave the older inward route clear"
+        );
     }
 
     #[test]
@@ -292,7 +439,7 @@ mod tests {
                 for (c, h, query) in &mut queries {
                     assert_eq!(
                         query.clears(&body),
-                        reference(&world, &body, *c, *h),
+                        guarded_reference(&world, &body, *c, *h),
                         "c={c} h={h}"
                     );
                 }

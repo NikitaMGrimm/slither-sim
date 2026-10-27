@@ -695,16 +695,12 @@ impl Simulation {
             .iter()
             .position(|join| join.slot < self.max_clients)
             .unwrap_or(0);
-        let waited = self
-            .ticks
-            .saturating_sub(self.waiting[first].requested_tick) as f64
-            * self.world.dt();
         let protected_until = self.last_spawn_tick.map_or(0, |tick| {
             tick.saturating_add((crate::spawn::DEPARTURE_SECONDS / self.world.dt()).ceil() as u64)
         });
         if !self
             .world
-            .grow_for_waiters(self.waiting.len(), waited, self.ticks >= protected_until)
+            .grow_for_waiters(self.waiting.len(), self.ticks >= protected_until)
         {
             // Stop admissions too, so fresh births cannot postpone expansion
             // indefinitely. No search work is spent during this bounded hold.
@@ -722,10 +718,13 @@ impl Simulation {
 
     fn join(&mut self, join: &PendingJoin) -> Result<bool, String> {
         let slot = join.slot;
+        let waited = self.ticks.saturating_sub(join.requested_tick) as f64 * self.world.dt();
         let admitted = if join.reset_kills {
-            self.world.connect_new_player(slot, join.appearance.clone())
+            self.world
+                .connect_new_player_waited(slot, join.appearance.clone(), waited)
         } else {
-            self.world.connect(slot, join.appearance.clone())
+            self.world
+                .connect_waited(slot, join.appearance.clone(), waited)
         };
         match admitted {
             Ok(false) => return Ok(false),
