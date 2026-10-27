@@ -52,8 +52,11 @@
 
 ### Fixed
 
-- The host socket thread wakes when encoded frames arrive instead of waiting
-  for its next input poll, reducing local delivery jitter without busy waiting.
+- Hosts send a newly encoded frame right away instead of at the socket
+  thread's next 1 ms poll. The 99th-percentile delay between encoding and
+  sending fell from 1.5 to 0.03 ms on Windows and from 1.6 to 0.4 ms on Linux
+  under WSL2, without busy waiting
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-host-frame-timing/REPORT.md)).
 - A client that falls too far behind is disconnected instead of stopping the
   host. Each socket may queue up to 2 MiB of output, counted the same way for
   protocol 13 and 19; stock clients previously had a 4,096-frame limit.
