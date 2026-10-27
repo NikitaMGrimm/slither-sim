@@ -123,6 +123,20 @@ pub(crate) fn frame(elapsed_ms: u16, packets: &[Vec<u8>]) -> Result<Vec<u8>, Str
     Ok(out)
 }
 
+/// Legacy output already owns each converted packet. Reuse that allocation for
+/// its elapsed header instead of copying it into a second frame buffer. Keep
+/// the ordinary framing rules for empty or length-prefixed singleton packets.
+pub(crate) fn frame_owned(elapsed_ms: u16, mut packet: Vec<u8>) -> Result<Vec<u8>, String> {
+    if !packet.first().is_some_and(|&code| code >= 32) {
+        return frame(elapsed_ms, &[packet]);
+    }
+    let len = packet.len();
+    packet.resize(len + 2, 0);
+    packet.copy_within(..len, 2);
+    packet[..2].copy_from_slice(&u16be(elapsed_ms));
+    Ok(packet)
+}
+
 /// Server number in setup bytes 25..27. Stock clients display it as the server;
 /// it never identifies the player's snake (the first full appearance does).
 pub(crate) const SERVER_NUMBER: u16 = 1;
@@ -682,6 +696,29 @@ mod tests {
             m += n;
         }
         out
+    }
+
+    #[test]
+    fn owned_singletons_match_borrowed_framing_and_reuse_room() {
+        for code in [0, 1, 31, 32, b'p', b'U', 255] {
+            for len in [0, 1, 2, 7, MAX_PACKET, MAX_PACKET + 1, 20000] {
+                let mut packet = vec![code; len];
+                packet.reserve(2);
+                for elapsed in [0, 1, 65535] {
+                    assert_eq!(
+                        frame_owned(elapsed, packet.clone()),
+                        frame(elapsed, &[packet.clone()]),
+                        "code={code}, len={len}, elapsed={elapsed}"
+                    );
+                }
+                if code >= 32 && len > 0 {
+                    let storage = packet.as_ptr();
+                    let framed = frame_owned(65535, packet).unwrap();
+                    assert_eq!(framed.as_ptr(), storage);
+                    assert_eq!(framed.len(), len + 2);
+                }
+            }
+        }
     }
 
     #[test]

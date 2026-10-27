@@ -344,9 +344,8 @@ impl SimulatorBackend {
             return Ok(());
         }
         let remote = self.slots[slot].remote;
-        let converted;
-        let (packets, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
-            converted = match legacy.packets(packets) {
+        let (groups, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
+            let converted = match legacy.packets(packets) {
                 Ok(converted) => converted,
                 // A conversion fault is this recipient's, like an overflow.
                 Err(reason) if remote => {
@@ -358,19 +357,20 @@ impl SimulatorBackend {
             };
             // Keep the shared latency RNG on the original physical grouping,
             // even if six-byte legacy food or U maps require more frames.
-            (converted.as_slice(), Some(physical.unwrap_or(packets)))
+            (
+                FrameGroups::Legacy(converted.into_iter()),
+                Some(physical.unwrap_or(packets)),
+            )
         } else {
-            (packets, physical)
+            (
+                FrameGroups::Stock(frame_groups(packets).into_iter()),
+                physical,
+            )
         };
         // Legacy browser clients read one command after the elapsed header;
         // they do not split the protocol-19 length-prefixed broadcast bundles.
         // The 13 catalog witnesses use individual messages. Keep the physical
         // grouping below for latency draws, independent of presentation frames.
-        let groups = if self.slots[slot].connection.legacy.is_some() {
-            packets.chunks(1).collect()
-        } else {
-            frame_groups(packets)
-        };
         let latency = self.player_latency.for_slot(slot, &self.config.latency);
         let connection = &mut self.slots[slot].connection;
         if !remote && connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
@@ -397,12 +397,12 @@ impl SimulatorBackend {
         } else {
             now
         };
-        for (index, group) in groups.into_iter().enumerate() {
+        for (index, group) in groups.enumerate() {
             let setup = *connection.setup_at.get_or_insert(now);
             let target = ((now - setup) * 1000.).round().max(0.) as u64;
             let elapsed = target.saturating_sub(connection.header_ms).min(65535);
             connection.header_ms += elapsed;
-            let bytes = encode::frame(elapsed as u16, group)?;
+            let bytes = group.frame(elapsed as u16)?;
             if remote {
                 let used = connection
                     .downlink_bytes
@@ -493,6 +493,58 @@ impl SimulatorBackend {
     }
 }
 
+/// Consume legacy packet buffers while borrowing stock bundles. Both paths
+/// keep the same queue preflight and per-frame latency/header progression.
+enum FrameGroups<'a> {
+    Legacy(std::vec::IntoIter<Vec<u8>>),
+    Stock(std::vec::IntoIter<&'a [Vec<u8>]>),
+}
+
+enum FrameGroup<'a> {
+    Legacy(Vec<u8>),
+    Stock(&'a [Vec<u8>]),
+}
+
+impl FrameGroups<'_> {
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl FrameGroup<'_> {
+    fn frame(self, elapsed: u16) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Legacy(packet) => encode::frame_owned(elapsed, packet),
+            Self::Stock(packets) => encode::frame(elapsed, packets),
+        }
+    }
+}
+
+impl<'a> Iterator for FrameGroups<'a> {
+    type Item = FrameGroup<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Legacy(packets) => packets.next().map(FrameGroup::Legacy),
+            Self::Stock(groups) => groups.next().map(FrameGroup::Stock),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for FrameGroups<'_> {
+    fn len(&self) -> usize {
+        match self {
+            Self::Legacy(packets) => packets.len(),
+            Self::Stock(groups) => groups.len(),
+        }
+    }
+}
+
 /// Bijective mix of a connection serial, so IDs stay distinct for 2^32
 /// connections without revealing their order. Opaque; it authenticates nothing.
 fn session_id(serial: u32, key: u32) -> u32 {
@@ -558,6 +610,55 @@ mod tests {
         let packet = vec![b'i'; 8192];
         assert!(!encode::frameable(&packet));
         vec![packet; frames]
+    }
+
+    #[test]
+    fn owned_legacy_frames_keep_physical_draws_and_elapsed_allocation() {
+        let mut actual = backend();
+        let mut physical = backend();
+        actual.slots[0].connection.legacy =
+            Some(Box::new(crate::client::encode13::Encoder::new(0)));
+        let mut setup = None;
+        let mut header_ms = 0u64;
+        for (now, count) in [(1., 3), (1.0004, 0), (1.0006, 2), (1000., 17)] {
+            let packets = vec![encode::pong(); count];
+            actual.emit(0, now, &packets).unwrap();
+            physical.emit(0, now, &packets).unwrap();
+            let received = actual.slots[0].connection.take_downlink();
+            let reference = physical.slots[0].connection.take_downlink();
+            assert_eq!(received.len(), count);
+            for (at, bytes) in received {
+                assert_eq!(at, reference[0].0);
+                let start = *setup.get_or_insert(now);
+                let target = ((now - start) * 1000.).round().max(0.) as u64;
+                let elapsed = target.saturating_sub(header_ms).min(65535);
+                header_ms += elapsed;
+                let mut expected = (elapsed as u16).to_be_bytes().to_vec();
+                expected.push(b'p');
+                assert_eq!(bytes, expected);
+            }
+            assert_eq!(
+                format!("{:?}", actual.random),
+                format!("{:?}", physical.random)
+            );
+            assert_eq!(
+                format!("{:?}", actual.slots[0].connection.link),
+                format!("{:?}", physical.slots[0].connection.link)
+            );
+        }
+        assert_eq!(actual.slots[0].connection.header_ms, header_ms);
+        // Preflight counts all legacy frames, not the one physical bundle.
+        actual.slots[0]
+            .connection
+            .downlink
+            .resize(MAX_IN_FLIGHT - 1, (0., vec![0, 0, b'p']));
+        let random = format!("{:?}", actual.random);
+        assert_eq!(
+            actual.emit(0, 1001., &[encode::pong(), encode::pong()]),
+            Err("Downlink queue is full".into())
+        );
+        assert_eq!(actual.slots[0].connection.header_ms, header_ms);
+        assert_eq!(format!("{:?}", actual.random), random);
     }
 
     #[test]
