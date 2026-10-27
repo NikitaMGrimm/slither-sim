@@ -19,6 +19,11 @@
 
 ### Performance
 
+- Food pickup queries pellets in cells covered by living snakes instead of
+  scanning every pellet. A maintained cell index preserves all output, and the
+  offline official 500-player fixture uses 14.7–15.6% fewer process instructions
+  with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-lookup/REPORT.md)).
 - The host's socket thread finds a player's connection by slot instead of
   searching every connected session for each delivery. Output is
   byte-identical, and the 500-player official fixture runs 3.5–3.9% fewer
