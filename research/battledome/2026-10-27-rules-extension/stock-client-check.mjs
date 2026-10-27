@@ -15,6 +15,10 @@ const game = new Proxy({}, { get() { throw Error('game state read'); }, set() { 
 const context = { window: {}, pkps: 0, testing: false, os: game, foods: game, slither: game, flux_grds: game };
 runInNewContext(handler, context);
 const packet = new Uint8Array(24); packet.set([126, 1, 0, 15]);
+const fields = new DataView(packet.buffer);
+fields.setFloat64(4, 1784);
+fields.setUint32(12, 400);
+fields.setFloat64(16, 900);
 context.window.gotPacket(packet);
 assert.equal(context.pkps, 1); // Ordinary traffic accounting only.
 assert.equal(context.os, game); assert.equal(context.foods, game);
