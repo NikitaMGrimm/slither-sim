@@ -5,7 +5,7 @@ use super::{
     food::{FoodChanges, food_identity, food_updates},
     minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
-    snakes::{CoverageGrid, KnownSnake, SnakeDeltaCache, covered, full},
+    snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
 };
 use crate::{
     Simulator,
@@ -376,7 +376,7 @@ impl SimulatorBackend {
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
         // they are consumed by the next broadcast's update_reports.
-        let mut snake_deltas = vec![SnakeDeltaCache::default(); self.slots.len()];
+        let mut snakes = SnakeBroadcast::new(self.slots.len());
         let mut board = None;
         let mut map = None;
         for slot in 0..self.slots.len() {
@@ -414,7 +414,7 @@ impl SimulatorBackend {
                 &bounds,
                 &grid,
                 &prey_bounds,
-                &mut snake_deltas,
+                &mut snakes,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 packets.push(packet);
@@ -569,7 +569,7 @@ impl SimulatorBackend {
         bounds: &[[f64; 4]],
         grid: &CoverageGrid,
         prey_bounds: &PreyBounds,
-        snake_deltas: &mut [SnakeDeltaCache],
+        snakes: &mut SnakeBroadcast,
     ) -> Result<PacketViews, String> {
         let world = &self.world;
         let me = &world.snakes()[slot];
@@ -617,11 +617,9 @@ impl SimulatorBackend {
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
         let known = &self.slots[slot].connection.snakes;
-        let mut others: Vec<usize> = grid.near(head).to_vec();
-        others.extend(known.slots());
-        others.sort_unstable();
-        others.dedup();
-        let order = std::iter::once(slot).chain(others.into_iter().filter(|&i| i != slot));
+        let SnakeBroadcast { deltas, candidates } = snakes;
+        known.candidates(grid.near(head), candidates);
+        let order = std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
         for i in order {
             let snake = &world.snakes()[i];
             let life = self.slots[i].life;
@@ -636,7 +634,7 @@ impl SimulatorBackend {
                 (Some(known), true) if known.life == life => {
                     let wanted = physics::quantize_heading(control);
                     let reports = &self.reports[i];
-                    snake_deltas[i].changes(
+                    deltas[i].changes(
                         &mut packets,
                         own,
                         id,
