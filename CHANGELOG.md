@@ -30,6 +30,11 @@
 
 ### Performance
 
+- When a player's update has no pong or minimap in front of it, the host sends
+  the update's packet list as it is instead of copying it into a new list.
+  Output is byte-identical, and the 500-player official fixture runs 1.6–1.7%
+  fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-packet-lists/REPORT.md)).
 - Each player's food-sector subscription is updated once per tick instead of
   twice. Output is byte-identical, and the 500-player official fixture runs
   1.9–2.1% fewer instructions with stock and protocol-13 clients
