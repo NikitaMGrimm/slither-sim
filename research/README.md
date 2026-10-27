@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Performance | [Syscall boundary ceiling](performance/2026-10-27-host-syscall-ceiling/REPORT.md) | Five c7a/c8a null/send repetitions and a counted official-500 hold; boundary-only savings model is about 0.22 ms/tick on c7a, with observer/provenance limits. |
 | Performance | [Same-session c7a main recheck](performance/2026-10-27-c7a-main-recheck/REPORT.md) | Paired current-main/control official-500/375 holds and a nice +5 diagnostic; main passes 375, while 500 misses at both priorities. |
 | Fidelity | [NTL visibility sweep](fidelity/2026-10-27-ntl-vision/REPORT.md) | Pinned arena-vision candidate, five visibility settings and repeated real-client replays; normal-zoom 1500 is strongest tested, whole-food correction tails remain inconclusive. |
 | Fidelity | [Host frame timing](fidelity/2026-10-27-host-frame-timing/REPORT.md) | Windows/WSL2 loopback stage timings, retained official comparison and delivery-channel wakeup; no browser smoothness or native Linux qualification. |
