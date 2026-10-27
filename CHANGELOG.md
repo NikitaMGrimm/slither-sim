@@ -24,10 +24,11 @@
 
 ### Performance
 
-- Core physics reuses the current heading direction for collision and pickup
-  geometry, and shares food's pickup circle with prey. Output is byte-identical;
-  the official-500 fixture runs 2.59–2.79% fewer instructions across stock and
-  protocol-13 clients, with no WSL2 CPU-time or capacity claim
+- Each tick, a snake's heading direction is computed once during movement and
+  reused for its collision and pickup checks, and prey reuse the pickup circles
+  already computed for food. Output is byte-identical, and the 500-player
+  official fixture runs 2.6–2.8% fewer instructions with stock and protocol-13
+  clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-core-heading-geometry/REPORT.md)).
 - Each tick, the host rebuilds shared food listings only for sectors whose
   food changed or that a player started watching, instead of checking every
