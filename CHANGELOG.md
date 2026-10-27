@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## [0.7.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.2...v0.7.0) - 2026-10-27
+
+### Breaking
+
+- Battledome keeps its 3,584 radius up to 32 players and grows above that so
+  each player keeps the same space: about 5,069 at 64 seats and 5,667 at 80.
+  The pit and spawn band scale with it. A spawn that finds no strictly safe
+  spot within two seconds takes the safest spot that still keeps clear of
+  bodies and of other snakes' paths to the middle. `dynamicRadius: false` keeps
+  the 3,584 arena. Checkpoints use rules revision `slither-sim-rules-v5` and
+  reject earlier continuations.
+- Battledome food stays inside the pit (`foodOnlyInsidePit`). Ambient food
+  spawns only there, scaled to the pit's area. Every death drops food,
+  including floor-size snakes and pit-edge deaths, but only pellets that land
+  inside the pit remain. Boost pellets follow the same rule, so boost mass
+  spent outside the pit is lost. Food left outside a moving edge is removed.
+  Worlds without the setting keep their old food rules. Rust `Config` literals
+  need the new `food_only_inside_pit` field.
+- In worlds with `killScoreSeconds` (Battledome), the stock leaderboard and own
+  rank show rolling kills instead of size. Players who left stay listed while
+  their kills count; a new player in their seat starts at zero. Pit worlds'
+  minimaps show only snakes inside the pit and default to 256 cells (136
+  elsewhere), so `SimulationConfig.minimap_side` is now `Option<usize>`; JSON
+  accepts an integer or `null`.
+- SlitherSim hosts tell bot clients the live mode rules: pit radius, size
+  floor, kill-score window, boundary and free floor boost. They are sent at
+  setup and whenever they change, and surface as the optional
+  `ClientFrame.rules`. Host and socket bots read the same field, so
+  `ForagerBot::with_world_rules` is gone; use `new()`. Client JSON stays v2,
+  and stock browsers never receive the message.
+
 ### Added
 
 - Hosts accept the NTL browser mod. Its legacy login gets protocol 13 on that
@@ -18,31 +49,6 @@
 
 ### Changed
 
-- **Breaking:** Battledome food stays inside the pit (`foodOnlyInsidePit`).
-  Ambient food spawns only there, scaled to the pit's area. Every death drops
-  food, including floor-size snakes and pit-edge deaths, but only pellets that
-  land inside the pit remain. Boost pellets follow the same rule, so boost mass
-  spent outside the pit is lost. Food left outside a moving edge is removed.
-  Worlds without the setting keep their old food rules.
-- **Breaking:** Battledome keeps its 3,584 radius up to 32 players and grows
-  above that so each player keeps the same space: about 5,069 at 64 seats and
-  5,667 at 80. The pit and spawn band scale with it. A spawn that finds no
-  strictly safe spot within two seconds takes the safest spot that still keeps
-  clear of bodies and of other snakes' paths to the middle.
-  `dynamicRadius: false` keeps the 3,584 arena. Checkpoints use rules revision
-  `slither-sim-rules-v5` and reject earlier continuations.
-- **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
-  pit radius, size floor, kill-score window, boundary and free floor boost.
-  They are sent at setup and whenever they change, and surface as the optional
-  `ClientFrame.rules`. Host and socket bots read the same field, so
-  `ForagerBot::with_world_rules` is gone; use `new()`. Client JSON stays v2,
-  and stock browsers never receive the message.
-- **Breaking:** in worlds with `killScoreSeconds` (Battledome), the stock
-  leaderboard and own rank show rolling kills instead of size. Players who left
-  stay listed while their kills count; a new player in their seat starts at
-  zero. Pit worlds' minimaps show only snakes inside the pit and default to 256
-  cells (136 elsewhere), so `SimulationConfig.minimap_side` is now
-  `Option<usize>`; JSON accepts an integer or `null`.
 - Host bots each wear their own stock skin, kept across lives, instead of all
   using skin 0. Their death pellets take that skin's colors.
 - Host bots have names such as `Mamba (bot)`, kept across lives, instead of
@@ -52,23 +58,23 @@
 
 ### Fixed
 
+- A client that falls too far behind is disconnected instead of stopping the
+  host. Each socket may queue up to 2 MiB of output, counted the same way for
+  protocol 13 and 19; stock clients previously had a 4,096-frame limit.
 - Hosts send a newly encoded frame right away instead of at the socket
   thread's next 1 ms poll. The 99th-percentile delay between encoding and
   sending fell from 1.5 to 0.03 ms on Windows and from 1.6 to 0.4 ms on Linux
   under WSL2, without busy waiting
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-host-frame-timing/REPORT.md)).
-- A client that falls too far behind is disconnected instead of stopping the
-  host. Each socket may queue up to 2 MiB of output, counted the same way for
-  protocol 13 and 19; stock clients previously had a 4,096-frame limit.
-- Food removed by moving arena boundaries updates the affected sectors without
-  rebuilding the whole food index or revealing waiting ambient births before
-  their scheduled update. Survivor colors stay unchanged.
 - Battledome background bots head into the pit after spawning and treat its
   edge as a lethal wall once inside, instead of dying on it. In three local
   three-minute runs with 64 bots, they spent 87–97% of their time in the pit
   (previously 15–18%) and never died at its edge (previously 18–23 times a
   minute) ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-pit-aware-bots/REPORT.md)).
   Bots in worlds without a pit decide exactly as before.
+- Food removed by moving arena boundaries updates the affected sectors without
+  rebuilding the whole food index or revealing waiting ambient births before
+  their scheduled update. Survivor colors stay unchanged.
 - The pit-edge pellet ring stays visible while the arena shrinks. Replacement
   pellets used to restart the stock client's fade-in before it finished, so the
   ring could stay nearly invisible
