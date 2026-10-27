@@ -24,6 +24,11 @@
 
 ### Performance
 
+- Snake delivery skips unchanged recipient histories and computes wanted
+  headings only when encoding needs them. Output is byte-identical, and the
+  500-player official fixture runs 3.1–3.4% fewer instructions with stock and
+  protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-snake-noops/REPORT.md)).
 - The grid that finds which snakes each player might see is kept between
   ticks, and only snakes that moved into different cells are updated, instead
   of rebuilding it every tick. The exact visibility test and packet order are
