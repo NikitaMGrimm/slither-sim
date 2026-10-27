@@ -238,6 +238,10 @@ fn food_xy(key: [u8; 4]) -> [u16; 2] {
 /// on a browser mod's modern-map flag. It is a compatibility choice, not an
 /// assertion that the official protocol-13 capture used U (it used M).
 fn minimap(map: &Minimap) -> Vec<u8> {
+    // Client-derived compatibility: NTL also reads U with its dynamic map off
+    // ([99,3]). Precise only reads M, but sends the same [99,4]/selector-12
+    // admission as NTL, so there is no supported distinction for an M profile.
+    // See research/fidelity/2026-10-27-browser-admission/REPORT.md.
     let mut q = vec![b'U'];
     q.extend((map.side as u16).to_be_bytes());
     let mut remaining = map.cells.len();

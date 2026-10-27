@@ -2,6 +2,13 @@
   "schemaVersion": 1,
   "fixtures": [
     {
+      "path": "tests/fixtures/browser-admission.json",
+      "wireProtocol": 19,
+      "clientContract": null,
+      "dataOrigin": "synthetic",
+      "expectedOrigin": "synthetic"
+    },
+    {
       "path": "tests/fixtures/protocol-catalog-13.json",
       "wireProtocol": 13,
       "clientContract": null,

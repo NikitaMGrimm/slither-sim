@@ -32,6 +32,13 @@ captured wire evidence. The inventory does not duplicate source hashes.
 `client-food-interest.json` holds selected decoded receipt/pose witnesses with
 source identity and selection limits, rather than full raw frames.
 
+[`browser-admission.json`](browser-admission.json) is a synthetic selector-31
+short login, with the shared 24-byte challenge reply. It pins protocol-19
+selection, skin, nickname and custom data; selectors 11/12 remain protocol 13.
+It was authored from client format facts, without third-party code or captures.
+The [client-derived compatibility note](../../research/fidelity/2026-10-27-browser-admission/REPORT.md)
+records source pins, solver differences and the minimap limitation.
+
 [`client-legacy-login.json`](client-legacy-login.json) retains a bounded official
 `[99, 4]` / selector-12 login observation: the existing stock challenge format
 was accepted with its 27-byte reply, then setup advertised **protocol 13**.

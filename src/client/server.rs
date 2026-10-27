@@ -18,8 +18,9 @@
 //! Login accepts optional one-byte framing requests, `[99, 0]`, a `6` challenge
 //! generated from a fixed literal, a 27-byte reply and `s` login. The challenge
 //! provides stock-client compatibility, not authentication. A direct `s` login
-//! is also accepted. Legacy `[99,4]` uses a client-compatible 24-letter challenge;
-//! selectors 11/12 at login choose protocol-13 output for that connection.
+//! is also accepted. Legacy `[99]` / `[99,3|4]` use a client-compatible 24-letter
+//! challenge; selectors 11/12 choose protocol 13, selector 31 uses a short login
+//! with protocol-19 output.
 use super::{
     Bot, ClientState, ClientStatus, ForagerBot, SimulationConfig, challenge,
     latency::{LatencyConfig, Link, Random},
@@ -1339,7 +1340,9 @@ impl<S: io::Read + io::Write> Open<S> {
                 let challenge = gate.challenge.clone();
                 self.send(challenge)
             }
-            (Phase::Hello { .. }, [99, 4]) => {
+            // Client-derived: NTL's protocol toggle uses [99], and disabling
+            // its dynamic map uses [99,3]. All share the same reply solver.
+            (Phase::Hello { .. }, [99] | [99, 3 | 4]) => {
                 let (challenge, reply) = legacy_challenge();
                 self.legacy_reply = Some(reply);
                 self.phase = Phase::Reply;
@@ -1809,11 +1812,17 @@ fn legacy_login(bytes: &[u8]) -> bool {
     matches!(bytes.get(1), Some(11 | 12))
 }
 
-/// Stock: skin/name length at 24/25; legacy: at 2/3. Both end with the name,
+/// Stock: skin/name length at 24/25; legacy: at 2/3. All end with the name,
 /// two reserved bytes and custom skin. Stock bytes are interpreted as before.
 fn parse_login(bytes: &[u8]) -> Result<PlayerAppearance, String> {
     let (skin, name) = if legacy_login(bytes) {
         (2, 3)
+    } else if bytes.get(1) == Some(&31) {
+        // Client-derived compatibility: Frontier 6.4.2 sends two version bytes
+        // before skin/name, without the stock 20-byte password. Its parser has
+        // the full modern (>=15) body/appearance and (>=14) food branches, so
+        // this layout selector keeps protocol 19. See tests/fixtures/browser-admission.json.
+        (4, 5)
     } else {
         (24, 25)
     };
@@ -1837,13 +1846,17 @@ fn parse_login(bytes: &[u8]) -> Result<PlayerAppearance, String> {
     })
 }
 
-/// Client-derived compatibility profile: some browser mods parse a single
-/// quoted 24-letter literal. Official #177 captures instead returned the stock
+/// Client-derived compatibility: NTL 9.78 extracts the first quoted literal;
+/// Frontier 6.4.2 reads 24 letters at source offset 7; Precise 0.6 evaluates the
+/// source with a zero-filled `idba` in scope, then rotates its contents. The
+/// compact prefix and buffer fill support all three with the same reply.
+/// See research/fidelity/2026-10-27-browser-admission/REPORT.md.
+/// Official #177 captures instead returned the stock
 /// 27-copy source even for [4], [99,4]. This deliberately serves the supported
 /// client syntax, not an invented claim about official behavior. The generated
 /// source is fixed data, never executed; the challenge is not authentication.
 fn legacy_challenge() -> (Vec<u8>, Vec<u8>) {
-    let source = b"var a = 'ABCDEFGHIJKLMNOPQRSTUVWX';";
+    let source = b"var a='ABCDEFGHIJKLMNOPQRSTUVWX';for(var i=0;i<24;i++)idba[i]=a.charCodeAt(i);";
     let mut framed = vec![0, 0, b'6'];
     let mut key = 23_u8;
     for byte in source {
@@ -3476,26 +3489,36 @@ mod tests {
 
     #[test]
     fn legacy_login_boundaries_and_selector_choose_the_wire_profile() {
-        for selector in [11, 12] {
+        for selector in [11, 12, 31] {
             for length in [0, MAX_NICKNAME] {
                 let name = vec![b'x'; length];
                 let custom = vec![7; MAX_CUSTOM_SKIN];
-                let mut login = vec![b's', selector, 23, length as u8];
+                let mut login = vec![b's', selector];
+                if selector == 31 {
+                    login.extend([1, 161]);
+                }
+                login.extend([23, length as u8]);
                 login.extend(&name);
                 login.extend([0, 255]);
                 login.extend(&custom);
                 let parsed = parse_login(&login).unwrap();
-                assert!(legacy_login(&login));
+                assert_eq!(legacy_login(&login), selector != 31);
                 assert_eq!(parsed.nickname, name);
                 assert_eq!(parsed.skin, 23);
                 assert_eq!(parsed.custom_skin, custom);
                 login.push(0);
                 assert!(parse_login(&login).is_err());
-                for end in 0..length + 6 {
+                let minimum = length + if selector == 31 { 8 } else { 6 };
+                for end in 0..minimum {
                     assert!(parse_login(&login[..end]).is_err(), "length {end}");
                 }
             }
-            assert!(parse_login(&[b's', selector, 0, 25, 0, 0]).is_err());
+            let mut too_long = vec![b's', selector];
+            if selector == 31 {
+                too_long.extend([1, 161]);
+            }
+            too_long.extend([0, 25, 0, 0]);
+            assert!(parse_login(&too_long).is_err());
         }
         assert!(!legacy_login(&[b's', 30]));
     }
@@ -3520,7 +3543,16 @@ mod tests {
                 byte
             })
             .collect();
-        assert_eq!(source, b"var a = 'ABCDEFGHIJKLMNOPQRSTUVWX';");
+        assert_eq!(&source[..7], b"var a='");
+        let quoted = source.split(|&b| b == b'\'').nth(1).unwrap();
+        assert_eq!(quoted, b"ABCDEFGHIJKLMNOPQRSTUVWX");
+        assert_eq!(&source[7..31], quoted, "fixed-offset solver input");
+        // Pin the entire buffer-filling statement without evaluating source.
+        // The real eval-based client is tested only in the isolated browser.
+        assert_eq!(
+            &source[31..],
+            b"';for(var i=0;i<24;i++)idba[i]=a.charCodeAt(i);"
+        );
         // Client-derived local-sandbox observation, not an official capture.
         assert_eq!(reply, b"CGLRYGPZKWJXMCTLEYTPMKJJ");
         assert_ne!(reply, challenge_parts().unwrap().1[1]);

@@ -8,6 +8,10 @@
   connection: snakes, food, death and rejoin, and Battledome's kill board, pit
   minimap and edge ring all work. Stock clients and bots still get protocol 19,
   byte for byte as before.
+- The Frontier and Precise slither browser mods can join hosts too. Frontier's
+  short login gets protocol 19; Precise gets protocol 13 but shows no minimap,
+  because it reads only `M` maps. NTL's other handshake requests (`[99]`, and
+  `[99,3]` with its dynamic minimap off) also work.
 
 ### Changed
 

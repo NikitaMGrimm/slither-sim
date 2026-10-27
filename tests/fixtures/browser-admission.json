@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "wireProtocol": 19,
+  "dataOrigin": "synthetic",
+  "expectedOrigin": "synthetic",
+  "description": "Client-derived short selector-31 admission; authored from format facts, not captured client code. Challenge also serves protocol-13 selectors 11/12.",
+  "request": [
+    99,
+    4
+  ],
+  "replyAscii": "CGLRYGPZKWJXMCTLEYTPMKJJ",
+  "login": [
+    115,
+    31,
+    1,
+    161,
+    7,
+    8,
+    76,
+    111,
+    99,
+    97,
+    108,
+    65,
+    108,
+    116,
+    0,
+    255,
+    9,
+    8
+  ],
+  "nickname": "LocalAlt",
+  "skin": 7,
+  "customSkin": [
+    9,
+    8
+  ],
+  "setupProtocol": 19
+}

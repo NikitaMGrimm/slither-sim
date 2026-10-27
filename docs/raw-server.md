@@ -171,6 +171,7 @@ can differ from official sessions. See
 | --- | --- |
 | Client to host | Login, appearance, headings 0–250, ping 251, keyboard 252, boost 253/254, bounded victory text; framing/session negotiation before login. |
 | Legacy login | `[115, selector, skin, nameLength, name…, 0, reserved, custom skin…]`, selector 11 or 12, name up to 24 bytes and custom skin up to 255 bytes; selects protocol 13. Stock login offsets and protocol-19 output are unchanged. |
+| Short modern login | `[115, 31, versionHi, versionLo, skin, nameLength, name…, 0, reserved, custom skin…]`, same name/custom limits; selects protocol 19. This is a client-derived admission layout, not protocol-31 output. |
 | Host to client | Setup/radius, snakes, motion, body/growth/tail/mass, sector food, prey, minimap, pongs, game-over, leaderboard, kills, record and requested session IDs. |
 | Additional messages decoded by `ClientState` | Alternate gameplay encodings, compressed food, own score credits, minimap formats/deltas, team scores and team layers. |
 | Not provided by the host | Team gameplay, accounts, persistent daily records, administrative/debug services and unspecified extensions. |
@@ -180,9 +181,11 @@ and neither selects two-byte elapsed milliseconds. A second framing request is
 rejected. Optional `[4]` requests `S` after self appearance and may accompany
 framing in either order; repeated requests are rejected. IDs identify connections,
 not authentication or resumed lives. Challenge and direct logins are accepted.
-Stock `[99,0]` keeps its existing challenge. Legacy `[99,4]` (optionally after
-`[4]`) receives an encoded single-quoted 24-letter assignment and accepts its
-rotated 24-byte reply. This compatibility choice serves some browser mods;
+Stock `[99,0]` keeps its existing challenge. Legacy `[99]`, `[99,3]` and
+`[99,4]` (optionally after `[4]`) receive the same encoded single-quoted 24-letter assignment, with the
+first letter at source offset 7 and a statement filling the caller's `idba`
+buffer. They accept its rotated 24-byte reply. This compatibility choice serves
+some browser mods;
 the [official catalog](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-protocol13-catalog/REPORT.md)
 observed the stock 27-byte challenge even for that request. Neither is authentication.
 
@@ -190,6 +193,11 @@ Protocol 13 sends individual messages with elapsed headers by default, explicit
 snake IDs, coordinate-based body/food updates and full `U` minimaps. Protocol 19
 retains its bundles, angle bodies, sector food and `M`/`V` maps. Legacy `U` uses
 the same shared raster, including Battledome's pit, without a client delta base.
+Some browser mods only read `M` and therefore have no minimap on the legacy
+path. Their admission bytes also occur in clients that need `U`; the host keeps
+`U` without guessing a client identity. Client-derived admission facts and
+validation are recorded in the
+[compatibility note](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-browser-admission/REPORT.md).
 The first body update after appearance uses an absolute coordinate to establish
 the integer base; subsequent ordinary steps may use relative coordinates.
 
