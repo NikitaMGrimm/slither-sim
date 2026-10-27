@@ -2842,6 +2842,45 @@ fn find_eater<const PROFILE: bool>(
 #[cfg(test)]
 mod food_pickup_order_tests {
     use super::*;
+    use crate::RadiusUpdate;
+
+    #[test]
+    fn public_food_edits_reset_reusable_mirror_verification() {
+        let mut world = Simulator::new(WorldOptions {
+            seed: 7,
+            config: Config {
+                food_count: 4,
+                ambient_replenish_per_second: 0.0,
+                ..Config::sandbox()
+            },
+            population: InitialPopulation::Empty,
+        })
+        .unwrap();
+        world.step(&[]).unwrap();
+        let mut food = world.food().to_vec();
+        for f in &mut food {
+            f.origin = Some(Origin::Boost);
+        }
+        // Same length defeats a length-only check; the API must reset the cache.
+        world.replace_food(food).unwrap();
+        world.food_cache.begin_mirrored(world.food.len());
+        assert_eq!(world.food_cache.ambient(&world.food), 0);
+        world.food_cache.end();
+        let mut added = world.remove_food(0).unwrap();
+        added.origin = Some(Origin::Ambient);
+        added.x = 1234.0;
+        world.insert_food(added).unwrap();
+        world.food_cache.begin_mirrored(world.food.len());
+        assert_eq!(world.food_cache.ambient(&world.food), 1);
+        world.food_cache.end();
+        let mut restored = Simulator::from_checkpoint(
+            &serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
+            checkpoint::RestoreOptions::default(),
+        )
+        .unwrap();
+        restored.food_cache.begin_mirrored(restored.food.len());
+        assert_eq!(restored.food_cache.ambient(&restored.food), 1);
+    }
 
     #[test]
     fn reused_food_cache_matches_fresh_caches_through_radius_and_pit_retention() {
