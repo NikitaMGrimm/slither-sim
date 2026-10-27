@@ -24,6 +24,12 @@
 
 ### Performance
 
+- Moving arena and pit edges now mirror food removals into the warm cache.
+  Fourteen traces remain byte-identical. Synthetic shrinking-seat replays use
+  85.43% fewer process instructions in official mode and 36.72% fewer in
+  Battledome; normal official-500 controls increase by 0.032–0.041%.
+  WSL2 instruction results make no CPU-time or capacity claim
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-mirrored-food-retention/REPORT.md)).
 - Each player's prey visibility check looks only at prey in nearby x-axis
   strips instead of every prey in the world; the exact distance test and world
   order are unchanged. Output is byte-identical, and the 500-player official
