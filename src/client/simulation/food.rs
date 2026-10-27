@@ -43,6 +43,8 @@ pub(super) struct FoodSubscriptions {
     held: Vec<HeldSubscription>,
     counts: Vec<u32>,
     sectors: BTreeSet<u16>,
+    /// Zero-to-one subscription transitions in the latest sync.
+    entered: BTreeSet<u16>,
 }
 
 #[derive(Default)]
@@ -56,6 +58,7 @@ impl FoodSubscriptions {
         &mut self,
         interests: impl ExactSizeIterator<Item = Option<&'a SectorInterest>>,
     ) -> BTreeSet<u16> {
+        self.entered.clear();
         let len = interests.len();
         self.held
             .resize_with(self.held.len().max(len), HeldSubscription::default);
@@ -91,6 +94,7 @@ impl FoodSubscriptions {
                     let count = &mut self.counts[usize::from(sector)];
                     if *count == 0 {
                         self.sectors.insert(sector);
+                        self.entered.insert(sector);
                     }
                     *count += 1;
                     held.sectors.push(sector);
@@ -366,7 +370,7 @@ impl SimulatorBackend {
         }
         // Listings are independent and indexed by sector. Recipient packet
         // order comes from food_updates' sorted subscriptions, not this union.
-        for &index in &self.food_subscriptions.sectors {
+        let mut list_sector = |index: u16| {
             let listing = &mut table[usize::from(index)];
             if listing.is_none() || self.food_index.dirty.contains(&index) {
                 let run = self.food_index.listing(index);
@@ -392,6 +396,26 @@ impl SimulatorBackend {
                 // Pit motion or timed retirement can replace only the decorated
                 // listing; stable recipients need a hint for either transition.
                 changed.insert(index.to_be_bytes());
+            }
+        };
+        if pit_changed {
+            for &index in &self.food_subscriptions.sectors {
+                list_sector(index);
+            }
+        } else {
+            // A listing changes only on first subscription or shown-food edits.
+            // Pit motion/timed retirement above still refreshes the full union.
+            // Final counts exclude sectors that entered and retired in one sync;
+            // handoffs keep their existing handles. Recipient order is separate.
+            // research/performance/2026-10-27-shared-food-work/REPORT.md
+            for &index in self
+                .food_subscriptions
+                .entered
+                .union(&self.food_index.dirty)
+            {
+                if self.food_subscriptions.counts[usize::from(index)] != 0 {
+                    list_sector(index);
+                }
             }
         }
         // Unlisted sectors are built afresh when a connection subscribes.
@@ -576,6 +600,195 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Frozen exhaustive union walk: independent of sparse work hints.
+    fn reference_sync_food_sectors(backend: &mut SimulatorBackend) -> Result<FoodChanges, String> {
+        let eaten = eaten_sectors(&backend.food_eaters);
+        let mut changed = eaten.clone();
+        let now = backend.time();
+        let pit_changed = match (&mut backend.pit_markers, backend.world.pit_radius()) {
+            (Some(markers), Some(radius)) => markers.update(radius, now)?,
+            _ => false,
+        };
+        let retired = backend
+            .food_subscriptions
+            .sync(backend.slots.iter().map(|slot| {
+                slot.connection
+                    .setup
+                    .then_some(&slot.connection.food_interest)
+            }));
+        let table = &mut backend.food_sectors;
+        table.resize(1 << 16, None);
+        if backend.pit_markers.is_some() {
+            backend.decorated_food_sectors.resize(1 << 16, None);
+        }
+        for index in retired {
+            table[usize::from(index)] = None;
+            if backend.pit_markers.is_some() {
+                backend.decorated_food_sectors[usize::from(index)] = None;
+            }
+        }
+        // Listings are independent and indexed by sector. Recipient packet
+        // order comes from food_updates' sorted subscriptions, not this union.
+        for &index in &backend.food_subscriptions.sectors {
+            let listing = &mut table[usize::from(index)];
+            if listing.is_none() || backend.food_index.dirty.contains(&index) {
+                let run = backend.food_index.listing(index);
+                if listing.as_ref().is_none_or(|old| old.0 != run) {
+                    *listing = Some(Arc::new(SectorFood(run)));
+                    changed.insert(index.to_be_bytes());
+                }
+            }
+            if (pit_changed
+                || backend
+                    .decorated_food_sectors
+                    .get(usize::from(index))
+                    .is_none_or(Option::is_none)
+                || backend.food_index.dirty.contains(&index))
+                && let Some(markers) = &backend.pit_markers
+            {
+                let physical = listing.as_ref().unwrap();
+                backend.decorated_food_sectors[usize::from(index)] = Some(
+                    markers
+                        .overlay(index, &physical.0)
+                        .map_or_else(|| physical.clone(), |run| Arc::new(SectorFood(run))),
+                );
+                // Pit motion or timed retirement can replace only the decorated
+                // listing; stable recipients need a hint for either transition.
+                changed.insert(index.to_be_bytes());
+            }
+        }
+        // Unlisted sectors are built afresh when a connection subscribes.
+        backend.food_index.dirty.clear();
+        let current = Arc::new(());
+        let previous = std::mem::replace(&mut backend.food_revision, current.clone());
+        Ok(FoodChanges {
+            changed: changed.into_iter().collect(),
+            eaten,
+            previous,
+            current,
+        })
+    }
+
+    #[test]
+    fn sparse_listing_work_matches_full_union_through_lifetimes_and_pit_changes() {
+        use crate::{Action, Config, PitConfig, RadiusUpdate, client::SimulationConfig};
+        for pit in [false, true] {
+            let mut world = Config::sandbox();
+            world.radius = 8960.;
+            world.pit = pit.then_some(PitConfig { radius: 4460. });
+            world.food_count = 0;
+            world.ambient_replenish_per_second = 0.;
+            world.prey.count = 0;
+            world.radius_updates = vec![
+                RadiusUpdate {
+                    time: 0.,
+                    radius: 8960.,
+                },
+                RadiusUpdate {
+                    time: 8. * world.dt,
+                    radius: 8900.,
+                },
+                RadiusUpdate {
+                    time: 12. * world.dt,
+                    radius: 9000.,
+                },
+            ];
+            let config = SimulationConfig {
+                world,
+                agents: 3,
+                ..Default::default()
+            };
+            let mut actual = SimulatorBackend::new(47, config.clone()).unwrap();
+            let mut reference = SimulatorBackend::new(47, config).unwrap();
+            let foods: Vec<_> = (0..8)
+                .map(|i| Food {
+                    x: if i < 4 { 0. } else { 4560. },
+                    y: if i % 2 == 0 { 0. } else { 900. },
+                    value: i as f64 + 1.,
+                    size: Some(i as f64 + 1.),
+                    origin: Some(Origin::Ambient),
+                })
+                .collect();
+            let sectors: BTreeSet<_> = foods
+                .iter()
+                .map(|food| FoodIndex::sector(food).unwrap().0.to_be_bytes())
+                .chain([[108, 110], [110, 108]])
+                .collect();
+            let first = SectorInterest::from_subscribed(sectors.clone());
+            let second = SectorInterest::from_subscribed(sectors.iter().copied().skip(1).collect());
+            let empty = SectorInterest::from_subscribed(BTreeSet::new());
+            let mut active = Vec::new();
+            for tick in 0..180 {
+                let addition = &foods[tick % foods.len()];
+                active.push(addition.clone());
+                let removal = if tick % 3 == 1 {
+                    Some(active.remove(0))
+                } else {
+                    None
+                };
+                for backend in [&mut actual, &mut reference] {
+                    if tick > 0 {
+                        let actions: Vec<_> = backend
+                            .world
+                            .snakes()
+                            .iter()
+                            .map(|snake| {
+                                snake.alive.then_some(Action {
+                                    heading: snake.heading,
+                                    boost: false,
+                                })
+                            })
+                            .collect();
+                        backend.world.step(&actions).unwrap();
+                        backend.tick += 1;
+                    }
+                    for slot in 0..3 {
+                        let choice = (tick / 7 + slot) % 5;
+                        backend.slots[slot].connection.setup = choice != 0;
+                        backend.slots[slot].connection.food_interest = match choice {
+                            0 | 1 => first.clone(),
+                            2 | 3 => second.clone(),
+                            _ => empty.clone(),
+                        };
+                    }
+                    backend
+                        .food_index
+                        .add(addition, tick % 4 != 0, (tick % 9) as u8);
+                    if let Some(food) = &removal {
+                        backend.food_index.remove(food);
+                    }
+                    if tick % 6 == 0 {
+                        backend.food_index.reveal();
+                    }
+                    if tick % 29 == 0 {
+                        backend.food_presentation.sync(&active).unwrap();
+                        backend
+                            .food_index
+                            .rebuild(&active, &backend.food_presentation);
+                    }
+                    backend.food_eaters.clear();
+                    if tick % 5 == 0 {
+                        backend
+                            .food_eaters
+                            .insert(food_identity(addition.point()), 1);
+                    }
+                }
+                let got = actual.sync_food_sectors().unwrap();
+                let want = reference_sync_food_sectors(&mut reference).unwrap();
+                assert_eq!(got.changed, want.changed, "pit={pit} tick={tick}");
+                assert_eq!(got.eaten, want.eaten, "pit={pit} tick={tick}");
+                assert_eq!(
+                    actual.food_sectors, reference.food_sectors,
+                    "physical pit={pit} tick={tick}"
+                );
+                assert_eq!(
+                    actual.decorated_food_sectors, reference.decorated_food_sectors,
+                    "decorated pit={pit} tick={tick}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn subscription_union_matches_full_rebuild_through_handoffs_and_slot_reuse() {
