@@ -9,7 +9,68 @@
 //! second quantization error. It never feeds presentation state into physics.
 use super::{Minimap, encode};
 use crate::model::Point;
-use std::{collections::BTreeMap, f64::consts::TAU};
+use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
+
+/// One broadcast's checked M/V inputs and distinct U rasters. Histories are
+/// recipient-specific even when the input delta bytes happen to be identical.
+#[derive(Default)]
+pub(crate) struct MinimapCache {
+    inputs: BTreeMap<usize, Vec<CachedMap>>,
+    images: Vec<(Arc<Minimap>, Vec<u8>)>,
+}
+
+struct CachedMap {
+    input: Vec<u8>,
+    // Keep V's baseline identity alive after its recipient advances, so an
+    // allocator cannot reuse that address for a different history this tick.
+    _base: Option<Arc<Minimap>>,
+    image: usize,
+}
+
+impl MinimapCache {
+    fn convert(
+        &mut self,
+        previous: Option<&Arc<Minimap>>,
+        packet: &[u8],
+    ) -> Result<(Arc<Minimap>, Vec<u8>), String> {
+        let delta = packet[0] == b'V';
+        let key = if delta {
+            previous.map_or(0, |map| Arc::as_ptr(map) as usize)
+        } else {
+            0
+        };
+        let cached = self
+            .inputs
+            .get(&key)
+            .and_then(|inputs| inputs.iter().find(|entry| entry.input == packet));
+        let image = match cached {
+            Some(entry) => entry.image,
+            None => {
+                // Decode lazily, preserving invalid/missing-baseline errors.
+                let map = Minimap::packet(previous.map(Arc::as_ref), packet)?;
+                // Full M and divergent V histories can reach the same raster.
+                // Compare once per input/history miss, then encode U only once.
+                let image = self
+                    .images
+                    .iter()
+                    .position(|(known, _)| known.as_ref() == &map)
+                    .unwrap_or_else(|| {
+                        let packet = minimap(&map);
+                        self.images.push((Arc::new(map), packet));
+                        self.images.len() - 1
+                    });
+                self.inputs.entry(key).or_default().push(CachedMap {
+                    input: packet.to_vec(),
+                    _base: if delta { previous.cloned() } else { None },
+                    image,
+                });
+                image
+            }
+        };
+        let (map, packet) = &self.images[image];
+        Ok((map.clone(), packet.clone()))
+    }
+}
 
 #[derive(Clone, Debug)]
 struct Front {
@@ -22,7 +83,7 @@ pub(crate) struct Encoder {
     own: u16,
     spacing: f64,
     fronts: BTreeMap<u16, Front>,
-    map: Option<Minimap>,
+    map: Option<Arc<Minimap>>,
 }
 
 impl Encoder {
@@ -36,6 +97,22 @@ impl Encoder {
     }
 
     pub(crate) fn packets(&mut self, packets: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
+        self.packets_with_cache(packets, None)
+    }
+
+    pub(crate) fn packets_cached(
+        &mut self,
+        packets: &[Vec<u8>],
+        cache: &mut MinimapCache,
+    ) -> Result<Vec<Vec<u8>>, String> {
+        self.packets_with_cache(packets, Some(cache))
+    }
+
+    fn packets_with_cache(
+        &mut self,
+        packets: &[Vec<u8>],
+        mut cache: Option<&mut MinimapCache>,
+    ) -> Result<Vec<Vec<u8>>, String> {
         let mut out = Vec::with_capacity(packets.len());
         for p in packets {
             match p[0] {
@@ -95,8 +172,15 @@ impl Encoder {
                     out.push(q);
                 }
                 b'M' | b'V' => {
-                    let map = Minimap::packet(self.map.as_ref(), p)?;
-                    out.push(minimap(&map));
+                    let (map, packet) = match cache.as_deref_mut() {
+                        Some(cache) => cache.convert(self.map.as_ref(), p)?,
+                        None => {
+                            let map = Minimap::packet(self.map.as_deref(), p)?;
+                            let packet = minimap(&map);
+                            (Arc::new(map), packet)
+                        }
+                    };
+                    out.push(packet);
                     self.map = Some(map);
                 }
                 // Common catalog families, plus existing local score/record/rules

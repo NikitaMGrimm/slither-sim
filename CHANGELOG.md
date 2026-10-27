@@ -68,6 +68,8 @@
 
 ### Performance
 
+- Legacy host clients share minimap conversion within each broadcast, including
+  the full `U` raster encoding, while keeping their own map histories and frames.
 - Hosts encode each minimap once, and reuse each delta for every player who
   holds the same previous map, instead of encoding both per player. Minimap
   ticks were a large spike: with 500 players they took 291 million

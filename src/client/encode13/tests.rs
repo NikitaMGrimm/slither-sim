@@ -385,3 +385,110 @@ fn official_minimaps_and_deltas_keep_the_same_raster_in_u() {
         assert_eq!(decoder.shown.unwrap().0, map);
     }
 }
+
+fn binary_map(side: usize, bits: usize) -> Minimap {
+    Minimap {
+        side,
+        cells: (0..side * side).map(|i| ((bits >> i) & 1) as u8).collect(),
+        age_seconds: 0.,
+    }
+}
+
+#[test]
+fn shared_minimaps_preserve_divergent_skipped_and_reconnected_histories() {
+    let mut shared: Vec<_> = (0..4).map(Encoder::new).collect();
+    let mut reference = shared.clone();
+    let initial = [binary_map(4, 1), binary_map(4, 6), binary_map(4, 1)];
+    let mut cache = MinimapCache::default();
+    for (slot, map) in initial.iter().enumerate() {
+        let packets = [encode::minimap(map)];
+        assert_eq!(
+            shared[slot].packets_cached(&packets, &mut cache),
+            reference[slot].packets(&packets)
+        );
+    }
+    for (step, slots) in [
+        vec![0, 1, 2, 3],
+        vec![2, 0, 3],
+        vec![3, 1, 0, 2],
+        vec![0, 1, 2, 3],
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let map = binary_map(if step == 3 { 3 } else { 4 }, 0x153 ^ ((step + 1) << 7));
+        if step == 2 {
+            shared[2] = Encoder::new(2);
+            reference[2] = Encoder::new(2);
+        }
+        let mut cache = MinimapCache::default();
+        for slot in slots {
+            let packet = match reference[slot]
+                .map
+                .as_deref()
+                .filter(|old| old.side == map.side)
+            {
+                Some(previous) => encode::minimap_delta(previous, &map).unwrap(),
+                None => encode::minimap(&map),
+            };
+            let packets = [encode::pong(), packet, encode::credit(3)];
+            assert_eq!(
+                shared[slot].packets_cached(&packets, &mut cache),
+                reference[slot].packets(&packets)
+            );
+            assert_eq!(shared[slot].map, reference[slot].map);
+        }
+        // Different M/V inputs for one raster must not rebuild U per history.
+        assert_eq!(cache.images.len(), 1);
+    }
+}
+
+#[test]
+fn identical_delta_bytes_keep_distinct_recipient_bases() {
+    let mut a = Encoder::new(0);
+    let mut b = Encoder::new(1);
+    convert(&mut a, encode::minimap(&binary_map(4, 1)));
+    convert(&mut b, encode::minimap(&binary_map(4, 2)));
+    let mut cache = MinimapCache::default();
+    let delta = [vec![b'V']];
+    let first = a.packets_cached(&delta, &mut cache).unwrap();
+    let second = b.packets_cached(&delta, &mut cache).unwrap();
+    assert_ne!(first, second);
+    assert_eq!(a.packets_cached(&delta, &mut cache).unwrap(), first);
+}
+
+#[test]
+fn shared_minimap_errors_preserve_each_encoders_immediate_state() {
+    let mut shared = Encoder::new(0);
+    let mut reference = shared.clone();
+    let mut cache = MinimapCache::default();
+    let full = encode::minimap(&binary_map(4, 1));
+    for packets in [vec![full.clone()], vec![vec![b'V']]] {
+        assert_eq!(
+            shared.packets_cached(&packets, &mut cache),
+            reference.packets(&packets)
+        );
+    }
+    let mut fresh = Encoder::new(1);
+    assert_eq!(
+        fresh.packets_cached(&[vec![b'V']], &mut cache),
+        Encoder::new(1).packets(&[vec![b'V']])
+    );
+    for packets in [
+        vec![vec![b'M', 0, 0]],
+        vec![encode::minimap(&binary_map(3, 9)), vec![b'!']],
+        vec![vec![b'V']],
+    ] {
+        let before = reference.map.clone();
+        let expected = reference.packets(&packets);
+        assert_eq!(shared.packets_cached(&packets, &mut cache), expected);
+        assert_eq!(shared.map, reference.map);
+        if packets[0] == [b'M', 0, 0] {
+            assert_eq!(shared.map, before);
+        }
+    }
+    assert_eq!(
+        fresh.packets_cached(&[full], &mut cache).unwrap()[0][0],
+        b'U'
+    );
+}

@@ -340,13 +340,28 @@ impl SimulatorBackend {
         packets: &[Vec<u8>],
         physical: Option<&[Vec<u8>]>,
     ) -> Result<(), String> {
+        self.emit_presented_cached(slot, now, packets, physical, None)
+    }
+
+    pub(super) fn emit_presented_cached(
+        &mut self,
+        slot: usize,
+        now: f64,
+        packets: &[Vec<u8>],
+        physical: Option<&[Vec<u8>]>,
+        cache: Option<&mut crate::client::encode13::MinimapCache>,
+    ) -> Result<(), String> {
         if self.slots[slot].connection.output_fault.is_some() {
             return Ok(());
         }
         let remote = self.slots[slot].remote;
         let converted;
         let (packets, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
-            converted = match legacy.packets(packets) {
+            let result = match cache {
+                Some(cache) => legacy.packets_cached(packets, cache),
+                None => legacy.packets(packets),
+            };
+            converted = match result {
                 Ok(converted) => converted,
                 // A conversion fault is this recipient's, like an overflow.
                 Err(reason) if remote => {

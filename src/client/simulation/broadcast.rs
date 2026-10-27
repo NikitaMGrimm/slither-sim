@@ -379,6 +379,9 @@ impl SimulatorBackend {
         let mut snake_deltas = vec![SnakeDeltaCache::default(); self.slots.len()];
         let mut board = None;
         let mut map = None;
+        // Cache only within this broadcast; errors drop it too. Each legacy
+        // connection still owns its history, fronts, framing and output budget.
+        let mut legacy_maps = crate::client::encode13::MinimapCache::default();
         for slot in 0..self.slots.len() {
             if slot == early {
                 self.hand_over_early(early, hand_over)?;
@@ -436,9 +439,15 @@ impl SimulatorBackend {
             }
             packets.extend(hud);
             if let Some(presented) = presented {
-                self.emit_presented(slot, now, &presented, Some(&packets))?;
+                self.emit_presented_cached(
+                    slot,
+                    now,
+                    &presented,
+                    Some(&packets),
+                    Some(&mut legacy_maps),
+                )?;
             } else if !packets.is_empty() {
-                self.emit(slot, now, &packets)?;
+                self.emit_presented_cached(slot, now, &packets, None, Some(&mut legacy_maps))?;
             }
         }
         if early >= self.slots.len() {
