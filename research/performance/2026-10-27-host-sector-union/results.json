@@ -1,0 +1,318 @@
+{
+ "baseCommit": "5eb0736ee3650687adff5b5c431c33994bf75bb9",
+ "candidateRuntimeCommit": "46ecdf8e9f83f35c77780f32a081d4c8b84e304f",
+ "platform": "shared WSL2 Linux x86-64; no live CPU or capacity claim",
+ "build": "Rust 1.99.0, locked release, thin LTO, codegen-units=1, debug=1",
+ "cpuBudget": "outer 0,2; counter child CPU 0; Cargo jobs/Rayon/tests one",
+ "method": "instructions:u; one untallied pair then five alternating measured pairs; 100 decisions plus construction/warmup; includes native clients, excludes sockets/kernel",
+ "binarySha256": {
+  "base/perf_baseline": "e290921f97944308a2ffea8dc1a74bf40f01c8329f3c1c7ba7920f0bd9f7caa0",
+  "base/perf_battledome": "b5da449c8afdfd710cacc3185b56ce3c416bfbc2c85b4fff747bead76db29d2f",
+  "base/perf_client_retained": "ec39dfec3023f6efb78252fa11bdbea106a83f1e9dc3605e5f0025e0de866e00",
+  "candidate/perf_baseline": "6c4837b10aa2f10d1d22bf3a97a8edaad3cdb870ff02d969b8ad82a3f110dd3e",
+  "candidate/perf_battledome": "3131ac14d1a0e22879841630108b0d5c3314742f0d9390d82aac13575c2b88f0",
+  "candidate/perf_client_retained": "bb0b4a885ed2cf306b23c340c12f3c8d4649c38eece0bc8722a77fcef951d995"
+ },
+ "harnessSha256": {
+  "perf_baseline.rs": "70b5f42a7829266623687cc4faa41fec1426ffd91d305d7af399c6af1e633fa6",
+  "perf_battledome.rs": "dc578a13a2ee81db7e3922a5c7892e7cb2acbe5fdccf0c0775a6ca382b550057",
+  "perf_client_retained.rs": "c6bfec4fea2240681298d36670d36b5301eee1adbc0521579f7c4fd7e3ae5aef"
+ },
+ "sourceArchivesSha256": {
+  "base": "ea145db679839fabcc1c485a1255191b998236af099d5087ac6733875ada2dd2",
+  "candidate": "03968fe4b8e586b701361b928b0430466f214a42b5ad73fc3d968e0f959ff5be"
+ },
+ "workloads": {
+  "client-official-500": {
+   "pairedRatios": [
+    0.9748733664111513,
+    0.9748921127541299,
+    0.9748728134521185,
+    0.9748961270467702,
+    0.9748250788956426
+   ],
+   "medianPairedRatio": 0.9748733664111513,
+   "pairedRatioRange": [
+    0.9748250788956426,
+    0.9748961270467702
+   ],
+   "arms": {
+    "base": {
+     "medianInstructions": 20997317135,
+     "range": [
+      20996612036,
+      20998382748
+     ]
+    },
+    "candidate": {
+     "medianInstructions": 20469725241,
+     "range": [
+      20469472905,
+      20470147632
+     ]
+    }
+   },
+   "bothArms": {
+    "population": {
+     "depleted": false,
+     "maxAnchors": 1367,
+     "maxLiving": 500,
+     "meanLiving": 497.14,
+     "minAnchors": 948,
+     "minLiving": 474,
+     "requested": 500,
+     "samples": 100
+    },
+    "physicsTicks": 648,
+    "admissionCalls": 292,
+    "lifecycle": {
+     "bodyDeaths": 286,
+     "boundaryDeaths": 0,
+     "deathFoodPellets": 1562,
+     "deferredRespawns": 0,
+     "epochs": 0,
+     "refusalsPerDecision": 0.0,
+     "respawns": 292,
+     "respawnsPerDecision": 2.92
+    },
+    "finalLiving": 500,
+    "validityWindowOperations": 1
+   }
+  },
+  "client-battledome-40": {
+   "pairedRatios": [
+    0.9805212238650052,
+    0.980478486750404,
+    0.9803880905191026,
+    0.9805511520112884,
+    0.9804651979102563
+   ],
+   "medianPairedRatio": 0.980478486750404,
+   "pairedRatioRange": [
+    0.9803880905191026,
+    0.9805511520112884
+   ],
+   "arms": {
+    "base": {
+     "medianInstructions": 16114833556,
+     "range": [
+      16113580793,
+      16115022231
+     ]
+    },
+    "candidate": {
+     "medianInstructions": 15800151258,
+     "range": [
+      15798790899,
+      15800478524
+     ]
+    }
+   },
+   "bothArms": {
+    "population": {
+     "depleted": false,
+     "maxAnchors": 1066,
+     "maxLiving": 40,
+     "meanLiving": 39.99,
+     "minAnchors": 1036,
+     "minLiving": 39,
+     "requested": 40,
+     "samples": 100
+    },
+    "physicsTicks": 4200,
+    "admissionCalls": 2,
+    "lifecycle": {
+     "bodyDeaths": 0,
+     "boundaryDeaths": 0,
+     "deathFoodPellets": 4,
+     "deferredRespawns": 0,
+     "epochs": 0,
+     "pitDeaths": 1,
+     "refusalsPerDecision": 0.0,
+     "respawns": 2,
+     "respawnsPerDecision": 0.02
+    },
+    "finalLiving": 40,
+    "validityWindowOperations": 4
+   }
+  },
+  "client-battledome-64": {
+   "pairedRatios": [
+    0.9638548525131002,
+    0.9636708945913134,
+    0.9634739845930148,
+    0.9635167711246722,
+    0.9631646789587789
+   ],
+   "medianPairedRatio": 0.9635167711246722,
+   "pairedRatioRange": [
+    0.9631646789587789,
+    0.9638548525131002
+   ],
+   "arms": {
+    "base": {
+     "medianInstructions": 13785878385,
+     "range": [
+      13783055227,
+      13789128088
+     ]
+    },
+    "candidate": {
+     "medianInstructions": 13284283938,
+     "range": [
+      13281201128,
+      13285049756
+     ]
+    }
+   },
+   "bothArms": {
+    "population": {
+     "depleted": false,
+     "maxAnchors": 1670,
+     "maxLiving": 64,
+     "meanLiving": 64.0,
+     "minAnchors": 1669,
+     "minLiving": 64,
+     "requested": 64,
+     "samples": 100
+    },
+    "physicsTicks": 4200,
+    "admissionCalls": 1,
+    "lifecycle": {
+     "bodyDeaths": 0,
+     "boundaryDeaths": 0,
+     "deathFoodPellets": 0,
+     "deferredRespawns": 0,
+     "epochs": 0,
+     "refusalsPerDecision": 0.0,
+     "respawns": 1,
+     "respawnsPerDecision": 0.01
+    },
+    "finalLiving": 64,
+    "validityWindowOperations": 4
+   }
+  },
+  "client-battledome-80": {
+   "pairedRatios": [
+    0.9607147583615113,
+    0.9606410260129604,
+    0.9605203202456506,
+    0.9606306975307392,
+    0.9604214078342213
+   ],
+   "medianPairedRatio": 0.9606306975307392,
+   "pairedRatioRange": [
+    0.9604214078342213,
+    0.9607147583615113
+   ],
+   "arms": {
+    "base": {
+     "medianInstructions": 15869544877,
+     "range": [
+      15867431395,
+      15872662862
+     ]
+    },
+    "candidate": {
+     "medianInstructions": 15244445212,
+     "range": [
+      15242741689,
+      15245104321
+     ]
+    }
+   },
+   "bothArms": {
+    "population": {
+     "depleted": false,
+     "maxAnchors": 2085,
+     "maxLiving": 80,
+     "meanLiving": 79.98,
+     "minAnchors": 2057,
+     "minLiving": 79,
+     "requested": 80,
+     "samples": 100
+    },
+    "physicsTicks": 4200,
+    "admissionCalls": 3,
+    "lifecycle": {
+     "bodyDeaths": 2,
+     "boundaryDeaths": 0,
+     "deathFoodPellets": 1,
+     "deferredRespawns": 0,
+     "epochs": 0,
+     "refusalsPerDecision": 0.0,
+     "respawns": 3,
+     "respawnsPerDecision": 0.03
+    },
+    "finalLiving": 80,
+    "validityWindowOperations": 4
+   }
+  }
+ },
+ "traces": [
+  {
+   "case": "portable",
+   "bytes": 17260699,
+   "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "protocol",
+   "bytes": 8343664,
+   "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "client-official-500",
+   "bytes": 82283668,
+   "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "client-battledome-64",
+   "bytes": 57140985,
+   "sha256": "640ef5a2a9fa18e63ce18e96f126efa11007a3d33904e61a9c489507d09f446f",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "retained-step_all",
+   "bytes": 1772204756,
+   "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "retained-next_frame",
+   "bytes": 1736165882,
+   "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "client-battledome-40",
+   "bytes": 37113253,
+   "sha256": "aef8930c6401c13984549c1843ac31a4ccea0b0252a7440338427e1742955f45",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "client-battledome-64",
+   "bytes": 57140985,
+   "sha256": "640ef5a2a9fa18e63ce18e96f126efa11007a3d33904e61a9c489507d09f446f",
+   "terminal": "report",
+   "equal": true
+  },
+  {
+   "case": "client-battledome-80",
+   "bytes": 72398702,
+   "sha256": "3093e2249025ee031b8db411da9bbc9db403144d4cbfb1496045ae6d799df8c3",
+   "terminal": "report",
+   "equal": true
+  }
+ ],
+ "minimumCounterScheduledPercent": 100.0
+}

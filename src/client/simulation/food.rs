@@ -35,6 +35,75 @@ impl SectorFood {
         self.get(offset).is_some()
     }
 }
+
+/// The union of live connections' food subscriptions. Membership identities
+/// avoid scanning every unchanged recipient's sectors on every broadcast.
+#[derive(Default)]
+pub(super) struct FoodSubscriptions {
+    held: Vec<HeldSubscription>,
+    counts: Vec<u32>,
+    sectors: BTreeSet<u16>,
+}
+
+#[derive(Default)]
+struct HeldSubscription {
+    revision: Option<Arc<()>>,
+    sectors: Vec<u16>,
+}
+
+impl FoodSubscriptions {
+    fn sync<'a>(
+        &mut self,
+        interests: impl ExactSizeIterator<Item = Option<&'a SectorInterest>>,
+    ) -> BTreeSet<u16> {
+        let len = interests.len();
+        self.held
+            .resize_with(self.held.len().max(len), HeldSubscription::default);
+        self.counts.resize(1 << 16, 0);
+        let mut retired = BTreeSet::new();
+        for (held, interest) in self
+            .held
+            .iter_mut()
+            .zip(interests.chain(std::iter::repeat(None)))
+        {
+            let revision = interest.map(SectorInterest::revision);
+            let unchanged = match (&held.revision, revision) {
+                (Some(old), Some(new)) => Arc::ptr_eq(old, new),
+                (None, None) => true,
+                _ => false,
+            };
+            if unchanged {
+                continue;
+            }
+            for sector in held.sectors.drain(..) {
+                self.counts[usize::from(sector)] -= 1;
+                if self.counts[usize::from(sector)] == 0 {
+                    self.sectors.remove(&sector);
+                    retired.insert(sector);
+                }
+            }
+            // Retain the identity strongly: a closed/replaced connection cannot
+            // have its old address reused while this snapshot still names it.
+            held.revision = revision.cloned();
+            if let Some(interest) = interest {
+                for &sector in interest.subscribed() {
+                    let sector = u16::from_be_bytes(sector);
+                    let count = &mut self.counts[usize::from(sector)];
+                    if *count == 0 {
+                        self.sectors.insert(sector);
+                    }
+                    *count += 1;
+                    held.sectors.push(sector);
+                }
+            }
+        }
+        self.held.truncate(len);
+        // A sector may change owners in this same broadcast. Keep its listing
+        // unless the final union really lost it, regardless of update order.
+        retired.retain(|&sector| self.counts[usize::from(sector)] == 0);
+        retired
+    }
+}
 #[cfg(test)]
 impl std::ops::Index<&[u8; 2]> for SectorFood {
     type Output = KnownFood;
@@ -278,33 +347,25 @@ impl SimulatorBackend {
             (Some(markers), Some(radius)) => markers.update(radius, now)?,
             _ => false,
         };
-        // Taken so an early error drops a partly filled table.
-        let mut buckets = std::mem::take(&mut self.food_buckets);
-        buckets.resize(1 << 16, u32::MAX);
-        let mut sectors = Vec::new();
-        for slot in self.slots.iter().filter(|slot| slot.connection.setup) {
-            for &sector in slot.connection.food_interest.subscribed() {
-                let index = u16::from_be_bytes(sector);
-                if buckets[usize::from(index)] == u32::MAX {
-                    buckets[usize::from(index)] = sectors.len() as u32;
-                    sectors.push(index);
-                }
-            }
-        }
+        let retired = self.food_subscriptions.sync(self.slots.iter().map(|slot| {
+            slot.connection
+                .setup
+                .then_some(&slot.connection.food_interest)
+        }));
         let table = &mut self.food_sectors;
         table.resize(1 << 16, None);
         if self.pit_markers.is_some() {
             self.decorated_food_sectors.resize(1 << 16, None);
         }
-        for &index in &self.listed {
-            if buckets[usize::from(index)] == u32::MAX {
-                table[usize::from(index)] = None;
-                if self.pit_markers.is_some() {
-                    self.decorated_food_sectors[usize::from(index)] = None;
-                }
+        for index in retired {
+            table[usize::from(index)] = None;
+            if self.pit_markers.is_some() {
+                self.decorated_food_sectors[usize::from(index)] = None;
             }
         }
-        for &index in &sectors {
+        // Listings are independent and indexed by sector. Recipient packet
+        // order comes from food_updates' sorted subscriptions, not this union.
+        for &index in &self.food_subscriptions.sectors {
             let listing = &mut table[usize::from(index)];
             if listing.is_none() || self.food_index.dirty.contains(&index) {
                 let run = self.food_index.listing(index);
@@ -334,11 +395,6 @@ impl SimulatorBackend {
         }
         // Unlisted sectors are built afresh when a connection subscribes.
         self.food_index.dirty.clear();
-        for &index in &sectors {
-            buckets[usize::from(index)] = u32::MAX;
-        }
-        self.food_buckets = buckets;
-        self.listed = sectors;
         let current = Arc::new(());
         let previous = std::mem::replace(&mut self.food_revision, current.clone());
         Ok(FoodChanges {
@@ -510,6 +566,110 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subscription_union_matches_full_rebuild_through_handoffs_and_slot_reuse() {
+        let interest = |sectors: &[[u8; 2]]| {
+            SectorInterest::from_subscribed(sectors.iter().copied().collect())
+        };
+        let a = interest(&[[0, 0], [1, 2], [255, 255]]);
+        let b = interest(&[[1, 2], [2, 3]]);
+        let c = interest(&[[3, 4], [4, 5]]);
+        let empty = interest(&[]);
+        let cases = [
+            vec![Some(a.clone()), Some(b.clone())],
+            vec![Some(a.clone()), Some(b.clone())],
+            // Neither owner nor a fresh identity with equal membership may
+            // retire a sector that still belongs to the final union.
+            vec![Some(b.clone()), Some(a.clone())],
+            vec![
+                Some(b.clone()),
+                Some(interest(&[[0, 0], [1, 2], [255, 255]])),
+            ],
+            vec![None, Some(a.clone()), Some(c.clone())],
+            vec![Some(c.clone()), Some(empty.clone())],
+            vec![],
+            vec![Some(empty), None, Some(a.clone()), Some(a)],
+            vec![None],
+        ];
+        let mut cache = FoodSubscriptions::default();
+        let mut previous = BTreeSet::new();
+        for case in cases {
+            let mut counts = vec![0; 1 << 16];
+            let expected: BTreeSet<_> = case
+                .iter()
+                .flatten()
+                .flat_map(|i| {
+                    i.subscribed()
+                        .iter()
+                        .map(|&sector| u16::from_be_bytes(sector))
+                })
+                .collect();
+            for interest in case.iter().flatten() {
+                for &sector in interest.subscribed() {
+                    counts[usize::from(u16::from_be_bytes(sector))] += 1;
+                }
+            }
+            let retired = cache.sync(case.iter().map(Option::as_ref));
+            assert_eq!(cache.sectors, expected);
+            assert_eq!(cache.counts, counts);
+            assert_eq!(cache.held.len(), case.len());
+            assert_eq!(retired, previous.difference(&expected).copied().collect());
+            previous = expected;
+        }
+    }
+
+    #[test]
+    fn sector_handoff_keeps_both_listing_handles_until_the_last_subscriber_leaves() {
+        let mut world = crate::Config::sandbox();
+        world.pit = Some(crate::PitConfig { radius: 500. });
+        let mut backend = SimulatorBackend::new(
+            7,
+            crate::client::SimulationConfig {
+                world,
+                agents: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let sectors = BTreeSet::from([[108, 110], [110, 108]]);
+        backend.slots[0].connection.setup = true;
+        backend.slots[1].connection.setup = false;
+        backend.slots[0].connection.food_interest =
+            SectorInterest::from_subscribed(sectors.clone());
+        backend.sync_food_sectors().unwrap();
+        let index = usize::from(u16::from_be_bytes([110, 108]));
+        let physical = backend.food_sectors[index].as_ref().unwrap().clone();
+        let decorated = backend.decorated_food_sectors[index]
+            .as_ref()
+            .unwrap()
+            .clone();
+        assert!(!Arc::ptr_eq(&physical, &decorated));
+        backend.slots[0].connection.setup = false;
+        backend.slots[1].connection.setup = true;
+        backend.slots[1].connection.food_interest =
+            SectorInterest::from_subscribed(sectors.clone());
+        backend.sync_food_sectors().unwrap();
+        assert!(Arc::ptr_eq(
+            &physical,
+            backend.food_sectors[index].as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            &decorated,
+            backend.decorated_food_sectors[index].as_ref().unwrap()
+        ));
+        backend.slots[1].connection.setup = false;
+        backend.sync_food_sectors().unwrap();
+        assert!(backend.food_sectors[index].is_none());
+        assert!(backend.decorated_food_sectors[index].is_none());
+        backend.slots[0].connection.setup = true;
+        backend.slots[0].connection.food_interest = SectorInterest::from_subscribed(sectors);
+        backend.sync_food_sectors().unwrap();
+        assert!(!Arc::ptr_eq(
+            &physical,
+            backend.food_sectors[index].as_ref().unwrap()
+        ));
+    }
 
     /// Full ordered-map walk, independent of membership identity and change hints.
     fn reference_updates(

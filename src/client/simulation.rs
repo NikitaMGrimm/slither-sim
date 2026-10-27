@@ -70,7 +70,7 @@ pub(crate) use remote::RawSimulator;
 
 use broadcast::{PreyClock, Record};
 use connection::{Connection, Slot};
-use food::{FoodIndex, SectorFood};
+use food::{FoodIndex, FoodSubscriptions, SectorFood};
 use snakes::SnakeReports;
 
 /// Simulator backend whose clients reconstruct frames from protocol-19 bytes.
@@ -111,10 +111,7 @@ pub struct SimulatorBackend {
     next_leaderboard: u64,
     prey_clocks: BTreeMap<u64, PreyClock>,
     reports: Vec<SnakeReports>,
-    /// Sectors listed at the last broadcast.
-    listed: Vec<u16>,
-    /// Scratch sector-to-bucket table, all `u32::MAX` between broadcasts.
-    food_buckets: Vec<u32>,
+    food_subscriptions: FoodSubscriptions,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
@@ -198,8 +195,7 @@ impl SimulatorBackend {
             next_leaderboard: 1,
             prey_clocks: BTreeMap::new(),
             reports: vec![SnakeReports::default(); config.agents],
-            listed: Vec::new(),
-            food_buckets: Vec::new(),
+            food_subscriptions: FoodSubscriptions::default(),
             slots: Vec::with_capacity(config.agents),
             background_policy: None,
             player_latency: PlayerLatency::default(),
