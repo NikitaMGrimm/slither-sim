@@ -50,3 +50,15 @@ merge `5eb0736` and build both arms afresh against it. Reuse the same protocol
 and fixture overlays, not the older binaries. Do not pool the rejected F-cache
 series or interrupted union attempts with this series. All other methods,
 gates, resource limits and publication limits above remain unchanged.
+
+## Recovery amendment, before rebuilt union measurements
+
+Disk exhaustion forced a WSL restart, which erased the temporary directories,
+including the rejected F-cache's raw series, old diagnostic stacks, and the
+interrupted union check logs. Windows source archives/scripts and Git pins
+survived. Treat the earlier figures above as historical reports with unavailable
+raw data, not verified evidence for this comparison. Rebuild both frozen pins
+and every required check/trace/count. Keep this new series and task-local perf
+tools in persistent WSL home storage, with selected results copied to Windows.
+The frozen runtimes and measurement method remain unchanged. No live timing or
+capacity claim follows from the recovery window.
