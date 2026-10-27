@@ -4,33 +4,34 @@
 
 ## [0.7.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.6.2...v0.7.0) - 2026-10-27
 
-### Added
+### Breaking
 
-- *(battledome)* [**breaking**] preserve density with guarded spawn fallback ([#191](https://github.com/NikitaMGrimm/slither-sim/pull/191))
-- *(host)* support protocol-13 browser clients ([#190](https://github.com/NikitaMGrimm/slither-sim/pull/190))
-- *(battledome)* [**breaking**] keep food inside the pit and feed floor deaths ([#187](https://github.com/NikitaMGrimm/slither-sim/pull/187))
-- *(host)* name bot seats like official server bots ([#184](https://github.com/NikitaMGrimm/slither-sim/pull/184))
-- *(client)* [**breaking**] report live Battledome rules to socket bots ([#183](https://github.com/NikitaMGrimm/slither-sim/pull/183))
-- *(host)* give each bot seat its own stock skin ([#182](https://github.com/NikitaMGrimm/slither-sim/pull/182))
-- *(client)* [**breaking**] show Battledome kills and a visible pit ([#180](https://github.com/NikitaMGrimm/slither-sim/pull/180))
-- *(battledome)* [**breaking**] grow crowded arenas for safe spawns ([#176](https://github.com/NikitaMGrimm/slither-sim/pull/176))
-
-### Fixed
-
-- *(host)* wake socket delivery when frames are encoded ([#197](https://github.com/NikitaMGrimm/slither-sim/pull/197))
-- *(host)* align legacy minimaps with the player marker ([#196](https://github.com/NikitaMGrimm/slither-sim/pull/196))
-- *(host)* admit more browser mod clients ([#193](https://github.com/NikitaMGrimm/slither-sim/pull/193))
-- *(host)* cull food at moving arena edges ([#189](https://github.com/NikitaMGrimm/slither-sim/pull/189))
-- *(host)* number bot names from the first bot seat ([#185](https://github.com/NikitaMGrimm/slither-sim/pull/185))
-- *(bots)* keep Battledome foragers inside the live pit ([#181](https://github.com/NikitaMGrimm/slither-sim/pull/181))
-
-### Other
-
-- *(hosting)* name the browser mods that can join ([#194](https://github.com/NikitaMGrimm/slither-sim/pull/194))
-- *(host)* share minimap packets by recipient baseline ([#192](https://github.com/NikitaMGrimm/slither-sim/pull/192))
-- *(host)* avoid rebuilding the food-sector union each tick ([#188](https://github.com/NikitaMGrimm/slither-sim/pull/188))
-- *(host)* avoid repeated food scans for stable recipients ([#179](https://github.com/NikitaMGrimm/slither-sim/pull/179))
-- *(perf)* measure one-core EPYC socket capacity ([#178](https://github.com/NikitaMGrimm/slither-sim/pull/178))
+- Battledome keeps its 3,584 radius up to 32 players and grows above that so
+  each player keeps the same space: about 5,069 at 64 seats and 5,667 at 80.
+  The pit and spawn band scale with it. A spawn that finds no strictly safe
+  spot within two seconds takes the safest spot that still keeps clear of
+  bodies and of other snakes' paths to the middle. `dynamicRadius: false` keeps
+  the 3,584 arena. Checkpoints use rules revision `slither-sim-rules-v5` and
+  reject earlier continuations.
+- Battledome food stays inside the pit (`foodOnlyInsidePit`). Ambient food
+  spawns only there, scaled to the pit's area. Every death drops food,
+  including floor-size snakes and pit-edge deaths, but only pellets that land
+  inside the pit remain. Boost pellets follow the same rule, so boost mass
+  spent outside the pit is lost. Food left outside a moving edge is removed.
+  Worlds without the setting keep their old food rules. Rust `Config` literals
+  need the new `food_only_inside_pit` field.
+- In worlds with `killScoreSeconds` (Battledome), the stock leaderboard and own
+  rank show rolling kills instead of size. Players who left stay listed while
+  their kills count; a new player in their seat starts at zero. Pit worlds'
+  minimaps show only snakes inside the pit and default to 256 cells (136
+  elsewhere), so `SimulationConfig.minimap_side` is now `Option<usize>`; JSON
+  accepts an integer or `null`.
+- SlitherSim hosts tell bot clients the live mode rules: pit radius, size
+  floor, kill-score window, boundary and free floor boost. They are sent at
+  setup and whenever they change, and surface as the optional
+  `ClientFrame.rules`. Host and socket bots read the same field, so
+  `ForagerBot::with_world_rules` is gone; use `new()`. Client JSON stays v2,
+  and stock browsers never receive the message.
 
 ### Added
 
@@ -48,31 +49,6 @@
 
 ### Changed
 
-- **Breaking:** Battledome food stays inside the pit (`foodOnlyInsidePit`).
-  Ambient food spawns only there, scaled to the pit's area. Every death drops
-  food, including floor-size snakes and pit-edge deaths, but only pellets that
-  land inside the pit remain. Boost pellets follow the same rule, so boost mass
-  spent outside the pit is lost. Food left outside a moving edge is removed.
-  Worlds without the setting keep their old food rules.
-- **Breaking:** Battledome keeps its 3,584 radius up to 32 players and grows
-  above that so each player keeps the same space: about 5,069 at 64 seats and
-  5,667 at 80. The pit and spawn band scale with it. A spawn that finds no
-  strictly safe spot within two seconds takes the safest spot that still keeps
-  clear of bodies and of other snakes' paths to the middle.
-  `dynamicRadius: false` keeps the 3,584 arena. Checkpoints use rules revision
-  `slither-sim-rules-v5` and reject earlier continuations.
-- **Breaking (Rust):** SlitherSim hosts tell bot clients the live mode rules:
-  pit radius, size floor, kill-score window, boundary and free floor boost.
-  They are sent at setup and whenever they change, and surface as the optional
-  `ClientFrame.rules`. Host and socket bots read the same field, so
-  `ForagerBot::with_world_rules` is gone; use `new()`. Client JSON stays v2,
-  and stock browsers never receive the message.
-- **Breaking:** in worlds with `killScoreSeconds` (Battledome), the stock
-  leaderboard and own rank show rolling kills instead of size. Players who left
-  stay listed while their kills count; a new player in their seat starts at
-  zero. Pit worlds' minimaps show only snakes inside the pit and default to 256
-  cells (136 elsewhere), so `SimulationConfig.minimap_side` is now
-  `Option<usize>`; JSON accepts an integer or `null`.
 - Host bots each wear their own stock skin, kept across lives, instead of all
   using skin 0. Their death pellets take that skin's colors.
 - Host bots have names such as `Mamba (bot)`, kept across lives, instead of
@@ -82,23 +58,23 @@
 
 ### Fixed
 
+- A client that falls too far behind is disconnected instead of stopping the
+  host. Each socket may queue up to 2 MiB of output, counted the same way for
+  protocol 13 and 19; stock clients previously had a 4,096-frame limit.
 - Hosts send a newly encoded frame right away instead of at the socket
   thread's next 1 ms poll. The 99th-percentile delay between encoding and
   sending fell from 1.5 to 0.03 ms on Windows and from 1.6 to 0.4 ms on Linux
   under WSL2, without busy waiting
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-host-frame-timing/REPORT.md)).
-- A client that falls too far behind is disconnected instead of stopping the
-  host. Each socket may queue up to 2 MiB of output, counted the same way for
-  protocol 13 and 19; stock clients previously had a 4,096-frame limit.
-- Food removed by moving arena boundaries updates the affected sectors without
-  rebuilding the whole food index or revealing waiting ambient births before
-  their scheduled update. Survivor colors stay unchanged.
 - Battledome background bots head into the pit after spawning and treat its
   edge as a lethal wall once inside, instead of dying on it. In three local
   three-minute runs with 64 bots, they spent 87–97% of their time in the pit
   (previously 15–18%) and never died at its edge (previously 18–23 times a
   minute) ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-pit-aware-bots/REPORT.md)).
   Bots in worlds without a pit decide exactly as before.
+- Food removed by moving arena boundaries updates the affected sectors without
+  rebuilding the whole food index or revealing waiting ambient births before
+  their scheduled update. Survivor colors stay unchanged.
 - The pit-edge pellet ring stays visible while the arena shrinks. Replacement
   pellets used to restart the stock client's fade-in before it finished, so the
   ring could stay nearly invisible
