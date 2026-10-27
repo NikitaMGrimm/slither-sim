@@ -1,0 +1,468 @@
+{
+  "pins": {
+    "base": {
+      "runtimeCommit": "6769d7178a4afe518e0c19608ec925aa3fe08a2e",
+      "archiveSha256": "222667ae71cb553d8c1d1b70a9ba767222f57c423bbc11610d0ab67cdf9871b5",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "0c497fc83ce5fe870c8c32758fa3d5f3752577ad14d2b3dcab61e94fcae7a67c"
+    },
+    "candidate": {
+      "runtimeCommit": "252587ac02af8d29e37339b1e49a5b3058e6fa13",
+      "archiveSha256": "2568b09d87f99f87b1de97a7070f9c18eef4ea6a7da24f408bab290a49879716",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "5cb25ebcd03cc1ba31ee0156d682efb10167773186bbc089ba1525a4b4253cdf"
+    }
+  },
+  "instructions": {
+    "cases": {
+      "official500": {
+        "baseMedian": 12275633102,
+        "candidateMedian": 12086100824,
+        "pairedMedian": 0.9845670438818507,
+        "pairedRatioMin": 0.9844211243001142,
+        "pairedRatioMax": 0.9846387517097365,
+        "pairs": 5,
+        "warmupPairs": 1
+      },
+      "official500-half": {
+        "baseMedian": 12625509778,
+        "candidateMedian": 12430429490,
+        "pairedMedian": 0.9844852570076212,
+        "pairedRatioMin": 0.9841808030728086,
+        "pairedRatioMax": 0.9847526961695797,
+        "pairs": 5,
+        "warmupPairs": 1
+      },
+      "official500-legacy": {
+        "baseMedian": 12963142161,
+        "candidateMedian": 12773801421,
+        "pairedMedian": 0.9854496715112145,
+        "pairedRatioMin": 0.9852320319468162,
+        "pairedRatioMax": 0.9856153723170447,
+        "pairs": 5,
+        "warmupPairs": 1
+      }
+    },
+    "minCounterScheduledPct": 100.0,
+    "rawPairsSha256": "0e7f7bbe85af5845e631ffd57b30fe22941c372d21293fa5a84b06b6a5514e14"
+  },
+  "historicalTraces": {
+    "stock-traces/portable": {
+      "case": "portable",
+      "equal": true,
+      "base": {
+        "bytes": 17260699,
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "terminalKind": "report",
+        "binarySha256": "d07de9b9f3137c0e2716b9df4d0e4071957613665499bdfc4c53cfdade68cf8a"
+      },
+      "candidate": {
+        "bytes": 17260699,
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "terminalKind": "report",
+        "binarySha256": "9828d5c4d7fe37b06be4029f399f3156b224f12ef841a0eee251fe2c1955634e"
+      }
+    },
+    "stock-traces/protocol": {
+      "case": "protocol",
+      "equal": true,
+      "base": {
+        "bytes": 8343664,
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "terminalKind": "report",
+        "binarySha256": "d07de9b9f3137c0e2716b9df4d0e4071957613665499bdfc4c53cfdade68cf8a"
+      },
+      "candidate": {
+        "bytes": 8343664,
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "terminalKind": "report",
+        "binarySha256": "9828d5c4d7fe37b06be4029f399f3156b224f12ef841a0eee251fe2c1955634e"
+      }
+    },
+    "stock-traces/client-official-500": {
+      "case": "client-official-500",
+      "equal": true,
+      "base": {
+        "bytes": 82283668,
+        "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+        "terminalKind": "report",
+        "binarySha256": "d07de9b9f3137c0e2716b9df4d0e4071957613665499bdfc4c53cfdade68cf8a"
+      },
+      "candidate": {
+        "bytes": 82283668,
+        "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+        "terminalKind": "report",
+        "binarySha256": "9828d5c4d7fe37b06be4029f399f3156b224f12ef841a0eee251fe2c1955634e"
+      }
+    },
+    "stock-traces/client-battledome-64": {
+      "case": "client-battledome-64",
+      "equal": true,
+      "base": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "d07de9b9f3137c0e2716b9df4d0e4071957613665499bdfc4c53cfdade68cf8a"
+      },
+      "candidate": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "9828d5c4d7fe37b06be4029f399f3156b224f12ef841a0eee251fe2c1955634e"
+      }
+    },
+    "stock-traces/retained-step_all": {
+      "case": "retained-step_all",
+      "equal": true,
+      "base": {
+        "bytes": 1772204756,
+        "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+        "terminalKind": "report",
+        "binarySha256": "0a296d2b254930347c36643ffbbdcaa0a52bb9b41b1596b60f1a6f974dd1db2b"
+      },
+      "candidate": {
+        "bytes": 1772204756,
+        "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+        "terminalKind": "report",
+        "binarySha256": "16731f86f126b3066414aea1736d78b595069d0fcf1b7af48af10cebd14f1a5c"
+      }
+    },
+    "stock-traces/retained-next_frame": {
+      "case": "retained-next_frame",
+      "equal": true,
+      "base": {
+        "bytes": 1736165882,
+        "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+        "terminalKind": "report",
+        "binarySha256": "0a296d2b254930347c36643ffbbdcaa0a52bb9b41b1596b60f1a6f974dd1db2b"
+      },
+      "candidate": {
+        "bytes": 1736165882,
+        "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+        "terminalKind": "report",
+        "binarySha256": "16731f86f126b3066414aea1736d78b595069d0fcf1b7af48af10cebd14f1a5c"
+      }
+    },
+    "dome-traces/client-battledome-40": {
+      "case": "client-battledome-40",
+      "equal": true,
+      "base": {
+        "bytes": 25201354,
+        "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+        "terminalKind": "report",
+        "binarySha256": "0ddf124356bb6f9ded95efb0e7d4c1a2e739cc4c4332433c87da25913ef3dfb2"
+      },
+      "candidate": {
+        "bytes": 25201354,
+        "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+        "terminalKind": "report",
+        "binarySha256": "1af54495f7d12a6c94abc64f391f3f664f3382c01fbe454d92fbe2a21f46be54"
+      }
+    },
+    "dome-traces/client-battledome-64": {
+      "case": "client-battledome-64",
+      "equal": true,
+      "base": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "0ddf124356bb6f9ded95efb0e7d4c1a2e739cc4c4332433c87da25913ef3dfb2"
+      },
+      "candidate": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "1af54495f7d12a6c94abc64f391f3f664f3382c01fbe454d92fbe2a21f46be54"
+      }
+    },
+    "dome-traces/client-battledome-80": {
+      "case": "client-battledome-80",
+      "equal": true,
+      "base": {
+        "bytes": 52296445,
+        "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+        "terminalKind": "report",
+        "binarySha256": "0ddf124356bb6f9ded95efb0e7d4c1a2e739cc4c4332433c87da25913ef3dfb2"
+      },
+      "candidate": {
+        "bytes": 52296445,
+        "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+        "terminalKind": "report",
+        "binarySha256": "1af54495f7d12a6c94abc64f391f3f664f3382c01fbe454d92fbe2a21f46be54"
+      }
+    }
+  },
+  "profiles": {
+    "base": {
+      "ticks": 853,
+      "meanInstructions": {
+        "pre_physics": 117808.03399765534,
+        "setup": 101234.38335287222,
+        "movement_boost_body": 467679.31066822977,
+        "collision_records": 137433.50527549823,
+        "collision_order_index": 245461.36459554514,
+        "collision_tests": 293065.18640093785,
+        "death_drops": 75.0,
+        "pickup_cache": 771219.876905041,
+        "prey": 461505.3223915592,
+        "ambient": 4045.960140679953,
+        "finish": 26695.011723329426
+      },
+      "nestedMeanInstructions": {
+        "bounds_index_build": 0,
+        "bounds_index_query": 0
+      },
+      "nestedMeanCalls": {
+        "bounds_index_build": 0,
+        "bounds_index_query": 0
+      },
+      "physicsTotal": 2508414.921453693,
+      "minScheduledPct": 100.0,
+      "rawSha256": "df29a702d138b673ac0750649e610765c4075616cc329806e10774cc8a546d68",
+      "binarySha256": "e7a08ed8f8262d6960e83aa25811030262ead8b7b80f1e2bf372a8dd006ff42f",
+      "sourcePins": {
+        "ref": "6769d7178a4afe518e0c19608ec925aa3fe08a2e",
+        "nested": false,
+        "archiveSha256": "222667ae71cb553d8c1d1b70a9ba767222f57c423bbc11610d0ab67cdf9871b5",
+        "overlay": {
+          "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+          "src/simulator.rs": "beb91819c5e5a11150a4552402bfebd76b3c6f36ef503b29f7a050d44c60b44c",
+          "src/core_profile.rs": "c35afb6016d369ce486bda83431bf8f1a02193c0740173ee01c5c2339aef7b44",
+          "src/client/simulation.rs": "455ee3702440098fba36e52f3c9319e022640a846b9fb93d4d94170df939fd05",
+          "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+          "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+          "examples/study_protocols.rs": "4cee510482d83ea4e01ba0969b850a0d20dd1487f7c3ae340c81ffc7285afda2"
+        }
+      }
+    },
+    "candidate": {
+      "ticks": 853,
+      "meanInstructions": {
+        "pre_physics": 114745.84056271981,
+        "setup": 101234.35404454866,
+        "movement_boost_body": 467679.0750293083,
+        "collision_records": 137433.48065650644,
+        "collision_order_index": 187539.35052754983,
+        "collision_tests": 243023.1043376319,
+        "death_drops": 75.0,
+        "pickup_cache": 771219.5650644783,
+        "prey": 395583.92731535755,
+        "ambient": 4045.8851113716296,
+        "finish": 26695.00117233294
+      },
+      "nestedMeanInstructions": {
+        "bounds_index_build": 0,
+        "bounds_index_query": 0
+      },
+      "nestedMeanCalls": {
+        "bounds_index_build": 0,
+        "bounds_index_query": 0
+      },
+      "physicsTotal": 2334528.743259086,
+      "minScheduledPct": 100.0,
+      "rawSha256": "4d6570e1ac37c79dbd520adf34e99ff853c3658258ebdc6213e15386349f3ed4",
+      "binarySha256": "5b9b830f559c3713968be052926aa4c5eaa598c6291aec83916e91323fee52da",
+      "sourcePins": {
+        "ref": "252587ac02af8d29e37339b1e49a5b3058e6fa13",
+        "nested": false,
+        "archiveSha256": "2568b09d87f99f87b1de97a7070f9c18eef4ea6a7da24f408bab290a49879716",
+        "overlay": {
+          "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+          "src/simulator.rs": "beb91819c5e5a11150a4552402bfebd76b3c6f36ef503b29f7a050d44c60b44c",
+          "src/core_profile.rs": "c35afb6016d369ce486bda83431bf8f1a02193c0740173ee01c5c2339aef7b44",
+          "src/client/simulation.rs": "455ee3702440098fba36e52f3c9319e022640a846b9fb93d4d94170df939fd05",
+          "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+          "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+          "examples/study_protocols.rs": "4cee510482d83ea4e01ba0969b850a0d20dd1487f7c3ae340c81ffc7285afda2"
+        }
+      }
+    },
+    "nestedDiagnostic": {
+      "ticks": 853,
+      "meanInstructions": {
+        "pre_physics": 116565.96600234466,
+        "setup": 101234.36694021102,
+        "movement_boost_body": 467679.3153575616,
+        "collision_records": 137433.50058616648,
+        "collision_order_index": 245020.90035169988,
+        "collision_tests": 343656.89917936694,
+        "death_drops": 75.0,
+        "pickup_cache": 771219.9519343494,
+        "prey": 468495.6436107855,
+        "ambient": 4045.909730363423,
+        "finish": 26695.00586166471
+      },
+      "nestedMeanInstructions": {
+        "bounds_index_build": 332791.05861664715,
+        "bounds_index_query": 244158.44314185227
+      },
+      "nestedMeanCalls": {
+        "bounds_index_build": 2,
+        "bounds_index_query": 570.9695193434935
+      },
+      "physicsTotal": 2565556.493552169,
+      "minScheduledPct": 100.0,
+      "rawSha256": "01f463dcebefef611422aeb050fe5cae89a63eb3aca6565e7384950eea7458cd",
+      "binarySha256": "03bdfa67b86e5df5931f730dc41e159af41308926903ac43a4350a1831dfc2cc",
+      "sourcePins": {
+        "ref": "6769d7178a4afe518e0c19608ec925aa3fe08a2e",
+        "nested": true,
+        "archiveSha256": "222667ae71cb553d8c1d1b70a9ba767222f57c423bbc11610d0ab67cdf9871b5",
+        "overlay": {
+          "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+          "src/simulator.rs": "beb91819c5e5a11150a4552402bfebd76b3c6f36ef503b29f7a050d44c60b44c",
+          "src/core_profile.rs": "c35afb6016d369ce486bda83431bf8f1a02193c0740173ee01c5c2339aef7b44",
+          "src/client/simulation.rs": "455ee3702440098fba36e52f3c9319e022640a846b9fb93d4d94170df939fd05",
+          "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+          "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+          "examples/study_protocols.rs": "4cee510482d83ea4e01ba0969b850a0d20dd1487f7c3ae340c81ffc7285afda2",
+          "src/bounds_index.rs": "c496235285e9587046c2ed78da1c0db2557a3fad090ec90f36a9bd335edbbb64"
+        }
+      }
+    }
+  },
+  "alternatives": {
+    "bitset": {
+      "cases": {
+        "official500": {
+          "baseMedian": 12274503201,
+          "candidateMedian": 12301609836,
+          "pairedMedian": 1.0020734778527018,
+          "pairedRatioMin": 1.001956018146465,
+          "pairedRatioMax": 1.0023621524102106,
+          "pairs": 5,
+          "warmupPairs": 1
+        }
+      },
+      "minCounterScheduledPct": 100.0,
+      "rawPairsSha256": "5aefdd4ddc72a44d069040f90392a13520fe59ae4f24a527c1d21f2a0f565f6f",
+      "parentRuntimeCommit": "6769d7178a4afe518e0c19608ec925aa3fe08a2e",
+      "boundsIndexSha256": "420fd7d87ce968768aa9b2e8ef5fd2774b0c1f742a7519530d93a8f0124f7d57",
+      "binarySha256": "623800e685b2d3b5b0d9eead5f42372c8f8a75d6193631ce72922d8a8db3b3fa",
+      "stockTraceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209"
+    },
+    "combined": {
+      "cases": {
+        "official500": {
+          "baseMedian": 12276240187,
+          "candidateMedian": 12113917491,
+          "pairedMedian": 0.9867558047698068,
+          "pairedRatioMin": 0.9866839313868073,
+          "pairedRatioMax": 0.987186339535113,
+          "pairs": 5,
+          "warmupPairs": 1
+        }
+      },
+      "minCounterScheduledPct": 100.0,
+      "rawPairsSha256": "e7ba73994289183c2b7845e2fda0a5b9a6af69b393877cb84d2f35006f073e0b",
+      "parentRuntimeCommit": "6769d7178a4afe518e0c19608ec925aa3fe08a2e",
+      "boundsIndexSha256": "50c45c4495e854f25d1291e55cdbfd68ff932cd2f719a0aa4abce828a111735e",
+      "binarySha256": "4f7a04a8c8bce8203adea7b71f3cbf5909ce9d47a513516da3cfe1d0f0338dd4",
+      "stockTraceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209"
+    }
+  },
+  "officialTraces": {
+    "official500": {
+      "equal": true,
+      "sha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+      "bytes": 37938956,
+      "checkpointSha256": [
+        "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+        "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+      ],
+      "summary": {
+        "bytes": 9954005,
+        "case": "official500",
+        "forcedReconnect": true,
+        "frames": 317188,
+        "latencyRandom": "Random(8650339669496352976)",
+        "legacy": 0,
+        "maps": 1500,
+        "populationFinal": 500,
+        "populationMin": 499,
+        "populationSum": 539894,
+        "reconnects": 3,
+        "refused": 0,
+        "seats": 500,
+        "spawnRandom": "Random(6343971186635748709)",
+        "ticks": 1080
+      }
+    },
+    "official500-half": {
+      "equal": true,
+      "sha256": "f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb",
+      "bytes": 57556590,
+      "checkpointSha256": [
+        "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+        "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+      ],
+      "summary": {
+        "bytes": 10103063,
+        "case": "official500-half",
+        "forcedReconnect": true,
+        "frames": 664841,
+        "latencyRandom": "Random(8650339669496352976)",
+        "legacy": 250,
+        "maps": 1500,
+        "populationFinal": 500,
+        "populationMin": 499,
+        "populationSum": 539894,
+        "reconnects": 3,
+        "refused": 0,
+        "seats": 500,
+        "spawnRandom": "Random(6343971186635748709)",
+        "ticks": 1080
+      }
+    },
+    "official500-legacy": {
+      "equal": true,
+      "sha256": "e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3",
+      "bytes": 77137561,
+      "checkpointSha256": [
+        "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+        "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+      ],
+      "summary": {
+        "bytes": 10253767,
+        "case": "official500-legacy",
+        "forcedReconnect": true,
+        "frames": 1011810,
+        "latencyRandom": "Random(8650339669496352976)",
+        "legacy": 500,
+        "maps": 1500,
+        "populationFinal": 500,
+        "populationMin": 499,
+        "populationSum": 539894,
+        "reconnects": 3,
+        "refused": 0,
+        "seats": 500,
+        "spawnRandom": "Random(6343971186635748709)",
+        "ticks": 1080
+      }
+    }
+  },
+  "validation": {
+    "testedCommit": "ef8b6c4bc85ab36438a48eaa20ad2fe4ff74540e",
+    "archiveSha256": "90f04eec29790866b8080aef3923bfd1ad27d83c713a985ae722f242b28ae64b",
+    "productionSourceSha256": "880aceb7cfc2b74d21d074676239d812bca568f1b1ea1f24b3ff841afca14c46",
+    "rustCheckLogSha256": "93af171bb272e3031b9618c0729232d42e5afaa425ba0b91a12759c30bb1342b",
+    "boundsLogSha256": "c8648dc47109a9868d01cb578e0297e0ffe5ba2f984a54b2251d9d4140151c9e",
+    "physicsLogSha256": "f126a2a3b90d829c7ff9ee81fced3e6e052088ae9d19c991e404344349195bc0"
+  },
+  "documentationCheckLogSha256": "c996e1923ff02e01bdf087d7f572d1ed77dbf14a64ef313deabccecb73080601",
+  "mutationControl": {
+    "mutation": "query x range lx..=hx -> lx..hx",
+    "exit": 101,
+    "test": "bounds_index::tests::indexed_deaths_match_exhaustive_randomized_and_boundary_geometry",
+    "logSha256": "d4761f6178eeaf79ba21d6420ed85be91f55a7a4da0c0ae69398c48a0731c547",
+    "mutatedSourceSha256": "9a9dee40115c93582c0805ee9bc1e6d8af28acbdba7d86a640af0bc0d4122356"
+  },
+  "studyToolSha256": {
+    "reproduce.py": "1cb894d6cf4fc4bc57dfa013fffc61fa67ed6c434bf58a46d0dd337db20dff7c",
+    "profile.py": "09ca60c3f620eb3a517743a034c97b4f662d719f7235c4b953f950e65ef0aa28",
+    "select_profile.py": "e7811bf148ec91e8a4aab6f4d587abc4ead63656fe0ce423307fd871fe9995e8"
+  },
+  "evidenceAccess": "local-only; raw traces, arrays, prototype sources, binaries, diagnostic overlays and failed/untallied attempts outside Git"
+}
