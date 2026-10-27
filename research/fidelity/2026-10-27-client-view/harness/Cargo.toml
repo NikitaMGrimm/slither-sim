@@ -1,0 +1,13 @@
+[package]
+name = "client-view-research"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# This research tool is deliberately separate from SlitherSim's workspace.
+[workspace]
+
+[dependencies]
+slither-client = { git = "https://github.com/NikitaMGrimm/slither-client", rev = "8d0772c015d6b9b73b80253db8c7349aa600b201" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
