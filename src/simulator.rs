@@ -1572,7 +1572,6 @@ impl Simulator {
             fallen,
             eaters,
             hits,
-            eaten,
             prey: prey_buffers,
         } = &mut buffers;
         let c = &self.config;
@@ -2009,23 +2008,13 @@ impl Simulator {
             gain_mass(s, i, gain, "food", &mut self.failure);
         }
         if !hits.is_empty() {
-            eaten.clear();
-            eaten.resize(self.food.len(), false);
-            for &(findex, _) in hits.iter() {
-                eaten[findex] = true;
-            }
             // Both pickup paths append hits in reverse food order. Reversing them
             // lets the cache compact survivor ranges without changing that order.
             self.food_cache.remove(
                 self.food.len(),
                 hits.iter().rev().map(|&(findex, _)| findex),
             );
-            let mut i = 0;
-            self.food.retain(|_| {
-                let keep = !eaten[i];
-                i += 1;
-                keep
-            });
+            compact_food(&mut self.food, hits.iter().rev().map(|&(findex, _)| findex));
         }
         if PROFILE {
             profile.food_seconds += clock.unwrap().elapsed().as_secs_f64();
@@ -2675,7 +2664,6 @@ struct StepBuffers {
     fallen: Vec<bool>,
     eaters: Vec<(usize, Point, f64, Bounds)>,
     hits: Vec<(usize, usize)>,
-    eaten: Vec<bool>,
     prey: PreyBuffers,
 }
 #[derive(Default)]
@@ -2758,6 +2746,33 @@ fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
         || (a.x < -limit && b.x < -limit)
         || (a.y > limit && b.y > limit)
         || (a.y < -limit && b.y < -limit)
+}
+
+/// Remove strictly ascending original food indices, preserving survivor order.
+fn compact_food(food: &mut Vec<Food>, removed: impl Iterator<Item = usize>) {
+    let len = food.len();
+    let (mut read, mut write) = (0, 0);
+    for end in removed.chain(std::iter::once(len)) {
+        debug_assert!(read <= end && end <= len);
+        let kept = end - read;
+        let gap = read - write;
+        if gap != 0 && kept != 0 {
+            if gap <= kept {
+                // Move a survivor range at once, leaving removed items after it.
+                // The untouched suffix still has its original pellet indices.
+                food[write..end].rotate_left(gap);
+            } else {
+                // Rotating a large gap for each tiny survivor range can become
+                // quadratic. Move only survivors here, bounding work by O(len).
+                for offset in 0..kept {
+                    food.swap(write + offset, read + offset);
+                }
+            }
+        }
+        write += kept;
+        read = end + 1;
+    }
+    food.truncate(write);
 }
 
 /// Query occupied eater cells, then restore the original reverse pellet order.
@@ -2843,6 +2858,67 @@ fn find_eater<const PROFILE: bool>(
 mod food_pickup_order_tests {
     use super::*;
     use crate::RadiusUpdate;
+
+    #[test]
+    fn ordered_food_compaction_matches_stable_retention_bit_for_bit() {
+        let foods = |len| {
+            (0..len)
+                .map(|i| Food {
+                    x: [0.0, -0.0, 1e300, f64::NAN, f64::INFINITY][i % 5],
+                    y: i as f64,
+                    value: i as f64 + 1.0,
+                    size: (i % 2 == 0).then_some(i as f64 * 0.25),
+                    origin: [None, Some(Origin::Ambient), Some(Origin::Boost)][i % 3],
+                })
+                .collect::<Vec<_>>()
+        };
+        let bits = |food: &[Food]| {
+            food.iter()
+                .map(|f| {
+                    (
+                        f.x.to_bits(),
+                        f.y.to_bits(),
+                        f.value.to_bits(),
+                        f.size.map(f64::to_bits),
+                        f.origin,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        for len in 0..=12 {
+            for mask in 0..1usize << len {
+                let mut actual = foods(len);
+                let expected: Vec<_> = actual
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| mask & (1 << i) == 0)
+                    .map(|(_, f)| f.clone())
+                    .collect();
+                compact_food(&mut actual, (0..len).filter(|i| mask & (1 << i) != 0));
+                assert_eq!(bits(&actual), bits(&expected), "len {len}, mask {mask}");
+            }
+        }
+        // Cover long rotations and large gaps with tiny survivor ranges.
+        for removed in [
+            vec![],
+            vec![0],
+            vec![1023],
+            vec![1, 17, 127, 511, 997],
+            (0..1024).step_by(2).collect(),
+            (0..1024).filter(|i| i % 19 != 0).collect(),
+            (0..1024).collect(),
+        ] {
+            let mut actual = foods(1024);
+            let expected: Vec<_> = actual
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !removed.contains(i))
+                .map(|(_, f)| f.clone())
+                .collect();
+            compact_food(&mut actual, removed.iter().copied());
+            assert_eq!(bits(&actual), bits(&expected));
+        }
+    }
 
     #[test]
     fn public_food_edits_reset_reusable_mirror_verification() {
