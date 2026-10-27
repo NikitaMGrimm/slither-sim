@@ -48,6 +48,8 @@ The kernel retains scratch space but no per-seat state. The adapter reads the
 live pit from `frame.rules`, entering it after spawning and treating its edge
 as a lethal wall from inside. Host, native and socket bots use this same path.
 `ForagerBot::with_world_rules` has been removed; use `new()` and received rules.
+Rust callers constructing `ClientFrame` literals must initialize `rules`
+(`None` for unknown rules).
 Cost and playing-strength qualification on the current runtime is still pending.
 The [frozen port evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/bots/2026-10-26-forager-port/REPORT.md)
 describes parameter identity, conformance targets and limits.
@@ -195,9 +197,10 @@ inside `config.world`:
 The frame contains only decoded protocol reports. SlitherSim sends the exact live
 pit, floor and kill-score window in `rules`; no configuration side channel or
 scaling of the rounded wall radius is needed. There is no separate per-slot
-rolling-kill field. Reported kills count the current life. Leaderboards in worlds with `killScoreSeconds`
-rank rolling kills; otherwise they rank size. The numeric column is the stock table score
-from the transmitted row, not the opponent's physical mass.
+rolling-kill field. Reported kills count the current life. Leaderboards in worlds
+with `killScoreSeconds` rank rolling kills; otherwise they rank size. The numeric
+column is the stock table score from the transmitted row, not the opponent's
+physical mass.
 
 Example [latency settings](configuration.md#latencyconfig):
 
