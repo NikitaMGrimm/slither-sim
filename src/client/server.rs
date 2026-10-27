@@ -1112,6 +1112,8 @@ impl<S: io::Write> io::Write for ReadBudget<S> {
 
 struct Open<S = TcpStream> {
     socket: WebSocket<ReadBudget<S>>,
+    #[cfg(target_os = "linux")]
+    registered_index: Option<usize>,
     phase: Phase,
     framing: Framing,
     want_session_id: bool,
@@ -1192,11 +1194,17 @@ impl Gateway {
         #[cfg(target_os = "linux")]
         {
             use std::os::fd::AsRawFd;
-            self.readiness
-                .poll(self.sessions.iter().map(|session| match &session.stage {
-                    Stage::Open(open) => Some(open.socket.get_ref().inner.as_raw_fd()),
-                    _ => None,
-                }));
+            self.readiness.poll(
+                self.sessions
+                    .iter_mut()
+                    .map(|session| match &mut session.stage {
+                        Stage::Open(open) => Some((
+                            open.socket.get_ref().inner.as_raw_fd(),
+                            &mut open.registered_index,
+                        )),
+                        _ => None,
+                    }),
+            );
         }
         for (index, session) in self.sessions.iter_mut().enumerate() {
             #[cfg(target_os = "linux")]
@@ -1374,6 +1382,8 @@ impl<S: io::Read + io::Write> Open<S> {
         }
         Self {
             socket,
+            #[cfg(target_os = "linux")]
+            registered_index: None,
             phase: Phase::Hello { framed: false },
             framing: Framing::Elapsed,
             want_session_id: false,
