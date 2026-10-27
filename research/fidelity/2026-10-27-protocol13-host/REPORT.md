@@ -47,7 +47,7 @@ client; its game/challenge decoder and WebSocket payloads are unchanged.
 | --- | --- | --- |
 | Setup, own snake | 13; chosen name and skin 7 correct | 19; chosen name and skin 7 correct |
 | Controls | Visible steering; boost speed increased, release worked | Steering, boost and release worked |
-| Food | 44 own pickup reports in sandbox; 54 in final pit/rejoin run | Visible pellets and changing length |
+| Food | 46 own pickup reports in sandbox; 40 in final pit/rejoin run | Visible pellets and changing length |
 | Death/rejoin | Death fade, menu and fresh playable connection | Death, Play Again and fresh playable connection |
 | Reports | Size board; pit board showed an actual local collision kill of 1 | Size board received |
 | Pit | Edge pellet ring visible; 256-side map with pit outline/inner cells | Covered by unchanged path and offline regressions |
@@ -56,7 +56,7 @@ The replacement client's visible menu uses a red **Play** button after death;
 its detached stock control says **Play Again**. The actual visible button was
 clicked to rejoin. A handwritten local stock peer deliberately hit the player's
 body; its decoder reported game-over without errors. No other players participated.
-The replacement client rendered map occupancy (400 nontransparent raster cells),
+The replacement client rendered map occupancy (413 nontransparent raster cells),
 kill counter 1 and leaderboard 1 while the player was alive.
 No game JavaScript exceptions occurred. Six replacement-client console errors
 were expected blocked external resource requests; stock had 26 such failures.
@@ -65,13 +65,17 @@ The tested gameplay screenshot showed the snake and pellets without visible corr
 Retained failures: first local port was occupied (the new host failed to bind);
 a second attempt accepted setup but ignored bundled gameplay. The first pit
 run earned a kill but the harness targeted a detached rejoin control and timed out;
-the final run used the visible button. Every event log is retained privately.
+the final run used the visible button. A post-rebase comparison was invalidated
+because main and candidate had shared a Cargo target: integration tests linked
+the wrong library and rejected the handshake. All final checks below use fresh,
+separate targets and distinct frozen executables. Every failed log is retained privately.
 
 ## Stock trace comparison and checks
 
 Matched Windows x86-64 debug binaries, Rust 1.99.0, seed 7, one CPU,
 `CARGO_BUILD_JOBS=1`, `RAYON_NUM_THREADS=1`, single-threaded tests.
-Baseline `b40a2ca`; candidate is this change. Command on both binaries:
+Baseline `ac8552891db836ab43fdb15f18017179f1c445c4` (#187/#189/#188);
+runtime candidate `a123d9f5078d211801a128f687c93735cda2364f`. Command on both binaries:
 `perf_baseline client-official-500 1 --trace` (8 warmup records, 1 measured decision).
 All 82,283,626 bytes match, including actions, world state, frames and wire records.
 Both SHA-256: `3acd05bd2bdeb30a96e188a85870ba4a88423292ac6c0f127defd9cbbab4afc0`.
@@ -82,7 +86,13 @@ Offline regressions cover catalog setup/appearance/motion/body/growth/food and
 common reports, map raster equivalence, first-anchor rounding and 2,000 steps,
 large food listings/maps, legacy login boundaries, handshake/control/reconnect,
 mixed-recipient byte/due-time parity and Battledome kill board/ring/raster.
-Checks and final revisions are listed in the PR validation section.
+Full `python tools/check.py rust` passed before the main rebases. On final main:
+212 client-library tests passed (one explicit replay benchmark ignored), plus
+102 client protocol/server/contract/runner and Battledome integration tests;
+workspace/all-target Clippy, formatting, 7 documentation, 13 fixture-version and
+6 catalog tests passed. Portable socket bot: 30 steps, no ended lives, Playing.
+The browser assertions independently decode recorded packets and check controls,
+pickups, kill counter, map occupancy, death and the new playable connection.
 
 ## Retained private artifacts
 
@@ -92,10 +102,12 @@ SHA-256 values identify files, not official server conformance or game physics.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Sandbox browser events | `c9385900fbd5df12436e3b2324a484e1ff4a658e1a2553338d7729a52f44d0ca` |
+| Sandbox browser events | `97d9bab7e9cd5ca4e590b3febaea476b38a1b690ba984628e647a53e196a5df7` |
 | First pit browser events (failed rejoin harness) | `c46e2d493ad5d1d0d54ebc000d0aa02e004ea6611110b695a47bafac2b79d860` |
-| Final pit/rejoin browser events | `6a87f372ad61a7bfc8e91019737e3e10ed2485209e61af659f130dcf69d805fe` |
-| Stock browser events | `ba30f48831f1ccef2c2e7ee2372780b5a38c511a58dca127a891f2155a183796` |
-| Tested host binary | `e183602ae460a056c22938026989e778a5648fed1fc08f90ea23054ab3a17517` |
-| Final pit screenshot | `424520a441c3cebcb2eb415985e493ccc28ece97974e149cd468ab94898672fb` |
-| Final rejoin screenshot | `01ab0b4c3af33052a2304c606504010467d6bc74d30539f0960954881caacd5d` |
+| Final pit/rejoin browser events | `e035adaad9008e0f5296e83ac435158283e73eb4b8f93d27af44142e4285fbda` |
+| Stock browser events | `2495a55da5ddba467b0b3f42a77d5a268a3ffc40cf3fea348ec9c7fd66cf47b4` |
+| Tested host binary | `f632785ac067f060f1210c0b10f3254cdf98d7585f5821bd8074d654e8e75dcb` |
+| Final pit screenshot | `b1217e210f04ca15e7504cbdf1ba32887eaf4fcf17898a7bedee4b268e4da03f` |
+| Final rejoin screenshot | `7c13bd2b52f9cbad04703ec6a3f2108911dbc309e0fd03d2b5f9633c821e2a30` |
+| Main reference executable | `e9e740c0a99206e2ab14ccb743a9a4ecb01457ba5055dfd644d04a51a75a6899` |
+| Candidate executable | `28c5cc5629cf798b34b97609ffbd37eb3032d2599271fcc7a45f18610d24d4e2` |
