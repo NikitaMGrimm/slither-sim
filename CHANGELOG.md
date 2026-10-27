@@ -24,6 +24,11 @@
 
 ### Performance
 
+- The host refreshes each player's retained food subscriptions once per tick,
+  preserving standalone broadcasts and interrupted-tick behavior. Output is
+  byte-identical, and the 500-player official fixture runs 1.9–2.1% fewer
+  instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-interest-refresh/REPORT.md)).
 - Each tick, the host rebuilds shared food listings only for sectors whose
   food changed or that a player started watching, instead of checking every
   watched sector; a moving Battledome pit still refreshes them all. Output is
