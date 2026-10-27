@@ -1,6 +1,6 @@
-//! Caches for the step's food paths. Neither one can change a result: the cell
-//! occupancy cache is compared with `Simulator::food` bit for bit before it is
-//! trusted, and the eater grid omits only pickup candidates that cannot qualify.
+//! Caches for the step's food paths. Untrusted food lists are checked bit for
+//! bit; owned mirrored spans preserve that verification. The eater grid omits
+//! only pickup candidates that cannot qualify.
 use crate::model::{Food, Origin, Point};
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
@@ -81,8 +81,9 @@ impl Entry {
 
 /// Per-cell pellet counts and the ambient count, derived from a mirror of the
 /// food list. Every count is always a function of `entries`; the mirror is
-/// trusted only after comparing it with the current food, so external edits
-/// between steps force a rebuild.
+/// first verified against the current food. Untrusted spans compare again;
+/// the simulator can retain verification because public edits reset this cache,
+/// internal pushes/removals are mirrored, and retention changes the list length.
 #[derive(Clone, Default)]
 pub(crate) struct FoodCache {
     entries: Vec<Entry>,
@@ -95,6 +96,8 @@ pub(crate) struct FoodCache {
     /// suffices while every internal edit is mirrored.
     open: bool,
     verified: bool,
+    /// A prior comparison still covers this owner's list after mirrored edits.
+    matched: bool,
 }
 impl std::fmt::Debug for FoodCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -106,6 +109,15 @@ impl FoodCache {
     pub(crate) fn begin(&mut self) {
         self.open = true;
         self.verified = false;
+        self.matched = false;
+    }
+    /// Start an owned span: every non-mirrored edit must reset the cache or
+    /// change the food length. Simulator food APIs reset it; radius/pit retention
+    /// only removes items. Thus unchanged length preserves the prior comparison.
+    pub(crate) fn begin_mirrored(&mut self, food_len: usize) {
+        self.open = true;
+        self.verified = self.matched && self.entries.len() == food_len;
+        self.matched = self.verified;
     }
     pub(crate) fn end(&mut self) {
         self.open = false;
@@ -132,6 +144,7 @@ impl FoodCache {
             self.pellets = None;
         }
         self.verified = self.open;
+        self.matched = true;
     }
     /// Pellets in `food` with ambient origin.
     pub(crate) fn ambient(&mut self, food: &[Food]) -> usize {
@@ -186,6 +199,7 @@ impl FoodCache {
             self.grids.clear();
             self.pellets = None;
             self.verified = false;
+            self.matched = false;
             return;
         }
         let (mut read, mut write) = (0, 0);
@@ -671,6 +685,69 @@ mod tests {
         food.pop();
         cache.remove(food.len(), std::iter::empty());
         assert!(cache.pellets.is_none());
+        cache.pellets(&food).unwrap();
+        assert_pellet_index(&cache, &food);
+    }
+
+    #[test]
+    fn owned_spans_reuse_verification_and_detect_unmirrored_retention() {
+        let mut rng = Rng(29);
+        let mut food: Vec<_> = (0..64).map(|_| pellet(&mut rng)).collect();
+        let mut cache = FoodCache::default();
+        cache.begin_mirrored(food.len());
+        assert!(!cache.verified);
+        cache.pellets(&food).unwrap();
+        for size in [40.0, 75.0, 128.0] {
+            cache.has_room(&food, &food[0], size, usize::MAX);
+        }
+        for _ in 0..8 {
+            cache.end();
+            cache.begin_mirrored(food.len());
+            assert!(cache.verified);
+            let f = pellet(&mut rng);
+            cache.push(&f);
+            food.push(f);
+            let removed = [0, food.len() / 2, food.len() - 1];
+            cache.remove(food.len(), removed.into_iter());
+            let mut i = 0;
+            food.retain(|_| {
+                let keep = !removed.contains(&i);
+                i += 1;
+                keep
+            });
+            assert!(cache.verified && cache.matched);
+            assert_pellet_index(&cache, &food);
+            assert_eq!(
+                cache.ambient(&food),
+                food.iter()
+                    .filter(|f| f.origin == Some(Origin::Ambient))
+                    .count()
+            );
+            cache.end();
+            // Stable retention outside the span changes every later food index.
+            food.remove(0);
+            cache.begin_mirrored(food.len());
+            assert!(!cache.verified && !cache.matched);
+            cache.pellets(&food).unwrap();
+            assert_pellet_index(&cache, &food);
+        }
+    }
+
+    #[test]
+    fn untrusted_spans_and_outside_reads_still_check_same_length_edits() {
+        let mut rng = Rng(47);
+        let mut food: Vec<_> = (0..16).map(|_| pellet(&mut rng)).collect();
+        let mut cache = FoodCache::default();
+        cache.begin_mirrored(food.len());
+        cache.pellets(&food).unwrap();
+        cache.end();
+        food[0].x = 1234.0;
+        cache.begin();
+        assert!(!cache.verified && !cache.matched);
+        cache.pellets(&food).unwrap();
+        assert_pellet_index(&cache, &food);
+        cache.end();
+        food[1].y = -4321.0;
         cache.pellets(&food).unwrap();
         assert_pellet_index(&cache, &food);
     }

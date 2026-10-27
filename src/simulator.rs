@@ -1593,9 +1593,10 @@ impl Simulator {
                 .map(|s| head_tip(s.head, s.heading, s.segments)),
         );
         boundary_deaths.clear();
-        // Every food edit from here to the refill is mirrored into the cache, so
-        // occupancy is compared with the food list at most once per step.
-        self.food_cache.begin();
+        // Public food edits reset the cache; pushes/pickups below are mirrored.
+        // Radius/pit retention above can only change its length. Reuse the prior
+        // verification when that ownership invariant and length still hold.
+        self.food_cache.begin_mirrored(self.food.len());
         for &i in alive.iter() {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
@@ -2154,7 +2155,8 @@ impl Simulator {
         } else if self.config.dynamic_radius && self.radius < previous {
             // Stranded pellets must not suppress live-area refill. Fixed replay
             // keeps its historical retention; all food origins leave with this
-            // model's wall. The food cache resynchronizes at the next begin().
+            // model's wall. Removing items fails the next mirrored span's length
+            // guard, forcing cache verification before it is used again.
             // Use squared distances except at numerically ambiguous boundaries.
             self.food
                 .retain(|f| f.point().distance_lt(Point::default(), self.radius));
@@ -2840,6 +2842,87 @@ fn find_eater<const PROFILE: bool>(
 #[cfg(test)]
 mod food_pickup_order_tests {
     use super::*;
+
+    #[test]
+    fn reused_food_cache_matches_fresh_caches_through_radius_and_pit_retention() {
+        for pit_only in [false, true] {
+            let mut warm = Simulator::new(WorldOptions {
+                seed: 47,
+                config: Config {
+                    dynamic_radius: true,
+                    food_count: 500,
+                    ambient_replenish_per_second: 80.0,
+                    food_only_inside_pit: pit_only,
+                    pit: pit_only.then_some(PitConfig { radius: 900.0 }),
+                    radius_updates: vec![
+                        RadiusUpdate {
+                            time: 0.021,
+                            radius: 800.0,
+                        },
+                        RadiusUpdate {
+                            time: 0.084,
+                            radius: 600.0,
+                        },
+                        RadiusUpdate {
+                            time: 0.140,
+                            radius: 1000.0,
+                        },
+                    ],
+                    ..Config::sandbox()
+                },
+                population: InitialPopulation::Placed {
+                    ids: (0..8).map(|i| format!("s{i}")).collect(),
+                    placement: Placement::TestRing,
+                },
+            })
+            .unwrap();
+            warm.record_events(checkpoint::EventRecording {
+                pickups: true,
+                food_births: true,
+            });
+            let mut fresh = warm.clone();
+            for tick in 0..96 {
+                if tick == 20 {
+                    let mut food = warm.food().to_vec();
+                    food[0].x = 0.0;
+                    food[0].y = 0.0;
+                    for world in [&mut warm, &mut fresh] {
+                        world.replace_food(food.clone()).unwrap();
+                    }
+                }
+                let actions: Vec<_> = warm
+                    .snakes
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| {
+                        s.alive.then_some(Action {
+                            heading: i as f64 * 2.4 + tick as f64 * 0.003,
+                            boost: (tick / 12 + i) % 4 == 0,
+                        })
+                    })
+                    .collect();
+                fresh.food_cache = FoodCache::default();
+                warm.step(&actions).unwrap();
+                fresh.step(&actions).unwrap();
+                assert_eq!(
+                    warm.pickup_events(),
+                    fresh.pickup_events(),
+                    "tick {tick}, pit {pit_only}"
+                );
+                assert_eq!(
+                    warm.food_spawn_events(),
+                    fresh.food_spawn_events(),
+                    "tick {tick}, pit {pit_only}"
+                );
+                assert_eq!(warm.deaths(), fresh.deaths(), "tick {tick}, pit {pit_only}");
+                assert_eq!(
+                    serde_json::to_value(warm.checkpoint().unwrap()).unwrap(),
+                    serde_json::to_value(fresh.checkpoint().unwrap()).unwrap(),
+                    "tick {tick}, pit {pit_only}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn dense_hits_keep_reverse_pellet_order_nearest_head_and_lexical_ties() {
