@@ -4,14 +4,17 @@
 
 ### Added
 
+- A study that replays official and local recordings through SlitherClient,
+  a Rust port of the stock client, and measures how much its predictions of
+  other snakes get corrected. It maps the client's motion formulas against the
+  simulator's and ranks the remaining fidelity gaps; the comparison is not
+  matched, so it makes no parity claim, and game behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-client-view/REPORT.md)).
 - The hosting guide explains how to build the server for the machine's own
   CPU. In our tests its game output matched the portable build exactly, and
   its median cycle count was 3.5–4.5% lower on one shared development machine;
   portable archives, the crate and Python wheels are unchanged
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)).
-- A pinned stock-client prediction harness and first official/local client-view
-  comparison, with a formula map and ranked fidelity investigations; no runtime
-  change ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-client-view/REPORT.md)).
 - Tools for testing whether official servers compensate for latency when
   judging collisions, and a first attempt. None of the 27 active official
   servers was close to empty (the quietest had 61 players), so no controlled
