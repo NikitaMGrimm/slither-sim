@@ -30,6 +30,12 @@
   Battledome; normal official-500 controls increase by 0.032–0.041%.
   WSL2 instruction results make no CPU-time or capacity claim
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-mirrored-food-retention/REPORT.md)).
+- The grid that finds which snakes each player might see is kept between
+  ticks, and only snakes that moved into different cells are updated, instead
+  of rebuilding it every tick. The exact visibility test and packet order are
+  unchanged. Output is byte-identical, and the 500-player official fixture
+  runs 11.6–12.1% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-coverage-cells/REPORT.md)).
 - Each player's prey visibility check looks only at prey in nearby x-axis
   strips instead of every prey in the world; the exact distance test and world
   order are unchanged. Output is byte-identical, and the 500-player official
