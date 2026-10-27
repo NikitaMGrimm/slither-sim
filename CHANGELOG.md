@@ -62,6 +62,11 @@
   protocol-13 clients and 1.2% fewer with half; with stock clients it runs
   0.1% more
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-owned-legacy-frames/REPORT.md)).
+- Legacy clients requesting full U minimaps share decoding, projection and
+  encoding when their map state and projection agree. Output is byte-identical;
+  with all 500 official-fixture clients opting in, map-due ticks use 96.4%
+  fewer instructions and the whole fixture uses 7.2% fewer
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-full-map-sharing/REPORT.md)).
 - Food pickup removes eaten pellets from its occupancy cache by index and
   copies the surviving ranges, instead of scanning the whole cache twice.
   Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
