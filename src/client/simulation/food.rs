@@ -788,7 +788,10 @@ mod tests {
                 ] {
                     assert_eq!(actual.len(), reference.len());
                     for (sector, (actual, reference)) in actual.iter().zip(reference).enumerate() {
-                        assert_eq!(actual, reference, "{name} pit={pit} tick={tick} sector={sector}");
+                        assert_eq!(
+                            actual, reference,
+                            "{name} pit={pit} tick={tick} sector={sector}"
+                        );
                     }
                 }
             }
