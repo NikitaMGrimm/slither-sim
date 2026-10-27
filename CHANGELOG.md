@@ -8,6 +8,10 @@
   connection: snakes, food, death and rejoin, and Battledome's kill board, pit
   minimap and edge ring all work. Stock clients and bots still get protocol 19,
   byte for byte as before.
+- The Frontier and Precise slither browser mods can join hosts too. Frontier's
+  short login gets protocol 19; Precise gets protocol 13 but shows no minimap,
+  because it reads only `M` maps. NTL's other handshake requests (`[99]`, and
+  `[99,3]` with its dynamic minimap off) also work.
 
 ### Changed
 
@@ -45,10 +49,6 @@
 
 ### Fixed
 
-- More browser mods can join through a shared legacy challenge and the short
-  selector-31 login. Older handshake requests and requests with dynamic
-  minimaps off also work. Existing stock protocol-19 output stays unchanged.
-  Legacy clients that only read `M` minimaps still have no map.
 - A client that falls too far behind is disconnected instead of stopping the
   host. Each socket may queue up to 2 MiB of output, counted the same way for
   protocol 13 and 19; stock clients previously had a 4,096-frame limit.
