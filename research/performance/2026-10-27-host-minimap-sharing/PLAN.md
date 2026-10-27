@@ -38,3 +38,10 @@ the measured runtime pin separate from the eventual documentation/PR head.
 Publish selected summaries and rerun scripts only, targeting <=20 KB; retain
 raw rows, binaries, traces, failed attempts and logs locally. Open one PR; do
 not merge. No broad area redesign or long-lived branch.
+
+## Amendment before supplementary counts
+
+The completed standard 100-decision official series reaches only its first
+full map. Keep it. Add five alternating 400-decision official pairs after one
+untallied pair, covering multiple steady map epochs with the same frozen
+binaries and gates. Report it separately; do not replace the original result.

@@ -60,7 +60,9 @@
 
 - Host minimaps share full packets and checked deltas for recipients with the
   same retained bitmap, while preserving each connection's history, packet
-  bytes and order.
+  bytes and order. A fixed official-500 fixture spanning six map opportunities
+  uses 1.97% fewer whole-process user instructions
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-minimap-sharing/REPORT.md)).
 - Host food-sector listings track subscription changes incrementally instead
   of rebuilding the union of every client's subscriptions each tick. Packet
   bytes and order are unchanged; the official-500 fixture uses 2.5% fewer user
