@@ -19,6 +19,10 @@
 
 ### Performance
 
+- Food pickup skips position updates for pellets before the first removal.
+  Output is byte-identical, and the offline official 500-player fixture uses
+  1.4–1.5% fewer process instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-position-prefix/REPORT.md)).
 - Food pickup removes eaten pellets by moving whole ranges of surviving
   pellets, instead of filtering the food list through a per-pellet mask.
   Output is byte-identical, and the 500-player official fixture runs 4.1–4.4%
