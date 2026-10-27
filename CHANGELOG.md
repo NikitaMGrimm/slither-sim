@@ -24,6 +24,11 @@
 
 ### Performance
 
+- Shared food listings now visit newly subscribed and changed sectors instead
+  of scanning every subscribed sector each tick; pit changes still refresh the
+  full view. Output is byte-identical, and the official-500 fixture runs
+  7.20–7.76% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-shared-food-work/REPORT.md)).
 - The grid that finds which snakes each player might see is kept between
   ticks, and only snakes that moved into different cells are updated, instead
   of rebuilding it every tick. The exact visibility test and packet order are
