@@ -32,10 +32,11 @@ RUSTFLAGS="-C target-cpu=native" cargo build --release --locked --bin slither-si
 ```
 
 Install `target/release/slither-sim` as above. It runs only on CPUs with the
-same features, so rebuild after moving to other hardware. Game output is
-identical to the portable build. In a shared-machine test it used 3.5–4.5%
-fewer cycles ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md));
-measure on your own server before relying on it.
+same features, so rebuild after moving to other hardware. In our tests its
+game output matched the portable build exactly, and its median cycle count was
+3.5–4.5% lower on one shared development machine
+([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)).
+Check both on your own server before relying on it.
 
 ## Configure
 

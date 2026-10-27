@@ -5,9 +5,9 @@
 ### Added
 
 - The hosting guide explains how to build the server for the machine's own
-  CPU. Game output is identical to the portable build, and a shared-machine
-  test measured 3.5–4.5% fewer cycles; portable archives, the crate and Python
-  wheels are unchanged
+  CPU. In our tests its game output matched the portable build exactly, and
+  its median cycle count was 3.5–4.5% lower on one shared development machine;
+  portable archives, the crate and Python wheels are unchanged
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)).
 - Tools for testing whether official servers compensate for latency when
   judging collisions, and a first attempt. None of the 27 active official
@@ -24,6 +24,11 @@
 
 ### Performance
 
+- Each player's prey visibility check looks only at prey in nearby x-axis
+  strips instead of every prey in the world; the exact distance test and world
+  order are unchanged. Output is byte-identical, and the 500-player official
+  fixture runs 2.1–2.2% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-prey-cells/REPORT.md)).
 - Collision and prey lookups number their grid cells by truncating instead of
   calling `floor`; the cells only need to keep their order, and the exact tests
   are unchanged. Output is byte-identical, and the 500-player official fixture
@@ -67,6 +72,12 @@
   protocol-13 clients and 1.2% fewer with half; with stock clients it runs
   0.1% more
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-owned-legacy-frames/REPORT.md)).
+- Protocol-13 clients that ask for full `U` minimaps share one decoded and
+  projected map per distinct map state and projection, instead of each building
+  its own. Output is byte-identical. With all 500 fixture clients opted in, a
+  minimap tick takes 13M instead of 351M instructions and the whole fixture
+  runs 7.2% fewer; clients that don't opt in are unaffected
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-full-map-sharing/REPORT.md)).
 - Food pickup removes eaten pellets from its occupancy cache by index and
   copies the surviving ranges, instead of scanning the whole cache twice.
   Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
