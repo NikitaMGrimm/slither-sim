@@ -30,19 +30,17 @@
 
 ### Performance
 
+- Food pickup now works out each pellet's place in the food list from a
+  bitmap, instead of rewriting the stored position of every later pellet after
+  each removal. Stale entries are cleaned out 512 pellets per tick, so no
+  single tick pays for a full index rebuild (each batch stays under 0.28M
+  instructions). Output is byte-identical, and the 500-player official fixture
+  runs 2.4–2.6% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-bitset-ranks/REPORT.md)).
 - Each player's food-sector subscription is updated once per tick instead of
   twice. Output is byte-identical, and the 500-player official fixture runs
   1.9–2.1% fewer instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-interest-refresh/REPORT.md)).
-- Food pickup derives pellet positions from live-bit ranks instead of updating
-  every surviving pellet's position after removals, and uses exact integer
-  arithmetic for the bounded eater-cell covers. Periodic index maintenance is
-  spread over 512 pellets per tick: measured batches stay below 0.28M
-  instructions, replacing a 25.5M-instruction official-500 rebuild spike.
-  Output is byte-identical, and
-  the 500-player official fixture runs 2.4–2.6% fewer instructions with stock
-  and protocol-13 clients
-  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-bitset-ranks/REPORT.md)).
 - Each tick, a snake's heading direction is computed once during movement and
   reused for its collision and pickup checks, and prey reuse the pickup circles
   already computed for food. Output is byte-identical, and the 500-player
