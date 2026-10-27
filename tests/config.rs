@@ -3,6 +3,52 @@ use slither_sim::ErrorKind;
 use slither_sim::{Config, Simulator};
 
 #[test]
+fn food_view_round_trips_independently_of_vision_and_preserves_numeric_defaults() {
+    use slither_sim::{FoodView, Vision};
+    for preset in ["official", "sandbox", "battledome"] {
+        let base: Config = serde_json::from_value(serde_json::json!({"preset": preset})).unwrap();
+        assert_eq!(
+            base.food_view,
+            if preset == "battledome" {
+                FoodView::Arena
+            } else {
+                FoodView::Local
+            }
+        );
+        for (food, view) in [("local", FoodView::Local), ("arena", FoodView::Arena)] {
+            for vision in [serde_json::json!(1500), serde_json::json!("arena")] {
+                let config: Config = serde_json::from_value(serde_json::json!({
+                    "preset": preset, "vision": vision, "foodView": food
+                }))
+                .unwrap();
+                assert_eq!(config.food_view, view);
+                assert_eq!(
+                    config.vision,
+                    if vision.is_string() {
+                        Vision::Arena
+                    } else {
+                        Vision::Radius(1500.)
+                    }
+                );
+                let json = serde_json::to_value(&config).unwrap();
+                let round_trip: Config = serde_json::from_value(json.clone()).unwrap();
+                assert_eq!(round_trip.food_view, view);
+                assert_eq!(round_trip.vision, config.vision);
+                if view == FoodView::Local {
+                    // Preserve shipped numeric info/reset/checkpoint config bytes.
+                    assert!(json.get("foodView").is_none());
+                } else {
+                    assert_eq!(json["foodView"], "arena");
+                }
+            }
+        }
+    }
+    for value in ["null", "0", "true", "\"all\"", "{}", "[]"] {
+        assert!(serde_json::from_str::<Config>(&format!("{{\"foodView\":{value}}}")).is_err());
+    }
+}
+
+#[test]
 fn vision_accepts_a_radius_or_arena_and_preserves_preset_overrides() {
     use slither_sim::Vision;
     for preset in ["official", "sandbox", "battledome"] {

@@ -56,6 +56,10 @@ struct ConfigRecord {
     dynamic_radius: bool,
     size_to_population: bool,
     vision: crate::Vision,
+    // Older numeric checkpoints used local food delivery. Keep that meaning
+    // independent of request presets, and preserve their serialized shape.
+    #[serde(default, skip_serializing_if = "crate::FoodView::is_local")]
+    food_view: crate::FoodView,
     food_count: usize,
     ambient_refill_counts_all_food: bool,
     food_only_inside_pit: bool,
@@ -157,11 +161,14 @@ fn state_schema(raw: &Value) -> Result<(), SimError> {
     // cannot be left out of this list.
     let canonical = ConfigRecord::serialize(&Config::default(), serde_json::value::Serializer)
         .map_err(|e| invalid(Constraint::InconsistentState, "config", e.to_string()))?;
-    let keys: Vec<&str> = canonical
+    let mut keys: Vec<&str> = canonical
         .as_object()
         .into_iter()
         .flat_map(|config| config.keys().map(String::as_str))
         .collect();
+    if raw["config"].get("foodView").is_some() {
+        keys.push("foodView");
+    }
     fields(&raw["config"], &keys, "config")?;
     let state = &raw["state"];
     fields(

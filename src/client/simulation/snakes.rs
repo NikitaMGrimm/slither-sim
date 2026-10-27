@@ -471,6 +471,32 @@ mod tests {
     use crate::{Config, Simulator};
 
     #[test]
+    fn arena_candidates_are_an_ascending_unique_union_with_known_dead_slots() {
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: (0..6).map(|i| i.to_string()).collect(),
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut snakes = world.snakes().to_vec();
+        snakes[1].alive = false;
+        snakes[4].alive = false;
+        let grid = CoverageGrid::new(&snakes, &[], crate::Vision::Arena);
+        assert_eq!(grid.near(Point::default()), [0, 2, 3, 5]);
+        let mut known = KnownSnakes::default();
+        for i in [5, 4, 2, 1] {
+            known.insert(i, KnownSnake::new(1, &snakes[i], 0.).unwrap());
+        }
+        let mut out = Vec::new();
+        known.candidates(grid.near(Point::default()), &mut out);
+        assert_eq!(out, [0, 1, 2, 3, 4, 5]);
+        assert!(out.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
     fn candidate_merge_matches_sorted_union_and_reuses_storage() {
         let slots = [0, 1, 2, 7, 31, 63, 64, 500];
         let snake = KnownSnake {

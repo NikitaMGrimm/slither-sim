@@ -151,8 +151,10 @@ pub struct Config {
     /// food with area. Explicit JSON `radius` opts out unless `sizeToPopulation`
     /// is also supplied; a fixed Rust radius disables this and `dynamic_radius`.
     pub size_to_population: bool,
-    /// Snake/prey coverage and food interest policy.
+    /// Snake/prey coverage policy.
     pub vision: crate::Vision,
+    /// Food delivery policy, separate from snake/prey coverage.
+    pub food_view: crate::FoodView,
     /// Initial-area refill target; counts ambient pellets unless
     /// `ambient_refill_counts_all_food`. Seat-following scales it with live area.
     pub food_count: usize,
@@ -218,6 +220,8 @@ struct ConfigWire {
     dynamic_radius: bool,
     size_to_population: bool,
     vision: crate::Vision,
+    #[serde(skip_serializing_if = "crate::FoodView::is_local")]
+    food_view: crate::FoodView,
     food_count: usize,
     #[serde(skip_serializing_if = "is_false")]
     ambient_refill_counts_all_food: bool,
@@ -429,6 +433,7 @@ impl Config {
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
             // Exact server entry/exit geometry and size scaling remain unknown.
             vision: crate::Vision::Radius(1500.0),
+            food_view: crate::FoodView::Local,
             food_count,
             ambient_refill_counts_all_food: false,
             food_only_inside_pit: false,
@@ -486,6 +491,7 @@ impl Config {
             // Custom mode: zoomed-out players should know the entire arena.
             // research/battledome/2026-10-27-arena-vision/REPORT.md
             vision: crate::Vision::Arena,
+            food_view: crate::FoodView::Arena,
             dynamic_radius: true,
             size_to_population: false,
             food_count,

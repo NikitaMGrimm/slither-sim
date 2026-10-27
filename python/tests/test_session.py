@@ -685,5 +685,14 @@ class ArenaVisionTest(unittest.TestCase):
             self.assertEqual(len(frame.view_snakes), 2 if vision == "arena" else 0)
         self.assertEqual(session.request({"op": "info"})["protocol"], "slither-sim-json-v6")
 
+    def test_food_view_round_trip_is_independent_of_snake_vision(self):
+        session = Session()
+        for vision in [1500, "arena"]:
+            for food_view in ["local", "arena"]:
+                session.reset(agents=2, config={"preset": "battledome",
+                    "vision": vision, "foodView": food_view})
+                self.assertEqual(session.config["vision"], vision)
+                self.assertEqual(session.config.get("foodView", "local"), food_view)
+
 if __name__ == "__main__":
     unittest.main()

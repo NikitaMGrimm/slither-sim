@@ -3,10 +3,66 @@ mod tests {
     use crate::{model::*, prey::Prey, simulator::Simulator};
 
     #[test]
+    fn food_view_changes_food_without_widening_geometric_snake_or_prey_coverage() {
+        use crate::{FoodView, Vision};
+        let mut rng = Rng(7);
+        let mut world = world(&mut rng, 16, 0, 1500.);
+        world.radius = 4000.;
+        for (i, snake) in world.snakes.iter_mut().enumerate() {
+            snake.alive = true;
+            snake.head = Point {
+                x: if i < 8 { -2000. } else { 2000. },
+                y: i as f64,
+            };
+            snake.body = vec![snake.head];
+        }
+        world.food = [-2100., 0., 2100.]
+            .map(|x| Food {
+                x,
+                y: 500.,
+                value: 1.,
+                size: None,
+                origin: None,
+            })
+            .to_vec();
+        world.prey = [-2100., 2100.]
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| Prey {
+                id: i as u64,
+                position: Point { x, y: 600. },
+                heading: 0.,
+                target_heading: 0.,
+                speed: 1.,
+                size: 1.,
+            })
+            .collect();
+        for vision in [Vision::Radius(1500.), Vision::Arena] {
+            for food in [FoodView::Local, FoodView::Arena] {
+                world.config.vision = vision;
+                world.config.food_view = food;
+                let all = world.observe_all();
+                for (i, batch) in all.iter().enumerate() {
+                    let one = world.observe(i).unwrap();
+                    assert_eq!(batch.as_ref(), Some(&one));
+                    assert_eq!(one.food.len(), if food == FoodView::Arena { 3 } else { 1 });
+                    assert_eq!(
+                        one.opponents.len(),
+                        if vision == Vision::Arena { 15 } else { 7 }
+                    );
+                    assert_eq!(one.prey.len(), if vision == Vision::Arena { 2 } else { 1 });
+                    assert_eq!(one.vision_radius, Some(vision.radius(world.radius)));
+                }
+            }
+        }
+    }
+
+    #[test]
     fn arena_observations_include_every_living_opponent_food_and_prey() {
         let mut rng = Rng(7);
         let mut world = world(&mut rng, 16, 100, 10.);
         world.config.vision = crate::Vision::Arena;
+        world.config.food_view = crate::FoodView::Arena;
         for (i, snake) in world.snakes.iter_mut().enumerate() {
             snake.head = Point {
                 x: if i == 0 { -900. } else { 900. },

@@ -199,12 +199,16 @@ Rows and view lists follow world order, so a slot's view lists opponents by
 slot and food in spawn order. Coordinates use world units; speeds use world
 units per second.
 
-Numeric `config.vision` filters food and prey by the vision circle. With
-`vision: "arena"` (the Battledome default), every living opponent, food item and
-prey is included from any position, and frame `vision` / Rust
+Numeric `config.vision` filters prey and opponents by the vision circle. With
+`vision: "arena"` (the Battledome default), every living opponent and prey
+is included from any position, and frame `vision` / Rust
 `Observation.vision_radius` report twice the live arena radius. Config and
-checkpoints retain the string. The geometric contract is v6 for this coverage
-and config extension; portable client v2 and the numeric C ABI v3 are unchanged.
+checkpoints retain the string. `config.foodView: "arena"` independently includes
+all physical food. `"local"` retains the geometric food circle at numeric vision,
+or 1500 when snake vision is `"arena"`; the wire interface uses its stock food
+stencil instead. Battledome defaults both settings to `"arena"`. The geometric
+contract is v6 for both unshipped config/coverage changes; portable client v2
+and the numeric C ABI v3 are unchanged.
 
 For numeric vision, if an opponent's head or any
 anchor is visible, **its entire stored snake record is included**, even outside

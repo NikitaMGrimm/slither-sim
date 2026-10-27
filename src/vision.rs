@@ -2,11 +2,27 @@
 //! not an inferred official visibility rule.
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
-/// A head-centered radius, or all entities and food sectors in the live arena.
+/// A head-centered radius, or every living snake and prey in the live arena.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Vision {
     Radius(f64),
     Arena,
+}
+
+/// Food delivery is independent of snake/prey coverage. Local keeps the stock
+/// food-sector stencil; arena subscribes every sector touched by the live wall.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FoodView {
+    #[default]
+    Local,
+    Arena,
+}
+
+impl FoodView {
+    pub(crate) fn is_local(&self) -> bool {
+        *self == Self::Local
+    }
 }
 
 impl Vision {

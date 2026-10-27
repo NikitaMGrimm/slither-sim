@@ -87,7 +87,8 @@ constants](bot-api.md#in-process-sessions). Type stubs ship with the package.
 World configs accept `vision: "arena"` or a positive numeric radius; the
 Battledome default is `"arena"`. `Frame.vision` stays a finite float and reports
 the live diameter in arena mode. Host-only `bots.vision` does not affect
-in-process geometric sessions.
+standalone sessions. `foodView: "local"` or `"arena"` independently selects
+local or all physical food in those sessions; Battledome defaults to arena food.
 
 ## Frames
 

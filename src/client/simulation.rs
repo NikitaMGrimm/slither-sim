@@ -7,7 +7,7 @@
 //! clients measure only pings and their own reply time.
 //!
 //! Numeric snake/prey coverage approximates a circle around the head; arena
-//! vision covers every living entity and every live-arena food sector.
+//! vision covers every living snake/prey; food interest is selected separately.
 //! Any centerline part keeps a numeric-view snake covered. Numeric food views
 //! retain their separate 300-unit-sector interest. Snakes appear once per entry or life, then receive
 //! anchor, tail, mass and motion deltas. Native and remote coverage is shared.

@@ -132,19 +132,16 @@ impl SimulatorBackend {
     }
 
     fn advance_food_interest(&mut self, now: f64) {
-        let world_vision = self.world.config().vision;
-        let bot_vision = self.bot_vision();
-        if world_vision == crate::Vision::Arena {
+        let arena = self.world.config().food_view == crate::FoodView::Arena;
+        if arena {
             self.arena_food_interest.advance_arena(self.world.radius());
         }
         for (index, (slot, snake)) in self.slots.iter_mut().zip(self.world.snakes()).enumerate() {
             if slot.connection.setup {
-                let vision = if index >= self.player_latency.slots {
-                    bot_vision
-                } else {
-                    world_vision
-                };
-                if vision == crate::Vision::Arena {
+                // A host bot's tuned food stencil does not widen with either
+                // world view setting. Standalone backends have no bot cap.
+                let bot = self.bot_vision.is_some() && index >= self.player_latency.slots;
+                if arena && !bot {
                     slot.connection
                         .food_interest
                         .clone_from(&self.arena_food_interest);

@@ -1096,45 +1096,59 @@ fn old_rules_revision_is_rejected_atomically_without_changing_the_format() {
 
 #[test]
 fn arena_vision_checkpoints_round_trip_and_keep_numeric_continuations() {
-    for vision in [
-        slither_sim::Vision::Arena,
-        slither_sim::Vision::Radius(1500.),
-    ] {
-        let mut world = Simulator::new(slither_sim::WorldOptions {
-            seed: 7,
-            config: Config {
-                vision,
-                radius_updates: vec![RadiusUpdate {
-                    time: 0.014,
-                    radius: 1200.,
-                }],
-                ..Config::sandbox()
-            },
-            population: slither_sim::InitialPopulation::Placed {
-                ids: vec!["observer".into()],
-                placement: slither_sim::Placement::TestRing,
-            },
-        })
-        .unwrap();
-        let mut restored = Simulator::from_checkpoint(
-            &serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
-            Default::default(),
-        )
-        .unwrap();
-        for _ in 0..3 {
-            assert_eq!(world.observe_all(), restored.observe_all());
-            assert_eq!(
-                world.observe(0).unwrap().vision_radius,
-                Some(vision.radius(world.radius()))
-            );
-            world.step(&[Some(Action::default())]).unwrap();
-            restored.step(&[Some(Action::default())]).unwrap();
+    for food_view in [slither_sim::FoodView::Local, slither_sim::FoodView::Arena] {
+        for vision in [
+            slither_sim::Vision::Arena,
+            slither_sim::Vision::Radius(1500.),
+        ] {
+            let mut world = Simulator::new(slither_sim::WorldOptions {
+                seed: 7,
+                config: Config {
+                    vision,
+                    food_view,
+                    radius_updates: vec![RadiusUpdate {
+                        time: 0.014,
+                        radius: 1200.,
+                    }],
+                    ..Config::sandbox()
+                },
+                population: slither_sim::InitialPopulation::Placed {
+                    ids: vec!["observer".into()],
+                    placement: slither_sim::Placement::TestRing,
+                },
+            })
+            .unwrap();
+            let saved = value(&world);
+            if food_view == slither_sim::FoodView::Local {
+                assert!(saved["config"].get("foodView").is_none());
+            } else {
+                assert_eq!(saved["config"]["foodView"], "arena");
+            }
+            let mut restored = Simulator::from_checkpoint(
+                &serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
+                Default::default(),
+            )
+            .unwrap();
+            for _ in 0..3 {
+                assert_eq!(world.observe_all(), restored.observe_all());
+                assert_eq!(
+                    world.observe(0).unwrap().vision_radius,
+                    Some(vision.radius(world.radius()))
+                );
+                world.step(&[Some(Action::default())]).unwrap();
+                restored.step(&[Some(Action::default())]).unwrap();
+            }
+            assert_eq!(value(&world), value(&restored));
         }
-        assert_eq!(value(&world), value(&restored));
     }
     let mut invalid = value(&world());
     for vision in [json!("everywhere"), json!(null), json!(0), json!(-1)] {
         invalid["config"]["vision"] = vision;
+        assert!(Simulator::from_checkpoint(&bytes(&invalid), Default::default()).is_err());
+    }
+    for food in [json!("all"), json!(null), json!(1500)] {
+        invalid = value(&world());
+        invalid["config"]["foodView"] = food;
         assert!(Simulator::from_checkpoint(&bytes(&invalid), Default::default()).is_err());
     }
 }

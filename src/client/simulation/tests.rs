@@ -4053,11 +4053,90 @@ fn spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
 }
 
 #[test]
+fn food_arena_with_nearby_snakes_and_local_food_with_arena_snakes_are_independent() {
+    use crate::{FoodView, Vision};
+    for vision in [Vision::Radius(1500.), Vision::Arena] {
+        for food_view in [FoodView::Local, FoodView::Arena] {
+            let mut config = raw_config(3);
+            config.world.radius = 6000.;
+            config.world.vision = vision;
+            config.world.food_view = food_view;
+            let mut sim = RawSimulator::new(7, config, 3).unwrap();
+            let mut a = Remote::connect(&mut sim, 0, "Observer");
+            let mut b = Remote::connect(&mut sim, 1, "Nearby");
+            let mut c = Remote::connect(&mut sim, 2, "Distant");
+            for (slot, x, y) in [(0, -2500., 0.), (1, -1500., 200.), (2, 2500., 0.)] {
+                sim.backend.world.retire(slot).unwrap();
+                sim.backend
+                    .world
+                    .respawn(slot, Point { x, y }, 0., 2)
+                    .unwrap();
+                sim.backend.slots[slot].control.heading = 0.;
+            }
+            sim.backend
+                .world
+                .replace_food(
+                    [-2200., 0., 2200.]
+                        .map(|x| Food {
+                            x,
+                            y: 500.,
+                            value: 1.,
+                            size: Some(2.),
+                            origin: Some(Origin::Ambient),
+                        })
+                        .to_vec(),
+                )
+                .unwrap();
+            sim.backend
+                .world
+                .replace_prey(
+                    [-2000., 2400.]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, x)| crate::ReplayPrey {
+                            mode: crate::PreyMode::Roaming,
+                            prey: crate::Prey {
+                                id: i as u64,
+                                position: Point { x, y: 600. },
+                                heading: 0.,
+                                target_heading: 0.,
+                                speed: 1.,
+                                size: 1.,
+                            },
+                        })
+                        .collect(),
+                )
+                .unwrap();
+            run(&mut sim, &mut [(0, &mut a), (1, &mut b), (2, &mut c)], 1);
+            let observation = a.frame(&sim).observation.unwrap();
+            assert_eq!(
+                observation.food.len(),
+                if food_view == FoodView::Arena { 3 } else { 1 }
+            );
+            assert_eq!(
+                observation.opponents.len(),
+                if vision == Vision::Arena { 2 } else { 1 }
+            );
+            assert_eq!(
+                observation.prey.len(),
+                if vision == Vision::Arena { 2 } else { 1 }
+            );
+            assert!(sim.backend.slots[0].connection.snakes.contains_key(1));
+            assert_eq!(
+                sim.backend.slots[0].connection.snakes.contains_key(2),
+                vision == Vision::Arena
+            );
+        }
+    }
+}
+
+#[test]
 fn arena_vision_delivers_distant_entities_and_refreshes_food_on_radius_changes() {
     use crate::{ReplayPrey, Vision};
     let mut config = raw_config(2);
     config.world.radius = 3000.;
     config.world.vision = Vision::Arena;
+    config.world.food_view = crate::FoodView::Arena;
     config.world.radius_updates = vec![
         crate::RadiusUpdate {
             time: 0.014,
@@ -4156,6 +4235,7 @@ fn arena_recipients_receive_wall_culls_in_still_subscribed_sectors() {
     let mut config = raw_config(2);
     config.world = Config {
         vision: crate::Vision::Arena,
+        food_view: crate::FoodView::Arena,
         food_count: 0,
         ambient_replenish_per_second: 0.,
         radius_updates: vec![crate::RadiusUpdate {
@@ -4237,6 +4317,7 @@ fn host_bot_vision_keeps_tuned_coverage_while_players_see_the_arena() {
         let mut config = raw_config(3);
         config.world.radius = 6000.;
         config.world.vision = world_vision;
+        config.world.food_view = crate::FoodView::Arena;
         let mut sim = RawSimulator::new(7, config, 3).unwrap();
         sim.set_player_latency(1, LatencyConfig::default());
         sim.set_bot_vision(cap);
@@ -4272,9 +4353,9 @@ fn host_bot_vision_keeps_tuned_coverage_while_players_see_the_arena() {
             far_visible
         );
         assert_eq!(b.frame(&sim).observation.unwrap().food.len(), 0);
+        assert_eq!(a.frame(&sim).observation.unwrap().food.len(), 1);
         if world_vision == Vision::Arena {
             assert!(sim.backend.slots[0].connection.snakes.contains_key(2));
-            assert_eq!(a.frame(&sim).observation.unwrap().food.len(), 1);
         }
     }
 }

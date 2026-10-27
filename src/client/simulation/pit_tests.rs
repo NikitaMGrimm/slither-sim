@@ -148,6 +148,7 @@ fn food(state: &ClientState, now: f64) -> Vec<Food> {
 fn pit_markers_join_sector_exit_reentry_and_reconnect() {
     let mut config = config();
     config.world.vision = crate::Vision::Radius(1500.);
+    config.world.food_view = crate::FoodView::Local;
     let mut sim = RawSimulator::new(7, config, 1).unwrap();
     let mut state = browser(&mut sim);
     assert!(
@@ -836,6 +837,7 @@ fn stock_pit_markers_survive_growth_shrink_and_settle_with_time_to_fade() {
         for joined in [0., 1., 3.5] {
             let mut config = config();
             config.world.vision = crate::Vision::Radius(1500.);
+            config.world.food_view = crate::FoodView::Local;
             config.agents = 65;
             config.world.radius_updates = vec![
                 crate::RadiusUpdate {

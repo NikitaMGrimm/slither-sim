@@ -6,8 +6,10 @@
 
 - **Rust:** `Config.vision` is `Vision::Radius(r)` or `Vision::Arena`.
   JSON accepts a positive finite number or `"arena"`. Battledome defaults to
-  whole-arena snakes, prey and food; host bots keep tuned local coverage
-  (`bots.vision: 1500`). Geometric JSON uses `slither-sim-json-v6`.
+  whole-arena snakes, prey and food. `foodView: "local" | "arena"` controls food
+  independently, so `vision: 1500` can keep all food with nearby snakes. Host
+  bots keep tuned local coverage (`bots.vision: 1500`) and food. Geometric JSON
+  uses `slither-sim-json-v6` for both changes.
 
 ### Added
 

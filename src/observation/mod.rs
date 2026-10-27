@@ -18,6 +18,7 @@ pub(crate) struct VisibleState<'a> {
     pub prey: &'a [Prey],
     pub radius: f64,
     pub vision: crate::Vision,
+    pub food_view: crate::FoodView,
 }
 impl<'a> VisibleState<'a> {
     pub(crate) fn of(world: &'a Simulator) -> Self {
@@ -28,6 +29,7 @@ impl<'a> VisibleState<'a> {
             prey: world.prey(),
             radius: world.radius(),
             vision: world.config().vision,
+            food_view: world.config().food_view,
         }
     }
     /// Observation of one slot, without the batch index.
@@ -184,7 +186,8 @@ impl<'a> Observer<'a> {
                 .collect(),
             // Building the grid costs a few passes over the food list, so small
             // batches scan it directly instead.
-            food: (observers >= 8
+            food: (world.food_view == crate::FoodView::Local
+                && observers >= 8
                 && observers.saturating_mul(food) >= 1 << 15
                 && food < u32::MAX as usize)
                 .then(|| FoodGrid::new(world.food, vision, observers)),
@@ -252,10 +255,21 @@ impl<'a> Observer<'a> {
         let me = w.snakes.get(index).ok_or_else(|| {
             SimError::new(ErrorKind::UnknownSlot, "Unknown agent slot").at_slot(index)
         })?;
-        if w.vision == crate::Vision::Arena {
+        if w.food_view == crate::FoodView::Arena {
             sink.reserve_food(w.food.len());
             for i in 0..w.food.len() {
                 sink.food(i);
+            }
+        }
+        if w.vision == crate::Vision::Arena {
+            if w.food_view == crate::FoodView::Local {
+                // Geometric observations retain their circle model. Arena
+                // snake coverage has no local radius, so use the normal 1500.
+                for (i, food) in w.food.iter().enumerate() {
+                    if food.point().distance_le(me.head, 1500.) {
+                        sink.food(i);
+                    }
+                }
             }
             for i in 0..w.prey.len() {
                 sink.prey(i);
@@ -289,13 +303,17 @@ impl<'a> Observer<'a> {
             };
             (i, b)
         });
-        match query {
-            Some((
-                Index {
-                    food: Some(grid), ..
-                },
-                b,
-            )) => {
+        match (w.food_view, query) {
+            (crate::FoodView::Arena, _) => {}
+            (
+                crate::FoodView::Local,
+                Some((
+                    Index {
+                        food: Some(grid), ..
+                    },
+                    b,
+                )),
+            ) => {
                 marks.resize(w.food.len().div_ceil(64), 0);
                 let mut count = 0;
                 let mut first = usize::MAX;
@@ -346,7 +364,7 @@ impl<'a> Observer<'a> {
                     }
                 }
             }
-            _ => {
+            (crate::FoodView::Local, _) => {
                 for (i, f) in w.food.iter().enumerate() {
                     if visible(f.point()) {
                         sink.food(i);

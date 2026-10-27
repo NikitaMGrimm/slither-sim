@@ -15,6 +15,17 @@ wall's disc, including the wire-rounding strip at sector edges. One shared
 sector set changes identity only when membership changes; radius intervals
 avoid rebuilding it on every shrink tick. Reconnects get the current set.
 
+The subsequent food split adds `Config.food_view` / JSON `foodView`, with
+`"local"` (normal food stencil) and `"arena"` (all live-wall sectors), independent
+of snake/prey coverage on the wire. Battledome defaults both to arena; other
+presets keep local food. `vision: 1500, foodView: "arena"` supports nearby snakes
+with all food. Host bot seats always keep local food. Geometric local food
+retains its numeric vision circle, or 1500 when snake vision is arena; arena
+food includes every physical pellet independently. The
+[NTL study](../../fidelity/2026-10-27-ntl-vision/REPORT.md) motivates this option;
+its small-scene controls do not qualify dynamic-1500 correction-tail parity.
+The historical cost tables below predate the split and are not new timings for it.
+
 Host `bots.vision` is a positive finite number, default 1500. Each bot uses the
 smaller numeric world radius/cap, or that cap under arena vision, and retains
 the normal local food stencil. Socket slots use world vision. Standalone
@@ -26,9 +37,11 @@ radii stay finite and numeric: the live wall diameter for arena mode. Portable
 **slither-client-v2**, its JSON v2 envelope, and **C ABI v3** keep their layouts,
 units and nullability. Wire observations still report unknown vision (`null`).
 Python dictionaries accept the new config value; `Frame.vision` remains float.
-Checkpoint format **v2** and rules **v5** remain: there is no new saved field or
-physics tick law. Numeric saved configs restore with their original coverage;
-arena checkpoints retain the string and reproduce their observations.
+Checkpoint format **v2** and rules **v5** remain: there is no new physics tick
+law or saved physics state. Optional config `foodView` is omitted for local;
+older numeric checkpoints retain their exact shape and original coverage.
+Arena-food checkpoints retain the explicit setting and reproduce observations.
+Both unshipped view changes share geometric JSON **v6**; no second bump.
 
 ## Method and source identity
 

@@ -581,6 +581,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
     let config = Config::battledome();
     config.validate().unwrap();
     assert_eq!(config.vision, slither_sim::Vision::Arena);
+    assert_eq!(config.food_view, slither_sim::FoodView::Arena);
     let official = Config::official(1);
     let sectors = std::f64::consts::PI * 3584.0 * 3584.0 / 90_000.0;
     assert_eq!(config.food_count, (7.0 * sectors) as usize);
@@ -596,6 +597,7 @@ fn battledome_uses_official_ambient_density_and_runs_deterministically() {
         "radius",
         "dynamicRadius",
         "vision",
+        "foodView",
         "sizeToPopulation",
         "foodCount",
         "ambientRefillCountsAllFood",
