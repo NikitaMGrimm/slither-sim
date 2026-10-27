@@ -4,9 +4,11 @@
 
 ### Added
 
-- Collision-delay research tools and a retained official scouting study: no
-  near-zero server among 27 active entries, so latency compensation remains
-  inconclusive and simulator collision rules are unchanged.
+- Tools for testing whether official servers compensate for latency when
+  judging collisions, and a first attempt. None of the 27 active official
+  servers was close to empty (the quietest had 61 players), so no controlled
+  encounter ran and the question stays open. Collision rules are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-collision-delay/REPORT.md)).
 
 ### Changed
 
