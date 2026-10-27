@@ -83,7 +83,7 @@ impl Entry {
 /// food list. Every count is always a function of `entries`; the mirror is
 /// first verified against the current food. Untrusted spans compare again;
 /// the simulator can retain verification because public edits reset this cache,
-/// internal pushes/removals are mirrored, and retention changes the list length.
+/// internal pushes/removals and radius/pit retention are mirrored.
 #[derive(Clone, Default)]
 pub(crate) struct FoodCache {
     entries: Vec<Entry>,
@@ -113,7 +113,7 @@ impl FoodCache {
     }
     /// Start an owned span: every non-mirrored edit must reset the cache or
     /// change the food length. Simulator food APIs reset it; radius/pit retention
-    /// only removes items. Thus unchanged length preserves the prior comparison.
+    /// mirrors its removals. Thus owned edits preserve the prior comparison.
     /// Debug builds check that invariant before reusing verification.
     pub(crate) fn begin_mirrored(&mut self, food: &[Food]) {
         self.open = true;
@@ -229,7 +229,7 @@ impl FoodCache {
                     }
                 }
             }
-            // Pickup already supplies ordered indices. Copy survivor ranges rather
+            // Callers supply ordered indices. Copy survivor ranges rather
             // than testing every cached pellet twice; retain their original order.
             self.entries.copy_within(read..i, write);
             write += i - read;
@@ -264,6 +264,17 @@ impl FoodCache {
             self.pellets = Some(index);
         }
         self.pellets.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retention_state(&self) -> (bool, usize, usize, usize) {
+        let index = self.pellets.as_ref().expect("warm pellet index");
+        (
+            self.matched,
+            index.slots.len(),
+            index.free.len(),
+            self.grids.len(),
+        )
     }
 }
 
