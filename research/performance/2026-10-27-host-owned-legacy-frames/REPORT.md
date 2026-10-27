@@ -6,7 +6,9 @@ Stock bundles retain their encoder. No persistent conversion cache or changes
 to report gates, frame boundaries, elapsed allocation, or physical latency draws.
 Measured runtime: `587b597` -> `b104038` (before #212). Delivery integrates
 `40ce9fa` with identical framing files; four raw traces and the full Rust group
-also pass at `8d2a059`. The later `5220e7f` integration changes research only. Performance counts remain pinned to the measured arms.
+also pass at `8d2a059`. Later commits integrate main through `5220e7f` and edit
+research and the changelog only: `src/`, `tests/` and the Cargo files at the PR
+head equal `8d2a059`. Performance counts remain pinned to the measured arms.
 [Selected pins, paired summaries and thirteen trace hashes](results.json).
 
 ## Profile
@@ -52,7 +54,8 @@ drains; excludes sockets/kernel. Changes below are candidate/base:
 Five alternating steady-tick triplets after warmup, same 853-tick gate, exclude
 construction/drains. Median within-triplet extra sim instructions per legacy recipient/tick:
 half13 1,562->958, all13 1,540->938, about 39% less. Ranges are in results.json.
-The small stock instruction increase is retained as a tradeoff for majority13.
+The small stock instruction increase is retained as a tradeoff for workloads
+with a majority of protocol-13 recipients.
 
 Live whole-host user-instruction pairs use the same plan, 10s warmup/12s hold,
 host on one CPU and load/sampler on another. Stock changes +0.17% (range -1.49
