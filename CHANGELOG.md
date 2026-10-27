@@ -12,9 +12,10 @@
 
 ### Changed
 
-- Refreshed the hosting guide's one-core EPYC measurements after indexed food
-  pickup and socket delivery, with current official-375/500 and Battledome-80
-  results and the same delivery target.
+- The hosting guide's resource table now reflects this release's performance
+  work. One Zen 4 core runs 500 official players at 67% CPU instead of 87%,
+  but still misses the delivery target at 375 and 500. It meets the target
+  with 80 Battledome players, and one Zen 5 core meets it at 500.
 
 ### Performance
 

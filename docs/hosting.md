@@ -184,8 +184,9 @@ Memory is the host process's peak. CPU is the average share of one core.
 
 The delivery target is no newly deferred ticks and at most 10 ms of extra delay
 for 99% of received frames. A missed target can occur even below 100% average
-CPU. These short synthetic tests are sizing examples, not a capacity guarantee;
-bots, TLS, larger snakes and longer sessions can add work.
+CPU. The previous revision met it with 250 official players on the Zen 4 core,
+at 49% CPU. These short synthetic tests are sizing examples, not a capacity
+guarantee; bots, TLS, larger snakes and longer sessions can add work.
 
 Playing counts exclude clients waiting to spawn. The study reports those waits
 separately, including unfinished requests. Measure your intended workload before
