@@ -24,6 +24,12 @@
 
 ### Performance
 
+- Each tick, the host rebuilds shared food listings only for sectors whose
+  food changed or that a player started watching, instead of checking every
+  watched sector; a moving Battledome pit still refreshes them all. Output is
+  byte-identical, and the 500-player official fixture runs 7.2–7.8% fewer
+  instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-shared-food-work/REPORT.md)).
 - When the arena or Battledome pit shrinks, pellets left outside it are
   removed from the food cache directly instead of forcing a full rebuild on
   the next tick. Output is byte-identical. In an official test where players
