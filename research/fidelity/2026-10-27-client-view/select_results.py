@@ -43,7 +43,9 @@ def main():
             summary = json.loads((folder / "summary.json").read_text())
             attempt = json.loads((folder / "attempt.json").read_text())
             assert attempt["exit_code"] == 0
+            assert census["status"] == "complete"
             assert summary["provenance"]["source_sha256"] == census["archiveSha256"]
+            assert summary["provenance"]["terminal"] == "capture-end"
             assert summary["audit"]["frames"] == summary["audit"]["whole_frame_parity_checks"]
             row = dict(label=label, mode=mode, summary_sha256=sha(folder / "summary.json"),
                 rows_sha256=sha(folder / "rows.jsonl"), binary_sha256=attempt["binary_sha256"],
