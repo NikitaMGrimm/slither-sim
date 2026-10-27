@@ -15,6 +15,8 @@
   zero. Pit worlds' minimaps show only snakes inside the pit and default to 256
   cells (136 elsewhere), so `SimulationConfig.minimap_side` is now
   `Option<usize>`; JSON accepts an integer or `null`.
+- Host bots each wear their own stock skin, kept across lives, instead of all
+  using skin 0. Their death pellets take that skin's colors.
 - Linux hosting resource guidance now includes real socket tests on one Zen 4
   and one Zen 5 EPYC core, with delivery results and Battledome spawn waits.
 

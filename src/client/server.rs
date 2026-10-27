@@ -1710,7 +1710,10 @@ impl Seat {
         let _ = commands.send(Command::Connect {
             slot: self.slot,
             generation: self.generation,
-            appearance: PlayerAppearance::default(),
+            appearance: PlayerAppearance {
+                skin: bot_skin(self.slot),
+                ..PlayerAppearance::default()
+            },
             session_id: false,
             physical_food: true,
         });
@@ -1725,6 +1728,14 @@ impl Seat {
             sent,
         });
     }
+}
+
+/// Each bot seat keeps one stock skin across lives so the world isn't uniform.
+/// The pinned client offers skins 0..=64 (`max_skin_cv`) but its picker skips
+/// 42, an event skin, unless that event is active.
+fn bot_skin(slot: usize) -> u8 {
+    let skin = (slot % 64) as u8;
+    if skin >= 42 { skin + 1 } else { skin }
 }
 
 /// Stock-client login: protocol and client-version bytes, password, skin at
@@ -3149,6 +3160,14 @@ mod tests {
         login[25] = 25;
         assert!(parse_login(&login).is_err());
         assert!(parse_login(&login[..27]).is_err());
+    }
+
+    #[test]
+    fn bot_seats_wear_distinct_pickable_stock_skins() {
+        let skins: std::collections::BTreeSet<u8> = (0..64).map(bot_skin).collect();
+        assert_eq!(skins.len(), 64);
+        assert!(skins.iter().all(|&skin| skin <= 64 && skin != 42));
+        assert_eq!(bot_skin(64), bot_skin(0));
     }
 
     #[test]
