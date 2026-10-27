@@ -51,7 +51,8 @@ confidence interval or isolated attribution to #204/#205/#207/#208/#209. Offline
 not live capacity estimates. These weaving/food-avoidance clients do not model human browsers, larger growing
 snakes, TLS, Internet paths, legacy clients, slow readers or long uptime. Join order and ecology can diverge.
 The retail EPYC 9645 was not measured; c7a is the requested cloud proxy, with c8a an architectural control.
-No hold was repeated or excluded for speed. Official-500 is a two-minute sample, not five-minute confirmation.
+No hold was repeated or excluded because of its result; the one replacement pair only recovered from the
+Spot interruption above. Official-500 is a two-minute sample, not five-minute confirmation.
 
 All required holds decoded traffic without generator errors. Generator CPU reached 0.917 cores total;
 the busiest pinned shard averaged 12.30% of its core. Host steal was at most 0.0032%.
