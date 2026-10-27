@@ -1,9 +1,12 @@
 # Reuse verified food mirrors, 2026-10-27
 
-Keep. Main `65ff713` (including #208/#209) -> runtime `3cc3646`.
-[Selected results and identities](results.json). The delivery head adds this
-record. Production changes stay in `food_grid.rs` and `simulator.rs`; no server
-or recipient-broadcast implementation changes.
+Keep. The physics profile and original pairs compare main `65ff713` (including
+#208/#209) -> runtime `3cc3646`. An integration recheck compares main `587b597`
+(including #210) -> `e0a71f1`, with identical core changes.
+[Selected results and identities](results.json) retain both revision pairs; the
+delivery head updates documentation only. Production changes stay in
+`food_grid.rs` and `simulator.rs`; no server or recipient-broadcast implementation
+changes.
 
 ## Fresh core physics profile
 
@@ -63,26 +66,33 @@ pairs per protocol case, all counters 100% scheduled. Immutable executable copie
 rehashed before/after. Includes construction, all 1,080 ticks, clients and drains;
 excludes sockets and kernel work. No counted pair excluded.
 
+The table reports the integration recheck, with #210 on both sides. The original
+revision pair used the same protocol and gave 5.505%, 5.323% and 5.136% median
+paired reductions; its selected numbers remain in `results.json`.
+
 | Official 500 | Base / candidate median, B instructions | Paired reduction (range) |
 | --- | ---: | ---: |
-| Stock | 14.857 / 14.039 | 5.505% (5.497–5.511%) |
-| Half protocol 13 | 15.385 / 14.568 | 5.323% (5.256–5.359%) |
-| All protocol 13 | 15.907 / 15.089 | 5.136% (5.087–5.155%) |
+| Stock | 13.841 / 13.025 | 5.902% (5.875–5.909%) |
+| Half protocol 13 | 14.370 / 13.552 | 5.710% (5.687–5.724%) |
+| All protocol 13 | 14.891 / 14.071 | 5.503% (5.482–5.522%) |
 
 All twelve complete raw traces are byte-identical: three permanent-protocol
 official500 variants and the nine historical portable/protocol, official500,
 Battledome64, retained step_all/next_frame and separate Battledome40/64/80 cases.
 Direct decompressed comparison covers frames/order/timestamps, checkpoints and
 spawn/latency RNG endpoints. Physical checkpoints also match across protocols.
+All twelve comparisons pass on both revision pairs; the integration recheck has
+another warmup plus five alternating pairs per protocol, all 100% scheduled.
 
 These fixed synthetic fixtures support no CPU-time, latency, capacity or native
 EPYC transfer claim. Shared-machine WSL2 timing is contaminated.
 
 ## Validation and reproduction
 
-Full Linux Rust group passes, including all lint configurations, default/core/
-bot/networking tests, doctests, C ABI and Python crate build. The 58 focused food
-tests pass. New tests verify owned-span reuse, untrusted/same-length edits,
+Full Linux Rust group passes for the original and integrated candidates,
+including all lint configurations, default/core/bot/networking tests, doctests,
+C ABI and Python crate build. The 58 focused food tests pass. New tests verify
+owned-span reuse, untrusted/same-length edits,
 retention, public reset and restore behavior. Warm worlds match a fresh-food-cache
 oracle on every checkpoint, pickup/birth event and death through recorded radius
 changes, ordinary/pit retention and public replacement. The existing 8,000-edit

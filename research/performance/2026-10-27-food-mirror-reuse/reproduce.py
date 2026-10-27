@@ -17,8 +17,8 @@ if not __debug__:
 
 FIXTURE_REF = "8014ad0da6ad8d67f3d305ca3c43ed53841d66bd"
 FIXTURE_PATH = "research/performance/2026-10-27-host-snake-candidates"
-BASE = "65ff713731cbd436bf5c19a25705fa77b0ebedcc"
-CANDIDATE = "3cc3646fef3ae2e6f0e7667b39112ae948c72be3"
+BASE = "587b597d86185c994b067a9a18ee94a7f95f957e"
+CANDIDATE = "e0a71f12d11dd02efe09e286ccee49481564047e"
 GUARD = 'if not __debug__: raise SystemExit("Study checks require Python without optimization")\n'
 
 if len(sys.argv) < 4 or sys.argv[1] not in {"build", "trace", "count"}:
