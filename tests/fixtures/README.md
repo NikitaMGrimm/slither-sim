@@ -212,3 +212,7 @@ C and Python. `serve-errors-v3.json`, `serve-errors-v4.json` and
 the wire/client inventory. Its 500→100 shrink ticks, duration and final radius
 come from the stated scalar formula, not from regenerated simulator output.
 The measured `arena-radius-updates.json` fixture and historical study stay intact.
+
+`serve-vision-v6.json` is a synthetic contract fixture for numeric versus
+whole-arena geometric coverage and finite exported radii. Historical v5 rules
+and error fixtures retain their original labels and assertions.

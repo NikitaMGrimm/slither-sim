@@ -623,7 +623,7 @@ fn terminal_failure_is_distinct_from_rejection_and_reset_recovers() {
     assert_eq!(unsafe { slither_worlds(handle.0) }, 0);
     assert_eq!(
         handle.request(step),
-        br#"{"error":{"code":11,"field":null,"message":"Reset first","rule":null,"slot":null,"world":null},"protocol":"slither-sim-json-v5","sessionEnded":false}"#
+        br#"{"error":{"code":11,"field":null,"message":"Reset first","rule":null,"slot":null,"world":null},"protocol":"slither-sim-json-v6","sessionEnded":false}"#
     );
     handle.request(r#"{"op":"reset","agents":1}"#);
     assert_eq!(handle.step(&[0.0], &[0]), SLITHER_OK);
@@ -759,7 +759,8 @@ fn c_frame_and_snapshot_expose_live_radius_without_changing_initial_config() {
     for radius in fixture["liveRadii"].as_array().unwrap() {
         let snapshot: serde_json::Value =
             serde_json::from_slice(&session.request(r#"{"op":"snapshot"}"#)).unwrap();
-        assert_eq!(snapshot["protocol"], fixture["protocol"]);
+        assert_eq!(fixture["protocol"], "slither-sim-json-v5");
+        assert_eq!(snapshot["protocol"], "slither-sim-json-v6");
         assert_eq!(
             snapshot["result"]["config"]["radius"],
             fixture["initialRadius"]

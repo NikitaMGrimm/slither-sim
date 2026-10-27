@@ -55,7 +55,7 @@ struct ConfigRecord {
     radius: f64,
     dynamic_radius: bool,
     size_to_population: bool,
-    vision: f64,
+    vision: crate::Vision,
     food_count: usize,
     ambient_refill_counts_all_food: bool,
     food_only_inside_pit: bool,

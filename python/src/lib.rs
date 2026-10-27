@@ -303,7 +303,7 @@ fn reset_object<T: serde::de::DeserializeOwned + Default>(
     }
 }
 
-/// A `slither-sim-json-v5` session of independent worlds, run in this process.
+/// A `slither-sim-json-v6` session of independent worlds, run in this process.
 ///
 /// Reset through keyword arguments, step with flat world-major heading and boost
 /// arrays and read each world's frame as columns. Use one session from one

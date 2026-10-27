@@ -47,6 +47,7 @@ both delays.
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
 | `bots.count` | `4` | Background food-seeking bots; players + bots must be at most 65,535. |
+| `bots.vision` | `1500` | Positive finite cap on each host bot's snake/prey coverage, the radius A4 was tuned for. Effective radius is the smaller of this and world vision; bots keep the normal local food stencil, including when socket players use `"arena"`. |
 | `bots.threads` | `2` | Background workers, separate from simulation and sockets; at least 1 when `bots.count > 0`. At most `bots.count` workers start. |
 | `bots.latency` | Zero added delay | Bot link and processing settings. |
 | `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false and `latency` must stay at its default. |
@@ -91,7 +92,7 @@ fit (for example, `size: 51, maxSize: 51.01`).
 | `radius` | `670` | Initial arena radius after startup sizing; positive, finite and at most `1e150`. Live radius is separate runtime state. |
 | `dynamicRadius` | `true` | Follow occupied seats (`670 × sqrt(max(occupied, 1))`): grow at once, shrink at at most 23.4375 units/s, moving only outside a 3% dead zone of the current radius. Food/refill/prey targets follow live area. A product model, not an identified official law. Sandbox and explicit JSON `radius` default to false; Battledome uses its [circular floor policy](#battledome). |
 | `sizeToPopulation` | `true` | Runtimes enlarge this arena to fit their population at creation, scaling food target/refill with area. Sandbox, Battledome and explicit JSON `radius` default to false; an explicit flag overrides that choice. See [population sizing](#population-sizing). |
-| `vision` | `1500` | Positive finite snake/prey coverage radius; an approximation, not a measured official threshold. Food has separate sector interest. |
+| `vision` | `1500` (`"arena"` in Battledome) | Positive finite snake/prey coverage radius, or `"arena"` for every living snake/prey and all food sectors touched by the live arena, from any position. Numeric vision keeps the separate local food-sector interest. This is a mode design choice, not a measured official threshold. |
 | `foodCount` | `109` | Refill target/startup placement attempts. Admission limits can reduce placement; memory bounds it. |
 | `ambientRefillCountsAllFood` | `false` | Count all pellets toward the refill target; otherwise count only ambient food. Does not cap death/boost drops. |
 | `foodOnlyInsidePit` | `false` | Requires `pit`. Restrict ambient, death and boost pellets to the live pit, scale ambient target/rate by its area fraction, and use the ordinary full-body death budget even at a size floor. Enabled by Battledome. |
@@ -122,6 +123,13 @@ ecology follows the resulting live area even on sample ticks.
 `Simulator::radius()`, frame `radius` and snapshot `radius` report the
 live boundary; `config().radius` and `snapshot.config.radius` retain the initial
 setting. See [rules and evidence limits](server-rules.md).
+
+In Rust, use `Vision::Radius(1500.)` or `Vision::Arena` for `Config.vision`.
+Direct observations and column frames keep a finite numeric vision radius: the
+live wall diameter for arena coverage. Portable wire observations continue to
+report `visionRadius: null`, since the wire does not declare a visibility policy.
+Whole-arena delivery increases join bursts and steady downlink traffic; the
+host keeps its existing 2 MiB per-recipient queued-output limit.
 
 ### Population sizing
 
@@ -237,6 +245,7 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 | Spawn body | 26 anchors, 42 units apart along its own circle, tangent heading | 400-unit body clearance and the circular safety checks below; wait when sampled poses fail |
 | Kill score | `killScoreSeconds: 900` | +1 per credited kill for 15 minutes; retained across lives so death does not erase recent kills |
 | Death food | Full ordinary body budget, including floor-size snakes and pit deaths | Keep only scattered pellet positions strictly inside the live pit; outer-wall deaths still drop none |
+| Vision | `vision: "arena"` | Every snake and pellet is known from any position; interest follows live growth and shrink. Clients control camera zoom. An explicit number restores local coverage and food-sector interest |
 | Prey | `prey.count: 0` | Snakes only |
 | Ambient food | `foodOnlyInsidePit: true`; reference full-arena `foodCount: 3138`, about 45.9 attempts/s | Multiply target/rate by `(pit / wall)²`: about 24.8%, or 777 placement attempts and 11.38 attempts/s at base size. `ambientRefillCountsAllFood: true` counts death/boost pellets too; inherited admission caps remain |
 

@@ -114,6 +114,49 @@ fn wire_score(snake: &Snake) -> f64 {
 }
 
 impl SimulatorBackend {
+    fn bot_vision(&self) -> crate::Vision {
+        let world = self.world.config().vision;
+        match (world, self.bot_vision) {
+            (crate::Vision::Radius(radius), Some(cap)) => crate::Vision::Radius(radius.min(cap)),
+            (crate::Vision::Arena, Some(cap)) => crate::Vision::Radius(cap),
+            _ => world,
+        }
+    }
+
+    fn vision_for_slot(&self, slot: usize) -> crate::Vision {
+        if slot >= self.player_latency.slots {
+            self.bot_vision()
+        } else {
+            self.world.config().vision
+        }
+    }
+
+    fn advance_food_interest(&mut self, now: f64) {
+        let world_vision = self.world.config().vision;
+        let bot_vision = self.bot_vision();
+        if world_vision == crate::Vision::Arena {
+            self.arena_food_interest.advance_arena(self.world.radius());
+        }
+        for (index, (slot, snake)) in self.slots.iter_mut().zip(self.world.snakes()).enumerate() {
+            if slot.connection.setup {
+                let vision = if index >= self.player_latency.slots {
+                    bot_vision
+                } else {
+                    world_vision
+                };
+                if vision == crate::Vision::Arena {
+                    slot.connection
+                        .food_interest
+                        .clone_from(&self.arena_food_interest);
+                } else {
+                    slot.connection
+                        .food_interest
+                        .advance(snake.head, snake.heading, now);
+                }
+            }
+        }
+    }
+
     /// Text from the client whose dead life holds the record, accepted once.
     /// Anything else is ignored: this is a local session rule, not an official
     /// qualification check.
@@ -270,13 +313,7 @@ impl SimulatorBackend {
         self.settle_lives();
         self.tick += 1;
         let now = self.time();
-        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
-            if slot.connection.setup {
-                slot.connection
-                    .food_interest
-                    .advance(snake.head, snake.heading, now);
-            }
-        }
+        self.advance_food_interest(now);
         for slot in &mut self.slots {
             // A decision that sent nothing is complete once its duration elapses.
             if slot
@@ -349,14 +386,7 @@ impl SimulatorBackend {
         }
         // Dead clients still render the world during the stock death fade;
         // withholding deltas leaves opponents extrapolating stale motion.
-        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
-            if slot.connection.setup {
-                // Also covers explicit diagnostic broadcasts between physics ticks.
-                slot.connection
-                    .food_interest
-                    .advance(snake.head, snake.heading, now);
-            }
-        }
+        self.advance_food_interest(now);
         let food_changes = self.sync_food_sectors()?;
         self.assign_prey_wire()?;
         self.update_prey_clocks()?;
@@ -373,6 +403,14 @@ impl SimulatorBackend {
             .collect();
         let grid = CoverageGrid::new(self.world.snakes(), &bounds, self.world.config().vision);
         let prey_bounds = PreyBounds::new(self.world.prey(), self.world.config().vision);
+        // Only hosts with a different bot cap need a second finite broad phase.
+        let bot_vision = self.bot_vision();
+        let bot_coverage = (bot_vision != self.world.config().vision).then(|| {
+            (
+                CoverageGrid::new(self.world.snakes(), &bounds, bot_vision),
+                PreyBounds::new(self.world.prey(), bot_vision),
+            )
+        });
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
         // they are consumed by the next broadcast's update_reports.
@@ -412,8 +450,14 @@ impl SimulatorBackend {
                 slot,
                 &food_changes,
                 &bounds,
-                &grid,
-                &prey_bounds,
+                bot_coverage
+                    .as_ref()
+                    .filter(|_| slot >= self.player_latency.slots)
+                    .map_or(&grid, |(grid, _)| grid),
+                bot_coverage
+                    .as_ref()
+                    .filter(|_| slot >= self.player_latency.slots)
+                    .map_or(&prey_bounds, |(_, prey)| prey),
                 &mut snakes,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
@@ -571,6 +615,7 @@ impl SimulatorBackend {
         prey_bounds: &PreyBounds,
         snakes: &mut SnakeBroadcast,
     ) -> Result<PacketViews, String> {
+        let vision = self.vision_for_slot(slot);
         let world = &self.world;
         let me = &world.snakes()[slot];
         let record = self
@@ -612,7 +657,6 @@ impl SimulatorBackend {
             packets.push(crate::client::rules_packet::encode(rules));
             connection.rules_sent = Some(rules);
         }
-        let vision = world.config().vision;
         let head = me.head;
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
@@ -707,7 +751,9 @@ impl SimulatorBackend {
         let mut visible = BTreeMap::new();
         for index in prey_bounds.near(head) {
             let prey = &world.prey()[index];
-            if prey.position.distance(head) <= vision {
+            if vision == crate::Vision::Arena
+                || prey.position.distance(head) <= vision.radius(world.radius())
+            {
                 visible.entry(prey.id).or_insert(prey);
             }
         }

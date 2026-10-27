@@ -18,7 +18,7 @@ pub(super) const CLEANUP_SECONDS: f64 = 0.504;
 /// Recipient state, reset with its connection rather than shared with the world.
 #[derive(Clone, Debug, Default)]
 pub(super) struct SectorInterest {
-    subscribed: BTreeSet<[u8; 2]>,
+    subscribed: Arc<BTreeSet<[u8; 2]>>,
     // Held food listings share this identity, avoiding a key-by-key comparison
     // on every broadcast. Replace it only when membership actually changes.
     revision: Arc<()>,
@@ -29,6 +29,9 @@ pub(super) struct SectorInterest {
     /// Grid center of the latest stencil.
     center: Option<[f64; 2]>,
     touched: f64,
+    /// Radius interval with exactly this arena sector set: inclusive below,
+    /// exclusive above. A slow moving wall normally needs no membership work.
+    arena_interval: Option<(f64, f64)>,
 }
 
 impl SectorInterest {
@@ -50,7 +53,7 @@ impl SectorInterest {
                 }
             }
             for sector in stencil([cx, cy]) {
-                changed |= self.subscribed.insert(sector);
+                changed |= Arc::make_mut(&mut self.subscribed).insert(sector);
                 self.last_seen.insert(sector, now);
             }
             self.center = Some([cx, cy]);
@@ -63,7 +66,7 @@ impl SectorInterest {
         let epoch = (now / CLEANUP_SECONDS).floor() as u64;
         if epoch > self.cleanup_epoch {
             self.cleanup_epoch = epoch;
-            let subscribed = &mut self.subscribed;
+            let subscribed = Arc::make_mut(&mut self.subscribed);
             let [cx, cy] = [cx, cy];
             self.last_seen.retain(|sector, last_seen| {
                 let dx = (f64::from(sector[0]) - cx).abs();
@@ -82,6 +85,51 @@ impl SectorInterest {
         }
     }
 
+    /// Whole-arena food interest is a custom-mode choice. Share the set across
+    /// recipients, and replace its identity only at an actual sector crossing.
+    pub(super) fn advance_arena(&mut self, radius: f64) {
+        if self
+            .arena_interval
+            .is_some_and(|(lo, hi)| radius >= lo && radius < hi)
+        {
+            return;
+        }
+        let size = f64::from(encode::SECTOR_SIZE);
+        let center = f64::from(encode::GRID_CENTER);
+        // food_key rounds before selecting the sector. Its cell can start half
+        // a wire unit before the nominal sector edge; include that strip too.
+        let half_cell = size / 512.;
+        let lower = (((center - radius) / size).floor() as i32).saturating_sub(1);
+        let upper = (((center + radius) / size).floor() as i32).saturating_add(1);
+        let mut sectors = BTreeSet::new();
+        let (mut lo, mut hi) = (0_f64, f64::INFINITY);
+        for x in lower.max(0)..=upper.min(255) {
+            for y in lower.max(0)..=upper.min(255) {
+                let near = |cell: i32| {
+                    // At wire coordinates below 1e5, 1e-8 exceeds the rounding
+                    // in origin addition, cell selection and hypot. Their edges
+                    // can otherwise disagree on a pellet just inside the wall.
+                    let slack = 1e-8;
+                    let a = f64::from(cell) * size - center - half_cell - slack;
+                    let b = a + size + 2. * slack;
+                    a.max(-b).max(0.)
+                };
+                let edge = near(x).hypot(near(y));
+                if edge <= radius {
+                    sectors.insert([x as u8, y as u8]);
+                    lo = lo.max(edge);
+                } else {
+                    hi = hi.min(edge);
+                }
+            }
+        }
+        self.arena_interval = Some((lo, hi));
+        if *self.subscribed != sectors {
+            self.subscribed = Arc::new(sectors);
+            self.revision = Arc::new(());
+        }
+    }
+
     pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
         &self.subscribed
     }
@@ -95,7 +143,7 @@ impl SectorInterest {
     pub(super) fn from_subscribed(subscribed: BTreeSet<[u8; 2]>) -> Self {
         let last_seen = subscribed.iter().map(|&sector| (sector, 0.)).collect();
         Self {
-            subscribed,
+            subscribed: Arc::new(subscribed),
             last_seen,
             ..Self::default()
         }
@@ -125,6 +173,58 @@ mod tests {
     use std::f64::consts::FRAC_PI_2;
 
     const FAR: Point = Point { x: 10_000., y: 0. };
+
+    #[test]
+    fn arena_interest_covers_wire_rounding_just_inside_the_wall() {
+        let boundary = 149.4140625_f64;
+        let radius = boundary.next_down();
+        for point in [
+            Point {
+                x: radius.next_down(),
+                y: 0.,
+            },
+            Point {
+                x: 0.,
+                y: radius.next_down(),
+            },
+        ] {
+            assert!(point.distance_lt(Point::default(), radius));
+            let [x, y, _, _] = encode::food_key(point).unwrap();
+            assert!(x == 109 || y == 109);
+            let mut interest = SectorInterest::default();
+            interest.advance_arena(radius);
+            assert!(interest.subscribed().contains(&[x, y]));
+        }
+    }
+
+    #[test]
+    fn arena_interest_follows_the_live_disc_and_shares_unchanged_membership() {
+        let mut interest = SectorInterest::default();
+        interest.advance_arena(1000.);
+        let initial = interest.clone();
+        interest.advance_arena(1000.001);
+        assert!(Arc::ptr_eq(initial.revision(), interest.revision()));
+        assert!(Arc::ptr_eq(&initial.subscribed, &interest.subscribed));
+        interest.advance_arena(3000.);
+        assert!(initial.subscribed().is_subset(interest.subscribed()));
+        assert!(interest.subscribed().len() > initial.subscribed().len());
+        for x in -3000..=3000 {
+            for y in [-2999., -150., 0., 150., 2999.] {
+                let point = Point { x: f64::from(x), y };
+                if point.distance(Point::default()) <= 3000. {
+                    let [sx, sy, _, _] = encode::food_key(point).unwrap();
+                    assert!(interest.subscribed().contains(&[sx, sy]));
+                }
+            }
+        }
+        // No retention delay on shrink; the world culls stranded food first.
+        interest.advance_arena(1000.);
+        assert_eq!(initial.subscribed(), interest.subscribed());
+        assert!(!Arc::ptr_eq(initial.revision(), interest.revision()));
+        // Extreme valid core radii cannot overflow sector-key arithmetic.
+        interest.advance_arena(1e150);
+        assert_eq!(interest.subscribed().len(), 65_536);
+    }
 
     #[test]
     fn revision_tracks_membership_across_cloning_revisits_and_cleanup() {

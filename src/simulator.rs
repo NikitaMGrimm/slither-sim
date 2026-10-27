@@ -151,7 +151,8 @@ pub struct Config {
     /// food with area. Explicit JSON `radius` opts out unless `sizeToPopulation`
     /// is also supplied; a fixed Rust radius disables this and `dynamic_radius`.
     pub size_to_population: bool,
-    pub vision: f64,
+    /// Snake/prey coverage and food interest policy.
+    pub vision: crate::Vision,
     /// Initial-area refill target; counts ambient pellets unless
     /// `ambient_refill_counts_all_food`. Seat-following scales it with live area.
     pub food_count: usize,
@@ -216,7 +217,7 @@ struct ConfigWire {
     radius: f64,
     dynamic_radius: bool,
     size_to_population: bool,
-    vision: f64,
+    vision: crate::Vision,
     food_count: usize,
     #[serde(skip_serializing_if = "is_false")]
     ambient_refill_counts_all_food: bool,
@@ -427,7 +428,7 @@ impl Config {
             // A finite receipt approximation: the paired visibility census
             // rejects 500, while 1500 substantially reduces missed snakes/prey.
             // Exact server entry/exit geometry and size scaling remain unknown.
-            vision: 1500.0,
+            vision: crate::Vision::Radius(1500.0),
             food_count,
             ambient_refill_counts_all_food: false,
             food_only_inside_pit: false,
@@ -482,6 +483,9 @@ impl Config {
         let (food_count, ambient_replenish_per_second) = official_food(RADIUS);
         Self {
             radius: RADIUS,
+            // Custom mode: zoomed-out players should know the entire arena.
+            // research/battledome/2026-10-27-arena-vision/REPORT.md
+            vision: crate::Vision::Arena,
             dynamic_radius: true,
             size_to_population: false,
             food_count,
@@ -510,11 +514,7 @@ impl Config {
     /// Checks the initial rules. Checkpoints validate the live radius separately,
     /// so a world that has shrunk inside its pit or spawn band still restores.
     pub fn validate(&self) -> Result<(), SimError> {
-        for (field, value) in [
-            ("radius", self.radius),
-            ("vision", self.vision),
-            ("dt", self.dt),
-        ] {
+        for (field, value) in [("radius", self.radius), ("dt", self.dt)] {
             if let Some(rule) = Constraint::positive(value) {
                 return Err(SimError::config(
                     rule,
@@ -522,6 +522,15 @@ impl Config {
                     "Settings must be positive finite numbers",
                 ));
             }
+        }
+        if let crate::Vision::Radius(radius) = self.vision
+            && let Some(rule) = Constraint::positive(radius)
+        {
+            return Err(SimError::config(
+                rule,
+                "vision",
+                "Vision must be a positive finite number or arena",
+            ));
         }
         let radius_limit_error = |field: &str| {
             SimError::config(

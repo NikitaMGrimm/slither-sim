@@ -2,6 +2,47 @@
 mod tests {
     use crate::{model::*, prey::Prey, simulator::Simulator};
 
+    #[test]
+    fn arena_observations_include_every_living_opponent_food_and_prey() {
+        let mut rng = Rng(7);
+        let mut world = world(&mut rng, 16, 100, 10.);
+        world.config.vision = crate::Vision::Arena;
+        for (i, snake) in world.snakes.iter_mut().enumerate() {
+            snake.head = Point {
+                x: if i == 0 { -900. } else { 900. },
+                y: 0.,
+            };
+            snake.body = vec![snake.head];
+        }
+        world.food.retain(|f| f.x.is_finite() && f.y.is_finite());
+        world
+            .prey
+            .retain(|p| p.position.x.is_finite() && p.position.y.is_finite());
+        for radius in [1000., 3000., 1000.] {
+            world.radius = radius;
+            let all = world.observe_all();
+            for (i, slot) in all.iter().enumerate() {
+                let one = world.observe(i).unwrap();
+                assert_eq!(one.vision_radius, Some(2. * radius));
+                assert_eq!(one.food, world.food);
+                assert_eq!(one.prey, world.prey);
+                assert_eq!(
+                    one.opponents,
+                    world
+                        .snakes
+                        .iter()
+                        .enumerate()
+                        .filter(|(j, s)| *j != i && s.alive)
+                        .map(|(_, s)| s.clone())
+                        .collect::<Vec<_>>()
+                );
+                if world.snakes[i].alive {
+                    assert_eq!(Some(&one), slot.as_ref());
+                }
+            }
+        }
+    }
+
     struct Rng(u64);
     impl Rng {
         fn unit(&mut self) -> f64 {
@@ -76,7 +117,7 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        world.config.vision = vision;
+        world.config.vision = crate::Vision::Radius(vision);
         let spread = rng.pick(&[10.0, 3000.0, 20_000.0]);
         let center = Point::default();
         let heads: Vec<_> = (0..snakes)

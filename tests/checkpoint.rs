@@ -1093,3 +1093,48 @@ fn old_rules_revision_is_rejected_atomically_without_changing_the_format() {
         assert_eq!(error.field.as_deref(), Some("rulesRevision"));
     }
 }
+
+#[test]
+fn arena_vision_checkpoints_round_trip_and_keep_numeric_continuations() {
+    for vision in [
+        slither_sim::Vision::Arena,
+        slither_sim::Vision::Radius(1500.),
+    ] {
+        let mut world = Simulator::new(slither_sim::WorldOptions {
+            seed: 7,
+            config: Config {
+                vision,
+                radius_updates: vec![RadiusUpdate {
+                    time: 0.014,
+                    radius: 1200.,
+                }],
+                ..Config::sandbox()
+            },
+            population: slither_sim::InitialPopulation::Placed {
+                ids: vec!["observer".into()],
+                placement: slither_sim::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut restored = Simulator::from_checkpoint(
+            &serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
+            Default::default(),
+        )
+        .unwrap();
+        for _ in 0..3 {
+            assert_eq!(world.observe_all(), restored.observe_all());
+            assert_eq!(
+                world.observe(0).unwrap().vision_radius,
+                Some(vision.radius(world.radius()))
+            );
+            world.step(&[Some(Action::default())]).unwrap();
+            restored.step(&[Some(Action::default())]).unwrap();
+        }
+        assert_eq!(value(&world), value(&restored));
+    }
+    let mut invalid = value(&world());
+    for vision in [json!("everywhere"), json!(null), json!(0), json!(-1)] {
+        invalid["config"]["vision"] = vision;
+        assert!(Simulator::from_checkpoint(&bytes(&invalid), Default::default()).is_err());
+    }
+}

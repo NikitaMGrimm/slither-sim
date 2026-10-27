@@ -88,7 +88,7 @@ pub struct FrameRef<'a> {
     pub living: u32,
     /// Arena radius around the origin.
     pub radius: f64,
-    /// Vision radius.
+    /// Effective vision radius; live arena diameter for `Vision::Arena`.
     pub vision: f64,
     pub rules: WorldRules,
     pub snakes: SnakeColumns<'a>,
@@ -287,7 +287,7 @@ impl Frame {
         self.ticks = count(ticks, "tick")?;
         self.living = count(world.living(), "living snake")?;
         self.radius = world.radius();
-        self.vision = world.config().vision;
+        self.vision = world.config().vision.radius(world.radius());
         self.rules = world.rules();
         self.collect_snakes(world)?;
         self.collect_food(world)?;

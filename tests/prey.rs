@@ -782,7 +782,7 @@ fn raw_visibility_keeps_moving_entities_separate_from_food() {
     let mut w = world();
     {
         let mut config = w.config().clone();
-        config.vision = 500.;
+        config.vision = slither_sim::Vision::Radius(500.);
         support::reconfigure(&mut w, config);
     }
     for (id, mut prey) in [entity(100., 120.), entity(600., 120.)]

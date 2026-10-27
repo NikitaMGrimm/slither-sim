@@ -105,6 +105,13 @@
       "clientContract": "slither-client-v2",
       "dataOrigin": "synthetic",
       "expectedOrigin": "synthetic"
+    },
+    {
+      "path": "tests/fixtures/serve-vision-v6.json",
+      "wireProtocol": 19,
+      "clientContract": "slither-sim-json-v6",
+      "dataOrigin": "synthetic",
+      "expectedOrigin": "synthetic"
     }
   ]
 }

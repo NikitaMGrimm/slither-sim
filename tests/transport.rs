@@ -578,6 +578,14 @@ fn terminal_steps_clear_all_worlds_and_allow_reset() {
     use slither_sim::transport::StepError;
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/serve-errors-v5.json")).unwrap();
+    // V6 extends vision; keep the historical v5 error fields frozen while
+    // checking today's envelope ID separately.
+    let current_reply = |name: &str| {
+        let mut expected = fixture[name].clone();
+        assert_eq!(expected["protocol"], "slither-sim-json-v5");
+        expected["protocol"] = json!("slither-sim-json-v6");
+        expected
+    };
     let reset = serde_json::to_vec(&fixture["reset"]).unwrap();
     let step = serde_json::to_vec(&fixture["step"]).unwrap();
     let mut session = transport::Session::new();
@@ -601,7 +609,7 @@ fn terminal_steps_clear_all_worlds_and_allow_reset() {
         matches!(session.step(&[], &[]), Err(StepError::Rejected(ref e)) if e.kind == ErrorKind::NotReset)
     );
     let rejected: Value = serde_json::from_slice(&session.request(&step)).unwrap();
-    assert_eq!(rejected, fixture["rejectedReply"]);
+    assert_eq!(rejected, current_reply("rejectedReply"));
     result(&session.request(br#"{"op":"reset","agents":1}"#));
     session.step(&[0.0], &[false]).unwrap();
     assert!(session.frame(0).unwrap().time > 0.0);
@@ -615,12 +623,12 @@ fn terminal_steps_clear_all_worlds_and_allow_reset() {
         json!({"op":"reset","agents":1}),
         json!({"op":"step","actions":[{"heading":[0],"boost":[false]}]}),
     ]);
-    assert_eq!(replies[0], fixture["rejectedReply"]);
+    assert_eq!(replies[0], current_reply("rejectedReply"));
     assert_eq!(replies[2]["error"]["message"], error.to_string());
     let mut terminal = replies[2].clone();
     terminal["error"]["message"] = fixture["terminalReply"]["error"]["message"].clone();
-    assert_eq!(terminal, fixture["terminalReply"]);
-    assert_eq!(replies[3], fixture["rejectedReply"]);
+    assert_eq!(terminal, current_reply("terminalReply"));
+    assert_eq!(replies[3], current_reply("rejectedReply"));
     assert!(replies[5]["result"]["worlds"][0]["time"].as_f64().unwrap() > 0.0);
 }
 
@@ -794,5 +802,27 @@ fn initial_config_and_live_radius_survive_reset_replay_and_samples() {
         assert_eq!(snapshot["radius"], *radius);
         assert_eq!(session.frame(0).unwrap().radius, radius.as_f64().unwrap());
         session.step(&[0.], &[false]).unwrap();
+    }
+}
+
+#[test]
+fn geometric_v6_vision_fixture_preserves_numeric_units_and_covers_the_arena() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/serve-vision-v6.json")).unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let mut session = slither_sim::transport::Session::new();
+        let reply: serde_json::Value = serde_json::from_slice(&session.request(&serde_json::to_vec(&json!({
+            "op":"reset", "agents":2, "config":{"preset":"sandbox","radius":4000,"vision":case["vision"],"foodCount":0,"ambientReplenishPerSecond":0}
+        })).unwrap())).unwrap();
+        assert_eq!(reply["protocol"], fixture["protocol"]);
+        let frame = &reply["result"]["worlds"][0];
+        assert_eq!(frame["vision"].as_f64(), case["expectedVision"].as_f64());
+        for view in frame["views"].as_array().unwrap() {
+            // The view's self row is separate from its opponent rows.
+            assert_eq!(
+                view["snakes"].as_array().unwrap().len(),
+                case["expectedOpponents"].as_u64().unwrap() as usize
+            );
+        }
     }
 }

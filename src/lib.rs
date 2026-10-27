@@ -23,6 +23,8 @@ pub mod rules;
 pub mod simulator;
 pub mod spawn;
 pub mod transport;
+mod vision;
+pub use vision::Vision;
 
 pub use boundary::{BoundaryMode, RadiusUpdate};
 pub use error::{

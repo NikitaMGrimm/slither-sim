@@ -162,6 +162,9 @@ pub struct BotConfig {
     pub count: usize,
     /// Workers apart from the simulation and socket threads.
     pub threads: usize,
+    /// Tuned A4 observation radius; capped by world vision. Bots retain local
+    /// food interest even when players see the whole custom arena.
+    pub vision: f64,
     pub latency: LatencyConfig,
 }
 
@@ -170,6 +173,7 @@ impl Default for BotConfig {
         Self {
             count: 4,
             threads: 2,
+            vision: 1500.,
             latency: LatencyConfig::default(),
         }
     }
@@ -196,6 +200,9 @@ impl HostConfig {
         }
         if self.bots.count > 0 && self.bots.threads == 0 {
             return Err("Bots need 1 or more bots.threads".into());
+        }
+        if !self.bots.vision.is_finite() || self.bots.vision <= 0. {
+            return Err("bots.vision must be a positive finite number".into());
         }
         if self.simulation.record_wire {
             return Err("The host does not retain wire records; set recordWire to false".into());
@@ -389,6 +396,7 @@ impl Host {
             config.players.max + config.bots.count,
         )?;
         world.set_player_latency(config.players.max, config.players.latency);
+        world.set_bot_vision(config.bots.vision);
         let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         Ok(Self {
@@ -2021,6 +2029,62 @@ mod bot_tests;
 mod tests {
     use super::*;
     use crate::client::simulation::MAX_AGENTS;
+
+    #[test]
+    fn bot_vision_defaults_and_validation_keep_a_finite_tuned_cap() {
+        let mut config = HostConfig::default();
+        assert_eq!(config.bots.vision, 1500.);
+        for radius in [0., -1., f64::NAN, f64::INFINITY] {
+            config.bots.vision = radius;
+            assert!(config.validate().unwrap_err().contains("bots.vision"));
+        }
+        let config: HostConfig = serde_json::from_str(r#"{"bots":{"vision":900}}"#).unwrap();
+        assert_eq!(config.bots.vision, 900.);
+        config.validate().unwrap();
+    }
+
+    #[test]
+    fn default_host_bot_cap_preserves_player_and_bot_wire_bytes() {
+        for world in [crate::Config::official(1), crate::Config::sandbox()] {
+            let config = HostConfig {
+                bind: "127.0.0.1:0".parse().unwrap(),
+                seed: 7,
+                players: PlayerConfig {
+                    max: 1,
+                    ..Default::default()
+                },
+                bots: BotConfig {
+                    count: 1,
+                    threads: 1,
+                    ..Default::default()
+                },
+                simulation: SimulationConfig {
+                    world,
+                    ..Default::default()
+                },
+            };
+            let mut uncapped = RawSimulator::new(7, config.world_config().unwrap(), 2).unwrap();
+            uncapped.set_player_latency(1, config.players.latency.clone());
+            let mut capped = Host::bind(config).unwrap().world;
+            for slot in 0..2 {
+                assert_eq!(
+                    uncapped.connect(slot, PlayerAppearance::default()),
+                    capped.connect(slot, PlayerAppearance::default())
+                );
+            }
+            for _ in 0..200 {
+                uncapped.advance_tick_with(0, &mut |_| Ok(())).unwrap();
+                capped.advance_tick_with(0, &mut |_| Ok(())).unwrap();
+                for slot in 0..2 {
+                    assert_eq!(uncapped.take(slot).unwrap(), capped.take(slot).unwrap());
+                }
+                assert_eq!(
+                    uncapped.fixture_world().observe_all(),
+                    capped.fixture_world().observe_all()
+                );
+            }
+        }
+    }
 
     #[test]
     fn owned_frames_preserve_websocket_bytes_and_sequence_wrap() {

@@ -81,7 +81,7 @@ fn config(agents: usize, latency: LatencyConfig) -> SimulationConfig {
         ..Default::default()
     };
     config.world.radius = 1500.;
-    config.world.vision = 900.;
+    config.world.vision = slither_sim::Vision::Radius(900.);
     config.world.food_count = 200;
     config
 }
@@ -427,7 +427,7 @@ fn wire_records_replay_to_identical_frames() {
 #[test]
 fn received_state_hides_private_metadata() {
     let mut config = config(3, LatencyConfig::fixed(0.05));
-    config.world.vision = 3000.;
+    config.world.vision = slither_sim::Vision::Radius(3000.);
     let mut backend = SimulatorBackend::new(6, config).unwrap();
     for _ in 0..80 {
         backend.next_frame().unwrap();
@@ -448,7 +448,7 @@ fn received_state_hides_private_metadata() {
 #[test]
 fn appearances_only_on_entry_and_unreported_fields_keep_aging() {
     let mut config = config(2, LatencyConfig::fixed(0.02));
-    config.world.vision = 3000.;
+    config.world.vision = slither_sim::Vision::Radius(3000.);
     config.world.food_count = 0;
     let mut backend = SimulatorBackend::new(8, config).unwrap();
     playing(&mut backend, 0);
@@ -472,7 +472,7 @@ fn appearances_only_on_entry_and_unreported_fields_keep_aging() {
 fn dead_slots_stop_and_reconnect_resets_history() {
     let mut config = config(2, LatencyConfig::fixed(0.02));
     config.world.radius = 600.;
-    config.world.vision = 3000.;
+    config.world.vision = slither_sim::Vision::Radius(3000.);
     config.world.boundary_mode = slither_sim::BoundaryMode::Hard;
     let mut backend = SimulatorBackend::new(5, config).unwrap();
     playing(&mut backend, 0);
@@ -700,7 +700,7 @@ fn accepted_prey_size_matches_the_received_appearance() {
     for (size, max_size, expected) in [(0.2, 0.2, 0.2), (51., 51., 51.), (51., 51.01, 51.)] {
         let mut config = SimulationConfig::default();
         config.world.food_count = 0;
-        config.world.vision = 3000.;
+        config.world.vision = slither_sim::Vision::Radius(3000.);
         config.world.prey.count = 1;
         config.world.prey.size = size;
         config.world.prey.max_size = max_size;
@@ -719,7 +719,7 @@ fn accepted_prey_size_matches_the_received_appearance() {
 fn prey_that_cannot_turn_are_shown_without_turning() {
     let mut config = SimulationConfig::default();
     config.world.food_count = 0;
-    config.world.vision = 3000.;
+    config.world.vision = slither_sim::Vision::Radius(3000.);
     config.world.prey.count = 1;
     config.world.prey.turn_rate = 0.;
     let mut backend = SimulatorBackend::new(7, config).unwrap();

@@ -6,9 +6,10 @@
 //! delay messages without reordering them. Configured delays stay private:
 //! clients measure only pings and their own reply time.
 //!
-//! Snake/prey coverage approximates a circle of `world.vision` around the head;
-//! any centerline part keeps a snake covered. Food has separate retained
-//! 300-unit-sector interest. Snakes appear once per entry or life, then receive
+//! Numeric snake/prey coverage approximates a circle around the head; arena
+//! vision covers every living entity and every live-arena food sector.
+//! Any centerline part keeps a numeric-view snake covered. Numeric food views
+//! retain their separate 300-unit-sector interest. Snakes appear once per entry or life, then receive
 //! anchor, tail, mass and motion deltas. Native and remote coverage is shared.
 use super::{
     Backend, Bot, ClientFrame, ClientState, ClientStatus, ForagerBot, WireEvent, WireRecord,
@@ -115,9 +116,13 @@ pub struct SimulatorBackend {
     prey_clocks: BTreeMap<u64, PreyClock>,
     reports: Vec<SnakeReports>,
     food_subscriptions: FoodSubscriptions,
+    /// One live-arena sector set, shared by all whole-arena recipients.
+    arena_food_interest: super::visibility::SectorInterest,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
+    /// Host-only cap for background recipients. Standalone backends use world vision.
+    bot_vision: Option<f64>,
     /// Profiles of the remote slots; native slots use `NATIVE_PROFILE`.
     profiles: Vec<PlayerAppearance>,
     record: Option<Record>,
@@ -199,6 +204,7 @@ impl SimulatorBackend {
             prey_clocks: BTreeMap::new(),
             reports: vec![SnakeReports::default(); config.agents],
             food_subscriptions: FoodSubscriptions::default(),
+            arena_food_interest: super::visibility::SectorInterest::default(),
             slots: Vec::with_capacity(config.agents),
             background_policy: None,
             player_latency: PlayerLatency::default(),
@@ -206,6 +212,7 @@ impl SimulatorBackend {
             config,
             tick: 0,
             remote,
+            bot_vision: None,
             profiles: vec![PlayerAppearance::default(); remote],
             record: None,
             connections: 0,

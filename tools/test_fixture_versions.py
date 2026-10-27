@@ -179,6 +179,12 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assertEqual(rules["protocol"], "slither-sim-json-v5")
         self.assertEqual(set(rules["rules"]), {"boundaryMode", "pitRadius", "minScore", "killScoreSeconds", "freeBoostAtFloor"})
 
+    def test_synthetic_serve_v6_vision_contract(self):
+        entry, fixture = self.fixture("tests/fixtures/serve-vision-v6.json")
+        self.assertEqual(entry["clientContract"], fixture["protocol"])
+        self.assertEqual(fixture["protocol"], "slither-sim-json-v6")
+        self.assertEqual([case["vision"] for case in fixture["cases"]], [1, "arena"])
+
     def test_protocol19_food_interest_receipts(self):
         entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")
         self.assertEqual(entry["wireProtocol"], 19)

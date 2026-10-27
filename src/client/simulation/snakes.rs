@@ -259,13 +259,31 @@ impl KnownSnakes {
 /// reach, so the cell holding a head lists every snake that can cover it.
 /// Testing all snakes for each of ~500 connections every tick cost ~2.3 ms.
 pub(super) struct CoverageGrid {
+    all: Option<Vec<usize>>,
     cell: f64,
     cells: HashMap<(i64, i64), Vec<usize>>,
 }
 impl CoverageGrid {
-    pub(super) fn new(snakes: &[Snake], bounds: &[[f64; 4]], vision: f64) -> Self {
+    pub(super) fn new(snakes: &[Snake], bounds: &[[f64; 4]], vision: crate::Vision) -> Self {
+        if vision == crate::Vision::Arena {
+            return Self {
+                all: Some(
+                    snakes
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, s)| s.alive.then_some(i))
+                        .collect(),
+                ),
+                cell: 0.,
+                cells: HashMap::new(),
+            };
+        }
+        let crate::Vision::Radius(vision) = vision else {
+            unreachable!()
+        };
         let reach = vision + 1.;
         let mut grid = Self {
+            all: None,
             cell: reach.max(256.),
             cells: HashMap::new(),
         };
@@ -293,6 +311,9 @@ impl CoverageGrid {
 
     /// Ascending slots of the snakes that may cover `point`.
     pub(super) fn near(&self, point: Point) -> &[usize] {
+        if let Some(all) = &self.all {
+            return all;
+        }
         self.cells
             .get(&self.key(point.x, point.y))
             .map_or(&[], Vec::as_slice)
@@ -300,7 +321,15 @@ impl CoverageGrid {
 }
 
 /// Coverage: any centerline part within `vision` of `head`.
-pub(super) fn covered(head: Point, snake: &Snake, [x0, y0, x1, y1]: [f64; 4], vision: f64) -> bool {
+pub(super) fn covered(
+    head: Point,
+    snake: &Snake,
+    [x0, y0, x1, y1]: [f64; 4],
+    vision: crate::Vision,
+) -> bool {
+    let crate::Vision::Radius(vision) = vision else {
+        return true;
+    };
     let reach = vision + 1.;
     if head.x < x0 - reach || head.x > x1 + reach || head.y < y0 - reach || head.y > y1 + reach {
         return false;

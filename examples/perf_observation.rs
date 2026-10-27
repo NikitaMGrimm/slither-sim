@@ -103,7 +103,7 @@ fn world(case: &str) -> Result<Simulator, String> {
     let mut config = Config {
         radius,
         food_count,
-        vision: 1500.0,
+        vision: slither_sim::Vision::Radius(1500.0),
         ..Config::sandbox()
     };
     config.prey.count = 8;

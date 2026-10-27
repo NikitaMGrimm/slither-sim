@@ -1,4 +1,4 @@
-# Geometric controller: slither-sim-json-v5
+# Geometric controller: slither-sim-json-v6
 
 Run `slither-sim serve` from a [release archive](../README.md#download-a-release)
 without Rust, or `cargo run --release --locked -- serve` from a checkout. One
@@ -8,8 +8,8 @@ process. Rust callers can use [in-process sessions](#in-process-sessions) or the
 library directly.
 
 ```json
-{"protocol":"slither-sim-json-v5","result":{}}
-{"protocol":"slither-sim-json-v5","error":{"code":11,"rule":null,"world":null,"slot":null,"field":null,"message":"Reset first"},"sessionEnded":false}
+{"protocol":"slither-sim-json-v6","result":{}}
+{"protocol":"slither-sim-json-v6","error":{"code":11,"rule":null,"world":null,"slot":null,"field":null,"message":"Reset first"},"sessionEnded":false}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
@@ -199,7 +199,14 @@ Rows and view lists follow world order, so a slot's view lists opponents by
 slot and food in spawn order. Coordinates use world units; speeds use world
 units per second.
 
-Food and prey are filtered by the vision circle. If an opponent's head or any
+Numeric `config.vision` filters food and prey by the vision circle. With
+`vision: "arena"` (the Battledome default), every living opponent, food item and
+prey is included from any position, and frame `vision` / Rust
+`Observation.vision_radius` report twice the live arena radius. Config and
+checkpoints retain the string. The geometric contract is v6 for this coverage
+and config extension; portable client v2 and the numeric C ABI v3 are unchanged.
+
+For numeric vision, if an opponent's head or any
 anchor is visible, **its entire stored snake record is included**, even outside
 that circle. This authoritative simulation data includes metadata that may be
 unavailable to network clients.

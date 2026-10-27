@@ -76,6 +76,7 @@ fn run(options: Options) -> Result<(), String> {
         bots: BotConfig {
             count: options.bots,
             threads: options.bot_threads,
+            vision: 1500.,
             latency: LatencyConfig::fixed(options.round_trip),
         },
         simulation: SimulationConfig {

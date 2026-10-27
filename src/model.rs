@@ -149,6 +149,8 @@ pub struct Observation {
     #[serde(default)]
     pub prey: Vec<crate::prey::Prey>,
     pub arena: Arena,
+    /// Effective world-unit radius: the live diameter for arena vision.
+    /// Wire clients leave it unknown (`None`).
     pub vision_radius: Option<f64>,
 }
 

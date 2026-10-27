@@ -1,0 +1,63 @@
+{
+  "base": "20e5064378ae8cabc7ca50cceacdbe339e6846b4",
+  "measuredSourceManifestSha256": "bf88da1ebdadf93072efb1969ed64f411346f837ff9024fe244fb386dba59b40",
+  "releaseBinarySha256": "3b67c7915d4d3fdb7b99bee4659c5751236d6c5abd584f4ed03e274c7cd4ee53",
+  "stockGameSha256": "5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095",
+  "harnessSha256": {
+    "run-bots.py": "d0a8a54012166160b714b031867dcc4b90ee4fb33e8a11898c70afb02e988ffa",
+    "stock.py": "80079720f58a9bbac4b817193cc45adf6874020919a721036440bf15cc24470b",
+    "run-legacy.py": "07fcca13b43f5664ed12c2d3c0f0e5f187a80e256036d21fc45f1dfc811ad2b3",
+    "legacy-load.mjs": "d1e1fd696daea703d240d52acb55f6b2add4c9771ed5c9d8a72dc839b68803e3",
+    "socket-load.mjs": "96b0b949b91bcd846bec58276aa78baeae5c16ef090f88b789e66dbaac30867b"
+  },
+  "failedCohortManifestSha256": {
+    "rejected-legacy-framing": "22bb5532160c26dcd7c54cb46e5d15aa3d48a8cacfd4b4607722e0c7ff74751c",
+    "rejected-socket-relogin": "1dd42ae1d0c24c8c55844f9caa419c23a74694120772b880c4d572d34afd04f8",
+    "rejected-stock-bare-framing": "e53d0e10c4d9fb10e3827a9c07d7c43c7d02214028ee50286f394449b5be572f",
+    "rejected-stock-first": "2146c5ee21e6028711247330c320de6515c8179ac11e546ea49570b45a1ff905",
+    "rejected-stock-legacy-hang": "5e16a7c10dd22e5b818cf9e92fe5f12734fdc7930415ad6d41b17321ec2b9ad4",
+    "rejected-stock-short-challenge": "b1770f4a70a20a2e780f2ffc242bd816678b863a0f0cf042cab2ba023b5a2668",
+    "rejected-stock-teardown": "4093522667412f690c30e6450bffec8127ce834dabb4f42af1ba826be9940988"
+  },
+  "incompleteSocketCohort": {
+    "summarySha256": "7c7de85944c55a83e46db9271143d8906cd646e7b862736c282d2aa776c0f647",
+    "candidateHostLogSha256": "e0674d91a7ac3386f441ac96da65368b7b5f74d41bd7cb4fcadcb42828f14e72",
+    "candidateDriverLogSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "planSha256": "99ab8f6a6364daaf59a5d4fb2ccb3117bfee10f5c9bfa65b8a1fdd8d77cbbf2d",
+  "deliveredSourceManifestSha256": "07aa33e9d0bb7826029a432f75624a75beb27d289016faac54474b250a8484a5",
+  "deliveredReleaseBinarySha256": "4af5e1c2dc0380adbff73e9ef9f5e87190ebd600994de87eed2b302974243819",
+  "defaultTraceComparisons": [
+    {
+      "case": "portable",
+      "bytes": 17260572,
+      "sha256": "63ade78e5b5b30af1fcea9cf6213fd6989a5ba680ccf51c54b7423c62c516b2c",
+      "byteIdentical": true
+    },
+    {
+      "case": "protocol",
+      "bytes": 8343664,
+      "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+      "byteIdentical": true
+    },
+    {
+      "case": "observe",
+      "bytes": 210431960,
+      "sha256": "4a4ca511a76c3a1cb5c081b3c48e17b65807d83df51ad235f0191c5cf9a924c6",
+      "byteIdentical": true
+    },
+    {
+      "case": "stock-official-500",
+      "bytes": 82283625,
+      "sha256": "f2baac880190289159bace1ce4ebc2ca741802a8757570a1796cc89301163fc7",
+      "byteIdentical": true
+    }
+  ],
+  "arenaMarginTrace": {
+    "byteIdentical": true,
+    "bytes": 144547918,
+    "sha256": "6d74b441cf1a58cae264ed421674afaea4c90f591a8e12946d42fee92e914971",
+    "iterations": 8
+  },
+  "roundingNegativeControlSha256": "0cf31328791f429cd48f9811cd1f26abc3726cdb9bf76704806c53553aca5145"
+}

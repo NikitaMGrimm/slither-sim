@@ -362,7 +362,8 @@ class ErrorTests(unittest.TestCase):
         session.reset(**options)
         for radius in fixture["liveRadii"]:
             snapshot = session.request({"op": "snapshot"})
-            self.assertEqual(snapshot["protocol"], fixture["protocol"])
+            self.assertEqual(fixture["protocol"], "slither-sim-json-v5")
+            self.assertEqual(snapshot["protocol"], "slither-sim-json-v6")
             self.assertEqual(snapshot["result"]["config"]["radius"], fixture["initialRadius"])
             self.assertEqual(snapshot["result"]["radius"], radius)
             self.assertEqual(session.frame(0).radius, radius)
@@ -536,6 +537,10 @@ class ErrorTests(unittest.TestCase):
     def test_terminal_steps_clear_worlds_and_reset_recovers(self):
         fixture = json.loads((Path(__file__).resolve().parents[2]
                               / "tests/fixtures/serve-errors-v5.json").read_text(encoding="utf-8"))
+        def current_reply(name):
+            expected = dict(fixture[name])
+            self.assertEqual(expected["protocol"], "slither-sim-json-v5")
+            return expected | {"protocol": "slither-sim-json-v6"}
         typed, encoded = Session(), Session()
         options = fixture["reset"]
         typed.reset(worlds=options["worlds"], agents=options["agents"],
@@ -550,7 +555,7 @@ class ErrorTests(unittest.TestCase):
         self.assertEqual(reply["error"]["message"], str(caught.exception))
         self.assert_cause(caught.exception, reply)
         reply["error"]["message"] = fixture["terminalReply"]["error"]["message"]
-        self.assertEqual(reply, fixture["terminalReply"])
+        self.assertEqual(reply, current_reply("terminalReply"))
         self.assertIsNone(typed.config)
         for session in (typed, encoded):
             self.assertEqual((session.worlds, session.agents), (0, 0))
@@ -559,7 +564,7 @@ class ErrorTests(unittest.TestCase):
                     session.frame(world)
             with self.assertRaisesRegex(ValueError, "^Reset first$"):
                 session.step([], b"")
-            self.assertEqual(session.request(fixture["step"]), fixture["rejectedReply"])
+            self.assertEqual(session.request(fixture["step"]), current_reply("rejectedReply"))
             session.reset(agents=1)
             session.step([0.0], b"\0")
             self.assertGreater(session.frame(0).time, 0)
@@ -666,6 +671,19 @@ class ExampleTests(unittest.TestCase):
                                 capture_output=True, text=True, env=environment, check=True)
         self.assertEqual(result.stdout, "decisions=10 time=0.420s living=4\n")
 
+
+
+class ArenaVisionTest(unittest.TestCase):
+    def test_arena_config_and_finite_frame_radius(self):
+        session = Session()
+        for vision in ["arena", 250]:
+            session.reset(agents=2, config={"preset": "sandbox", "radius": 4000,
+                "vision": vision, "foodCount": 0, "ambientReplenishPerSecond": 0})
+            self.assertEqual(session.config["vision"], vision)
+            frame = session.frame(0)
+            self.assertEqual(frame.vision, 8000 if vision == "arena" else 250)
+            self.assertEqual(len(frame.view_snakes), 2 if vision == "arena" else 0)
+        self.assertEqual(session.request({"op": "info"})["protocol"], "slither-sim-json-v6")
 
 if __name__ == "__main__":
     unittest.main()

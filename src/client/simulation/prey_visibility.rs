@@ -2,31 +2,46 @@
 //! Measured scope: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-host-prey-visibility/REPORT.md
 use crate::{Prey, model::Point};
 
-pub(super) struct PreyBounds(Vec<[f64; 4]>);
+pub(super) struct PreyBounds {
+    bounds: Vec<[f64; 4]>,
+    count: usize,
+    arena: bool,
+}
 impl PreyBounds {
-    pub(super) fn new(prey: &[Prey], vision: f64) -> Self {
+    pub(super) fn new(prey: &[Prey], vision: crate::Vision) -> Self {
+        let crate::Vision::Radius(vision) = vision else {
+            return Self {
+                bounds: Vec::new(),
+                count: prey.len(),
+                arena: true,
+            };
+        };
         // Leave rounding slack rather than replacing hypot's inclusive edge
         // with rounded axis arithmetic. Infinite bounds simply reject nothing.
         let reach = (2. * vision).max(1.);
-        Self(
-            prey.iter()
+        Self {
+            count: prey.len(),
+            arena: false,
+            bounds: prey
+                .iter()
                 .map(|prey| {
                     let Point { x, y } = prey.position;
                     [x - reach, y - reach, x + reach, y + reach]
                 })
                 .collect(),
-        )
+        }
     }
 
     /// A superset of visible prey in world order. Keep the original distance
     /// test after lookup, including its exact rounding and inclusive boundary.
     pub(super) fn near(&self, point: Point) -> impl Iterator<Item = usize> + '_ {
-        self.0
-            .iter()
-            .enumerate()
-            .filter_map(move |(index, &[x0, y0, x1, y1])| {
-                (point.x >= x0 && point.x <= x1 && point.y >= y0 && point.y <= y1).then_some(index)
-            })
+        (0..self.count).filter(move |&index| {
+            if self.arena {
+                return true;
+            }
+            let [x0, y0, x1, y1] = self.bounds[index];
+            point.x >= x0 && point.x <= x1 && point.y >= y0 && point.y <= y1
+        })
     }
 }
 
@@ -57,7 +72,7 @@ mod tests {
                     items.push(prey((items.len() % 7) as u64, x, y));
                 }
             }
-            let grid = PreyBounds::new(&items, vision);
+            let grid = PreyBounds::new(&items, crate::Vision::Radius(vision));
             for anchor in &items {
                 for x in [
                     anchor.position.x,
@@ -97,7 +112,7 @@ mod tests {
     #[test]
     fn rebuilding_tracks_motion_and_rejects_distant_candidates() {
         let mut items = vec![prey(0, 0., 0.); 16];
-        let before = PreyBounds::new(&items, 1500.);
+        let before = PreyBounds::new(&items, crate::Vision::Radius(1500.));
         assert_eq!(
             before.near(Point::default()).collect::<Vec<_>>(),
             (0..16).collect::<Vec<_>>()
@@ -105,7 +120,7 @@ mod tests {
         for item in &mut items {
             item.position.x = 30_000.;
         }
-        let after = PreyBounds::new(&items, 1500.);
+        let after = PreyBounds::new(&items, crate::Vision::Radius(1500.));
         assert!(after.near(Point::default()).next().is_none());
     }
 }

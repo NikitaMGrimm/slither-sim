@@ -17,7 +17,7 @@ pub(crate) struct VisibleState<'a> {
     pub food: &'a [Food],
     pub prey: &'a [Prey],
     pub radius: f64,
-    pub vision: f64,
+    pub vision: crate::Vision,
 }
 impl<'a> VisibleState<'a> {
     pub(crate) fn of(world: &'a Simulator) -> Self {
@@ -166,7 +166,11 @@ impl<'a> Observer<'a> {
         // Exact visibility tests still decide every candidate; the index only
         // skips food and snakes that cannot pass them.
         let food = world.food.len();
-        let index = (observers >= 2 && (0.0..=TAME).contains(&world.vision)).then(|| Index {
+        let vision = world.vision.radius(world.radius);
+        let index = (observers >= 2
+            && matches!(world.vision, crate::Vision::Radius(_))
+            && (0.0..=TAME).contains(&vision))
+        .then(|| Index {
             bodies: world
                 .snakes
                 .iter()
@@ -183,7 +187,7 @@ impl<'a> Observer<'a> {
             food: (observers >= 8
                 && observers.saturating_mul(food) >= 1 << 15
                 && food < u32::MAX as usize)
-                .then(|| FoodGrid::new(world.food, world.vision, observers)),
+                .then(|| FoodGrid::new(world.food, vision, observers)),
         });
         Self { world, index }
     }
@@ -232,7 +236,7 @@ impl<'a> Observer<'a> {
                 center: Point::default(),
                 radius: w.radius,
             },
-            vision_radius: Some(w.vision),
+            vision_radius: Some(w.vision.radius(w.radius)),
         });
         Ok(())
     }
@@ -248,7 +252,22 @@ impl<'a> Observer<'a> {
         let me = w.snakes.get(index).ok_or_else(|| {
             SimError::new(ErrorKind::UnknownSlot, "Unknown agent slot").at_slot(index)
         })?;
-        let vision = w.vision;
+        if w.vision == crate::Vision::Arena {
+            sink.reserve_food(w.food.len());
+            for i in 0..w.food.len() {
+                sink.food(i);
+            }
+            for i in 0..w.prey.len() {
+                sink.prey(i);
+            }
+            for (i, snake) in w.snakes.iter().enumerate() {
+                if i != index && snake.alive {
+                    sink.opponent(i);
+                }
+            }
+            return Ok(());
+        }
+        let vision = w.vision.radius(w.radius);
         let visible = |p: Point| {
             (p.x - me.head.x).abs() <= vision
                 && (p.y - me.head.y).abs() <= vision

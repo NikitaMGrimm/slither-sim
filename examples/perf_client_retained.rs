@@ -171,7 +171,7 @@ mod retained {
         let mut world = Config {
             radius: 6000.0,
             food_count: 12_000,
-            vision: 3000.0,
+            vision: slither_sim::Vision::Radius(3000.0),
             dt: DT,
             ..Config::sandbox()
         };

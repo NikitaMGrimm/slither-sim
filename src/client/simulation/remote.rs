@@ -26,6 +26,10 @@ impl RawSimulator {
         self.backend.player_latency = PlayerLatency { slots, config };
     }
 
+    pub(crate) fn set_bot_vision(&mut self, radius: f64) {
+        self.backend.bot_vision = Some(radius);
+    }
+
     pub(crate) fn new(
         seed: u32,
         config: SimulationConfig,

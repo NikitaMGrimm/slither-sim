@@ -3,6 +3,42 @@ use slither_sim::ErrorKind;
 use slither_sim::{Config, Simulator};
 
 #[test]
+fn vision_accepts_a_radius_or_arena_and_preserves_preset_overrides() {
+    use slither_sim::Vision;
+    for preset in ["official", "sandbox", "battledome"] {
+        let config: Config = serde_json::from_value(serde_json::json!({"preset": preset})).unwrap();
+        assert_eq!(
+            config.vision,
+            if preset == "battledome" {
+                Vision::Arena
+            } else {
+                Vision::Radius(1500.)
+            }
+        );
+        for vision in [serde_json::json!(600.), serde_json::json!("arena")] {
+            let config: Config =
+                serde_json::from_value(serde_json::json!({"preset": preset, "vision": vision}))
+                    .unwrap();
+            config.validate().unwrap();
+            assert_eq!(serde_json::to_value(&config).unwrap()["vision"], vision);
+        }
+    }
+    for input in ["null", "true", "\"all\"", "{}", "[]"] {
+        assert!(serde_json::from_str::<Config>(&format!("{{\"vision\":{input}}}")).is_err());
+    }
+    for radius in [0., -1., f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let config = Config {
+            vision: Vision::Radius(radius),
+            ..Config::sandbox()
+        };
+        assert_eq!(
+            config.validate().unwrap_err().field.as_deref(),
+            Some("vision")
+        );
+    }
+}
+
+#[test]
 fn radius_limit_rejections_name_the_config_field() {
     use slither_sim::{Constraint, RadiusUpdate};
     for (field, config) in [

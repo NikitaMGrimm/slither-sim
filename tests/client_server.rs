@@ -49,7 +49,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
         ..Default::default()
     };
     // Every snake is covered, so all players receive each other.
-    simulation.world.vision = 3000.;
+    simulation.world.vision = slither_sim::Vision::Radius(3000.);
     HostConfig {
         bind: "127.0.0.1:0".parse().unwrap(),
         seed: 7,

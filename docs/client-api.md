@@ -17,7 +17,7 @@ supported, without translation. Check the envelope and frame contract before act
 | Protocol `19` | Binary WebSocket packets and commands. |
 | `slither-client-v2` | Bot frame fields, units and lifecycle. |
 | `slither-client-json-v2` | The `client` JSON requests and reply envelope. |
-| `slither-sim-json-v5` | The separate geometric [`serve` controller](bot-api.md). |
+| `slither-sim-json-v6` | The separate geometric [`serve` controller](bot-api.md). |
 | `slither-sim-abi-v3` | The in-process [C ABI](c-api.md) over `serve` sessions. |
 | Package version | Rust API and simulator implementation; also pin the commit for reproducibility. |
 

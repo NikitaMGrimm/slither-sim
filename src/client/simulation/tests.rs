@@ -1173,7 +1173,7 @@ fn raw_config(agents: usize) -> SimulationConfig {
     SimulationConfig {
         agents,
         world: Config {
-            vision: 3000.,
+            vision: crate::Vision::Radius(3000.),
             ..Config::sandbox()
         },
         ..Default::default()
@@ -1268,7 +1268,7 @@ fn hosted_and_native_snakes_use_finite_whole_body_coverage() {
     let mut config = raw_config(3);
     config.world.radius = 6000.;
     config.world.vision = Config::default().vision;
-    assert_eq!(config.world.vision, 1500.);
+    assert_eq!(config.world.vision, crate::Vision::Radius(1500.));
     let mut sim = RawSimulator::new(7, config, 1).unwrap();
     let mut remote = Remote::connect(&mut sim, 0, "Browser");
     for (slot, x) in [(0, 0.), (1, 1000.), (2, 4000.)] {
@@ -4050,4 +4050,156 @@ fn spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
         backend.spawn_pose(0).unwrap_err(),
         "Spawn candidate search exhausted: no sampled position fits inside the arena"
     );
+}
+
+#[test]
+fn arena_vision_delivers_distant_entities_and_refreshes_food_on_radius_changes() {
+    use crate::{ReplayPrey, Vision};
+    let mut config = raw_config(2);
+    config.world.radius = 3000.;
+    config.world.vision = Vision::Arena;
+    config.world.radius_updates = vec![
+        crate::RadiusUpdate {
+            time: 0.014,
+            radius: 6000.,
+        },
+        crate::RadiusUpdate {
+            time: 0.021,
+            radius: 3000.,
+        },
+    ];
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    let mut a = Remote::connect(&mut sim, 0, "A");
+    let mut b = Remote::connect(&mut sim, 1, "B");
+    for (slot, x) in [(0, -2500.), (1, 2500.)] {
+        sim.backend.world.retire(slot).unwrap();
+        sim.backend
+            .world
+            .respawn(slot, Point { x, y: 0. }, 0., 2)
+            .unwrap();
+        sim.backend.slots[slot].control.heading = 0.;
+    }
+    let pellet = |x| Food {
+        x,
+        y: 500.,
+        value: 1.,
+        size: Some(2.),
+        origin: Some(Origin::Ambient),
+    };
+    sim.backend
+        .world
+        .replace_food(vec![pellet(-2200.), pellet(2200.)])
+        .unwrap();
+    sim.backend
+        .world
+        .replace_prey(vec![ReplayPrey {
+            mode: crate::PreyMode::Roaming,
+            prey: crate::Prey {
+                id: 1,
+                position: Point { x: 2400., y: 600. },
+                heading: 0.,
+                target_heading: 0.,
+                speed: 1.,
+                size: 1.,
+            },
+        }])
+        .unwrap();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
+    for remote in [&a, &b] {
+        let observation = remote.frame(&sim).observation.unwrap();
+        assert_eq!(observation.opponents.len(), 1);
+        assert_eq!(observation.food.len(), 2);
+        assert_eq!(observation.prey.len(), 1);
+    }
+    assert!(Arc::ptr_eq(
+        sim.backend.slots[0].connection.food_interest.revision(),
+        sim.backend.slots[1].connection.food_interest.revision()
+    ));
+    let initial = sim.backend.slots[0].connection.food_interest.clone();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
+    assert_eq!(sim.backend.world.radius(), 6000.);
+    assert!(
+        sim.backend.slots[0]
+            .connection
+            .food_interest
+            .subscribed()
+            .len()
+            > initial.subscribed().len()
+    );
+    // Force a listing in a newly subscribed sector; the cached subscription
+    // union must include it, then retire it when the live wall culls the food.
+    let edge = pellet(5000.);
+    sim.backend.world.insert_food(edge.clone()).unwrap();
+    sim.backend.broadcast().unwrap();
+    for (slot, remote) in [(0, &mut a), (1, &mut b)] {
+        remote.pump(&mut sim, slot);
+        assert_eq!(remote.frame(&sim).observation.unwrap().food.len(), 3);
+    }
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
+    assert_eq!(sim.backend.world.radius(), 3000.);
+    for remote in [&a, &b] {
+        assert_eq!(remote.frame(&sim).observation.unwrap().food.len(), 2);
+    }
+    assert_eq!(
+        initial.subscribed(),
+        sim.backend.slots[0].connection.food_interest.subscribed()
+    );
+    // A new connection gets the whole current arena, too.
+    let mut again = Remote::connect(&mut sim, 0, "Again");
+    run(&mut sim, &mut [(0, &mut again), (1, &mut b)], 1);
+    assert_eq!(again.frame(&sim).observation.unwrap().food.len(), 2);
+}
+
+#[test]
+fn host_bot_vision_keeps_tuned_coverage_while_players_see_the_arena() {
+    use crate::Vision;
+    for (world_vision, cap, far_visible) in [
+        (Vision::Arena, 1500., false),
+        (Vision::Radius(500.), 1500., false),
+        (Vision::Radius(6000.), 1500., false),
+        (Vision::Radius(6000.), 6000., true),
+    ] {
+        let mut config = raw_config(3);
+        config.world.radius = 6000.;
+        config.world.vision = world_vision;
+        let mut sim = RawSimulator::new(7, config, 3).unwrap();
+        sim.set_player_latency(1, LatencyConfig::default());
+        sim.set_bot_vision(cap);
+        let mut a = Remote::connect(&mut sim, 0, "Player");
+        let mut b = Remote::connect(&mut sim, 1, "Bot");
+        let mut c = Remote::connect(&mut sim, 2, "Distant");
+        let other_x = if world_vision == Vision::Radius(500.) {
+            -1500.
+        } else {
+            2500.
+        };
+        for (slot, x, y) in [(0, -2500., -100.), (1, -2500., 100.), (2, other_x, 0.)] {
+            sim.backend.world.retire(slot).unwrap();
+            sim.backend
+                .world
+                .respawn(slot, Point { x, y }, 0., 2)
+                .unwrap();
+            sim.backend.slots[slot].control.heading = 0.;
+        }
+        sim.backend
+            .world
+            .replace_food(vec![Food {
+                x: 2500.,
+                y: 500.,
+                value: 1.,
+                size: Some(2.),
+                origin: None,
+            }])
+            .unwrap();
+        run(&mut sim, &mut [(0, &mut a), (1, &mut b), (2, &mut c)], 1);
+        assert_eq!(
+            sim.backend.slots[1].connection.snakes.contains_key(2),
+            far_visible
+        );
+        assert_eq!(b.frame(&sim).observation.unwrap().food.len(), 0);
+        if world_vision == Vision::Arena {
+            assert!(sim.backend.slots[0].connection.snakes.contains_key(2));
+            assert_eq!(a.frame(&sim).observation.unwrap().food.len(), 1);
+        }
+    }
 }

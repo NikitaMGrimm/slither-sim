@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic geometric v6 coverage contract, not server evidence. Numeric observations retain their old units; arena reports the live diameter.",
+  "protocol": "slither-sim-json-v6",
+  "cases": [
+    {
+      "vision": 1,
+      "expectedVision": 1,
+      "expectedOpponents": 0
+    },
+    {
+      "vision": "arena",
+      "expectedVision": 8000,
+      "expectedOpponents": 1
+    }
+  ]
+}

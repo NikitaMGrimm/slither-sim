@@ -69,9 +69,9 @@ reconstructed poses and renderer predictions are distinct states.
 
 | Area | Implemented behavior | Evidence and regression |
 | --- | --- | --- |
-| Food interest | 45 sectors: 7×7 without four corners, 300 units per sector, center led 100 units along physical heading. Retain last-touched sectors for 2.6 s; cleanup on nominal 504 ms opportunities. | `client-food-interest.json` pins selected receipts. Later food-model counterexamples remain; scheduler and size scaling are provisional. |
-| Snakes | Complete centerline intersects `world.vision`, default 1,500. | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
-| Prey coverage | Points checked independently at the same configurable distance. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
+| Food interest | Numeric vision uses 45 sectors: 7×7 without four corners, 300 units per sector, center led 100 units along physical heading. Retain last-touched sectors for 2.6 s; cleanup on nominal 504 ms opportunities. `"arena"` subscribes the live arena disc, independent of the recipient pose. | `client-food-interest.json` pins selected receipts. Later food-model counterexamples remain; scheduler and size scaling are provisional. |
+| Snakes | Complete centerline intersects numeric `world.vision`, default 1,500; `"arena"` covers all living snakes (Battledome default). | `src/client/visibility.rs` tests whole-body coverage. Paired receipts reject 500 and whole-world streaming; 1,500 is an engineering choice, not an identified boundary. |
+| Prey coverage | Points checked independently at the same configurable distance, or all prey with `"arena"`. | `src/client/simulation.rs` tests delivery and actual eater IDs. A shared numeric default does not establish a shared official subscription algorithm. |
 | Hosted spawning | Without `spawnRadius`, radial-lattice candidates prefer 600-unit body clearance, then the most open positive-contact-margin pose of 64 draws; a failed search refuses. A refusal means the sampled candidates failed, not that no legal pose exists. Circular worlds require body, head-path and departure clearance and queue joins; see [configuration](configuration.md#battledome). | `spawn.rs` and host tests. Official joins were never seen refused, and three of 181 came within 550–600 units of visible bodies; see the [spawn admission record](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-25-spawn-admission/REPORT.md). The preference, fallback and custom circular admission are local policies. Initial geometric test rings are synthetic. |
 | Minimap | Global living heads and body centerlines, 136×136 by default, server-wide 2.504 s model clock; stop after death and reset on reconnect. | `client-reporting-cadence-near-server.json` and client tests; the original home summary remains. Resolution/cadence are measured; exact raster filtering and official encoding selection are unknown. |
 | Pellet presentation | A separate seeded RNG gives persistent colors to admitted births; primary skins 0–8 select matching boost/death colors, with retained stock/custom recipes. | `client-presentation.json` retains recipes, pooled ambient counts and weights. Starting phase, rejected-birth advancement and some custom boost behavior remain unverified. Unknown skins use an approximate modulo-9 fallback. |
@@ -80,6 +80,10 @@ The [visibility study](https://github.com/NikitaMGrimm/slither-sim/blob/main/res
 retains food counterexamples and unsuccessful crossings; no follow-up validated
 a replacement snake/prey subscription rule. The collector's bounded-staleness
 pause has offline coverage; live route completion is still required before fitting.
+
+Host `bots.vision` caps bot snake/prey coverage at the tuned 1500 by default,
+with local food interest. Socket players use world vision. Battledome's arena
+coverage is our custom design, not an official visibility inference.
 
 ### Food sector delivery
 

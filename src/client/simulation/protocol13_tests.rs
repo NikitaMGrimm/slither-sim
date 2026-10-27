@@ -12,7 +12,7 @@ fn a_legacy_recipient_preserves_other_slots_bytes_times_and_world() {
         ..Default::default()
     };
     config.world.radius = 1200.;
-    config.world.vision = 3000.;
+    config.world.vision = crate::Vision::Radius(3000.);
     config.world.food_count = 12000;
     config.minimap_interval_seconds = 0.1;
     config.leaderboard_interval_seconds = 0.1;

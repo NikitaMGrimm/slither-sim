@@ -67,7 +67,7 @@ multidimensional buffers use C order. Other iterables, including lists, accept
 Rejected resets and steps raise `SimulationError` (a `ValueError`) with the
 protocol's diagnostic message and change nothing. Simulator exceptions expose
 `.code`, `.rule`, `.world`, `.slot` and `.field`; optional values are `None`.
-Codes and locations match the geometric v5 error object and C inspection.
+Codes and locations match the geometric v6 error object and C inspection.
 Frame lookup still raises `IndexError` for an unknown world, with the same
 cause attributes. Native Python buffer/type-conversion errors remain `TypeError`. Buffers of other item types raise `TypeError`. `frame` raises
 `ValueError` before the first reset and `IndexError` for any index outside the
@@ -80,9 +80,14 @@ Advancement or frame-collection failure makes `step` raise `SessionEndedError`
 `frame` raises `ValueError` ("Reset first"). Reset to continue. `request` instead
 returns an error reply with `sessionEnded: true` (false for unchanged-state errors).
 
-The module also exports `PROTOCOL` (`slither-sim-json-v5`), `NONE`, `NO_ORIGIN`,
+The module also exports `PROTOCOL` (`slither-sim-json-v6`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
 constants](bot-api.md#in-process-sessions). Type stubs ship with the package.
+
+World configs accept `vision: "arena"` or a positive numeric radius; the
+Battledome default is `"arena"`. `Frame.vision` stays a finite float and reports
+the live diameter in arena mode. Host-only `bots.vision` does not affect
+in-process geometric sessions.
 
 ## Frames
 
@@ -150,5 +155,5 @@ the same wall time as one.
 ## Compatibility
 
 The package inherits the workspace's `slither-sim` crate version. Check
-`PROTOCOL` (`slither-sim-json-v5`) and record the commit for reproducibility.
+`PROTOCOL` (`slither-sim-json-v6`) and record the commit for reproducibility.
 The Python API is experimental and may change between `0.x` versions.
