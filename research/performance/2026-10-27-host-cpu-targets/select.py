@@ -57,7 +57,9 @@ for target in targets:
     assert all(r["equal"] for r in raw_traces.values())
     result["traces"][target] = {"official": raw_traces, "historical": historical, "equalCount": 12}
 raw_counts = json.loads((root / "counts/raw.json").read_text())
+assert set(raw_counts) == set(targets[1:]), "Incomplete or unexpected target set"
 for target in targets[1:]:
+    assert set(raw_counts[target]) == {"official500", "official500-half", "official500-legacy"}, "Incomplete or unexpected protocol case set"
     result["counters"][target] = {}
     for case, entry in raw_counts[target].items():
         rows = entry["rows"]

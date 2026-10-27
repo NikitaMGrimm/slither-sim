@@ -102,6 +102,8 @@ The seven documentation tests pass. A one-bit mutation in a scratch copy of
 v2's supplemental math output makes the selector fail at its bit-equality gate;
 the original raw output remains intact. This checks the study gate, not a
 runtime mutation (there is no runtime change).
+Missing and unexpected protocol-case controls also fail selection; tightening
+that guard leaves the complete selected result byte-identical.
 Raw arrays, executables, source archives, disassembly and traces are local-only
 under the task's scratch output; only bounded selected summaries/hashes are
 committed. A transient new-session WSL connection timeout occurred during traces;
