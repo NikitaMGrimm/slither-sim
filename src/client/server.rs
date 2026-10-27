@@ -54,6 +54,8 @@ use tungstenite::{
     protocol::{CloseFrame, WebSocketConfig, frame::coding::CloseCode},
 };
 
+#[cfg(target_os = "linux")]
+mod readiness;
 #[cfg(windows)]
 mod wake;
 
@@ -457,6 +459,8 @@ impl Host {
         let gateway = Gateway {
             listener: self.listener,
             sessions: Vec::new(),
+            #[cfg(target_os = "linux")]
+            readiness: readiness::Readiness::default(),
             gate: Gate {
                 occupied: vec![false; self.max_clients],
                 generations: vec![0; self.max_clients],
@@ -997,6 +1001,8 @@ fn socket_config() -> WebSocketConfig {
 struct Gateway {
     listener: TcpListener,
     sessions: Vec<Session>,
+    #[cfg(target_os = "linux")]
+    readiness: readiness::Readiness,
     gate: Gate,
     deliveries: Receiver<Vec<Delivery>>,
 }
@@ -1049,6 +1055,8 @@ struct ReadBudget<S> {
     inner: S,
     bytes: usize,
     calls: usize,
+    #[cfg(target_os = "linux")]
+    read_blocked: bool,
 }
 
 impl<S> ReadBudget<S> {
@@ -1057,12 +1065,16 @@ impl<S> ReadBudget<S> {
             inner,
             bytes: MAX_RAW_READ_BYTES,
             calls: MAX_RAW_READ_CALLS,
+            #[cfg(target_os = "linux")]
+            read_blocked: false,
         }
     }
 
     fn rearm(&mut self) {
         self.bytes = MAX_RAW_READ_BYTES;
         self.calls = MAX_RAW_READ_CALLS;
+        // Keep read_blocked: a fairness yield does not establish that the
+        // transport is empty, and rearming must not trigger another empty read.
     }
 }
 
@@ -1073,7 +1085,14 @@ impl<S: io::Read> io::Read for ReadBudget<S> {
         }
         self.calls -= 1;
         let limit = bytes.len().min(self.bytes);
-        let read = self.inner.read(&mut bytes[..limit])?;
+        let result = self.inner.read(&mut bytes[..limit]);
+        #[cfg(target_os = "linux")]
+        {
+            self.read_blocked = result
+                .as_ref()
+                .is_err_and(|error| error.kind() == io::ErrorKind::WouldBlock);
+        }
+        let read = result?;
         self.bytes -= read;
         Ok(read)
     }
@@ -1168,8 +1187,24 @@ impl Gateway {
             }
         }
         let wall = self.gate.shared.clock.wall(now);
-        for session in &mut self.sessions {
-            session.service(&mut self.gate, now, wall)?;
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::fd::AsRawFd;
+            self.readiness
+                .poll(self.sessions.iter().map(|session| match &session.stage {
+                    Stage::Open(open) => Some(open.socket.get_ref().inner.as_raw_fd()),
+                    _ => None,
+                }));
+        }
+        for (index, session) in self.sessions.iter_mut().enumerate() {
+            #[cfg(target_os = "linux")]
+            let readable = self.readiness.readable(index);
+            #[cfg(not(target_os = "linux"))]
+            let readable = {
+                let _ = index;
+                true
+            };
+            session.service(&mut self.gate, now, wall, readable)?;
         }
         for session in &mut self.sessions {
             let Stage::Open(open) = &mut session.stage else {
@@ -1274,7 +1309,13 @@ impl Session {
         matches!(&self.stage, Stage::Open(open) if matches!(open.phase, Phase::Playing(_)))
     }
 
-    fn service(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
+    fn service(
+        &mut self,
+        gate: &mut Gate,
+        now: Instant,
+        wall: f64,
+        readable: bool,
+    ) -> Result<(), String> {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
             Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
@@ -1287,7 +1328,7 @@ impl Session {
                 Err(HandshakeError::Failure(_)) => Stage::Closed,
             },
             Stage::Open(mut open) => {
-                if open.service(gate, now, wall, age)? {
+                if open.service(gate, now, wall, age, readable)? {
                     Stage::Open(open)
                 } else {
                     Stage::Closed
@@ -1301,6 +1342,13 @@ impl Session {
 
 impl<S: io::Read + io::Write> Open<S> {
     fn new(socket: WebSocket<ReadBudget<S>>, physical_food: bool) -> Self {
+        #[cfg(target_os = "linux")]
+        let mut socket = socket;
+        // An upgrade may already hold WebSocket bytes from the handshake.
+        #[cfg(target_os = "linux")]
+        {
+            socket.get_mut().read_blocked = false;
+        }
         Self {
             socket,
             phase: Phase::Hello { framed: false },
@@ -1322,6 +1370,7 @@ impl<S: io::Read + io::Write> Open<S> {
         now: Instant,
         wall: f64,
         age: Duration,
+        readable: bool,
     ) -> Result<bool, String> {
         if let Phase::Closing(deadline) = self.phase {
             return Ok(now < deadline && self.drain_close());
@@ -1330,7 +1379,24 @@ impl<S: io::Read + io::Write> Open<S> {
             self.reject(gate, now, "Login timeout");
             return Ok(true);
         }
-        for _ in 0..MAX_READS_PER_POLL {
+        #[cfg(target_os = "linux")]
+        let reads = if readable || !self.socket.get_ref().read_blocked {
+            MAX_READS_PER_POLL
+        } else {
+            0
+        };
+        #[cfg(not(target_os = "linux"))]
+        let reads = {
+            let _ = readable;
+            MAX_READS_PER_POLL
+        };
+        for _ in 0..reads {
+            // Only a real transport WouldBlock permits waiting for readiness.
+            // A parser write stall or a fairness budget can leave buffered input.
+            #[cfg(target_os = "linux")]
+            {
+                self.socket.get_mut().read_blocked = false;
+            }
             match self.socket.read() {
                 Ok(Message::Binary(bytes)) => {
                     if let Err(reason) = self.receive(gate, &bytes, wall) {
@@ -2089,6 +2155,55 @@ mod tests {
         }
     }
 
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn buffered_messages_resume_without_readiness_then_empty_reads_stop() {
+        let (mut gateway, _simulation) = pit_gateway();
+        let count = MAX_READS_PER_POLL + 1;
+        // Masked binary pings, all loaded by the first transport read.
+        let bytes = [130, 129, 0, 0, 0, 0, 251].repeat(count);
+        let socket = WebSocket::from_raw_socket(
+            ReadBudget::new(Readable {
+                bytes: bytes.into(),
+                read: 0,
+                first_read: None,
+            }),
+            tungstenite::protocol::Role::Server,
+            Some(socket_config()),
+        );
+        let mut open = Open::new(socket, false);
+        open.phase = Phase::Playing(0);
+        let now = Instant::now();
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO, true)
+            .unwrap();
+        assert_eq!(
+            gateway.gate.shared.pending[0].load(Ordering::Relaxed),
+            MAX_READS_PER_POLL
+        );
+        assert!(!open.socket.get_ref().read_blocked);
+        open.socket.get_mut().rearm();
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO, false)
+            .unwrap();
+        assert_eq!(
+            gateway.gate.shared.pending[0].load(Ordering::Relaxed),
+            count
+        );
+        assert!(open.socket.get_ref().read_blocked);
+        open.socket.get_mut().rearm();
+        assert!(open.socket.get_ref().read_blocked);
+        let remaining_reads = open.socket.get_ref().calls;
+        let frame = vec![0, 7, b'p'];
+        open.queued_bytes = output_cost(&frame);
+        open.queued.push_back((0., frame));
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO, false)
+            .unwrap();
+        assert_eq!(open.socket.get_ref().calls, remaining_reads);
+        assert!(
+            open.queued.is_empty(),
+            "unreadable sockets still send due output"
+        );
+    }
+
     fn fragmented_framing_request() -> Vec<u8> {
         let mut bytes = vec![2, 128, 0, 0, 0, 0];
         for _ in 0..100_000 {
@@ -2119,7 +2234,7 @@ mod tests {
         assert!(open.socket.get_ref().inner.read > 0);
         let now = Instant::now();
         // Acceptance and first service belong to the same gateway poll.
-        open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO, true)
             .unwrap();
         assert!(open.socket.get_ref().inner.read <= MAX_RAW_READ_BYTES);
         assert_eq!(open.phase, Phase::Hello { framed: false });
@@ -2129,7 +2244,7 @@ mod tests {
                 break;
             }
             open.socket.get_mut().rearm();
-            open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+            open.service(&mut gateway.gate, now, 0., Duration::ZERO, false)
                 .unwrap();
         }
         assert_eq!(open.phase, Phase::Hello { framed: true });
@@ -2151,7 +2266,7 @@ mod tests {
         );
         let mut open = Open::new(socket, false);
         let now = Instant::now();
-        open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+        open.service(&mut gateway.gate, now, 0., Duration::ZERO, true)
             .unwrap();
         assert!(open.socket.get_ref().inner.read <= 64 << 10);
         assert_eq!(open.phase, Phase::Hello { framed: false });
@@ -2160,13 +2275,13 @@ mod tests {
                 break;
             }
             open.socket.get_mut().rearm();
-            open.service(&mut gateway.gate, now, 0., Duration::ZERO)
+            open.service(&mut gateway.gate, now, 0., Duration::ZERO, false)
                 .unwrap();
         }
         assert_eq!(open.phase, Phase::Hello { framed: true });
         assert_eq!(open.framing, Framing::Bare);
         // Deadlines still apply with a partial fragmented message.
-        open.service(&mut gateway.gate, now, 0., LOGIN_TIMEOUT)
+        open.service(&mut gateway.gate, now, 0., LOGIN_TIMEOUT, false)
             .unwrap();
         assert!(matches!(open.phase, Phase::Closing(_)));
     }
@@ -3270,6 +3385,8 @@ mod tests {
         let gateway = Gateway {
             listener,
             sessions: Vec::new(),
+            #[cfg(target_os = "linux")]
+            readiness: readiness::Readiness::default(),
             gate: Gate {
                 occupied: vec![false],
                 generations: vec![0],
