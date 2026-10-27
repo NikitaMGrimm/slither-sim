@@ -131,6 +131,14 @@ pub(crate) fn frame_owned(elapsed_ms: u16, mut packet: Vec<u8>) -> Result<Vec<u8
         return frame(elapsed_ms, &[packet]);
     }
     let len = packet.len();
+    if packet.capacity() - len < 2 {
+        // Reallocating then shifting could copy a large map twice. When no
+        // header room remains, copy once into an exactly sized frame instead.
+        let mut out = Vec::with_capacity(len + 2);
+        out.extend(u16be(elapsed_ms));
+        out.extend_from_slice(&packet);
+        return Ok(out);
+    }
     packet.resize(len + 2, 0);
     packet.copy_within(..len, 2);
     packet[..2].copy_from_slice(&u16be(elapsed_ms));
@@ -703,6 +711,9 @@ mod tests {
         for code in [0, 1, 31, 32, b'p', b'U', 255] {
             for len in [0, 1, 2, 7, MAX_PACKET, MAX_PACKET + 1, 20000] {
                 let mut packet = vec![code; len];
+                for (index, byte) in packet.iter_mut().enumerate().skip(1) {
+                    *byte = index as u8;
+                }
                 packet.reserve(2);
                 for elapsed in [0, 1, 65535] {
                     assert_eq!(
@@ -712,8 +723,10 @@ mod tests {
                     );
                 }
                 if code >= 32 && len > 0 {
+                    let expected = frame(65535, std::slice::from_ref(&packet)).unwrap();
                     let storage = packet.as_ptr();
                     let framed = frame_owned(65535, packet).unwrap();
+                    assert_eq!(framed, expected);
                     assert_eq!(framed.as_ptr(), storage);
                     assert_eq!(framed.len(), len + 2);
                 }
