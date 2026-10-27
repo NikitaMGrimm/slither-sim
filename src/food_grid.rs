@@ -194,6 +194,13 @@ impl FoodCache {
         if self.entries.len() >= NONE as usize {
             self.pellets = None;
         }
+        if self
+            .pellets
+            .as_ref()
+            .is_some_and(|index| index.slots.len() >= NONE as usize)
+        {
+            self.pellets = None;
+        }
         if let Some(index) = &mut self.pellets {
             index.push(entry, self.entries.len() - 1);
         }
@@ -211,11 +218,11 @@ impl FoodCache {
             return;
         }
         let (mut read, mut write) = (0, 0);
-        let mut first_removed = food_len;
+        let mut first_removed_word = usize::MAX;
         for i in removed {
-            first_removed = first_removed.min(i);
             let e = self.entries[i];
             if let Some(index) = &mut self.pellets {
+                first_removed_word = first_removed_word.min(index.food_slots[i] as usize / 64);
                 index.remove(i);
                 index.food_slots.copy_within(read..i, write);
             }
@@ -240,11 +247,15 @@ impl FoodCache {
         if let Some(index) = &mut self.pellets {
             index.food_slots.copy_within(read.., write);
             index.food_slots.truncate(self.entries.len());
-            // Stable compaction leaves the prefix before the first removal in
-            // place. Only the remaining handles can have a new food position;
-            // no removals means the entire prefix stays unchanged.
-            for (i, &slot) in index.food_slots.iter().enumerate().skip(first_removed) {
-                index.slots[slot as usize].food = i as u32;
+            // Appended handles remain in food order after stable compaction.
+            // Refresh one rank prefix per 64 handles, rather than the position
+            // of every survivor. Prefixes before the first removed word agree.
+            if first_removed_word < index.live.len() {
+                let mut count = index.prefixes[first_removed_word];
+                for word in first_removed_word..index.live.len() {
+                    index.prefixes[word] = count;
+                    count += index.live[word].count_ones();
+                }
             }
         }
     }
@@ -255,6 +266,15 @@ impl FoodCache {
         self.sync(food);
         if food.len() >= NONE as usize {
             return None;
+        }
+        if self
+            .pellets
+            .as_ref()
+            .is_some_and(|index| index.slots.len() >= food.len().max(4096).saturating_mul(2))
+        {
+            // Retired handles are never reused: that would break food order.
+            // Rebuild lazily to bound retained storage after churn/shrink.
+            self.pellets = None;
         }
         if self.pellets.is_none() {
             let mut index = PelletIndex::default();
@@ -272,7 +292,7 @@ impl FoodCache {
         (
             self.matched,
             index.slots.len(),
-            index.free.len(),
+            index.slots.len() - index.food_slots.len(),
             self.grids.len(),
         )
     }
@@ -297,21 +317,24 @@ fn pellet_cell(entry: Entry) -> u32 {
     pack_cell(floor_small(x), floor_small(y))
 }
 
-/// Cell lists contain stable handles, not food-array indices. A handle stores
-/// its current array index and its position in its cell for constant-time
-/// deletion; freed handles are reused. Neither list order nor hashing selects
-/// a winner: pickup tests use the ordered eater list and hits are sorted later.
+/// Cell lists contain append-ordered handles. Stable food compaction preserves
+/// their relative order, so a live handle's food position is its live-bit rank.
+/// Each handle still stores its cell-list offset for constant-time deletion.
+/// Neither hashing nor cell order selects a winner: exact pickup tests retain
+/// eater order, and hits restore descending food order before application.
+/// research/performance/2026-10-27-pellet-bitset-ranks/REPORT.md
 #[derive(Clone, Default)]
 pub(crate) struct PelletIndex {
     cells: HashMap<u32, Vec<u32>, BuildHasherDefault<CellHasher>>,
     slots: Vec<PelletSlot>,
     food_slots: Vec<u32>,
-    free: Vec<u32>,
+    /// One bit per handle; prefix is the live count before that word.
+    live: Vec<u64>,
+    prefixes: Vec<u32>,
 }
 
 #[derive(Clone)]
 struct PelletSlot {
-    food: u32,
     cell: u32,
     offset: usize,
 }
@@ -319,18 +342,19 @@ struct PelletSlot {
 impl PelletIndex {
     fn push(&mut self, entry: Entry, food: usize) {
         let cell = pellet_cell(entry);
-        let slot = self.free.pop().unwrap_or(self.slots.len() as u32);
+        let slot = self.slots.len() as u32;
+        let word = slot as usize / 64;
+        if word == self.live.len() {
+            self.live.push(0);
+            self.prefixes.push(food as u32);
+        }
+        self.live[word] |= 1u64 << (slot % 64);
         let list = self.cells.entry(cell).or_default();
         let value = PelletSlot {
-            food: food as u32,
             cell,
             offset: list.len(),
         };
-        if slot as usize == self.slots.len() {
-            self.slots.push(value);
-        } else {
-            self.slots[slot as usize] = value;
-        }
+        self.slots.push(value);
         list.push(slot);
         self.food_slots.push(slot);
     }
@@ -346,14 +370,20 @@ impl PelletIndex {
         if list.is_empty() {
             self.cells.remove(&self.slots[slot as usize].cell);
         }
-        self.free.push(slot);
+        self.live[slot as usize / 64] &= !(1u64 << (slot % 64));
+    }
+    fn position(&self, slot: u32) -> usize {
+        let word = slot as usize / 64;
+        debug_assert_ne!(self.live[word] & (1u64 << (slot % 64)), 0);
+        (self.prefixes[word] + (self.live[word] & ((1u64 << (slot % 64)) - 1)).count_ones())
+            as usize
     }
     pub(crate) fn food(&self, cell: u32) -> impl Iterator<Item = usize> + '_ {
         self.cells
             .get(&cell)
             .into_iter()
             .flatten()
-            .map(|&slot| self.slots[slot as usize].food as usize)
+            .map(|&slot| self.position(slot))
     }
 }
 
@@ -429,11 +459,13 @@ impl EaterGrid {
             if !(r >= 0.0 && c.x.abs() + r <= REGULAR && c.y.abs() + r <= REGULAR) {
                 return false;
             }
+            // The validated cover coordinates are within +/-8193, where the
+            // integer helper equals floor exactly, including negative edges.
             let cover = [
-                ((c.x - r - 1e-9) / CELL).floor() as i64,
-                ((c.x + r + 1e-9) / CELL).floor() as i64,
-                ((c.y - r - 1e-9) / CELL).floor() as i64,
-                ((c.y + r + 1e-9) / CELL).floor() as i64,
+                floor_small((c.x - r - 1e-9) / CELL),
+                floor_small((c.x + r + 1e-9) / CELL),
+                floor_small((c.y - r - 1e-9) / CELL),
+                floor_small((c.y + r + 1e-9) / CELL),
             ];
             lo_x = lo_x.min(cover[0]);
             hi_x = hi_x.max(cover[1]);
@@ -673,7 +705,7 @@ mod tests {
         assert!(cache.entries == food.iter().map(Entry::of).collect::<Vec<_>>());
         let index = cache.pellets.as_ref().unwrap();
         assert_eq!(index.food_slots.len(), food.len());
-        assert_eq!(index.slots.len(), food.len() + index.free.len());
+        assert!(index.food_slots.windows(2).all(|w| w[0] < w[1]));
         let mut seen = Vec::new();
         let mut live = std::collections::HashSet::new();
         for (&cell, slots) in &index.cells {
@@ -683,22 +715,31 @@ mod tests {
                 let value = &index.slots[slot as usize];
                 assert_eq!(value.offset, offset);
                 assert_eq!(value.cell, cell);
-                assert_eq!(index.food_slots[value.food as usize], slot);
-                assert_eq!(pellet_cell(Entry::of(&food[value.food as usize])), cell);
-                seen.push(value.food as usize);
+                assert_eq!(index.food_slots[index.position(slot)], slot);
+                assert_eq!(pellet_cell(Entry::of(&food[index.position(slot)])), cell);
+                seen.push(index.position(slot));
             }
         }
         seen.sort_unstable();
         assert_eq!(seen, (0..food.len()).collect::<Vec<_>>());
-        let mut free = std::collections::HashSet::new();
-        for &slot in &index.free {
-            assert!(free.insert(slot));
-            assert!(!live.contains(&slot));
+        let mut rank = 0;
+        for slot in 0..index.slots.len() {
+            let word = slot / 64;
+            if slot % 64 == 0 {
+                assert_eq!(index.prefixes[word], rank);
+            }
+            let present = index.live[word] & (1u64 << (slot % 64)) != 0;
+            assert_eq!(present, live.contains(&(slot as u32)));
+            if present {
+                assert_eq!(index.position(slot as u32), rank as usize);
+                rank += 1;
+            }
         }
+        assert_eq!(rank as usize, food.len());
     }
 
     #[test]
-    fn removal_boundaries_keep_positions_correct_through_handle_reuse() {
+    fn removal_boundaries_keep_ranks_correct_through_appends() {
         let pellet = |i| Food {
             x: i as f64,
             y: 0.0,
@@ -726,7 +767,8 @@ mod tests {
         }
         // Shared cells also exercise repair of a swapped cell-list entry.
         remove(&mut cache, &mut food, &[29, 32, 39]);
-        assert_eq!(cache.pellets.as_ref().unwrap().free.len(), 3);
+        let index = cache.pellets.as_ref().unwrap();
+        assert_eq!(index.slots.len() - index.food_slots.len(), 3);
         for i in 40..50 {
             let f = pellet(i);
             cache.push(&f);
@@ -747,6 +789,63 @@ mod tests {
         let middle: Vec<_> = (15..35).collect();
         remove(&mut cache, &mut food, &middle);
         cache.end();
+    }
+
+    #[test]
+    fn live_ranks_cross_word_boundaries_and_survive_lazy_rebuilds() {
+        let mut rng = Rng(47);
+        let mut food: Vec<_> = (0..9000).map(|_| pellet(&mut rng)).collect();
+        let mut cache = FoodCache::default();
+        cache.begin();
+        cache.pellets(&food).unwrap();
+        // Empty words, first/last bits and gaps spanning several words. Removing
+        // only the suffix must also leave all earlier prefixes unchanged.
+        for round in 0..4 {
+            let removed: Vec<_> = match round {
+                0 => vec![63, 64, 127, 128, 255, 256, 8999],
+                1 => (64..256).collect(),
+                2 => vec![0, 1, 62, 63, 64, 65],
+                _ => (food.len() - 100..food.len()).collect(),
+            };
+            cache.remove(food.len(), removed.iter().copied());
+            let mut i = 0;
+            food.retain(|_| {
+                let keep = removed.binary_search(&i).is_err();
+                i += 1;
+                keep
+            });
+            assert_pellet_index(&cache, &food);
+            for _ in 0..130 {
+                let f = pellet(&mut rng);
+                cache.push(&f);
+                food.push(f);
+            }
+            assert_pellet_index(&cache.clone(), &food);
+        }
+        let old_slots = cache.pellets.as_ref().unwrap().slots.len();
+        let keep = 4000;
+        cache.remove(food.len(), keep..food.len());
+        food.truncate(keep);
+        assert_pellet_index(&cache, &food);
+        assert!(old_slots >= food.len().max(4096) * 2);
+        cache.pellets(&food).unwrap();
+        assert_pellet_index(&cache, &food);
+        assert_eq!(cache.pellets.as_ref().unwrap().slots.len(), keep);
+        assert_eq!(cache.pellets.as_ref().unwrap().food_slots.len(), keep);
+        cache.end();
+    }
+
+    #[test]
+    fn small_cover_floor_matches_library_on_cell_edges() {
+        for cell in -8193..=8193 {
+            let edge = cell as f64;
+            for v in [edge.next_down(), edge, edge.next_up()] {
+                assert_eq!(floor_small(v), v.floor() as i64, "{v:?}");
+            }
+        }
+        for v in [-0.0, 0.0, -f64::MIN_POSITIVE, f64::MIN_POSITIVE] {
+            assert_eq!(floor_small(v), v.floor() as i64);
+        }
     }
 
     #[test]
