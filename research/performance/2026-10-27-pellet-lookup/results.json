@@ -1,0 +1,409 @@
+{
+  "pins": {
+    "base": {
+      "runtimeCommit": "422a9e9604c5b73af88771fc3ced9190d5594f69",
+      "archiveSha256": "ec2dcdddbea762501140cf9810986b70641cb0586c295ee2ebf87f0ab4bc1f21",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "e59a9eca8fbb70d0d2143b8a9944a0406ee603344d92efa0c8746732cbb94b04"
+    },
+    "candidate": {
+      "runtimeCommit": "967d0766166ab07cace1a76cdb4ca9c114dba11c",
+      "archiveSha256": "a2b5be89b9dc4aa21b4a1b16a1171fb62baba11810b26e43fe4b5840b457984f",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "b70c122262dcc55138977adafd6d0b62eebae16f03ae4a9575e63e95c4c9c7c4"
+    }
+  },
+  "instructions": {
+    "official500": {
+      "baseMedian": 17595939555,
+      "candidateMedian": 14856465189,
+      "pairedMedian": 0.8442910400303588,
+      "pairedRatioMin": 0.844161706425968,
+      "pairedRatioMax": 0.8443640366374432,
+      "pairs": 5,
+      "warmupPairs": 1
+    },
+    "official500-half": {
+      "baseMedian": 18138129969,
+      "candidateMedian": 15387507987,
+      "pairedMedian": 0.8483514018974885,
+      "pairedRatioMin": 0.8481829088625397,
+      "pairedRatioMax": 0.8487443126273031,
+      "pairs": 5,
+      "warmupPairs": 1
+    },
+    "official500-legacy": {
+      "baseMedian": 18658261538,
+      "candidateMedian": 15906339087,
+      "pairedMedian": 0.8525346024866666,
+      "pairedRatioMin": 0.8524846224073762,
+      "pairedRatioMax": 0.8526068977972486,
+      "pairs": 5,
+      "warmupPairs": 1
+    }
+  },
+  "officialTraces": {
+    "official500": {
+      "equal": true,
+      "sha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+      "bytes": 37938956,
+      "checkpointSha256": [
+        "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+        "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+      ],
+      "summary": {
+        "bytes": 9954005,
+        "case": "official500",
+        "forcedReconnect": true,
+        "frames": 317188,
+        "latencyRandom": "Random(8650339669496352976)",
+        "legacy": 0,
+        "maps": 1500,
+        "populationFinal": 500,
+        "populationMin": 499,
+        "populationSum": 539894,
+        "reconnects": 3,
+        "refused": 0,
+        "seats": 500,
+        "spawnRandom": "Random(6343971186635748709)",
+        "ticks": 1080
+      }
+    },
+    "official500-half": {
+      "equal": true,
+      "sha256": "f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb",
+      "bytes": 57556590,
+      "checkpointSha256": [
+        "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+        "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+      ],
+      "summary": {
+        "bytes": 10103063,
+        "case": "official500-half",
+        "forcedReconnect": true,
+        "frames": 664841,
+        "latencyRandom": "Random(8650339669496352976)",
+        "legacy": 250,
+        "maps": 1500,
+        "populationFinal": 500,
+        "populationMin": 499,
+        "populationSum": 539894,
+        "reconnects": 3,
+        "refused": 0,
+        "seats": 500,
+        "spawnRandom": "Random(6343971186635748709)",
+        "ticks": 1080
+      }
+    },
+    "official500-legacy": {
+      "equal": true,
+      "sha256": "e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3",
+      "bytes": 77137561,
+      "checkpointSha256": [
+        "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+        "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+      ],
+      "summary": {
+        "bytes": 10253767,
+        "case": "official500-legacy",
+        "forcedReconnect": true,
+        "frames": 1011810,
+        "latencyRandom": "Random(8650339669496352976)",
+        "legacy": 500,
+        "maps": 1500,
+        "populationFinal": 500,
+        "populationMin": 499,
+        "populationSum": 539894,
+        "reconnects": 3,
+        "refused": 0,
+        "seats": 500,
+        "spawnRandom": "Random(6343971186635748709)",
+        "ticks": 1080
+      }
+    }
+  },
+  "historicalTraces": {
+    "stock-traces/portable": {
+      "case": "portable",
+      "equal": true,
+      "base": {
+        "bytes": 17260699,
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "terminalKind": "report",
+        "binarySha256": "f151a393f4ea991a64f596da45bdd85a1dd0dde1752cb16224a4595cdef133fd"
+      },
+      "candidate": {
+        "bytes": 17260699,
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "terminalKind": "report",
+        "binarySha256": "7375ddc0fff8f5fd9e5b539123319fe6db55c96b30072cf89e1d9b7d2320d93f"
+      }
+    },
+    "stock-traces/protocol": {
+      "case": "protocol",
+      "equal": true,
+      "base": {
+        "bytes": 8343664,
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "terminalKind": "report",
+        "binarySha256": "f151a393f4ea991a64f596da45bdd85a1dd0dde1752cb16224a4595cdef133fd"
+      },
+      "candidate": {
+        "bytes": 8343664,
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "terminalKind": "report",
+        "binarySha256": "7375ddc0fff8f5fd9e5b539123319fe6db55c96b30072cf89e1d9b7d2320d93f"
+      }
+    },
+    "stock-traces/client-official-500": {
+      "case": "client-official-500",
+      "equal": true,
+      "base": {
+        "bytes": 82283668,
+        "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+        "terminalKind": "report",
+        "binarySha256": "f151a393f4ea991a64f596da45bdd85a1dd0dde1752cb16224a4595cdef133fd"
+      },
+      "candidate": {
+        "bytes": 82283668,
+        "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+        "terminalKind": "report",
+        "binarySha256": "7375ddc0fff8f5fd9e5b539123319fe6db55c96b30072cf89e1d9b7d2320d93f"
+      }
+    },
+    "stock-traces/client-battledome-64": {
+      "case": "client-battledome-64",
+      "equal": true,
+      "base": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "f151a393f4ea991a64f596da45bdd85a1dd0dde1752cb16224a4595cdef133fd"
+      },
+      "candidate": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "7375ddc0fff8f5fd9e5b539123319fe6db55c96b30072cf89e1d9b7d2320d93f"
+      }
+    },
+    "stock-traces/retained-step_all": {
+      "case": "retained-step_all",
+      "equal": true,
+      "base": {
+        "bytes": 1772204756,
+        "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+        "terminalKind": "report",
+        "binarySha256": "e06962b67f3b33948a4c120efe6dd0c54b31bd10bbbb8db91fd5f84b589277f2"
+      },
+      "candidate": {
+        "bytes": 1772204756,
+        "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+        "terminalKind": "report",
+        "binarySha256": "27addaee68ddaccf06ec7d70bab124f22e2b0da24eeb14f96cae2c8c85551c41"
+      }
+    },
+    "stock-traces/retained-next_frame": {
+      "case": "retained-next_frame",
+      "equal": true,
+      "base": {
+        "bytes": 1736165882,
+        "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+        "terminalKind": "report",
+        "binarySha256": "e06962b67f3b33948a4c120efe6dd0c54b31bd10bbbb8db91fd5f84b589277f2"
+      },
+      "candidate": {
+        "bytes": 1736165882,
+        "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+        "terminalKind": "report",
+        "binarySha256": "27addaee68ddaccf06ec7d70bab124f22e2b0da24eeb14f96cae2c8c85551c41"
+      }
+    },
+    "dome-traces/client-battledome-40": {
+      "case": "client-battledome-40",
+      "equal": true,
+      "base": {
+        "bytes": 25201354,
+        "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+        "terminalKind": "report",
+        "binarySha256": "0cb0aa11585beaca960949537a4ab902822c9492b75ccb885a59ecb01587bfa4"
+      },
+      "candidate": {
+        "bytes": 25201354,
+        "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+        "terminalKind": "report",
+        "binarySha256": "870b226985ae18b7655f13ef738788a4686ac388dafc549375159c7be7af5bd2"
+      }
+    },
+    "dome-traces/client-battledome-64": {
+      "case": "client-battledome-64",
+      "equal": true,
+      "base": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "0cb0aa11585beaca960949537a4ab902822c9492b75ccb885a59ecb01587bfa4"
+      },
+      "candidate": {
+        "bytes": 35965725,
+        "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+        "terminalKind": "report",
+        "binarySha256": "870b226985ae18b7655f13ef738788a4686ac388dafc549375159c7be7af5bd2"
+      }
+    },
+    "dome-traces/client-battledome-80": {
+      "case": "client-battledome-80",
+      "equal": true,
+      "base": {
+        "bytes": 52296445,
+        "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+        "terminalKind": "report",
+        "binarySha256": "0cb0aa11585beaca960949537a4ab902822c9492b75ccb885a59ecb01587bfa4"
+      },
+      "candidate": {
+        "bytes": 52296445,
+        "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+        "terminalKind": "report",
+        "binarySha256": "870b226985ae18b7655f13ef738788a4686ac388dafc549375159c7be7af5bd2"
+      }
+    }
+  },
+  "prototypes": {
+    "index": {
+      "baseMedian": 17595625548,
+      "candidateMedian": 14886885534,
+      "medianRatio": 0.8460233558414388,
+      "ratioMin": 0.8459315183194656,
+      "ratioMax": 0.8460926661224719,
+      "pairs": 5,
+      "warmupPairs": 1,
+      "pins": {
+        "base": {
+          "ref": "18bb9647891b00082b93ce4b9b13aaf559eb5a0f",
+          "archiveSha256": "3b84cba82e0ae4bb80c13f84aca4305b5a4f2d906584f735df8f8d665557bbc4",
+          "binarySha256": "fe39726d59fd5b917ce24828daa6e70e6e3bd9b005afbea084c7568a9eaa571c"
+        },
+        "index": {
+          "ref": "7bd0a71cf72f6d485372df69e6284a84fae5419e",
+          "archiveSha256": "8d884aaed0d4ddca29a90199a139712a95071ad30c0c8283cbaa8fe894315123",
+          "binarySha256": "d3358bf277af6cf40371f244390f094b36e52d101f05864a3c7e26617bd69812"
+        }
+      },
+      "traceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+      "traceBytes": 37938956
+    },
+    "cells": {
+      "baseMedian": 17595155498,
+      "candidateMedian": 15528464402,
+      "medianRatio": 0.8825609431130312,
+      "ratioMin": 0.8824088178417349,
+      "ratioMax": 0.8826265010822277,
+      "pairs": 5,
+      "warmupPairs": 1,
+      "pins": {
+        "base": {
+          "ref": "18bb9647891b00082b93ce4b9b13aaf559eb5a0f",
+          "archiveSha256": "3b84cba82e0ae4bb80c13f84aca4305b5a4f2d906584f735df8f8d665557bbc4",
+          "binarySha256": "fe39726d59fd5b917ce24828daa6e70e6e3bd9b005afbea084c7568a9eaa571c"
+        },
+        "cells": {
+          "ref": "1fc8a324bbdcec846dbe06d9149a6a811b7e6d56",
+          "archiveSha256": "04f6375297044085aef693e9c29521cf93adbf61a3d3a0150d1c309bb483dcd8",
+          "binarySha256": "fef5e1f00de3b2f341d77faf71306f17930b98bc12cfbb6b57a64521119ad390"
+        }
+      },
+      "traceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+      "traceBytes": 37938956
+    }
+  },
+  "pickupProfile": {
+    "base": {
+      "meanInstructionsByStage": {
+        "0": 1720552.611957796,
+        "1": 114764.754982415,
+        "2": 201537.3223915592,
+        "3": 69.0,
+        "4": 3102976.8956623683,
+        "5": 1999.6858147713951,
+        "6": 3172.3528722157093,
+        "7": 585450.1512309496
+      },
+      "rawSha256": "e3b4cf156ffe3906ba5691f446b551fa54fc569d0ee4b1b56d1913f07caa099a",
+      "binarySha256": "364bbb86729ae1994aca330d3428294bb1fe7a327b7cad6b7ddbd189163b8931",
+      "sourceFiles": {
+        "src/simulator.rs": "f2c5b435aa68c6045857cc06155bb5994cda26dbf8f3347d45429c96fda6b8bc",
+        "src/food_grid.rs": "9615f4f36709168b191fb239ce4209a12fca6a8081e0821acbe6b2de0398326f",
+        "src/pickup_profile.rs": "c7ba6862a0f37bfc41f946eb34b4f4019b2ba7a85f96399acd4503294241d05f",
+        "src/lib.rs": "63de9f30c9f51bafb71f9b88b0e050ca29e0badd129b692690ca04d9cdbcf905",
+        "src/client/simulation.rs": "455ee3702440098fba36e52f3c9319e022640a846b9fb93d4d94170df939fd05",
+        "src/client/simulation/study_protocols.rs": "ad084fe5f1303a740f3eba95d899e9171e9f5be7ae343f1d10f5ee316ed64ec9",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+        "examples/study_protocols.rs": "4cee510482d83ea4e01ba0969b850a0d20dd1487f7c3ae340c81ffc7285afda2"
+      }
+    },
+    "candidate": {
+      "meanInstructionsByStage": {
+        "0": 1718518.1781946074,
+        "1": 114764.75381008207,
+        "2": 201537.30246189918,
+        "3": 387352.8323563892,
+        "4": 193071.59320046892,
+        "5": 1999.6869871043377,
+        "6": 398273.3305978898,
+        "7": 568054.9566236811
+      },
+      "rawSha256": "de5883cdaba5f290afe23e1ee2f9414d3e5ba0955d47fdce0b7cbe832419c620",
+      "binarySha256": "b819c67984f3d6519eff38fed34769ca864f5f0a41e560174919dc8d003ae716",
+      "sourceFiles": {
+        "src/simulator.rs": "7851de1acee5db4460bf31f9ea5f6b888275c951d97240caa346d8db0ad4bd54",
+        "src/food_grid.rs": "cae4478a1fe3c2e32a26d01a94bc94531575c5b2dbff7182a77f2517a2d2c855",
+        "src/pickup_profile.rs": "c7ba6862a0f37bfc41f946eb34b4f4019b2ba7a85f96399acd4503294241d05f",
+        "src/lib.rs": "63de9f30c9f51bafb71f9b88b0e050ca29e0badd129b692690ca04d9cdbcf905",
+        "src/client/simulation.rs": "455ee3702440098fba36e52f3c9319e022640a846b9fb93d4d94170df939fd05",
+        "src/client/simulation/study_protocols.rs": "ad084fe5f1303a740f3eba95d899e9171e9f5be7ae343f1d10f5ee316ed64ec9",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+        "examples/study_protocols.rs": "4cee510482d83ea4e01ba0969b850a0d20dd1487f7c3ae340c81ffc7285afda2"
+      }
+    }
+  },
+  "steadyTickDiagnostic": {
+    "ticks": 853,
+    "meanInstructions": {
+      "base": 15455322.534583822,
+      "candidate": 12848366.01641266
+    },
+    "reduction": 0.168676940409213
+  },
+  "counterScheduledMinPct": 100.0,
+  "mutationControls": {
+    "slot-remap": {
+      "exit": 101,
+      "regression": "food_grid::tests::occupancy_and_pellet_indexes_match_recounting_through_external_edits",
+      "logSha256": "569be5934e5a139d2fc50614535f9aa82d394d3d203541dc0fe5090971cf237f"
+    },
+    "hit-sort": {
+      "exit": 101,
+      "regression": "simulator::food_pickup_order_tests::dense_hits_keep_reverse_pellet_order_nearest_head_and_lexical_ties",
+      "logSha256": "cf1e0d0f5f8cd01f9f06677d0acde5c1a878651e1fdc1544ba63f1a8cdaa5746"
+    }
+  },
+  "allocationProbe": {
+    "unscopedOriginalControl": {
+      "base": 0,
+      "candidate": 1
+    },
+    "originalControlPairs": 30,
+    "witnessDifferentHarnessAndSimulationThreads": true,
+    "harnessTlsAllocationBytes": 48,
+    "harnessWakerAllocationBytes": 96,
+    "witnessRawSha256": "127393b00957c1bd67aad554685dddd4848eda0a1ede90f20c761657147966d0",
+    "fixedProbeRuns": 200,
+    "fixedProbeFailures": 0,
+    "fixedProbeBinarySha256": "ec95bd57a38516c6b12a41a09f39305c4e9c2dbb108f309d43990ca8576944a4"
+  },
+  "rawInstructionPairsSha256": "f24a81c34f0c379e75c7479da6dcceb48faebc720068663292914a3b7e7102bc",
+  "reproducerSha256": "586a8765037513558cbc9d8e28c97012738e0fc7e6f163fcfcedb02ffdb45d03",
+  "evidenceAccess": "local-only; raw traces, counter arrays, diagnostic sources and binaries outside Git"
+}

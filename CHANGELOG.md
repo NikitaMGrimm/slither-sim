@@ -19,6 +19,12 @@
 
 ### Performance
 
+- Food pickup tests only the pellets in grid cells that a snake's pickup
+  circle covers, instead of every pellet each tick, using a cell index kept up
+  to date as food appears and is eaten. Output is byte-identical, and the
+  500-player official fixture runs 14.7–15.6% fewer instructions with stock
+  and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-lookup/REPORT.md)).
 - The host's socket thread finds a player's connection by slot instead of
   searching every connected session for each delivery. Output is
   byte-identical, and the 500-player official fixture runs 3.5–3.9% fewer

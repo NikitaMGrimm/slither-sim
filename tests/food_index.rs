@@ -92,6 +92,118 @@ fn indexed_pickup_matches_scanning_every_eater() {
 }
 
 #[test]
+fn pellet_index_matches_scan_through_public_edits_compaction_and_restore() {
+    let mut indexed = world(true);
+    let actions = vec![Some(Action::default()); 40];
+    for _ in 0..12 {
+        indexed.step(&actions).unwrap();
+    }
+    let restore = |world: &Simulator| {
+        Simulator::from_checkpoint(
+            &serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
+            slither_sim::RestoreOptions {
+                events: slither_sim::EventRecording {
+                    pickups: true,
+                    food_births: false,
+                },
+                #[cfg(feature = "parallel")]
+                parallel: false,
+            },
+        )
+        .unwrap()
+    };
+    let mut restored = restore(&indexed);
+    let mut scanned = restore(&indexed);
+    let mut config = scanned.config().clone();
+    config.food_index = false;
+    support::reconfigure(&mut scanned, config);
+    let mut pickups = 0;
+    for tick in 0..96 {
+        if tick % 24 == 0 {
+            let food: Vec<_> = indexed
+                .snakes()
+                .iter()
+                .take(8)
+                .map(|s| {
+                    let (p, _) =
+                        slither_sim::physics::pickup_circle(s.head, s.heading, s.speed, s.segments);
+                    Food {
+                        x: p.x,
+                        y: p.y,
+                        value: 1.0,
+                        size: Some(2.0),
+                        origin: Some(Origin::Ambient),
+                    }
+                })
+                .collect();
+            for world in [&mut indexed, &mut restored, &mut scanned] {
+                for pellet in &food {
+                    world.insert_food(pellet.clone()).unwrap();
+                }
+            }
+        }
+        if tick % 24 == 8 {
+            for world in [&mut indexed, &mut restored, &mut scanned] {
+                for index in [world.food().len() - 1, world.food().len() / 2, 0] {
+                    world.remove_food(index).unwrap();
+                }
+            }
+        }
+        if tick == 16 {
+            for world in [&mut indexed, &mut restored, &mut scanned] {
+                let mut food = world.food().to_vec();
+                food[7].x = -128.0f64.next_down();
+                food[8].origin = Some(Origin::Boost);
+                world.replace_food(food).unwrap();
+            }
+        }
+        if tick == 40 {
+            restored = restore(&indexed);
+        }
+        if tick == 64 {
+            for world in [&mut indexed, &mut restored, &mut scanned] {
+                world.replace_food(Vec::new()).unwrap();
+            }
+        }
+        for world in [&mut indexed, &mut restored, &mut scanned] {
+            let actions: Vec<_> = world
+                .snakes()
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    s.alive.then_some(Action {
+                        heading: i as f64 * 2.4 + tick as f64 * 0.003,
+                        boost: (tick / 12 + i) % 4 == 0,
+                    })
+                })
+                .collect();
+            world.step(&actions).unwrap();
+        }
+        assert_eq!(
+            indexed.pickup_events(),
+            restored.pickup_events(),
+            "restore tick {tick}"
+        );
+        assert_eq!(
+            indexed.pickup_events(),
+            scanned.pickup_events(),
+            "scan tick {tick}"
+        );
+        pickups += indexed.pickup_events().unwrap().len();
+        let expected = serde_json::to_value(indexed.checkpoint().unwrap()).unwrap();
+        assert_eq!(
+            expected,
+            serde_json::to_value(restored.checkpoint().unwrap()).unwrap(),
+            "restore tick {tick}"
+        );
+        let mut actual = serde_json::to_value(scanned.checkpoint().unwrap()).unwrap();
+        actual["config"]["foodIndex"] = serde_json::json!(true);
+        assert_eq!(expected, actual, "scan tick {tick}");
+    }
+    assert!(pickups >= 24, "only {pickups} pickups");
+}
+
+#[test]
 fn hashed_pickup_matches_scanning_every_eater() {
     // Snakes spread over a wide arena, each heading into a line of pellets.
     let world = |food_index| {
