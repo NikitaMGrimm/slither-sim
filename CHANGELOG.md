@@ -46,6 +46,12 @@
   byte-identical, and the 500-player official fixture runs 3.5–3.9% fewer
   instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-delivery-index/REPORT.md)).
+- Protocol-13 frames reuse each converted packet's buffer for the frame header
+  instead of copying the packet into a new frame. Frames are byte-identical,
+  and the 500-player official fixture runs 2.3% fewer instructions with all
+  protocol-13 clients and 1.2% fewer with half; with stock clients it runs
+  0.1% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-owned-legacy-frames/REPORT.md)).
 - Food pickup removes eaten pellets from its occupancy cache by index and
   copies the surviving ranges, instead of scanning the whole cache twice.
   Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
