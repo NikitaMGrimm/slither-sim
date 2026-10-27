@@ -1,6 +1,8 @@
 # Earlier spawn-head rejection, 2026-10-27
 
 Keep. Main `368abe4` (#196) → measured runtime `dcb7fcb`.
+Delivery integrates main `3a530e0` (#197). Counts and socket holds predate it;
+four additional stock/legacy integration traces match the same main hashes.
 Check the existing head-runway predicate before full-body collision tests.
 Accepted poses, RNG draws/order, 4096/256 budgets, strict preference, fallback
 scores/ties and errors stay unchanged. Body construction remains; scoring still
@@ -72,7 +74,8 @@ the useful target. Arena code is untouched.
 
 ## Validation and reproduction
 
-Full Rust group and docs pass on Linux, including seven safety tests; changing
+Full Rust group and docs pass on Linux, repeated after #197 integration,
+including seven safety tests; changing
 the inclusive head threshold to strict fails the new ULP boundary test for both
 tiers. Windows/macOS await CI. Preparatory connection-setup and unsupported
 legacy-decode attempts are retained locally; no counted pair was excluded.

@@ -100,7 +100,7 @@ if args.mode=='trace':
                     if not a:break
             results[case]={'equal':True,**records['base'],'summary':reports['base']}
             (out/'selected.json').write_text(json.dumps(results,indent=2)+'\n');print('PARITY',case,flush=True)
-    rehash();(root/'traces.complete').write_text('six complete equal traces\n')
+    rehash();(root/'traces.complete').write_text(f'{len(results)} complete equal traces\n')
 
 if args.mode=='count':
     assert args.perf and (root/'traces.complete').exists();rehash()
