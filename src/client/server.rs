@@ -421,7 +421,7 @@ impl Host {
             routes.push(sender);
             let seats = (self.max_clients + worker..self.max_clients + self.bots)
                 .step_by(self.bot_threads)
-                .map(|slot| Seat::new(slot, self.decision_seconds))
+                .map(|slot| Seat::new(slot, slot - self.max_clients, self.decision_seconds))
                 .collect();
             let bots = Bots {
                 seats,
@@ -1484,6 +1484,9 @@ struct Bots {
 /// matching the simulator's native background client.
 struct Seat {
     slot: usize,
+    /// Position among bot seats, which follow the player slots; picks the
+    /// seat's skin and name.
+    bot: usize,
     generation: u64,
     state: ClientState,
     /// Processing draws for this connection.
@@ -1559,9 +1562,10 @@ impl Bots {
 
 impl Seat {
     /// `decide_at` is relative to the start until the thread runs.
-    fn new(slot: usize, interval: f64) -> Self {
+    fn new(slot: usize, bot: usize, interval: f64) -> Self {
         Self {
             slot,
+            bot,
             generation: 0,
             state: ClientState::new(),
             link: Link::default(),
@@ -1711,8 +1715,8 @@ impl Seat {
             slot: self.slot,
             generation: self.generation,
             appearance: PlayerAppearance {
-                nickname: bot_nickname(self.slot),
-                skin: bot_skin(self.slot),
+                nickname: bot_nickname(self.bot),
+                skin: bot_skin(self.bot),
                 custom_skin: Vec::new(),
             },
             session_id: false,
@@ -1734,8 +1738,8 @@ impl Seat {
 /// Each bot seat keeps one stock skin across lives so the world isn't uniform.
 /// The pinned client offers skins 0..=64 (`max_skin_cv`) but its picker skips
 /// 42, an event skin, unless that event is active.
-fn bot_skin(slot: usize) -> u8 {
-    let skin = (slot % 64) as u8;
+fn bot_skin(bot: usize) -> u8 {
+    let skin = (bot % 64) as u8;
     if skin >= 42 { skin + 1 } else { skin }
 }
 
@@ -1754,9 +1758,9 @@ const BOT_NAMES: [&str; 64] = [
 /// player name, as seen in 2026-10 live captures. Each seat keeps one name
 /// across lives so its rolling kills stay readable; seats past the list get a
 /// round number, keeping names distinct up to `MAX_AGENTS`.
-fn bot_nickname(slot: usize) -> Vec<u8> {
-    let name = BOT_NAMES[slot % BOT_NAMES.len()];
-    match slot / BOT_NAMES.len() {
+fn bot_nickname(bot: usize) -> Vec<u8> {
+    let name = BOT_NAMES[bot % BOT_NAMES.len()];
+    match bot / BOT_NAMES.len() {
         0 => format!("{name} (bot)"),
         round => format!("{name} {} (bot)", round + 1),
     }
@@ -2005,7 +2009,7 @@ mod tests {
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
         let mut policy = ForagerBot::new();
-        let mut seat = Seat::new(4, 1.);
+        let mut seat = Seat::new(4, 0, 1.);
         seat.join(0., &commands, &latency, &mut random).unwrap();
         let _ = received.recv().unwrap();
         seat.decide_at = 1.;
@@ -2060,7 +2064,7 @@ mod tests {
             }
         ));
         // A different seat on the same worker still runs normally.
-        let mut healthy = Seat::new(5, 1.);
+        let mut healthy = Seat::new(5, 0, 1.);
         healthy.join(0.1, &commands, &latency, &mut random).unwrap();
         healthy
             .run(0.1, &commands, &latency, &mut random, 1., &mut policy)
@@ -2566,7 +2570,7 @@ mod tests {
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
         let mut policy = ForagerBot::new();
-        let mut seat = Seat::new(4, 0.042);
+        let mut seat = Seat::new(4, 0, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         assert!(matches!(
             received.try_recv().unwrap(),
@@ -2783,7 +2787,7 @@ mod tests {
         let (_route, deliveries) = mpsc::channel();
         let latency = LatencyConfig::default();
         let mut random = Random::new(1);
-        let mut seat = Seat::new(4, 0.042);
+        let mut seat = Seat::new(4, 0, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         let mut bots = Bots {
             seats: vec![seat],
@@ -2825,7 +2829,7 @@ mod tests {
         };
         let mut random = Random::new(1);
         let mut policy = ForagerBot::new();
-        let mut seat = Seat::new(0, 0.042);
+        let mut seat = Seat::new(0, 0, 0.042);
         seat.join(0.5, &commands, &latency, &mut random).unwrap();
         // A world catching up on ticks stamps the setup before the join.
         let mut frame = vec![0, 0];
@@ -3204,6 +3208,24 @@ mod tests {
         assert!(names.iter().all(|name| name.len() <= MAX_NICKNAME));
         assert_eq!(bot_nickname(0), b"Noodle (bot)");
         assert_eq!(bot_nickname(64), b"Noodle 2 (bot)");
+    }
+
+    #[test]
+    fn first_bot_after_player_slots_gets_the_first_name_and_skin() {
+        let (commands, received) = mpsc::channel();
+        let mut seat = Seat::new(8, 0, 1.);
+        seat.join(
+            0.,
+            &commands,
+            &LatencyConfig::default(),
+            &mut Random::new(1),
+        )
+        .unwrap();
+        let Command::Connect { appearance, .. } = received.recv().unwrap() else {
+            panic!("expected a connect");
+        };
+        assert_eq!(appearance.nickname, b"Noodle (bot)");
+        assert_eq!(appearance.skin, 0);
     }
 
     #[test]
