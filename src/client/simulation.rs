@@ -61,6 +61,8 @@ mod markers;
 mod pit_tests;
 mod prey_visibility;
 mod remote;
+#[cfg(test)]
+mod rules_tests;
 mod snakes;
 
 pub use config::{DeliveryProfile, SimulationConfig};
@@ -538,7 +540,7 @@ impl SimulatorBackend {
                     let frame = self.frame_for(slot)?;
                     if let Some(action) = self
                         .background_policy
-                        .get_or_insert_with(|| ForagerBot::with_world_rules(self.world.config()))
+                        .get_or_insert_with(ForagerBot::new)
                         .decide(&frame)
                     {
                         self.send_to(slot, action)?;

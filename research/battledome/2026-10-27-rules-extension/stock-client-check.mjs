@@ -1,0 +1,25 @@
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { runInNewContext } from 'node:vm';
+import assert from 'node:assert/strict';
+const bytes = readFileSync(process.argv[2]);
+const sha256 = createHash('sha256').update(bytes).digest('hex');
+assert.equal(sha256, '5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095');
+const source = bytes.toString('utf8');
+const start = source.indexOf('window.gotPacket=function(a)');
+const end = source.indexOf(';ws.onerror=', start);
+assert.ok(start >= 0 && end > start);
+const handler = source.slice(start, end);
+assert.ok(![...handler.matchAll(/cmd==["']([^"']+)["']/g)].some(m => m[1] === '~'));
+const game = new Proxy({}, { get() { throw Error('game state read'); }, set() { throw Error('game state write'); } });
+const context = { window: {}, pkps: 0, testing: false, os: game, foods: game, slither: game, flux_grds: game };
+runInNewContext(handler, context);
+const packet = new Uint8Array(24); packet.set([126, 1, 0, 15]);
+const fields = new DataView(packet.buffer);
+fields.setFloat64(4, 1784);
+fields.setUint32(12, 400);
+fields.setFloat64(16, 900);
+context.window.gotPacket(packet);
+assert.equal(context.pkps, 1); // Ordinary traffic accounting only.
+assert.equal(context.os, game); assert.equal(context.foods, game);
+console.log(JSON.stringify({ stockClientSha256: sha256, command: 126, handler: 'ignored; traffic counter only', gameStateTouched: false }));

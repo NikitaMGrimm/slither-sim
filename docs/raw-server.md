@@ -174,6 +174,43 @@ rejected. Optional `[4]` requests `S` after self appearance and may accompany
 framing in either order; repeated requests are rejected. IDs identify connections,
 not authentication or resumed lives. Challenge and direct logins are accepted.
 
+### SlitherSim rules extension
+
+This is a SlitherSim extension, not official protocol. A socket opts in with the
+HTTP upgrade header `X-SlitherSim-Food: physical`. `NetworkBackend` sends it
+automatically on every connection. Reusing the existing bot signal keeps one
+handshake choice for physical food and mode metadata. The server tracks rule
+delivery separately from decoration state; stock browser sockets never receive
+this message. In-process clients also opt in.
+
+After setup, in the same frame, the host sends the following 24-byte `~` packet.
+It sends another whenever any rule value changes, including subunit pit changes
+as the wall moves. Values have the same meanings as geometric frame
+[`rules`](bot-api.md#frames). These reports do not include individual kill scores.
+The exact pit is independent of the integer-rounded wall report.
+
+| Byte offsets | Encoding | Meaning |
+| --- | --- | --- |
+| 0 | u8 | Command `~` (126). |
+| 1 | u8 | Extension version, currently 1. |
+| 2 | u8 | Boundary mode: 0 sliding, 1 hard. |
+| 3 | u8 | Flags: bit 0 pit present, bit 1 floor present, bit 2 kill window present, bit 3 free boost at floor; other bits zero. |
+| 4–11 | big-endian IEEE 754 f64 | Live pit radius in world units; zero when absent. |
+| 12–15 | big-endian u32 | `minScore`; zero when absent. |
+| 16–23 | big-endian IEEE 754 f64 | `killScoreSeconds`; zero when absent. |
+
+Present floating-point values must be finite and positive. A present floor must
+be in the configured `minScore` range; free boost at floor must match its
+presence. The decoder rejects invalid size, version, flags or values before
+applying any packet in the frame. Reconnect clears received rules to unknown.
+
+The pinned stock client has no `~` handler and its browser WebSocket constructor
+sends no custom header. An offline check of its actual packet handler also
+confirms an accidentally supplied `~` packet only increments traffic accounting:
+[source pin and reproduction](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-rules-extension/REPORT.md).
+This source check is separate from the regression proving that the host excludes
+stock sockets.
+
 ### Reports and game-over
 
 - `l`: top ten, recipient rank and population, after the recipient's own snake

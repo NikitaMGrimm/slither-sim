@@ -21,10 +21,6 @@ pub(crate) struct RawSimulator {
 }
 
 impl RawSimulator {
-    pub(crate) fn backend_config(&self) -> &crate::Config {
-        self.backend.world.config()
-    }
-
     /// Called by the host before any slots connect; bot slots keep config.latency.
     pub(crate) fn set_player_latency(&mut self, slots: usize, config: LatencyConfig) {
         self.backend.player_latency = PlayerLatency { slots, config };
@@ -148,6 +144,7 @@ impl RawSimulator {
 
     pub(crate) fn physical_food(&mut self, slot: usize) {
         self.backend.slots[slot].connection.decorations = false;
+        self.backend.slots[slot].connection.rules_enabled = true;
     }
 
     /// Queue one client message sent now on the uplink; see `receive_at`.

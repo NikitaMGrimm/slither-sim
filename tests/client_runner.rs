@@ -53,6 +53,7 @@ fn frame(status: ClientStatus, generation: u64, life: u64) -> ClientFrame {
         ..Default::default()
     };
     ClientFrame {
+        rules: None,
         contract: CONTRACT.into(),
         time: 0.,
         status,
