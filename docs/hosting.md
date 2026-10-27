@@ -23,24 +23,19 @@ slither-sim --version
 
 ### Build for the hosting CPU
 
-For a dedicated server with a Rust toolchain, an optional CPU-specific build
-can use instructions that portable release archives omit. From a source checkout
-of the version you want, build on the machine that will run the host:
+Release archives run on any x86-64 CPU, so they can't use newer instructions
+such as AVX2. If the server has a Rust toolchain, build a binary for its own
+CPU from a checkout of the version you want:
 
 ```sh
 RUSTFLAGS="-C target-cpu=native" cargo build --release --locked --bin slither-sim
-./target/release/slither-sim --version
 ```
 
-Use that binary in the service's `ExecStart`, or install it as above. A `native`
-binary requires the build machine's CPU features; rebuild for another CPU.
-Portable archives, crate builds and Python wheels keep their existing defaults.
-
-The [four-target replay study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)
-found byte-identical output for default, x86-64-v2, x86-64-v3 and native builds.
-Native had the strongest local cycle medians, but the shared WSL2 measurements
-do not establish production CPU savings or player capacity. Measure on your host
-before choosing it for a deployment.
+Install `target/release/slither-sim` as above. It runs only on CPUs with the
+same features, so rebuild after moving to other hardware. Game output is
+identical to the portable build. In a shared-machine test it used 3.5–4.5%
+fewer cycles ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md));
+measure on your own server before relying on it.
 
 ## Configure
 
