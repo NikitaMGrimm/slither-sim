@@ -2415,6 +2415,14 @@ impl Simulator {
                 ));
             }
         }
+        #[cfg(debug_assertions)]
+        for (snake, circle) in self.snakes.iter().zip(circles.iter()) {
+            assert_eq!(
+                snake.alive,
+                circle.is_some(),
+                "shared pickup geometry must cover every living slot"
+            );
+        }
         // Index each living snake's swept circle path for many prey. Beyond the
         // largest radius plus one unit, a sweep's both ends lie past the
         // `sweep_misses` limit on one axis, so skipped pairs never eat. Capping
@@ -2931,6 +2939,44 @@ fn find_eater<const PROFILE: bool>(
 mod food_pickup_order_tests {
     use super::*;
     use crate::RadiusUpdate;
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "shared pickup geometry must cover every living slot")]
+    fn partial_food_geometry_is_rejected() {
+        let mut config = Config::sandbox();
+        config.food_count = 0;
+        config.prey.count = 1;
+        let mut world = Simulator::new(WorldOptions {
+            seed: 47,
+            config,
+            population: InitialPopulation::Placed {
+                ids: vec!["first".into(), "missing".into()],
+                placement: Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let previous: Vec<_> = world.snakes.iter().map(|s| s.head).collect();
+        let heads: Vec<_> = world
+            .snakes
+            .iter()
+            .map(|s| {
+                (
+                    head_tip(s.head, s.heading, s.segments),
+                    (s.heading.cos(), s.heading.sin()),
+                    scale(s.segments),
+                )
+            })
+            .collect();
+        let s = &world.snakes[0];
+        let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+        world.advance_prey(
+            &previous,
+            &heads,
+            &[(0, center, radius, Bounds::between(center, center))],
+            &mut PreyBuffers::default(),
+        );
+    }
 
     #[test]
     fn shared_prey_geometry_matches_fresh_circles_after_food_gain() {
