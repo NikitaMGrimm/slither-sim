@@ -451,7 +451,7 @@
     "boundsLogSha256": "c8648dc47109a9868d01cb578e0297e0ffe5ba2f984a54b2251d9d4140151c9e",
     "physicsLogSha256": "f126a2a3b90d829c7ff9ee81fced3e6e052088ae9d19c991e404344349195bc0"
   },
-  "documentationCheckLogSha256": "cb9afda83e0560c347a01ef0085633b0339f07142fff41f9ef816439efd1d50d",
+  "documentationCheckLogSha256": "c996e1923ff02e01bdf087d7f572d1ed77dbf14a64ef313deabccecb73080601",
   "mutationControl": {
     "mutation": "query x range lx..=hx -> lx..hx",
     "exit": 101,

@@ -1,0 +1,444 @@
+diff --git a/src/client/server.rs b/src/client/server.rs
+index 9562bf1..c807d7e 100644
+--- a/src/client/server.rs
++++ b/src/client/server.rs
+@@ -56,6 +56,7 @@ use tungstenite::{
+ 
+ #[cfg(target_os = "linux")]
+ mod readiness;
++mod turns;
+ #[cfg(windows)]
+ mod wake;
+ 
+@@ -259,6 +260,7 @@ struct Shared {
+     #[cfg(windows)]
+     socket_wake: wake::Wake,
+     clock: Clock,
++    turns: turns::Turns,
+     stop: AtomicBool,
+     ticks: AtomicU64,
+     /// Nanoseconds the simulation thread spent running ticks.
+@@ -409,6 +411,7 @@ impl Host {
+ 
+     /// Serve on new threads; the world clock starts now.
+     pub fn start(self) -> Result<RunningHost, String> {
++        let mode = turns::Mode::parse(std::env::var("SLITHERSIM_HOST_SCHEDULE").ok().as_deref())?;
+         let address = self.local_addr()?;
+         let (encoded, replies) = challenge_parts()?;
+         let mut challenge = vec![0, 0, b'6'];
+@@ -421,6 +424,7 @@ impl Host {
+                 dt: self.world.dt(),
+                 deferred: AtomicU64::new(0),
+             },
++            turns: turns::Turns::new(mode),
+             stop: AtomicBool::new(false),
+             ticks: AtomicU64::new(0),
+             busy: AtomicU64::new(0),
+@@ -473,8 +477,9 @@ impl Host {
+             deliveries: socket_inbox,
+         };
+         let agents = self.max_clients + self.bots;
+-        let simulation = Simulation {
++        let mut simulation = Simulation {
+             world: self.world,
++            inline_gateway: None,
+             commands: inbox,
+             batches: routes.iter().map(|_| Vec::new()).collect(),
+             routes,
+@@ -487,8 +492,13 @@ impl Host {
+             ticks: 0,
+             deferred: 0,
+         };
+-        running.spawn("slither-simulation", simulation, Simulation::run)?;
+-        running.spawn("slither-sockets", gateway, Gateway::run)?;
++        if mode == turns::Mode::Inline {
++            simulation.inline_gateway = Some(gateway);
++            running.spawn("slither-simulation", simulation, Simulation::run)?;
++        } else {
++            running.spawn("slither-simulation", simulation, Simulation::run)?;
++            running.spawn("slither-sockets", gateway, Gateway::run)?;
++        }
+         Ok(running)
+     }
+ 
+@@ -601,6 +611,7 @@ impl Drop for RunningHost {
+ /// The simulation thread: the world, its tick schedule and command intake.
+ struct Simulation {
+     world: RawSimulator,
++    inline_gateway: Option<Gateway>,
+     commands: Receiver<Command>,
+     /// Owner threads: sockets first, then bot workers.
+     routes: Vec<Sender<Vec<Delivery>>>,
+@@ -633,16 +644,25 @@ struct PendingJoin {
+ 
+ impl Simulation {
+     fn run(&mut self) -> Result<(), String> {
+-        let dt = self.shared.clock.dt;
++        let shared = self.shared.clone();
++        let dt = shared.clock.dt;
+         while !self.shared.stopped() {
+             let due = self.due_ticks(Instant::now());
+             if due == 0 {
+-                let next = (self.ticks + self.deferred + 1) as f64 * dt;
++                let mut next = (self.ticks + self.deferred + 1) as f64 * dt;
++                if let Some(gateway) = &mut self.inline_gateway {
++                    let now = self.shared.clock.wall(Instant::now());
++                    if gateway.next_due() <= now {
++                        gateway.poll()?;
++                    }
++                    next = next.min(gateway.next_due());
++                }
+                 self.shared.clock.sleep_until(next, MAX_IDLE);
+                 continue;
+             }
+             let started = Instant::now();
+             for _ in 0..due {
++                let turn = shared.turns.begin();
+                 // A command applies in the tick during which it arrives. Its send
+                 // time, not this loop, picks that tick, so each frame reflects the
+                 // input that reached the world by its due time.
+@@ -651,6 +671,10 @@ impl Simulation {
+                 self.ticks += 1;
+                 self.shared.ticks.store(self.ticks, Ordering::Relaxed);
+                 self.hand_over()?;
++                if let Some(gateway) = &mut self.inline_gateway {
++                    gateway.poll()?;
++                }
++                shared.turns.finish(turn, &shared.stop);
+             }
+             let busy = started.elapsed().as_nanos().try_into().unwrap_or(u64::MAX);
+             self.shared.busy.fetch_add(busy, Ordering::Relaxed);
+@@ -879,7 +903,12 @@ impl Simulation {
+             ..
+         } = self;
+         let offset = *deferred as f64 * shared.clock.dt;
+-        world.advance_tick_with(*max_clients, &mut |early| {
++        let early = if shared.turns.mode == turns::Mode::Concurrent {
++            *max_clients
++        } else {
++            0
++        };
++        world.advance_tick_with(early, &mut |early| {
+             for (slot, frames) in early {
+                 // Socket slots share route 0.
+                 batches[0].push(delivery(slot, generations[slot], frames, offset));
+@@ -1138,6 +1167,21 @@ struct Session {
+ 
+ impl Gateway {
+     fn run(&mut self) -> Result<(), String> {
++        if self.gate.shared.turns.mode == turns::Mode::Turns {
++            let shared = self.gate.shared.clone();
++            while !shared.stopped() {
++                let wait = (self.next_due() - shared.clock.wall(Instant::now())).clamp(0., 0.1);
++                let Some(turn) = shared
++                    .turns
++                    .socket_turn(Duration::from_secs_f64(wait), &shared.stop)
++                else {
++                    break;
++                };
++                self.poll()?;
++                shared.turns.serviced(turn);
++            }
++            return Ok(());
++        }
+         while !self.gate.shared.stopped() {
+             self.poll()?;
+             let next = self
+@@ -1174,6 +1218,16 @@ impl Gateway {
+         Ok(())
+     }
+ 
++    fn next_due(&self) -> f64 {
++        self.sessions
++            .iter()
++            .filter_map(|session| match &session.stage {
++                Stage::Open(open) => open.queued.front().map(|(at, _)| *at),
++                _ => None,
++            })
++            .fold(f64::INFINITY, f64::min)
++    }
++
+     /// Accept and service sockets, take the world's frames and send those due.
+     /// An error is a host failure; client faults only close that client.
+     fn poll(&mut self) -> Result<(), String> {
+@@ -2045,6 +2099,111 @@ mod tests {
+     use super::*;
+     use crate::client::simulation::MAX_AGENTS;
+ 
++    #[test]
++    fn tick_handoff_modes_preserve_each_recipients_protocol_trace() {
++        use sha2::{Digest, Sha256};
++        fn trace(mode: turns::Mode, legacy: usize) -> (Vec<u8>, u64) {
++            let count = 500;
++            let config = SimulationConfig {
++                agents: count,
++                world: crate::Config::official(count),
++                ..Default::default()
++            };
++            let mut world = RawSimulator::new(7, config, count).unwrap();
++            let profile = |slot| PlayerAppearance {
++                nickname: format!("Local{slot}").into_bytes(),
++                skin: (slot % 9) as u8,
++                ..Default::default()
++            };
++            for slot in 0..count {
++                assert!(world.connect_waited(slot, profile(slot), 2.).unwrap());
++                if slot < legacy {
++                    world.protocol13(slot);
++                }
++            }
++            let dt = world.dt();
++            let (commands, inbox) = mpsc::channel();
++            let (route, deliveries) = mpsc::channel();
++            let mut state = shared(dt, count);
++            Arc::get_mut(&mut state).unwrap().turns = turns::Turns::new(mode);
++            let mut simulation = Simulation {
++                world,
++                inline_gateway: None,
++                commands: inbox,
++                routes: vec![route],
++                batches: vec![Vec::new()],
++                max_clients: count,
++                generations: vec![1; count],
++                waiting: VecDeque::new(),
++                next_spawn_tick: 0,
++                last_spawn_tick: None,
++                shared: state,
++                ticks: 0,
++                deferred: 0,
++            };
++            let mut digest = Sha256::new();
++            let mut frame_count = 0;
++            for tick in 0..432 {
++                if tick == 216 {
++                    simulation.world.disconnect(0).unwrap();
++                    assert!(simulation.world.connect_waited(0, profile(0), 2.).unwrap());
++                    if legacy > 0 {
++                        simulation.world.protocol13(0);
++                    }
++                }
++                if tick % 6 == 0 {
++                    for slot in 0..count {
++                        simulation.shared.pending[slot].fetch_add(1, Ordering::Relaxed);
++                        commands
++                            .send(Command::Message {
++                                slot,
++                                generation: 1,
++                                bytes: vec![((slot * 37 + tick / 6 * 3) % 251) as u8],
++                                sent: tick as f64 * dt,
++                            })
++                            .unwrap();
++                    }
++                }
++                step(&mut simulation);
++                let mut by_slot = vec![Vec::new(); count];
++                while let Ok(batch) = deliveries.try_recv() {
++                    for delivery in batch {
++                        if let Delivery::Frames { slot, frames, .. } = delivery {
++                            by_slot[slot].extend(frames);
++                        } else {
++                            panic!("unexpected fixture close");
++                        }
++                    }
++                }
++                for (slot, frames) in by_slot.into_iter().enumerate() {
++                    for (at, bytes) in frames {
++                        digest.update((tick as u64).to_le_bytes());
++                        digest.update((slot as u64).to_le_bytes());
++                        digest.update(at.to_bits().to_le_bytes());
++                        digest.update((bytes.len() as u64).to_le_bytes());
++                        digest.update(bytes);
++                        frame_count += 1;
++                    }
++                }
++            }
++            digest.update(
++                serde_json::to_vec(&simulation.world.fixture_world().checkpoint().unwrap())
++                    .unwrap(),
++            );
++            (digest.finalize().to_vec(), frame_count)
++        }
++        for legacy in [0, 250, 500] {
++            let expected = trace(turns::Mode::Concurrent, legacy);
++            assert!(expected.1 > 500);
++            assert_eq!(trace(turns::Mode::Turns, legacy), expected);
++            assert_eq!(trace(turns::Mode::Inline, legacy), expected);
++            println!(
++                "schedule parity legacy={legacy} frames={} sha256={:02x?}",
++                expected.1, expected.0
++            );
++        }
++    }
++
+     #[test]
+     fn owned_frames_preserve_websocket_bytes_and_sequence_wrap() {
+         for framing in [Framing::Elapsed, Framing::Bare, Framing::Sequence(u16::MAX)] {
+@@ -2652,6 +2811,7 @@ mod tests {
+                 dt,
+                 deferred: AtomicU64::new(0),
+             },
++            turns: turns::Turns::new(turns::Mode::Concurrent),
+             stop: AtomicBool::new(false),
+             ticks: AtomicU64::new(0),
+             busy: AtomicU64::new(0),
+@@ -2679,6 +2839,7 @@ mod tests {
+         let (route, deliveries) = mpsc::channel();
+         let mut simulation = Simulation {
+             world,
++            inline_gateway: None,
+             commands: inbox,
+             routes: vec![route],
+             batches: vec![Vec::new()],
+@@ -2876,6 +3037,7 @@ mod tests {
+         let (bot_route, bot_deliveries) = mpsc::channel();
+         let mut simulation = Simulation {
+             world,
++            inline_gateway: None,
+             commands: inbox,
+             routes: vec![socket_route, bot_route],
+             batches: vec![Vec::new(), Vec::new()],
+@@ -3423,6 +3585,7 @@ mod tests {
+         };
+         let simulation = Simulation {
+             world,
++            inline_gateway: None,
+             commands: inbox,
+             routes: vec![route],
+             batches: vec![Vec::new()],
+diff --git a/src/client/server/turns.rs b/src/client/server/turns.rs
+new file mode 100644
+index 0000000..2f42c6e
+--- /dev/null
++++ b/src/client/server/turns.rs
+@@ -0,0 +1,131 @@
++//! Experimental one-core baton. A socket pass finishes before the next tick.
++use std::sync::{
++    Condvar, Mutex, MutexGuard,
++    atomic::{AtomicBool, Ordering},
++};
++use std::time::Duration;
++
++#[derive(Clone, Copy, Default, PartialEq, Eq)]
++pub(super) enum Mode {
++    #[default]
++    Concurrent,
++    Turns,
++    Inline,
++}
++
++impl Mode {
++    pub(super) fn parse(value: Option<&str>) -> Result<Self, String> {
++        match value {
++            None | Some("concurrent") => Ok(Self::Concurrent),
++            Some("turns") => Ok(Self::Turns),
++            Some("inline") => Ok(Self::Inline),
++            _ => Err("SLITHERSIM_HOST_SCHEDULE must be concurrent, turns or inline".into()),
++        }
++    }
++}
++
++#[derive(Default)]
++pub(super) struct State {
++    tick: u64,
++    serviced: u64,
++}
++
++pub(super) struct Turns {
++    pub(super) mode: Mode,
++    state: Mutex<State>,
++    changed: Condvar,
++}
++
++impl Turns {
++    pub(super) fn new(mode: Mode) -> Self {
++        Self {
++            mode,
++            state: Mutex::new(State::default()),
++            changed: Condvar::new(),
++        }
++    }
++
++    pub(super) fn begin(&self) -> Option<MutexGuard<'_, State>> {
++        (self.mode == Mode::Turns).then(|| self.state.lock().unwrap_or_else(|e| e.into_inner()))
++    }
++
++    pub(super) fn finish(&self, guard: Option<MutexGuard<'_, State>>, stop: &AtomicBool) {
++        let Some(mut state) = guard else { return };
++        state.tick += 1;
++        self.changed.notify_all();
++        while state.serviced < state.tick && !stop.load(Ordering::Relaxed) {
++            state = self.wait(state, Duration::from_millis(100));
++        }
++    }
++
++    pub(super) fn socket_turn(
++        &self,
++        wait: Duration,
++        stop: &AtomicBool,
++    ) -> Option<MutexGuard<'_, State>> {
++        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
++        if state.tick == state.serviced {
++            state = self.wait(state, wait);
++        }
++        (!stop.load(Ordering::Relaxed)).then_some(state)
++    }
++
++    pub(super) fn serviced(&self, mut state: MutexGuard<'_, State>) {
++        state.serviced = state.tick;
++        self.changed.notify_all();
++    }
++
++    fn wait<'a>(&self, state: MutexGuard<'a, State>, duration: Duration) -> MutexGuard<'a, State> {
++        self.changed
++            .wait_timeout(state, duration)
++            .unwrap_or_else(|e| e.into_inner())
++            .0
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::sync::{Arc, mpsc};
++    use std::thread;
++
++    #[test]
++    fn tick_holds_socket_pass_then_waits_for_its_acknowledgement() {
++        let turns = Arc::new(Turns::new(Mode::Turns));
++        let stop = Arc::new(AtomicBool::new(false));
++        let (entered, events) = mpsc::channel();
++        let guard = turns.begin();
++        let socket = {
++            let turns = turns.clone();
++            let stop = stop.clone();
++            thread::spawn(move || {
++                let state = turns.socket_turn(Duration::from_secs(1), &stop).unwrap();
++                entered.send(()).unwrap();
++                turns.serviced(state);
++            })
++        };
++        assert!(events.try_recv().is_err());
++        turns.finish(guard, &stop);
++        events.recv_timeout(Duration::from_secs(1)).unwrap();
++        socket.join().unwrap();
++        let state = turns.state.lock().unwrap();
++        assert_eq!(state.tick, state.serviced);
++        assert_eq!(state.tick, 1);
++    }
++
++    #[test]
++    fn stopped_host_does_not_wait_for_a_failed_socket_thread() {
++        let turns = Turns::new(Mode::Turns);
++        let stop = AtomicBool::new(true);
++        turns.finish(turns.begin(), &stop);
++        assert!(turns.socket_turn(Duration::ZERO, &stop).is_none());
++    }
++
++    #[test]
++    fn default_and_inline_need_no_baton() {
++        assert!(Turns::new(Mode::Concurrent).begin().is_none());
++        assert!(Turns::new(Mode::Inline).begin().is_none());
++        assert!(Mode::parse(Some("invalid")).is_err());
++        assert!(Mode::parse(None).unwrap() == Mode::Concurrent);
++    }
++}
