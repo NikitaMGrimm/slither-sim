@@ -4,6 +4,11 @@
 
 ### Added
 
+- The hosting guide explains how to build the server for the machine's own
+  CPU. In our tests its game output matched the portable build exactly, and
+  its median cycle count was 3.5–4.5% lower on one shared development machine;
+  portable archives, the crate and Python wheels are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)).
 - Tools for testing whether official servers compensate for latency when
   judging collisions, and a first attempt. None of the 27 active official
   servers was close to empty (the quietest had 61 players), so no controlled
