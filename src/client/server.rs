@@ -25,8 +25,8 @@ use super::{
     latency::{LatencyConfig, Link, Random},
     protocol,
     simulation::{
-        MAX_FRAME_BYTES, MAX_NICKNAME, MAX_VICTORY_TEXT, PlayerAppearance, REMOTE_IN_FLIGHT,
-        RawSimulator,
+        MAX_FRAME_BYTES, MAX_NICKNAME, MAX_REMOTE_OUTPUT_BYTES, MAX_VICTORY_TEXT, PlayerAppearance,
+        REMOTE_IN_FLIGHT, RawSimulator, output_cost,
     },
 };
 use crate::Action;
@@ -69,7 +69,8 @@ const WRITE_BUFFER_BYTES: usize = 16 << 10;
 /// refuses a frame before writing anything if it would overflow this, so leave
 /// room for the largest message and its 10-byte header behind an unflushed batch.
 const MAX_SEND_BUFFER_BYTES: usize = WRITE_BUFFER_BYTES + MAX_FRAME_BYTES + 10;
-/// Frames waiting for their delivery time on one connection, socket or bot.
+/// Frames waiting for their delivery time on one background bot. Socket queues
+/// use the shared byte budget, so legacy single messages have comparable room.
 const MAX_QUEUED_FRAMES: usize = 4096;
 /// Host policy: an unadmitted bot waits a wall second after refusal instead of
 /// retrying every decision (normally 42 ms). Socket joins keep their own cadence.
@@ -868,7 +869,13 @@ impl Simulation {
     fn hand_over(&mut self) -> Result<(), String> {
         let offset = self.deferred as f64 * self.shared.clock.dt;
         for slot in 0..self.generations.len() {
-            let frames = self.world.take(slot)?;
+            let frames = match self.world.take(slot) {
+                Ok(frames) => frames,
+                Err(reason) => {
+                    self.close(slot, reason)?;
+                    continue;
+                }
+            };
             if !frames.is_empty() {
                 let route = self.route(slot);
                 let generation = self.generations[slot];
@@ -1068,6 +1075,7 @@ struct Open<S = TcpStream> {
     generation: u64,
     /// Frames from the world waiting for their delivery time, in order.
     queued: VecDeque<(f64, Vec<u8>)>,
+    queued_bytes: usize,
 }
 
 enum Stage {
@@ -1152,9 +1160,13 @@ impl Gateway {
         };
         match delivery {
             Delivery::Frames { frames, .. } => {
-                if open.queued.len() + frames.len() > MAX_QUEUED_FRAMES {
+                let used = frames.iter().fold(open.queued_bytes, |used, (_, bytes)| {
+                    used.saturating_add(output_cost(bytes))
+                });
+                if used > MAX_REMOTE_OUTPUT_BYTES {
                     open.reject(&mut self.gate, now, "Client is reading too slowly");
                 } else {
+                    open.queued_bytes = used;
                     open.queued.extend(frames);
                 }
             }
@@ -1252,6 +1264,7 @@ impl<S: io::Read + io::Write> Open<S> {
             physical_food,
             generation: 0,
             queued: VecDeque::new(),
+            queued_bytes: 0,
         }
     }
 
@@ -1399,6 +1412,7 @@ impl<S: io::Read + io::Write> Open<S> {
     fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
         while self.queued.front().is_some_and(|(at, _)| *at <= wall) {
             let (_, message) = self.queued.pop_front().unwrap();
+            self.queued_bytes -= output_cost(&message);
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
             }
@@ -1469,6 +1483,7 @@ impl<S: io::Read + io::Write> Open<S> {
             });
             gate.occupied[slot] = false;
             self.queued.clear();
+            self.queued_bytes = 0;
         }
     }
 
@@ -2469,6 +2484,54 @@ mod tests {
         simulation.advance_tick().unwrap();
         simulation.ticks += 1;
         simulation.hand_over().unwrap();
+    }
+
+    #[test]
+    fn remote_output_overflow_closes_only_its_session_for_both_protocols() {
+        for legacy in [false, true] {
+            let (mut simulation, _gate, deliveries) = connected(LatencyConfig::default(), 0);
+            assert!(
+                simulation
+                    .world
+                    .connect(0, PlayerAppearance::default())
+                    .unwrap()
+            );
+            if legacy {
+                simulation.world.protocol13(0);
+            }
+            // Withhold handover to model an undrained world-side queue. Stock
+            // bundles and legacy single pongs must reach the same byte policy,
+            // without either protocol's overflow escaping the shared tick.
+            for _ in 0..if legacy { 20 } else { 400 } {
+                for _ in 0..REMOTE_IN_FLIGHT - 1 {
+                    simulation
+                        .world
+                        .receive_at(0, &[251], simulation.ticks as f64 * simulation.world.dt())
+                        .unwrap();
+                }
+                simulation
+                    .world
+                    .advance_tick_with(0, &mut |_| Ok(()))
+                    .unwrap();
+                simulation.ticks += 1;
+            }
+            assert_eq!(
+                simulation.world.take(0).unwrap_err(),
+                "Client output queue is full"
+            );
+            simulation.hand_over().unwrap();
+            assert!(deliveries.try_iter().flatten().any(|delivery| matches!(
+                delivery,
+                Delivery::Closed { slot: 0, generation: 1, ref reason }
+                    if reason == "Client output queue is full"
+            )));
+            assert_eq!(simulation.generations[0], 0);
+            assert!(simulation.world.take(0).unwrap().is_empty());
+            let before = simulation.ticks;
+            step(&mut simulation);
+            assert_eq!(simulation.ticks, before + 1);
+            assert!(!simulation.shared.stopped());
+        }
     }
 
     /// Wall delivery time of the first pong handed over, stepping at most

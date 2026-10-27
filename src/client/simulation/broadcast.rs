@@ -299,7 +299,7 @@ impl SimulatorBackend {
             .iter_mut()
             .enumerate()
             .filter(|(_, s)| !s.connection.downlink.is_empty())
-            .map(|(slot, s)| (slot, s.connection.downlink.drain(..).collect()))
+            .map(|(slot, s)| (slot, s.connection.take_downlink()))
             .collect();
         if frames.is_empty() {
             Ok(())

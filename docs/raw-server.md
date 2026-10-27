@@ -111,6 +111,11 @@ socket thread owns the listener and nonblocking connections, releasing frames
 at latency-model due times between ticks. OS scheduling and load affect delivery.
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
+Remote output queues in both the simulation and socket thread each allow 2 MiB,
+charging payload bytes plus a 64-byte allowance per message. Exceeding this
+host resource policy closes only that connection, for either protocol; legacy
+single messages do not share the virtual client's 4,096-frame limit. Input
+commands have their own separate bound.
 
 `bots.threads` runs background Forager clients using A4-mean. Each
 decodes its slot's frames, decides every `decisionTicks × dt` with staggered phases, models processing delay,

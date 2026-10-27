@@ -111,3 +111,22 @@ SHA-256 values identify files, not official server conformance or game physics.
 | Final rejoin screenshot | `7c13bd2b52f9cbad04703ec6a3f2108911dbc309e0fd03d2b5f9633c821e2a30` |
 | Main reference executable | `e9e740c0a99206e2ab14ccb743a9a4ecb01457ba5055dfd644d04a51a75a6899` |
 | Candidate executable | `28c5cc5629cf798b34b97609ffbd37eb3032d2599271fcc7a45f18610d24d4e2` |
+
+## Output-budget review follow-up
+
+Review of `068d5ef` found that 13's individual frames could exceed the old
+4,096-frame queue bound and abort a shared tick. Remote queues now charge
+payload plus a 64-byte allowance per frame against 2 MiB at each stage.
+The simulation flags an overflowing recipient, discards its pending output and
+closes that session through normal host handover; stock remote overflow is
+isolated too. Native virtual clients retain their existing frame limit.
+Input commands have a separate bound. Wire framing and encodings are unchanged.
+
+Regressions cover 5,000 prey staying connected, world-side overflow in both
+protocols, and a 100,000-pellet cull that closes only the legacy player while a
+stock peer still receives pongs. The reviewer's original prey and radius-700
+cull probes stayed connected in both protocols, with no host exit or stderr.
+The 2,000-step drift test decodes/accumulates emitted absolute/relative bytes
+and compares with an independent source-packet reference, not adapter fields.
+The stock official-500 trace still matches the main reference above exactly.
+No NTL browser rerun: visible frame grouping/order and all encodings are unchanged.

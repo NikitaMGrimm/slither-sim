@@ -210,10 +210,38 @@ fn first_anchor_is_absolute_then_relative_steps_do_not_drift() {
     .unwrap();
     let snake = &backend.world().snakes()[0];
     let appearance = encode::appearance(9, snake, 0., &PlayerAppearance::default()).unwrap();
+    // Decode the source appearance's front independently, including the 19
+    // terminal angle. Neither reference position comes from adapter state.
+    let read16 = |p: &[u8], at| f64::from(u16::from_be_bytes([p[at], p[at + 1]]));
+    let read24 = |p: &[u8], at| {
+        p[at..at + 3]
+            .iter()
+            .fold(0_u32, |value, &byte| value * 256 + u32::from(byte)) as f64
+    };
+    let custom = 23 + usize::from(appearance[22]);
+    let body = custom + 2 + usize::from(appearance[custom]);
+    let mut reference = [
+        read24(&appearance, body) / 5.,
+        read24(&appearance, body + 3) / 5.,
+    ];
+    for pair in appearance[body + 6..appearance.len() - 2]
+        .as_chunks::<2>()
+        .0
+    {
+        reference[0] += (f64::from(pair[0]) - 127.) / 2.;
+        reference[1] += (f64::from(pair[1]) - 127.) / 2.;
+    }
+    let last_angle = read16(&appearance, appearance.len() - 2) * TAU / 65536.;
+    reference[0] += 42. * last_angle.cos();
+    reference[1] += 42. * last_angle.sin();
+    let mut received = [0.; 2];
     let mut encoder = Encoder::new(9);
     convert(&mut encoder, appearance);
     for i in 0..2000 {
         let angle = ((i * 997) % 65536) as u16;
+        let radians = f64::from(angle) * TAU / 65536.;
+        reference[0] += 42. * radians.cos();
+        reference[1] += 42. * radians.sin();
         let p = encode::anchor(true, 9, angle, (i % 7 == 0).then_some(123));
         let q = convert(&mut encoder, p);
         assert_eq!(u16_at(&q, 1), 9);
@@ -227,14 +255,15 @@ fn first_anchor_is_absolute_then_relative_steps_do_not_drift() {
                 b'G'
             }
         );
-        let front = &encoder.fronts[&9];
-        assert_eq!(
-            front.sent.unwrap(),
-            [
-                coordinate(front.source.x).unwrap(),
-                coordinate(front.source.y).unwrap()
-            ]
-        );
+        match q[0] {
+            b'g' | b'n' => received = [read16(&q, 3), read16(&q, 5)],
+            b'G' | b'N' => {
+                received[0] += f64::from(q[3]) - 128.;
+                received[1] += f64::from(q[4]) - 128.;
+            }
+            _ => panic!("unexpected anchor"),
+        }
+        assert_eq!(received, reference.map(f64::round), "step {i}");
     }
     convert(&mut encoder, encode::removal(9, true));
     assert!(!encoder.fronts.contains_key(&9));

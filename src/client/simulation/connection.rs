@@ -16,6 +16,13 @@ use std::{
 /// Messages in flight per direction of one connection before the run fails.
 /// A local resource budget; the protocol has no such field.
 pub(super) const MAX_IN_FLIGHT: usize = 4096;
+/// Remote output policy, shared by the world and socket queues. Count payload
+/// bytes plus a fixed allocation/frame allowance, rather than penalizing 13's
+/// individual messages against 19's bundles. Exhaustion closes that recipient.
+pub(crate) const MAX_REMOTE_OUTPUT_BYTES: usize = 2 << 20;
+pub(crate) fn output_cost(frame: &[u8]) -> usize {
+    frame.len().saturating_add(64)
+}
 /// Fit the native client's 1 MiB message limit, leaving room for the largest
 /// unmasked WebSocket header.
 pub(super) const MAX_FRAME_BYTES: usize = (1 << 20) - 10;
@@ -48,6 +55,8 @@ pub(super) struct Connection {
     pub(super) link: Link,
     pub(super) uplink: VecDeque<(f64, Uplink)>,
     pub(super) downlink: VecDeque<(f64, Vec<u8>)>,
+    pub(super) downlink_bytes: usize,
+    pub(super) output_overflow: bool,
     /// The server has received the connect and sent setup.
     pub(super) setup: bool,
     /// Game over was sent; afterwards only pings and victory text are accepted.
@@ -88,6 +97,13 @@ pub(super) struct Connection {
     /// The client asked for its session ID; `session_pending` until it is sent.
     pub(super) session_requested: bool,
     pub(super) session_pending: bool,
+}
+
+impl Connection {
+    pub(super) fn take_downlink(&mut self) -> Vec<(f64, Vec<u8>)> {
+        self.downlink_bytes = 0;
+        self.downlink.drain(..).collect()
+    }
 }
 
 pub(super) struct Slot {
@@ -311,6 +327,9 @@ impl SimulatorBackend {
         packets: &[Vec<u8>],
         physical: Option<&[Vec<u8>]>,
     ) -> Result<(), String> {
+        if self.slots[slot].connection.output_overflow {
+            return Ok(());
+        }
         let converted;
         let (packets, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
             converted = legacy.packets(packets)?;
@@ -330,8 +349,9 @@ impl SimulatorBackend {
             frame_groups(packets)
         };
         let latency = self.player_latency.for_slot(slot, &self.config.latency);
+        let remote = self.slots[slot].remote;
         let connection = &mut self.slots[slot].connection;
-        if connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
+        if !remote && connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
             return Err("Downlink queue is full".into());
         }
         // Decorations must not consume extra shared latency RNG draws: that
@@ -361,6 +381,22 @@ impl SimulatorBackend {
             let elapsed = target.saturating_sub(connection.header_ms).min(65535);
             connection.header_ms += elapsed;
             let bytes = encode::frame(elapsed as u16, group)?;
+            if remote {
+                let used = connection
+                    .downlink_bytes
+                    .saturating_add(output_cost(&bytes));
+                if used > MAX_REMOTE_OUTPUT_BYTES {
+                    // RawSimulator::take reports this to the host's normal
+                    // per-session close path. Never abort the shared tick.
+                    connection.output_overflow = true;
+                    connection.setup = false;
+                    connection.downlink.clear();
+                    connection.downlink_bytes = 0;
+                    connection.uplink.clear();
+                    return Ok(());
+                }
+                connection.downlink_bytes = used;
+            }
             let arrival = match &arrivals {
                 Some(arrivals) => arrivals
                     .get(index)

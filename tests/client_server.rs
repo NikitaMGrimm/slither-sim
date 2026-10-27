@@ -470,7 +470,12 @@ impl Raw {
         match b[1] & 0x7f {
             126 if b.len() >= 4 => Some((b[0] & 15, 4, usize::from(b[2]) << 8 | usize::from(b[3]))),
             126 => None,
-            127 => panic!("unexpectedly large server frame"),
+            127 if b.len() >= 10 => Some((
+                b[0] & 15,
+                10,
+                usize::try_from(u64::from_be_bytes(b[2..10].try_into().unwrap())).unwrap(),
+            )),
+            127 => None,
             n => Some((b[0] & 15, 2, usize::from(n))),
         }
     }
@@ -646,6 +651,99 @@ fn legacy_handshake_login_controls_and_reconnect_use_individual_protocol13_messa
         }
     }
     host.finish();
+}
+
+#[test]
+fn dense_legacy_prey_burst_keeps_its_socket_and_the_host_alive() {
+    let mut config = config(2, 0);
+    config.simulation.world.radius = 1000.;
+    config.simulation.world.food_count = 0;
+    config.simulation.world.ambient_replenish_per_second = 0.;
+    config.simulation.world.prey.count = 5000;
+    let host = Running::start(config);
+    let mut legacy = Raw::connect(host.address, "/slither");
+    assert!(legacy.status().starts_with("HTTP/1.1 101"));
+    legacy.send(&[115, 12, 7, 0, 0, 255]);
+    let setup = legacy.binary();
+    assert_eq!(setup[2], b'a');
+    assert_eq!(setup[25], 13);
+    let mut prey = std::collections::BTreeSet::new();
+    let started = Instant::now();
+    // A few prey can be eaten before their first appearance. Still require
+    // comfortably more individual frames than the former 4,096-frame limit.
+    while prey.len() < 4500 {
+        let frame = legacy.binary();
+        assert!(frame[2] >= 32, "legacy messages remain individual");
+        if frame[2] == b'y' && frame.len() == 22 {
+            prey.insert(u16::from_be_bytes([frame[3], frame[4]]));
+        }
+        assert!(
+            started.elapsed() < WAIT,
+            "incomplete prey listing: {}",
+            prey.len()
+        );
+    }
+    legacy.send(&[251]);
+    while legacy.binary()[2] != b'p' {
+        assert!(started.elapsed() < WAIT, "legacy socket stopped responding");
+    }
+    let mut stock = network(host.url(), "Healthy", Handshake::Direct);
+    until(&mut stock, "other stock recipient", |frame| {
+        frame.status == ClientStatus::Playing && frame.timing.ping_seconds.is_some()
+    });
+    assert!(!host.host.is_finished());
+    stock.disconnect();
+    assert!(host.finish() > 0);
+}
+
+#[test]
+fn oversized_legacy_cull_disconnects_that_player_while_stock_still_gets_pongs() {
+    let mut config = config(2, 0);
+    config.simulation.world.radius = 1000.;
+    config.simulation.world.food_count = 100_000;
+    config.simulation.world.ambient_food.enabled = false;
+    config.simulation.world.ambient_replenish_per_second = 0.;
+    config.simulation.world.dynamic_radius = true;
+    config.simulation.world.size_to_population = false;
+    config.simulation.world.radius_updates = vec![slither_sim::RadiusUpdate {
+        time: 0.5,
+        radius: 100.,
+    }];
+    let host = Running::start(config);
+    let mut stock = Raw::connect(host.address, "/slither");
+    assert!(stock.status().starts_with("HTTP/1.1 101"));
+    stock.send(&stock_login(b"Healthy", 0, &[]));
+    let mut stock_writer = stock.stream.try_clone().unwrap();
+    // Keep this healthy recipient reading while the other socket receives its
+    // large listing/cull. All threads inherit the test process's CPU affinity.
+    let reader = std::thread::spawn(move || {
+        let started = Instant::now();
+        loop {
+            let frame = stock.binary();
+            if packets(&frame[2..]).iter().any(|p| p == b"p") {
+                return;
+            }
+            assert!(started.elapsed() < WAIT, "stock did not receive its pong");
+        }
+    });
+    let mut legacy = Raw::connect(host.address, "/slither");
+    assert!(legacy.status().starts_with("HTTP/1.1 101"));
+    legacy.send(&[115, 12, 7, 0, 0, 255]);
+    let started = Instant::now();
+    let reason = loop {
+        if let Some((8, payload)) = legacy.next() {
+            break String::from_utf8(payload[2..].to_vec()).unwrap();
+        }
+        assert!(
+            started.elapsed() < WAIT,
+            "over-budget legacy session stayed open"
+        );
+    };
+    assert_eq!(reason, "Client output queue is full");
+    assert!(!host.host.is_finished());
+    stock_writer.write_all(&Raw::frame(&[251])).unwrap();
+    reader.join().unwrap();
+    assert!(host.finish() > 0);
 }
 
 #[test]

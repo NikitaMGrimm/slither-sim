@@ -38,6 +38,9 @@
 
 ### Fixed
 
+- Dense client broadcasts no longer stop the host when an output queue fills;
+  only the affected connection closes. Remote output uses a byte budget for
+  both protocol 13 and 19, including legacy bursts with thousands of messages.
 - Food removed by moving arena boundaries updates the affected sectors without
   rebuilding the whole food index or revealing waiting ambient births before
   their scheduled update. Survivor colors stay unchanged.
