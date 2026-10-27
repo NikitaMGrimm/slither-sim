@@ -1597,6 +1597,9 @@ impl Simulator {
         // pushes/pickups are mirrored. Reuse verification while that ownership
         // invariant and the mirrored length still hold.
         self.food_cache.begin_mirrored(&self.food);
+        // Every living slot writes its current direction during movement below.
+        // Retained values are never used for a new step or a dead slot.
+        heads.resize(self.snakes.len(), (Point::default(), (0.0, 0.0), 0.0));
         for &i in alive.iter() {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
@@ -1696,7 +1699,7 @@ impl Simulator {
             } else {
                 state.clock = 0.0;
             }
-            (s.head, s.heading) = advance(
+            (s.head, s.heading, heads[i].1) = advance_directed(
                 s.head,
                 s.heading,
                 quantize_heading(a.heading),
@@ -1764,20 +1767,27 @@ impl Simulator {
         // Each living snake's tip, heading direction and scale, as `head_tip` and
         // `strikes` compute them, evaluated once rather than per pair. Dead
         // slots are never probed or tested.
-        heads.clear();
-        heads.extend(self.snakes.iter().map(|s| {
+        for (s, head) in self.snakes.iter().zip(heads.iter_mut()) {
             if !s.alive {
-                return (Point::default(), (0.0, 0.0), 0.0);
+                *head = (Point::default(), (0.0, 0.0), 0.0);
+                continue;
             }
+            // Boundary and kiosk processing leave the moved heading unchanged.
+            // Recompute scale after boost/kiosk mass changes, but reuse direction.
             let scale = scale(s.segments);
-            let direction = (s.heading.cos(), s.heading.sin());
+            let direction = head.1;
+            debug_assert_eq!(
+                (direction.0.to_bits(), direction.1.to_bits()),
+                (s.heading.cos().to_bits(), s.heading.sin().to_bits()),
+                "movement must supply the current heading direction"
+            );
             let r = BODY_RADIUS * scale;
             let tip = Point {
                 x: s.head.x + direction.0 * r,
                 y: s.head.y + direction.1 * r,
             };
-            (tip, direction, scale)
-        }));
+            *head = (tip, direction, scale);
+        }
         // The offline Android client resolves collisions oldest first against
         // newer snakes first, skipping those already dead. We preserve that
         // resolution after moving all snakes; online move/test phasing is unverified.
@@ -1897,7 +1907,8 @@ impl Simulator {
         if !self.food.is_empty() {
             eaters.extend(alive.iter().filter(|&&i| self.snakes[i].alive).map(|&i| {
                 let s = &self.snakes[i];
-                let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                let (center, radius) =
+                    pickup_circle_directed(s.head, heads[i].1, s.speed, s.segments);
                 (i, center, radius, Bounds::between(center, center))
             }));
         }
@@ -2021,7 +2032,7 @@ impl Simulator {
             profile.food_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
         }
-        self.advance_prey(previous, prey_buffers);
+        self.advance_prey(previous, heads, eaters, prey_buffers);
         if PROFILE {
             profile.prey_seconds += clock.unwrap().elapsed().as_secs_f64();
             clock = Some(Instant::now());
@@ -2306,7 +2317,13 @@ impl Simulator {
         }
     }
 
-    fn advance_prey(&mut self, previous: &[Point], buffers: &mut PreyBuffers) {
+    fn advance_prey(
+        &mut self,
+        previous: &[Point],
+        heads: &[(Point, (f64, f64), f64)],
+        food_circles: &[(usize, Point, f64, Bounds)],
+        buffers: &mut PreyBuffers,
+    ) {
         let c = &self.config;
         let p = &c.prey;
         let target = if c.dynamic_radius {
@@ -2353,16 +2370,51 @@ impl Simulator {
         // The same pickup circle as food. Eating prey changes only mass, so each
         // living snake's circle and lead stay fixed for this whole phase.
         circles.clear();
-        circles.extend(self.snakes.iter().map(|s| {
-            s.alive.then(|| {
-                let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
-                let lead = Point {
-                    x: center.x - s.head.x,
-                    y: center.y - s.head.y,
-                };
-                (center, radius, lead)
-            })
-        }));
+        if food_circles.is_empty() {
+            // Empty food skips its circle pass; prey still needs current geometry.
+            circles.extend(self.snakes.iter().enumerate().map(|(i, s)| {
+                s.alive.then(|| {
+                    let (center, radius) =
+                        pickup_circle_directed(s.head, heads[i].1, s.speed, s.segments);
+                    let lead = Point {
+                        x: center.x - s.head.x,
+                        y: center.y - s.head.y,
+                    };
+                    (center, radius, lead)
+                })
+            }));
+        } else {
+            // Food only changes fam. All current lives, heads, headings, speeds
+            // and integer segment counts still match the food-circle pass.
+            // Keep slot indexing and recompute the same center-minus-head lead.
+            // research/performance/2026-10-27-core-heading-geometry/REPORT.md
+            circles.resize(self.snakes.len(), None);
+            for &(i, center, radius, _) in food_circles {
+                let s = &self.snakes[i];
+                #[cfg(debug_assertions)]
+                {
+                    let expected = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                    assert_eq!(
+                        (center.x.to_bits(), center.y.to_bits(), radius.to_bits()),
+                        (
+                            expected.0.x.to_bits(),
+                            expected.0.y.to_bits(),
+                            expected.1.to_bits()
+                        ),
+                        "food pickup must preserve prey-circle geometry"
+                    );
+                    assert!(s.alive, "food pickup must preserve living slots");
+                }
+                circles[i] = Some((
+                    center,
+                    radius,
+                    Point {
+                        x: center.x - s.head.x,
+                        y: center.y - s.head.y,
+                    },
+                ));
+            }
+        }
         // Index each living snake's swept circle path for many prey. Beyond the
         // largest radius plus one unit, a sweep's both ends lie past the
         // `sweep_misses` limit on one axis, so skipped pairs never eat. Capping
@@ -2666,8 +2718,8 @@ impl Simulator {
 }
 
 /// Working memory kept between steps, so that small worlds do not pay for an
-/// allocation per buffer per tick. Every buffer is cleared before use and
-/// nothing in it outlives a step, so cloned and restored worlds start empty.
+/// allocation per buffer per tick. Buffers are reset or overwritten before use; no value is trusted across steps.
+/// Cloned and restored worlds start empty.
 #[derive(Default)]
 struct StepBuffers {
     alive: Vec<usize>,
@@ -2879,6 +2931,90 @@ fn find_eater<const PROFILE: bool>(
 mod food_pickup_order_tests {
     use super::*;
     use crate::RadiusUpdate;
+
+    #[test]
+    fn shared_prey_geometry_matches_fresh_circles_after_food_gain() {
+        for dt in [LOOP_SECONDS, LOOP_SECONDS * 2.0, LOOP_SECONDS * 4.0] {
+            let mut config = Config::sandbox();
+            config.radius = 4096.;
+            config.dt = dt;
+            config.food_count = 0;
+            config.ambient_replenish_per_second = 0.;
+            config.prey.count = 24;
+            let mut world = Simulator::new(WorldOptions {
+                seed: 47,
+                config,
+                population: InitialPopulation::Placed {
+                    ids: (0..40).map(|i| i.to_string()).collect(),
+                    placement: Placement::TestRing,
+                },
+            })
+            .unwrap();
+            world.record_events(checkpoint::EventRecording {
+                pickups: true,
+                food_births: true,
+            });
+            for i in (2..40).step_by(7) {
+                world.retire(i).unwrap();
+            }
+            let previous: Vec<_> = world
+                .snakes
+                .iter()
+                .map(|s| Point {
+                    x: s.head.x - 3.,
+                    y: s.head.y + 4.,
+                })
+                .collect();
+            let heads: Vec<_> = world
+                .snakes
+                .iter()
+                .map(|s| {
+                    (
+                        head_tip(s.head, s.heading, s.segments),
+                        (s.heading.cos(), s.heading.sin()),
+                        scale(s.segments),
+                    )
+                })
+                .collect();
+            let food_circles: Vec<_> = world
+                .snakes
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.alive)
+                .map(|(i, s)| {
+                    let (center, radius) = pickup_circle(s.head, s.heading, s.speed, s.segments);
+                    (i, center, radius, Bounds::between(center, center))
+                })
+                .collect();
+            world.prey[0].position = food_circles[0].1;
+            // Food can leave several pending anchors' worth of fam. It does not
+            // advance those anchors or alter the circle's integer segment input.
+            for (i, s) in world.snakes.iter_mut().enumerate() {
+                if s.alive {
+                    s.fam += [0., 0.999, 1.001, 20.][i % 4];
+                    Simulator::update_mass(s);
+                }
+            }
+            let mut reference = world.clone();
+            world.advance_prey(
+                &previous,
+                &heads,
+                &food_circles,
+                &mut PreyBuffers::default(),
+            );
+            reference.advance_prey(&previous, &heads, &[], &mut PreyBuffers::default());
+            assert_eq!(world.pickup_events(), reference.pickup_events());
+            assert!(
+                !world.pickup_events().unwrap().is_empty(),
+                "exercise consumption"
+            );
+            assert_eq!(
+                serde_json::to_vec(&world.checkpoint().unwrap()).unwrap(),
+                serde_json::to_vec(&reference.checkpoint().unwrap()).unwrap(),
+                "dt {dt}"
+            );
+        }
+    }
 
     #[test]
     fn ordered_food_compaction_matches_stable_retention_bit_for_bit() {
