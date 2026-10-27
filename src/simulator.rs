@@ -2001,7 +2001,12 @@ impl Simulator {
             for &(findex, _) in hits.iter() {
                 eaten[findex] = true;
             }
-            self.food_cache.remove(eaten);
+            // Both pickup paths append hits in reverse food order. Reversing them
+            // lets the cache compact survivor ranges without changing that order.
+            self.food_cache.remove(
+                self.food.len(),
+                hits.iter().rev().map(|&(findex, _)| findex),
+            );
             let mut i = 0;
             self.food.retain(|_| {
                 let keep = !eaten[i];
@@ -2790,6 +2795,70 @@ fn find_eater<const PROFILE: bool>(
         }
     }
     eater
+}
+
+#[cfg(test)]
+mod food_pickup_order_tests {
+    use super::*;
+
+    #[test]
+    fn dense_hits_keep_reverse_pellet_order_nearest_head_and_lexical_ties() {
+        let mut world = Simulator::new(WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: InitialPopulation::Placed {
+                ids: vec!["z".into(), "a".into()],
+                placement: Placement::TestRing,
+            },
+        })
+        .unwrap();
+        world.snakes[0].head = Point { x: -10.0, y: 0.0 };
+        world.snakes[1].head = Point { x: 10.0, y: 0.0 };
+        // Synthetic overlapping pickup circles isolate the existing selection
+        // contract: nearest head, lexical ID on ties, reverse pellet order.
+        let center = Point { x: 0.0, y: 0.0 };
+        let eaters: Vec<_> = (0..2)
+            .map(|i| (i, center, 36.0, Bounds::between(center, center)))
+            .collect();
+        let food: Vec<_> = [0.0, 100.0, -1.0, 1.0]
+            .into_iter()
+            .map(|x| Food {
+                x,
+                y: 0.0,
+                value: 1.0,
+                size: None,
+                origin: None,
+            })
+            .collect();
+        let mut grid = EaterGrid::default();
+        assert!(grid.build(eaters.iter().map(|&(_, c, r, _)| (c, r)), 4096));
+        let mut profile = StepProfile::default();
+        let mut hits = Vec::new();
+        dense_hits::<false>(
+            &grid,
+            &world.snakes,
+            &eaters,
+            &food,
+            &mut hits,
+            &mut profile,
+        );
+        assert_eq!(hits, [(3, 1), (2, 0), (0, 1)]);
+        let scanned: Vec<_> = food
+            .iter()
+            .enumerate()
+            .rev()
+            .filter_map(|(findex, f)| {
+                find_eater::<false>(
+                    &world.snakes,
+                    f.point(),
+                    eaters.iter().copied(),
+                    &mut profile,
+                )
+                .map(|eater| (findex, eater))
+            })
+            .collect();
+        assert_eq!(hits, scanned);
+    }
 }
 
 #[cfg(test)]
