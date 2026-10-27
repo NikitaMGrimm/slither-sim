@@ -4,6 +4,8 @@
 
 ### Added
 
+- Document turn-count evidence and the measurements still needed to resolve it
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-turn-count-phase/REPORT.md)).
 - The hosting guide explains how to build the server for the machine's own
   CPU. In our tests its game output matched the portable build exactly, and
   its median cycle count was 3.5–4.5% lower on one shared development machine;
