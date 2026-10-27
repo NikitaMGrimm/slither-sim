@@ -66,7 +66,7 @@ unqualified for 500, and unusable as an untraced kernel-cost comparison.
 ## Permanent protocol13 cost
 
 Matched physical worlds: 853 steady all 500-alive ticks, same as the
-[candidate-union study](https://github.com/NikitaMGrimm/slither-sim/blob/49e3c8e02f888f28e47de9f767d06ec8978e9416/research/performance/2026-10-27-host-snake-candidates/REPORT.md).
+[candidate-union study](../2026-10-27-host-snake-candidates/REPORT.md).
 Extra sim user instructions per legacy recipient/tick: half13 **1,605**
 (1,601–1,617); all13 **1,573** (1,571–1,584). All13 conversion 0.302M/tick,
 framing excluding conversion 0.936M vs stock 0.470M; U rebuild/decode zero.
