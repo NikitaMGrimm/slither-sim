@@ -54,8 +54,8 @@ use tungstenite::{
 
 pub const PATH: &str = "/slither";
 pub const DEFAULT_PORT: u16 = 8766;
-/// Automatic bot handshake: preserve physical food even at decorative wire keys.
-/// An HTTP header keeps the stock binary protocol and other servers unchanged.
+/// Automatic bot opt-in to physical food and the SlitherSim rules extension.
+/// Stock browser sockets never request this header.
 pub(crate) const PHYSICAL_FOOD_HEADER: &str = "x-slithersim-food";
 // The budgets and timeouts below are host resource policies, not protocol or
 // physics limits.

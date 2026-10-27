@@ -317,7 +317,8 @@ Kill scores appear in `serve` frames as `snakes.killScore`, in the C ABI and
 Python as `snake_kill_score`, and in Rust as `Simulator::kill_score(slot)`.
 Rust `Observation` omits the rolling score. Geometric frames carry pit
 geometry and the floor setting in [`rules`](bot-api.md#frames); `Observation`
-and portable `ClientFrame` omit them, so retain world config separately. Portable
+omits them. Portable `ClientFrame.rules` receives the same live settings through
+the opt-in [SlitherSim extension](raw-server.md#slithersim-rules-extension). Portable
 clients receive per-life kills and the same leaderboard number column
 as the browser (rolling kills when enabled), without a distinct pit death reason.
 At the base size the stock browser shows the pit edge as 749 decorative pellets:

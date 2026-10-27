@@ -139,9 +139,23 @@ mod tests {
             cases.push(packet);
         }
         for value in [0., -1., f64::NAN, f64::INFINITY] {
+            for (flag, offset) in [(1, 4), (4, 16)] {
+                let mut packet = valid.clone();
+                packet[3] = flag;
+                packet[offset..offset + 8].copy_from_slice(&value.to_be_bytes());
+                cases.push(packet);
+            }
+        }
+        for min in [0_u32, u32::MAX] {
             let mut packet = valid.clone();
-            packet[3] = 1;
-            packet[4..12].copy_from_slice(&value.to_be_bytes());
+            packet[3] = 2 | 8;
+            packet[12..16].copy_from_slice(&min.to_be_bytes());
+            cases.push(packet);
+        }
+        // Absent fields must not hide nonzero values.
+        for offset in [4, 12, 16] {
+            let mut packet = valid.clone();
+            packet[offset] = 1;
             cases.push(packet);
         }
         let mut client = ClientState::new();
