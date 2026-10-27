@@ -106,7 +106,8 @@ fn pellet_index_matches_scan_through_public_edits_compaction_and_restore() {
                     pickups: true,
                     food_births: false,
                 },
-                ..Default::default()
+                #[cfg(feature = "parallel")]
+                parallel: false,
             },
         )
         .unwrap()
