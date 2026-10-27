@@ -78,6 +78,11 @@
   minimap tick takes 13M instead of 351M instructions and the whole fixture
   runs 7.2% fewer; clients that don't opt in are unaffected
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-full-map-sharing/REPORT.md)).
+- Snake coverage keeps unchanged cell memberships between broadcasts instead
+  of rebuilding the grid each tick. Exact visibility tests and wire order are
+  unchanged; the 500-player official fixture runs 11.6–12.1% fewer instructions
+  with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-coverage-cells/REPORT.md)).
 - Food pickup removes eaten pellets from its occupancy cache by index and
   copies the surviving ranges, instead of scanning the whole cache twice.
   Output is byte-identical, and the 500-player official fixture runs 4.0–4.2%
