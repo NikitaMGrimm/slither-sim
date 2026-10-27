@@ -23,7 +23,7 @@ fn received_seats() -> (Vec<Seat>, f64) {
     let at = backend.time();
     let seats = (0..4)
         .map(|slot| {
-            let mut seat = Seat::new(slot, 0.042);
+            let mut seat = Seat::new(slot, 0, 0.042);
             for record in backend.drain_records(slot).unwrap() {
                 replay_record(&mut seat.state, &record).unwrap();
             }
