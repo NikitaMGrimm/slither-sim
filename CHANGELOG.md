@@ -24,6 +24,10 @@
 
 ### Performance
 
+- Each player's food-sector subscription is updated once per tick instead of
+  twice. Output is byte-identical, and the 500-player official fixture runs
+  1.9–2.1% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-interest-refresh/REPORT.md)).
 - Each tick, a snake's heading direction is computed once during movement and
   reused for its collision and pickup checks, and prey reuse the pickup circles
   already computed for food. Output is byte-identical, and the 500-player
