@@ -1228,6 +1228,7 @@ impl Gateway {
         // Only service creates slot owners, and deliveries run outside it.
         // Rebuild while compacting so both newly joined and moved sessions are
         // indexed before the next delivery, without another session scan.
+        // research/performance/2026-10-27-host-delivery-index/REPORT.md
         self.sessions.retain(|session| {
             if matches!(session.stage, Stage::Closed) {
                 return false;
