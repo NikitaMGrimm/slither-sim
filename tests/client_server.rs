@@ -594,13 +594,17 @@ fn stock_default_login_uses_bare_messages_and_routes_controls() {
 #[test]
 fn legacy_handshake_login_controls_and_reconnect_use_individual_protocol13_messages() {
     let host = Running::start(config(1, 0));
-    for (selector, request_session) in [(12, true), (11, false)] {
+    for (selector, request_session, request) in [
+        (12, true, &[99, 4][..]),
+        (11, false, &[99][..]),
+        (12, false, &[99, 3][..]),
+    ] {
         let mut client = Raw::connect(host.address, "/slither");
         assert!(client.status().starts_with("HTTP/1.1 101"));
         if request_session {
             client.send(&[4]);
         }
-        client.send(&[99, 4]);
+        client.send(request);
         let challenge = client.binary();
         assert_eq!(&challenge[..3], &[0, 0, b'6']);
         client.send(b"CGLRYGPZKWJXMCTLEYTPMKJJ");
@@ -651,6 +655,61 @@ fn legacy_handshake_login_controls_and_reconnect_use_individual_protocol13_messa
         }
     }
     host.finish();
+}
+
+/// Synthetic format fixture, not third-party code or a recorded login.
+#[test]
+fn short_modern_login_uses_protocol19_after_the_shared_challenge() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/browser-admission.json")).unwrap();
+    let bytes = |key: &str| -> Vec<u8> {
+        fixture[key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u8)
+            .collect()
+    };
+    let host = Running::start(config(1, 0));
+    let mut client = Raw::connect(host.address, "/slither");
+    assert!(client.status().starts_with("HTTP/1.1 101"));
+    client.send(&[4]);
+    client.send(&bytes("request"));
+    let challenge = client.binary();
+    assert_eq!(&challenge[..3], &[0, 0, b'6']);
+    client.send(fixture["replyAscii"].as_str().unwrap().as_bytes());
+    client.send(&bytes("login"));
+    let setup = packets(&client.binary()[2..]).remove(0);
+    assert_eq!(setup[0], b'a');
+    assert_eq!(setup[23], fixture["setupProtocol"].as_u64().unwrap() as u8);
+    let started = Instant::now();
+    let mut session = false;
+    let mut appearance = false;
+    client.send(&[100]);
+    client.send(&[253]);
+    client.send(&[254]);
+    client.send(&[251]);
+    loop {
+        for packet in packets(&client.binary()[2..]) {
+            session |= packet[0] == b'S';
+            if packet[0] == b's' && packet.len() > 9 {
+                let name = fixture["nickname"].as_str().unwrap().as_bytes();
+                assert_eq!(packet[15], fixture["skin"].as_u64().unwrap() as u8);
+                assert_eq!(usize::from(packet[22]), name.len());
+                assert_eq!(&packet[23..23 + name.len()], name);
+                let custom = bytes("customSkin");
+                let at = 23 + name.len();
+                assert_eq!(usize::from(packet[at]), custom.len());
+                assert_eq!(&packet[at + 1..at + 1 + custom.len()], custom);
+                appearance = true;
+            }
+            if packet[0] == b'p' && session && appearance {
+                host.finish();
+                return;
+            }
+        }
+        assert!(started.elapsed() < WAIT, "short modern login did not join");
+    }
 }
 
 #[test]
