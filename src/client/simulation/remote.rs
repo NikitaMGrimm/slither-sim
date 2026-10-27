@@ -194,8 +194,8 @@ impl RawSimulator {
     pub(crate) fn take(&mut self, slot: usize) -> Result<Vec<(f64, Vec<u8>)>, String> {
         self.remote(slot)?;
         let connection = &mut self.backend.slots[slot].connection;
-        if connection.output_overflow {
-            return Err("Client output queue is full".into());
+        if let Some(reason) = &connection.output_fault {
+            return Err(reason.clone());
         }
         Ok(connection.take_downlink())
     }

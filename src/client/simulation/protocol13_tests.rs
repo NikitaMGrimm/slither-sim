@@ -132,3 +132,31 @@ fn battledome_legacy_keeps_kill_board_pit_raster_and_edge_food() {
         Minimap::from_world(&sim.backend.world, 256).unwrap()
     );
 }
+
+#[test]
+fn a_legacy_conversion_fault_closes_only_that_recipient() {
+    let config = SimulationConfig {
+        agents: 2,
+        world: crate::Config::sandbox(),
+        ..Default::default()
+    };
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    for slot in 0..2 {
+        sim.connect(slot, PlayerAppearance::default()).unwrap();
+    }
+    sim.protocol13(1);
+    sim.advance_ticks(5).unwrap();
+    let now = sim.time();
+    // Protocol 13 has no layout for this code; stock frames it unchanged.
+    for slot in 0..2 {
+        sim.backend.emit(slot, now, &[vec![254, 1, 2]]).unwrap();
+    }
+    assert!(sim.take(0).is_ok());
+    let reason = sim.take(1).unwrap_err();
+    assert_eq!(
+        reason,
+        "Protocol-13 output failed: No protocol-13 encoding for code 254"
+    );
+    sim.advance_ticks(5).unwrap();
+    assert!(sim.take(0).is_ok());
+}

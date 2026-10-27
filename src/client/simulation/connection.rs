@@ -56,7 +56,9 @@ pub(super) struct Connection {
     pub(super) uplink: VecDeque<(f64, Uplink)>,
     pub(super) downlink: VecDeque<(f64, Vec<u8>)>,
     pub(super) downlink_bytes: usize,
-    pub(super) output_overflow: bool,
+    /// Why this remote recipient's output stopped. `RawSimulator::take`
+    /// reports it to the host's per-session close path.
+    pub(super) output_fault: Option<String>,
     /// The server has received the connect and sent setup.
     pub(super) setup: bool,
     /// Game over was sent; afterwards only pings and victory text are accepted.
@@ -103,6 +105,16 @@ impl Connection {
     pub(super) fn take_downlink(&mut self) -> Vec<(f64, Vec<u8>)> {
         self.downlink_bytes = 0;
         self.downlink.drain(..).collect()
+    }
+
+    /// Stop a remote recipient's output without aborting the shared tick: an
+    /// output fault belongs to that client, so the host closes only its session.
+    fn fail_output(&mut self, reason: String) {
+        self.output_fault = Some(reason);
+        self.setup = false;
+        self.downlink.clear();
+        self.downlink_bytes = 0;
+        self.uplink.clear();
     }
 }
 
@@ -327,12 +339,22 @@ impl SimulatorBackend {
         packets: &[Vec<u8>],
         physical: Option<&[Vec<u8>]>,
     ) -> Result<(), String> {
-        if self.slots[slot].connection.output_overflow {
+        if self.slots[slot].connection.output_fault.is_some() {
             return Ok(());
         }
+        let remote = self.slots[slot].remote;
         let converted;
         let (packets, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
-            converted = legacy.packets(packets)?;
+            converted = match legacy.packets(packets) {
+                Ok(converted) => converted,
+                // A conversion fault is this recipient's, like an overflow.
+                Err(reason) if remote => {
+                    let reason = format!("Protocol-13 output failed: {reason}");
+                    self.slots[slot].connection.fail_output(reason);
+                    return Ok(());
+                }
+                Err(reason) => return Err(reason),
+            };
             // Keep the shared latency RNG on the original physical grouping,
             // even if six-byte legacy food or U maps require more frames.
             (converted.as_slice(), Some(physical.unwrap_or(packets)))
@@ -349,7 +371,6 @@ impl SimulatorBackend {
             frame_groups(packets)
         };
         let latency = self.player_latency.for_slot(slot, &self.config.latency);
-        let remote = self.slots[slot].remote;
         let connection = &mut self.slots[slot].connection;
         if !remote && connection.downlink.len() + groups.len() > MAX_IN_FLIGHT {
             return Err("Downlink queue is full".into());
@@ -386,13 +407,7 @@ impl SimulatorBackend {
                     .downlink_bytes
                     .saturating_add(output_cost(&bytes));
                 if used > MAX_REMOTE_OUTPUT_BYTES {
-                    // RawSimulator::take reports this to the host's normal
-                    // per-session close path. Never abort the shared tick.
-                    connection.output_overflow = true;
-                    connection.setup = false;
-                    connection.downlink.clear();
-                    connection.downlink_bytes = 0;
-                    connection.uplink.clear();
+                    connection.fail_output("Client output queue is full".into());
                     return Ok(());
                 }
                 connection.downlink_bytes = used;
