@@ -345,7 +345,7 @@ impl SimulatorBackend {
         }
         let remote = self.slots[slot].remote;
         let (groups, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
-            let converted = match legacy.packets(packets) {
+            let converted = match legacy.packets(packets, &mut self.legacy_maps) {
                 Ok(converted) => converted,
                 // A conversion fault is this recipient's, like an overflow.
                 Err(reason) if remote => {

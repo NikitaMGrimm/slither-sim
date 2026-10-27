@@ -111,6 +111,9 @@ pub struct SimulatorBackend {
     food_epoch: u64,
     /// Next minimap and leaderboard periods; see `broadcast::clock_due`.
     next_minimap: u64,
+    /// Full U conversions live for one broadcast; recipients retain immutable
+    /// decoded baselines independently of the broadcast-local packet cache.
+    legacy_maps: crate::client::encode13::FullMapCache,
     next_leaderboard: u64,
     prey_clocks: BTreeMap<u64, PreyClock>,
     reports: Vec<SnakeReports>,
@@ -195,6 +198,7 @@ impl SimulatorBackend {
             food_index: FoodIndex::default(),
             food_epoch: 0,
             next_minimap: 1,
+            legacy_maps: crate::client::encode13::FullMapCache::default(),
             next_leaderboard: 1,
             prey_clocks: BTreeMap::new(),
             reports: vec![SnakeReports::default(); config.agents],
