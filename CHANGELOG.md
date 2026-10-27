@@ -58,6 +58,13 @@
 
 ### Performance
 
+- Hosts encode each minimap once, and reuse each delta for every player who
+  holds the same previous map, instead of encoding both per player. Minimap
+  ticks were a large spike: with 500 players they took 291 million
+  simulation-thread instructions against 16 million on other ticks, and now
+  take 19 million. Battledome with 64 players drops from 112 to 12 million.
+  Packets are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-minimap-sharing/REPORT.md)).
 - Host food-sector listings track subscription changes incrementally instead
   of rebuilding the union of every client's subscriptions each tick. Packet
   bytes and order are unchanged; the official-500 fixture uses 2.5% fewer user

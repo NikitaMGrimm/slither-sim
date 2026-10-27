@@ -3,6 +3,7 @@ use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::KnownPrey,
     food::{FoodChanges, food_identity, food_updates},
+    minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
     snakes::{CoverageGrid, KnownSnake, SnakeDeltaCache, covered, full},
 };
@@ -538,37 +539,25 @@ impl SimulatorBackend {
     }
 
     /// A due minimap for a living connection that knows its own snake, as a
-    /// delta when shorter. `map` is built once per broadcast.
+    /// delta when shorter. Raster and encodings are shared within this broadcast.
     pub(super) fn minimap(
         &mut self,
         slot: usize,
-        map: &mut Option<Minimap>,
+        map: &mut Option<MinimapBroadcast>,
     ) -> Result<Option<Vec<u8>>, String> {
         let connection = &self.slots[slot].connection;
         if !self.world.snakes()[slot].alive || !connection.snakes.contains_key(slot) {
             return Ok(None);
         }
         if map.is_none() {
-            *map = Some(Minimap::from_world(
+            *map = Some(MinimapBroadcast::new(Minimap::from_world(
                 &self.world,
                 self.config.minimap_side(),
-            )?);
+            )?));
         }
-        let map = map.as_ref().expect("minimap was just constructed");
-        let mut packet = encode::minimap(map);
-        if let Some(previous) = connection
-            .minimap_sent
-            .as_ref()
-            .filter(|previous| previous.side == map.side)
-        {
-            let delta = encode::minimap_delta(previous, map)?;
-            // Shortest valid encoding is a local compression choice, not
-            // a recovered server policy; see docs/server-rules.md.
-            if delta.len() < packet.len() {
-                packet = delta;
-            }
-        }
-        self.slots[slot].connection.minimap_sent = Some(map.clone());
+        let map = map.as_mut().expect("minimap was just constructed");
+        let packet = map.packet19(connection.minimap_sent.as_ref())?;
+        self.slots[slot].connection.minimap_sent = Some(map.map.clone());
         Ok(Some(packet))
     }
 

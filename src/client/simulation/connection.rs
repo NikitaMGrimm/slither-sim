@@ -11,6 +11,7 @@ use crate::{
 use std::{
     collections::{BTreeMap, VecDeque},
     f64::consts::TAU,
+    sync::Arc,
 };
 
 /// Messages in flight per direction of one connection before the run fails.
@@ -83,7 +84,7 @@ pub(super) struct Connection {
     pub(super) prey: BTreeMap<u64, KnownPrey>,
     pub(super) radius: u32,
     /// XOR bases belong to recipients: missed maps and reconnects differ.
-    pub(super) minimap_sent: Option<Minimap>,
+    pub(super) minimap_sent: Option<Arc<Minimap>>,
     /// The connection's own snake has appeared; HUD packets wait for it.
     pub(super) appeared: bool,
     /// Pongs owed after setup; they lead the next broadcast.
