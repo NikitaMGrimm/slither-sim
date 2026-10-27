@@ -1,0 +1,2855 @@
+{
+  "synthetic": true,
+  "cases": [
+    {
+      "delayMs": 147,
+      "wholeState": false,
+      "counts": {
+        "control": 12,
+        "delay": 12
+      },
+      "sensitivities": [
+        {
+          "floor": 2,
+          "verdict": "inconclusive",
+          "control": [
+            -102,
+            -38
+          ],
+          "delayed": [
+            -122,
+            -58
+          ],
+          "shift": [
+            -84,
+            44
+          ],
+          "expectedShift": -26.684487028301884,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 4,
+          "verdict": "inconclusive",
+          "control": [
+            -104,
+            -36
+          ],
+          "delayed": [
+            -124,
+            -56
+          ],
+          "shift": [
+            -88,
+            48
+          ],
+          "expectedShift": -26.684487028301884,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 8,
+          "verdict": "inconclusive",
+          "control": [
+            -108,
+            -32
+          ],
+          "delayed": [
+            -128,
+            -52
+          ],
+          "shift": [
+            -96,
+            56
+          ],
+          "expectedShift": -26.684487028301884,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        }
+      ],
+      "rows": [
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        }
+      ]
+    },
+    {
+      "delayMs": 147,
+      "wholeState": true,
+      "counts": {
+        "control": 12,
+        "delay": 12
+      },
+      "sensitivities": [
+        {
+          "floor": 2,
+          "verdict": "inconclusive",
+          "control": [
+            -102,
+            -38
+          ],
+          "delayed": [
+            -102,
+            -38
+          ],
+          "shift": [
+            -64,
+            64
+          ],
+          "expectedShift": -26.684487028301884,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 4,
+          "verdict": "inconclusive",
+          "control": [
+            -104,
+            -36
+          ],
+          "delayed": [
+            -104,
+            -36
+          ],
+          "shift": [
+            -68,
+            68
+          ],
+          "expectedShift": -26.684487028301884,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 8,
+          "verdict": "inconclusive",
+          "control": [
+            -108,
+            -32
+          ],
+          "delayed": [
+            -108,
+            -32
+          ],
+          "shift": [
+            -76,
+            76
+          ],
+          "expectedShift": -26.684487028301884,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        }
+      ],
+      "rows": [
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": -26.684487028301884,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 147,
+          "delaySteps": 21,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": -26.684487028301884,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        }
+      ]
+    },
+    {
+      "delayMs": 448,
+      "wholeState": false,
+      "counts": {
+        "control": 12,
+        "delay": 12
+      },
+      "sensitivities": [
+        {
+          "floor": 2,
+          "verdict": "compensation",
+          "control": [
+            -102,
+            -38
+          ],
+          "delayed": [
+            -182,
+            -118
+          ],
+          "shift": [
+            -144,
+            -16
+          ],
+          "expectedShift": -81.32415094339622,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 4,
+          "verdict": "compensation",
+          "control": [
+            -104,
+            -36
+          ],
+          "delayed": [
+            -184,
+            -116
+          ],
+          "shift": [
+            -148,
+            -12
+          ],
+          "expectedShift": -81.32415094339622,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 8,
+          "verdict": "compensation",
+          "control": [
+            -108,
+            -32
+          ],
+          "delayed": [
+            -188,
+            -112
+          ],
+          "shift": [
+            -156,
+            -4
+          ],
+          "expectedShift": -81.32415094339622,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        }
+      ],
+      "rows": [
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        }
+      ]
+    },
+    {
+      "delayMs": 448,
+      "wholeState": true,
+      "counts": {
+        "control": 12,
+        "delay": 12
+      },
+      "sensitivities": [
+        {
+          "floor": 2,
+          "verdict": "no compensation",
+          "control": [
+            -102,
+            -38
+          ],
+          "delayed": [
+            -102,
+            -38
+          ],
+          "shift": [
+            -64,
+            64
+          ],
+          "expectedShift": -81.32415094339622,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 4,
+          "verdict": "no compensation",
+          "control": [
+            -104,
+            -36
+          ],
+          "delayed": [
+            -104,
+            -36
+          ],
+          "shift": [
+            -68,
+            68
+          ],
+          "expectedShift": -81.32415094339622,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 8,
+          "verdict": "no compensation",
+          "control": [
+            -108,
+            -32
+          ],
+          "delayed": [
+            -108,
+            -32
+          ],
+          "shift": [
+            -76,
+            76
+          ],
+          "expectedShift": -81.32415094339622,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        }
+      ],
+      "rows": [
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": -81.32415094339622,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 448,
+          "delaySteps": 64,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": -81.32415094339622,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": true,
+          "arm": "delay",
+          "qualified": true
+        }
+      ]
+    },
+    {
+      "delayMs": 450,
+      "model": "no rewind",
+      "counts": {
+        "control": 12,
+        "delay": 12
+      },
+      "sensitivities": [
+        {
+          "floor": 2,
+          "verdict": "no compensation",
+          "control": [
+            -102,
+            -38
+          ],
+          "delayed": [
+            -102,
+            -38
+          ],
+          "shift": [
+            -64,
+            64
+          ],
+          "expectedShift": -81.68720518867923,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 4,
+          "verdict": "no compensation",
+          "control": [
+            -104,
+            -36
+          ],
+          "delayed": [
+            -104,
+            -36
+          ],
+          "shift": [
+            -68,
+            68
+          ],
+          "expectedShift": -81.68720518867923,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        },
+        {
+          "floor": 8,
+          "verdict": "no compensation",
+          "control": [
+            -108,
+            -32
+          ],
+          "delayed": [
+            -108,
+            -32
+          ],
+          "shift": [
+            -76,
+            76
+          ],
+          "expectedShift": -81.68720518867923,
+          "uncertainty": "deterministic identification interval with per-arm position floor; not a confidence interval"
+        }
+      ],
+      "rows": [
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -240,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -200,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -160,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -120,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -80,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 400,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -40,
+          "predictedShift": 0,
+          "repeat": 0,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -220,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 0,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -180,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 1,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -140,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 2,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": false,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -100,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 3,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -60,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 4,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "control",
+          "qualified": true
+        },
+        {
+          "contact": true,
+          "crossingStep": 417,
+          "delayMs": 0,
+          "delaySteps": 0,
+          "geometry": "finite-tail-crossing",
+          "offset": -20,
+          "predictedShift": 0,
+          "repeat": 1,
+          "segments": 7,
+          "speed": 181.5271226415094,
+          "step": 5,
+          "synthetic": true,
+          "tailAtCrossing": {
+            "x": 279.09,
+            "y": 0
+          },
+          "wholeState": false,
+          "arm": "delay",
+          "qualified": true
+        }
+      ]
+    }
+  ]
+}

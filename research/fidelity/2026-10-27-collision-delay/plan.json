@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "planFormat": "collision-delay-research-v1",
+  "studyId": "collision-delay-20261027-v1",
+  "title": "Coarse current-state versus peer-rewind collision experiment",
+  "kind": "exploratory",
+  "dataOrigin": "official-server",
+  "frozenAtUtc": "2026-10-27T09:29:51.673038+00:00",
+  "baseCommit": "20e5064378ae8cabc7ca50cceacdbe339e6846b4",
+  "question": "Does added symmetric local delay shift an official head-past-body contact boundary in packet-derived current positions, as specified peer-only rewind predicts?",
+  "hypotheses": [
+    "H_current: collision is tested against current state; added delay changes achieved trajectories but does not shift the contact boundary expressed in achieved packet-derived geometry.",
+    "H_peer_rewind: when testing the delayed probe, the reference body is rewound by an extra 450 ms while the probe uses its current/input-predicted state. A perpendicular pass behind the finite tail shifts the signed contact boundary approximately -v_reference*0.450, about -81.7 units at 181.5 units/s.",
+    "Whole-state rewind of both trajectories is a distinct hypothesis that this constant-motion design cannot distinguish from current-state testing. A null cannot rule it out.",
+    "Fixed display delay is present in both arms and cancels from the arm difference. It is not measured here. Server rewind caps, stale ping estimation and other input policies may also make the result inconclusive."
+  ],
+  "method": "Before official game sockets: production loopback host and both-delay-direction queues, ordinary raw recorder/audit and packet-prefix analysis; separate analytical and production-Simulator post-hoc peer-rewind positive controls, plus current/whole-state negatives. Then sequentially scout active decoded IPv4 entries in listed order, one socket at a time. Stop at first near-zero eligible candidate, else stop after all active entries or 48 scouts. Only an eligible candidate permits one paired invocation (maximum 3600 s, no replacement invocation). Reference client 0 has no added delay; probe client 1 has 0 ms in control and 450 ms in each direction in delay. Delay challenge/login/gameplay/ping traffic in ordered queues. Standard raw frame times are actual socket ingress/egress; delayed application/request metadata is separate. Stage a finite-tail perpendicular pass behind the reference body; a straight infinite/tandem lateral pass is non-discriminating. Keep identities during transient interference, restage toward the center and retain every interruption. Close both sockets only after a terminal encounter and 1450 ms post-event observation; await both closes before any replacement. Admissions must be at least eight seconds apart; any early close stops the pair invocation and requires a 30 s back-off for scouting.",
+  "sampling": {
+    "unit": "One scheduled paired encounter; two phase/order blocks within one selected endpoint are dependent, not independent server replications.",
+    "attempts": 1,
+    "selection": "24 scheduled encounters: 12 per arm. For repeat in [0,1] and step in [0..5], target signed tail-passing offset=-240+20*(2*step+repeat), giving offsets -240..-20 by 20. Each offset has control and delay, using control/delay for even (repeat+step) and delay/control otherwise. No replacement for excluded or failed slots; stop for the global deadline, early close/join failure, recorder/source fault or population gate failure. All scout rejects, interrupted stages and censored slots remain retained.",
+    "independence": "Single endpoint/vantage session; lives and arms are dependent. No p-values or population confidence interval. Report deterministic identification intervals and zero cells."
+  },
+  "discovery": {
+    "url": "https://slither.io/i80124.txt",
+    "clientUrl": "https://slither.io/s/game1107249518.js",
+    "listSha256": "7314065834215b674c978f6a6a2983f67f7c1d0c929976787ae65c50dfb5defc",
+    "clientSha256": "5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095",
+    "decoderExcerptSha256": "c5e6d1ab0a907865098cf2db1e55cd5155df133959e65454b18b96dff5ccc455",
+    "decodedEntries": 141,
+    "activeIpv4Entries": 27,
+    "maximumScouts": 48,
+    "selection": "First first-leaderboard population <=6 (self plus <=5 others), with <=5 visible other snakes. Server bots count as others. Setup and first leaderboard must arrive within 12 s. List advertised counts do not substitute for decoded leaderboard totals. Pair totals must remain <=7. Do not relax to a busier server."
+  },
+  "exclusions": [
+    "Never more than two connecting/open/closing official sockets in total; scouts are sequential and closed before paired admission. No automatic reconnects. Send Origin http://slither.io; no ping before own setup/appearance.",
+    "Any received third-party head or complete body edge within 600 units of either controlled head excludes an active encounter. During staging, record interruption and preserve identities/approach, then restage. Unknown unseen bodies remain a limit. At <1200 units rim clearance restage inward; an active encounter crossing it is excluded.",
+    "Staging deadline 90 s, active crossing deadline 8 s, control gaps <=100 ms, raw own-anchor ages <=350 ms, unchanged identities/segments/fam after launch, no boost during active approach, four live samples and own game-over for contact. A socket close or cache disappearance never establishes contact or survival. Both-dead/reference-only-dead is not a probe contact boundary observation.",
+    "Independent offline analysis consumes each raw incoming prefix on common batch/timeOrigin, without the artificial queues, and uses the observed finite-tail geometry. Require >=4 geometry samples while relative transverse coordinate is -100..-20 units, reference/probe headings within .12 rad of straight/perpendicular and a finite forward crossing prediction <=1 s. Use the full observed intercept range, not the requested waypoint. No samples from staging or later future anchors.",
+    "Every block and arm needs contact and survival bounds. Missing coverage, contradictory/nonmonotone boundaries, high RTT/jitter or timing/position envelopes that overlap both predictions are inconclusive. Require all 12 scheduled encounters per arm qualified before an empirical verdict."
+  ],
+  "analysis": {
+    "delayPerDirectionMs": 450,
+    "positionFloorUnits": 4,
+    "sensitivityFloorsUnits": [
+      2,
+      4,
+      8
+    ],
+    "boundary": "For each repeat/arm: max of survival offset-range lower ends to min of contact offset-range upper ends; expand by position floor and (v_reference+v_probe)*wire RTT p95/1000. Empty, one-sided or contradictory sets are inconclusive. Use the union envelope across repeats, retaining anchor-phase variation; shift interval is [delay.low-control.high,delay.high-control.low]. The estimate is its midpoint, with that full identification interval; it is not a sampling confidence interval.",
+    "prediction": "Expected arm shift interval = [-0.450*maximum qualified reference speed, -0.450*minimum qualified reference speed]. Also recompute current and peer-rewind trajectory outcomes on the same packet windows, retaining phase uncertainty. Do not infer absolute one-way latency or display delay from RTT.",
+    "decision": "Compensation only if the complete shift interval excludes zero, contains the predicted peer-rewind interval and the trajectory screens agree at half/base/double position floors. No-compensation only if it contains zero, excludes the entire peer-rewind interval and the same screens agree. All other outcomes inconclusive. The no-compensation label is limited to the specified uncapped peer-only 450 ms hypothesis; whole-state rewind remains unidentified.",
+    "secondary": "No additional head-on or fine-radius trials. Report move/test phasing only if an already-qualified encounter discriminates candidates under all uncertainty bounds."
+  },
+  "validation": "Five focused new Node tests and seven retained collision tests; production-Simulator two-case regression and fixed 12-per-arm controls at two anchor phases; loopback wire run with one contact and one miss per arm at 450 ms each direction; both final standard capture audits verified. Raw reanalysis preserves raw ingress/egress, counts and common clock. Retain all failed development captures. Desktop CPU contamination prevents using loopback timings as an official latency baseline. Selected synthetic controls are engineering sensitivity checks, not empirical power guarantees.",
+  "offlineGate": {
+    "passed": true,
+    "verifiedLocalArchives": [
+      "6917e9300a89670deb359fc512c0cfbabd96366520628bbcbb33581adcf1e3e1",
+      "78074fa930285658ed8ee056a102690f08127e2679631fd9b3b4bc0261ae0f20"
+    ],
+    "loopbackQualifiedPerArm": 2,
+    "loopbackContactsPerArm": 1,
+    "loopbackSurvivalsPerArm": 1,
+    "syntheticPlannedSamplesPerArm": 12,
+    "syntheticPeerRewindStepMs": 448,
+    "plannedWireDelayMs": 450,
+    "note": "448 ms is 64 production simulator ticks; 450 ms is the wire treatment. The 2 ms difference is 0.36 units at the synthetic cruise speed, inside the retained floor. Synthetic controls detect peer-only rewind and preserve the whole-state limitation."
+  },
+  "sourceSha256": {
+    "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+    "tools/fidelity/slither-paired-collision.mjs": "3b56e383f65ca8f8927822e04aab33625e9daf99ac78fe249b6f541d9a6830b7",
+    "tools/fidelity/slither-collision-delay.mjs": "da5a491e5b9a223dae8c0017c253d3cbf616f645f5765c3515499e38cebe27fd",
+    "tools/fidelity/collision-delay-scout.mjs": "5983f88928d1c407aab1e29bd59a3facfdfc0a54e9e5205646798c3470a7cffa",
+    "tools/fidelity/collision-delay-preflight.mjs": "94ce7ae6691190a35794d902958addb3c1f4584b99bac51903d1bc12910a9fba",
+    "tools/fidelity/collision-delay-preflight.test.mjs": "b93323b5226060eb65c93a0e949f97aba57f994d391479af2cbe2d1b29475742",
+    "tools/fidelity/slither-collision-delay.local.test.mjs": "eacb9feb5aeaa6c0f50c93fe96d6f470c4d4b59ef605c9b3441c4591b165d461",
+    "examples/collision_delay.rs": "d858e894c1a0812d175463906184a89bed4303961f5b21576dbe57d208b7b27f",
+    "src/physics.rs": "ef4d1ccf9f68f7790cee0243132b8564afb02246e5db235a616e805615365c37",
+    "src/simulator.rs": "85a847df16285c707c56ce500e7c6aff2e29eb5a6b90d6cf11e1e05f74face9b",
+    "src/client/server.rs": "7095606d8d6f3237bb1cd378957eae00217383d1d87443f17a93c5aea9c2bf97",
+    "tools/fidelity/capture_quality.py": "2b8a722c2e72f6072a4e780bc68e818f26abf88fa82992299bc26dab10801eff",
+    "Cargo.lock": "2b0d2303a69ddee36f2375da7b736e1e215f1cd6035865c3ed80cbd8a445bd56"
+  },
+  "limits": [
+    "No change to simulator rules or deployment; update server-rules.md only for a conclusive empirical result.",
+    "This is a study-specific direct-collector plan, not a managed collect.py scenario. Use the existing raw recording format and capture_quality audit; transfer/source tarballs are not evidence.py-verified bundles.",
+    "Official population is one leaderboard snapshot and visible snakes are a recipient cache, not a global census. No unseen third party can be ruled out.",
+    "Use only a capped ephemeral remote container for this run. No personal or infrastructure endpoints, accounts or machine identifiers in published selected results. Full raw data and operational provenance stay private outside Git."
+  ]
+}

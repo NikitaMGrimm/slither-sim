@@ -1,0 +1,654 @@
+{
+  "schemaVersion": 1,
+  "verdict": "inconclusive",
+  "reason": "No active listed official server passed the frozen near-zero population gate; no controlled encounter launched.",
+  "rawAccess": "local-only; full raw captures, sent bytes, source exports, list response and audits retained outside Git",
+  "frozenPlanSha256": "bb8c71cd943a94c98c3003b4c43f6fba67fd80a14a7f6239ff11ac81cc5b7d71",
+  "acquisition": {
+    "serversScouted": 27,
+    "decodedEntries": 141,
+    "activeEntries": 27,
+    "populations": [
+      438,
+      103,
+      321,
+      280,
+      82,
+      226,
+      454,
+      168,
+      429,
+      105,
+      458,
+      483,
+      80,
+      304,
+      65,
+      480,
+      314,
+      480,
+      null,
+      61,
+      321,
+      140,
+      483,
+      289,
+      138,
+      442,
+      220
+    ],
+    "visibleOtherSnakes": [
+      1,
+      15,
+      4,
+      4,
+      4,
+      4,
+      3,
+      6,
+      2,
+      2,
+      2,
+      3,
+      1,
+      4,
+      2,
+      8,
+      2,
+      0,
+      null,
+      7,
+      2,
+      3,
+      3,
+      2,
+      2,
+      5,
+      8
+    ],
+    "eligibleServers": 0,
+    "setupAndLeaderboard": 26,
+    "earlyCloses": 1,
+    "officialConnectionCount": 27,
+    "maximumConcurrentOfficialConnections": 1,
+    "allConnectionsClosed": true,
+    "preSetupPings": 0,
+    "minimumCloseToNextConnectMs": 8004,
+    "minimumConnectSpacingMs": 8404,
+    "earlyCloseBackoffMs": [
+      30009
+    ],
+    "populationGate": "scout total <=6 including self and visible other snakes <=5; pair total <=7. No threshold relaxation.",
+    "vantage": "owner-provided remote container, ephemeral, capped at 2 logical CPUs / 768 MiB / 128 processes; existing containers untouched"
+  },
+  "arms": [
+    {
+      "arm": "control",
+      "planned": 12,
+      "attempted": 0,
+      "launched": 0,
+      "qualified": 0,
+      "contact": 0,
+      "survival": 0,
+      "excluded": 0,
+      "censored": 0
+    },
+    {
+      "arm": "delay",
+      "planned": 12,
+      "attempted": 0,
+      "launched": 0,
+      "qualified": 0,
+      "contact": 0,
+      "survival": 0,
+      "excluded": 0,
+      "censored": 0
+    }
+  ],
+  "shift": {
+    "estimateUnits": null,
+    "identificationIntervalUnits": null,
+    "reason": "Empty qualified encounter set; no finite uncertainty interval or p-value identified."
+  },
+  "onlineMoveTestPhasing": "unidentified; no encounter evidence",
+  "scouts": [
+    {
+      "alias": "scout-01",
+      "listedIndex": 0,
+      "firstPopulation": 438,
+      "visibleOtherSnakes": 1,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3021.289308,
+      "completedWall": 1793093407134,
+      "failure": null,
+      "archiveSha256": "76186b9c7e03ab7266659a1f46079fd8c436d99a482ccf3fd5264f9562ef0734",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-02",
+      "listedIndex": 3,
+      "firstPopulation": 103,
+      "visibleOtherSnakes": 15,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3146.252732000001,
+      "completedWall": 1793093418288,
+      "failure": null,
+      "archiveSha256": "14607eb71e05654a4e1d6b67d7f63584401b92843ed3d64c66a94b06576774f3",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-03",
+      "listedIndex": 6,
+      "firstPopulation": 321,
+      "visibleOtherSnakes": 4,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3250.598725,
+      "completedWall": 1793093429547,
+      "failure": null,
+      "archiveSha256": "921f94cdf7b260bdc3e847b219c5ab4661be941184d3734103f192e597a3e9ac",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-04",
+      "listedIndex": 12,
+      "firstPopulation": 280,
+      "visibleOtherSnakes": 4,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3078.495784999999,
+      "completedWall": 1793093440629,
+      "failure": null,
+      "archiveSha256": "9768ce5e0b3741101dc4994852fc3fc83f0ef71c03c3d30698546e50ed753155",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-05",
+      "listedIndex": 15,
+      "firstPopulation": 82,
+      "visibleOtherSnakes": 4,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 2904.9255550000016,
+      "completedWall": 1793093451540,
+      "failure": null,
+      "archiveSha256": "a33d7f3904557fa43956005c2e206bb33611334a316106dda4610a363e223897",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-06",
+      "listedIndex": 18,
+      "firstPopulation": 226,
+      "visibleOtherSnakes": 4,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3091.568788000004,
+      "completedWall": 1793093462640,
+      "failure": null,
+      "archiveSha256": "d585797e86127c5e7e966c6c63b6ab22df704a192e4a0bf7b5f774cdbe5b37b9",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-07",
+      "listedIndex": 21,
+      "firstPopulation": 454,
+      "visibleOtherSnakes": 3,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1565.395955,
+      "completedWall": 1793093472209,
+      "failure": null,
+      "archiveSha256": "d1d2718b7fa0fc300fd5cc05dd4e163217b05c3041569fe7968353a3c2d3c254",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-08",
+      "listedIndex": 30,
+      "firstPopulation": 168,
+      "visibleOtherSnakes": 6,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1911.2046280000068,
+      "completedWall": 1793093482123,
+      "failure": null,
+      "archiveSha256": "5c33b141efc04d2cbd4ce49ab53006d0526388d212fc24ce3346bffa44532cc1",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-09",
+      "listedIndex": 39,
+      "firstPopulation": 429,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 397.1738489999989,
+      "completedWall": 1793093490527,
+      "failure": null,
+      "archiveSha256": "66e7fd4dba6ced863d1640362a8971c457918de4082d30189ce698765e8872b5",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-10",
+      "listedIndex": 48,
+      "firstPopulation": 105,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 2191.5883420000027,
+      "completedWall": 1793093500725,
+      "failure": null,
+      "archiveSha256": "38d5c2a2dc9bf36264762ec48bbe69ba7bc86457528c38614844b38ff49944be",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-11",
+      "listedIndex": 51,
+      "firstPopulation": 458,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 743.5462879999977,
+      "completedWall": 1793093509473,
+      "failure": null,
+      "archiveSha256": "dd5cd8c637196afa8d996e302ead8fa2b9650eadfe11b3ba00b0cbf5fa016859",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-12",
+      "listedIndex": 57,
+      "firstPopulation": 483,
+      "visibleOtherSnakes": 3,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1472.813468999986,
+      "completedWall": 1793093518955,
+      "failure": null,
+      "archiveSha256": "44733e4af7af484df222b813cc5c2424b85526a937ce5ad21210b6f454002506",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-13",
+      "listedIndex": 66,
+      "firstPopulation": 80,
+      "visibleOtherSnakes": 1,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 789.623219999994,
+      "completedWall": 1793093527748,
+      "failure": null,
+      "archiveSha256": "e3027597d9578eed80160de35ea2ce8ac78e35ff76bc0cc28915503f801afd21",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-14",
+      "listedIndex": 69,
+      "firstPopulation": 304,
+      "visibleOtherSnakes": 4,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3795.394546000025,
+      "completedWall": 1793093539547,
+      "failure": null,
+      "archiveSha256": "9183254814bb71f240c14ff1d03fbcde2b9b14a240e9e0f120a46c256e94dba4",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-15",
+      "listedIndex": 72,
+      "firstPopulation": 65,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1416.9882970000035,
+      "completedWall": 1793093548972,
+      "failure": null,
+      "archiveSha256": "0368f4108baca42e07511ff27a7136db20519958e2c0b3aa78e05dac3a22d343",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-16",
+      "listedIndex": 75,
+      "firstPopulation": 480,
+      "visibleOtherSnakes": 8,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 2583.9812939999974,
+      "completedWall": 1793093559564,
+      "failure": null,
+      "archiveSha256": "2cdb87bb3920693ccacba1e364fa1c0854705cf556f9f044f114fee68958d865",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-17",
+      "listedIndex": 76,
+      "firstPopulation": 314,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1776.6009049999993,
+      "completedWall": 1793093569344,
+      "failure": null,
+      "archiveSha256": "06ca37ef64fc918cb46ccb274901309a5f06c6ebc410015a188884429219f3eb",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-18",
+      "listedIndex": 84,
+      "firstPopulation": 480,
+      "visibleOtherSnakes": 0,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 2126.585404000012,
+      "completedWall": 1793093579472,
+      "failure": null,
+      "archiveSha256": "6678e89f454f0bf38b8715b7e9907c748029536738a9302c42dab97ace67b0cc",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-19",
+      "listedIndex": 93,
+      "firstPopulation": null,
+      "visibleOtherSnakes": null,
+      "setup": false,
+      "reason": "early_close",
+      "elapsedMs": 830.5785510000132,
+      "completedWall": 1793093588309,
+      "failure": null,
+      "archiveSha256": "1ea7f2ecd4357d9099028263b6ae38d4247eaec68eb721b84264d877cb2c7468",
+      "auditStatus": "quarantine",
+      "auditIssues": [
+        "no_gameplay_setup"
+      ],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-20",
+      "listedIndex": 99,
+      "firstPopulation": 61,
+      "visibleOtherSnakes": 7,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3191.9900440000056,
+      "completedWall": 1793093621506,
+      "failure": null,
+      "archiveSha256": "414327bfa1ba5b7e42d1b596a585bf353c06fdbcaff84abba60b73ce0bdaf27f",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-21",
+      "listedIndex": 102,
+      "firstPopulation": 321,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 770.9966350000177,
+      "completedWall": 1793093630285,
+      "failure": null,
+      "archiveSha256": "a8457b1a95b288eea2e3f3da3ae4303e013d11576b97dba6c76650268e9cc368",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-22",
+      "listedIndex": 105,
+      "firstPopulation": 140,
+      "visibleOtherSnakes": 3,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3557.387288000027,
+      "completedWall": 1793093641845,
+      "failure": null,
+      "archiveSha256": "ac6d1e5293b58f01176c68329041fb0ac95ac6f889bb4c601c77f4b0a7e2f75a",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-23",
+      "listedIndex": 111,
+      "firstPopulation": 483,
+      "visibleOtherSnakes": 3,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1151.694634000014,
+      "completedWall": 1793093651002,
+      "failure": null,
+      "archiveSha256": "2bea1b0ff1367689d60acf2597124f889bc5316b25c4fa7e5538ed0847979149",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-24",
+      "listedIndex": 112,
+      "firstPopulation": 289,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 3491.1376380000147,
+      "completedWall": 1793093662498,
+      "failure": null,
+      "archiveSha256": "04f20764f58fd2827c07521e0e4d09dab7804ede285e5e33cb8ae8d5af444995",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-25",
+      "listedIndex": 120,
+      "firstPopulation": 138,
+      "visibleOtherSnakes": 2,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 1131.9530479999958,
+      "completedWall": 1793093671633,
+      "failure": null,
+      "archiveSha256": "54bcea350d591f87807022501da1df36bb24a3e19dafd4a67ec2f8410da40dbd",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-26",
+      "listedIndex": 123,
+      "firstPopulation": 442,
+      "visibleOtherSnakes": 5,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 2198.0110149999964,
+      "completedWall": 1793093681833,
+      "failure": null,
+      "archiveSha256": "5fa6c97e694b00f9ef3df9533f49e54bad63edb242e8bbaa765ce97b0652d36b",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    },
+    {
+      "alias": "scout-27",
+      "listedIndex": 132,
+      "firstPopulation": 220,
+      "visibleOtherSnakes": 8,
+      "setup": true,
+      "reason": "leaderboard",
+      "elapsedMs": 633.1933100000024,
+      "completedWall": 1793093690471,
+      "failure": null,
+      "archiveSha256": "54d8687fbaad07efa656127a732c51c5ed4f7e3880d24c05e1747e263eaff40f",
+      "auditStatus": "verified",
+      "auditIssues": [],
+      "closeCodes": [
+        1006
+      ],
+      "connections": 1,
+      "closes": 1
+    }
+  ],
+  "limits": [
+    "Population snapshots do not establish permanent server occupancy. Only the 27 entries marked active in the retained list were probed; 114 inactive entries were not tested.",
+    "All received server-controlled snakes count as third parties; visible cache alone is not a near-zero population witness.",
+    "The single early close is retained; its cause and any rate limit are not established.",
+    "Synthetic sensitivity and localhost acquisition do not answer the official mechanics question. No simulator rule or server-rules.md change is supported."
+  ],
+  "privateArchives": [
+    {
+      "alias": "remote-transfer-01",
+      "sha256": "417ae83beebaf6345463aa4af90b787658825f505ff017cfd80853e50952b41a",
+      "kind": "private transfer/source archive, not an evidence.py bundle"
+    },
+    {
+      "alias": "base-source-01",
+      "sha256": "fb7357ac805b40430df5f80c61f9cbbdfebb377b3e8163f6e09d632bd13ddf0f",
+      "kind": "tracked collection-base source export"
+    },
+    {
+      "alias": "source-overlay-01",
+      "sha256": "1f9a9cfc5de947927699fa13d5b432ecc890d9eb405bdc47e9c6fbd20ff58ddd",
+      "kind": "study sources and selected results export"
+    }
+  ]
+}

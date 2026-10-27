@@ -1,0 +1,785 @@
+{
+  "base": "368abe464c90c998d54c964f2d735ea8880193ea",
+  "measurements": {
+    "normal60-official13": {
+      "common": {
+        "exposure": 24.81209999990466,
+        "frames": 1543,
+        "frameMs": {
+          "50": 15.90000009536743,
+          "95": 18.899999976158142,
+          "99": 28.200000047683716
+        },
+        "speedResidualUnitsPerSec": {
+          "50": 6.625059308551101,
+          "95": 27.001729074202586,
+          "99": 99.37332802925317
+        },
+        "relativeRms": 0.18328285283654272,
+        "offsetInnovation": {
+          "50": 1.8197412664361474,
+          "95": 4.773243849777301,
+          "99": 6.099440933538478
+        },
+        "innovations": 123,
+        "innovationsPerSec": 4.957258756835279,
+        "lagSeconds": 0.0,
+        "segmentCount": {
+          "50": 154,
+          "95": 164,
+          "99": 166
+        },
+        "speed": {
+          "50": 6.333333333333333,
+          "95": 8.444444444444445,
+          "99": 8.88888888888889
+        },
+        "stallsOutside4to50Ms": 10
+      },
+      "relativeSpeedError": {
+        "50": 0.031880704847399896,
+        "95": 0.13090486971449242,
+        "99": 0.4426780727695197,
+        "100": 4.552165656370583
+      },
+      "successiveSpeedDifferenceUnitsPerSec": {
+        "50": 7.404493288398442,
+        "95": 43.076831052719456,
+        "99": 269.1799244318896,
+        "100": 1267.9017177723383
+      },
+      "renderPhaseMs": {
+        "loopMs": {
+          "50": 1.3000000715255737,
+          "95": 2.899999976158142,
+          "99": 4.399999976158142,
+          "100": 29.200000047683716
+        },
+        "renderMs": {
+          "50": 1.2000000476837158,
+          "95": 2.600000023841858,
+          "99": 3.9000000953674316,
+          "100": 29
+        },
+        "modelMs": {
+          "50": 0,
+          "95": 0.19999992847442627,
+          "99": 0.2999999523162842,
+          "100": 0.6000000238418579
+        },
+        "parseMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.30000007152557373,
+          "100": 15.700000047683716
+        },
+        "parseMaxMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.20000004768371582,
+          "100": 15.700000047683716
+        },
+        "messages": {
+          "50": 6,
+          "95": 15,
+          "99": 26,
+          "100": 295
+        },
+        "cached": {
+          "50": 13,
+          "95": 19,
+          "99": 19,
+          "100": 19
+        },
+        "live": {
+          "50": 13,
+          "95": 19,
+          "99": 19,
+          "100": 19
+        },
+        "visible": {
+          "50": 5,
+          "95": 8,
+          "99": 8,
+          "100": 9
+        },
+        "bodyPoints": {
+          "50": 1102,
+          "95": 1440,
+          "99": 1576,
+          "100": 1588
+        }
+      },
+      "relayLateMs": {
+        "50": 0.2914000000089345,
+        "95": 0.5625000000009095,
+        "99": 0.9203000000042039,
+        "100": 8.085800000003474
+      },
+      "source": {
+        "sha256": "85068f4b2f3ac7dfea2500c5fc41d082a47ca2334fec4d16f35be235e6cf5aca",
+        "clock": "receipt",
+        "session": 0,
+        "availableSessions": [
+          {
+            "duration": 150.6075461000437,
+            "frames": 65711
+          }
+        ],
+        "frames": 43805,
+        "duration": 99.99289830005728,
+        "payloadSha256": "9e0fc3e2b50b82172d3749dca27cc6699a7903c5b7b6d448e63df2457ed5b4e5"
+      },
+      "eventsSha256": "1f2d936352dd4191774232424b605308a81d7fe869af2ecd88e35adb3c77aae4",
+      "access": "local-only; raw frames and browser observations are not public downloads"
+    },
+    "normal60-matched13": {
+      "common": {
+        "exposure": 11.88199999988078,
+        "frames": 612,
+        "frameMs": {
+          "50": 15.899999976158142,
+          "95": 42.60000002384186,
+          "99": 76.89999997615814
+        },
+        "speedResidualUnitsPerSec": {
+          "50": 7.926757564288266,
+          "95": 250.71025842168123,
+          "99": 701.6142057943736
+        },
+        "relativeRms": 0.7782983119324558,
+        "offsetInnovation": {
+          "50": 1.8883198231430085,
+          "95": 19.14550851287825,
+          "99": 34.094602547593084
+        },
+        "innovations": 53,
+        "innovationsPerSec": 4.460528530595168,
+        "lagSeconds": 0.0,
+        "segmentCount": {
+          "50": 112,
+          "95": 116,
+          "99": 116
+        },
+        "speed": {
+          "50": 6.166666666666667,
+          "95": 6.222222222222222,
+          "99": 6.666666666666667
+        },
+        "stallsOutside4to50Ms": 32
+      },
+      "relativeSpeedError": {
+        "50": 0.041032297444516544,
+        "95": 1.3009829626206157,
+        "99": 3.640808851689722,
+        "100": 8.383706719568131
+      },
+      "successiveSpeedDifferenceUnitsPerSec": {
+        "50": 9.478374180987913,
+        "95": 350.18871417092373,
+        "99": 1012.1665536381302,
+        "100": 1469.7399652144472
+      },
+      "renderPhaseMs": {
+        "loopMs": {
+          "50": 1.3000000715255737,
+          "95": 11.799999952316284,
+          "99": 28.699999928474426,
+          "100": 32.799999952316284
+        },
+        "renderMs": {
+          "50": 1.2000000476837158,
+          "95": 11.600000023841858,
+          "99": 28.5,
+          "100": 32.59999990463257
+        },
+        "modelMs": {
+          "50": 0.10000002384185791,
+          "95": 0.20000004768371582,
+          "99": 0.30000007152557373,
+          "100": 1.2999999523162842
+        },
+        "parseMs": {
+          "50": 0,
+          "95": 0.30000007152557373,
+          "99": 1.2000000476837158,
+          "100": 17.899999976158142
+        },
+        "parseMaxMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.8999999761581421,
+          "100": 17.899999976158142
+        },
+        "messages": {
+          "50": 34,
+          "95": 97,
+          "99": 150,
+          "100": 275
+        },
+        "cached": {
+          "50": 65,
+          "95": 66,
+          "99": 67,
+          "100": 67
+        },
+        "live": {
+          "50": 65,
+          "95": 65,
+          "99": 65,
+          "100": 65
+        },
+        "visible": {
+          "50": 8,
+          "95": 10,
+          "99": 11,
+          "100": 11
+        },
+        "bodyPoints": {
+          "50": 5505,
+          "95": 5637,
+          "99": 5684,
+          "100": 5710
+        }
+      },
+      "relayLateMs": {
+        "50": 0.2627000000003932,
+        "95": 0.5009999999998627,
+        "99": 0.5695000000001116,
+        "100": 2.7620000000005973
+      },
+      "source": {
+        "sha256": "4e9032ec51abdc0c1eaca7a2680cc9614337c0c77e826d4d5b75d4dee7ddc8a4",
+        "clock": "receipt",
+        "session": 2,
+        "availableSessions": [
+          {
+            "duration": 21.9726645,
+            "frames": 45499
+          },
+          {
+            "duration": 28.414073300000002,
+            "frames": 63013
+          },
+          {
+            "duration": 34.860048799999994,
+            "frames": 74663
+          },
+          {
+            "duration": 14.762582100000003,
+            "frames": 32482
+          }
+        ],
+        "frames": 74663,
+        "duration": 34.860048799999994,
+        "payloadSha256": "53f9d29ad962008f9428ab21386723e948d393895c1f71f3a6d24b0718fa7396"
+      },
+      "eventsSha256": "35e41e06e7866d03ff345c3d8265ff157207d1eaf77ba6d08005345152033281",
+      "access": "local-only; raw frames and browser observations are not public downloads"
+    },
+    "normal-matched19": {
+      "common": {
+        "exposure": 14.099700000047669,
+        "frames": 1056,
+        "frameMs": {
+          "50": 12.200000047683716,
+          "95": 28.200000047683716,
+          "99": 40.60000002384186
+        },
+        "speedResidualUnitsPerSec": {
+          "50": 7.683932055922469,
+          "95": 84.27817844894253,
+          "99": 142.71795592021545
+        },
+        "relativeRms": 0.19008189554485336,
+        "offsetInnovation": {
+          "50": 1.170197024694882,
+          "95": 3.817458927337283,
+          "99": 6.000614625002719
+        },
+        "innovations": 63,
+        "innovationsPerSec": 4.46818017403115,
+        "lagSeconds": 0.0,
+        "segmentCount": {
+          "50": 111,
+          "95": 116,
+          "99": 116
+        },
+        "speed": {
+          "50": 6.166666666666667,
+          "95": 6.222222222222222,
+          "99": 6.5
+        },
+        "stallsOutside4to50Ms": 32
+      },
+      "relativeSpeedError": {
+        "50": 0.03957035440202929,
+        "95": 0.433430632023133,
+        "99": 0.7339780590182509,
+        "100": 2.948251019274565
+      },
+      "successiveSpeedDifferenceUnitsPerSec": {
+        "50": 10.374889271170446,
+        "95": 129.94303209121722,
+        "99": 237.93855163592727,
+        "100": 730.7795722447763
+      },
+      "renderPhaseMs": {
+        "loopMs": {
+          "50": 3.6999999284744263,
+          "95": 9.099999904632568,
+          "99": 15.699999928474426,
+          "100": 20.300000071525574
+        },
+        "renderMs": {
+          "50": 3.200000047683716,
+          "95": 7.399999976158142,
+          "99": 14,
+          "100": 19.899999976158142
+        },
+        "modelMs": {
+          "50": 0,
+          "95": 0,
+          "99": 0,
+          "100": 0
+        },
+        "parseMs": {
+          "50": 0.10000002384185791,
+          "95": 0.5000001192092896,
+          "99": 1.600000023841858,
+          "100": 7.4999998807907104
+        },
+        "parseMaxMs": {
+          "50": 0.10000002384185791,
+          "95": 0.3999999761581421,
+          "99": 1.2000000476837158,
+          "100": 7.099999904632568
+        },
+        "messages": {
+          "50": 2,
+          "95": 4,
+          "99": 6,
+          "100": 11
+        },
+        "cached": {
+          "50": 65,
+          "95": 66,
+          "99": 67,
+          "100": 67
+        },
+        "live": {
+          "50": 65,
+          "95": 65,
+          "99": 65,
+          "100": 65
+        },
+        "visible": {
+          "50": 7,
+          "95": 10,
+          "99": 11,
+          "100": 11
+        },
+        "bodyPoints": {
+          "50": 4998,
+          "95": 5535,
+          "99": 5576,
+          "100": 5587
+        }
+      },
+      "relayLateMs": {
+        "50": 0.2636000000002525,
+        "95": 0.4999999999988347,
+        "99": 0.5247999999999919,
+        "100": 4.934800000000905
+      },
+      "source": {
+        "sha256": "0bcbc008bd0ccc774916c7fb8311a147e8ffa9f0a0139a8f3df75a94dd35468a",
+        "clock": "receipt",
+        "session": 2,
+        "availableSessions": [
+          {
+            "duration": 21.9726645,
+            "frames": 3141
+          },
+          {
+            "duration": 28.414073300000002,
+            "frames": 4061
+          },
+          {
+            "duration": 34.860048799999994,
+            "frames": 4982
+          },
+          {
+            "duration": 14.762582100000003,
+            "frames": 2111
+          }
+        ],
+        "frames": 4982,
+        "duration": 34.860048799999994,
+        "payloadSha256": "c9e7eb5f474c6297e2a4515b9f019ec4d0e73ab955466ad3e74e1c5ad48efced"
+      },
+      "eventsSha256": "aa94dc591048cd6fb1310dc876abdda3cbe08d54363bda6676d9f49c175251a6",
+      "access": "local-only; raw frames and browser observations are not public downloads"
+    },
+    "normal60-reduced13": {
+      "common": {
+        "exposure": 12.618999999761565,
+        "frames": 752,
+        "frameMs": {
+          "50": 15.799999952316284,
+          "95": 28.0,
+          "99": 48.10000002384186
+        },
+        "speedResidualUnitsPerSec": {
+          "50": 8.95665074853622,
+          "95": 136.68733104149408,
+          "99": 908.1503261219829
+        },
+        "relativeRms": 0.7625498224729828,
+        "offsetInnovation": {
+          "50": 1.7726144803269923,
+          "95": 5.811929204721312,
+          "99": 10.521590974962587
+        },
+        "innovations": 56,
+        "innovationsPerSec": 4.437752595376663,
+        "lagSeconds": 0.0,
+        "segmentCount": {
+          "50": 112,
+          "95": 116,
+          "99": 116
+        },
+        "speed": {
+          "50": 6.166666666666667,
+          "95": 6.222222222222222,
+          "99": 6.611111111111111
+        },
+        "stallsOutside4to50Ms": 15
+      },
+      "relativeSpeedError": {
+        "50": 0.046062775278186266,
+        "95": 0.7092964205396447,
+        "99": 4.7125638544708295,
+        "100": 7.094368510709236
+      },
+      "successiveSpeedDifferenceUnitsPerSec": {
+        "50": 13.338398194817785,
+        "95": 487.85747852593244,
+        "99": 1122.7325800599795,
+        "100": 1493.524868994657
+      },
+      "renderPhaseMs": {
+        "loopMs": {
+          "50": 1.600000023841858,
+          "95": 13.199999928474426,
+          "99": 33.60000002384186,
+          "100": 37.90000009536743
+        },
+        "renderMs": {
+          "50": 1.5,
+          "95": 12.700000047683716,
+          "99": 33.39999997615814,
+          "100": 37.5
+        },
+        "modelMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.20000004768371582,
+          "100": 0.40000009536743164
+        },
+        "parseMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.3999999761581421,
+          "100": 21.200000047683716
+        },
+        "parseMaxMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.20000004768371582,
+          "100": 21.200000047683716
+        },
+        "messages": {
+          "50": 4,
+          "95": 10,
+          "99": 15,
+          "100": 46
+        },
+        "cached": {
+          "50": 6,
+          "95": 6,
+          "99": 6,
+          "100": 6
+        },
+        "live": {
+          "50": 6,
+          "95": 6,
+          "99": 6,
+          "100": 6
+        },
+        "visible": {
+          "50": 3,
+          "95": 3,
+          "99": 3,
+          "100": 3
+        },
+        "bodyPoints": {
+          "50": 654,
+          "95": 761,
+          "99": 764,
+          "100": 764
+        }
+      },
+      "relayLateMs": {
+        "50": 0.3074000000005128,
+        "95": 0.5556999999999368,
+        "99": 0.7209000000010235,
+        "100": 3.487899999999655
+      },
+      "source": {
+        "sha256": "a2a2b3416f9c5f44c9282040744b55dd3984f3d4e36f51af70b88381f0bbeb0c",
+        "clock": "receipt",
+        "session": 0,
+        "availableSessions": [
+          {
+            "duration": 34.860048799999994,
+            "frames": 9042
+          }
+        ],
+        "frames": 9042,
+        "duration": 34.860048799999994,
+        "payloadSha256": "fd03d1549876070d82c7bb891bb45cddcd94f6977808fd7c3dab89cab58c4d31"
+      },
+      "eventsSha256": "d7ee55d8bdbbad584643695d6c691bd6a486c78448a86f0088155750966e8bf0",
+      "access": "local-only; raw frames and browser observations are not public downloads"
+    },
+    "normal60-default13": {
+      "common": {
+        "exposure": 31.113399999856846,
+        "frames": 1884,
+        "frameMs": {
+          "50": 16.0,
+          "95": 23.600000023841858,
+          "99": 43.09999990463257
+        },
+        "speedResidualUnitsPerSec": {
+          "50": 5.427405886909554,
+          "95": 114.89238033628335,
+          "99": 463.8733525356017
+        },
+        "relativeRms": 0.5273910139289298,
+        "offsetInnovation": {
+          "50": 1.6443619991277443,
+          "95": 6.1618058485286005,
+          "99": 7.841588606325456
+        },
+        "innovations": 144,
+        "innovationsPerSec": 4.628230923031959,
+        "lagSeconds": 0.0,
+        "segmentCount": {
+          "50": 145,
+          "95": 156,
+          "99": 162
+        },
+        "speed": {
+          "50": 6.333333333333333,
+          "95": 7.388888888888889,
+          "99": 8.222222222222221
+        },
+        "stallsOutside4to50Ms": 41
+      },
+      "relativeSpeedError": {
+        "50": 0.02688661150449049,
+        "95": 0.5856461156964532,
+        "99": 2.3645225757566957,
+        "100": 7.2245716152589665
+      },
+      "successiveSpeedDifferenceUnitsPerSec": {
+        "50": 6.233831520184964,
+        "95": 276.4931623133971,
+        "99": 896.9562500833321,
+        "100": 1536.751537920837
+      },
+      "renderPhaseMs": {
+        "loopMs": {
+          "50": 1.2999999523162842,
+          "95": 3,
+          "99": 27.800000071525574,
+          "100": 30.09999990463257
+        },
+        "renderMs": {
+          "50": 1.2000000476837158,
+          "95": 2.5,
+          "99": 27.600000023841858,
+          "100": 29.899999976158142
+        },
+        "modelMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.20000004768371582,
+          "100": 0.30000007152557373
+        },
+        "parseMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.3999999761581421,
+          "100": 68.30000007152557
+        },
+        "parseMaxMs": {
+          "50": 0,
+          "95": 0.10000002384185791,
+          "99": 0.19999992847442627,
+          "100": 68.30000007152557
+        },
+        "messages": {
+          "50": 10,
+          "95": 22,
+          "99": 35,
+          "100": 251
+        },
+        "cached": {
+          "50": 19,
+          "95": 24,
+          "99": 24,
+          "100": 24
+        },
+        "live": {
+          "50": 19,
+          "95": 24,
+          "99": 24,
+          "100": 24
+        },
+        "visible": {
+          "50": 7,
+          "95": 10,
+          "99": 11,
+          "100": 11
+        },
+        "bodyPoints": {
+          "50": 1800,
+          "95": 2480,
+          "99": 2578,
+          "100": 2585
+        }
+      },
+      "relayLateMs": {
+        "50": 0.2743999999985647,
+        "95": 0.5014000000009844,
+        "99": 0.5782999999999205,
+        "100": 14.589600000000758
+      },
+      "source": {
+        "sha256": "4ddfabaa93877e0294a1bb251269286b75e2c280d0b48d021629fcc72519831d",
+        "clock": "receipt",
+        "session": 2,
+        "availableSessions": [
+          {
+            "duration": 25.704564899999998,
+            "frames": 13973
+          },
+          {
+            "duration": 31.836403600000004,
+            "frames": 17267
+          },
+          {
+            "duration": 42.445644099999996,
+            "frames": 28026
+          }
+        ],
+        "frames": 28026,
+        "duration": 42.445644099999996,
+        "payloadSha256": "7de16850941b5c004260280ccd7c4fa7e7f42c2709f487b7e1ca36b6615138cc"
+      },
+      "eventsSha256": "32abeb8eaa73ae31831171de51ccd5b430ca0f7048be3dcb4f291c99680f4c3b",
+      "access": "local-only; raw frames and browser observations are not public downloads"
+    }
+  },
+  "matchedKinematics": {
+    "source19": {
+      "sha256": "0bcbc008bd0ccc774916c7fb8311a147e8ffa9f0a0139a8f3df75a94dd35468a",
+      "clock": "receipt",
+      "session": 2,
+      "availableSessions": [
+        {
+          "duration": 21.9726645,
+          "frames": 3141
+        },
+        {
+          "duration": 28.414073300000002,
+          "frames": 4061
+        },
+        {
+          "duration": 34.860048799999994,
+          "frames": 4982
+        },
+        {
+          "duration": 14.762582100000003,
+          "frames": 2111
+        }
+      ],
+      "frames": 4982,
+      "duration": 34.860048799999994,
+      "payloadSha256": "c9e7eb5f474c6297e2a4515b9f019ec4d0e73ab955466ad3e74e1c5ad48efced"
+    },
+    "derived13": {
+      "sha256": "4e9032ec51abdc0c1eaca7a2680cc9614337c0c77e826d4d5b75d4dee7ddc8a4",
+      "clock": "receipt",
+      "session": 2,
+      "availableSessions": [
+        {
+          "duration": 21.9726645,
+          "frames": 45499
+        },
+        {
+          "duration": 28.414073300000002,
+          "frames": 63013
+        },
+        {
+          "duration": 34.860048799999994,
+          "frames": 74663
+        },
+        {
+          "duration": 14.762582100000003,
+          "frames": 32482
+        }
+      ],
+      "frames": 74663,
+      "duration": 34.860048799999994,
+      "payloadSha256": "53f9d29ad962008f9428ab21386723e948d393895c1f71f3a6d24b0718fa7396"
+    },
+    "anchorsCompared": 10192,
+    "rotationTuplesCompared": 60048,
+    "tailsCompared": 39,
+    "counts": {
+      "move": 8904,
+      "growth": 1288
+    },
+    "maxAnchorEuclideanError": 0.6974798324740971,
+    "maxPerAxisBound": 0.5,
+    "segmentCountsFamGrowthAndTimesIdentical": true,
+    "rotationTimesValuesIdentical": true,
+    "scope": "Derived13 uses current production adapter on a real stock connection. One source session, no network comparison or claim of official physics."
+  },
+  "privateAnalysisArtifactsSha256": {
+    "native_relay.rs": "2bbecd2c44b4a308e9c861b00315b7c1baa2d2813a6286979759db0755585a37",
+    "native_prepare.py": "fb750f0afb1cc1253ce28f5b0c59b4f23dbeb49cfac8ee97f11bd8a1ffa754d5",
+    "replay_sources.py": "e4a2edf000510f0cbcc9bfdfc67a30df8f948ab83a7e78a769ce9bff01e8bfc6",
+    "stock_pair_recorder.rs": "515eced05cf4e16e67a16acc594e956327604cf9cb4d2ea1aa89433721a779e6",
+    "record_stock_pair.py": "d149cc52cf444c3ae50371b2d177780b1d0d19483b5a6b1c02ad5ed5a6c8c33a",
+    "drawn_observer.js": "10143c35f992f9e7f6a5d522ebe8d1ffc4d40b1fd328b9651d04b74442c38f09",
+    "packet_observer.js": "dd2ac00d8a471c7985247a4a03c8a512eff9f600ce456a88fa4acc261cfad4d7",
+    "cohort_metrics_v2.py": "b79cc7dc943a64ac921873836e20c12026679019bed7311f22c5375ce19fa583",
+    "final_motion_summary.py": "e2a0a991fa88f3a886099de9525a542150b224157ac7fa6fcc4155543d00dbd1",
+    "matched_kinematics.py": "8c5f1b288ddea82f240dc1c8b7bf4f72adfb40c023618c5b7fbe322571c1cc71",
+    "reduce_matched.py": "5ff538fe19fd43f0f5d069f768a6aa4c40be6ad9fc1a45300df2dc9e982313de",
+    "matched-reduced-metadata.json": "a78e2453aff2968935e76749e7b79f810c91e14bc2bf81ba034ceac407ec8b34",
+    "final-evidence-plan.json": "6e057f1f7d121f789ee35bd517eb4fdfdf7994c2ca81f73913859d00e5ca274d"
+  },
+  "limits": [
+    "Descriptive single source/replay per primary condition; no independent repeat/equivalence claim",
+    "One CPU, headless browser; not owner Chrome instrumentation",
+    "Correction innovation is a smoothing offset update, not an instantaneous drawn jump",
+    "Default-vision workload check is separate from matched full-visibility source",
+    "Plan in scratch is retrospective compilation, not a preregistered acquisition contract"
+  ]
+}
