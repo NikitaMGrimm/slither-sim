@@ -745,8 +745,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "reused food verification does not match the food list")]
     fn owned_span_rejects_unmirrored_same_length_edits() {
-        let mut rng = Rng(47);
-        let mut food = vec![pellet(&mut rng)];
+        let mut food = vec![Food {
+            x: 0.0,
+            y: 0.0,
+            value: 1.0,
+            size: Some(1.0),
+            origin: Some(Origin::Ambient),
+        }];
         let mut cache = FoodCache::default();
         cache.begin_mirrored(&food);
         cache.pellets(&food).unwrap();

@@ -4,7 +4,8 @@ Keep. The physics profile and original pairs compare main `65ff713` (including
 #208/#209) -> runtime `3cc3646`. An integration recheck compares main `587b597`
 (including #210) -> `e0a71f1`, with identical core changes.
 [Selected results and identities](results.json) retain both revision pairs; the
-delivery head updates documentation only. Production changes stay in
+delivery head adds documentation and a debug-only invariant guard. The measured
+release behavior is unchanged. Production changes stay in
 `food_grid.rs` and `simulator.rs`; no server or recipient-broadcast implementation
 changes.
 
@@ -97,6 +98,11 @@ retention, public reset and restore behavior. Warm worlds match a fresh-food-cac
 oracle on every checkpoint, pickup/birth event and death through recorded radius
 changes, ordinary/pit retention and public replacement. The existing 8,000-edit
 pellet/cache oracle remains unchanged.
+
+Debug builds also compare the mirror bit for bit whenever an owned span reuses
+verification. A debug-only `should_panic` regression deliberately makes an
+unmirrored same-length edit and verifies that the assertion catches it. This
+review follow-up adds no release check and needs no new instruction measurements.
 
 Removing the length guard fails the retained-food/fresh-cache oracle. Removing
 the public replacement reset fails the same-length origin-change oracle. Both
