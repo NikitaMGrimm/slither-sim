@@ -421,7 +421,11 @@ impl SimulatorBackend {
             // Official frames lead with pongs (81,830 of 81,843 pong frames),
             // and put the map before gameplay updates.
             let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
-            let mut packets = vec![encode::pong(); pongs];
+            let mut prefix = if pongs == 0 {
+                Vec::new()
+            } else {
+                vec![encode::pong(); pongs]
+            };
             let (updates, presented_updates) = self.updates(
                 slot,
                 &food_changes,
@@ -431,14 +435,21 @@ impl SimulatorBackend {
                 &mut snakes,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
-                packets.push(packet);
+                prefix.push(packet);
             }
-            let mut presented = presented_updates.map(|updates| {
-                let mut presented = packets.clone();
-                presented.extend(updates);
-                presented
-            });
-            packets.extend(updates);
+            // Most broadcasts have neither pongs nor a map. Keep updates' own
+            // allocation instead of moving every packet through another Vec.
+            let (mut packets, mut presented) = if prefix.is_empty() {
+                (updates, presented_updates)
+            } else {
+                let presented = presented_updates.map(|updates| {
+                    let mut presented = prefix.clone();
+                    presented.extend(updates);
+                    presented
+                });
+                prefix.extend(updates);
+                (prefix, presented)
+            };
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
             let live_board = board
