@@ -20,4 +20,4 @@ generator headroom. If not consistent, reject without more searching. Retain
 all failed attempts and diagnose harness failures before any recovery. Do not
 change security/system settings, install packages, use forbidden ports, merge,
 or contact outside game servers. Record frame-excess and tick tails as controls,
-not a capacity qualification. No instabox CLI; SSH only.
+not a capacity qualification. SSH only; no provisioning CLI.

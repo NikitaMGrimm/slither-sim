@@ -3,7 +3,7 @@
 Three native pairs use less total host CPU with persistent epoll registrations.
 Keep the small CPU candidate for review, with an unresolved latency failure:
 **one candidate hold deferred 39 ticks and had 470 ms frame-excess p99.**
-No latency, capacity or c7a improvement is established. No hold was excluded.
+No latency or deployment-capacity improvement is established. No hold was excluded.
 
 Measured `4532a76` -> `e10a20a`; [full pins/results](results.json).
 Delivery merges documentation-only main changes; runtime sources still match
@@ -36,9 +36,8 @@ unmeasured. All six arm values, two smokes and tick tails remain in JSON.
 The bad hold saturates its core during seconds114.1–120: about98% process CPU,
 57% simulation and40% sockets, with no sampled CPU0 steal. Maximum tick-start
 gap is under16ms; this is accumulated backlog, not evidence of one long pause.
-The cause is unresolved. One-second telemetry supplies no usable after-window.
-The older anomaly helper rejects that empty window; isolated analysis marks it
-unavailable without changing raw data. No favorable rerun replaces this hold.
+The cause is unresolved. Telemetry samples about once per second; the after-window is unavailable.
+No favorable rerun replaces this hold.
 
 ## Code and checks
 
@@ -54,7 +53,8 @@ replacement and failure. Skipping MOD fails the oracle; restored tests pass.
 Focused server/loopback/Clippy and all15 Rust-group commands pass. These WSL2
 checks completed before the owner's no-heavy-local-compute limit. All fifteen
 complete stock/half13/all13/U and historical wire/state traces are byte-identical;
-selected hashes are in JSON. CI and independent maintainer review remain separate.
+selected hashes are in JSON. Native server, loopback and documentation checks pass.
+CI and independent maintainer review remain separate.
 
 ## Reproduce and access
 
@@ -64,6 +64,5 @@ Copy setup-native.py, native-series.py, PLAN.md and both archives as
 base.tar.gz/candidate.tar.gz into a fresh ~/slither-bench/capacity/RUN directory.
 Run setup-native.py, then bench.py build FULL_SHA for each arm, followed by
 native-series.py smoke and pairs. The setup uses the same shared lock; scripts
-reject -O. Keep completed progress instead of overwriting it. Raw logs, complete
-traces, telemetry, source snapshots and binaries are local-only outside /tmp,
-not publicly downloadable. Selected source/tool/binary hashes identify them.
+reject -O. Keep completed progress instead of overwriting it. Full logs, traces, telemetry, snapshots and binaries remain local-only outside
+/tmp, without a public download.
