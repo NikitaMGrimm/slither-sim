@@ -83,12 +83,26 @@ impl SnakeDeltaCache {
         id: u16,
         known: &mut KnownSnake,
         snake: &Snake,
-        wanted: f64,
+        wanted: impl FnOnce() -> f64,
         profile: &PlayerAppearance,
         reports: &SnakeReports,
     ) -> Result<(), String> {
+        // With no fresh anchor or length change, only open motion/mass gates
+        // and kills can emit anything. The caller still observes this history
+        // for stale reports, even when there are no packets to encode.
+        if snake.body.first() == Some(&known.front)
+            && known.len == snake.body.len()
+            && known.kills == snake.kills
+            && (!reports.motion_due || [known.heading, known.wanted, known.speed] == reports.motion)
+            && (!reports.fam_due || known.fam == encode::fam_u24(snake.fam))
+        {
+            // Equality treats signed zeros alike; changes assigns the actual
+            // front even in that case, so preserve its exact stored bits.
+            known.front = snake.body[0];
+            return Ok(());
+        }
         if own {
-            return changes(packets, own, id, known, snake, wanted, profile, reports);
+            return changes(packets, own, id, known, snake, wanted(), profile, reports);
         }
         let entry = &mut self.0;
         if let Some(delta) = entry.as_ref().filter(|delta| delta.before == *known) {
@@ -97,7 +111,7 @@ impl SnakeDeltaCache {
         } else {
             let before = known.clone();
             let start = packets.len();
-            changes(packets, own, id, known, snake, wanted, profile, reports)?;
+            changes(packets, own, id, known, snake, wanted(), profile, reports)?;
             *entry = Some(SnakeDelta {
                 before,
                 after: known.clone(),
@@ -784,13 +798,211 @@ mod tests {
                         4,
                         &mut shared,
                         snake,
-                        0.7,
+                        || 0.7,
                         &PlayerAppearance::default(),
                         &reports,
                     )
                     .unwrap();
                 assert_eq!(actual, expected);
                 assert_eq!(shared, reference);
+            }
+        }
+    }
+
+    #[test]
+    fn unchanged_updates_match_uncached_packets_and_history() {
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["snake".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut snake = world.snakes()[0].clone();
+        snake.fam = 0.5;
+        let initial = KnownSnake::new(2, &snake, 0.7).unwrap();
+        let profile = PlayerAppearance::default();
+        for gates in 0..4 {
+            let reports = SnakeReports {
+                motion: [7, 9, 13],
+                motion_due: gates & 1 != 0,
+                fam_due: gates & 2 != 0,
+                ..Default::default()
+            };
+            let mut cache = SnakeDeltaCache::default();
+            for front in [snake.body[0], snake.body[1], Point { x: 1e6, y: 1e6 }] {
+                for offset in [-1, 0, 1] {
+                    for mask in 0..8u8 {
+                        for fam in [encode::fam_u24(snake.fam), encode::fam_u24(snake.fam) ^ 1] {
+                            for kills in [snake.kills, snake.kills + 1] {
+                                let history = KnownSnake {
+                                    front,
+                                    len: snake.body.len().saturating_add_signed(offset),
+                                    heading: reports.motion[0] ^ (mask & 1),
+                                    wanted: reports.motion[1] ^ ((mask >> 1) & 1),
+                                    speed: reports.motion[2] ^ ((mask >> 2) & 1),
+                                    fam,
+                                    kills,
+                                    ..initial.clone()
+                                };
+                                for own in [false, false, true, false] {
+                                    let (mut expected, mut actual) =
+                                        (vec![vec![99]], vec![vec![99]]);
+                                    let (mut reference, mut shared) =
+                                        (history.clone(), history.clone());
+                                    let result = changes(
+                                        &mut expected,
+                                        own,
+                                        4,
+                                        &mut reference,
+                                        &snake,
+                                        0.7,
+                                        &profile,
+                                        &reports,
+                                    );
+                                    assert_eq!(
+                                        cache.changes(
+                                            &mut actual,
+                                            own,
+                                            4,
+                                            &mut shared,
+                                            &snake,
+                                            || 0.7,
+                                            &profile,
+                                            &reports
+                                        ),
+                                        result
+                                    );
+                                    assert_eq!(actual, expected);
+                                    assert_eq!(shared, reference);
+                                    assert_eq!(
+                                        shared.front.x.to_bits(),
+                                        reference.front.x.to_bits()
+                                    );
+                                    assert_eq!(
+                                        shared.front.y.to_bits(),
+                                        reference.front.y.to_bits()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unchanged_updates_preserve_signed_zero_and_defer_wanted() {
+        use std::cell::Cell;
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["snake".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let mut snake = world.snakes()[0].clone();
+        snake.body[0] = Point { x: -0., y: 0. };
+        let mut known = KnownSnake::new(2, &snake, 0.7).unwrap();
+        known.front = Point { x: 0., y: -0. };
+        let profile = PlayerAppearance::default();
+        let reports = SnakeReports::default();
+        let mut cache = SnakeDeltaCache::default();
+        for own in [false, true] {
+            let mut packets = vec![vec![99]];
+            cache
+                .changes(
+                    &mut packets,
+                    own,
+                    4,
+                    &mut known,
+                    &snake,
+                    || panic!("no encoding needs wanted"),
+                    &profile,
+                    &reports,
+                )
+                .unwrap();
+            assert_eq!(packets, [vec![99]]);
+            assert_eq!(known.front.x.to_bits(), snake.body[0].x.to_bits());
+            assert_eq!(known.front.y.to_bits(), snake.body[0].y.to_bits());
+        }
+        let before = known;
+        let next = Point { x: 42., y: 0. };
+        physics::append_anchor(&mut snake.body, next, false);
+        let calls = Cell::new(0);
+        for (own, expected_calls) in [(false, 1), (false, 1), (true, 2), (false, 2)] {
+            let mut known = before.clone();
+            cache
+                .changes(
+                    &mut Vec::new(),
+                    own,
+                    4,
+                    &mut known,
+                    &snake,
+                    || {
+                        calls.set(calls.get() + 1);
+                        0.7
+                    },
+                    &profile,
+                    &reports,
+                )
+                .unwrap();
+            assert_eq!(calls.get(), expected_calls);
+        }
+    }
+
+    #[test]
+    fn skipped_encoding_retains_existing_error_and_partial_state_behavior() {
+        let world = Simulator::new(crate::WorldOptions {
+            seed: 7,
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["snake".into()],
+                placement: crate::Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let original = &world.snakes()[0];
+        let history = KnownSnake::new(2, original, 0.7).unwrap();
+        for length in [0, 1] {
+            let mut snake = original.clone();
+            snake.body.truncate(length);
+            for own in [false, true] {
+                let mut cache = SnakeDeltaCache::default();
+                for _ in 0..2 {
+                    let (mut reference, mut shared) = (history.clone(), history.clone());
+                    let (mut expected, mut actual) = (vec![vec![99]], vec![vec![99]]);
+                    let result = changes(
+                        &mut expected,
+                        own,
+                        4,
+                        &mut reference,
+                        &snake,
+                        0.7,
+                        &PlayerAppearance::default(),
+                        &SnakeReports::default(),
+                    );
+                    assert_eq!(
+                        cache.changes(
+                            &mut actual,
+                            own,
+                            4,
+                            &mut shared,
+                            &snake,
+                            || 0.7,
+                            &PlayerAppearance::default(),
+                            &SnakeReports::default()
+                        ),
+                        result
+                    );
+                    assert_eq!(actual, expected);
+                    assert_eq!(shared, reference);
+                }
             }
         }
     }
