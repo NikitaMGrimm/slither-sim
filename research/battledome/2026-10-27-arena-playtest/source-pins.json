@@ -39,5 +39,12 @@
     "playableSourceTreeSha256": "6f707f3d94477e039cb23ae89c63b71015afb658e992adfd383daa4c2f7502a7",
     "playableBinarySha256": "f50779950ca8c40e8c0c9582f086f1bc62274d6d29c8966d6f35e26de5635468",
     "playableSmokeSha256": "ced0ea2f968cbc831f6686264dd6d95e699475b1d878a35d997ff8af835296bf"
+  },
+  "prValidation": {
+    "base": "ac8552891db836ab43fdb15f18017179f1c445c4",
+    "approvedHead": "82c46fe8ffc55bcbc312e589cd8a6cd893c33e58",
+    "sourceTreeSha256": "b5bb2e2a5922ba230f70db53704c1ed4ad97d2cbe8c29cfad3a1efc91c23b417",
+    "traceIdentitySha256": "23a3f80c8c3bf7e20b794ecf72c482f80bddea6c9278861c039c2072ffc58786",
+    "tracePinsSha256": "b53a680d947c87f0abb963f02f478193ea480fe0f59a7cee323758861c41bfec"
   }
 }

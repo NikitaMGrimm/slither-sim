@@ -1,141 +1,133 @@
-# Arena playtest v1 — 2026-10-27
+# Constant-density Battledome admission — 2026-10-27
 
-This is a playable first version for owner feedback, not an adopted arena design
-or a completed safety/capacity study. No redesign PR is open. The owner deferred
-remaining directional seeds and held-out confirmation for local playtesting.
+The owner approved build `82c46fe` after playing the plain Battledome preset
+with 64 bots, eight player slots and responsive delivery. This PR preserves
+that behavior on main `ac85528`. It is not a completed capacity/safety study.
 
-## Current behavior
+## Player behavior
 
-Wall target: 3,584 through 32 seats, then `3584 * sqrt(seats / 32)`:
-5,068.54 at 64 and 5,666.80 at 80. Pit/spawn proportions follow the live wall.
-All queue-age growth allowances are removed. Existing immediate growth, gradual
-shrink and 3% dead zone remain. Fresh 16–32-seat geometry, floor, pit and scoring
-rules remain; normal spawn-to-pit travel is still about 4.9–8.8 seconds.
-Area per seat is constant above 32, rather than decreasing crowd density.
+Wall target: `3584 * sqrt(max(seats, 32) / 32)`:
 
-The owner subsequently liked a separately played 64-bot setup with wall 5,069,
-pit 2,523 and spawn band 3,796–4,808. That matches this policy's 64-seat geometry
-and supports constant density over the slower fixed-size screen. That setup
-also used pit-only food, now included here from merged #187.
-This is a feel signal, not independent safety or capacity validation.
+| Seats | Wall | Pit | Spawn band |
+| ---: | ---: | ---: | ---: |
+| 32 | 3,584 | 1,784 | 2,684–3,400 |
+| 64 | 5,069 | 2,523 | 3,796–4,808 |
+| 80 | 5,667 | 2,821 | 4,244–5,376 |
 
-Preferred admission retains 400 body, 600/2s forward-head exclusion and the 3s
-head halo/departure rules. Every selected pose also reserves outside heads'
-3s inward routes at 300 clearance. After 2s waiting, at most the first 256 draws
-can qualify for a directional floor: 200 body/head clearance, 300/1s forward
-paths, and 300/3s normal-speed inward runway. Contact+40 always dominates.
-If no strict pose passes 4,096 draws, choose the eligible pose maximizing its
-minimum body-floor margin. Cache bounds prune losing scores. One search/tick,
-14ms failed retry and socket-before-bot priority remain.
+Wall, pit and spawn band scale together. Area per seat stays constant above 32;
+fresh 16–32-seat geometry and normal spawn-to-pit travel (4.9–8.8s) are unchanged.
+The 64-seat geometry matches the separately approved fixed-radius play setup.
+No queue-age growth allowances remain. Existing immediate growth, 23.4375-unit/s
+shrink and 3% dead zone remain. The mass floor, boost, pit and kill rules are
+those on main, including #187's pit-only food. No new player mechanic is added.
 
-The fallback protects travel toward the middle. It does not promise arbitrary
-future turns or boosted departures, and is not collision immunity. Search
-work is bounded; worst-case waiting is not guaranteed. The current simultaneous
-80-bot fill still reaches about 10s maximum; this is disclosed for playtesting,
-not presented as the final short-wait solution.
+Preferred admission retains 400-unit body clearance, 600-unit/two-second
+forward-head exclusion, the three-second head halo and inward/tangent runways.
+Every selected pose also leaves outside heads' three-second inward routes
+clear by `max(contact+40, 300)`.
 
-## Measurements so far
+After two world seconds waiting, at most the first 256 of the 4,096 draws can
+also qualify for a directional fallback: body/head clearance at least 200,
+forward-head paths 300 over one second, and a three-second normal-speed inward
+runway at 300 clearance. Contact+40 always dominates. If no preferred pose
+passes, choose the eligible pose with greatest minimum body-floor margin.
+Ordering/ties stay deterministic. One search per tick, 14ms failed retry and
+socket-before-bot priority remain. Work is bounded; worst-case wait is not.
+This reserves modeled inward travel, not arbitrary future turns or boosts.
+
+Arena sizing advances rules-v4 to `slither-sim-rules-v5`, rejecting v1–v4
+continuations. Checkpoint format stays v2; no saved fields are added. Queue
+ages remain host state; checkpoints retain the live radius.
+
+## Retained measurements
 
 Offline synthetic host lifecycle: real Simulation/Seat commands, framed
-delivery, shared pit-aware A4 and respawns, driven in a deterministic virtual
-schedule. 180 world seconds/run; strict screens use seeds 7/29/47. Subsequent
-directional pilots use seed 7 only, pending owner direction before a larger study.
-Release/thin LTO, locked dependencies, two-CPU affinity verified, build jobs 1,
-Rayon/test threads 2. No outside servers or owner play-server access.
-Virtual wait seconds are not wall-clock/socket capacity results.
+delivery, shared pit-aware A4 and respawns on a deterministic virtual schedule.
+180 world seconds/run, serial release/thin-LTO builds with locked dependencies
+and at most two CPUs. Strict screens use seeds 7/29/47; directional pilots use
+seed 7. World-time waits and elapsed fixture timings do not qualify sockets.
 
-| Policy | Seats | Wait p50,s | Wait p95,s (seed range) | Wait max,s | Deaths<=3s |
+| Policy | Seats | Wait p50,s (seed range) | Wait p95,s (seed range) | Max,s | Deaths ≤3s |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Strict fixed | 32 | 0.00–0.00 | 7.02–8.56 | 10.54 | 0 |
-| Strict fixed | 64 | 0.00–0.00 | 18.56–19.66 | 26.06 | 0 |
+| Strict fixed | 32 | 0–0 | 7.02–8.56 | 10.54 | 0 |
+| Strict fixed | 64 | 0–0 | 18.56–19.66 | 26.06 | 0 |
 | Strict fixed | 80 | 1.08–1.74 | 23.34–25.22 | 34.00 | 0 |
-| Strict density | 32 | 0.00–0.00 | 7.02–8.56 | 10.54 | 0 |
-| Strict density | 64 | 0.00–0.00 | 14.35–15.21 | 17.30 | 0 |
-| Strict density | 80 | 0.00–0.00 | 15.29–16.70 | 18.67 | 0 |
-| Playtest directional | 32 | 0.00 | 3.89 | 4.94 | 0 |
-| Playtest directional | 64 | 0.00 | 9.26 | 9.32 | 0 |
-| Playtest directional | 80 | 0.00 | 9.88 | 9.96 | 0 |
+| Strict density | 32 | 0–0 | 7.02–8.56 | 10.54 | 0 |
+| Strict density | 64 | 0–0 | 14.35–15.21 | 17.30 | 0 |
+| Strict density | 80 | 0–0 | 15.29–16.70 | 18.67 | 0 |
+| Directional pilot | 32 | 0 | 3.89 | 4.94 | 0 |
+| Directional pilot | 64 | 0 | 9.26 | 9.32 | 0 |
+| Directional pilot | 80 | 0 | 9.88 | 9.96 | 0 |
 
-All strict screens had zero strict head-path intrusions. The three selected
-directional pilots had 11/24/27 strict 600/2 intrusions at 32/64/80 respectively,
-while observing zero deaths<=3s, zero first-3s sampled near-miss lives and zero
-birth-time inward-route intrusions. Complete 3s-followup births: 91/157/190.
-Sampled minimum clearance was at least 200 units, capped at 200 for reporting.
-Near-miss threshold: 100 units beyond physical contact; samples every 42ms,
-both head/body directions between each young snake and every living opponent.
-Sampling does not prove continuous clearance or human comfort. Late lives are
-censored; raw early events are retained. Final pending queues were zero in
-selected pilots. Strict fixed screens ended with up to two pending requests at 80.
+Strict screens had zero strict head-path intrusions. Directional pilots had
+11/24/27 intrusions against the preferred 600/2s exclusion at 32/64/80, while
+observing zero early deaths, sampled near-miss lives and birth-time inward-route
+intrusions. Complete three-second follow-ups: 91/157/190 births. Near-misses mean
+either head within 100 beyond physical contact of the other's body, sampled
+every 42ms during the young life; minimum sampled clearance was at least the
+200-unit reporting cap. Sampling does not prove continuous safety or human
+dodge comfort. Late births are censored. Selected pilots ended with no waiting
+requests; strict fixed screens ended with up to two pending at 80.
 
-Pilot admission elapsed ms/tick: 0.064/0.085/0.100 at 32/64/80. Virtual busy
-ratios were 4.71%/6.17% at 64/80. These include diagnostic overhead and shared
-scheduling. They are descriptive fixture timings, not isolated CPU, real-time
-host load, throughput or a qualified speedup claim. Stable pilots do not qualify
-a long 80-to-32 shrink; final-source shrink load remains unmeasured. No
-eight-minute real-time startup claim is made.
+Admission elapsed ms/tick: 0.064/0.085/0.100 at 32/64/80. Virtual busy ratios
+at 64/80 were 4.71%/6.17%. Diagnostic overhead/shared scheduling are included;
+these are not isolated CPU times, a qualified speedup or a capacity result.
+All gameplay rows predate #187. Strict screens also predate later food-sharing,
+presentation and full-arc A4 fixes; directional v2 includes #180 and the #181 arc
+fix. Source cohorts remain separate; none is relabeled as final-source data.
 
-## Attempts and provenance
+## Owner approval and short startup checks
 
-Full fixtures, source snapshots, copied binaries, hashes, plans, per-tick
-outputs and failed attempts remain local-only in outputs/pit-redesign.
-Selected results retain every run digest. Source-pins identify local-only frozen
-source manifests, binaries and plans; hashes do not make them downloadable or
-validate a claim. The strict screens used the earlier pit-aware source before
-later main food-sharing/presentation merges and the full-arc bot correction; the
-directional v2 pilots include #180 and the #181 hard-arc correction. They are
-distinct cohorts; none is relabeled as a later-source run. Subsequent main host
-changes are integrated on the playable branch; these rows do not qualify that
-final source. Every gameplay row also predates pit-only food (#187).
+The owner approved the full `82c46fe` preset build ("looks good"). The maintainer
+reported a subsequent 75s check through the local relay using two stock headless
+clients: wall 5,068, pit about 2,523, zero pellets outside the pit, no early
+deaths (shortest life about 19s), `(bot)` names, 7.6–9.2% load and zero deferred
+ticks. This is maintainer-provided evidence; raw relay captures were not supplied
+to this study. It supports the 64-seat playtest, not 80-seat capacity or long-run
+safety. Remaining directional/held-out runs were deferred for owner playtesting.
 
-The first fixture attempt omitted the real startup Seat::join call, admitted
-no bots and failed on empty wait quantiles. It contributes no gameplay or timing
-result. The corrected fixture checks nonempty births. Full failed artifacts and
-the superseded startup investigation are retained locally.
+Historical CLI smoke runs were serial, 21s each, default seed, 64 then 80 bots,
+responsive Battledome with eight player slots, loopback 18876 and one-core
+affinity. Four five-second load samples before food integration (`56c8bd1`):
+64: 14.8/37.9/4.4/4.8%; 80: 35.4/32.9/4.2/5.0%. After food (`82c46fe`):
+64: 28.4/11.0/2.9/3.6%; 80: 36.3/33.3/4.0/8.8%. All intervals had zero deferred
+ticks, about 142.7–143.0 ticks/s. These confirm startup, not alive-seat counts.
+Long 80→32 shrink load and eight-minute startup performance remain unmeasured.
 
-The first fixed maximin pilot (32/64/80, seed 7) had no early deaths/near-misses
-but waited up to 7.32/17.97/24.37s; one 64-seat strict birth cut an inward route.
-It is rejected. A failing-before regression reproduced the strict bypass;
-the common cache now guards inward routes for both tiers. A second fixed pilot
-reduced maximum waits to 4.94/12.86/17.41s, still too slow. The current playtest
-uses density at 64/80 with that corrected directional policy. No compact-body,
-immunity or extra-growth design was adopted. Planned remaining directional
-seeds and held-out seeds 71/101 have not run; no adoption gate is claimed.
+## Rebase and cache regressions
 
-Incremental culling is included and split into infrastructure PR #189.
-It mirrors physical wall/pit food removals into the food
-index and presentation before births/pickups, retaining unchanged sector handles
-and hidden ambient births. Focused regressions cover real wall movement and food
-diffs. The main food-generation and ecology_at_radius helpers are untouched.
+`56cc183`, `0a6568c` and `0485107` are dropped: #189 (`c115e05`) already contains
+their complete moving-wall/pit food cull, tests and release note. In particular,
+`0485107` adds no behavior beyond merged #189. #188's subscription union cache
+is preserved. It caches membership, while edge culls independently dirty food
+listings. Strengthened wall/pit regressions hold both membership identities
+constant, require the edge listing to refresh and the quiet handle to survive,
+and verify decoded removals for both clients. A negative control retaining
+dirty cached listings fails both tests; production cache logic needs no change.
 
-This branch is rebased onto pit-only food (#187, main f18dde6, rules-v4).
-Arena sizing advances the combined rules identity to v5; format stays v2.
-Core food generation/ecology calculations remain those merged in #187.
+The current full CONTRIBUTING Rust group and seven docs checks pass, serialized
+with build jobs 1, Rayon 1, test threads 1 and one-core affinity. Approved-build
+and rebased binaries produce byte-identical complete trace windows: portable
+and protocol (32 operations), official-500 (one decision), Battledome-64 (four),
+and retained step_all/next_frame (384 each, including reconnect/decoder replay).
+Harness bytes match. No timing comparison is inferred from these traces.
 
-## Local play config
+## Failed attempts and provenance
 
-No special world overrides are required. For 64 background bots:
+The initial fixture omitted Seat::join, admitted nobody and failed on empty
+wait quantiles; it supplies no timing/gameplay result. The first fixed maximin
+pilot (32/64/80, seed 7) had no early deaths/near-misses but maximum waits
+7.32/17.97/24.37s and one 64-seat strict birth cutting an inward route. Rejected:
+a failing-before regression exposed that strict bypass; both tiers now guard
+inward routes. The corrected fixed pilot still reached 4.94/12.86/17.41s, so the
+playtest uses density at 64/80. No immunity, compact body or extra-growth design
+was adopted. Seeds 71/101 and the remaining directional seeds have not run;
+no completed multi-seed adoption gate is claimed. The superseded startup study
+and all failed/rejected outputs are retained locally.
 
-```json
-{"players":{"max":8},"bots":{"count":64,"threads":2},"simulation":{"world":{"preset":"battledome"},"delivery":"responsive"}}
-```
-
-Set bots.count to 32 or 80 for the other sizes. Occupied/queued human seats also
-count, so those bot counts assume no connected players. Choose a separate bind;
-study smoke tests use 127.0.0.1:18876. The owner controls the local play server.
-
-## Validation of this playable source
-
-Before #187, the full Rust group and seven docs checks passed. After rebasing:
-all five Clippy configurations, the library, Battledome, checkpoint, seat-radius,
-world-rules and socket integration tests pass; release build and docs pass.
-Feature runtime suites were not repeated after the rebase. Final checks use
-one-core affinity, jobs 1, Rayon 1 and test threads 1; older cohorts used two CPUs.
-
-Historical pre-food 21-second CLI smoke runs, 64 then 80 bots, one core:
-64 bots: load 14.8/37.9/4.4/4.8%; 80 bots: 35.4/32.9/4.2/5.0%.
-Zero deferred ticks, about 142.7–143.0 ticks/s. Prior head and hashes are retained.
-Fresh post-food smoke runs use the same 21s/default-seed/config/loopback-18876
-protocol, sequentially on one core. Four five-second load samples:
-64 bots: 28.4/11.0/2.9/3.6%. 80 bots: 36.3/33.3/4.0/8.8%. All intervals had zero deferred ticks.
-These confirm startup, not alive-seat counts, long-run load or shrink cost.
-Binary/log hashes are in source-pins; full logs remain local-only.
+`results.json` retains all 26 summaries and full-result digests. Full fixtures,
+frozen plans, source snapshots, binaries, attempts and traces remain local-only
+under outputs/pit-redesign and outputs/arena-pr. `source-pins.json` preserves
+historical source/binary/plan hashes and identifies the approved build and PR
+validation sources. Hashes identify artifacts; they do not make them publicly
+downloadable or validate empirical claims. No outside game servers were used.

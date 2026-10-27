@@ -240,7 +240,7 @@ floor and free boost at the floor are design choices. Other mechanics inherit
 | Prey | `prey.count: 0` | Snakes only |
 | Ambient food | `foodOnlyInsidePit: true`; reference full-arena `foodCount: 3138`, about 45.9 attempts/s | Multiply target/rate by `(pit / wall)²`: about 24.8%, or 777 placement attempts and 11.38 attempts/s at base size. `ambientRefillCountsAllFood: true` counts death/boost pellets too; inherited admission caps remain |
 
-This playtest version targets constant density above 32 seats:
+Battledome targets constant density above 32 seats:
 `3584 × sqrt(max(seats, 32) / 32)`, about 5,069 at 64 and 5,667 at 80.
 Seats count living players, retained dead players and, before host admission,
 queued joins. Queue age never enlarges the arena. Pit and spawn band scale with
@@ -256,7 +256,8 @@ normal-speed runway toward the middle. Contact exclusions always dominate.
 If the strict search fails, the best minimum body-clearance fallback wins.
 This fallback reserves inward travel; it does not promise a clear three-second
 tangent departure or arbitrary later turns/boosting. These provisional choices
-are being iterated through local playtests.
+have been approved in a 64-bot local playtest; the measurements below retain
+the limits of the spawn model.
 
 Waiting sockets still precede bots. At most one bounded search runs per tick,
 with 14 ms between failed searches. Actual growth still waits for the latest
@@ -264,7 +265,7 @@ newborn's three-second departure window. Work is bounded, but exhausting both
 tiers can still leave a request waiting. Initial simultaneous bot fills in the
 current pilot take up to about ten seconds at 80 seats; ordinary respawns are
 usually much faster. See the
-[playtest record](https://github.com/NikitaMGrimm/slither-sim/blob/fix/battledome-admission/research/battledome/2026-10-27-arena-playtest/REPORT.md).
+[admission record](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-arena-playtest/REPORT.md).
 
 `dynamicRadius: false` keeps the 3,584-unit arena with the same admission tiers.
 Other worlds with `dynamicRadius`, `spawnRadius` and `minScore` use this capped
@@ -274,9 +275,7 @@ queue allowance. Queue state remains outside core checkpoints.
 
 In fresh 16–32-seat worlds the wall, pit, spawn band, food density and
 spawn-to-pit travel (about 4.9–8.8 s at normal speed) are unchanged. After a
-large population leaves, the arena shrinks gradually. The
-[local capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-26-spawn-capacity/REPORT.md)
-compares fixed strict admission, fixed-arena relaxation and strict growth.
+large population leaves, the arena shrinks gradually.
 
 When the growing pit passes over a snake that hasn't entered it, the snake can
 still leave. Crossing the edge inward, or starting inside, commits it to the
