@@ -372,7 +372,12 @@ impl SimulatorBackend {
                 )
             })
             .collect();
-        let grid = CoverageGrid::new(self.world.snakes(), &bounds, self.world.config().vision);
+        let grid = if let Some(mut grid) = self.coverage_grid.take() {
+            grid.update(self.world.snakes(), &bounds, self.world.config().vision);
+            grid
+        } else {
+            CoverageGrid::new(self.world.snakes(), &bounds, self.world.config().vision)
+        };
         let prey_bounds = PreyBounds::new(self.world.prey(), self.world.config().vision);
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
@@ -445,6 +450,7 @@ impl SimulatorBackend {
         if early >= self.slots.len() {
             self.hand_over_early(early, hand_over)?;
         }
+        self.coverage_grid = Some(grid);
         self.food_eaters.clear();
         self.prey_eaters.clear();
         Ok(())

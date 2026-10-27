@@ -74,7 +74,7 @@ pub(crate) use remote::RawSimulator;
 use broadcast::{PreyClock, Record};
 use connection::{Connection, Slot};
 use food::{FoodIndex, FoodSubscriptions, SectorFood};
-use snakes::SnakeReports;
+use snakes::{CoverageGrid, SnakeReports};
 
 /// Simulator backend whose clients reconstruct frames from protocol-19 bytes.
 ///
@@ -117,6 +117,9 @@ pub struct SimulatorBackend {
     next_leaderboard: u64,
     prey_clocks: BTreeMap<u64, PreyClock>,
     reports: Vec<SnakeReports>,
+    /// Reused broad-phase cells; an interrupted broadcast may drop this scratch
+    /// and the next one rebuilds it without changing recipient state.
+    coverage_grid: Option<CoverageGrid>,
     food_subscriptions: FoodSubscriptions,
     tick: u64,
     /// Leading slots owned by external clients; zero for the native backend.
@@ -202,6 +205,7 @@ impl SimulatorBackend {
             next_leaderboard: 1,
             prey_clocks: BTreeMap::new(),
             reports: vec![SnakeReports::default(); config.agents],
+            coverage_grid: None,
             food_subscriptions: FoodSubscriptions::default(),
             slots: Vec::with_capacity(config.agents),
             background_policy: None,
