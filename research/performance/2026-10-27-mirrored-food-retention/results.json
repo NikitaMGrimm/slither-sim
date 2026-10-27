@@ -695,5 +695,18 @@
     "mutation": "omit mirrored cache removal before compaction",
     "regressionFailed": true,
     "logSha256": "d527cc32669ce6398d6b09ea522f660dc07cc3c8a66a663b9b4f399e4fe6067b"
+  },
+  "integration": {
+    "runtime": "dea716ef1ea01fe97f0e1bcefda5e725c7c858a9",
+    "main": "ef866d73259e35fe8659a1996d7b97c36d511e0b",
+    "coreMatchesMeasured": true,
+    "rustPassed": true,
+    "archiveSha256": "98ea11577c14c7c57a2d0b8c0693a96b405725f3abc9d5e55948d62c38a9527d",
+    "rustLogSha256": "1ca74c0403fc27646463651e8ce79289390fc7c4ad80bad8fe44605351dd0bbd",
+    "focusedLogSha256": "481641e5cfd2e0d37c79c99f85e16807702eb27a33c3d51913c5e0ee4e832877"
+  },
+  "documentationAndGuards": {
+    "passed": true,
+    "logSha256": "7e869fddbf822e9820e95e525c8886bcd3c1c3d03e1e7725e2d90b605a981078"
   }
 }

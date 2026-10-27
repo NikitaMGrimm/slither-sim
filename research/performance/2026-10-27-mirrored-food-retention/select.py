@@ -110,4 +110,15 @@ result['checks']={'rustPassed':True,'archiveSha256':sha(checks/'source.tar'),'ru
 negative=root/'negative';control=json.loads((negative/'selected.json').read_text())
 assert control['runtime']==candidate and control['regressionFailed']
 result['negative']={**control,'logSha256':sha(negative/'test.log')}
+integration='dea716ef1ea01fe97f0e1bcefda5e725c7c858a9'
+checks=root/'checks-integration'
+with tarfile.open(checks/'source.tar') as f:assert f.pax_headers['comment']==integration
+assert 'CHECKS PASS refs/heads/perf/mirrored-food-retention rust' in (root/'checks-integration.log').read_text()
+assert '5 passed; 0 failed' in (checks/'focused.log').read_text()
+subprocess.run(['git','-C',str(repo),'diff','--exit-code',candidate,integration,'--','src/simulator.rs','src/food_grid.rs','src/physics.rs','src/bounds_index.rs','Cargo.toml','Cargo.lock','build.rs'],check=True)
+result['integration']={'runtime':integration,'main':'ef866d73259e35fe8659a1996d7b97c36d511e0b',
+                       'coreMatchesMeasured':True,'rustPassed':True,'archiveSha256':sha(checks/'source.tar'),
+                       'rustLogSha256':sha(checks/'rust.log'),'focusedLogSha256':sha(checks/'focused.log')}
+assert 'DOCS AND SEVEN GUARDS PASS' in (root/'docs-guards.log').read_text()
+result['documentationAndGuards']={'passed':True,'logSha256':sha(root/'docs-guards.log')}
 print(json.dumps(result,indent=2))

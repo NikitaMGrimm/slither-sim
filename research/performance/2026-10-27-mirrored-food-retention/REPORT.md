@@ -119,3 +119,11 @@ Verification: all five focused retention tests, the full Linux Rust group
 (15 commands), seven documentation tests and all seven study-entrypoint
 `python -O` rejection checks pass. The mutation control fails as expected.
 All selected process and per-tick counters are 100% scheduled.
+
+After measurement, main advanced to `ef866d73259e35fe8659a1996d7b97c36d511e0b`
+(#222 study and #223 host coverage). Integration revision
+`dea716ef1ea01fe97f0e1bcefda5e725c7c858a9` preserves the measured simulator,
+food cache, physics, bounds index and Cargo inputs byte for byte. The five
+focused tests and full Linux Rust group were rerun on that integration in a
+fresh isolated target. Measurement tables retain their original revision pins;
+these later host changes are not included in those paired numbers.
