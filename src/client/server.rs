@@ -425,7 +425,7 @@ impl Host {
                 .collect();
             let bots = Bots {
                 seats,
-                policy: ForagerBot::with_world_rules(self.world.backend_config()),
+                policy: ForagerBot::new(),
                 stride: self.bot_threads,
                 deliveries: receiver,
                 commands: commands.clone(),

@@ -91,3 +91,15 @@ fn known_response_fields_still_require_their_declared_types() {
         );
     }
 }
+
+#[test]
+fn absent_rules_in_older_frames_stay_unknown() {
+    let mut old = example();
+    old.as_object_mut().unwrap().remove("rules");
+    assert!(
+        serde_json::from_value::<ClientFrame>(old)
+            .unwrap()
+            .rules
+            .is_none()
+    );
+}

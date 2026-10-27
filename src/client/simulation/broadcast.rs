@@ -584,6 +584,11 @@ impl SimulatorBackend {
             connection.radius = radius;
             packets.push(encode::radius(world.radius())?);
         }
+        let rules = world.rules();
+        if connection.rules_enabled && connection.rules_sent != Some(rules) {
+            packets.push(crate::client::rules_packet::encode(rules));
+            connection.rules_sent = Some(rules);
+        }
         let vision = world.config().vision;
         let head = me.head;
         // Snakes that may cover the head, or that this connection shows and may

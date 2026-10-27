@@ -59,6 +59,9 @@ pub(super) struct Connection {
     pub(super) decorated_food: KnownSectors,
     /// Stock sockets get decoration; bot clients retain physical food at every key.
     pub(super) decorations: bool,
+    /// Explicit bot opt-in; native clients opt in at connection creation.
+    pub(super) rules_enabled: bool,
+    pub(super) rules_sent: Option<crate::WorldRules>,
     /// Last presented delivery, including marker-only frames. The physical
     /// latency stream must not advance for decorations, but output stays ordered.
     pub(super) presented_at: f64,
@@ -172,6 +175,7 @@ impl SimulatorBackend {
         self.connections = self.connections.wrapping_add(1);
         let mut connection = Connection {
             open: true,
+            rules_enabled: !self.slots[slot].remote,
             session: session_id(self.connections, self.session_key),
             link: Link::connect(latency, &mut self.random),
             ..Default::default()
@@ -380,11 +384,14 @@ impl SimulatorBackend {
                     let connection = &mut self.slots[slot].connection;
                     connection.setup = true;
                     connection.radius = radius.round() as u32;
-                    self.emit(
-                        slot,
-                        now,
-                        &[encode::setup(radius, self.world.config().prey.turn_rate)?],
-                    )?;
+                    let mut packets =
+                        vec![encode::setup(radius, self.world.config().prey.turn_rate)?];
+                    if connection.rules_enabled {
+                        let rules = self.world.rules();
+                        packets.push(crate::client::rules_packet::encode(rules));
+                        connection.rules_sent = Some(rules);
+                    }
+                    self.emit(slot, now, &packets)?;
                 }
                 Uplink::Message(bytes) => match bytes[..] {
                     [heading @ 0..=250] => {

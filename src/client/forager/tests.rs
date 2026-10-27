@@ -20,7 +20,7 @@ fn backend(round_trip: f64) -> SimulatorBackend {
 }
 
 #[test]
-fn local_pit_rules_follow_live_wall_and_leave_pitless_decisions_unchanged() {
+fn received_pit_rules_are_authoritative_and_leave_pitless_decisions_unchanged() {
     let mut backend = backend(0.);
     backend.advance_ticks(1).unwrap();
     let mut frame = backend.frame_for(0).unwrap();
@@ -32,25 +32,72 @@ fn local_pit_rules_follow_live_wall_and_leave_pitless_decisions_unchanged() {
     o.me.head = crate::Point { x: 2200., y: 0. };
     o.me.heading = std::f64::consts::FRAC_PI_2;
     o.me.body = vec![o.me.head];
+    frame.rules = None;
     let plain = ForagerBot::new().decide(&frame);
-    assert_eq!(
-        ForagerBot::with_world_rules(&Config::official(4)).decide(&frame),
-        plain
-    );
-    let mut rules = Config::battledome();
-    let mut pit_bot = ForagerBot::with_world_rules(&rules);
-    let inward = pit_bot.decide(&frame).unwrap();
+    frame.rules = Some(crate::WorldRules::default());
+    assert_eq!(ForagerBot::new().decide(&frame), plain);
+    frame.rules.as_mut().unwrap().pit_radius = Some(1784.);
+    let inward = ForagerBot::new().decide(&frame).unwrap();
     assert!(inward.heading.cos() < -0.5, "{inward:?}");
-    // With a doubled live wall this same head is inside the live pit. Its
-    // ordinary tangent is safe there; a fixed reference pit would still enter.
     frame.observation.as_mut().unwrap().arena.radius *= 2.;
-    let inside = pit_bot.decide(&frame).unwrap();
-    assert!(inside.heading.cos().abs() < 0.1, "{inside:?}");
-    rules.dynamic_radius = false;
     assert_eq!(
-        ForagerBot::with_world_rules(&rules).decide(&frame),
-        Some(inward)
+        ForagerBot::new().decide(&frame),
+        Some(inward),
+        "wall alone cannot infer a pit"
     );
+    frame.rules.as_mut().unwrap().pit_radius = Some(3568.);
+    let inside = ForagerBot::new().decide(&frame).unwrap();
+    assert!(inside.heading.cos().abs() < 0.1, "{inside:?}");
+}
+
+#[test]
+fn received_pit_policy_matches_181_at_frozen_integer_wall_radii() {
+    for radius in [3584., 7168., 8960.] {
+        let mut world = Config::battledome();
+        world.food_count = 0;
+        world.ambient_replenish_per_second = 0.;
+        world.radius_updates = (0..=250)
+            .map(|tick| crate::RadiusUpdate {
+                time: tick as f64 * world.dt,
+                radius,
+            })
+            .collect();
+        let reference_pit = world.pit.as_ref().unwrap().radius;
+        let reference_wall = world.radius;
+        let mut backend = SimulatorBackend::new(
+            7,
+            SimulationConfig {
+                world,
+                agents: 4,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut bot = ForagerBot::new();
+        let mut playing = 0;
+        for _ in 0..40 {
+            let mut actions = Vec::new();
+            for slot in 0..4 {
+                let frame = backend.frame_for(slot).unwrap();
+                let action = bot.decide(&frame);
+                if let Some(o) = &frame.observation {
+                    let old_pit = reference_pit * (o.arena.radius / reference_wall);
+                    assert_eq!(frame.rules.unwrap().pit_radius, Some(old_pit));
+                    let expected =
+                        Forager::new().decide_with_pit(o, &bot.timing(&frame), &[], Some(old_pit));
+                    assert_eq!(
+                        action.unwrap().heading.to_bits(),
+                        expected.heading.to_bits()
+                    );
+                    assert_eq!(action.unwrap().boost, expected.boost);
+                    playing += 1;
+                }
+                actions.push(action);
+            }
+            backend.step_all(&actions).unwrap();
+        }
+        assert!(playing > 100);
+    }
 }
 
 #[test]

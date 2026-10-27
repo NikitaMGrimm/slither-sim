@@ -173,6 +173,7 @@ fn pit_markers_reach_stock_sockets_but_not_portable_bots() {
     let start = Instant::now();
     loop {
         let received = packets(&stock.binary());
+        assert!(received.iter().all(|p| p[0] != b'~'));
         if received.iter().any(|p| p[0] == b'F' && p.len() > 3) {
             for packet in received.iter().filter(|p| p[0] == b'F') {
                 for marker in packet[3..].as_chunks::<4>().0 {
@@ -200,6 +201,7 @@ fn pit_markers_reach_stock_sockets_but_not_portable_bots() {
                 assert_ne!(f.status, ClientStatus::Dead, "{handshake:?} life {life}");
                 f.status == ClientStatus::Playing
             });
+            assert!(frame.rules.is_some());
             assert!(frame.observation.unwrap().food.is_empty());
             for _ in 0..5 {
                 assert!(
@@ -856,4 +858,45 @@ fn legacy_host_keys_are_rejected_with_grouped_config_names() {
         .to_string();
     assert!(error.contains("BotConfig"), "{error}");
     assert!(error.contains("expected"), "{error}");
+}
+
+#[test]
+fn socket_bots_receive_exact_live_battledome_rules_while_stock_sockets_do_not() {
+    let mut cfg = config(2, 0);
+    cfg.simulation.world = slither_sim::Config::battledome();
+    cfg.simulation.world.food_count = 0;
+    cfg.simulation.world.ambient_replenish_per_second = 0.;
+    cfg.simulation.world.radius_updates = vec![slither_sim::RadiusUpdate {
+        time: 0.7,
+        radius: 7168.,
+    }];
+    let host = Running::start(cfg);
+    let mut bot = network(host.url(), "Rules", Handshake::Direct);
+    let initial = until(&mut bot, "initial rules", |f| f.rules.is_some());
+    assert_eq!(initial.rules.unwrap().pit_radius, Some(1784.));
+    assert_eq!(initial.rules.unwrap().min_score, Some(400));
+    assert_eq!(initial.rules.unwrap().kill_score_seconds, Some(900.));
+    let grown = until(&mut bot, "grown pit", |f| {
+        f.rules.is_some_and(|r| r.pit_radius.unwrap() > 3500.)
+    });
+    let pit = grown.rules.unwrap().pit_radius.unwrap();
+    let shrunk = until(&mut bot, "shrinking pit", |f| {
+        f.rules.is_some_and(|r| r.pit_radius.unwrap() < pit)
+    });
+    assert_eq!(shrunk.rules.unwrap().min_score, Some(400));
+    // A stock-compatible socket provides no custom header and uses bare framing.
+    let mut stock = Raw::connect(host.address, "/slither");
+    assert!(stock.status().starts_with("HTTP/1.1 101"));
+    stock.send(&[1]);
+    stock.send(&stock_login(b"StockRules", 0, &[]));
+    let mut saw_self = false;
+    for _ in 0..40 {
+        let received = packets(&stock.binary());
+        assert!(received.iter().all(|p| p[0] != b'~'));
+        saw_self |= received.iter().any(|p| p[0] == b's' && p.len() > 7);
+    }
+    assert!(saw_self);
+    bot.disconnect();
+    drop(stock);
+    host.finish();
 }

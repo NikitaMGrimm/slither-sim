@@ -12,6 +12,7 @@
     "time": 1.5,
     "status": "playing",
     "life": 2,
+    "rules": {"boundaryMode":"sliding","freeBoostAtFloor":true,"killScoreSeconds":900.0,"minScore":400,"pitRadius":1784.0},
     "settings": {
       "protocol": 19,
       "gridCenter": 21600,
