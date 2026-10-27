@@ -4,6 +4,12 @@
 
 ### Added
 
+- A study that replays official and local recordings through SlitherClient,
+  a Rust port of the stock client, and measures how much its predictions of
+  other snakes get corrected. It maps the client's motion formulas against the
+  simulator's and ranks the remaining fidelity gaps; the comparison is not
+  matched, so it makes no parity claim, and game behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-client-view/REPORT.md)).
 - The hosting guide explains how to build the server for the machine's own
   CPU. In our tests its game output matched the portable build exactly, and
   its median cycle count was 3.5–4.5% lower on one shared development machine;
