@@ -21,6 +21,27 @@ sudo install -m 0755 "slither-sim-$TARGET/slither-sim" /usr/local/bin/slither-si
 slither-sim --version
 ```
 
+### Build for the hosting CPU
+
+For a dedicated server with a Rust toolchain, an optional CPU-specific build
+can use instructions that portable release archives omit. From a source checkout
+of the version you want, build on the machine that will run the host:
+
+```sh
+RUSTFLAGS="-C target-cpu=native" cargo build --release --locked --bin slither-sim
+./target/release/slither-sim --version
+```
+
+Use that binary in the service's `ExecStart`, or install it as above. A `native`
+binary requires the build machine's CPU features; rebuild for another CPU.
+Portable archives, crate builds and Python wheels keep their existing defaults.
+
+The [four-target replay study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)
+found byte-identical output for default, x86-64-v2, x86-64-v3 and native builds.
+Native had the strongest local cycle medians, but the shared WSL2 measurements
+do not establish production CPU savings or player capacity. Measure on your host
+before choosing it for a deployment.
+
 ## Configure
 
 Save one of these as `/etc/slither-sim.json`. Both listen on port 444 and run

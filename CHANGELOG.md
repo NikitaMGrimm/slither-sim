@@ -19,6 +19,11 @@
 
 ### Performance
 
+- Document optional CPU-specific host builds. All twelve replay traces match
+  across default, x86-64-v2, x86-64-v3 and native targets. Native's local paired
+  user-cycle medians were 3.5–4.5% lower; these descriptive WSL2 results make no
+  production CPU or capacity claim. Portable build defaults are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)).
 - Collision and prey lookups number their grid cells by truncating instead of
   calling `floor`; the cells only need to keep their order, and the exact tests
   are unchanged. Output is byte-identical, and the 500-player official fixture
