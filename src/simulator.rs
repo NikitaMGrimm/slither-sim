@@ -2783,7 +2783,7 @@ fn indexed_hits<const PROFILE: bool>(
             }
         }
     }
-    hits.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+    hits.sort_unstable_by_key(|hit| std::cmp::Reverse(hit.0));
 }
 
 /// Visit food in reverse, recording each pellet's eater.
