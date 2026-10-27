@@ -1,6 +1,7 @@
 """Linux x86-64: build, trace, count, then measure baseline legacy tick cost."""
 import argparse,gzip,hashlib,json,os,shutil,statistics,struct,subprocess
 from pathlib import Path
+if not __debug__:raise SystemExit('run without -O: the parity and pin checks are asserts')
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('mode',choices=['build','trace','count'])
