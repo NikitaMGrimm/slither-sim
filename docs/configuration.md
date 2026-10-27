@@ -304,8 +304,11 @@ balance choice the owner can revisit. Floor boost remains free with no pellets.
 The decorative edge ring remains presentation-only; it is not physical food.
 Setting `foodOnlyInsidePit: false` restores the previous food rules, including
 above-floor death budgets in custom floor worlds. Official and sandbox defaults
-remain unchanged. These are owner-directed mode rules with synthetic regressions;
-the requested three-seed ten-minute supply study is deferred until playtesting.
+remain unchanged. These are owner-directed mode rules with synthetic regressions.
+The owner approved the local play build; a short matched 32/64-seat supply check
+and its limits are recorded in the
+[pit-food report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-pit-food/REPORT.md).
+The original three-seed ten-minute study was not run.
 The [earlier food study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-25-food-balance/REPORT.md)
 describes the prior mapping and does not validate this version's food supply.
 

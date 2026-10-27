@@ -20,7 +20,8 @@ death and boost pellets are discarded outside the strict live pit edge.
 Moving edges remove stranded food. Above-floor boost mass spent outside the pit
 is lost; floor boosting stays free without pellets. The total-food refill target
 pauses ambient generation but does not cap death/boost food. Long-run supply
-balance for this owner-directed version has not yet been measured.
+balance for this owner-directed version is not established by the
+[short local supply check](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/battledome/2026-10-27-pit-food/REPORT.md).
 
 The seat-following radius, food admission limits, prey population, kiosk penalty and rim
 sliding are provisional. In particular:
