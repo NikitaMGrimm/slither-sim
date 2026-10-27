@@ -926,7 +926,7 @@ fn diff_food(
         &SectorInterest::from_subscribed(subscribed.clone()),
         &listings,
         &FoodChanges {
-            changed: subscribed.clone(),
+            changed: subscribed.iter().copied().collect(),
             eaten: eaten_sectors(eaters),
             ..Default::default()
         },
@@ -986,7 +986,7 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
         &interest,
         &sectors,
         &FoodChanges {
-            changed: eaten_sectors(&eaters),
+            changed: eaten_sectors(&eaters).into_iter().collect(),
             eaten: eaten_sectors(&eaters),
             previous: unchanged.current.clone(),
             ..Default::default()

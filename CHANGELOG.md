@@ -19,6 +19,11 @@
 
 ### Performance
 
+- Host food delivery checks only the changed food sectors inside each
+  player's subscribed range, instead of every changed sector in the world.
+  Output is byte-identical, and the 500-player official fixture runs 6.4–6.8%
+  fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-food-ranges/REPORT.md)).
 - Food pickup tests only the pellets in grid cells that a snake's pickup
   circle covers, instead of every pellet each tick, using a cell index kept up
   to date as food appears and is eaten. Output is byte-identical, and the
