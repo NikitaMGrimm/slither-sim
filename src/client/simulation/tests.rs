@@ -357,6 +357,155 @@ fn shrinking_food_and_surplus_prey_leave_both_decoded_client_views_without_picku
     }
 }
 
+#[test]
+fn a_shrinking_wall_culls_edge_food_without_resynchronizing_quiet_sectors() {
+    shrinking_food_cull(false);
+}
+
+#[test]
+fn a_shrinking_pit_culls_edge_food_without_resynchronizing_quiet_sectors() {
+    shrinking_food_cull(true);
+}
+
+fn shrinking_food_cull(pit_only: bool) {
+    let mut config = SimulationConfig {
+        agents: 2,
+        ..Default::default()
+    };
+    config.world = Config::official(4);
+    if pit_only {
+        config.world.radius = 2680.;
+        config.world.size_to_population = false;
+        config.world.spawn_radius = Some(2000.);
+        config.world.min_score = Some(10);
+        config.world.pit = Some(crate::PitConfig { radius: 1340. });
+        config.world.food_only_inside_pit = true;
+    }
+    config.world.food_count = 0;
+    config.world.ambient_replenish_per_second = 0.;
+    config.world.prey.count = 0;
+    config.world.radius_updates = vec![crate::RadiusUpdate {
+        time: 0.021,
+        radius: if pit_only { 1340. } else { 670. },
+    }];
+    let mut sim = RawSimulator::new(7, config, 2).unwrap();
+    let mut a = Remote::connect(&mut sim, 0, "Observer A");
+    let mut b = Remote::connect(&mut sim, 1, "Observer B");
+    if pit_only {
+        for slot in 0..2 {
+            sim.physical_food(slot);
+        }
+    }
+    for (slot, y) in [(0, -100.), (1, 100.)] {
+        sim.backend.world.retire(slot).unwrap();
+        sim.backend
+            .world
+            .respawn(slot, Point { x: 0., y }, 0., 2)
+            .unwrap();
+        sim.backend.slots[slot].control = Action::default();
+    }
+    let pellet = |x, y, origin| Food {
+        x,
+        y,
+        value: 1.,
+        size: Some(2.),
+        origin: Some(origin),
+    };
+    let quiet = pellet(400., 0., Origin::Ambient);
+    let edge = pellet(600., 0., Origin::Ambient);
+    let outside = [
+        pellet(700., 0., Origin::Ambient),
+        pellet(1000., -60., Origin::Ambient),
+        pellet(1000., 60., Origin::Death),
+    ];
+    sim.backend
+        .food_presentation
+        .births(&[crate::FoodSpawnEvent {
+            source: Some(0),
+            food: outside[2].clone(),
+        }])
+        .unwrap();
+    let mut food = vec![quiet.clone(), edge.clone()];
+    food.extend(outside.iter().cloned());
+    sim.backend.world.replace_food(food).unwrap();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 2);
+    assert_eq!(sim.backend.world.food().len(), 5);
+    // An ambient birth waiting for maintenance in the quiet sector, recorded
+    // as a physics birth would be.
+    let hidden = pellet(420., 0., Origin::Ambient);
+    sim.backend
+        .food_presentation
+        .births(&[crate::FoodSpawnEvent {
+            source: None,
+            food: hidden.clone(),
+        }])
+        .unwrap();
+    let color = sim.backend.food_presentation.newest(&hidden);
+    sim.backend.food_index.add(&hidden, false, color);
+    sim.backend.world.insert_food(hidden.clone()).unwrap();
+    let key = |food: &Food| encode::food_key(food.point()).unwrap();
+    let sector = |food: &Food| usize::from(FoodIndex::sector(food).unwrap().0);
+    assert_eq!(sector(&hidden), sector(&quiet));
+    assert_eq!(sector(&outside[0]), sector(&edge));
+    let listing = sim.backend.food_sectors[sector(&quiet)].clone().unwrap();
+    let colors = [&quiet, &edge].map(|food| sim.backend.food_presentation.color(food, 0));
+    a.packets.clear();
+    b.packets.clear();
+    run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 1);
+    assert_eq!(
+        sim.backend.world.radius(),
+        if pit_only { 1340. } else { 670. }
+    );
+    assert_eq!(sim.backend.world.food_radius(), 670.);
+    assert_eq!(sim.backend.world.food().len(), 3);
+    assert!(sim.backend.world.pickup_events().unwrap().is_empty());
+    assert_eq!(sim.backend.food_index.count, 3);
+    assert!(!sim.backend.food_index.stale);
+    // A full resynchronization would reveal the hidden birth early.
+    assert!(std::sync::Arc::ptr_eq(
+        &listing,
+        sim.backend.food_sectors[sector(&quiet)].as_ref().unwrap()
+    ));
+    let edge_listing = &sim.backend.food_sectors[sector(&edge)].as_ref().unwrap().0;
+    assert_eq!(edge_listing.len(), 1);
+    assert_eq!(edge_listing[0].1.point, edge.point());
+    assert_eq!(
+        [&quiet, &edge].map(|food| sim.backend.food_presentation.color(food, 0)),
+        colors
+    );
+    assert_eq!(sim.backend.food_presentation.lifetimes(&hidden), 1);
+    for food in &outside {
+        assert_eq!(sim.backend.food_presentation.lifetimes(food), 0);
+    }
+    for remote in [&a, &b] {
+        for food in &outside {
+            let key = key(food);
+            assert!(remote.packets.contains(&encode::food_remove(key, None)));
+            assert!(
+                !remote
+                    .packets
+                    .iter()
+                    .any(|p| p[0] == b'<' && p[1..5] == key)
+            );
+            assert!(
+                !remote
+                    .packets
+                    .contains(&encode::sector_clear([key[0], key[1]]))
+            );
+        }
+        for food in [&quiet, &edge, &hidden] {
+            let key = key(food);
+            assert!(
+                !remote
+                    .packets
+                    .iter()
+                    .any(|p| matches!(p[0], b'f' | b'b' | b'c' | b'<') && p[1..5] == key)
+            );
+        }
+        assert_eq!(remote.frame(&sim).observation.unwrap().food.len(), 2);
+    }
+}
+
 /// Original exhaustive admission, kept independent of the bounded scorer.
 fn exhaustive_spawn_pose(
     world: &Simulator,

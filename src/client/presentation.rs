@@ -244,6 +244,20 @@ impl FoodPresentation {
         Ok(visible)
     }
 
+    /// Forget every lifetime at each position a shrinking wall removed. The
+    /// wall test depends only on position, so co-located pellets leave
+    /// together; colors elsewhere and the random stream are untouched.
+    pub(super) fn cull(&mut self, culled: &[Food]) {
+        for food in culled {
+            self.colors.remove(&identity(food));
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn lifetimes(&self, food: &Food) -> usize {
+        self.colors.get(&identity(food)).map_or(0, VecDeque::len)
+    }
+
     /// Color of the `lifetime`-th pellet, in food order, at this food's
     /// position. Call after births and a successful sync of the world food.
     pub(super) fn color(&self, food: &Food, lifetime: usize) -> u8 {
@@ -543,6 +557,41 @@ mod tests {
         births(&mut presentation, 0, std::slice::from_ref(&same));
         assert_eq!(presentation.color(&same, 0), 3);
         assert_eq!(presentation.colors.len(), 1);
+    }
+
+    #[test]
+    fn culling_forgets_every_lifetime_at_a_point_and_keeps_later_colors() {
+        let start = || {
+            let mut presentation = FoodPresentation::new(5, 1);
+            presentation.register(0, 15, &[]);
+            let gone = food(-0., Some(Origin::Death));
+            let kept = food(2., Some(Origin::Death));
+            births(&mut presentation, 0, &[gone.clone(), kept, gone]);
+            presentation
+        };
+        let (mut culled, mut twin) = (start(), start());
+        let kept = food(2., Some(Origin::Death));
+        culled.cull(&[food(0., Some(Origin::Death))]);
+        assert_eq!(culled.lifetimes(&food(0., None)), 0);
+        assert_eq!(culled.lifetimes(&kept), 1);
+        assert_eq!(culled.color(&kept, 0), 2);
+        // Later source and ambient births continue both streams unchanged.
+        for presentation in [&mut culled, &mut twin] {
+            presentation
+                .births(&[
+                    FoodSpawnEvent {
+                        source: Some(0),
+                        food: food(3., Some(Origin::Boost)),
+                    },
+                    FoodSpawnEvent {
+                        source: None,
+                        food: food(4., None),
+                    },
+                ])
+                .unwrap();
+        }
+        assert_eq!(culled.newest(&food(3., None)), 4);
+        assert_eq!(culled.newest(&food(4., None)), twin.newest(&food(4., None)));
     }
 
     #[test]

@@ -32,6 +32,9 @@
 
 ### Fixed
 
+- Food removed by moving arena boundaries updates the affected sectors without
+  rebuilding the whole food index or revealing waiting ambient births before
+  their scheduled update. Survivor colors stay unchanged.
 - Battledome background bots head into the pit after spawning and treat its
   edge as a lethal wall once inside, instead of dying on it. In three local
   three-minute runs with 64 bots, they spent 87–97% of their time in the pit

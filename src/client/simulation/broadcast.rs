@@ -223,9 +223,18 @@ impl SimulatorBackend {
             .zip(&self.slots)
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
+        let radius = self.world.radius();
         self.world
             .step(&actions)
             .map_err(|error| error.to_string())?;
+        // Mirror update_radius's food removal before births and pickups,
+        // including the smaller live pit edge in pit-only food worlds.
+        if (self.world.config().food_only_inside_pit && self.world.radius() != radius)
+            || (self.world.config().dynamic_radius && self.world.radius() < radius)
+        {
+            let culled = self.food_index.cull(self.world.food_radius());
+            self.food_presentation.cull(&culled);
+        }
         let births = self.world.food_spawn_events().unwrap_or(&[]);
         // Physics appends boost/death food, visits pickups in reverse food
         // order, then appends ambient replenishment. Preserve that ordering for

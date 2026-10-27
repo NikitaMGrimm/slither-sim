@@ -186,6 +186,40 @@ impl FoodIndex {
         }
     }
 
+    /// Remove pellets outside a shrunk dynamic wall with the same test physics
+    /// uses, keeping survivor order, colors and visibility. Only sectors that
+    /// lose a shown pellet need a new listing. Returns the culled food.
+    ///
+    /// Off-grid food is not indexed; culling it leaves `count` high, so the
+    /// next broadcast falls back to a full rebuild.
+    pub(super) fn cull(&mut self, radius: f64) -> Vec<Food> {
+        let mut culled = Vec::new();
+        self.sectors.retain(|&sector, entries| {
+            if sector_reach(sector) < radius {
+                return true;
+            }
+            let (mut shown, mut hidden) = (false, false);
+            entries.retain(|entry| {
+                let inside = entry.food.point().distance_lt(Point::default(), radius);
+                if !inside {
+                    shown |= entry.shown;
+                    hidden |= !entry.shown;
+                    culled.push(entry.food.clone());
+                    self.count = self.count.wrapping_sub(1);
+                }
+                inside
+            });
+            if shown {
+                self.dirty.insert(sector);
+            }
+            if hidden && entries.iter().all(|entry| entry.shown) {
+                self.hidden.remove(&sector);
+            }
+            !entries.is_empty()
+        });
+        culled
+    }
+
     /// Show every ambient birth held since the last maintenance.
     pub(super) fn reveal(&mut self) {
         for sector in std::mem::take(&mut self.hidden) {
@@ -454,6 +488,18 @@ pub(super) fn eaten_sectors(eaters: &BTreeMap<(u64, u64), u16>) -> BTreeSet<[u8;
             encode::food_key(point).ok().map(|key| [key[0], key[1]])
         })
         .collect()
+}
+
+/// Bound on the center distance of any pellet keyed to `sector`. Wire cells
+/// round to the nearest 300/256 units, so a unit of slack covers both edges.
+fn sector_reach(sector: u16) -> f64 {
+    let size = f64::from(encode::SECTOR_SIZE);
+    let far = |cell: u8| {
+        let low = f64::from(cell) * size - f64::from(encode::GRID_CENTER);
+        low.abs().max((low + size).abs()) + 1.
+    };
+    let [x, y] = sector.to_be_bytes();
+    far(x).hypot(far(y))
 }
 
 pub(super) fn food_identity(point: Point) -> (u64, u64) {
@@ -821,6 +867,78 @@ mod tests {
         index.rebuild(std::slice::from_ref(&food), &presentation);
         assert_eq!(index.count, 1);
         assert!(!index.stale);
+    }
+
+    #[test]
+    fn a_wall_cull_dirties_only_sectors_that_lose_shown_food() {
+        let pellet = |x, y| Food {
+            x,
+            y,
+            value: 1.,
+            size: Some(2.),
+            origin: None,
+        };
+        let sector = |x, y| FoodIndex::sector(&pellet(x, y)).unwrap().0;
+        let mut index = FoodIndex::default();
+        // Quiet: entirely inside, with a hidden birth that must stay hidden.
+        index.add(&pellet(0., 0.), true, 1);
+        index.add(&pellet(10., 0.), true, 2);
+        index.add(&pellet(20., 0.), false, 3);
+        // Mixed: one survivor, a shown and a hidden pellet outside.
+        index.add(&pellet(600., 0.), true, 4);
+        index.add(&pellet(700., 0.), true, 5);
+        index.add(&pellet(710., 0.), false, 6);
+        // Two lifetimes at one point leave together.
+        index.add(&pellet(1000., 0.), true, 7);
+        index.add(&pellet(1000., 0.), true, 8);
+        // Hidden only: no listing changes.
+        index.add(&pellet(0., 1000.), false, 0);
+        let (quiet, mixed, gone, unseen) = (
+            sector(0., 0.),
+            sector(600., 0.),
+            sector(1000., 0.),
+            sector(0., 1000.),
+        );
+        assert_eq!(sector(700., 0.), mixed);
+        let before = index.listing(quiet);
+        index.dirty.clear();
+        let mut culled: Vec<_> = index.cull(670.).iter().map(|f| (f.x, f.y)).collect();
+        culled.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(
+            culled,
+            [
+                (0., 1000.),
+                (700., 0.),
+                (710., 0.),
+                (1000., 0.),
+                (1000., 0.)
+            ]
+        );
+        assert_eq!(index.count, 4);
+        assert_eq!(index.dirty, BTreeSet::from([mixed, gone]));
+        assert_eq!(index.hidden, BTreeSet::from([quiet]));
+        assert!(!index.sectors.contains_key(&gone));
+        assert!(!index.sectors.contains_key(&unseen));
+        assert_eq!(index.listing(quiet), before);
+        let mixed = index.listing(mixed);
+        assert_eq!(mixed.len(), 1);
+        assert_eq!(mixed[0].1.point, Point { x: 600., y: 0. });
+        assert_eq!(mixed[0].1.style.color, 4);
+        // The quiet sector's hidden birth is still revealed at maintenance.
+        index.reveal();
+        assert_eq!(index.listing(quiet).len(), 3);
+    }
+
+    #[test]
+    fn sector_reach_bounds_every_wire_keyed_point() {
+        for x in [-32550., -150.6, -150., 149.4, 450., 32985.] {
+            for y in [-32550., -0.6, 0., 299.4, 32985.] {
+                let point = Point { x, y };
+                let key = encode::food_key(point).unwrap();
+                let reach = sector_reach(u16::from_be_bytes([key[0], key[1]]));
+                assert!(point.distance(Point::default()) < reach, "{point:?}");
+            }
+        }
     }
 
     #[test]
