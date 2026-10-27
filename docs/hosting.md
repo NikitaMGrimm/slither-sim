@@ -21,6 +21,23 @@ sudo install -m 0755 "slither-sim-$TARGET/slither-sim" /usr/local/bin/slither-si
 slither-sim --version
 ```
 
+### Build for the hosting CPU
+
+Release archives run on any x86-64 CPU, so they can't use newer instructions
+such as AVX2. If the server has a Rust toolchain, build a binary for its own
+CPU from a checkout of the version you want:
+
+```sh
+RUSTFLAGS="-C target-cpu=native" cargo build --release --locked --bin slither-sim
+```
+
+Install `target/release/slither-sim` as above. It runs only on CPUs with the
+same features, so rebuild after moving to other hardware. In our tests its
+game output matched the portable build exactly, and its median cycle count was
+3.5–4.5% lower on one shared development machine
+([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-cpu-targets/REPORT.md)).
+Check both on your own server before relying on it.
+
 ## Configure
 
 Save one of these as `/etc/slither-sim.json`. Both listen on port 444 and run
