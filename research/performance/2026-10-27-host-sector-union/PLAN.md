@@ -1,5 +1,8 @@
 # Frozen protocol, 2026-10-27
 
+Current series: baseline `5eb0736ee3650687adff5b5c431c33994bf75bb9`, candidate
+after merging it. The amendment below supersedes the initial source pins only.
+
 Baseline `fabc5ac22b55f3841de1ae3c02b88f4d6cb0547e`. Maintain the shared union
 of set-up connections' food sectors from changed membership identities and
 per-sector subscriber counts. Intended claim: fewer whole-process user
@@ -35,3 +38,15 @@ Focus checks on union counts, owner handoffs, fresh equal memberships, empty/
 closed/reused slots, both food streams and interrupted broadcasts; then run
 CONTRIBUTING's Rust group and docs checks. Keep the published study <=20 KB,
 with raw stacks/traces/samples/binaries local-only.
+
+## Amendment after provider interruption, before union measurements
+
+The initial union series never reached traces or instruction pairs. A shared
+negative-control Cargo target first contaminated its test executable; the
+fresh-target rerun was then interrupted during Clippy by the provider failure.
+Keep both logs locally. Final checks, harness tests and controls use distinct
+targets. Main also gained #183's wire-rules extension before #184/#185, so
+merge `5eb0736` and build both arms afresh against it. Reuse the same protocol
+and fixture overlays, not the older binaries. Do not pool the rejected F-cache
+series or interrupted union attempts with this series. All other methods,
+gates, resource limits and publication limits above remain unchanged.
