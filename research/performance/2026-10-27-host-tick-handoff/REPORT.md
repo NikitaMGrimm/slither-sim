@@ -1,10 +1,11 @@
 # One-core tick/socket handoff, 2026-10-27
 
-**Neither serialized schedule nor the ENA control qualified official-500.** No fix PR, runtime default or
-hosting-capacity update. The original and rebased prototypes remain local Git commits and a local-only patch.
+**Neither serialized schedule nor the ENA control qualified official-500.** This research-only record proposes
+no runtime default or hosting-capacity update. The rebased prototype is preserved in [prototype.patch](prototype.patch).
 Runtime baseline is main-at-start `40ce9fa`; prototype `c41e409` rebased cleanly onto `6769d71` as `587d03e`.
 The scheduler files are byte-identical across rebase; #215 framing and #216 food edits elsewhere are preserved.
-The measured binaries predate those edits; rebase is not a capacity qualification of later main.
+The measured binaries predate those edits; rebase is not a capacity qualification of later main. Prototype commit
+IDs are local provenance; the published patch can be applied without those commits or a pushed prototype branch.
 See the frozen [plan](PLAN.md), [harness recovery](RECOVERY.md), and [selected results](selected-results.json).
 
 ## c7a.medium official-500, one 120 s hold per arm
@@ -52,6 +53,12 @@ Thus ~95% next-tick ingestion after a read is not proof that inputs enqueued dur
 
 ## Method and checks
 
+To reproduce the prototype in a separate checkout, start at base `6769d7178a4afe518e0c19608ec925aa3fe08a2e`
+and run `git -c core.autocrlf=false apply /path/to/prototype.patch` from that checkout's root. Build with Rust 1.99 and the release flags
+below; run with `SLITHERSIM_HOST_SCHEDULE=turns` or `inline` (unset selects concurrent). The patch includes the
+500-seat parity regression: `cargo test --locked --lib tick_handoff_modes_preserve_each_recipients_protocol_trace`.
+Its SHA-256 is recorded in selected results. Applying it is a reproduction step, not a proposed runtime change.
+
 Same #201 frozen load source and steering/decoder/control timings, adding buffered samples only for IDs divisible
 by 64. Eight pinned shards on a separate c7a.4xlarge; seed 7, 15 s warmup, no boost/TLS/added latency, fresh worlds.
 All host threads were verified on CPU [0]. Input instrumentation and counters were equal across arms; no new packets.
@@ -76,7 +83,8 @@ First pair ran no qualification hold: trace filenames collided with the legacy s
 Both instances terminated; corrected packaging re-reduced the retained smoke, and the one allowed recovery reused
 identical tested binaries. Preserve that smoke, failure and all costs. No performance-based repeat or exclusion.
 One seed/hold, evolving world, timestamp bounds and input sampling limit conclusions. No browser/TLS, retail EPYC,
-long-uptime or later-main capacity claim. Runtime sources, commits, patch and logs remain local-only, not downloadable.
+long-uptime or later-main capacity claim. The prototype diff and study tooling are published here; full runtime
+snapshots, binaries, traces, logs and private metadata remain local-only, not publicly downloadable.
 
 | Local-only archive | SHA-256 |
 | --- | --- |
