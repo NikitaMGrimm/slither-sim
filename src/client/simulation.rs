@@ -57,6 +57,7 @@ mod config;
 mod connection;
 mod food;
 mod markers;
+mod minimap;
 #[cfg(test)]
 mod pit_tests;
 mod prey_visibility;

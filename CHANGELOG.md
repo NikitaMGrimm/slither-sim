@@ -58,6 +58,9 @@
 
 ### Performance
 
+- Host minimaps share full packets and checked deltas for recipients with the
+  same retained bitmap, while preserving each connection's history, packet
+  bytes and order.
 - Host food-sector listings track subscription changes incrementally instead
   of rebuilding the union of every client's subscriptions each tick. Packet
   bytes and order are unchanged; the official-500 fixture uses 2.5% fewer user
