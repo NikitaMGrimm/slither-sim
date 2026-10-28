@@ -7,7 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
-| Performance | [Persistent Linux readiness](performance/2026-10-27-host-epoll-readiness/REPORT.md) | Three native official-500 pairs reduce host CPU 2.5–5.2%; fifteen exact traces and readiness oracles pass, but one candidate hold has unresolved deferrals/delivery tails. |
+| Performance | [Persistent Linux readiness](performance/2026-10-27-host-epoll-readiness/REPORT.md) | Seven native official-500 pairs have mixed CPU results; the original stall and a shorter candidate-only post-window burst remain unexplained. Held; fifteen exact traces pass. |
 | Performance | [Interrupted c7a operator tuning](performance/2026-10-28-c7a-operator-tuning/REPORT.md) | Current main at official 500 on one c7a core with operator settings only: default 60.0 ms excess p99, socket nice +5 20.0 ms, NIC RX interrupt moderation 32.1 ms, both 16.6 ms, all missing the 10 ms target. A Spot reclaim stopped the repeat holds; no setting qualified. |
 | Fidelity | [Turn count and phase](fidelity/2026-10-28-turn-count-phase/REPORT.md) | Original 111-fit count convention, frozen retained-interval comparisons, authored client geometry and conditional capture power; no collection or runtime change. |
 | Performance | [Syscall boundary ceiling](performance/2026-10-27-host-syscall-ceiling/REPORT.md) | c7a/c8a null-syscall and 22-byte send microbenchmarks plus a counted official-500 hold; removing every syscall boundary would save at most about 0.22 ms/tick (3% of a c7a core), so batching cannot close the c7a gap. Sends cost 4.5 µs on c7a vs 1.5 µs on c8a, mostly inside the kernel. |

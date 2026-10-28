@@ -38,9 +38,9 @@
 
 - On Linux, the host keeps socket readiness registrations between gateway
   passes instead of rescanning every descriptor in the kernel. Service order
-  and flush points are unchanged. Three native 500-player official pairs use
-  2.5–5.2% less host CPU per tick; one candidate hold has an unresolved delivery
-  stall, so this does not establish a latency or capacity improvement
+  and flush points are unchanged. Seven native 500-player official pairs have
+  mixed CPU results and unresolved candidate CPU/backlog bursts, so this does
+  not establish a latency or capacity improvement
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-epoll-readiness/REPORT.md)).
 - Food pickup now works out each pellet's place in the food list from a
   bitmap, instead of rewriting the stored position of every later pellet after
