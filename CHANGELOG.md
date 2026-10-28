@@ -4,6 +4,7 @@
 
 ### Added
 
+- An offline prey flight-speed and activation study; retained evidence leaves close candidates unresolved and does not justify another capture.
 - A study of why the simulator's turning rule divides by 111 where the stock
   client divides by 106. On the recordings behind the original fit, 111 matches
   observed turning about five times better than 106, but a fixed offset of 7–8
