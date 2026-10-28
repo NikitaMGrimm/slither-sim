@@ -1,0 +1,271 @@
+{
+  "scope": "Review fixes; output parity and regression checks only, no new instruction measurement",
+  "candidate": "ec0dd92fa813c0a7be0f07628984c2d9dbf192c1",
+  "base": "bf3d103e",
+  "builds": {
+    "base": {
+      "runtimeCommit": "bf3d103e",
+      "archiveSha256": "4bbbfa0ca49fc4968c754be03884734d6c46dcfd5a978d059b611abd782b2fec",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "1be08e6fca1839a2d958c0e456fec469b8ba8ecafb73834183097cf868cf3b52"
+    },
+    "candidate": {
+      "runtimeCommit": "ec0dd92fa813c0a7be0f07628984c2d9dbf192c1",
+      "archiveSha256": "5dd3ec9d269f6d8bb8fe769c3f140227c1bb279dd61fa8bce89375265bb3e806",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "7d076bd154cc494af949b5b2616a49ff6fe5211818b72369394504586077d40f"
+    }
+  },
+  "traces": {
+    "official": {
+      "official500": {
+        "equal": true,
+        "sha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "bytes": 37938956,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 9954005,
+          "case": "official500",
+          "forcedReconnect": true,
+          "frames": 317188,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-half": {
+        "equal": true,
+        "sha256": "f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb",
+        "bytes": 57556590,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10103063,
+          "case": "official500-half",
+          "forcedReconnect": true,
+          "frames": 664841,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 250,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-legacy": {
+        "equal": true,
+        "sha256": "e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3",
+        "bytes": 77137561,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10253767,
+          "case": "official500-legacy",
+          "forcedReconnect": true,
+          "frames": 1011810,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 500,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      }
+    },
+    "historical": [
+      {
+        "case": "portable",
+        "equal": true,
+        "base": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "c6fd17a0fccc9493d22e1bf1ed028ace205debaa8ac09ba38bfbd1cc6a79b92d"
+        },
+        "candidate": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "73710e60c866413707a5ef2af437a5d06e18e36f3233580f88d53f839e38d0d6"
+        }
+      },
+      {
+        "case": "protocol",
+        "equal": true,
+        "base": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "c6fd17a0fccc9493d22e1bf1ed028ace205debaa8ac09ba38bfbd1cc6a79b92d"
+        },
+        "candidate": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "73710e60c866413707a5ef2af437a5d06e18e36f3233580f88d53f839e38d0d6"
+        }
+      },
+      {
+        "case": "client-official-500",
+        "equal": true,
+        "base": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "c6fd17a0fccc9493d22e1bf1ed028ace205debaa8ac09ba38bfbd1cc6a79b92d"
+        },
+        "candidate": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "73710e60c866413707a5ef2af437a5d06e18e36f3233580f88d53f839e38d0d6"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "c6fd17a0fccc9493d22e1bf1ed028ace205debaa8ac09ba38bfbd1cc6a79b92d"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "73710e60c866413707a5ef2af437a5d06e18e36f3233580f88d53f839e38d0d6"
+        }
+      },
+      {
+        "case": "retained-step_all",
+        "equal": true,
+        "base": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "e23e23d6278665816c0853593c77124d094e4c0017bf3a43dd6ac30d1ea0b8ac"
+        },
+        "candidate": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "dbccc8afd2e20aa6f45d2d5f840d3cf98b90fd9b259056084644d8ea6726b889"
+        }
+      },
+      {
+        "case": "retained-next_frame",
+        "equal": true,
+        "base": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "e23e23d6278665816c0853593c77124d094e4c0017bf3a43dd6ac30d1ea0b8ac"
+        },
+        "candidate": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "dbccc8afd2e20aa6f45d2d5f840d3cf98b90fd9b259056084644d8ea6726b889"
+        }
+      }
+    ],
+    "battledome": [
+      {
+        "case": "client-battledome-40",
+        "equal": true,
+        "base": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "1f1eceb84cf5843888b74a6b218c826215652e869a17f8d2bfba61c034cd3822"
+        },
+        "candidate": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "6ca468d70963b8a6fe2e6b3f72ce51ef9203964f528976d508c2cb79fe9fd99f"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "1f1eceb84cf5843888b74a6b218c826215652e869a17f8d2bfba61c034cd3822"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "6ca468d70963b8a6fe2e6b3f72ce51ef9203964f528976d508c2cb79fe9fd99f"
+        }
+      },
+      {
+        "case": "client-battledome-80",
+        "equal": true,
+        "base": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "1f1eceb84cf5843888b74a6b218c826215652e869a17f8d2bfba61c034cd3822"
+        },
+        "candidate": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "6ca468d70963b8a6fe2e6b3f72ce51ef9203964f528976d508c2cb79fe9fd99f"
+        }
+      }
+    ]
+  },
+  "checks": {
+    "focusedTests": 76,
+    "linuxRustGroupPassed": true,
+    "focusedLogSha256": "454508d6e3d5d51392a9f8ff2220254005ad22609bf5ad443c3d740f325b7b07",
+    "rustLogSha256": "f8a6aabf523e62ebcbac7a01612284ea6d8431dcf52f0df69eb1e61d138fd117",
+    "selectorSha256": "22b8a698d542e5e72392581e962bc7d89591e3624609fa947ef5efae83afbb54",
+    "selectorControls": [
+      "recorded collision overlay hashes match retained source",
+      "matching synthetic pilot accepted",
+      "changed collision source rejected",
+      "NaN and both infinities rejected"
+    ],
+    "documentationPassed": true
+  },
+  "resourceLimit": {
+    "logicalCpus": 1,
+    "cargoJobs": 1,
+    "rayonThreads": 1,
+    "testThreads": 1
+  }
+}

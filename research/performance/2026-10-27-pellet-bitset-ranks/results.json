@@ -1,0 +1,773 @@
+{
+  "base": "4532a76f22958ae3abcca801e90edd30ed9f466f",
+  "candidate": "47e416a3eacc99163a3af12fa5eb11af317f9e28",
+  "validated": "47e416a3eacc99163a3af12fa5eb11af317f9e28",
+  "builds": {
+    "base": {
+      "runtimeCommit": "4532a76f22958ae3abcca801e90edd30ed9f466f",
+      "archiveSha256": "2257985e1f585925ac56e1cfd9e1ba59991e091c69f16475935f2a55df705764",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "9720367054b372f8631102ea92f96a349155e6049714e37a5f5e90aa79a201d6",
+      "binaries": {
+        "study_protocols": "9720367054b372f8631102ea92f96a349155e6049714e37a5f5e90aa79a201d6",
+        "perf_baseline": "f01c9d8927a6674dc641b90e1294806eebe87dc10e3c3eff4cafdc616986fed2",
+        "perf_battledome": "cf8a6fba4cc172f5de2307185b6b322f2731b46e74c1b576e5067c60c4066ae1",
+        "perf_client_retained": "fb731c09d0f24c434e6cacb01fa12dd24fa1693a4e57cdaba6535f41ba404af1"
+      }
+    },
+    "candidate": {
+      "runtimeCommit": "47e416a3eacc99163a3af12fa5eb11af317f9e28",
+      "archiveSha256": "1310e50d2793232221fa52ba19d16f82bccfff5927dcba06ece258afd4395cbd",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "c5a8107c9f37ee05a2cd1b10bb2f4c390f908494d39e35bb64992aa65f6adada",
+      "binaries": {
+        "study_protocols": "c5a8107c9f37ee05a2cd1b10bb2f4c390f908494d39e35bb64992aa65f6adada",
+        "perf_baseline": "470eac04fbc283a40f9936d56473f361f30e63513f9b9ba1ab2ad11ffaf0c786",
+        "perf_battledome": "926b67bb832a5cdcd2292b208dc46246b7163c4aa57eccbf3dc9d4c62cb1b190",
+        "perf_client_retained": "e6b2576fb57cfbf3153eb42217f70de31efbe6ea78cbfd9b29a20b6ab61b25b8"
+      }
+    }
+  },
+  "traces": {
+    "official": {
+      "official500": {
+        "equal": true,
+        "sha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "bytes": 37938956,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 9954005,
+          "case": "official500",
+          "forcedReconnect": true,
+          "frames": 317188,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-half": {
+        "equal": true,
+        "sha256": "f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb",
+        "bytes": 57556590,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10103063,
+          "case": "official500-half",
+          "forcedReconnect": true,
+          "frames": 664841,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 250,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-legacy": {
+        "equal": true,
+        "sha256": "e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3",
+        "bytes": 77137561,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10253767,
+          "case": "official500-legacy",
+          "forcedReconnect": true,
+          "frames": 1011810,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 500,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      }
+    },
+    "stock-traces": [
+      {
+        "case": "portable",
+        "equal": true,
+        "base": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "f01c9d8927a6674dc641b90e1294806eebe87dc10e3c3eff4cafdc616986fed2"
+        },
+        "candidate": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "470eac04fbc283a40f9936d56473f361f30e63513f9b9ba1ab2ad11ffaf0c786"
+        }
+      },
+      {
+        "case": "protocol",
+        "equal": true,
+        "base": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "f01c9d8927a6674dc641b90e1294806eebe87dc10e3c3eff4cafdc616986fed2"
+        },
+        "candidate": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "470eac04fbc283a40f9936d56473f361f30e63513f9b9ba1ab2ad11ffaf0c786"
+        }
+      },
+      {
+        "case": "client-official-500",
+        "equal": true,
+        "base": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "f01c9d8927a6674dc641b90e1294806eebe87dc10e3c3eff4cafdc616986fed2"
+        },
+        "candidate": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "470eac04fbc283a40f9936d56473f361f30e63513f9b9ba1ab2ad11ffaf0c786"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "f01c9d8927a6674dc641b90e1294806eebe87dc10e3c3eff4cafdc616986fed2"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "470eac04fbc283a40f9936d56473f361f30e63513f9b9ba1ab2ad11ffaf0c786"
+        }
+      },
+      {
+        "case": "retained-step_all",
+        "equal": true,
+        "base": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "fb731c09d0f24c434e6cacb01fa12dd24fa1693a4e57cdaba6535f41ba404af1"
+        },
+        "candidate": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "e6b2576fb57cfbf3153eb42217f70de31efbe6ea78cbfd9b29a20b6ab61b25b8"
+        }
+      },
+      {
+        "case": "retained-next_frame",
+        "equal": true,
+        "base": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "fb731c09d0f24c434e6cacb01fa12dd24fa1693a4e57cdaba6535f41ba404af1"
+        },
+        "candidate": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "e6b2576fb57cfbf3153eb42217f70de31efbe6ea78cbfd9b29a20b6ab61b25b8"
+        }
+      }
+    ],
+    "dome-traces": [
+      {
+        "case": "client-battledome-40",
+        "equal": true,
+        "base": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "cf8a6fba4cc172f5de2307185b6b322f2731b46e74c1b576e5067c60c4066ae1"
+        },
+        "candidate": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "926b67bb832a5cdcd2292b208dc46246b7163c4aa57eccbf3dc9d4c62cb1b190"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "cf8a6fba4cc172f5de2307185b6b322f2731b46e74c1b576e5067c60c4066ae1"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "926b67bb832a5cdcd2292b208dc46246b7163c4aa57eccbf3dc9d4c62cb1b190"
+        }
+      },
+      {
+        "case": "client-battledome-80",
+        "equal": true,
+        "base": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "cf8a6fba4cc172f5de2307185b6b322f2731b46e74c1b576e5067c60c4066ae1"
+        },
+        "candidate": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "926b67bb832a5cdcd2292b208dc46246b7163c4aa57eccbf3dc9d4c62cb1b190"
+        }
+      }
+    ]
+  },
+  "instructions": {
+    "official500": {
+      "baseMedian": 8779200127,
+      "candidateMedian": 8564765894,
+      "pairedMedian": 0.9755743664687051,
+      "pairedRange": [
+        0.9755724425300265,
+        0.9755951295285494
+      ],
+      "warmupPairs": 1,
+      "measuredPairs": 5
+    },
+    "official500-half": {
+      "baseMedian": 9133454696,
+      "candidateMedian": 8920872454,
+      "pairedMedian": 0.9767224873437114,
+      "pairedRange": [
+        0.9766664729862977,
+        0.9767411847903471
+      ],
+      "warmupPairs": 1,
+      "measuredPairs": 5
+    },
+    "official500-legacy": {
+      "baseMedian": 9476795796,
+      "candidateMedian": 9262490411,
+      "pairedMedian": 0.9773818668619789,
+      "pairedRange": [
+        0.9773791880157665,
+        0.9774002823351858
+      ],
+      "warmupPairs": 1,
+      "measuredPairs": 5
+    }
+  },
+  "profiles": {
+    "base": {
+      "coarse": {
+        "runtime": "194d13047775cca92e2a7f5163e9fdd28e918073",
+        "ticks": 853,
+        "minimumScheduledPct": 100.0,
+        "phases": {
+          "validation": 7123.0,
+          "setup": 101237.3692848769,
+          "movement_boost_body": 475728.4325908558,
+          "collision_records": 59262.725674091445,
+          "collision_order_index": 187244.5674091442,
+          "collision_tests": 243946.72098475968,
+          "death_drops": 79.0,
+          "pickup_cache": 692799.1969519344,
+          "prey": 307186.80890973035,
+          "refill_admission": 4042.923798358734,
+          "finish": 26702.002344665885,
+          "pre_world": 98876.7796014068
+        },
+        "worldTotal": 2105352.7479484174,
+        "nestedInstructions": {
+          "index_build_collision_and_prey": 0.0,
+          "collision_candidate_query": 0.0,
+          "collision_exact": 0.0,
+          "movement_math": 0.0,
+          "append_contract_body": 0.0,
+          "speed": 0.0,
+          "kiosk": 0.0,
+          "cache_remove": 0.0,
+          "eater_grid_build": 0.0,
+          "pellet_lookup_tests_sort": 0.0,
+          "admission_has_room": 0.0,
+          "cache_push": 0.0,
+          "prey_all": 0.0,
+          "update_mass": 0.0,
+          "validation_all": 0.0,
+          "prey_decisions": 0.0,
+          "pickup_circle": 0.0,
+          "prey_motion": 0.0,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 0.0
+        },
+        "nestedCalls": {
+          "index_build_collision_and_prey": 0.0,
+          "collision_candidate_query": 0.0,
+          "collision_exact": 0.0,
+          "movement_math": 0.0,
+          "append_contract_body": 0.0,
+          "speed": 0.0,
+          "kiosk": 0.0,
+          "cache_remove": 0.0,
+          "eater_grid_build": 0.0,
+          "pellet_lookup_tests_sort": 0.0,
+          "admission_has_room": 0.0,
+          "cache_push": 0.0,
+          "prey_all": 0.0,
+          "update_mass": 0.0,
+          "validation_all": 0.0,
+          "prey_decisions": 0.0,
+          "pickup_circle": 0.0,
+          "prey_motion": 0.0,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 0.0
+        },
+        "binarySha256": "b4705bd8b12035575f864387ec6ace268c5fbad366a9d11f6babc1a09bb35f7b",
+        "controlSha256": "acc94728bb35e32278b7857165b74cd7d9720e2e29cd2c01ba790047915e58c4",
+        "traceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "traceEqual": true,
+        "pins": {
+          "ref": "194d13047775cca92e2a7f5163e9fdd28e918073",
+          "nested": false,
+          "archiveSha256": "449e5e1d07b63d71d543845b67cfa0be7ce6ce7ed72881cf6d929985775b557b",
+          "overlay": {
+            "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+            "src/client/simulation.rs": "5017c78c9ea5e909220f8324f3ad75edefa36e8bfe2eb71a206fa3fbd89de0f3",
+            "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+            "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+            "examples/study_protocols.rs": "1ad8476e828a078443a0959871fba99e72d2418c66286d354436f6076ffbff11",
+            "src/core_profile.rs": "88c39453ed22d91985f0ccc4936eed68a9ed174c8327d4588c2ea49801b5153a",
+            "src/simulator.rs": "f31577cfb6793ae3b9c345585a461d69e9dfa2e162e6b49af48bac9f8bed2173",
+            "src/physics.rs": "44dc94d6c41105236a95bbe18f8751a1e5e9c7b11460232a899ec735112ef416",
+            "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+            "src/food_grid.rs": "d3f4bdc1388359a15576e6923933cdda1c39b6cde30f05ad733b21322272b722",
+            "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+            "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282"
+          }
+        }
+      },
+      "nested": {
+        "runtime": "194d13047775cca92e2a7f5163e9fdd28e918073",
+        "ticks": 853,
+        "minimumScheduledPct": 100.0,
+        "phases": {
+          "validation": 7231.0,
+          "setup": 101239.3774912075,
+          "movement_boost_body": 764246.5838218054,
+          "collision_records": 59264.74091441969,
+          "collision_order_index": 185853.5756154748,
+          "collision_tests": 297526.29894490034,
+          "death_drops": 81.0,
+          "pickup_cache": 748610.590855803,
+          "prey": 322345.1348182884,
+          "refill_admission": 4871.852286049238,
+          "finish": 26702.003516998826,
+          "pre_world": 98876.77608440797
+        },
+        "worldTotal": 2517972.158264947,
+        "nestedInstructions": {
+          "index_build_collision_and_prey": 214941.17233294254,
+          "collision_candidate_query": 190073.86987104337,
+          "collision_exact": 0.0,
+          "movement_math": 319542.38100820634,
+          "append_contract_body": 1160.0468933177021,
+          "speed": 40283.32942555686,
+          "kiosk": 42500.08323563892,
+          "cache_remove": 178371.97303634233,
+          "eater_grid_build": 199000.33997655334,
+          "pellet_lookup_tests_sort": 193863.02696365767,
+          "admission_has_room": 2486.2438452520514,
+          "cache_push": 5484.086752637749,
+          "prey_all": 322209.1336459555,
+          "update_mass": 112794.50527549825,
+          "validation_all": 7060.0,
+          "prey_decisions": 8801.684642438453,
+          "pickup_circle": 35500.07385697538,
+          "prey_motion": 41629.769050410316,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 174001.94255568582
+        },
+        "nestedCalls": {
+          "index_build_collision_and_prey": 2.0,
+          "collision_candidate_query": 500.0,
+          "collision_exact": 0.0,
+          "movement_math": 570.9695193434935,
+          "append_contract_body": 14.805392731535756,
+          "speed": 500.0,
+          "kiosk": 500.0,
+          "cache_remove": 0.8628370457209847,
+          "eater_grid_build": 1.0,
+          "pellet_lookup_tests_sort": 1.0,
+          "admission_has_room": 12.150058616647128,
+          "cache_push": 11.729191090269637,
+          "prey_all": 1.0,
+          "update_mass": 1007.0926143024619,
+          "validation_all": 1.0,
+          "prey_decisions": 1.4161781946072685,
+          "pickup_circle": 500.0,
+          "prey_motion": 70.96951934349356,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 0.8628370457209847
+        },
+        "binarySha256": "ca9212b26aa84e3699172f45b0f75189942b1404f369dae7ed3acea1a48468cc",
+        "controlSha256": "acc94728bb35e32278b7857165b74cd7d9720e2e29cd2c01ba790047915e58c4",
+        "traceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "traceEqual": true,
+        "pins": {
+          "ref": "194d13047775cca92e2a7f5163e9fdd28e918073",
+          "nested": true,
+          "archiveSha256": "449e5e1d07b63d71d543845b67cfa0be7ce6ce7ed72881cf6d929985775b557b",
+          "overlay": {
+            "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+            "src/client/simulation.rs": "5017c78c9ea5e909220f8324f3ad75edefa36e8bfe2eb71a206fa3fbd89de0f3",
+            "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+            "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+            "examples/study_protocols.rs": "1ad8476e828a078443a0959871fba99e72d2418c66286d354436f6076ffbff11",
+            "src/core_profile.rs": "88c39453ed22d91985f0ccc4936eed68a9ed174c8327d4588c2ea49801b5153a",
+            "src/simulator.rs": "1cb3b3beb2ecb0fbe9713e418edfb3b27bd8604f97a46838b331d738be51d117",
+            "src/physics.rs": "703ea341b990d644662ba121aa84a6d1163892b488a01273d42fb7c318b55df3",
+            "src/bounds_index.rs": "0a1b09fd7145f65d1916727abda80a11d6d50e7468e7736a15a0c4ca7607d456",
+            "src/food_grid.rs": "932584a7f9a94ff44cece4255c65c438dc368fe75ad96dcfe29fe9c1a0b4291e",
+            "src/kiosk.rs": "9d5a7f403cc3addb70042337884e7a2d38fe32ada9b1244e588ab0d8029e8cdd",
+            "src/prey.rs": "69549e5a1b70e0136ffc8cbcfd8618d921c4f40a3bfcde1542db9cd595fbae54"
+          }
+        }
+      }
+    },
+    "candidate": {
+      "coarse": {
+        "runtime": "81c3e503ea657f5e9416910bb4d9c8841efb9774",
+        "ticks": 853,
+        "minimumScheduledPct": 100.0,
+        "phases": {
+          "validation": 7123.0,
+          "setup": 101238.35756154748,
+          "movement_boost_body": 476363.01524032827,
+          "collision_records": 59262.72332942556,
+          "collision_order_index": 187245.1875732708,
+          "collision_tests": 243446.65416178195,
+          "death_drops": 79.0,
+          "pickup_cache": 541849.9531066823,
+          "prey": 307153.50996483,
+          "refill_admission": 4077.0926143024617,
+          "finish": 26702.003516998826,
+          "pre_world": 98181.73622508792
+        },
+        "worldTotal": 1954540.4970691677,
+        "nestedInstructions": {
+          "index_build_collision_and_prey": 0.0,
+          "collision_candidate_query": 0.0,
+          "collision_exact": 0.0,
+          "movement_math": 0.0,
+          "append_contract_body": 0.0,
+          "speed": 0.0,
+          "kiosk": 0.0,
+          "cache_remove": 0.0,
+          "eater_grid_build": 0.0,
+          "pellet_lookup_tests_sort": 0.0,
+          "admission_has_room": 0.0,
+          "cache_push": 0.0,
+          "prey_all": 0.0,
+          "update_mass": 0.0,
+          "validation_all": 0.0,
+          "prey_decisions": 0.0,
+          "pickup_circle": 0.0,
+          "prey_motion": 0.0,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 0.0
+        },
+        "nestedCalls": {
+          "index_build_collision_and_prey": 0.0,
+          "collision_candidate_query": 0.0,
+          "collision_exact": 0.0,
+          "movement_math": 0.0,
+          "append_contract_body": 0.0,
+          "speed": 0.0,
+          "kiosk": 0.0,
+          "cache_remove": 0.0,
+          "eater_grid_build": 0.0,
+          "pellet_lookup_tests_sort": 0.0,
+          "admission_has_room": 0.0,
+          "cache_push": 0.0,
+          "prey_all": 0.0,
+          "update_mass": 0.0,
+          "validation_all": 0.0,
+          "prey_decisions": 0.0,
+          "pickup_circle": 0.0,
+          "prey_motion": 0.0,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 0.0
+        },
+        "binarySha256": "81b4881db57c218296aaaba09eee631ce3af8208cc5456e5978aff1408651911",
+        "controlSha256": "a24a613403cf73eca75bb48905fe4b4effbd036b14005dc3abf93e941250fc06",
+        "traceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "traceEqual": true,
+        "pins": {
+          "ref": "81c3e503ea657f5e9416910bb4d9c8841efb9774",
+          "nested": false,
+          "archiveSha256": "916307ba0471f23631f09f2ccf0ab6f59f3251f8360b90644bb874eacb3d8f87",
+          "overlay": {
+            "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+            "src/client/simulation.rs": "5017c78c9ea5e909220f8324f3ad75edefa36e8bfe2eb71a206fa3fbd89de0f3",
+            "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+            "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+            "examples/study_protocols.rs": "1ad8476e828a078443a0959871fba99e72d2418c66286d354436f6076ffbff11",
+            "src/core_profile.rs": "88c39453ed22d91985f0ccc4936eed68a9ed174c8327d4588c2ea49801b5153a",
+            "src/simulator.rs": "f31577cfb6793ae3b9c345585a461d69e9dfa2e162e6b49af48bac9f8bed2173",
+            "src/physics.rs": "44dc94d6c41105236a95bbe18f8751a1e5e9c7b11460232a899ec735112ef416",
+            "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+            "src/food_grid.rs": "0c1f6e216eaf5027b744b162a3dac283065f34a3b805c0bf06d4434183537f76",
+            "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+            "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282"
+          }
+        }
+      },
+      "nested": {
+        "runtime": "81c3e503ea657f5e9416910bb4d9c8841efb9774",
+        "ticks": 853,
+        "minimumScheduledPct": 100.0,
+        "phases": {
+          "validation": 7231.005861664713,
+          "setup": 101239.40797186401,
+          "movement_boost_body": 764882.3399765533,
+          "collision_records": 59264.79953106683,
+          "collision_order_index": 185854.29073856975,
+          "collision_tests": 297026.5369284877,
+          "death_drops": 81.0023446658851,
+          "pickup_cache": 596547.9495896834,
+          "prey": 322356.0281359906,
+          "refill_admission": 4906.046893317703,
+          "finish": 26702.016412661196,
+          "pre_world": 98181.8288393904
+        },
+        "worldTotal": 2366091.424384525,
+        "nestedInstructions": {
+          "index_build_collision_and_prey": 214928.68347010552,
+          "collision_candidate_query": 190074.0351699883,
+          "collision_exact": 0.0,
+          "movement_math": 319542.6295427902,
+          "append_contract_body": 1160.0785463071513,
+          "speed": 40283.403282532236,
+          "kiosk": 42500.1406799531,
+          "cache_remove": 11241.287221570927,
+          "eater_grid_build": 164146.2977725674,
+          "pellet_lookup_tests_sort": 243776.89683470107,
+          "admission_has_room": 2486.290738569754,
+          "cache_push": 5652.746776084408,
+          "prey_all": 322220.0281359906,
+          "update_mass": 112794.6447831184,
+          "validation_all": 7060.003516998828,
+          "prey_decisions": 8801.68347010551,
+          "pickup_circle": 35500.094958968344,
+          "prey_motion": 41629.80422039859,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 6845.731535756155
+        },
+        "nestedCalls": {
+          "index_build_collision_and_prey": 2.0,
+          "collision_candidate_query": 500.0,
+          "collision_exact": 0.0,
+          "movement_math": 570.9695193434935,
+          "append_contract_body": 14.805392731535756,
+          "speed": 500.0,
+          "kiosk": 500.0,
+          "cache_remove": 0.8628370457209847,
+          "eater_grid_build": 1.0,
+          "pellet_lookup_tests_sort": 1.0,
+          "admission_has_room": 12.150058616647128,
+          "cache_push": 11.729191090269637,
+          "prey_all": 1.0,
+          "update_mass": 1007.0926143024619,
+          "validation_all": 1.0,
+          "prey_decisions": 1.4161781946072685,
+          "pickup_circle": 500.0,
+          "prey_motion": 70.96951934349356,
+          "unused": 0.0,
+          "pellet_position_or_rank_refresh": 0.8628370457209847
+        },
+        "binarySha256": "607762a4d4efe9a39205701a92c0a182628f02fca598384f6eec993c22645576",
+        "controlSha256": "a24a613403cf73eca75bb48905fe4b4effbd036b14005dc3abf93e941250fc06",
+        "traceSha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "traceEqual": true,
+        "pins": {
+          "ref": "81c3e503ea657f5e9416910bb4d9c8841efb9774",
+          "nested": true,
+          "archiveSha256": "916307ba0471f23631f09f2ccf0ab6f59f3251f8360b90644bb874eacb3d8f87",
+          "overlay": {
+            "src/lib.rs": "a1de59d5e2614cf53aa9a5073efd6f115fe53e67afdddfea46b0be894e93e4be",
+            "src/client/simulation.rs": "5017c78c9ea5e909220f8324f3ad75edefa36e8bfe2eb71a206fa3fbd89de0f3",
+            "src/client/simulation/study_protocols.rs": "b8546ca7608ab100d794e169cc5c8ad65df37b0d4c917444efb3718f51cc6ab1",
+            "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+            "examples/study_protocols.rs": "1ad8476e828a078443a0959871fba99e72d2418c66286d354436f6076ffbff11",
+            "src/core_profile.rs": "88c39453ed22d91985f0ccc4936eed68a9ed174c8327d4588c2ea49801b5153a",
+            "src/simulator.rs": "1cb3b3beb2ecb0fbe9713e418edfb3b27bd8604f97a46838b331d738be51d117",
+            "src/physics.rs": "703ea341b990d644662ba121aa84a6d1163892b488a01273d42fb7c318b55df3",
+            "src/bounds_index.rs": "0a1b09fd7145f65d1916727abda80a11d6d50e7468e7736a15a0c4ca7607d456",
+            "src/food_grid.rs": "c0bc26fb887dd10a1f09d3353f53c17d92412dd884c08cbeb8ca56f595b2019e",
+            "src/kiosk.rs": "9d5a7f403cc3addb70042337884e7a2d38fe32ada9b1244e588ab0d8029e8cdd",
+            "src/prey.rs": "69549e5a1b70e0136ffc8cbcfd8618d921c4f40a3bfcde1542db9cd595fbae54"
+          }
+        }
+      }
+    }
+  },
+  "minimumProcessCounterScheduledPct": 100.0,
+  "preIntegrationRuntime": {
+    "base": "194d13047775cca92e2a7f5163e9fdd28e918073",
+    "candidate": "81c3e503ea657f5e9416910bb4d9c8841efb9774"
+  },
+  "preIntegrationInstructions": {
+    "official500": {
+      "baseMedian": 8971373268,
+      "candidateMedian": 8757549515,
+      "pairedMedian": 0.9761636749104812,
+      "pairedRange": [
+        0.9761495320850915,
+        0.9761744392370624
+      ]
+    },
+    "official500-half": {
+      "baseMedian": 9328123251,
+      "candidateMedian": 9111659876,
+      "pairedMedian": 0.9768011783590542,
+      "pairedRange": [
+        0.9767885342943228,
+        0.9768176867756526
+      ]
+    },
+    "official500-legacy": {
+      "baseMedian": 9669814484,
+      "candidateMedian": 9455759095,
+      "pairedMedian": 0.9778635475009181,
+      "pairedRange": [
+        0.9778340206476209,
+        0.977874119714932
+      ]
+    }
+  },
+  "profileIntegration": {
+    "coreSourcesUnchanged": true,
+    "commonHostChange": "src/client/simulation/broadcast.rs"
+  },
+  "checks": {
+    "rustPassed": true,
+    "archiveSha256": "1310e50d2793232221fa52ba19d16f82bccfff5927dcba06ece258afd4395cbd",
+    "focusedLogSha256": "00c9a08ff1a8f9e470e300880818129a803141669b708030e4ae90b618c6ca35",
+    "pickupLogSha256": "f2e7ccdc31734e7f2cbf34e63e6f9278bd6c8f4bf3100d603b38d5cbafde50c1",
+    "rustLogSha256": "41a0b34e1340616f1cbb75ad62d37b80e2303ebfba34ed8f04e00a0bd63694b2"
+  },
+  "negative": {
+    "runtime": "47e416a3eacc99163a3af12fa5eb11af317f9e28",
+    "mutation": "include current live bit in rank",
+    "regressionFailed": true,
+    "originalFoodGridSha256": "0c1f6e216eaf5027b744b162a3dac283065f34a3b805c0bf06d4434183537f76",
+    "mutatedFoodGridSha256": "b0c9117f3d112b01197f09f772322f9cbae8b2d8bf354e2084a61014975cfba3",
+    "logSha256": "375e065e89dced4b9cc16b1471b783c13d5eaa3808487d9b7cc6a91a7f42d70c"
+  },
+  "documentationAndGuards": {
+    "passed": true,
+    "logSha256": "171222bae8c5c89414c9950410726c1ea4bb7751ce92a43bceb147a3c8d36aec"
+  },
+  "pilots": {
+    "collision_memberships": {
+      "base": "194d13047775cca92e2a7f5163e9fdd28e918073",
+      "overlaySha256": {
+        "bounds_index.rs": "a4affbb4c2e3fd307d7f7304a24ec368df09f6289e0ab5cf274cc36f679da6f8",
+        "simulator.rs": "8110b98835b798e9dc83fb24115d4157eb000b2dc5d69f1a7ecfd277c37fae5c"
+      },
+      "traceEqual": true,
+      "baseMedian": 8971715485,
+      "candidateMedian": 8877211160,
+      "medianPairedReduction": 1.0542250047734347,
+      "range": [
+        1.051518975210508,
+        1.0568563148854682
+      ],
+      "minimumScheduledPct": 100.0,
+      "binarySha256": {
+        "base": "276889dd6c5964f9fe3d279353e37c892c849062ce1fe88e8267513fca236ab9",
+        "candidate": "fcf4195092a1d8c487a803a89180fb746cb47deaf16d6b488c37f05ea787e2f4"
+      },
+      "sourceSha256": {
+        "bounds_index.rs": "a4affbb4c2e3fd307d7f7304a24ec368df09f6289e0ab5cf274cc36f679da6f8",
+        "simulator.rs": "8110b98835b798e9dc83fb24115d4157eb000b2dc5d69f1a7ecfd277c37fae5c"
+      }
+    },
+    "cover_floor": {
+      "base": "194d13047775cca92e2a7f5163e9fdd28e918073",
+      "traceEqual": true,
+      "baseMedian": 8971679076,
+      "candidateMedian": 8929697835,
+      "medianPairedReduction": 0.4675729837362974,
+      "range": [
+        0.4670534685152883,
+        0.4692760002370844
+      ],
+      "minimumScheduledPct": 100.0,
+      "binarySha256": {
+        "base": "276889dd6c5964f9fe3d279353e37c892c849062ce1fe88e8267513fca236ab9",
+        "candidate": "47cef292eb476b93cf10e240143f0f670f39e32fa9dbba9095825dfa94972923"
+      },
+      "sourceSha256": {
+        "food_grid.rs": "ff3742c9289cb318e3dead7f0f0e25346297b73585ad96d4967b5eb65b4c774c"
+      }
+    },
+    "rank_and_floor": {
+      "base": "194d13047775cca92e2a7f5163e9fdd28e918073",
+      "traceEqual": true,
+      "baseMedian": 8971659319,
+      "candidateMedian": 8757780384,
+      "medianPairedReduction": 2.3844425027035543,
+      "range": [
+        2.381923059526736,
+        2.38542359606263
+      ],
+      "minimumScheduledPct": 100.0,
+      "binarySha256": {
+        "base": "276889dd6c5964f9fe3d279353e37c892c849062ce1fe88e8267513fca236ab9",
+        "candidate": "d9ae1e1092310874cb554804ec97b5f172bdd2c16f177a9f42d4de19f8828a96"
+      },
+      "sourceSha256": {
+        "food_grid.rs": "bf32cff6d82a63f55dc88a7dc4bd89737460fc345c1d57cd77cd26e21f4bd556"
+      }
+    }
+  }
+}
