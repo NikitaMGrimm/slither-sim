@@ -27,10 +27,12 @@
 
 ### Performance
 
-- The host skips distant blocks of snake body when building each player's view.
-  Output is byte-identical; the mature 500-seat fixture uses 22.9% fewer host
-  instructions with stock clients and 22.5% fewer with protocol 13, including
-  the bounds build. Short fixtures use 0.6–1.0% more instructions
+- When deciding what each player can see, the host now skips whole blocks of
+  eight body segments whose bounds are too far away, instead of checking every
+  segment. Output is byte-identical. With fully grown snakes, host ticks in
+  the 500-player official world run 22.9% fewer instructions with stock
+  clients and 22.5% with protocol 13, including the cost of building the
+  bounds; worlds of short snakes run 0.6–1.0% more
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-covered-bounds/REPORT.md)).
 
 - Each tick, the host decides which snakes and prey each player can see by
