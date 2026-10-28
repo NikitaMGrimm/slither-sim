@@ -21,6 +21,10 @@
 
 ### Performance
 
+- World broadcasts check snake and prey visibility with fewer math-library
+  calls, retaining the existing decisions at boundaries and extreme inputs
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-broadcast-distance/REPORT.md)).
+
 - Bots running inside the server build their view of the game faster. They
   copy the food list from a snapshot kept until the food changes, and update
   other snakes' predicted heads once per motion report instead of replaying
