@@ -22,6 +22,7 @@ use crate::{
 };
 use std::collections::{BTreeMap, VecDeque};
 use std::f64::consts::TAU;
+use std::sync::OnceLock;
 
 pub const PROTOCOL_VERSION: u8 = 19;
 /// Sent commands retained to interpret server replies; a local budget.
@@ -700,7 +701,7 @@ impl Side {
         // so fold each once, preserving the replay's arithmetic and addition
         // order (including equal-time reports). Polling then integrates only the
         // last interval. Anchors still reset the prediction and receipt clock.
-        // research/performance/2026-10-28-client-head-prefix/REPORT.md.
+        // research/performance/2026-10-28-client-frame-materialization/REPORT.md.
         self.base = self.head_at(server);
         self.base_server = server;
         self.heading = heading;
@@ -726,6 +727,8 @@ struct Session {
     own_dead: bool,
     credit: u8,
     food: BTreeMap<u32, Food>,
+    /// Ordered materialization, invalidated by every food edit. Frames own copies.
+    food_frame: OnceLock<Vec<Food>>,
     last_food_sector: Option<(u8, u8)>,
     last_eaten_sector: Option<(u8, u8)>,
     prey: BTreeMap<u16, Prey>,
@@ -1216,7 +1219,9 @@ impl ClientState {
                     session.last_eaten_sector = sector;
                 }
                 if let Some((sx, sy)) = session.last_eaten_sector {
-                    session.food.remove(&food_id(sx, sy, rx, ry));
+                    if session.food.remove(&food_id(sx, sy, rx, ry)).is_some() {
+                        session.food_frame.take();
+                    }
                 }
             }
             Packet::ClearSector(sx, sy) => {
@@ -1228,6 +1233,9 @@ impl ClientState {
                     .range(food_id(sx, sy, 0, 0)..=food_id(sx, sy, 255, 255))
                     .map(|(&id, _)| id)
                     .collect();
+                if !ids.is_empty() {
+                    session.food_frame.take();
+                }
                 for id in ids {
                     session.food.remove(&id);
                 }
@@ -1375,6 +1383,7 @@ impl ClientState {
             f64::from(sx) * sector + f64::from(rx) * (sector / 256.),
             f64::from(sy) * sector + f64::from(ry) * (sector / 256.),
         );
+        self.session.food_frame.take();
         self.session.food.insert(
             food_id(sx, sy, rx, ry),
             Food {
@@ -1753,7 +1762,14 @@ impl ClientState {
                     time: server,
                     me,
                     opponents,
-                    food: session.food.values().cloned().collect(),
+                    // Repeated frames copy a contiguous snapshot rather than
+                    // walking the same ordered tree. Mutations invalidate it;
+                    // visibility, values and order still come only from bytes.
+                    // research/performance/2026-10-28-client-frame-materialization/REPORT.md.
+                    food: session
+                        .food_frame
+                        .get_or_init(|| session.food.values().cloned().collect())
+                        .clone(),
                     prey: session.prey.values().cloned().collect(),
                     arena: Arena {
                         center: Point::default(),
