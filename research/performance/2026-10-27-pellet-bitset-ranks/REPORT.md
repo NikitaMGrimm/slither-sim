@@ -147,6 +147,27 @@ the final fixture records real refusals and
 uses the pit-entering controller instead. All entry points reject Python `-O`.
 Selected amendment data: [long-results.json](long-results.json).
 
+### Review hardening
+
+Runtime `ec0dd92fa813c0a7be0f07628984c2d9dbf192c1` adds a push-side
+guard at twice the shared dense rebuild threshold: four times
+`max(entries.len(), 4096)`. Sparse/no-eater stretches can no longer accumulate
+retired handles indefinitely; the guard drops both layers, and the next dense
+query cold-builds. The regression churns at constant food without queries,
+both with and without an active migration, then checks a rebuilt index against
+the independent recount. Dense queries retain their original threshold and
+512-pellet migration, so the prior instruction results were not remeasured.
+
+All twelve full traces match the owner's merged revision `bf3d103e` literally;
+76 food-focused tests, both pickup suites, the complete Linux Rust group,
+documentation checks and selector controls pass. Collision-pilot source hashes
+must match the recorded overlay hashes before selection, and JSON serialization
+rejects NaN and both infinities. Historical results retain their pinned measured
+archive hashes; neither historical record stores a standalone selector hash.
+[Selected review validation](review-validation.json) records the new checks.
+Validation ran serially on CPU 2 with one Cargo/Rayon/test job; task-owned Rust
+targets and large trace payloads were removed after comparison.
+
 ## Initial rank implementation record
 ## Collision feasibility gate
 
