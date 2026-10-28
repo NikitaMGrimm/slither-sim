@@ -4,7 +4,12 @@
 
 ### Added
 
-- An offline prey flight-speed and activation study; retained evidence leaves close candidates unresolved and does not justify another capture.
+- A study of when prey start fleeing and how fast they flee. The current rules
+  reproduce all 13 recorded test cases exactly, with flight-speed error 0.04
+  against 0.38 for the older two-speed rule. Two close variants of each rule
+  can't be told apart from five official recordings, and no capture with two
+  connections could separate them, so the rules stay as they are
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-prey-flight-activation/REPORT.md)).
 - A study of why the simulator's turning rule divides by 111 where the stock
   client divides by 106. On the recordings behind the original fit, 111 matches
   observed turning about five times better than 106, but a fixed offset of 7–8
