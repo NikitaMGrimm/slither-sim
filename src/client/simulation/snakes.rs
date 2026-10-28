@@ -385,15 +385,18 @@ pub(super) fn covered(head: Point, snake: &Snake, [x0, y0, x1, y1]: [f64; 4], vi
     if head.x < x0 - reach || head.x > x1 + reach || head.y < y0 - reach || head.y > y1 + reach {
         return false;
     }
-    snake.head.distance(head) <= vision
+    // Reuse the guarded comparison: clear cases avoid hypot, while boundaries
+    // and extreme inputs retain the original result. Projection is unchanged:
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-broadcast-distance/REPORT.md
+    snake.head.distance_le(head, vision)
         || snake
             .body
             .first()
-            .is_some_and(|&point| physics::segment_distance(head, snake.head, point) <= vision)
+            .is_some_and(|&point| physics::segment_distance_le(head, snake.head, point, vision))
         || snake
             .body
             .windows(2)
-            .any(|pair| physics::segment_distance(head, pair[0], pair[1]) <= vision)
+            .any(|pair| physics::segment_distance_le(head, pair[0], pair[1], vision))
 }
 
 /// Full snake, then its complete motion with the turn direction: the stock
