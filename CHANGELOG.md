@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking
+
+- `Food` now implements `Copy`, so pellets are copied instead of cloned.
+  Rust code with a non-`move` closure that uses a `Food` now captures it by
+  reference instead of moving it; add `move` if the closure must own it.
+
 ### Performance
 
 - Bots running inside the server build their view of the game faster. They
