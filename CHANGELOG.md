@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.8.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.1...v0.8.0) - 2026-10-28
+
 ### Added
 
 - A note on measuring the host with fully grown snakes. A 500-seat world
