@@ -35,9 +35,10 @@
 
 - Each tick, the host decides which snakes and prey each player can see by
   comparing squared distances, and only near the edge of view falls back to
-  the slower exact distance it used before. Output is byte-identical, and host
-  ticks in the 500-player official fixture run 3.1–3.3% fewer instructions
-  with stock and protocol-13 clients (3.0% at 2,281 seats)
+  the slower exact distance it used before. Output is byte-identical. Host
+  ticks in a 500-player official world with fully grown snakes run 23.6% fewer
+  instructions with stock clients and 23.2% with protocol 13; with short
+  snakes the saving is 3.0–3.3%
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-broadcast-distance/REPORT.md)).
 
 - Bots running inside the server build their view of the game faster. They
