@@ -16,25 +16,31 @@ $guardCreated = $false
 $ordinal = $null
 $guardFailure = $null
 $processResultPath = $null
+. (Join-Path $PSScriptRoot 'preflight.ps1')
+
+function Throw-Exclusivity([string]$Message) {
+    $failure = [InvalidOperationException]::new($Message)
+    $failure.Data['TurnExclusivityFailure'] = $true
+    throw $failure
+}
 
 function Assert-Exclusive([int]$AllowedPid) {
     $others = @(Get-CimInstance Win32_Process | Where-Object {
         $_.ProcessId -ne $AllowedPid -and $_.Name -match '^(node|python|python3|uv)(\.exe)?$' -and
         $_.CommandLine -match '(slither|official|collect\.py|collector|fidelity|turn-offset)'
     })
-    if ($others.Count -gt 0) { throw 'Another possible official collector is running; capture stopped.' }
+    if ($others.Count -gt 0) { Throw-Exclusivity 'Another possible official collector is running; capture stopped.' }
     $endpointPath = Join-Path $ArchiveRoot 'endpoint-private.json'
     if (Test-Path -LiteralPath $endpointPath) {
         $endpoint = Get-Content -Raw -LiteralPath $endpointPath | ConvertFrom-Json
         $connections = @(Get-NetTCPConnection -RemoteAddress $endpoint.ip -RemotePort $endpoint.port -ErrorAction SilentlyContinue |
             Where-Object { $_.State -notin @('Closed', 'TimeWait', 'Listen', 'Bound') -and $_.OwningProcess -ne $AllowedPid })
-        if ($connections.Count -gt 0) { throw 'Another connection to the bound server exists; capture stopped.' }
+        if ($connections.Count -gt 0) { Throw-Exclusivity 'Another connection to the bound server exists; capture stopped.' }
     }
 }
 
 try {
     $lock = [IO.File]::Open($lockPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
-    Assert-Exclusive 0
     if (Test-Path -LiteralPath (Join-Path $ArchiveRoot 'STUDY-STOP.json')) { throw 'Study stop is permanent.' }
     if (Test-Path -LiteralPath (Join-Path $ArchiveRoot 'STOP')) { throw 'Integrity stop is permanent.' }
     [IO.File]::WriteAllText($activePath, (@{ pid = $PID; action = $Action; started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json))
@@ -61,6 +67,18 @@ try {
             $gate = Get-Content -Raw -LiteralPath (Join-Path $ArchiveRoot 'heldout-gate.json') | ConvertFrom-Json
             if (-not $gate.coveredAllPrimary -or -not $gate.freezeCommit) { throw 'Held-out gate closed.' }
         }
+    }
+    # This gate precedes reservation/launch, so no game socket can yet exist.
+    Wait-TurnExclusive -Check { Assert-Exclusive 0 } -Record {
+        param($Row)
+        $Row.action = $Action
+        $Row.invocation = $ordinal
+        $Row.wall = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+        $text = ($Row | ConvertTo-Json -Compress) + "`n"
+        [IO.File]::AppendAllText((Join-Path $ArchiveRoot 'preflight-checks-private.jsonl'), $text)
+        Write-Output ($Row | ConvertTo-Json -Compress)
+    }
+    if ($Action -eq 'Capture') {
         $reservation = @{ ordinal = $ordinal; reservedWall = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json -Compress
         $ledger = [IO.File]::Open($ledgerPath, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::Read)
         try {

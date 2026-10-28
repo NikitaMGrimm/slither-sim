@@ -63,3 +63,38 @@ Source hashes are recorded in `SOURCE-FREEZE.json` before any request. The
 development/held-out boundary permits documented implementation corrections only
 as the original plan allows; no candidate, duration, gate or decision-rule tuning.
 All failures, stdout/stderr, process outcomes and raw traffic stay external.
+
+## Owner amendment: attempt 2, before new requests
+
+On 2026-10-28, after reviewing PR #239's retained exclusivity stop, the capture
+owner explicitly authorized **attempt 2 on the same branch and PR**. The owner
+clarified that the no-replacement rule prevents rerunning after seeing gameplay
+data; attempt 1 opened zero game sockets and therefore cannot select favorable
+gameplay data. Attempt 1 and its failed-preflight record remain unchanged in their
+original external archive and in the retained public attempt-1 results.
+
+This amendment changes **only the stop policy for exclusivity failures before
+an invocation opens any game socket**. Immediately before each invocation, run
+the exclusivity gate. On failure, leave the other connection/process alone, wait
+**15 minutes**, then re-check, with at most **four re-checks** after the initial
+check. If all five checks fail, stop permanently. Source, integrity, protocol,
+challenge and other failures remain permanent. Exclusivity failures after game
+sockets have opened retain the original permanent-stop rule and never wait/retry.
+
+Reuse the retained discovery response when its bound entry is listed active.
+Otherwise, make at most one new discovery request under the unchanged endpoint
+selection rule. Discovery-list activity is a listing observation, not a fresh
+admission or reachability claim. There are no scouting sockets or endpoint changes
+after a game attempt.
+
+All candidate formulas, received-count cells, cruise-only controls, durations,
+eligibility, exclusions, uncertainty, replicated decision rule and development/
+held-out split remain frozen. The limits remain two simultaneous connections,
+four invocations of at most 1200 seconds and one local logical CPU. Pre-invocation
+waiting does not open sockets or reserve an invocation. All preflight checks and
+waits are retained externally. The old stop is not deleted or overwritten; a new
+external attempt-2 directory carries the authorization and reused binding.
+
+The source manifest preserves the original policy hashes and updates only this
+amendment, the outer guard and the authored zero-socket waiting-policy tests.
+The capture driver, native client and all analysis/scoring sources are unchanged.
