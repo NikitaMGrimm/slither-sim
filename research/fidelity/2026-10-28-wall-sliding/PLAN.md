@@ -88,8 +88,9 @@ use predicted/extrapolated/rendered heads as authoritative samples. Preserve
 directed-angle accumulation since the last absolute/body origin.
 
 Score every consecutive own-anchor interval in one incarnation with server gap
-in [50,700] ms, both center gaps in [-5,40] units, outward angle magnitude .35..0.68
-radians, matching tangent direction at both ends, no count change inside the
+in [50,700] ms, both center gaps in [-5,40] units, positive outward angle
+asin(dot(radial_unit,heading_unit)) in [.35,.68] radians, matching tangent
+direction at both ends, no count change inside the
 interval, actual reported speed <=14.1 wire units and >0, and nearest visible
 other body anchor >200 world units at both ends (empty cache is only absence of
 known interference). Split on setup/spawn/removal/death. No model-error filter.
