@@ -67,3 +67,8 @@
   100% PMU scheduling. The selector rechecks every copied binary, all 23
   retained decompressed matrix traces against their partners and hashes, and
   full catalog coverage. The validated bot trace retains 597,804 actions.
+- Before delivery, main adds #244's spawn bounds and the v0.7.1 release. Merge
+  `4e68c804` into the PR branch, preserving both. Only the changelog conflicts;
+  the client implementation, `Food`, shared policy and new regressions stay
+  byte-identical to measured `64490e2e`. Existing performance numbers retain
+  their original pins; no combined-runtime speed claim is substituted.

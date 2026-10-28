@@ -6,6 +6,9 @@ mod initialization_tests;
 mod observation_tests;
 #[cfg(test)]
 mod pit_food_tests;
+mod spawn_bounds;
+#[cfg(test)]
+mod spawn_bounds_tests;
 use crate::bounds_index::BoundsIndex;
 use crate::food_grid::{EaterGrid, FoodCache, PelletIndex};
 use crate::kiosk::{KioskConfig, KioskState};
@@ -20,6 +23,7 @@ pub use initialization::{
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
+use std::sync::OnceLock;
 use std::time::Instant;
 
 /// Provisional density limit inferred from received death-food packets.
@@ -852,6 +856,8 @@ pub struct Simulator {
     /// mass, or non-finite prey motion. Validation rejects every later step.
     failure: Option<SimError>,
     food_cache: FoodCache,
+    /// Derived admission boxes, rebuilt lazily after motion/growth/deaths.
+    spawn_bounds: OnceLock<Vec<Option<Bounds>>>,
     eater_grid: EaterGrid,
     buffers: StepBuffers,
     /// Batch observation on the rayon pool; see `set_parallel`.
@@ -924,6 +930,7 @@ impl Simulator {
             prey_motion_clock: 0.0,
             radius_update_index: 0,
             food_cache: FoodCache::default(),
+            spawn_bounds: OnceLock::new(),
             eater_grid: EaterGrid::default(),
             buffers: StepBuffers::default(),
             #[cfg(feature = "parallel")]
@@ -1210,13 +1217,22 @@ impl Simulator {
             return None;
         }
         let mut margin = f64::INFINITY;
-        for (_, s) in self
+        let query = spawn_bounds::bounds(body.iter().copied());
+        let bounds = self.spawn_bounds();
+        for (i, s) in self
             .snakes
             .iter()
             .enumerate()
             .filter(|(i, s)| s.alive && Some(*i) != excluded)
         {
             let contact = collision_distance(s.segments, body.len()) + 40.;
+            // Skip only boxes that cannot lower the accumulated exact minimum.
+            // Using stop_at here would change early returns and fallback ties.
+            if let (Some(query), Some(bounds)) = (query, bounds[i])
+                && spawn_bounds::gap(query, bounds) - contact - 1. > margin
+            {
+                continue;
+            }
             for edge in body.windows(2) {
                 let (head, tail) = (edge[0], edge[1]);
                 margin = margin.min(segment_distance(s.head, head, tail) - contact);
@@ -1250,12 +1266,22 @@ impl Simulator {
         {
             return false;
         }
+        let query = spawn_bounds::bounds(line.iter().copied());
+        let bounds = self.spawn_bounds();
         self.snakes
             .iter()
             .enumerate()
             .filter(|(i, s)| s.alive && Some(*i) != excluded)
-            .all(|(_, s)| {
+            .all(|(i, s)| {
                 let width = (collision_distance(s.segments, segments) + 40.).max(clearance);
+                // Include every head/body edge in the box and the requested
+                // clearance, with slack for exact-distance roundoff. Unusual
+                // coordinates retain the exhaustive path. See spawn_bounds.rs.
+                if let (Some(query), Some(bounds)) = (query, bounds[i])
+                    && !bounds.near(query, width + 1.)
+                {
+                    return true;
+                }
                 line.windows(2).all(|edge| {
                     let (head, tail) = (edge[0], edge[1]);
                     // Include the head even if an externally supplied body is empty.
@@ -1404,6 +1430,7 @@ impl Simulator {
         self.death_times[index] = None;
         self.joins[index] = self.next_join;
         self.next_join += 1;
+        self.refresh_spawn_bounds(index);
         Ok(())
     }
     pub fn living(&self) -> usize {
@@ -1548,6 +1575,7 @@ impl Simulator {
         actions: &[Option<Action>],
         profile: &mut StepProfile,
     ) {
+        self.spawn_bounds.take();
         let mut clock = if PROFILE { Some(Instant::now()) } else { None };
         if let Some(events) = &mut self.pickup_events {
             events.clear();

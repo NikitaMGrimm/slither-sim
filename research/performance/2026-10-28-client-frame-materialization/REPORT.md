@@ -63,6 +63,14 @@ use the original encoded bytes and decoder. No authoritative observation path,
 structured-delivery bypass, delivery-clock change or reduced simulation rate.
 Spawn-admission geometry is untouched.
 
+Delivery integrates main `4e68c8047e2ff61c985f449506ff7bca5273c3ff`, including
+the separately qualified spawn-admission optimization and v0.7.1 release.
+The client implementation, `Food` declaration, shared policy and new regression
+tests equal the measured candidate exactly. Counts remain pinned to the
+baseline/candidate above; they are not relabelled as a new measurement of the
+combined runtime. The merge conflict was the released changelog section; the
+new entry stays under Unreleased while main's released entries are preserved.
+
 ## Method and parity
 
 Offline synthetic official 500, seed 7, official delivery, 1,000 warmup decisions
