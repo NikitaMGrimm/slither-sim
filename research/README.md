@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Fidelity | [Turn count and phase](fidelity/2026-10-28-turn-count-phase/REPORT.md) | Original 111-fit count convention, frozen retained-interval comparisons, authored client geometry and conditional capture power; no collection or runtime change. |
 | Performance | [Syscall boundary ceiling](performance/2026-10-27-host-syscall-ceiling/REPORT.md) | c7a/c8a null-syscall and 22-byte send microbenchmarks plus a counted official-500 hold; removing every syscall boundary would save at most about 0.22 ms/tick (3% of a c7a core), so batching cannot close the c7a gap. Sends cost 4.5 µs on c7a vs 1.5 µs on c8a, mostly inside the kernel. |
 | Performance | [Same-session c7a main recheck](performance/2026-10-27-c7a-main-recheck/REPORT.md) | Paired current-main/control official-500/375 holds and a nice +5 diagnostic; main passes 375, while 500 misses at both priorities. |
 | Fidelity | [Client-view prediction comparison](fidelity/2026-10-27-client-view/REPORT.md) | Pinned Rust stock-client formula map, retained official/local host correction distributions and ranked investigations; no runtime change or new official capture. |
