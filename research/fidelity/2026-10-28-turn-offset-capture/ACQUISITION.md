@@ -98,3 +98,47 @@ external attempt-2 directory carries the authorization and reused binding.
 The source manifest preserves the original policy hashes and updates only this
 amendment, the outer guard and the authored zero-socket waiting-policy tests.
 The capture driver, native client and all analysis/scoring sources are unchanged.
+
+## Owner amendment: attempt 3, before requests
+
+The owner explicitly authorized attempt 3 of PR #239 in **a capped ephemeral
+Linux container on a separate machine**. Attempt 2 acquired zero eligible cells;
+a fresh ledger therefore selects no favorable measured cell. Attempts 1 and 2,
+including both stop records and full archives, remain unchanged outside Git;
+their bounded public results are retained separately.
+
+Only the outer guard changes. `container-guard.mjs`, its authored tests, the
+connection-only coordinator and read-only census helper have their own frozen
+hashes. The capture driver, headless client, native harness, analysis, scoring,
+cells, interval durations, uncertainty and decision rules remain byte-identical.
+The frozen PR-head sources are mounted read-only and verified before requests.
+No new discovery request or scouting connection is allowed: reuse the same private
+binding; failure of that binding ends collection without endpoint fallback.
+
+The fresh container runs only our process tree, with a one-CPU and 512-MiB cap.
+Immediately before every invocation and periodically during it, a connection
+coordinator checks the bound endpoint on **both machines**. It uses connections
+only, without screening unrelated process names. The separate-machine check
+compares socket owners with that container's process tree. Unknown attribution
+fails closed. Connecting and closing TCP states count; completed time-wait states
+do not. Our active connection bound is two.
+
+Connection snapshots carry an instance/sequence identity. The container's local
+monotonic receipt clock expires a missing/stale monitor after 15 seconds; no
+cross-machine wall-clock agreement is assumed. Conflicts retain the full census,
+available process identities and untruncated command lines in private files on
+both sides. No such identifiers are published.
+
+Pre-launch exclusivity failures keep the attempt-2 policy: wait 15 minutes, at
+most four re-checks after the initial check, then stop permanently. Post-launch
+conflicts, lost monitoring, source/integrity failures and interruption retain
+permanent-stop behavior. Reservation is flushed before child launch; failed
+launches consume their ordinal. The child receives the existing interruption
+file and time to seal, bounded by the hard 1200-second invocation deadline.
+The fresh ledger allows at most four invocations, development before held-out;
+the original development-coverage gate and committed held-out checkpoint remain.
+
+Raw archives use a bind mount so container removal cannot remove them. After
+copying and verifying the archive locally, the task scratch directory is removed.
+An image already present is left untouched; a task-pulled image would be removed.
+No host installation/configuration or existing container/image/volume is changed.
