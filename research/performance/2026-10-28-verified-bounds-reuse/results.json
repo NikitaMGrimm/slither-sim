@@ -1,0 +1,277 @@
+{
+  "machine": "a 4-vCPU Zen 5 EPYC KVM guest",
+  "access": "full samples, traces, sources, copied binaries and receipts local-only",
+  "rows": {
+    "stock": {
+      "pairs": 5,
+      "medianReduction": 0.10944795943359242,
+      "reductionRange": [
+        0.10944676836456113,
+        0.10944799407862782
+      ],
+      "warmTicks": 193000,
+      "ticks": 360,
+      "beforeMedianInstructions": 4183008974,
+      "afterMedianInstructions": 3725187178,
+      "windowTraceSha256": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+      "endCensus": {
+        "anchors": 27942,
+        "food": 28610,
+        "living": 500,
+        "max": 271,
+        "mean": 55.884,
+        "p90": 176,
+        "p99": 247,
+        "prey": 21
+      },
+      "warmBytesPerArm": 5876276676,
+      "warmTraceSha256": "e97aeb8d4579f0ed1d5228dc76cec361ed2151faeadc9e9fe7b40ac475e1a26c"
+    },
+    "legacy": {
+      "pairs": 5,
+      "medianReduction": 0.10648276927819844,
+      "reductionRange": [
+        0.10648253837400723,
+        0.10648287094611564
+      ],
+      "warmTicks": 193000,
+      "ticks": 360,
+      "beforeMedianInstructions": 4304765055,
+      "afterMedianInstructions": 3846381726,
+      "windowTraceSha256": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+      "endCensus": {
+        "anchors": 27942,
+        "food": 28610,
+        "living": 500,
+        "max": 271,
+        "mean": 55.884,
+        "p90": 176,
+        "p99": 247,
+        "prey": 21
+      },
+      "warmBytesPerArm": 10132210980,
+      "warmTraceSha256": "204c47503751b7d8c53e7680ff2c7859042185f4416905fab95125f35b6d54b4"
+    },
+    "short": {
+      "pairs": 5,
+      "medianReduction": -0.008488707800140327,
+      "reductionRange": [
+        -0.008489133378304592,
+        -0.008486928301578489
+      ],
+      "warmTicks": 0,
+      "ticks": 1080,
+      "beforeMedianInstructions": 7240281966,
+      "afterMedianInstructions": 7301743156,
+      "windowTraceSha256": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+      "endCensus": {
+        "anchors": 2364,
+        "food": 48953,
+        "living": 500,
+        "max": 13,
+        "mean": 4.728,
+        "p90": 6,
+        "p99": 11,
+        "prey": 58
+      }
+    }
+  },
+  "phases": {
+    "base-profile": {
+      "ticks": 360,
+      "instructions": {
+        "2": 4656855206,
+        "3": 1616973025,
+        "4": 106920902,
+        "5": 2915705635,
+        "6": 848989308,
+        "7": 452628737,
+        "8": 170071152,
+        "9": 92825708,
+        "10": 61974880,
+        "11": 305265270,
+        "12": 790638434,
+        "13": 557236166,
+        "14": 197772866,
+        "15": 32162305
+      }
+    },
+    "candidate-profile": {
+      "ticks": 360,
+      "instructions": {
+        "2": 4196936457,
+        "3": 1616731865,
+        "4": 106922616,
+        "5": 2456079691,
+        "6": 832998882,
+        "7": 452559014,
+        "8": 170009878,
+        "9": 92824964,
+        "10": 61974886,
+        "11": 305191839,
+        "12": 790638484,
+        "13": 116778337,
+        "14": 197738420,
+        "15": 32162112
+      }
+    }
+  },
+  "pins": {
+    "base": {
+      "commit": "634b54d835e56fd054d220f7aab13389f93564ff",
+      "archiveSha256": "1a5697f4e7af88330444eff219e64192d9271e52a16517684f6a1d3acc3c831a",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "rustSources": 178,
+      "rustSourceDigest": "7e16dab748c2a2d8f50a98ab81fc886e5a8c2b0e56e8732781b0cee6f301bfee",
+      "binaryDigest": "3259d2dc83c2d402bc2f25c9c0a4a561c908a59a0cfb549116ba628e1b496b13"
+    },
+    "candidate": {
+      "commit": "b12f70b9c13ff0984648579415deb9131c656b59",
+      "archiveSha256": "0cb0bdec4cfe25ed534df58c3d5ccc3bb2be65c62d47b734be12bca928f1a9b7",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "rustSources": 178,
+      "rustSourceDigest": "c9de0ee654320fd54917472f59622efdfc48868515d5afefac8d9bfd4557243f",
+      "binaryDigest": "0fe784f8b613d9edfb96fe78841c622174e2b5404ef1c46f547bbe4759d89fdd"
+    },
+    "base-profile": {
+      "commit": "634b54d835e56fd054d220f7aab13389f93564ff",
+      "archiveSha256": "1a5697f4e7af88330444eff219e64192d9271e52a16517684f6a1d3acc3c831a",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "rustSources": 178,
+      "rustSourceDigest": "38b9509e4d2e7da7e8c585d959edbd7c2e44ecd171d39a2f4e903039854e2338",
+      "binaryDigest": "82e133cfc202c6a0d48b0aa41a89827fea82af28fb16288815090c87740dd25b"
+    },
+    "candidate-profile": {
+      "commit": "b12f70b9c13ff0984648579415deb9131c656b59",
+      "archiveSha256": "0cb0bdec4cfe25ed534df58c3d5ccc3bb2be65c62d47b734be12bca928f1a9b7",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "rustSources": 178,
+      "rustSourceDigest": "d0447c6d4cc2daec166f60a453d4ba3bbbc1dd0ab3b122df2262ddbfdcc01c23",
+      "binaryDigest": "02fb8bf7de3e4ab7f0d183a647436ef4aad81a6f19a44aec75e16a696037d43b"
+    },
+    "mutation": {
+      "commit": "b12f70b9c13ff0984648579415deb9131c656b59",
+      "archiveSha256": "0cb0bdec4cfe25ed534df58c3d5ccc3bb2be65c62d47b734be12bca928f1a9b7",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "rustSources": 178,
+      "rustSourceDigest": "805ef93738917329b53aa692943db40fef4a50ed5a197f8ee53665fc6a3e110b",
+      "binaryDigest": "638d340ed694224f7ae017c8ec78d321d616e97b33d8b9556707d87470462549"
+    }
+  },
+  "matureCensus": {
+    "anchors": 27610,
+    "food": 28897,
+    "living": 499,
+    "max": 271,
+    "mean": 55.33066132264529,
+    "p90": 176,
+    "p99": 247,
+    "prey": 20
+  },
+  "shortRows": {
+    "official500": {
+      "pairs": 5,
+      "medianReduction": -0.008462103267857568,
+      "reductionRange": [
+        -0.008484264389303497,
+        -0.008454087376523756
+      ]
+    },
+    "official500-legacy": {
+      "pairs": 5,
+      "medianReduction": -0.007898511337716352,
+      "reductionRange": [
+        -0.007933553959628359,
+        -0.007880222960027439
+      ]
+    },
+    "official2281": {
+      "pairs": 5,
+      "medianReduction": -0.009491176616766905,
+      "reductionRange": [
+        -0.009499905699539513,
+        -0.00948380611103139
+      ]
+    },
+    "client-official-500": {
+      "pairs": 5,
+      "medianReduction": -0.0062907237439635555,
+      "reductionRange": [
+        -0.0062925248402065925,
+        -0.006285362571386122
+      ]
+    }
+  },
+  "validation": {
+    "rustGroupPassed": true,
+    "originalTracesEqual": 27,
+    "stockAndLegacyMatureBytesEqual": true,
+    "matureMutationPhysicalStatesUnchanged": true,
+    "streamMutationsDetected": 2,
+    "reconstructedArms": 5,
+    "targetRemoved": true,
+    "checks": {
+      "body-oracle": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "cache-edit-oracles": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "body-oracle-release": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "narrowed-block-mutation": {
+        "exit": 101,
+        "expectedFailure": true
+      },
+      "restored-oracle": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "narrowed-circle-mutation": {
+        "exit": 101,
+        "expectedFailure": true
+      },
+      "restored-circle-oracle": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "length-only-cache-key": {
+        "exit": 101,
+        "expectedFailure": true
+      },
+      "x-only-cache-key": {
+        "exit": 101,
+        "expectedFailure": true
+      },
+      "numeric-only-cache-key": {
+        "exit": 101,
+        "expectedFailure": true
+      },
+      "restored-cache-oracles": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "cache-edit-oracles-release": {
+        "exit": 0,
+        "expectedFailure": false
+      },
+      "rust-group": {
+        "exit": 0,
+        "expectedFailure": false
+      }
+    }
+  },
+  "cpu": {
+    "matureWarmSeconds": 5326.4622413609995,
+    "hostForkAndControllerSeconds": 5511.015796359
+  }
+}

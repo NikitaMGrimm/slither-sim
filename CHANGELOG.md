@@ -27,6 +27,13 @@
 
 ### Performance
 
+- The host keeps body visibility bounds between ticks after checking every
+  body point, and rebuilds them after any edit. Output is byte-identical.
+  In the fully grown 500-player official world, host ticks run a further
+  10.9% fewer instructions with stock clients and 10.6% with protocol 13;
+  short-snake rows run 0.6–1.0% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-verified-bounds-reuse/REPORT.md)).
+
 - The host also skips body blocks that lie inside the square around a
   player's view but entirely outside its circle. Output is byte-identical.
   With fully grown snakes, host ticks in the 500-player official world run a

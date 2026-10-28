@@ -1,0 +1,33 @@
+--- a/check.py
++++ b/check.py
+@@ -18,6 +18,7 @@
+  rows.append({'label':label,'command':command,'expectedFailure':fails,'exit':proc.returncode});(checks/'results.json').write_text(json.dumps(rows,indent=2)+'\n');print(label,proc.returncode,flush=True)
+ command=['cargo','test','--locked','--lib','body_bounds_match_original_coverage']
+ run(command,'body-oracle')
++run(['cargo','test','--locked','--lib','retained_body_bounds_'],'cache-edit-oracles')
+ run(['cargo','test','--release','--locked','--lib','body_bounds_match_original_coverage'],'body-oracle-release')
+ f=source/'src/client/simulation/snakes.rs';before=f.read_bytes();needle='if !bounds.near(query, reach) {'
+ try:
+@@ -34,6 +35,22 @@
+  run(command,'narrowed-circle-mutation',True)
+ finally:f.write_bytes(before)
+ run(command,'restored-circle-oracle')
++
++cache_command=['cargo','test','--locked','--lib','retained_body_bounds_']
++for label,needle,replacement in [
++ ('length-only-cache-key','if same_body {','if cached.body.len() == snake.body.len() {'),
++ ('x-only-cache-key','a.y.to_bits() == b.y.to_bits()','true'),
++ ('numeric-only-cache-key','a.x.to_bits() == b.x.to_bits() && a.y.to_bits() == b.y.to_bits()','*a == *b'),
++]:
++ f=source/'src/client/simulation/snakes.rs';before=f.read_bytes()
++ try:
++  text=before.decode();assert text.count(needle)==1
++  f.write_text(text.replace(needle,replacement),newline='\n');run(cache_command,label,True)
++ finally:f.write_bytes(before)
++ assert hashlib.sha256(f.read_bytes()).digest()==hashlib.sha256(before).digest()
++run(cache_command,'restored-cache-oracles')
++run(['cargo','test','--release','--locked','--lib','retained_body_bounds_'],'cache-edit-oracles-release')
++
+ run(['python3','tools/check.py','rust'],'rust-group')
+ (root/'required-checks-pass.json').write_text(json.dumps({'passed':True,'checks':rows},indent=2)+'\n')
+ print('REQUIRED CHECKS PASS',flush=True)
