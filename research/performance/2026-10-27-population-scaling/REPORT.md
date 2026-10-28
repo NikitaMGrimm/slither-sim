@@ -66,7 +66,8 @@ Synthetic, offline SlitherSim worlds at runtime
 thin LTO, one codegen unit, debuginfo=1, default features. Physics and each bot
 sample use one logical CPU. Initially two collectors used CPUs 2 and 3, with
 Cargo jobs=2/Rayon=2 for builds; the simulator's parallel observations are off.
-The owner's 2026-10-28 amendment restricts all remaining work to CPU 2,
+From 2026-10-28, the maintaining agent's one-CPU allocation under the owner's
+machine budget restricts all remaining work to CPU 2,
 jobs=1/Rayon=1 and one active world at a time. In-flight single-threaded warmups
 were paused and resumed sequentially, preserving their state; they use no
 Rayon work. Both finished and released their memory before counted checkpoint

@@ -74,7 +74,8 @@
   that case, censored by the maintaining agent, is collected only by the
   CPU-bounded probe script.
   The six primary cases and compiled Rust templates are unchanged.
-- At the owner's 2026-10-28 one-CPU amendment, both large warmups were stopped
+- When the maintaining agent cut this study to one CPU under the owner's
+  2026-10-28 machine budget, both large warmups were stopped
   immediately; the old parallel Python controller processes were terminated.
   Both warmups were pinned to CPU 2, with only the 5k control resumed. `/proc`
   reports one thread each, about 345/307 MB resident memory, one running and
@@ -88,8 +89,8 @@
   `profile/target`. Copied binaries, archived runtime/overlay sources, logs and
   unique evidence remain. Identical endpoint files are retained with hard links.
 - New native children also have a process-local 2.5 GiB address-space ceiling
-  (`RLIMIT_AS`), keeping their resident memory below the owner's approximate
-  3 GB budget. Checkpoint-loading counts begin only after both retained worlds
+  (`RLIMIT_AS`), keeping their resident memory below the maintaining agent's
+  approximate 3 GB budget. Checkpoint-loading counts begin only after both retained worlds
   have exited. A limit failure is retained as a failed attempt, never hidden.
 - The mature 5k checkpoint failed restoration under the 2.5 GiB address-space
   guard. The production importer held its generic JSON tree and typed world
