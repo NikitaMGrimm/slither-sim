@@ -73,8 +73,11 @@
 
 ### Performance
 
-- Spawn placement skips distant snake bodies using cached conservative bounds,
-  preserving candidate order, scores and simulation output
+- Finding a safe spot for a new snake now skips snakes whose bodies are too
+  far away to matter, instead of checking every body in the world. Output is
+  byte-identical. At 2,000 snakes, placement drops from 162M to 3.1M
+  instructions per tick and the whole tick from 197M to 38M. In a 500-player
+  official server it was already only about 0.2% of the cost
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-spawn-bounds/REPORT.md)).
 - Food pickup now works out each pellet's place in the food list from a
   bitmap, instead of rewriting the stored position of every later pellet after
