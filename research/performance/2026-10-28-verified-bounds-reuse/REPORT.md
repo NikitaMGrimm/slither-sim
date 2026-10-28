@@ -158,9 +158,8 @@ all retained measured Rust sources and copied binaries still match their pins.
 Compact archive/source/binary identities belong in selected results; full source
 maps, binaries, samples, traces, commands and failed attempts remain local-only.
 
-During the run, a bounded SSH status request was refused by the existing guest
-access service with `administratively prohibited: machine is cooling down`.
-No configuration or security setting was changed. The most recent successful
+During the run, the guest's access service briefly refused a bounded SSH
+status request. No configuration or security setting was changed. The most recent successful
 receipt already showed the complete Rust group passing, stock warm-byte parity,
 repeated-child window parity and the mature stock output mutation being detected.
 Access resumed without restarting the controller; subsequent durable receipts
