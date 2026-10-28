@@ -56,14 +56,76 @@ pub(super) struct SnakeDeltaCache(Option<SnakeDelta>);
 pub(super) struct SnakeBroadcast {
     pub(super) deltas: Vec<SnakeDeltaCache>,
     pub(super) candidates: Vec<usize>,
+    pub(super) body_bounds: BodyBounds,
 }
 
 impl SnakeBroadcast {
-    pub(super) fn new(slots: usize) -> Self {
+    pub(super) fn new(snakes: &[Snake]) -> Self {
         Self {
-            deltas: vec![SnakeDeltaCache::default(); slots],
+            deltas: vec![SnakeDeltaCache::default(); snakes.len()],
             candidates: Vec::new(),
+            body_bounds: BodyBounds::new(snakes),
         }
+    }
+}
+
+const BODY_BOUND_EDGES: usize = 8;
+const BODY_BOUND_MIN_EDGES: usize = 16;
+const BODY_BOUND_LIMIT: f64 = 1e7;
+
+/// Consecutive edge blocks, shared by all recipients of one broadcast. Rebuild
+/// with the geometry, including external pose edits and non-tick broadcasts.
+#[derive(Default)]
+pub(super) struct BodyBounds {
+    ranges: Vec<std::ops::Range<usize>>,
+    blocks: Vec<physics::Bounds>,
+}
+
+fn boundable(point: Point) -> bool {
+    point.finite() && point.x.abs() <= BODY_BOUND_LIMIT && point.y.abs() <= BODY_BOUND_LIMIT
+}
+
+impl BodyBounds {
+    fn new(snakes: &[Snake]) -> Self {
+        let indexed = |snake: &Snake| snake.alive && snake.body.len() > BODY_BOUND_MIN_EDGES;
+        if !snakes.iter().any(indexed) {
+            return Self::default();
+        }
+        let capacity = snakes
+            .iter()
+            .filter(|s| indexed(s))
+            .map(|s| (s.body.len() - 1).div_ceil(BODY_BOUND_EDGES))
+            .sum();
+        let mut index = Self {
+            ranges: vec![0..0; snakes.len()],
+            blocks: Vec::with_capacity(capacity),
+        };
+        for (slot, snake) in snakes.iter().enumerate().filter(|(_, s)| indexed(s)) {
+            let start = index.blocks.len();
+            for first in (0..snake.body.len() - 1).step_by(BODY_BOUND_EDGES) {
+                // Neighboring blocks share their endpoint, so every original
+                // edge belongs to exactly one block, including the final edge.
+                let end = (first + BODY_BOUND_EDGES + 1).min(snake.body.len());
+                let points = &snake.body[first..end];
+                if !points.iter().copied().all(boundable) {
+                    index.blocks.truncate(start);
+                    break;
+                }
+                let mut bounds = physics::Bounds::between(points[0], points[0]);
+                for &point in &points[1..] {
+                    bounds.include(point);
+                }
+                index.blocks.push(bounds);
+            }
+            index.ranges[slot] = start..index.blocks.len();
+        }
+        index
+    }
+
+    pub(super) fn for_snake(&self, slot: usize) -> &[physics::Bounds] {
+        self.ranges
+            .get(slot)
+            .map_or(&[], |range| &self.blocks[range.clone()])
     }
 }
 
@@ -380,7 +442,13 @@ impl CoverageGrid {
 }
 
 /// Coverage: any centerline part within `vision` of `head`.
-pub(super) fn covered(head: Point, snake: &Snake, [x0, y0, x1, y1]: [f64; 4], vision: f64) -> bool {
+pub(super) fn covered(
+    head: Point,
+    snake: &Snake,
+    [x0, y0, x1, y1]: [f64; 4],
+    vision: f64,
+    body_bounds: &[physics::Bounds],
+) -> bool {
     let reach = vision + 1.;
     if head.x < x0 - reach || head.x > x1 + reach || head.y < y0 - reach || head.y > y1 + reach {
         return false;
@@ -388,15 +456,39 @@ pub(super) fn covered(head: Point, snake: &Snake, [x0, y0, x1, y1]: [f64; 4], vi
     // Reuse the guarded comparison: clear cases avoid hypot, while boundaries
     // and extreme inputs retain the original result. Projection is unchanged:
     // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-broadcast-distance/REPORT.md
-    snake.head.distance_le(head, vision)
+    if snake.head.distance_le(head, vision)
         || snake
             .body
             .first()
             .is_some_and(|&point| physics::segment_distance_le(head, snake.head, point, vision))
-        || snake
+    {
+        return true;
+    }
+    if body_bounds.is_empty() || !boundable(head) || !(0. ..=BODY_BOUND_LIMIT).contains(&vision) {
+        return snake
             .body
             .windows(2)
+            .any(|pair| physics::segment_distance_le(head, pair[0], pair[1], vision));
+    }
+    // As in the admission bounds, one unit safely exceeds projection/hypot
+    // roundoff at this finite scale. This only skips impossible blocks; the
+    // original predicate still decides visibility, in original edge order.
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-covered-bounds/REPORT.md
+    let query = physics::Bounds::between(head, head);
+    for (block, &bounds) in body_bounds.iter().enumerate() {
+        if !bounds.near(query, reach) {
+            continue;
+        }
+        let first = block * BODY_BOUND_EDGES;
+        let end = (first + BODY_BOUND_EDGES + 1).min(snake.body.len());
+        if snake.body[first..end]
+            .windows(2)
             .any(|pair| physics::segment_distance_le(head, pair[0], pair[1], vision))
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// Full snake, then its complete motion with the turn direction: the stock
@@ -523,6 +615,196 @@ pub(super) fn changes(
 mod tests {
     use super::*;
     use crate::{Config, Simulator};
+
+    fn original_segment_distance(p: Point, a: Point, b: Point) -> f64 {
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let denom = dx * dx + dy * dy;
+        let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / if denom == 0.0 { 1.0 } else { denom })
+            .clamp(0.0, 1.0);
+        p.distance(Point {
+            x: a.x + t * dx,
+            y: a.y + t * dy,
+        })
+    }
+
+    fn original_covered(head: Point, snake: &Snake, b: [f64; 4], vision: f64) -> bool {
+        let [x0, y0, x1, y1] = b;
+        let reach = vision + 1.;
+        if head.x < x0 - reach || head.x > x1 + reach || head.y < y0 - reach || head.y > y1 + reach
+        {
+            return false;
+        }
+        snake.head.distance(head) <= vision
+            || snake
+                .body
+                .first()
+                .is_some_and(|&p| original_segment_distance(head, snake.head, p) <= vision)
+            || snake
+                .body
+                .windows(2)
+                .any(|p| original_segment_distance(head, p[0], p[1]) <= vision)
+    }
+
+    fn coverage_bounds(snake: &Snake) -> [f64; 4] {
+        snake.body.iter().fold(
+            [snake.head.x, snake.head.y, snake.head.x, snake.head.y],
+            |[x0, y0, x1, y1], p| [x0.min(p.x), y0.min(p.y), x1.max(p.x), y1.max(p.y)],
+        )
+    }
+
+    #[test]
+    fn body_bounds_match_original_coverage() {
+        let world = Simulator::new(crate::WorldOptions {
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["template".into()],
+                placement: crate::Placement::TestRing,
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let mut snake = world.snakes()[0].clone();
+        // The middle and final blocks are visible without the head/front edge.
+        // Adjacent radii keep the exact inclusive boundary independently of
+        // the index, including a long edge crossing far from both endpoints.
+        snake.head = Point {
+            x: -10000.,
+            y: 10001.,
+        };
+        snake.body = (0..34)
+            .map(|i| {
+                if i < 16 {
+                    Point {
+                        x: -10000. + i as f64,
+                        y: 10000.,
+                    }
+                } else {
+                    Point {
+                        x: 0.,
+                        y: (i as f64 - 24.) * 100.,
+                    }
+                }
+            })
+            .collect();
+        let check = |snake: &Snake, p: Point, radii: &[f64]| {
+            let index = BodyBounds::new(std::slice::from_ref(snake));
+            let bounds = coverage_bounds(snake);
+            for &r in radii {
+                assert_eq!(
+                    covered(p, snake, bounds, r, index.for_snake(0)),
+                    original_covered(p, snake, bounds, r),
+                    "p={p:?}, radius={r:?}, snake={snake:?}"
+                );
+            }
+        };
+        for y in [-800., -750., 0., 850., 900.] {
+            check(
+                &snake,
+                Point { x: 500., y },
+                &[500f64.next_down(), 500., 500f64.next_up()],
+            );
+        }
+        let mut state = 0x4d15_fa32_1c07_u64;
+        let mut coordinate = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            ((state >> 11) as f64 / (1u64 << 53) as f64 - 0.5) * 40000.
+        };
+        for scene in 0..2048 {
+            let len = [0, 1, 2, 8, 9, 16, 17, 18, 31, 33, 65, 257][scene % 12];
+            snake.head = Point {
+                x: coordinate(),
+                y: coordinate(),
+            };
+            snake.body = (0..len)
+                .map(|_| Point {
+                    x: coordinate(),
+                    y: coordinate(),
+                })
+                .collect();
+            for _ in 0..16 {
+                let p = Point {
+                    x: coordinate(),
+                    y: coordinate(),
+                };
+                let r = snake
+                    .body
+                    .windows(2)
+                    .next()
+                    .map_or(0., |edge| original_segment_distance(p, edge[0], edge[1]));
+                check(&snake, p, &[0., 500., r.next_down(), r, r.next_up()]);
+            }
+        }
+        let special = [
+            0.,
+            -0.,
+            f64::MIN_POSITIVE,
+            1e-200,
+            1e-9,
+            BODY_BOUND_LIMIT.next_down(),
+            BODY_BOUND_LIMIT,
+            BODY_BOUND_LIMIT.next_up(),
+            1e150,
+            1e200,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
+        for x in special {
+            for y in special {
+                snake.head = Point { x: 0., y: 0. };
+                snake.body = vec![Point { x, y }; 34];
+                snake.body[17] = Point { x: 42., y: -42. };
+                for p in [Point { x, y }, Point { x: 42., y: -42. }, Point::default()] {
+                    check(
+                        &snake,
+                        p,
+                        &[
+                            -1.,
+                            -0.,
+                            0.,
+                            1e-200,
+                            42.,
+                            500.,
+                            1e150,
+                            f64::INFINITY,
+                            f64::NAN,
+                        ],
+                    );
+                }
+            }
+        }
+        // Separate broadcasts can replace, shrink, retire and reuse slots.
+        let mut snakes = vec![snake.clone(); 3];
+        for count in [3, 1, 0, 4] {
+            snakes.resize(count, snake.clone());
+            for (slot, s) in snakes.iter_mut().enumerate() {
+                s.alive = slot % 2 == 0;
+                s.head = Point {
+                    x: 10000.,
+                    y: 10000.,
+                };
+                s.body = vec![Point::default(); 17 + slot];
+                check(s, Point { x: 500., y: 0. }, &[500.]);
+            }
+            let index = BodyBounds::new(&snakes);
+            for (slot, s) in snakes.iter().enumerate() {
+                assert_eq!(
+                    covered(
+                        Point::default(),
+                        s,
+                        coverage_bounds(s),
+                        0.,
+                        index.for_snake(slot)
+                    ),
+                    original_covered(Point::default(), s, coverage_bounds(s), 0.)
+                );
+            }
+        }
+    }
 
     fn fresh_coverage_cells(
         snakes: &[Snake],

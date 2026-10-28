@@ -390,7 +390,7 @@ impl SimulatorBackend {
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
         // they are consumed by the next broadcast's update_reports.
-        let mut snakes = SnakeBroadcast::new(self.slots.len());
+        let mut snakes = SnakeBroadcast::new(self.world.snakes());
         let mut board = None;
         let mut map = None;
         for slot in 0..self.slots.len() {
@@ -643,14 +643,19 @@ impl SimulatorBackend {
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
         let known = &self.slots[slot].connection.snakes;
-        let SnakeBroadcast { deltas, candidates } = snakes;
+        let SnakeBroadcast {
+            deltas,
+            candidates,
+            body_bounds,
+        } = snakes;
         known.candidates(grid.near(head), candidates);
         let order = std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
         for i in order {
             let snake = &world.snakes()[i];
             let life = self.slots[i].life;
             let control = self.slots[i].control.heading;
-            let eligible = snake.alive && (i == slot || covered(head, snake, bounds[i], vision));
+            let eligible = snake.alive
+                && (i == slot || covered(head, snake, bounds[i], vision, body_bounds.for_snake(i)));
             let own = i == slot;
             let id = i as u16;
             let profile = self.profiles.get(i).unwrap_or(&NATIVE_PROFILE);
