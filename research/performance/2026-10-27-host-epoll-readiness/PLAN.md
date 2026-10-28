@@ -51,3 +51,12 @@ new pairs, report environmental/world-driven evidence for the owner's landing
 decision. Absence of recurrence does not establish a cause or latency improvement.
 If validity/instrumentation fails, retain the attempt and stop for diagnosis;
 do not replace it silently. Retained historical gaps remain unavailable.
+
+Instrumentation correction after the first added hold: the buffered `deaths`
+field sums an already cumulative history. Pause the driver, retain the running
+hold, and validate recovery before continuing; do not change binaries or replace
+holds. Recover deaths as cumulative slot births minus alive population only
+through the live post-window: this fixture starts empty and reconnects only after
+own death. Require no generator errors or other close reasons, monotone recovered
+counts and agreement with load death counters. Preserve the erroneous raw field
+as integratedDeathHistory in analysis. The decision rule and schedule are unchanged.
