@@ -5440,6 +5440,17 @@
       ]
     }
   ],
+  "P16SensitivityErrorChangeMaxWorld": {
+    "integrationStepSeconds": {
+      "0.0035": 0.0022116081139684773,
+      "0.014": 0.003957936477439805
+    },
+    "eventShiftMs": {
+      "7": 2.9955915840714535,
+      "14": 2.994455785684173,
+      "42": 5.066121269329251
+    }
+  },
   "localRehearsal": {
     "origin": "local-simulator",
     "officialConnections": 0,
@@ -7451,10 +7462,26 @@
     "additionalFields": "local full-selector dry run, authored native boundary witnesses and power diagnostics; no new interval selection",
     "preliminaryPassesRetainedOutsideGit": true
   },
+  "cleanup": {
+    "officialConnections": 0,
+    "remoteResourcesUsed": false,
+    "localServerAndCollectorStopped": true,
+    "nativeTargetCleaned": true
+  },
+  "checks": {
+    "authoredPythonTests": 6,
+    "documentationTests": 7,
+    "nativeIntervalContracts": 2,
+    "harnessFormatting": "passed",
+    "localArchiveIntegrity": "passed",
+    "fullSelectorAcquisitionGate": "failed",
+    "officialConnections": 0,
+    "independentReview": "not performed for this study"
+  },
   "verificationSha256": {
     "analyze.py": "c90b89fd2d92eaefadf21bde1ac9c3b19d805ba3c273e89c49a590fc9e74f227",
     "dry-run.ps1": "da42a1cb3d0a4718ce1dcb8cd560b50b9f4b3a2e1ddc83b4077af0f89c78ce80",
-    "select_results.py": "38d1006f3f4ef5c72f4a57a5cf9d41a8ea9acb389c29a9871dbbc5062fb52bda",
+    "select_results.py": "a7b897be46486d19f30a792d0d049885387923fc0f2bf693ecf5d48b16e65e5b",
     "test_analysis.py": "003bdabc5230bf864990820cb4732275b583f7afdd4b4716f7e27a1aa91aeffc",
     "verify.py": "ba8d1010ee954cbfecde9c265bcb2e3a4b0a86f4a6e8e6d14ba1e66037c7058d"
   }

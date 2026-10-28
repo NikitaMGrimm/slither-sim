@@ -17,12 +17,15 @@ def main():
     p.add_argument('--local',type=Path,required=True)
     p.add_argument('--parity',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--cleanup',type=Path,help='bounded, verified task cleanup receipt')
     a=p.parse_args();wall.cpu_limit()
     result=json.loads((a.analysis/'selected-results.json').read_text(encoding='utf-8'))
     result['planCommit']=subprocess.check_output(['git','rev-parse',result['planCommit']],text=True).strip()
     result['analysisCommit']='400d6d4f'
     result['analysisCommit']=subprocess.check_output(['git','rev-parse',result['analysisCommit']],text=True).strip()
-    intervals=[json.loads(t) for t in (a.analysis/'intervals-private.jsonl').read_text(encoding='utf-8').splitlines()]
+    admitted={r['archive'] for r in result['inventory'] if r['status']=='admitted'}
+    intervals=[r for t in (a.analysis/'intervals-private.jsonl').read_text(encoding='utf-8').splitlines()
+        if (r:=json.loads(t))['source'] in admitted]
     for row in intervals:row['budgets']={int(k):v for k,v in row['budgets'].items()}
     def brief(rows):
         summary=wall.aggregate(rows)
@@ -42,6 +45,9 @@ def main():
         countRange=[min(r['count'] for r in rows),max(r['count'] for r in rows)],
         modes=sorted({r['speedClass'] for r in rows}),directions=sorted({r['direction'] for r in rows}))
         for (source,conn,inc),rows in sorted(by_life.items())]
+    result['P16SensitivityErrorChangeMaxWorld']=dict(
+        integrationStepSeconds={str(dt):max(abs(r['sensitivities']['P16']['step'][str(dt)]['error']-r['models']['P16']['endpoint']) for r in intervals) for dt in (.0035,.014)},
+        eventShiftMs={str(j):max(abs(r['sensitivities']['P16']['eventShift'][str(sign*j)]['error']-r['models']['P16']['endpoint']) for r in intervals for sign in (-1,1)) for j in (7,14,42)})
     local=json.loads((a.local/'selector-results.json').read_text(encoding='utf-8'))
     parity=json.loads(a.parity.read_text(encoding='utf-8'))
     powers=wall.power()['rows']
@@ -94,6 +100,10 @@ def main():
         additionalFields='local full-selector dry run, authored native boundary witnesses and power diagnostics; no new interval selection',
         preliminaryPassesRetainedOutsideGit=True)
     result['decision']='current projection is descriptively compatible; exact rule and alternatives unresolved; no mechanics change or capture proposed'
+    if a.cleanup:result['cleanup']=json.loads(a.cleanup.read_text(encoding='utf-8'))
+    result['checks']=dict(authoredPythonTests=6,documentationTests=7,nativeIntervalContracts=2,
+        harnessFormatting='passed',localArchiveIntegrity='passed',fullSelectorAcquisitionGate='failed',
+        officialConnections=0,independentReview='not performed for this study')
     result['verificationSha256']={p.name:wall.sha(p) for p in wall.HERE.iterdir() if p.suffix in ('.py','.ps1')}
     wall.dump(a.output,result)
     wall.dump(a.analysis.parent/'supplemental-power-private.json',extra)

@@ -20,7 +20,9 @@ and worktree, separate from #239. The [plan](PLAN.md) was committed at
 `404dca85fffa5839154b0e325b3eb851ca06b19f`, with two wording clarifications ending
 at `372f7171`, all before new scoring or raw-position inspection. The final
 retained-data implementation was committed at `400d6d4f`; source hashes and full
-commit identities are in [selected-results.json](selected-results.json).
+commit identities are in [selected-results.json](selected-results.json). Delivery
+merged the subsequently landed main at `a4dfa201` without rewriting these study
+commits. Its #239 changes do not alter the wall rule or decoder used here.
 
 The canonical source is the authored historical Arena
 `docs/research/boundary-evidence.md` at
@@ -152,7 +154,7 @@ identification limit.
 
 The lethal cutoff remains unvalidated. The canonical note retains broader replay
 premature deaths, radius-change confounding and terminal predictions that flip
-when the held heading moves by one 8-bit quantum. Our surviving .35..68-angle
+when the held heading moves by one 8-bit quantum. Our surviving .35..0.68-angle
 cohort does not test that .7 boundary. It cannot erase those counterexamples or
 validate the simulator's complete death law.
 
@@ -241,5 +243,9 @@ uv run --offline --no-project python -B "$study/select_results.py" --analysis "$
 
 Full recordings, private path resolution, raw local traffic and detailed rows
 remain outside Git. No official client JS/assets, credentials or private endpoint
-information are included. The report supports keeping the existing calibrated
+information are included. Six research tests, seven documentation tests, the two
+native interval contracts, harness formatting and source/privacy checks passed.
+There was no separate independent review for this study. The local server and
+collector were stopped and the disposable native target was cleaned; no remote
+resources were used. The report supports keeping the existing calibrated
 projection as a compatible model, with its identification limits intact.
