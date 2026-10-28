@@ -3058,7 +3058,7 @@ mod tests {
                 size: None,
                 origin: None,
             };
-            o.food = vec![food.clone()];
+            o.food = vec![food];
             projected.food = vec![food];
             let run = |obs: &Observation, t: &Timing, pit| {
                 decide_with_pit(obs, t, &[], &p, &mut Scratch::default(), pit)

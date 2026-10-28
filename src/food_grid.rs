@@ -715,10 +715,10 @@ mod tests {
             cache.push(&f);
             food.push(f);
         }
-        let same = food[0].clone();
+        let same = food[0];
         assert!(cache.has_room(&food, &same, size, 2));
         cache.push(&same);
-        food.push(same.clone());
+        food.push(same);
         assert!(!cache.has_room(&food, &same, size, 2));
     }
 
@@ -779,7 +779,7 @@ mod tests {
                         let max = rng.below(4);
                         let probe = match food.len() {
                             0 => pellet(&mut rng),
-                            n => food[rng.below(n)].clone(),
+                            n => food[rng.below(n)],
                         };
                         let cell = food_cell(probe.x, probe.y, size);
                         let count = food

@@ -302,7 +302,7 @@ mod tests {
             .iter()
             .map(|food| FoodSpawnEvent {
                 source: Some(source),
-                food: food.clone(),
+                food: *food,
             })
             .collect();
         presentation.births(&events).unwrap();
@@ -368,7 +368,7 @@ mod tests {
             .enumerate()
             .map(|(source, food)| FoodSpawnEvent {
                 source: Some(source),
-                food: food.clone(),
+                food: *food,
             })
             .collect();
         presentation.births(&events).unwrap();
@@ -432,7 +432,7 @@ mod tests {
         presentation
             .births(&[FoodSpawnEvent {
                 source: Some(0),
-                food: items[1].clone(),
+                food: items[1],
             }])
             .unwrap();
         presentation.sync(&items).unwrap();
@@ -444,7 +444,7 @@ mod tests {
         presentation
             .births(&[FoodSpawnEvent {
                 source: Some(0),
-                food: items[2].clone(),
+                food: items[2],
             }])
             .unwrap();
         presentation.sync(&items).unwrap();
@@ -486,10 +486,7 @@ mod tests {
             );
             assert!(
                 presentation
-                    .births(&[FoodSpawnEvent {
-                        source: None,
-                        food: food.clone(),
-                    }])
+                    .births(&[FoodSpawnEvent { source: None, food }])
                     .unwrap_err()
                     .contains("birth provenance")
             );
@@ -546,12 +543,12 @@ mod tests {
         let first = food(-0., Some(Origin::Death));
         let same = food(0., Some(Origin::Death));
         let nearby = food(f64::from_bits(1), Some(Origin::Death));
-        births(&mut presentation, 0, &[first, nearby.clone()]);
+        births(&mut presentation, 0, &[first, nearby]);
         assert_eq!(presentation.color(&same, 0), 1);
         assert_eq!(presentation.color(&nearby, 0), 7);
         assert_eq!(presentation.colors.len(), 2);
         presentation.register(0, 3, &[]);
-        presentation.sync(&[same.clone(), nearby.clone()]).unwrap();
+        presentation.sync(&[same, nearby]).unwrap();
         assert_eq!(presentation.color(&same, 0), 1);
         presentation.picked_up(&same).unwrap();
         births(&mut presentation, 0, std::slice::from_ref(&same));
@@ -566,7 +563,7 @@ mod tests {
             presentation.register(0, 15, &[]);
             let gone = food(-0., Some(Origin::Death));
             let kept = food(2., Some(Origin::Death));
-            births(&mut presentation, 0, &[gone.clone(), kept, gone]);
+            births(&mut presentation, 0, &[gone, kept, gone]);
             presentation
         };
         let (mut culled, mut twin) = (start(), start());
@@ -604,11 +601,11 @@ mod tests {
             presentation
                 .births(&[FoodSpawnEvent {
                     source: Some(source),
-                    food: item.clone(),
+                    food: item,
                 }])
                 .unwrap();
         }
-        presentation.sync(&[item.clone(), item.clone()]).unwrap();
+        presentation.sync(&[item, item]).unwrap();
         assert_eq!(presentation.color(&item, 0), 3);
         assert!(!presentation.picked_up(&item).unwrap());
         assert_eq!(presentation.color(&item, 0), 3);

@@ -79,10 +79,10 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
         size: Some(2.),
         value: 1.,
         origin: Some(crate::model::Origin::Ambient),
-        ..marker.clone()
+        ..marker
     };
     let key = encode::food_key(real.point()).unwrap();
-    sim.backend.world.insert_food(real.clone()).unwrap();
+    sim.backend.world.insert_food(real).unwrap();
     sim.backend.broadcast().unwrap();
     let browser_birth = pump_for(&mut sim, &mut readers[0], 0);
     let bot_birth = pump_for(&mut sim, &mut readers[1], 1);
@@ -208,14 +208,14 @@ fn pit_markers_join_sector_exit_reentry_and_reconnect() {
 fn pit_markers_reserve_browser_keys_but_bots_keep_colliding_real_food() {
     let mut sim = RawSimulator::new(7, config(), 1).unwrap();
     let mut state = browser(&mut sim);
-    let marker = food(&state, sim.time())[0].clone();
+    let marker = food(&state, sim.time())[0];
     let real = Food {
         size: Some(2.),
         value: 1.,
-        ..marker.clone()
+        ..marker
     };
     let key = encode::food_key(real.point()).unwrap();
-    sim.backend.world.insert_food(real.clone()).unwrap();
+    sim.backend.world.insert_food(real).unwrap();
     sim.backend.broadcast().unwrap();
     let packets = pump(&mut sim, &mut state);
     assert!(

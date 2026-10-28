@@ -214,10 +214,8 @@ fn checked_food_and_prey_edits_match_fresh_caches() {
         size: None,
         origin: Some(Origin::Ambient),
     };
-    world
-        .replace_food(vec![pellet.clone(), pellet.clone()])
-        .unwrap();
-    assert_eq!(world.insert_food(pellet.clone()).unwrap(), 2);
+    world.replace_food(vec![pellet, pellet]).unwrap();
+    assert_eq!(world.insert_food(pellet).unwrap(), 2);
     assert_eq!(world.remove_food(1).unwrap(), pellet);
     let prey = Prey {
         id: 90,
