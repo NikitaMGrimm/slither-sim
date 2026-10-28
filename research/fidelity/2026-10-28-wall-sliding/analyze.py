@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import statistics
+import subprocess
 import sys
 
 HERE = Path(__file__).resolve().parent
@@ -17,6 +18,27 @@ MODELS = ('P16', 'P15', 'P0', 'H', 'T16', 'D90')
 TAU = 2 * math.pi
 JITTER = (0, 7, 14, 42)
 CHORD_ERROR = 84 * math.sin(math.pi / 65536)
+NATIVE = None
+
+
+class NativeReplay:
+    def __init__(self, binary):
+        self.process=subprocess.Popen([str(binary.resolve())],stdin=subprocess.PIPE,stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,text=True,encoding='utf-8')
+
+    def run(self, request):
+        self.process.stdin.write(json.dumps(request)+'\n');self.process.stdin.flush()
+        line=self.process.stdout.readline()
+        if not line:raise RuntimeError('native replay failed')
+        try:return json.loads(line)
+        except ValueError as error:raise RuntimeError('native replay returned invalid JSON') from error
+
+    def close(self):
+        if not self.process.stdin.closed:self.process.stdin.close()
+        try:
+            if self.process.wait(timeout=10):raise RuntimeError('native replay exit failure')
+        except subprocess.TimeoutExpired:
+            self.process.kill();self.process.wait();raise
 
 
 def cpu_limit():
@@ -200,6 +222,10 @@ def replay(a, b, states, model, dt=.007, shift=0.):
     current = initial[-1][2:6] if initial else states[0][2:6]
     changes = [e for e in states if (e[0]/1000+shift, e[1]) > (start, a['order']) and
         (e[0]/1000+shift, e[1]) <= (end, b['order'])]
+    if model=='P16' and NATIVE:
+        transitions=[[max(0.,min(end,e[0]/1000+shift)-start),*e[2:6]] for e in changes]
+        transitions.append([end-start,*current])
+        return NATIVE.run(dict(start=a['xy'],initial=current,changes=transitions,dt=dt))
     p, t, dead = tuple(a['xy']), start, False
     free = list(p)
     for event in changes + [(b['server'], b['order']+1, *current, 0)]:
@@ -334,7 +360,12 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--recordings',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--source-map',type=Path,help='private SHA-256 to retained-path map for sanitized inventory aliases')
+    p.add_argument('--native',type=Path,help='actual Rust P16 interval runner; required for final reported scores')
     a=p.parse_args();cpu_limit();a.output.mkdir(parents=True,exist_ok=False)
+    global NATIVE
+    NATIVE=NativeReplay(a.native) if a.native else None
+    source_map=json.loads(a.source_map.read_text(encoding='utf-8')) if a.source_map else {}
     sp=module('wall_protocol',REPO/'tools/fidelity/slither_protocol.py')
     inventory=json.loads((REPO/'research/fidelity/2026-10-26-arena-radius/source-inventory.json').read_text(encoding='utf-8'))
     census,rows,seen=[],[],set()
@@ -343,6 +374,11 @@ def main():
             rel=item['archive'];source=a.recordings/rel
             entry=dict(archive=rel,expectedSha256=item['sha256'],status='excluded')
             try:
+                entry['pathResolution']='declared'
+                if not source.exists() and item['sha256'] in source_map:
+                    source=Path(source_map[item['sha256']]).resolve()
+                    if not source.is_relative_to(a.recordings.resolve()):raise ValueError('mapped source outside declared root')
+                    entry['pathResolution']='same SHA-256 within declared root'
                 if sha(source)!=item['sha256']:raise ValueError('hash mismatch')
                 if item['sha256'] in seen:raise ValueError('duplicate archive')
                 seen.add(item['sha256'])
@@ -388,8 +424,15 @@ def main():
         fixture=fixture_scores(),inventory=census,cohorts=groups,perSourcePrimary=per_source,
         rejection=rejection,power=pow,sourceSha256={str(f.relative_to(REPO)):sha(f) for f in (HERE/'analyze.py',REPO/'src/boundary.rs',REPO/'tools/fidelity/slither_protocol.py',REPO/'tests/fixtures/boundary-contact.json')},
         decision='retrospective conditional comparison; no mechanics correction or official capture')
+    result['currentRuleExecution']='actual Rust boundary::constrain' if NATIVE else 'Python mirror; preliminary only'
+    if NATIVE:
+        result['nativeBinarySha256']=sha(a.native)
+        NATIVE.close()
     dump(a.output/'selected-results.json',result)
     print(json.dumps(dict(eligible=len(rows),primary=sum(r['primary'] for r in rows),decision=result['decision'])))
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:main()
+    finally:
+        if NATIVE and not NATIVE.process.stdin.closed:NATIVE.close()
