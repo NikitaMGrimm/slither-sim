@@ -63,6 +63,9 @@
 
 ### Performance
 
+- Spawn placement skips distant snake bodies using cached conservative bounds,
+  preserving candidate order, scores and simulation output
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-spawn-bounds/REPORT.md)).
 - Food pickup now works out each pellet's place in the food list from a
   bitmap, instead of rewriting the stored position of every later pellet after
   each removal. Stale entries are cleaned out 512 pellets per tick, so no
