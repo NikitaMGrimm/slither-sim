@@ -14,7 +14,7 @@ capability failure, not evidence that a competing connection was established.
 Attempt 1's failed preflight opened no game socket. It remains unchanged in its
 original external archive, [attempt-1-results.json](attempt-1-results.json), and
 the original report at commit `d92f499a2ae4964ad7518ce2dc12a683dbd224f2`.
-Attempt 2 was authorized on the owner's behalf, with and the narrowly scoped zero-socket
+Attempt 2 was authorized on the owner's behalf, with the narrowly scoped zero-socket
 preflight amendment before collection resumed.
 Attempt 2's result is preserved byte-for-byte in
 [attempt-2-results.json](attempt-2-results.json); its stop and archive are unchanged.
