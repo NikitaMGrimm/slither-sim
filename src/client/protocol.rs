@@ -1218,10 +1218,10 @@ impl ClientState {
                 if sector.is_some() {
                     session.last_eaten_sector = sector;
                 }
-                if let Some((sx, sy)) = session.last_eaten_sector {
-                    if session.food.remove(&food_id(sx, sy, rx, ry)).is_some() {
-                        session.food_frame.take();
-                    }
+                if let Some((sx, sy)) = session.last_eaten_sector
+                    && session.food.remove(&food_id(sx, sy, rx, ry)).is_some()
+                {
+                    session.food_frame.take();
                 }
             }
             Packet::ClearSector(sx, sy) => {
