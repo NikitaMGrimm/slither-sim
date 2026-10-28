@@ -136,12 +136,13 @@ fn population_sizing_obeys_the_wire_radius_limit() {
         ..Default::default()
     };
     assert!(config.world.dynamic_radius);
-    assert!(
-        config
-            .validate()
-            .unwrap_err()
-            .contains("arena radii up to 32000")
-    );
+    let error = config.validate().unwrap_err();
+    assert!(error.contains("arena radii up to 32000"));
+    // 670 × sqrt(2281) ≈ 31,999.9 fits; 2,282 seats does not.
+    assert!(error.contains("reaches that at 2281 seats"), "{error}");
+    config.agents = 2281;
+    config.validate().unwrap();
+    config.agents = 2500;
     assert!(
         SimulatorBackend::new(7, config.clone())
             .err()

@@ -79,7 +79,8 @@ Incremental updates send at most three new body anchors per snake per tick.
 When `world.dt × 437.5 ≥ 126` world units, boosting snakes can outrun this window;
 full resends preserve correctness at extra bandwidth cost and configs warn.
 All possible arena radii must be at most 32,000 (an encoding-margin
-[policy](#limits)). Prey require `round(speed × 32) ≤ 65535`,
+[policy](#limits)), so a seat-following official arena keeps official density
+up to 2,281 seats. More seats need a fixed radius and play denser. Prey require `round(speed × 32) ≤ 65535`,
 `round(turnRate × 8) ≤ 65535` and a largest attainable 0.2-grid size ≤ 51, the
 appearance packet's maximum. Endpoints may exceed 51 if all attainable sizes
 fit (for example, `size: 51, maxSize: 51.01`).
