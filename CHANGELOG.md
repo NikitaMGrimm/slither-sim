@@ -4,6 +4,13 @@
 
 ### Added
 
+- A study of how the simulator's cost grows from 500 to 10,000 snakes on one
+  core. Moving the world stays at about 13–22 thousand instructions per snake
+  per tick, but finding a safe spot for each new snake grows roughly with the
+  square of the population and dominates from about 1,000 snakes. 10,000
+  snakes on one core isn't realistic with the current code; 2,000 looks
+  reachable once spawn placement gets faster. Game behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-population-scaling/REPORT.md)).
 - A study of how snakes slide along the arena edge. In three official
   recordings with shallow edge contacts, the current sliding rule predicts
   positions to about one world unit, against about 25 for free motion. The
@@ -56,6 +63,9 @@
 
 ### Changed
 
+- When an arena that grows with its seats would get too big for the stock
+  client, the error now says how many seats fit at official density (2,281
+  for the official preset) and how to host more in a fixed, denser arena.
 - The hosting guide's resource table now reflects this release's performance
   work. One Zen 4 server core now meets the delivery target with 375 official
   players at 46% CPU; 500 players use 61% CPU but still miss it. One Zen 5

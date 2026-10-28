@@ -169,22 +169,42 @@ impl SimulationConfig {
                 crate::client::minimap::MAX_SIDE
             ));
         }
+        let seated = (world.dynamic_radius || world.size_to_population)
+            .then(|| world.seat_radius(self.agents));
         let largest = world
             .radius_updates
             .iter()
             .map(|update| update.radius)
             .chain([world.radius])
-            .chain(
-                (world.dynamic_radius || world.size_to_population)
-                    .then(|| world.seat_radius(self.agents)),
-            )
+            .chain(seated)
             .fold(0., f64::max);
         if largest > encode::MAX_RADIUS {
-            return Err(format!(
+            let mut error = format!(
                 "Protocol-19 simulation supports arena radii up to {}, a margin inside the \
                  ±32,550 u16 anchor coordinates",
                 encode::MAX_RADIUS
-            ));
+            );
+            if seated.is_some_and(|radius| radius > encode::MAX_RADIUS)
+                && world.seat_radius(1) <= encode::MAX_RADIUS
+            {
+                // Seat-following arenas keep their density by growing with seats,
+                // so name the last count that fits and the denser alternative.
+                let (mut fits, mut too_many) = (1, self.agents);
+                while too_many - fits > 1 {
+                    let middle = fits + (too_many - fits) / 2;
+                    if world.seat_radius(middle) <= encode::MAX_RADIUS {
+                        fits = middle;
+                    } else {
+                        too_many = middle;
+                    }
+                }
+                error.push_str(&format!(
+                    ". A seat-following arena reaches that at {fits} seats; for more seats, \
+                     set dynamicRadius and sizeToPopulation to false with a fixed radius, \
+                     which makes the arena denser"
+                ));
+            }
+            return Err(error);
         }
         if world.dynamic_radius && world.ecology_at_radius(largest).2 > MAX_PREY {
             return Err(format!(
