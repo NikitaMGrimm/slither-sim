@@ -180,7 +180,8 @@ python3 select_results.py "$OUT" "$OUT/selected.json"
 ```
 
 Raw archives, generated source trees, binaries, process inventories, build/test
-logs, complete traces and all attempts remain outside Git. Source reconstruction
+logs, complete traces and all attempts remain outside Git; access: local-only.
+Source reconstruction
 verifies the final recipe despite later driver additions for validation and
 selection. The guest endpoint's cooldown paused verification; the same process
 and artifacts survived, and every comparison pair ran after verification finished.
