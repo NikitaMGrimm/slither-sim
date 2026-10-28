@@ -1,0 +1,207 @@
+{
+  "status": "NOT APPROVED; proposal only; no collection performed",
+  "frozen_analysis_plan_commit": "b588af3c4d25286c226e4ed2f88bb4128ad32e03",
+  "purpose": "Distinguish D106, D111 and the fixed-offset family conditionally; stable arcs do not identify event phase",
+  "connections_maximum": 2,
+  "invocations_maximum": 4,
+  "invocation_seconds_maximum": 1200,
+  "development_invocations": [
+    1,
+    2
+  ],
+  "heldout_invocations": [
+    3,
+    4
+  ],
+  "per_size_direction_mode_cell": {
+    "intervals": 3,
+    "development": 1,
+    "heldout": 2
+  },
+  "directions": [
+    "increasing",
+    "decreasing"
+  ],
+  "modes": [
+    "cruise",
+    "boost"
+  ],
+  "total_requested_intervals": 36,
+  "target_counts_and_interval_seconds": [
+    {
+      "logical_count": 174,
+      "seconds": 60
+    },
+    {
+      "logical_count": 244,
+      "seconds": 40
+    },
+    {
+      "logical_count": 293,
+      "seconds": 20
+    }
+  ],
+  "source_counts": "exact constant received logical count per interval; no rounding to nominal target",
+  "eligibility": {
+    "stable_count_buffer_seconds": 1,
+    "wanted_margin_radians": 0.55,
+    "minimum_triplets": 5,
+    "maximum_adjacent_server_gap_ms": 700,
+    "chord_world_units": [
+      39,
+      45
+    ]
+  },
+  "uncertainty": {
+    "angular_radians": 0.07263554952022173,
+    "per_endpoint_jitter_sensitivity_ms": [
+      0,
+      7,
+      14,
+      42
+    ],
+    "hard_timing_bound_established": false,
+    "clock_assumption": "Coherent accumulated server clock with endpoint quantization; independent interval truncation and clock-rate error are not bounded by this study"
+  },
+  "fixed_offset_family": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "fitted_development_offset": 9,
+  "stop_rules": [
+    "No substitutions or replacement invocations for missing sizes/lives",
+    "Keep every failure and unfilled mode/size cell",
+    "Stable long boost plateaus may be infeasible because of mass loss; qualify feasibility before requesting a full run",
+    "No unconditional physics conclusion without a justified event-to-send timing bound",
+    "No mechanics implementation from these results"
+  ],
+  "replication_note": "Three arcs per cell are a coverage proposal, not a calculated 80-percent statistical power claim",
+  "phase_note": "Old/new/adjacent count phases coincide on stable arcs. Single-segment 7ms phase signals are below one u16 angle quantum; this protocol does not resolve hidden tick phasing",
+  "conditional_42ms_offset_separation_by_size": {
+    "0": [
+      174,
+      244,
+      293
+    ],
+    "1": [
+      174,
+      244,
+      293
+    ],
+    "2": [
+      174,
+      244,
+      293
+    ],
+    "3": [
+      174,
+      244,
+      293
+    ],
+    "4": [
+      174,
+      244,
+      293
+    ],
+    "5": [
+      174,
+      244,
+      293
+    ],
+    "6": [
+      174,
+      244,
+      293
+    ],
+    "7": [
+      244,
+      293
+    ],
+    "8": [
+      244,
+      293
+    ],
+    "9": [
+      174,
+      244,
+      293
+    ],
+    "10": [
+      174
+    ],
+    "11": [
+      174
+    ],
+    "12": [
+      174
+    ],
+    "13": [
+      174,
+      244
+    ],
+    "14": [
+      174,
+      244
+    ],
+    "15": [
+      174,
+      244
+    ],
+    "16": [
+      174,
+      244
+    ],
+    "17": [
+      174,
+      244,
+      293
+    ],
+    "18": [
+      174,
+      244,
+      293
+    ],
+    "19": [
+      174,
+      244,
+      293
+    ],
+    "20": [
+      174,
+      244,
+      293
+    ]
+  },
+  "actor_control": {
+    "refresh_ms": 42,
+    "wanted_heading": "last received actor heading plus/minus pi/2 for the named direction",
+    "boost": "held for boost cell, off for cruise cell",
+    "log": "every outgoing command and ping, including unchanged commands"
+  },
+  "observer_control": {
+    "target_actor_distance_world_units": 800,
+    "maximum_causal_position_age_ms": 300,
+    "stale_action": "pause acquisition and retain exclusion; never refresh an earlier pose with later packets"
+  },
+  "selection": "First chronological eligible arc in the assigned cell; end at the first anchor midpoint span meeting the duration. Use actual duration. Retain failed starts and the following one-second stable-count check.",
+  "development_cell_assignment": "Invocation 1 for even (size index + direction index + mode index); invocation 2 for odd. Indices follow listed order. Heldout invocations 3 and 4 each target one interval in every cell."
+}

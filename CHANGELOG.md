@@ -4,6 +4,12 @@
 
 ### Added
 
+- A study of why the simulator's turning rule divides by 111 where the stock
+  client divides by 106. On the recordings behind the original fit, 111 matches
+  observed turning about five times better than 106, but a fixed offset of 7–8
+  segments in the count also still fits, so the cause stays open. Game behavior
+  is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-turn-count-phase/REPORT.md)).
 - A study that replays official and local recordings through SlitherClient,
   a Rust port of the stock client, and measures how much its predictions of
   other snakes get corrected. It maps the client's motion formulas against the
@@ -37,6 +43,11 @@
   instructions). Output is byte-identical, and the 500-player official fixture
   runs 2.4–2.6% fewer instructions with stock and protocol-13 clients
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-bitset-ranks/REPORT.md)).
+- When a player's update has no pong or minimap in front of it, the host sends
+  the update's packet list as it is instead of copying it into a new list.
+  Output is byte-identical, and the 500-player official fixture runs 1.6–1.7%
+  fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-host-packet-lists/REPORT.md)).
 - Each player's food-sector subscription is updated once per tick instead of
   twice. Output is byte-identical, and the 500-player official fixture runs
   1.9–2.1% fewer instructions with stock and protocol-13 clients
