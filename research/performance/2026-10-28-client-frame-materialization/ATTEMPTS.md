@@ -72,3 +72,8 @@
   the client implementation, `Food`, shared policy and new regressions stay
   byte-identical to measured `64490e2e`. Existing performance numbers retain
   their original pins; no combined-runtime speed claim is substituted.
+- The integrated runtime passes all library unit tests plus client protocol,
+  received-state, simulation, spawn, server, runner, transport and contract
+  suites, all-target workspace Clippy, formatting and all seven documentation
+  checks. These complement the full Rust feature group at the frozen measured
+  candidate. The combined target is deleted after completion.

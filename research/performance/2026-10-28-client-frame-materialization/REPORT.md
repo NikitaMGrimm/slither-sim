@@ -118,10 +118,14 @@ clone/repeated polling, ownership, rejected bundles and reconnect. Perturbing
 motion duration or removing food-insertion invalidation fails the respective
 oracle; exact restoration passes.
 
-The complete Rust group passes, including all Clippy feature configurations,
+The complete Rust group passes at the measured candidate, including all Clippy feature configurations,
 default/core/bot/networking all-target tests, doctests, C ABI, Python crate check
 and the basic example. All seven documentation tests also pass with the final
-study, index and changelog. No independent agent
+study, index and changelog. After integrating main, all library unit tests and
+the protocol, received-state, simulation, spawn, server, runner, transport and
+contract integration suites pass, as do formatting, all-target workspace
+Clippy and documentation checks. The entire feature matrix was not repeated
+after this merge; the measured client files are unchanged. No independent agent
 review, full tools group, native socket hold or Windows runtime build is claimed.
 
 ## Reproduce and limits
