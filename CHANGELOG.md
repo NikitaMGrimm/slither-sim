@@ -27,6 +27,13 @@
 
 ### Performance
 
+- The host also skips body blocks that lie inside the square around a
+  player's view but entirely outside its circle. Output is byte-identical.
+  With fully grown snakes, host ticks in the 500-player official world run a
+  further 10.6% fewer instructions with stock clients and 10.4% with protocol
+  13; with short snakes the change is negligible
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-circle-body-coverage/REPORT.md)).
+
 - When deciding what each player can see, the host now skips whole blocks of
   eight body segments whose bounds are too far away, instead of checking every
   segment. Output is byte-identical. With fully grown snakes, host ticks in

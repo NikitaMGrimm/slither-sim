@@ -479,6 +479,13 @@ pub(super) fn covered(
         if !bounds.near(query, reach) {
             continue;
         }
+        // Within the existing finite safe domain, the same one-unit margin
+        // conservatively encloses the exact projected distance at box corners.
+        let dx = (bounds.min.x - head.x).max(head.x - bounds.max.x).max(0.);
+        let dy = (bounds.min.y - head.y).max(head.y - bounds.max.y).max(0.);
+        if dx * dx + dy * dy > reach * reach {
+            continue;
+        }
         let first = block * BODY_BOUND_EDGES;
         let end = (first + BODY_BOUND_EDGES + 1).min(snake.body.len());
         if snake.body[first..end]
@@ -704,6 +711,11 @@ mod tests {
                 Point { x: 500., y },
                 &[500f64.next_down(), 500., 500f64.next_up()],
             );
+        }
+        // Box corners: the nearest endpoint is exactly a 3-4-5 distance
+        // away, including the last partial block. Keep adjacent radii exact.
+        for head in [Point { x: 300., y: -1200. }, Point { x: 300., y: 1300. }] {
+            check(&snake, head, &[500f64.next_down(), 500., 500f64.next_up()]);
         }
         let mut state = 0x4d15_fa32_1c07_u64;
         let mut coordinate = || {

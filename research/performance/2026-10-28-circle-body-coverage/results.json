@@ -1,0 +1,3328 @@
+{
+  "environment": "a 4-vCPU Zen 5 EPYC KVM guest",
+  "access": "local-only sources, archives, copied binaries, window traces, counters, inventories and failed attempts; full warm streams compared live and not stored",
+  "selection": {
+    "pilotInstructions": {
+      "base": 4680334856,
+      "candidate": 4221882399,
+      "circle": 4182858001
+    },
+    "pilotReductions": {
+      "candidate": 0.09795291813624885,
+      "circle": 0.10629086813355992
+    },
+    "largestPilot": "circle",
+    "plainWindowBytesEqual": true
+  },
+  "cohorts": {
+    "stock": {
+      "warmTrace": {
+        "ready": {
+          "base": {
+            "cpuSeconds": 687.327468219,
+            "ready": true,
+            "summary": {
+              "bytes": 1334926028,
+              "census": {
+                "anchors": 27610,
+                "food": 28897,
+                "living": 499,
+                "max": 271,
+                "mean": 55.33066132264529,
+                "p90": 176,
+                "p99": 247,
+                "prey": 20
+              },
+              "connections": 4412,
+              "frames": 38627484,
+              "latencyRandom": "Random(16957582082675805896)",
+              "legacy": false,
+              "minimum": 499,
+              "refused": 0,
+              "rejoins": 3912,
+              "spawnRandom": "Random(12060488000483537592)",
+              "tick": 193000
+            },
+            "threads": 1
+          },
+          "candidate": {
+            "cpuSeconds": 680.85801383,
+            "ready": true,
+            "summary": {
+              "bytes": 1334926028,
+              "census": {
+                "anchors": 27610,
+                "food": 28897,
+                "living": 499,
+                "max": 271,
+                "mean": 55.33066132264529,
+                "p90": 176,
+                "p99": 247,
+                "prey": 20
+              },
+              "connections": 4412,
+              "frames": 38627484,
+              "latencyRandom": "Random(16957582082675805896)",
+              "legacy": false,
+              "minimum": 499,
+              "refused": 0,
+              "rejoins": 3912,
+              "spawnRandom": "Random(12060488000483537592)",
+              "tick": 193000
+            },
+            "threads": 1
+          }
+        },
+        "warmTraceComparedEveryByte": true,
+        "traceBytes": {
+          "base": 5876276676,
+          "candidate": 5876276676
+        },
+        "traceSha256": {
+          "base": "e97aeb8d4579f0ed1d5228dc76cec361ed2151faeadc9e9fe7b40ac475e1a26c",
+          "candidate": "e97aeb8d4579f0ed1d5228dc76cec361ed2151faeadc9e9fe7b40ac475e1a26c"
+        },
+        "windowTicks": 360,
+        "warmTicks": 193000,
+        "countCpu": 0
+      },
+      "forkCompleteWindowBytesEqual": true,
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": 4679994056,
+          "candidate": 4182574133,
+          "reduction": 0.10628644332620063
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": 4679974434,
+          "candidate": 4182573522,
+          "reduction": 0.10628282675785228
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": 4679977424,
+          "candidate": 4182574584,
+          "reduction": 0.1062831708224069
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": 4679975007,
+          "candidate": 4182573115,
+          "reduction": 0.10628302314777727
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": 4679973822,
+          "candidate": 4182573247,
+          "reduction": 0.10628276864750374
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": 4679975365,
+          "candidate": 4182571570,
+          "reduction": 0.10628342164360949
+        }
+      ],
+      "medianReduction": 0.10628302314777727,
+      "range": [
+        0.10628276864750374,
+        0.10628342164360949
+      ],
+      "source": "plain current-thread instructions:u; 360 host advances after fixed 193000 warm ticks; controls/drains/A4 excluded"
+    },
+    "legacy": {
+      "warmTrace": {
+        "ready": {
+          "candidate": {
+            "cpuSeconds": 697.240472223,
+            "ready": true,
+            "summary": {
+              "bytes": 1334817436,
+              "census": {
+                "anchors": 27610,
+                "food": 28897,
+                "living": 499,
+                "max": 271,
+                "mean": 55.33066132264529,
+                "p90": 176,
+                "p99": 247,
+                "prey": 20
+              },
+              "connections": 4412,
+              "frames": 114628250,
+              "latencyRandom": "Random(16957582082675805896)",
+              "legacy": true,
+              "minimum": 499,
+              "refused": 0,
+              "rejoins": 3912,
+              "spawnRandom": "Random(12060488000483537592)",
+              "tick": 193000
+            },
+            "threads": 1
+          },
+          "base": {
+            "cpuSeconds": 709.676967152,
+            "ready": true,
+            "summary": {
+              "bytes": 1334817436,
+              "census": {
+                "anchors": 27610,
+                "food": 28897,
+                "living": 499,
+                "max": 271,
+                "mean": 55.33066132264529,
+                "p90": 176,
+                "p99": 247,
+                "prey": 20
+              },
+              "connections": 4412,
+              "frames": 114628250,
+              "latencyRandom": "Random(16957582082675805896)",
+              "legacy": true,
+              "minimum": 499,
+              "refused": 0,
+              "rejoins": 3912,
+              "spawnRandom": "Random(12060488000483537592)",
+              "tick": 193000
+            },
+            "threads": 1
+          }
+        },
+        "warmTraceComparedEveryByte": true,
+        "traceBytes": {
+          "base": 10132210980,
+          "candidate": 10132210980
+        },
+        "traceSha256": {
+          "base": "204c47503751b7d8c53e7680ff2c7859042185f4416905fab95125f35b6d54b4",
+          "candidate": "204c47503751b7d8c53e7680ff2c7859042185f4416905fab95125f35b6d54b4"
+        },
+        "windowTicks": 360,
+        "warmTicks": 193000,
+        "countCpu": 0
+      },
+      "forkCompleteWindowBytesEqual": true,
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": 4801851513,
+          "candidate": 4304564130,
+          "reduction": 0.10356159111828
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": 4801851656,
+          "candidate": 4304564168,
+          "reduction": 0.10356160990076202
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": 4801851474,
+          "candidate": 4304564150,
+          "reduction": 0.10356157967246615
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": 4801851222,
+          "candidate": 4304564223,
+          "reduction": 0.10356151742512276
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": 4801851401,
+          "candidate": 4304564196,
+          "reduction": 0.10356155646474996
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": 4801851350,
+          "candidate": 4304564142,
+          "reduction": 0.10356155818942625
+        }
+      ],
+      "medianReduction": 0.10356155818942625,
+      "range": [
+        0.10356151742512276,
+        0.10356160990076202
+      ],
+      "source": "plain current-thread instructions:u; 360 host advances after fixed 193000 warm ticks; controls/drains/A4 excluded"
+    },
+    "short": {
+      "warmTrace": {
+        "ready": {
+          "base": {
+            "cpuSeconds": 0.11531489,
+            "ready": true,
+            "summary": {
+              "bytes": 0,
+              "census": {
+                "anchors": 1000,
+                "food": 52781,
+                "living": 500,
+                "max": 2,
+                "mean": 2.0,
+                "p90": 2,
+                "p99": 2,
+                "prey": 71
+              },
+              "connections": 500,
+              "frames": 0,
+              "latencyRandom": "Random(2335103303451069078)",
+              "legacy": false,
+              "minimum": 500,
+              "refused": 0,
+              "rejoins": 0,
+              "spawnRandom": "Random(3891727776118404986)",
+              "tick": 0
+            },
+            "threads": 1
+          },
+          "candidate": {
+            "cpuSeconds": 0.11552041000000002,
+            "ready": true,
+            "summary": {
+              "bytes": 0,
+              "census": {
+                "anchors": 1000,
+                "food": 52781,
+                "living": 500,
+                "max": 2,
+                "mean": 2.0,
+                "p90": 2,
+                "p99": 2,
+                "prey": 71
+              },
+              "connections": 500,
+              "frames": 0,
+              "latencyRandom": "Random(2335103303451069078)",
+              "legacy": false,
+              "minimum": 500,
+              "refused": 0,
+              "rejoins": 0,
+              "spawnRandom": "Random(3891727776118404986)",
+              "tick": 0
+            },
+            "threads": 1
+          }
+        },
+        "warmTraceComparedEveryByte": true,
+        "traceBytes": {
+          "base": 9719935,
+          "candidate": 9719935
+        },
+        "traceSha256": {
+          "base": "e9663d8993d6fa7b587abc8aa8d44b9faa167198008af50b3c481966c80f723b",
+          "candidate": "e9663d8993d6fa7b587abc8aa8d44b9faa167198008af50b3c481966c80f723b"
+        },
+        "windowTicks": 1080,
+        "warmTicks": 0,
+        "countCpu": 0
+      },
+      "forkCompleteWindowBytesEqual": true,
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": 7243428439,
+          "candidate": 7240777775,
+          "reduction": 0.0003659405242038005
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": 7243429212,
+          "candidate": 7240781230,
+          "reduction": 0.0003655702185386689
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": 7243432856,
+          "candidate": 7240783740,
+          "reduction": 0.00036572659023204057
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": 7243429823,
+          "candidate": 7240779890,
+          "reduction": 0.0003658395352413857
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": 7243437350,
+          "candidate": 7240780441,
+          "reduction": 0.000366802233748853
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": 7243427427,
+          "candidate": 7240776660,
+          "reduction": 0.00036595479511802864
+        }
+      ],
+      "medianReduction": 0.0003658395352413857,
+      "range": [
+        0.0003655702185386689,
+        0.000366802233748853
+      ],
+      "source": "plain current-thread instructions:u; 1080 host advances after fixed 0 warm ticks; controls/drains/A4 excluded"
+    }
+  },
+  "pins": {
+    "base": {
+      "archiveCommit": "85e745096e533143dedfb6c1948b697781e697e9",
+      "archiveSha256": "fa15a71a68a3f6e932e9659e03984653fad3ed7742327f187de7e9aa12eeadb9",
+      "binaries": {
+        "perf_baseline": "29d082704aedfce303b19c273907bfebec7039f1cd58c07ad9eca15e055d076b",
+        "study_host": "c81715dd69f926b21e904b984d157af81a12f18a4ca79b4548cff87f1225ae2b",
+        "study_protocols": "3bd83822efe1f8d77303d30a0efc92f4666f7eb5d14467338e20bd2e008e6e45"
+      },
+      "sources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/study_counter.rs": "7ffcf8f5911c49f82482da53aa25d9b72cd33d83dfdefc3dee22777ebd0ee632",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/lib.rs": "60ef8a1e66c7e9cd14907bca2a47fa7e65ec46f13e23084c58cc48a265c30d7a",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "examples/study_protocols.rs": "63ddf04df40b0516fe5f32c0487b8cf6183784b09e4f37db7d9b2443c5a6f876",
+        "examples/perf_baseline.rs": "a7d640f6b549cd745fdb622970f3aa700340369a07709fa60eeea1adf65c1b69",
+        "examples/study_host.rs": "92c544bfce380c9a3d08d8cc047dfdd499c6184646739a446d49becdb715ca87",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/server.rs": "eaa8ef95b41869546b90340a968ec6d8e168f90902d2b5449a835af659ea4a0c",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/visibility.rs": "8f995df3b56899583c84b889238214b8486aa2b3bf00459b2f8fb7a030f0b2a1",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/simulation.rs": "76ab07e38e6e6cb59c84c8385f5fa6d7edc0bdb98db976590674388ce651a9d0",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/study_protocols.rs": "36fc277cf140e742e25d9557280ef54e228df7fd7c13da6235d48079910edc3b",
+        "src/client/simulation/snakes.rs": "b840e4fd7fb19ced604cecac69665f3ee15d7a009bb8b86a12fb96e7b687e0b5",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/food.rs": "4713e1e21509367caf6f0bad37b3c942472ff2f867c1ee838d556b4db5e600d5",
+        "src/client/simulation/broadcast.rs": "afc506d26db468171c0e5e04afa9a01c226c8bb10f9392c3011f0b7e7973a71b",
+        "src/client/simulation/study_host.rs": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2"
+      },
+      "driverSha256": "b610f61590c30f50f9d657311fdd18bed3eda33bbe4e5a36e482a7354055e962",
+      "fixtureSha256": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+      "manifestSha256": "3a0ee5bdc9fc97d670cd9b3d0459f238c6db521a25125dfd265d7fe9869ad14e",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f"
+    },
+    "candidate": {
+      "archiveCommit": "5904e1f941facb5d994dbb520cb8527c94c19af6",
+      "archiveSha256": "a6fe1bb3093947af289163a8910265a98144cc64b2ba886b508eb38c0128df1d",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "binaries": {
+        "perf_baseline": "f652135b31ac189ee6b56cb5c55ea42edae9c448e39158616e9c9c4eaf156fb9",
+        "study_host": "9178b73ccd7d3155213061ad699d369b3fd41c1b2cfc44e1d6d7164652872612",
+        "study_protocols": "786a7900dfce2133ff3fd35a013bc33a012980c0e311bdc8ed072ab81635651b"
+      },
+      "sources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/study_counter.rs": "7ffcf8f5911c49f82482da53aa25d9b72cd33d83dfdefc3dee22777ebd0ee632",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/lib.rs": "60ef8a1e66c7e9cd14907bca2a47fa7e65ec46f13e23084c58cc48a265c30d7a",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "examples/study_protocols.rs": "63ddf04df40b0516fe5f32c0487b8cf6183784b09e4f37db7d9b2443c5a6f876",
+        "examples/perf_baseline.rs": "a7d640f6b549cd745fdb622970f3aa700340369a07709fa60eeea1adf65c1b69",
+        "examples/study_host.rs": "92c544bfce380c9a3d08d8cc047dfdd499c6184646739a446d49becdb715ca87",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/server.rs": "eaa8ef95b41869546b90340a968ec6d8e168f90902d2b5449a835af659ea4a0c",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/visibility.rs": "8f995df3b56899583c84b889238214b8486aa2b3bf00459b2f8fb7a030f0b2a1",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/simulation.rs": "76ab07e38e6e6cb59c84c8385f5fa6d7edc0bdb98db976590674388ce651a9d0",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/study_protocols.rs": "36fc277cf140e742e25d9557280ef54e228df7fd7c13da6235d48079910edc3b",
+        "src/client/simulation/snakes.rs": "25e4eab24459a58709ec2b9ecf36a7678a0403e215d0deea0d39ecd59d4e23cf",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/food.rs": "4713e1e21509367caf6f0bad37b3c942472ff2f867c1ee838d556b4db5e600d5",
+        "src/client/simulation/broadcast.rs": "afc506d26db468171c0e5e04afa9a01c226c8bb10f9392c3011f0b7e7973a71b",
+        "src/client/simulation/study_host.rs": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2"
+      },
+      "driverSha256": "a36c9bfcee3872309654132e3b8267b655102f8c181a90594bed564499899270",
+      "fixtureSha256": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+      "manifestSha256": "3a0ee5bdc9fc97d670cd9b3d0459f238c6db521a25125dfd265d7fe9869ad14e"
+    },
+    "base-profile": {
+      "archiveCommit": "85e745096e533143dedfb6c1948b697781e697e9",
+      "archiveSha256": "fa15a71a68a3f6e932e9659e03984653fad3ed7742327f187de7e9aa12eeadb9",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "binaries": {
+        "perf_baseline": "9e811d4ce03d0fdb4cfa80278c1c90667ed09f8e27e312c4f377630a198c1c7a",
+        "study_host": "1cefb2e3ca28328df036e20d8f18ff3e6e7e25cf010cfb5fd4ce8fb35d4521cc",
+        "study_protocols": "ab3c40b056303b69ee7fc9bf9bf5005ca23e044acead6a3d8debc022e46e297e"
+      },
+      "sources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/study_counter.rs": "7ffcf8f5911c49f82482da53aa25d9b72cd33d83dfdefc3dee22777ebd0ee632",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/lib.rs": "60ef8a1e66c7e9cd14907bca2a47fa7e65ec46f13e23084c58cc48a265c30d7a",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/simulator.rs": "8c3e61b4f4a806b306f2486cc4b83b5fa252f800632cbf65ad3ffc1b51e61af7",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "examples/study_protocols.rs": "63ddf04df40b0516fe5f32c0487b8cf6183784b09e4f37db7d9b2443c5a6f876",
+        "examples/perf_baseline.rs": "a7d640f6b549cd745fdb622970f3aa700340369a07709fa60eeea1adf65c1b69",
+        "examples/study_host.rs": "92c544bfce380c9a3d08d8cc047dfdd499c6184646739a446d49becdb715ca87",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/server.rs": "eaa8ef95b41869546b90340a968ec6d8e168f90902d2b5449a835af659ea4a0c",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/visibility.rs": "8f995df3b56899583c84b889238214b8486aa2b3bf00459b2f8fb7a030f0b2a1",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/simulation.rs": "76ab07e38e6e6cb59c84c8385f5fa6d7edc0bdb98db976590674388ce651a9d0",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/study_protocols.rs": "6595d028bca9b93ef5103c7daff6a8fd876ef661e7485bc9f3771a7b9b7baeb6",
+        "src/client/simulation/snakes.rs": "d819ab6fd0cae7257d6585462649722eb94d28aeb155408e319af126c6184989",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/food.rs": "4713e1e21509367caf6f0bad37b3c942472ff2f867c1ee838d556b4db5e600d5",
+        "src/client/simulation/broadcast.rs": "c890e76aa9ab11cd05f3e9aa348672db30655e8f5f13ee88abdf491604c8a2f3",
+        "src/client/simulation/study_host.rs": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2"
+      },
+      "driverSha256": "a36c9bfcee3872309654132e3b8267b655102f8c181a90594bed564499899270",
+      "fixtureSha256": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+      "manifestSha256": "3a0ee5bdc9fc97d670cd9b3d0459f238c6db521a25125dfd265d7fe9869ad14e"
+    },
+    "candidate-profile": {
+      "archiveCommit": "5904e1f941facb5d994dbb520cb8527c94c19af6",
+      "archiveSha256": "a6fe1bb3093947af289163a8910265a98144cc64b2ba886b508eb38c0128df1d",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "binaries": {
+        "perf_baseline": "13a0e15e71e98ad494709aadebc34c28d44967226c79164b86ee8a268aeb1ffa",
+        "study_host": "b50125d1d79e3278999006a5247d0e49ad0372e611fa8276dde3857f604389a2",
+        "study_protocols": "bca1f089cedc944c7c013de020a1e908f22bf8f07b330b248a318c8373dcaa05"
+      },
+      "sources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/study_counter.rs": "7ffcf8f5911c49f82482da53aa25d9b72cd33d83dfdefc3dee22777ebd0ee632",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/lib.rs": "60ef8a1e66c7e9cd14907bca2a47fa7e65ec46f13e23084c58cc48a265c30d7a",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/simulator.rs": "8c3e61b4f4a806b306f2486cc4b83b5fa252f800632cbf65ad3ffc1b51e61af7",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "examples/study_protocols.rs": "63ddf04df40b0516fe5f32c0487b8cf6183784b09e4f37db7d9b2443c5a6f876",
+        "examples/perf_baseline.rs": "a7d640f6b549cd745fdb622970f3aa700340369a07709fa60eeea1adf65c1b69",
+        "examples/study_host.rs": "92c544bfce380c9a3d08d8cc047dfdd499c6184646739a446d49becdb715ca87",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/server.rs": "eaa8ef95b41869546b90340a968ec6d8e168f90902d2b5449a835af659ea4a0c",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/visibility.rs": "8f995df3b56899583c84b889238214b8486aa2b3bf00459b2f8fb7a030f0b2a1",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/simulation.rs": "76ab07e38e6e6cb59c84c8385f5fa6d7edc0bdb98db976590674388ce651a9d0",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/study_protocols.rs": "6595d028bca9b93ef5103c7daff6a8fd876ef661e7485bc9f3771a7b9b7baeb6",
+        "src/client/simulation/snakes.rs": "4185f3389c7027e2742945a3d196358526dfa79d7aaad9fcb041b9497b6afa7f",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/food.rs": "4713e1e21509367caf6f0bad37b3c942472ff2f867c1ee838d556b4db5e600d5",
+        "src/client/simulation/broadcast.rs": "c890e76aa9ab11cd05f3e9aa348672db30655e8f5f13ee88abdf491604c8a2f3",
+        "src/client/simulation/study_host.rs": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2"
+      },
+      "driverSha256": "a36c9bfcee3872309654132e3b8267b655102f8c181a90594bed564499899270",
+      "fixtureSha256": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+      "manifestSha256": "3a0ee5bdc9fc97d670cd9b3d0459f238c6db521a25125dfd265d7fe9869ad14e"
+    },
+    "mutation": {
+      "archiveCommit": "5904e1f941facb5d994dbb520cb8527c94c19af6",
+      "archiveSha256": "a6fe1bb3093947af289163a8910265a98144cc64b2ba886b508eb38c0128df1d",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "lockfileSha256": "0a3baa4bca1f9bbab8334eb85485e6a6d873e4de2cf183446563e8b39226014f",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "binaries": {
+        "perf_baseline": "d8e8f827863f7054cd0031381a33d68339d0c678035aa8f7720b5e8c6359b41b",
+        "study_host": "c7e2912ac477e616e74a463ed351177653deb3796f57315456c4e03f291f85ab",
+        "study_protocols": "f23b760dd38e679c33e81f3d9b2e5431b80e1ef5185fcc7f5dd3a8b8bbc7eb07"
+      },
+      "sources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/study_counter.rs": "99a5c479a9503951a7309c30c4cd78cff0cdcaac9a1d6e788c87ae9442126a0c",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/lib.rs": "60ef8a1e66c7e9cd14907bca2a47fa7e65ec46f13e23084c58cc48a265c30d7a",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "examples/study_protocols.rs": "79ce29dc04f59d80452a73e740dca2406f559f81c87e09fdd36cb60ed0c11c26",
+        "examples/perf_baseline.rs": "c00b6a057a37768f82bb368ad595ebef8d4f984273b4ed3263ab79c243c2a92e",
+        "examples/study_host.rs": "92c544bfce380c9a3d08d8cc047dfdd499c6184646739a446d49becdb715ca87",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/server.rs": "eaa8ef95b41869546b90340a968ec6d8e168f90902d2b5449a835af659ea4a0c",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/visibility.rs": "8f995df3b56899583c84b889238214b8486aa2b3bf00459b2f8fb7a030f0b2a1",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/simulation.rs": "76ab07e38e6e6cb59c84c8385f5fa6d7edc0bdb98db976590674388ce651a9d0",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/study_protocols.rs": "36fc277cf140e742e25d9557280ef54e228df7fd7c13da6235d48079910edc3b",
+        "src/client/simulation/snakes.rs": "422b1054142d3b2aabf65ca3f83ee7b9911e3ed0111c68315e038175a73a8483",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/food.rs": "4713e1e21509367caf6f0bad37b3c942472ff2f867c1ee838d556b4db5e600d5",
+        "src/client/simulation/broadcast.rs": "afc506d26db468171c0e5e04afa9a01c226c8bb10f9392c3011f0b7e7973a71b",
+        "src/client/simulation/study_host.rs": "6366c95365fd989b4e91a4d1fe7773858620503a98f8456ead9b91d94ede67c5",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2"
+      },
+      "driverSha256": "a36c9bfcee3872309654132e3b8267b655102f8c181a90594bed564499899270",
+      "fixtureSha256": "6366c95365fd989b4e91a4d1fe7773858620503a98f8456ead9b91d94ede67c5",
+      "manifestSha256": "3a0ee5bdc9fc97d670cd9b3d0459f238c6db521a25125dfd265d7fe9869ad14e"
+    }
+  },
+  "phases": {
+    "base-profile": {
+      "counts": {
+        "calls": [
+          0,
+          0,
+          360,
+          360,
+          360,
+          360,
+          180000,
+          180000,
+          180000,
+          180000,
+          360,
+          360,
+          360,
+          360,
+          360,
+          360
+        ],
+        "instructions": [
+          0,
+          0,
+          5125530556,
+          1616843360,
+          106920988,
+          3384596473,
+          1318076794,
+          452567208,
+          170034593,
+          92826491,
+          61974871,
+          305178370,
+          790638442,
+          557207010,
+          197744356,
+          32162018
+        ]
+      },
+      "summary": {
+        "bytes": 1337636327,
+        "census": {
+          "anchors": 27942,
+          "food": 28610,
+          "living": 500,
+          "max": 271,
+          "mean": 55.884,
+          "p90": 176,
+          "p99": 247,
+          "prey": 21
+        },
+        "connections": 4414,
+        "frames": 38702939,
+        "latencyRandom": "Random(10276678464773436738)",
+        "legacy": false,
+        "minimum": 499,
+        "refused": 0,
+        "rejoins": 3914,
+        "spawnRandom": "Random(14930101159515440133)",
+        "tick": 193360
+      }
+    },
+    "candidate-profile": {
+      "counts": {
+        "calls": [
+          0,
+          0,
+          360,
+          360,
+          360,
+          360,
+          180000,
+          180000,
+          180000,
+          180000,
+          360,
+          360,
+          360,
+          360,
+          360,
+          360
+        ],
+        "instructions": [
+          0,
+          0,
+          4656498498,
+          1616842943,
+          106920978,
+          2915564840,
+          848972506,
+          452567116,
+          170034557,
+          92826494,
+          61974861,
+          305178374,
+          790638422,
+          557207010,
+          197744349,
+          32162202
+        ]
+      },
+      "summary": {
+        "bytes": 1337636327,
+        "census": {
+          "anchors": 27942,
+          "food": 28610,
+          "living": 500,
+          "max": 271,
+          "mean": 55.884,
+          "p90": 176,
+          "p99": 247,
+          "prey": 21
+        },
+        "connections": 4414,
+        "frames": 38702939,
+        "latencyRandom": "Random(10276678464773436738)",
+        "legacy": false,
+        "minimum": 499,
+        "refused": 0,
+        "rejoins": 3914,
+        "spawnRandom": "Random(14930101159515440133)",
+        "tick": 193360
+      }
+    }
+  },
+  "matureMutations": {
+    "mutation-stock": {
+      "detected": true,
+      "physicsStateUnchanged": true
+    },
+    "mutation-legacy": {
+      "detected": true,
+      "physicsStateUnchanged": true
+    }
+  },
+  "cachePrototype": {
+    "qualification": {
+      "fullWarmTraceComparedEveryByte": true,
+      "repeatedChildrenAndDirectParentsMatch": true,
+      "selection": "circle"
+    },
+    "requiredChecks": {
+      "passed": true,
+      "checks": [
+        {
+          "label": "body-oracle",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "body_bounds_match_original_coverage"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "retained-body-oracle",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "retained_body_bounds_follow_every_body_edit"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "body-oracle-release",
+          "command": [
+            "cargo",
+            "test",
+            "--release",
+            "--locked",
+            "--lib",
+            "body_bounds_match_original_coverage"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "narrowed-block-mutation",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "body_bounds_match_original_coverage"
+          ],
+          "expectedFailure": true,
+          "exit": 101
+        },
+        {
+          "label": "restored-oracle",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "body_bounds_match_original_coverage"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "length-only-cache-mutation",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "retained_body_bounds_follow_every_body_edit"
+          ],
+          "expectedFailure": true,
+          "exit": 101
+        },
+        {
+          "label": "retained-body-oracle-release",
+          "command": [
+            "cargo",
+            "test",
+            "--release",
+            "--locked",
+            "--lib",
+            "retained_body_bounds_follow_every_body_edit"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "rust-group",
+          "command": [
+            "python3",
+            "tools/check.py",
+            "rust"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        }
+      ]
+    },
+    "candidatePin": {
+      "archiveCommit": "0b071fb277afbf62cee4ed9ab69595d76c29bc04",
+      "archiveSha256": "369ca98e1efa8f0e997abc78e015381e882cdd3857d2c81f85e1126160b1d184",
+      "binaries": {
+        "perf_baseline": "bc486e72323d335a28628df368f91c6638aee132093cea18f88c64f9cb8e92b9",
+        "study_host": "44c01a55a19fd2a0193e01002bd1b188bab223391d71bacd2e2bab12435779bc",
+        "study_protocols": "13a75233c56e3377a1f607462815cd11d71d65b428c218c138b1fdb75d7a7f2a"
+      },
+      "sources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/study_counter.rs": "7ffcf8f5911c49f82482da53aa25d9b72cd33d83dfdefc3dee22777ebd0ee632",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/lib.rs": "60ef8a1e66c7e9cd14907bca2a47fa7e65ec46f13e23084c58cc48a265c30d7a",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "examples/study_protocols.rs": "63ddf04df40b0516fe5f32c0487b8cf6183784b09e4f37db7d9b2443c5a6f876",
+        "examples/perf_baseline.rs": "a7d640f6b549cd745fdb622970f3aa700340369a07709fa60eeea1adf65c1b69",
+        "examples/study_host.rs": "92c544bfce380c9a3d08d8cc047dfdd499c6184646739a446d49becdb715ca87",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/server.rs": "eaa8ef95b41869546b90340a968ec6d8e168f90902d2b5449a835af659ea4a0c",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/visibility.rs": "8f995df3b56899583c84b889238214b8486aa2b3bf00459b2f8fb7a030f0b2a1",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/simulation.rs": "f1d367eb7b4a2cecdf03284b318b8e815764f0a1211e06e24b4be7f046ea739a",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/study_protocols.rs": "36fc277cf140e742e25d9557280ef54e228df7fd7c13da6235d48079910edc3b",
+        "src/client/simulation/snakes.rs": "240bcf715406f6123554b3b8e5184cbabdb6e0bad4ae1f7dccf33b1c492401a9",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/food.rs": "4713e1e21509367caf6f0bad37b3c942472ff2f867c1ee838d556b4db5e600d5",
+        "src/client/simulation/broadcast.rs": "1070698c20640f510aa914bb0a9c83141148db3c57ba8fc15db6f462f5f1a590",
+        "src/client/simulation/study_host.rs": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/simulation/study_protocols/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2"
+      },
+      "driverSha256": "b610f61590c30f50f9d657311fdd18bed3eda33bbe4e5a36e482a7354055e962",
+      "fixtureSha256": "7810cd828e91d0107443d030cf48fdfaf42c5172f7177b6044bd746d535d2d14"
+    }
+  },
+  "requiredChecks": {
+    "passed": true,
+    "checks": [
+      {
+        "label": "body-oracle",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--lib",
+          "body_bounds_match_original_coverage"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      },
+      {
+        "label": "body-oracle-release",
+        "command": [
+          "cargo",
+          "test",
+          "--release",
+          "--locked",
+          "--lib",
+          "body_bounds_match_original_coverage"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      },
+      {
+        "label": "narrowed-block-mutation",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--lib",
+          "body_bounds_match_original_coverage"
+        ],
+        "expectedFailure": true,
+        "exit": 101
+      },
+      {
+        "label": "restored-oracle",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--lib",
+          "body_bounds_match_original_coverage"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      },
+      {
+        "label": "narrowed-circle-mutation",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--lib",
+          "body_bounds_match_original_coverage"
+        ],
+        "expectedFailure": true,
+        "exit": 101
+      },
+      {
+        "label": "restored-circle-oracle",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--lib",
+          "body_bounds_match_original_coverage"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      },
+      {
+        "label": "rust-group",
+        "command": [
+          "python3",
+          "tools/check.py",
+          "rust"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      }
+    ]
+  },
+  "catalogParity": [
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "step-default",
+        "32"
+      ],
+      "base": {
+        "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+        "bytes": 4747394
+      },
+      "candidate": {
+        "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+        "bytes": 4747394
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "step-food",
+        "32"
+      ],
+      "base": {
+        "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+        "bytes": 114813212
+      },
+      "candidate": {
+        "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+        "bytes": 114813212
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "step-body",
+        "32"
+      ],
+      "base": {
+        "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+        "bytes": 26873819
+      },
+      "candidate": {
+        "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+        "bytes": 26873819
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "observe",
+        "32"
+      ],
+      "base": {
+        "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+        "bytes": 210433034
+      },
+      "candidate": {
+        "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+        "bytes": 210433034
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "portable",
+        "32"
+      ],
+      "base": {
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "bytes": 17260699
+      },
+      "candidate": {
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "bytes": 17260699
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "protocol",
+        "32"
+      ],
+      "base": {
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "bytes": 8343664
+      },
+      "candidate": {
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "bytes": 8343664
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "sandbox-16-step",
+        "32"
+      ],
+      "base": {
+        "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+        "bytes": 8039178
+      },
+      "candidate": {
+        "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+        "bytes": 8039178
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "sandbox-16-bot",
+        "24"
+      ],
+      "base": {
+        "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+        "bytes": 54871500
+      },
+      "candidate": {
+        "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+        "bytes": 54871500
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-30-step",
+        "32"
+      ],
+      "base": {
+        "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+        "bytes": 20728651
+      },
+      "candidate": {
+        "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+        "bytes": 20728651
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-30-bot",
+        "16"
+      ],
+      "base": {
+        "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+        "bytes": 54020496
+      },
+      "candidate": {
+        "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+        "bytes": 54020496
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-100-step",
+        "16"
+      ],
+      "base": {
+        "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+        "bytes": 42173472
+      },
+      "candidate": {
+        "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+        "bytes": 42173472
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-100-bot",
+        "4"
+      ],
+      "base": {
+        "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+        "bytes": 59803592
+      },
+      "candidate": {
+        "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+        "bytes": 59803592
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-200-step",
+        "8"
+      ],
+      "base": {
+        "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+        "bytes": 41669943
+      },
+      "candidate": {
+        "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+        "bytes": 41669943
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-200-bot",
+        "2"
+      ],
+      "base": {
+        "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+        "bytes": 57425821
+      },
+      "candidate": {
+        "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+        "bytes": 57425821
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-500-step",
+        "4"
+      ],
+      "base": {
+        "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+        "bytes": 59311550
+      },
+      "candidate": {
+        "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+        "bytes": 59311550
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-500-bot",
+        "1"
+      ],
+      "base": {
+        "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+        "bytes": 78389779
+      },
+      "candidate": {
+        "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+        "bytes": 78389779
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "battledome-32-step",
+        "16"
+      ],
+      "base": {
+        "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+        "bytes": 17701194
+      },
+      "candidate": {
+        "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+        "bytes": 17701194
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "battledome-32-bot",
+        "4"
+      ],
+      "base": {
+        "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+        "bytes": 19456951
+      },
+      "candidate": {
+        "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+        "bytes": 19456951
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-128-step",
+        "16"
+      ],
+      "base": {
+        "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+        "bytes": 53280691
+      },
+      "candidate": {
+        "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+        "bytes": 53280691
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-128-bot",
+        "3"
+      ],
+      "base": {
+        "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+        "bytes": 60841865
+      },
+      "candidate": {
+        "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+        "bytes": 60841865
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "client-battledome-64",
+        "4"
+      ],
+      "base": {
+        "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+        "bytes": 36608905
+      },
+      "candidate": {
+        "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+        "bytes": 36608905
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "client-official-500",
+        "1"
+      ],
+      "base": {
+        "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+        "bytes": 82283629
+      },
+      "candidate": {
+        "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+        "bytes": 82283629
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "shared-forager-a4-mean-8",
+        "16"
+      ],
+      "base": {
+        "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+        "bytes": 8549310
+      },
+      "candidate": {
+        "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+        "bytes": 8549310
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official500"
+      ],
+      "base": {
+        "sha256": "b180007306603630818f49aca6f286b8ba299bc0c7512af6af18e9724a017856",
+        "bytes": 37938956
+      },
+      "candidate": {
+        "sha256": "b180007306603630818f49aca6f286b8ba299bc0c7512af6af18e9724a017856",
+        "bytes": 37938956
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official500-half"
+      ],
+      "base": {
+        "sha256": "421c314e03c9ab23506c3d1139cd5a4eeecb50c700aff0829427f6da6d9f8893",
+        "bytes": 57556590
+      },
+      "candidate": {
+        "sha256": "421c314e03c9ab23506c3d1139cd5a4eeecb50c700aff0829427f6da6d9f8893",
+        "bytes": 57556590
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official500-legacy"
+      ],
+      "base": {
+        "sha256": "62ad9e18e44e6efdeae7e46fac3ea0e8fb7ecacc7b34cf0386cc192e422cf7c0",
+        "bytes": 77137561
+      },
+      "candidate": {
+        "sha256": "62ad9e18e44e6efdeae7e46fac3ea0e8fb7ecacc7b34cf0386cc192e422cf7c0",
+        "bytes": 77137561
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official2281"
+      ],
+      "base": {
+        "sha256": "3704e4c66a304a5c794ea2c6fec17be763d8b893250947490d342046faa4a81d",
+        "bytes": 180734869
+      },
+      "candidate": {
+        "sha256": "3704e4c66a304a5c794ea2c6fec17be763d8b893250947490d342046faa4a81d",
+        "bytes": 180734869
+      }
+    }
+  ],
+  "shortMutations": [
+    {
+      "case": "official500",
+      "detected": true,
+      "sha256": "9485cb055438ef8f6b69e3b17d0e2089ad7a726ac894203f865be0fbfc53301c",
+      "bytes": 37452407
+    },
+    {
+      "case": "official500-legacy",
+      "detected": true,
+      "sha256": "0a846d6610340003fe4e750fbe6f1a4523e1ecf8ad50c8fd6d2715fbe296b9c6",
+      "bytes": 75151093
+    }
+  ],
+  "shortPairs": {
+    "official500": [
+      {
+        "pair": -1,
+        "warmup": true,
+        "base": 7867725232,
+        "baseTicks": 7322524837,
+        "candidate": 7864798206,
+        "candidateTicks": 7319597222,
+        "reduction": 0.00039980950084417266
+      },
+      {
+        "pair": 0,
+        "warmup": false,
+        "base": 7868981580,
+        "baseTicks": 7323217865,
+        "candidate": 7864795271,
+        "candidateTicks": 7319594439,
+        "reduction": 0.0004947860444406427
+      },
+      {
+        "pair": 1,
+        "warmup": false,
+        "candidate": 7864840203,
+        "candidateTicks": 7319639733,
+        "base": 7868965829,
+        "baseTicks": 7323201652,
+        "reduction": 0.0004863882177854606
+      },
+      {
+        "pair": 2,
+        "warmup": false,
+        "base": 7868949233,
+        "baseTicks": 7323185413,
+        "candidate": 7864859510,
+        "candidateTicks": 7319659069,
+        "reduction": 0.0004815314376364066
+      },
+      {
+        "pair": 3,
+        "warmup": false,
+        "candidate": 7864820452,
+        "candidateTicks": 7319619723,
+        "base": 7868912878,
+        "baseTicks": 7323149403,
+        "reduction": 0.0004819893471726955
+      },
+      {
+        "pair": 4,
+        "warmup": false,
+        "base": 7868881264,
+        "baseTicks": 7323117042,
+        "candidate": 7864904266,
+        "candidateTicks": 7319703157,
+        "reduction": 0.0004661792212824478
+      }
+    ],
+    "official500-legacy": [
+      {
+        "pair": -1,
+        "warmup": true,
+        "base": 8521236817,
+        "baseTicks": 7834614451,
+        "candidate": 8518345451,
+        "candidateTicks": 7831723338,
+        "reduction": 0.00036901790357157793
+      },
+      {
+        "pair": 0,
+        "warmup": false,
+        "base": 8521094447,
+        "baseTicks": 7834471876,
+        "candidate": 8518515074,
+        "candidateTicks": 7831892621,
+        "reduction": 0.00032921874515901006
+      },
+      {
+        "pair": 1,
+        "warmup": false,
+        "candidate": 8518352469,
+        "candidateTicks": 7831730263,
+        "base": 8521278094,
+        "baseTicks": 7834656099,
+        "reduction": 0.00037344791692561774
+      },
+      {
+        "pair": 2,
+        "warmup": false,
+        "base": 8521221874,
+        "baseTicks": 7834599216,
+        "candidate": 8518293884,
+        "candidateTicks": 7831671781,
+        "reduction": 0.00037365472301653657
+      },
+      {
+        "pair": 3,
+        "warmup": false,
+        "candidate": 8518348529,
+        "candidateTicks": 7831726031,
+        "base": 8521202758,
+        "baseTicks": 7834579926,
+        "reduction": 0.0003642690516857394
+      },
+      {
+        "pair": 4,
+        "warmup": false,
+        "base": 8521295253,
+        "baseTicks": 7834672204,
+        "candidate": 8518359507,
+        "candidateTicks": 7831737142,
+        "reduction": 0.0003746247352252041
+      }
+    ],
+    "official2281": [
+      {
+        "pair": -1,
+        "warmup": true,
+        "base": 40907043626,
+        "baseTicks": 38005255747,
+        "candidate": 40892442108,
+        "candidateTicks": 37990656481,
+        "reduction": 0.0003841380807220185
+      },
+      {
+        "pair": 0,
+        "warmup": false,
+        "base": 40906393376,
+        "baseTicks": 38004606412,
+        "candidate": 40892594085,
+        "candidateTicks": 37990806066,
+        "reduction": 0.00036312298173524216
+      },
+      {
+        "pair": 1,
+        "warmup": false,
+        "candidate": 40892438783,
+        "candidateTicks": 37990651798,
+        "base": 40906244247,
+        "baseTicks": 38004456541,
+        "reduction": 0.0003632401106724581
+      },
+      {
+        "pair": 2,
+        "warmup": false,
+        "base": 40907450052,
+        "baseTicks": 38005659421,
+        "candidate": 40893128927,
+        "candidateTicks": 37991338983,
+        "reduction": 0.0003767975143219582
+      },
+      {
+        "pair": 3,
+        "warmup": false,
+        "candidate": 40892164437,
+        "candidateTicks": 37990375080,
+        "base": 40907115321,
+        "baseTicks": 38005325082,
+        "reduction": 0.00039336598141825885
+      },
+      {
+        "pair": 4,
+        "warmup": false,
+        "base": 40906604552,
+        "baseTicks": 38004816730,
+        "candidate": 40892365369,
+        "candidateTicks": 37990576336,
+        "reduction": 0.0003746997150695375
+      }
+    ],
+    "client-official-500": [
+      {
+        "pair": -1,
+        "warmup": true,
+        "base": 5170807360,
+        "candidate": 5167824099,
+        "reduction": 0.0005769429785912328
+      },
+      {
+        "pair": 0,
+        "warmup": false,
+        "base": 5170815534,
+        "candidate": 5167822590,
+        "reduction": 0.0005788146918643822
+      },
+      {
+        "pair": 1,
+        "warmup": false,
+        "candidate": 5167838705,
+        "base": 5170844009,
+        "reduction": 0.0005812018298694266
+      },
+      {
+        "pair": 2,
+        "warmup": false,
+        "base": 5170811101,
+        "candidate": 5167825737,
+        "reduction": 0.0005773492672015434
+      },
+      {
+        "pair": 3,
+        "warmup": false,
+        "candidate": 5167838817,
+        "base": 5170796370,
+        "reduction": 0.0005719724368105084
+      },
+      {
+        "pair": 4,
+        "warmup": false,
+        "base": 5170807760,
+        "candidate": 5167845918,
+        "reduction": 0.0005728006411129805
+      }
+    ]
+  },
+  "streamControls": {
+    "0": {
+      "offset": 0,
+      "matchedPrefixBytes": 0,
+      "readBytes": {
+        "base": 4061095,
+        "candidate": 63399
+      }
+    },
+    "1": {
+      "offset": 0,
+      "matchedPrefixBytes": 0,
+      "readBytes": {
+        "base": 4192167,
+        "candidate": 63399
+      }
+    }
+  },
+  "phaseScope": {
+    "2": "complete host advance",
+    "3": "world physics",
+    "4": "food-interest advance",
+    "5": "broadcast inclusive",
+    "6": "snake coverage",
+    "7": "snake encoding/history",
+    "8": "recipient food",
+    "9": "recipient prey",
+    "10": "whole food compaction",
+    "11": "collision bounds/index construction",
+    "12": "collision query/exact tests",
+    "13": "body-block construction",
+    "14": "whole-body broadcast bounds",
+    "15": "coverage grid update"
+  },
+  "samples": {
+    "sample-mature": {
+      "sample-0": {
+        "header": "# instructions=5150761575 enabled=2679270210 running=2679270210 period=1000003",
+        "samples": 5150,
+        "weightedInstructions": 5150015450,
+        "groups": {
+          "other executable": {
+            "weight": 2299006897,
+            "share": 0.4464077669902913
+          },
+          "coverage projection/exact edge tests": {
+            "weight": 598001794,
+            "share": 0.11611650485436893
+          },
+          "body bounds construction": {
+            "weight": 583001749,
+            "share": 0.11320388349514564
+          },
+          "collision exact tests": {
+            "weight": 472001416,
+            "share": 0.0916504854368932
+          },
+          "coverage bounds/query bookkeeping": {
+            "weight": 269000807,
+            "share": 0.052233009708737864
+          },
+          "bounds index queries/builds (shared)": {
+            "weight": 252000756,
+            "share": 0.04893203883495146
+          },
+          "coverage exact distance comparison": {
+            "weight": 45000135,
+            "share": 0.008737864077669903
+          }
+        },
+        "external": {
+          "libm.so.6": 160000480,
+          "unmapped IP": 217000651,
+          "libstudy-small.so": 6000018,
+          "libc.so.6": 249000747
+        },
+        "selectedLocations": [
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:180",
+            "weight": 135000405,
+            "share": 0.02621359223300971
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 124000372,
+            "share": 0.024077669902912623
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:268",
+            "weight": 113000339,
+            "share": 0.021941747572815536
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:39",
+            "weight": 107000321,
+            "share": 0.020776699029126214
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::abs",
+            "source": "src/num/f64.rs:1651",
+            "weight": 84000252,
+            "share": 0.016310679611650485
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:?",
+            "weight": 80000240,
+            "share": 0.015533980582524271
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:525",
+            "weight": 78000234,
+            "share": 0.015145631067961166
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1593",
+            "weight": 73000219,
+            "share": 0.014174757281553398
+          },
+          {
+            "group": "body bounds construction",
+            "function": "core::ptr::write::<slither_sim::physics::Bounds>",
+            "source": "src/ptr/mod.rs:1963",
+            "weight": 71000213,
+            "share": 0.013786407766990291
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:44",
+            "weight": 70000210,
+            "share": 0.013592233009708738
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 61000183,
+            "share": 0.011844660194174758
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:?",
+            "weight": 54000162,
+            "share": 0.010485436893203883
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:524",
+            "weight": 50000150,
+            "share": 0.009708737864077669
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::min",
+            "source": "src/num/f64.rs:1118",
+            "weight": 47000141,
+            "share": 0.00912621359223301
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered::{closure#2}",
+            "source": "src/client/simulation/snakes.rs:486",
+            "weight": 42000126,
+            "share": 0.008155339805825243
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter.rs:1355",
+            "weight": 42000126,
+            "share": 0.008155339805825243
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:528",
+            "weight": 41000123,
+            "share": 0.007961165048543689
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:185",
+            "weight": 38000114,
+            "share": 0.007378640776699029
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::ptr::non_null::NonNull<slither_sim::model::Point> as core::cmp::PartialEq>::eq",
+            "source": "src/ptr/non_null.rs:1663",
+            "weight": 30000090,
+            "share": 0.005825242718446602
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/iter/adapters/chain.rs:82",
+            "weight": 29000087,
+            "share": 0.005631067961165049
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1596",
+            "weight": 24000072,
+            "share": 0.004660194174757282
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::option::Option<core::array::iter::IntoIter<slither_sim::model::Point, 2>>>::as_mut",
+            "source": "src/option.rs:765",
+            "weight": 24000072,
+            "share": 0.004660194174757282
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:522",
+            "weight": 23000069,
+            "share": 0.004466019417475728
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:523",
+            "weight": 22000066,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "coverage exact distance comparison",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:46",
+            "weight": 22000066,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:453",
+            "weight": 22000066,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:478",
+            "weight": 22000066,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:529",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/client/simulation/snakes.rs:115",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::iter::adapters::enumerate::Enumerate<core::slice::iter::Iter<slither_sim::physics::Bounds>> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/iter/adapters/enumerate.rs:?",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<slither_sim::physics::Bounds>::near",
+            "source": "src/physics.rs:570",
+            "weight": 18000054,
+            "share": 0.003495145631067961
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:40",
+            "weight": 17000051,
+            "share": 0.0033009708737864077
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::option::Option<core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>::as_mut",
+            "source": "src/option.rs:765",
+            "weight": 17000051,
+            "share": 0.0033009708737864077
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&[slither_sim::model::Point], slither_sim::client::simulation::snakes::covered::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 17000051,
+            "share": 0.0033009708737864077
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<f64>::abs",
+            "source": "src/num/f64.rs:1651",
+            "weight": 14000042,
+            "share": 0.0027184466019417475
+          }
+        ]
+      },
+      "sample-1": {
+        "header": "# instructions=5150761745 enabled=2826891699 running=2826891699 period=1000003",
+        "samples": 5150,
+        "weightedInstructions": 5150015450,
+        "groups": {
+          "other executable": {
+            "weight": 2285006855,
+            "share": 0.4436893203883495
+          },
+          "coverage projection/exact edge tests": {
+            "weight": 623001869,
+            "share": 0.12097087378640776
+          },
+          "body bounds construction": {
+            "weight": 574001722,
+            "share": 0.11145631067961165
+          },
+          "collision exact tests": {
+            "weight": 464001392,
+            "share": 0.09009708737864078
+          },
+          "bounds index queries/builds (shared)": {
+            "weight": 250000750,
+            "share": 0.04854368932038835
+          },
+          "coverage bounds/query bookkeeping": {
+            "weight": 218000654,
+            "share": 0.04233009708737864
+          },
+          "coverage exact distance comparison": {
+            "weight": 59000177,
+            "share": 0.01145631067961165
+          }
+        },
+        "external": {
+          "libm.so.6": 181000543,
+          "unmapped IP": 267000801,
+          "libstudy-small.so": 6000018,
+          "libc.so.6": 223000669
+        },
+        "selectedLocations": [
+          {
+            "group": "collision exact tests",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 135000405,
+            "share": 0.02621359223300971
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:268",
+            "weight": 135000405,
+            "share": 0.02621359223300971
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:39",
+            "weight": 125000375,
+            "share": 0.024271844660194174
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::abs",
+            "source": "src/num/f64.rs:1651",
+            "weight": 121000363,
+            "share": 0.02349514563106796
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:180",
+            "weight": 102000306,
+            "share": 0.019805825242718445
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:525",
+            "weight": 78000234,
+            "share": 0.015145631067961166
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:44",
+            "weight": 73000219,
+            "share": 0.014174757281553398
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1593",
+            "weight": 67000201,
+            "share": 0.013009708737864077
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:?",
+            "weight": 62000186,
+            "share": 0.012038834951456311
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:?",
+            "weight": 55000165,
+            "share": 0.010679611650485437
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:528",
+            "weight": 52000156,
+            "share": 0.010097087378640776
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 51000153,
+            "share": 0.009902912621359223
+          },
+          {
+            "group": "body bounds construction",
+            "function": "core::ptr::write::<slither_sim::physics::Bounds>",
+            "source": "src/ptr/mod.rs:1963",
+            "weight": 50000150,
+            "share": 0.009708737864077669
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::min",
+            "source": "src/num/f64.rs:1118",
+            "weight": 50000150,
+            "share": 0.009708737864077669
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:524",
+            "weight": 46000138,
+            "share": 0.008932038834951457
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered::{closure#2}",
+            "source": "src/client/simulation/snakes.rs:486",
+            "weight": 43000129,
+            "share": 0.008349514563106796
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/iter/adapters/chain.rs:82",
+            "weight": 37000111,
+            "share": 0.007184466019417476
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::option::Option<core::array::iter::IntoIter<slither_sim::model::Point, 2>>>::as_mut",
+            "source": "src/option.rs:765",
+            "weight": 33000099,
+            "share": 0.006407766990291262
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter.rs:1355",
+            "weight": 27000081,
+            "share": 0.005242718446601942
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:522",
+            "weight": 26000078,
+            "share": 0.005048543689320388
+          },
+          {
+            "group": "coverage exact distance comparison",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:46",
+            "weight": 24000072,
+            "share": 0.004660194174757282
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:40",
+            "weight": 24000072,
+            "share": 0.004660194174757282
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::ptr::non_null::NonNull<slither_sim::model::Point> as core::cmp::PartialEq>::eq",
+            "source": "src/ptr/non_null.rs:1663",
+            "weight": 23000069,
+            "share": 0.004466019417475728
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:185",
+            "weight": 23000069,
+            "share": 0.004466019417475728
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:529",
+            "weight": 23000069,
+            "share": 0.004466019417475728
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1596",
+            "weight": 22000066,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "body bounds construction",
+            "function": "core::iter::traits::iterator::Iterator::all::check::<slither_sim::model::Point, slither_sim::client::simulation::snakes::boundable>::{closure#0}",
+            "source": "src/iter/traits/iterator.rs:2836",
+            "weight": 22000066,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/slice/iter/macros.rs:?",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::copied::copy_try_fold<slither_sim::model::Point, (), core::ops::control_flow::ControlFlow<()>, core::iter::traits::iterator::Iterator::all::check<slither_sim::model::Point, slither_sim::client::simulation::snakes::boundable>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:478",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/client/simulation/snakes.rs:115",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:453",
+            "weight": 18000054,
+            "share": 0.003495145631067961
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<slither_sim::physics::Bounds>::near",
+            "source": "src/physics.rs:570",
+            "weight": 17000051,
+            "share": 0.0033009708737864077
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&[slither_sim::model::Point], slither_sim::client::simulation::snakes::covered::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 17000051,
+            "share": 0.0033009708737864077
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<alloc::vec::Vec<slither_sim::physics::Bounds>>::push_mut",
+            "source": "src/vec/mod.rs:1038",
+            "weight": 15000045,
+            "share": 0.002912621359223301
+          }
+        ]
+      },
+      "sample-2": {
+        "header": "# instructions=5150761485 enabled=2632703079 running=2632703079 period=1000003",
+        "samples": 5150,
+        "weightedInstructions": 5150015450,
+        "groups": {
+          "other executable": {
+            "weight": 2305006915,
+            "share": 0.4475728155339806
+          },
+          "coverage projection/exact edge tests": {
+            "weight": 604001812,
+            "share": 0.11728155339805825
+          },
+          "body bounds construction": {
+            "weight": 583001749,
+            "share": 0.11320388349514564
+          },
+          "collision exact tests": {
+            "weight": 438001314,
+            "share": 0.08504854368932038
+          },
+          "bounds index queries/builds (shared)": {
+            "weight": 263000789,
+            "share": 0.051067961165048546
+          },
+          "coverage bounds/query bookkeeping": {
+            "weight": 244000732,
+            "share": 0.04737864077669903
+          },
+          "coverage exact distance comparison": {
+            "weight": 52000156,
+            "share": 0.010097087378640776
+          }
+        },
+        "external": {
+          "libm.so.6": 177000531,
+          "unmapped IP": 252000756,
+          "libstudy-small.so": 6000018,
+          "libc.so.6": 226000678
+        },
+        "selectedLocations": [
+          {
+            "group": "collision exact tests",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 146000438,
+            "share": 0.028349514563106797
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:39",
+            "weight": 127000381,
+            "share": 0.02466019417475728
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::abs",
+            "source": "src/num/f64.rs:1651",
+            "weight": 123000369,
+            "share": 0.023883495145631067
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:268",
+            "weight": 110000330,
+            "share": 0.021359223300970873
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:44",
+            "weight": 84000252,
+            "share": 0.016310679611650485
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:525",
+            "weight": 75000225,
+            "share": 0.014563106796116505
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:180",
+            "weight": 66000198,
+            "share": 0.012815533980582524
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 66000198,
+            "share": 0.012815533980582524
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1593",
+            "weight": 57000171,
+            "share": 0.011067961165048544
+          },
+          {
+            "group": "body bounds construction",
+            "function": "core::ptr::write::<slither_sim::physics::Bounds>",
+            "source": "src/ptr/mod.rs:1963",
+            "weight": 53000159,
+            "share": 0.01029126213592233
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:?",
+            "weight": 52000156,
+            "share": 0.010097087378640776
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:?",
+            "weight": 49000147,
+            "share": 0.009514563106796117
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:528",
+            "weight": 45000135,
+            "share": 0.008737864077669903
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::min",
+            "source": "src/num/f64.rs:1118",
+            "weight": 43000129,
+            "share": 0.008349514563106796
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:524",
+            "weight": 42000126,
+            "share": 0.008155339805825243
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/iter/adapters/chain.rs:82",
+            "weight": 40000120,
+            "share": 0.007766990291262136
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered::{closure#2}",
+            "source": "src/client/simulation/snakes.rs:486",
+            "weight": 35000105,
+            "share": 0.006796116504854369
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:185",
+            "weight": 31000093,
+            "share": 0.006019417475728156
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:529",
+            "weight": 30000090,
+            "share": 0.005825242718446602
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter.rs:1355",
+            "weight": 28000084,
+            "share": 0.005436893203883495
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::option::Option<core::array::iter::IntoIter<slither_sim::model::Point, 2>>>::as_mut",
+            "source": "src/option.rs:765",
+            "weight": 27000081,
+            "share": 0.005242718446601942
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<slither_sim::physics::Bounds>::near",
+            "source": "src/physics.rs:570",
+            "weight": 27000081,
+            "share": 0.005242718446601942
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::copied::copy_try_fold<slither_sim::model::Point, (), core::ops::control_flow::ControlFlow<()>, core::iter::traits::iterator::Iterator::all::check<slither_sim::model::Point, slither_sim::client::simulation::snakes::boundable>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 27000081,
+            "share": 0.005242718446601942
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/slice/iter/macros.rs:?",
+            "weight": 26000078,
+            "share": 0.005048543689320388
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::ptr::non_null::NonNull<slither_sim::model::Point> as core::cmp::PartialEq>::eq",
+            "source": "src/ptr/non_null.rs:1663",
+            "weight": 25000075,
+            "share": 0.0048543689320388345
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:40",
+            "weight": 23000069,
+            "share": 0.004466019417475728
+          },
+          {
+            "group": "body bounds construction",
+            "function": "core::iter::traits::iterator::Iterator::all::check::<slither_sim::model::Point, slither_sim::client::simulation::snakes::boundable>::{closure#0}",
+            "source": "src/iter/traits/iterator.rs:2836",
+            "weight": 23000069,
+            "share": 0.004466019417475728
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/client/simulation/snakes.rs:115",
+            "weight": 20000060,
+            "share": 0.003883495145631068
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:38",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:453",
+            "weight": 19000057,
+            "share": 0.0036893203883495147
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:522",
+            "weight": 18000054,
+            "share": 0.003495145631067961
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:478",
+            "weight": 18000054,
+            "share": 0.003495145631067961
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::copied::copy_try_fold<slither_sim::model::Point, (), core::ops::control_flow::ControlFlow<()>, core::iter::traits::iterator::Iterator::all::check<slither_sim::model::Point, slither_sim::client::simulation::snakes::boundable>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/slice/iter/macros.rs:?",
+            "weight": 17000051,
+            "share": 0.0033009708737864077
+          },
+          {
+            "group": "coverage exact distance comparison",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:46",
+            "weight": 16000048,
+            "share": 0.0031067961165048546
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&[slither_sim::model::Point], slither_sim::client::simulation::snakes::covered::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 16000048,
+            "share": 0.0031067961165048546
+          }
+        ]
+      }
+    },
+    "sample-2000003": {
+      "sample-0": {
+        "header": "# instructions=5150765317 enabled=2684834559 running=2684834559 period=2000003",
+        "samples": 2575,
+        "weightedInstructions": 5150007725,
+        "groups": {
+          "other executable": {
+            "weight": 2194003291,
+            "share": 0.42601941747572813
+          },
+          "coverage projection/exact edge tests": {
+            "weight": 678001017,
+            "share": 0.1316504854368932
+          },
+          "body bounds construction": {
+            "weight": 600000900,
+            "share": 0.11650485436893204
+          },
+          "collision exact tests": {
+            "weight": 494000741,
+            "share": 0.09592233009708738
+          },
+          "coverage bounds/query bookkeeping": {
+            "weight": 254000381,
+            "share": 0.04932038834951456
+          },
+          "bounds index queries/builds (shared)": {
+            "weight": 210000315,
+            "share": 0.040776699029126215
+          },
+          "coverage exact distance comparison": {
+            "weight": 48000072,
+            "share": 0.009320388349514564
+          },
+          "food compaction": {
+            "weight": 2000003,
+            "share": 0.0003883495145631068
+          }
+        },
+        "external": {
+          "unmapped IP": 230000345,
+          "libm.so.6": 194000291,
+          "libc.so.6": 242000363,
+          "libstudy-small.so": 4000006
+        },
+        "selectedLocations": [
+          {
+            "group": "collision exact tests",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 168000252,
+            "share": 0.03262135922330097
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:39",
+            "weight": 144000216,
+            "share": 0.02796116504854369
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:525",
+            "weight": 118000177,
+            "share": 0.0229126213592233
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:180",
+            "weight": 118000177,
+            "share": 0.0229126213592233
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:268",
+            "weight": 116000174,
+            "share": 0.022524271844660194
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::abs",
+            "source": "src/num/f64.rs:1651",
+            "weight": 112000168,
+            "share": 0.02174757281553398
+          },
+          {
+            "group": "collision exact tests",
+            "function": "slither_sim::physics::strikes_scaled::<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>>>",
+            "source": "src/physics.rs:?",
+            "weight": 84000126,
+            "share": 0.016310679611650485
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:44",
+            "weight": 82000123,
+            "share": 0.015922330097087378
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::max",
+            "source": "src/num/f64.rs:1091",
+            "weight": 70000105,
+            "share": 0.013592233009708738
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1593",
+            "weight": 64000096,
+            "share": 0.012427184466019418
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:?",
+            "weight": 64000096,
+            "share": 0.012427184466019418
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered::{closure#2}",
+            "source": "src/client/simulation/snakes.rs:486",
+            "weight": 54000081,
+            "share": 0.010485436893203883
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<f64>::min",
+            "source": "src/num/f64.rs:1118",
+            "weight": 50000075,
+            "share": 0.009708737864077669
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:528",
+            "weight": 46000069,
+            "share": 0.008932038834951457
+          },
+          {
+            "group": "body bounds construction",
+            "function": "core::ptr::write::<slither_sim::physics::Bounds>",
+            "source": "src/ptr/mod.rs:1963",
+            "weight": 42000063,
+            "share": 0.008155339805825243
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::ptr::non_null::NonNull<slither_sim::model::Point> as core::cmp::PartialEq>::eq",
+            "source": "src/ptr/non_null.rs:1663",
+            "weight": 40000060,
+            "share": 0.007766990291262136
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::iter::adapters::chain::Chain<core::array::iter::IntoIter<slither_sim::model::Point, 2>, core::iter::adapters::copied::Copied<core::slice::iter::Iter<slither_sim::model::Point>>> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/iter/adapters/chain.rs:82",
+            "weight": 36000054,
+            "share": 0.006990291262135922
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:40",
+            "weight": 32000048,
+            "share": 0.006213592233009709
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/client/simulation/snakes.rs:115",
+            "weight": 32000048,
+            "share": 0.006213592233009709
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::option::Option<core::array::iter::IntoIter<slither_sim::model::Point, 2>>>::as_mut",
+            "source": "src/option.rs:765",
+            "weight": 30000045,
+            "share": 0.005825242718446602
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:529",
+            "weight": 30000045,
+            "share": 0.005825242718446602
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:478",
+            "weight": 26000039,
+            "share": 0.005048543689320388
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:524",
+            "weight": 26000039,
+            "share": 0.005048543689320388
+          },
+          {
+            "group": "collision exact tests",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter/macros.rs:185",
+            "weight": 26000039,
+            "share": 0.005048543689320388
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "slither_sim::physics::closest_on_segment",
+            "source": "src/physics.rs:522",
+            "weight": 24000036,
+            "share": 0.004660194174757282
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::next",
+            "source": "src/slice/iter.rs:1355",
+            "weight": 22000033,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<slither_sim::physics::Bounds>::near",
+            "source": "src/physics.rs:570",
+            "weight": 22000033,
+            "share": 0.004271844660194175
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:38",
+            "weight": 20000030,
+            "share": 0.003883495145631068
+          },
+          {
+            "group": "coverage exact distance comparison",
+            "function": "<slither_sim::model::Point>::distance_order",
+            "source": "src/model.rs:46",
+            "weight": 18000027,
+            "share": 0.003495145631067961
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<slither_sim::client::simulation::snakes::BodyBounds>::new",
+            "source": "src/slice/iter/macros.rs:?",
+            "weight": 16000024,
+            "share": 0.0031067961165048546
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "slither_sim::client::simulation::snakes::covered",
+            "source": "src/client/simulation/snakes.rs:453",
+            "weight": 16000024,
+            "share": 0.0031067961165048546
+          },
+          {
+            "group": "coverage projection/exact edge tests",
+            "function": "<f64>::clamp",
+            "source": "src/num/f64.rs:1596",
+            "weight": 16000024,
+            "share": 0.0031067961165048546
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<core::slice::iter::Iter<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::copied::copy_try_fold<slither_sim::model::Point, (), core::ops::control_flow::ControlFlow<()>, core::iter::traits::iterator::Iterator::all::check<slither_sim::model::Point, slither_sim::client::simulation::snakes::boundable>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 16000024,
+            "share": 0.0031067961165048546
+          },
+          {
+            "group": "coverage bounds/query bookkeeping",
+            "function": "<core::slice::iter::Windows<slither_sim::model::Point> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&[slither_sim::model::Point], slither_sim::client::simulation::snakes::covered::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+            "source": "src/iter/traits/iterator.rs:2490",
+            "weight": 16000024,
+            "share": 0.0031067961165048546
+          },
+          {
+            "group": "body bounds construction",
+            "function": "<usize as core::cmp::Ord>::min",
+            "source": "src/cmp.rs:1090",
+            "weight": 14000021,
+            "share": 0.0027184466019417475
+          }
+        ]
+      }
+    }
+  },
+  "retainedSamplerFailure": {
+    "stage": "first optional sampling window before accepted data",
+    "error": "64 MiB perf ring mmap returned MAP_FAILED; errno not retained in original helper",
+    "sourceSha256": "114c0e6a0d8269088ab7fa42669c5de8b3c2bec0f030a8338a75dd03ae68417c",
+    "librarySha256": "8f045cd0d9d523fbb8a7fd9bb94cfa2580138d3c4696abb8feba5012195a6e9d",
+    "warmCpuSeconds": 686.260929488,
+    "noSystemOrLimitChange": true
+  },
+  "smallSampler": {
+    "sourceSha256": "b23d95723a20a28e09f2c2b75e23b2b05cb09709332c851b48044193ed7a2589",
+    "librarySha256": "ec6779f8a9f0dbc223e7f9b8a92b666389c3264362d32a3320e30b07cb15ad73",
+    "ringBytes": 524288,
+    "periods": [
+      1000003,
+      2000003
+    ],
+    "probeHeader": "# instructions=2920616140 enabled=2547528919 running=2547528919 period=1000003"
+  },
+  "traceHashes": {
+    "cache-pilot/circle-pilot/proof-1.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/circle-pilot/proof-parent.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/circle-pilot/proof-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/stock/proof-candidate-1.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/stock/proof-base-parent.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/stock/proof-candidate-parent.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/stock/proof-candidate-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/stock/proof-base-1.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "cache-pilot/stock/proof-base-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/phases/candidate-profile-window.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/phases/base-profile-window.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/mutation-stock/mutation-window.trace": "b46512a5df8b8e1fe8a578c021d5d9542db1531e78c1f6e8211cdd4a75c98189",
+    "selected/short/proof-candidate-1.trace": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+    "selected/short/proof-base-parent.trace": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+    "selected/short/proof-candidate-parent.trace": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+    "selected/short/proof-candidate-0.trace": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+    "selected/short/proof-base-1.trace": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+    "selected/short/proof-base-0.trace": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+    "selected/mutation-legacy/mutation-window.trace": "51db9720b9622248e1eb9cdb48c7f93b105b98a781431fe0e80f0f309a71c26a",
+    "selected/legacy/proof-candidate-1.trace": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+    "selected/legacy/proof-base-parent.trace": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+    "selected/legacy/proof-candidate-parent.trace": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+    "selected/legacy/proof-candidate-0.trace": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+    "selected/legacy/proof-base-1.trace": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+    "selected/legacy/proof-base-0.trace": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+    "selected/stock/proof-candidate-1.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/stock/proof-base-parent.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/stock/proof-candidate-parent.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/stock/proof-candidate-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/stock/proof-base-1.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "selected/stock/proof-base-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "sampling/sample-2000003/sample-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "sampling/sample-mature/sample-1.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "sampling/sample-mature/sample-2.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+    "sampling/sample-mature/sample-0.trace": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8"
+  },
+  "warmCpuSeconds": 9727.741726102,
+  "warmCpuByCohort": {
+    "initial/sample-mature": 686.260929488,
+    "cache-pilot/circle-pilot": 676.5114662039999,
+    "cache-pilot/stock": 1373.3204294050001,
+    "selected/phases": 1404.532014507,
+    "selected/mutation-stock": 682.072124608,
+    "selected/mutation-legacy": 720.78852355,
+    "selected/legacy": 1406.917439375,
+    "selected/stock": 1368.185482049,
+    "sampling/sample-2000003": 714.028881761,
+    "sampling/sample-mature": 695.124435155
+  },
+  "cpuReceipts": {
+    "initial/sample-mature": {
+      "waitedHostAndForkCpuSeconds": 686.400414,
+      "controllerCpuSeconds": 2.32574964
+    },
+    "cache-pilot/circle-pilot": {
+      "waitedHostAndForkCpuSeconds": 682.765163,
+      "controllerCpuSeconds": 0.6408117990000001
+    },
+    "cache-pilot/stock": {
+      "waitedHostAndForkCpuSeconds": 1385.6557619999999,
+      "controllerCpuSeconds": 17.713993612
+    },
+    "selected/stream-control-0": {
+      "waitedHostAndForkCpuSeconds": 0.20869,
+      "controllerCpuSeconds": 0.02198291
+    },
+    "selected/stream-control-1": {
+      "waitedHostAndForkCpuSeconds": 0.20291900000000002,
+      "controllerCpuSeconds": 0.022339829999999998
+    },
+    "selected/phases": {
+      "waitedHostAndForkCpuSeconds": 1411.74859,
+      "controllerCpuSeconds": 0.64847089
+    },
+    "selected/mutation-stock": {
+      "waitedHostAndForkCpuSeconds": 683.714777,
+      "controllerCpuSeconds": 0.47949739
+    },
+    "selected/short": {
+      "waitedHostAndForkCpuSeconds": 74.742085,
+      "controllerCpuSeconds": 0.609809869
+    },
+    "selected/mutation-legacy": {
+      "waitedHostAndForkCpuSeconds": 722.566509,
+      "controllerCpuSeconds": 0.49045181
+    },
+    "selected/legacy": {
+      "waitedHostAndForkCpuSeconds": 1436.748341,
+      "controllerCpuSeconds": 29.918196281
+    },
+    "selected/stock": {
+      "waitedHostAndForkCpuSeconds": 1396.412445,
+      "controllerCpuSeconds": 18.840396777000002
+    },
+    "sampling/sample-2000003": {
+      "waitedHostAndForkCpuSeconds": 717.6904460000001,
+      "controllerCpuSeconds": 0.38187721
+    },
+    "sampling/sample-mature": {
+      "waitedHostAndForkCpuSeconds": 706.057769,
+      "controllerCpuSeconds": 0.53888911
+    }
+  },
+  "reconstruction": [
+    {
+      "arm": "base",
+      "allRustSourceHashesMatch": true,
+      "files": 178
+    },
+    {
+      "arm": "candidate",
+      "allRustSourceHashesMatch": true,
+      "files": 178
+    },
+    {
+      "arm": "base-profile",
+      "allRustSourceHashesMatch": true,
+      "files": 178
+    },
+    {
+      "arm": "candidate-profile",
+      "allRustSourceHashesMatch": true,
+      "files": 178
+    },
+    {
+      "arm": "mutation",
+      "allRustSourceHashesMatch": true,
+      "files": 178
+    }
+  ],
+  "cleanup": {
+    "targetRemoved": true,
+    "taskTargetSymlinksRemoved": [
+      "selected/target",
+      "pilot-circle/target",
+      "circle-selected/target"
+    ],
+    "logicalFileBytesRemoved": 2093699326,
+    "freeBytesIncrease": 1941598208,
+    "taskWorkers": [],
+    "sourcesAndCopiedMeasurementBinariesRetained": true
+  }
+}
