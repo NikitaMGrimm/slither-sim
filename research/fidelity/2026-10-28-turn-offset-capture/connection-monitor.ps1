@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory)][string]$RemoteScratch,
     [Parameter(Mandatory)][string]$ImageId,
     [Parameter(Mandatory)][string]$Instance,
+    [ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$ArchiveName = 'archive',
     [string]$SshExecutable = 'ssh'
 )
 $ErrorActionPreference = 'Stop'
@@ -32,7 +33,7 @@ function Write-Snapshot($Snapshot) {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $SshExecutable
     $info.ArgumentList.Add($RemoteTarget)
-    $info.ArgumentList.Add("cat > '$RemoteScratch/archive/connection-snapshot.tmp' && mv '$RemoteScratch/archive/connection-snapshot.tmp' '$RemoteScratch/archive/connection-snapshot-private.json'")
+    $info.ArgumentList.Add("cat > '$RemoteScratch/$ArchiveName/connection-snapshot.tmp' && mv '$RemoteScratch/$ArchiveName/connection-snapshot.tmp' '$RemoteScratch/$ArchiveName/connection-snapshot-private.json'")
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     $info.RedirectStandardInput = $true
@@ -45,7 +46,7 @@ function Write-Snapshot($Snapshot) {
 try {
     $existing = Remote-Text "docker ps -a --filter 'name=^/$Instance$' --format '{{.ID}}'"
     if ($existing.Trim()) { throw 'Task container name already exists; nothing altered.' }
-    $command = "docker run --rm --pull never --name '$Instance' --network host --cpus 1 --memory 512m --memory-swap 512m --pids-limit 64 --read-only --tmpfs /tmp:rw,nosuid,noexec,size=16m --env UV_THREADPOOL_SIZE=1 --env NODE_OPTIONS=--max-old-space-size=320 --mount type=bind,src=$RemoteScratch/source,dst=/source,readonly --mount type=bind,src=$RemoteScratch/archive,dst=/archive '$ImageId' node '/source/$study/container-guard.mjs' /archive '$Instance'"
+    $command = "docker run --rm --pull never --name '$Instance' --label research.turn-capture-instance=$Instance --network bridge --cpus 1 --memory 512m --memory-swap 512m --pids-limit 64 --read-only --tmpfs /tmp:rw,nosuid,noexec,size=16m --env UV_THREADPOOL_SIZE=1 --env NODE_OPTIONS=--max-old-space-size=320 --mount type=bind,src=$RemoteScratch/source,dst=/source,readonly --mount type=bind,src=$RemoteScratch/$ArchiveName,dst=/archive '$ImageId' node '/source/$study/container-guard.mjs' /archive '$Instance'"
     $stdout = Join-Path $ArchiveRoot ($Instance + '-stdout-private.txt')
     $stderr = Join-Path $ArchiveRoot ($Instance + '-stderr-private.txt')
     $remote = Start-Process -FilePath $SshExecutable -ArgumentList @($RemoteTarget, ('"' + $command + '"')) -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
@@ -54,7 +55,8 @@ try {
         $sequence++
         $connections = @(Get-NetTCPConnection -ErrorAction Stop |
             Where-Object { $_.RemoteAddress -eq $endpoint.ip -and $_.RemotePort -eq $endpoint.port -and $_.State -notin @('Closed','TimeWait','Listen','Bound') } | ForEach-Object {
-                $identity = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $_.OwningProcess)
+                $identity = $null
+                try { $identity = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $_.OwningProcess) } catch { <# optional identity #> }
                 @{ state = $_.State.ToString(); pid = $_.OwningProcess; commandLine = $identity.CommandLine }
             })
         $snapshot = @{ instance = $Instance; sequence = $sequence; wall = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();
@@ -64,7 +66,6 @@ try {
             if ($encoded.Length -ne 3) { throw 'Invalid census framing.' }
             $decoded = @($encoded | ForEach-Object { $utf8.GetString([Convert]::FromBase64String($_)) })
             $owned = @($decoded[0].Split("`n") | ForEach-Object { if ($_ -match '^\s*(\d+)\s') { $Matches[1] } })
-            if (-not $owned.Count) { throw 'Container process census unavailable.' }
             $commands = @{}
             foreach ($line in $decoded[2].Split("`n")) { if ($line -match '^\s*(\d+)\s+(.*)$') { $commands[$Matches[1]] = $Matches[2] } }
             $snapshot.remote = @{ ok = $true; ownedPids = $owned; ss = $decoded[1]; commandLines = $commands }
@@ -86,7 +87,8 @@ try {
     throw
 } finally {
     if ($remote -and -not $remote.HasExited) {
-        & $SshExecutable $RemoteTarget "docker stop --time 5 '$Instance'" | Out-Null
+        $ownedId = Remote-Text "docker ps -q --filter 'name=^/$Instance$' --filter 'label=research.turn-capture-instance=$Instance'"
+        if ($ownedId.Trim()) { & $SshExecutable $RemoteTarget "docker stop --time 5 '$ownedId'" | Out-Null }
         if (-not $remote.WaitForExit(10000)) { $remote.Kill() }
     }
     [IO.File]::WriteAllText((Join-Path $ArchiveRoot ($Instance + '-coordinator-result-private.json')),

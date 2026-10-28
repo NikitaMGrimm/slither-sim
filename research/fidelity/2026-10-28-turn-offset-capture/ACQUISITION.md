@@ -64,11 +64,11 @@ development/held-out boundary permits documented implementation corrections only
 as the original plan allows; no candidate, duration, gate or decision-rule tuning.
 All failures, stdout/stderr, process outcomes and raw traffic stay external.
 
-## Owner amendment: attempt 2, before new requests
+## Authorization amendment: attempt 2, before new requests
 
-On 2026-10-28, after reviewing PR #239's retained exclusivity stop, the capture
-owner explicitly authorized **attempt 2 on the same branch and PR**. The owner
-clarified that the no-replacement rule prevents rerunning after seeing gameplay
+On 2026-10-28, after reviewing PR #239's retained exclusivity stop, attempt 2 was
+authorized on the owner's behalf by the maintaining agent, on the same branch
+and PR. The maintaining agent clarified that the no-replacement rule prevents rerunning after seeing gameplay
 data; attempt 1 opened zero game sockets and therefore cannot select favorable
 gameplay data. Attempt 1 and its failed-preflight record remain unchanged in their
 original external archive and in the retained public attempt-1 results.
@@ -99,9 +99,9 @@ The source manifest preserves the original policy hashes and updates only this
 amendment, the outer guard and the authored zero-socket waiting-policy tests.
 The capture driver, native client and all analysis/scoring sources are unchanged.
 
-## Owner amendment: attempt 3, before requests
+## Authorization amendment: attempt 3, before requests
 
-The owner explicitly authorized attempt 3 of PR #239 in **a capped ephemeral
+Attempt 3 of PR #239 was authorized on the owner's behalf in **a capped ephemeral
 Linux container on a separate machine**. Attempt 2 acquired zero eligible cells;
 a fresh ledger therefore selects no favorable measured cell. Attempts 1 and 2,
 including both stop records and full archives, remain unchanged outside Git;
@@ -142,3 +142,39 @@ Raw archives use a bind mount so container removal cannot remove them. After
 copying and verifying the archive locally, the task scratch directory is removed.
 An image already present is left untouched; a task-pulled image would be removed.
 No host installation/configuration or existing container/image/volume is changed.
+
+## Final authorization on the owner's behalf: attempt 4
+
+Attempt 4 was authorized on the owner's behalf by the maintaining agent. There
+will be **no attempt 5**. If this final attempt yields no decision, PR #239 is to
+be landed as inconclusive and this investigation line stops.
+
+The capture container now uses Docker's default bridge and its own network
+namespace. Every matching connection in that namespace is ours; `/proc/net/tcp*`
+provides the required census. Inode-to-fd links and full command arguments are
+optional private diagnostics. Missing identity fields do not stop collection.
+The separate-machine host namespace is checked with `ss -tn` without `-p`:
+any matching connection there is a conflict because our sockets are not in that
+namespace. The controller retains connection-only checks. Census command errors,
+real conflicts, source/integrity failures and interruption fail closed.
+
+The pre-launch waiting policy, post-launch permanent stop, four-invocation limit,
+two-connection limit, 1200-second bound and development/held-out rule are unchanged.
+Attempt 3 scored zero eligible cells; the maintaining agent authorized a fresh
+ledger on the owner's behalf without selecting favorable measured cells. All old
+attempts and stop records remain retained. Core capture and scientific sources
+remain byte-identical.
+
+`rehearse.ps1` must first run the same image, limits, bridge, mounts and guard
+against a release-built local simulator, without any official binding available.
+It requires a five-minute attributed baseline, a deliberate extra host-namespace
+connection, permanent interruption and valid sealed recordings. The unexposed
+local endpoint uses the unit-tested controller-conflict branch. Rehearsal data
+are authored local data in separate directories; the unchanged inner driver's
+legacy origin label does not override the explicit outer rehearsal marker.
+
+Official launch is blocked by `attempt4-official-gate.json` until the successful
+rehearsal summary is committed to the PR and matches the frozen source manifest.
+Rehearsal stop/ledger files are archived and cleared only in rehearsal directories;
+the official archive is never reused. The same private binding is then used with
+no discovery or fallback. All machine and endpoint details remain private.

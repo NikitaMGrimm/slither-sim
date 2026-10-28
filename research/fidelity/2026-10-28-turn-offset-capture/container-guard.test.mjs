@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { classify, preflight, snapshotReader, run, boundedDelay } from './container-guard.mjs';
+import { parseProc, namespaceCensus } from './namespace-census.mjs';
 const sample = ss => ({ windows: { ok: true, connections: [] },
   remote: { ok: true, ss, ownedPids: [21, 22], commandLines: { 99: 'authored foreign command' } } });
 test('poll and drain sleeps clamp to their remaining budget', async () => {
@@ -17,10 +18,10 @@ test('poll and drain sleeps clamp to their remaining budget', async () => {
 });
 test('fresh preflight permits no connection and admits only two owned connections during capture', () => {
   assert.equal(classify(sample(''), 'peer:7', true).conflicts.length, 0);
-  const line = 'ESTAB 0 0 local:8 peer:7 users:(("node",pid=22,fd=4))';
-  assert.equal(classify(sample(line), 'peer:7').ours, 1);
-  assert(classify(sample(line), 'peer:7', true).conflicts.length);
-  assert(classify(sample([line,line,line].join('\n')), 'peer:7').conflicts.length);
+  const namespace = { connections: [{ attribution: 'dedicated-container-namespace', owners: [] }] };
+  assert.equal(classify(sample(''), 'peer:7', false, namespace).ours, 1);
+  assert(classify(sample(''), 'peer:7', true, namespace).conflicts.length);
+  assert(classify(sample(''), 'peer:7', false, { connections: [{}, {}, {}] }).conflicts.length);
 });
 test('authored child seals before completion; post-launch conflict interrupts without replacement', async () => {
   for (const conflict of [false, true]) {
@@ -28,6 +29,7 @@ test('authored child seals before completion; post-launch conflict interrupts wi
     let timer;
     try {
       fs.writeFileSync(path.join(dir, 'endpoint-private.json'), JSON.stringify({ ip: [127,0,0,1].join('.'), port: 9 }));
+      fs.writeFileSync(path.join(dir, 'rehearsal-marker.json'), JSON.stringify({ origin: 'authored-local-rehearsal' }));
       const fake = path.join(dir, 'authored-child.mjs');
       fs.writeFileSync(fake, `import fs from 'node:fs'; import path from 'node:path';
         const root=process.argv[2]; fs.writeFileSync(path.join(root,'started'),'authored');
@@ -41,8 +43,9 @@ test('authored child seals before completion; post-launch conflict interrupts wi
         fs.writeFileSync(path.join(dir, 'connection-snapshot-private.json'), JSON.stringify({ ...s, instance: 'authored', sequence: ++sequence }));
       };
       publish(); timer = setInterval(publish, 50);
-      if (conflict) await assert.rejects(run(dir, 'authored', { captureFile: fake }), /conflict/);
-      else await run(dir, 'authored', { captureFile: fake });
+      const options = { captureFile: fake, namespaceProbe: () => ({ connections: [] }) };
+      if (conflict) await assert.rejects(run(dir, 'authored', options), /conflict/);
+      else await run(dir, 'authored', options);
       assert.equal(fs.readFileSync(path.join(dir, 'invocations.jsonl'), 'utf8').trim().split('\n').length, 1);
       assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'invocation-1/result-private.json'))).completed, !conflict);
       assert.equal(fs.existsSync(path.join(dir, 'STUDY-STOP.json')), conflict);
@@ -57,16 +60,35 @@ test('authored child seals before completion; post-launch conflict interrupts wi
 });
 test('conflicts retain command identities; unrelated processes are never inputs', () => {
   const s = sample('SYN-SENT 0 0 local:8 peer:7 users:(("other",pid=99,fd=4))');
-  assert.equal(classify(s, 'peer:7').conflicts[0].commandLines[0], 'authored foreign command');
+  assert.equal(classify(s, 'peer:7').conflicts[0].machine, 'separate-host-namespace');
   s.windows.connections.push({ pid: 40, commandLine: 'authored controller command' });
   assert.equal(classify(s, 'peer:7').conflicts.length, 2);
 });
-test('missing attribution conflicts; closing connections count; time-wait does not', () => {
+test('host connections conflict without identity; missing optional namespace owners do not', () => {
   assert(classify(sample('FIN-WAIT-1 0 0 local:8 peer:7'), 'peer:7').conflicts.length);
   assert.equal(classify(sample('TIME-WAIT 0 0 local:8 peer:7'), 'peer:7').conflicts.length, 0);
   const unavailable = sample(''); unavailable.remote.ok = false;
   assert.throws(() => classify(unavailable, 'peer:7'));
   assert.throws(() => classify(sample('broken'), 'peer:7'));
+  assert.equal(classify(sample(''), 'peer:7', false, { connections: [{ owners: [] }, { owners: [] }] }).conflicts.length, 0);
+});
+test('proc census handles IPv4 and mapped IPv6; namespace attribution survives missing optional fd data', () => {
+  const endpoint = { ip: [127,0,0,1].join('.'), port: 7 };
+  const row = (remote, state = '01') => ` 0: 00000000:0001 ${remote}:0007 ${state} 0:0 0:0 0 0 0 123`;
+  const header = 'sl local_address rem_address st\n';
+  assert.equal(parseProc(header + row('0100007F'), endpoint).length, 1);
+  assert.equal(parseProc(header + row('0000000000000000FFFF00000100007F'), endpoint).length, 1);
+  assert.equal(parseProc(header + row('0100007F', '06'), endpoint).length, 0);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'authored-proc-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'net')); fs.mkdirSync(path.join(dir, '1'));
+    fs.writeFileSync(path.join(dir, 'net/tcp'), header + row('0100007F'));
+    fs.writeFileSync(path.join(dir, 'net/tcp6'), header);
+    const census = namespaceCensus(endpoint, dir);
+    assert.equal(census.connections.length, 1); assert.deepEqual(census.connections[0].owners, []);
+    fs.unlinkSync(path.join(dir, 'net/tcp6'));
+    assert.throws(() => namespaceCensus(endpoint, dir));
+  } finally { assert(dir.startsWith(path.resolve(os.tmpdir()) + path.sep)); fs.rmSync(dir, { recursive: true }); }
 });
 test('four 15-minute rechecks precede exhaustion and generic errors never retry', async () => {
   let tick = 0, checks = 0;

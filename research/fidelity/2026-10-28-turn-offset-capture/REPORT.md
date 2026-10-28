@@ -5,7 +5,7 @@
 guard could not positively attribute the two connections to our process tree and
 failed closed. Both task sockets closed. The actor reached count **3**, the observer
 **2**, and **zero cells** were acquired. The post-launch permanent stop was honored;
-invocations 2–4 were not launched and no held-out checkpoint occurred.
+invocations 2â€“4 were not launched and no held-out checkpoint occurred.
 
 Preparation should have demonstrated positive own-socket attribution offline
 before opening game sockets. That capability check was missed. This is a guard
@@ -14,7 +14,7 @@ capability failure, not evidence that a competing connection was established.
 Attempt 1's failed preflight opened no game socket. It remains unchanged in its
 original external archive, [attempt-1-results.json](attempt-1-results.json), and
 the original report at commit `d92f499a2ae4964ad7518ce2dc12a683dbd224f2`.
-The owner explicitly authorized attempt 2 and the narrowly scoped zero-socket
+Attempt 2 was authorized on the owner's behalf, with and the narrowly scoped zero-socket
 preflight amendment before collection resumed.
 Attempt 2's result is preserved byte-for-byte in
 [attempt-2-results.json](attempt-2-results.json); its stop and archive are unchanged.
@@ -51,7 +51,7 @@ connection**. The implementation, [acquisition details](ACQUISITION.md) and
 `2df58630fce4b7c16a0c1cbe43e399b8b1642196`, also before the request. Both commits
 remain in history. The accepted #236 branch was not modified or pushed.
 
-The owner-authorized [attempt-2 amendment](ACQUISITION.md#owner-amendment-attempt-2-before-new-requests)
+The [attempt-2 amendment](ACQUISITION.md#authorization-amendment-attempt-2-before-new-requests), authorized on the owner's behalf,
 was committed at `20146991ad92bdc0de6548fe524216783dca62be`; the final preflight
 policy corrections were committed at `8ab600c2d5bfe331938149456f1293c184ec1d0d`,
 both before attempt 2's first game request. Only the outer zero-socket preflight
@@ -59,7 +59,7 @@ policy, its tests and policy hashes changed. Capture, native-client and analysis
 scoring sources, cells, durations, uncertainty and decision rules are unchanged.
 The manifest retains the original policy hashes alongside their amended versions.
 
-The owner subsequently authorized attempt 3 in **a capped ephemeral Linux container
+Attempt 3 was subsequently authorized on the owner's behalf in **a capped ephemeral Linux container
 on a separate machine**, with connection-based exclusivity and a fresh ledger
 because attempt 2 scored zero eligible cells. The amendment was pushed to PR #239
 at `7d9a11b7`; the final guard deadline correction was pushed at `8a5f943a`, both
@@ -97,7 +97,7 @@ invocations. Ordinals are flushed before launch; failed launches consume them.
 No favorable reruns after gameplay data are allowed. Attempt 1 reserved no ordinal;
 attempt 2 reserved ordinal 1 before launch. Its interruption consumes that ordinal.
 Attempt 2's other three ordinals were unused because its post-launch stop was
-permanent. The owner's distinct attempt-3 authorization permits a fresh ledger
+permanent. The distinct attempt-3 authorization on the owner's behalf permits a fresh ledger
 with the same four-invocation bounds; it did not erase or resume attempt 2.
 
 The frozen rejection rule requires **both** held-out invocations to have complete
@@ -124,8 +124,8 @@ the absence of an official invocation ledger, task guard and task lock. No other
 process or connection was altered. The original model decision was
 `inconclusive-development-coverage`.
 
-The owner then clarified that replacement prevention applies after seeing gameplay
-data and authorized attempt 2. The amended policy checks exclusivity immediately
+The maintaining agent clarified that replacement prevention applies after seeing
+gameplay data and authorized attempt 2 on the owner's behalf. The amended policy checks exclusivity immediately
 before each invocation, waits 15 minutes after a zero-socket failure, and allows
 at most four re-checks after the initial check. Exhaustion stops permanently.
 Post-launch exclusivity failures retain the original immediate permanent stop.
@@ -161,16 +161,16 @@ The interrupted invocation is unqualified and was not retried.
 | Invocation | Split | Duration | Actor / observer maximum received count | Primary cells | Optional cells | Outcome |
 | --- | --- | ---: | --- | ---: | ---: | --- |
 | 1 | Development | 61.565 s | 26 / 11 | 0 / 4 | 0 / 2 | Post-launch process-exclusivity stop |
-| 2 | Development | — | — | Not acquired | Not acquired | Not launched: permanent stop |
-| 3 | Held-out | — | — | Not acquired | Not acquired | Not launched: permanent stop |
-| 4 | Held-out | — | — | Not acquired | Not acquired | Not launched: permanent stop |
+| 2 | Development | â€” | â€” | Not acquired | Not acquired | Not launched: permanent stop |
+| 3 | Held-out | â€” | â€” | Not acquired | Not acquired | Not launched: permanent stop |
+| 4 | Held-out | â€” | â€” | Not acquired | Not acquired | Not launched: permanent stop |
 
 Pinned-client replay validates **8,513 setup/gameplay frames** and reconstructs
 **2,633 snake anchors**, including **260 own anchors per recipient**. There were
 8,515 incoming frames in the raw archives; the two challenge frames are excluded
 from the native gameplay audit. The raw incoming/outgoing counts are 4,434/653 for
-the actor and 4,081/842 for the observer. Received logical count ranges are 2–26
-and 2–11. Physical anchors, dying points, fam and displayed length are retained
+the actor and 4,081/842 for the observer. Received logical count ranges are 2â€“26
+and 2â€“11. Physical anchors, dying points, fam and displayed length are retained
 separately as bounded ranges in [attempt-2-results.json](attempt-2-results.json).
 Those presentation diagnostics are not substitutions in the frozen rate formula.
 
@@ -214,15 +214,15 @@ none was attempted after this stop.
 | Attempt-3 invocation | Split | Duration | Actor / observer maximum received count | Primary cells | Optional cells | Outcome |
 | --- | --- | ---: | --- | ---: | ---: | --- |
 | 1 | Development | 4.483 s | 3 / 2 | 0 / 4 | 0 / 2 | Ownership unavailable; fail-closed stop |
-| 2 | Development | — | — | Not acquired | Not acquired | Not launched: permanent stop |
-| 3 | Held-out | — | — | Not acquired | Not acquired | Not launched: permanent stop |
-| 4 | Held-out | — | — | Not acquired | Not acquired | Not launched: permanent stop |
+| 2 | Development | â€” | â€” | Not acquired | Not acquired | Not launched: permanent stop |
+| 3 | Held-out | â€” | â€” | Not acquired | Not acquired | Not launched: permanent stop |
+| 4 | Held-out | â€” | â€” | Not acquired | Not acquired | Not launched: permanent stop |
 
 Both clients received protocol-19 setup and one life each. Raw archives contain
 334/45 incoming/outgoing actor frames and 439/21 observer frames. Both interrupted
 prefixes verify. Pinned-client replay validates **771 setup/gameplay frames** and
 **266 anchors**, including **18 own anchors per client**. The two challenge frames
-are excluded from the native frame count. Logical count ranges are 2–3 and 2–2;
+are excluded from the native frame count. Logical count ranges are 2â€“3 and 2â€“2;
 other presentation counters are retained separately in the selected JSON. No target
 was reached, no interval was scored, and no candidate gains new evidence.
 

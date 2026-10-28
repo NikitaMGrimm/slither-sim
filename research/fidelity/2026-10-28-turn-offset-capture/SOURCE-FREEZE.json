@@ -6,7 +6,7 @@
     "research/fidelity/2026-10-28-turn-count-phase/harness/Cargo.lock": "03b6fad90ac4d994b9019a307ae77db50d64b4544330d1d65abb4f5170e4137d",
     "research/fidelity/2026-10-28-turn-count-phase/harness/Cargo.toml": "fe156a787d255474b83f4b1eae5d444a2766edfda487a9ab9999a41044a4f646",
     "research/fidelity/2026-10-28-turn-count-phase/harness/src/main.rs": "fc5c5bba4bec9c00c0ae5e3ee1d178907f644b782eada41ce597427f25bb8a39",
-    "research/fidelity/2026-10-28-turn-offset-capture/ACQUISITION.md": "7d69733582feeec002b711433f8107747496f7e7d374af94c6c58ddd1927912d",
+    "research/fidelity/2026-10-28-turn-offset-capture/ACQUISITION.md": "9222a385cd8ef28878c354133aa0374fe1972b661afef6e19b14ca190ec2bcd0",
     "research/fidelity/2026-10-28-turn-offset-capture/analyze.py": "1d3303d641a313aa224cdfdfb43d04ffb959cbed7d4b8bcbfda60bac641993ae",
     "research/fidelity/2026-10-28-turn-offset-capture/CAPTURE-PROTOCOL.json": "6b96d20e07149efebcd608328eb1a786049f9bdb0b810eceeac7b7b42cbbe424",
     "research/fidelity/2026-10-28-turn-offset-capture/capture.mjs": "7277318d3b51567a6a221f358401c739f27bf38b8c6a1e5ccace1a5cf49b1f4a",
@@ -20,13 +20,16 @@
     "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
     "research/fidelity/2026-10-28-turn-offset-capture/preflight.ps1": "360988b0a7b291013eba8b4ccd704a6a3f4683cfa6f992721b20c2617a31fdc0",
     "research/fidelity/2026-10-28-turn-offset-capture/preflight.test.ps1": "8a61ccb3cd6eab5a08598393bb972d9ebdf1244942f3c39f0d4e588e924aade2",
-    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.mjs": "c0b03d9b241405656c17c365ab5608e42890f6816697d09e179877fbcc3a1a1d",
-    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.test.mjs": "f00f5614fd2d230df566be27b39e147009a4cc7d44e9cf25651b6b76778c491d",
-    "research/fidelity/2026-10-28-turn-offset-capture/connection-probe.sh": "4dc18fb05697fa63d85c30e648fec5dec384bc42e3790fe19be1d036a8fc3f95",
-    "research/fidelity/2026-10-28-turn-offset-capture/connection-monitor.ps1": "5687156f7a428ba4b4b99fa69c59645d2daac1c8fe9b454462ca23e4ee73a3c5"
+    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.mjs": "aceae23f157ae59a2fe64aa5199cfc8afb1439c91a3b204e9f76a99fd23d0422",
+    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.test.mjs": "f541868a475c3eb5f15d318d5f962528292b304f8866539258d5049d64942f33",
+    "research/fidelity/2026-10-28-turn-offset-capture/connection-probe.sh": "09628638177bca00469bc1e9b37d6e71eb02f5fc4c5f9de6e2a51993156aeaff",
+    "research/fidelity/2026-10-28-turn-offset-capture/connection-monitor.ps1": "f456ec56b1217011557e3d369aa08a4abaf419912efa5d3f702a6361ea8389e5",
+    "research/fidelity/2026-10-28-turn-offset-capture/namespace-census.mjs": "8e0baa30eec1a396ced722b44a2dd63f20558d72b07ba07ee901c6f80ed052ea",
+    "research/fidelity/2026-10-28-turn-offset-capture/rehearse.ps1": "a9a782410f84c98ca77a3b5bf1fb6dbc76420499729eb4b7f17d8a50cd7d9ee2",
+    "research/fidelity/2026-10-28-turn-offset-capture/rehearsal-audit.mjs": "52e51b79e438dc5c62e971637d77dba5fd971ae7dc5d92e2aa3c5bf3e90e2e18"
   },
   "policyAmendment": {
-    "authorization": "Owner capture approval in PR239 conversation on 2026-10-28: attempt2 after zero-socket failed exclusivity preflight",
+    "authorization": "Authorized on the owner's behalf: attempt2 after zero-socket failed exclusivity preflight",
     "originalImplementationFreezeCommit": "2df58630fce4b7c16a0c1cbe43e399b8b1642196",
     "originalPolicySha256": {
       "research/fidelity/2026-10-28-turn-offset-capture/ACQUISITION.md": "5ec57694cfa7a8a6549cb29f804bbdf063ded8f2237b79b9e9cd2cff7bbf582d",
@@ -35,9 +38,14 @@
     "unchanged": "all capture and analysis/scoring sources, protocol, cells, durations, uncertainty and decision rule"
   },
   "attempt3Amendment": {
-    "authorization": "Owner approved a capped ephemeral Linux container on a separate machine, connection-only exclusivity, and a fresh ledger after zero scored cells",
+    "authorization": "Authorized on the owner's behalf: capped ephemeral container, connection-only exclusivity, fresh ledger after zero scored cells",
     "priorHead": "4a3668d3ecc9d76ced29ae207bf4de45dd4563f4",
     "priorAcquisitionNoteSha256": "b25efb1af0b06c98d61329e0f64fd69664c46e2e45c315e6a06049358a0444f5",
     "unchanged": "capture driver, headless client, native harness, analysis/scoring, cells, durations, uncertainty and decision rules"
+  },
+  "attempt4Amendment": {
+    "authorization": "Final attempt authorized on the owner's behalf; successful full offline rehearsal must be committed before any official request; no attempt5",
+    "unchanged": "capture/headless/native/analysis/scoring/cells/durations/uncertainty/decision rules",
+    "priorHead": "ad8c0ddec4b28fe36c64beda36bccba4b1702500"
   }
 }
