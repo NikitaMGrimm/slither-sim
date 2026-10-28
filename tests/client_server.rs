@@ -12,6 +12,7 @@ use slither_sim::{
 use std::{
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpStream},
+    sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
 
@@ -801,16 +802,23 @@ fn oversized_legacy_cull_disconnects_that_player_while_stock_still_gets_pongs() 
     assert!(stock.status().starts_with("HTTP/1.1 101"));
     stock.send(&stock_login(b"Healthy", 0, &[]));
     let mut stock_writer = stock.stream.try_clone().unwrap();
+    let pinged = Arc::new(OnceLock::<Instant>::new());
+    let reader_pinged = Arc::clone(&pinged);
     // Keep this healthy recipient reading while the other socket receives its
     // large listing/cull. All threads inherit the test process's CPU affinity.
     let reader = std::thread::spawn(move || {
-        let started = Instant::now();
         loop {
             let frame = stock.binary();
+            // Time the pong from the ping: the legacy listing and cull before it
+            // can take several seconds on slow CI runners. Checking before the
+            // pong rejects a late one; the socket's read timeout still catches a
+            // recipient that stops receiving frames.
+            if let Some(sent) = reader_pinged.get() {
+                assert!(sent.elapsed() < WAIT, "stock did not receive its pong");
+            }
             if packets(&frame[2..]).iter().any(|p| p == b"p") {
                 return;
             }
-            assert!(started.elapsed() < WAIT, "stock did not receive its pong");
         }
     });
     let mut legacy = Raw::connect(host.address, "/slither");
@@ -828,6 +836,7 @@ fn oversized_legacy_cull_disconnects_that_player_while_stock_still_gets_pongs() 
     };
     assert_eq!(reason, "Client output queue is full");
     assert!(!host.host.is_finished());
+    pinged.set(Instant::now()).unwrap();
     stock_writer.write_all(&Raw::frame(&[251])).unwrap();
     reader.join().unwrap();
     assert!(host.finish() > 0);
