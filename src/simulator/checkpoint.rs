@@ -1084,6 +1084,7 @@ impl State {
             radius_update_index: self.radius_update_index,
             failure: self.failure,
             food_cache: FoodCache::default(),
+            spawn_bounds: OnceLock::new(),
             eater_grid: EaterGrid::default(),
             buffers: StepBuffers::default(),
             #[cfg(feature = "parallel")]
