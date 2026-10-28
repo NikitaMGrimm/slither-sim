@@ -4,17 +4,6 @@
 
 ## [0.8.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.1...v0.8.0) - 2026-10-28
 
-### Other
-
-- *(client)* reuse verified body bounds between broadcasts ([#255](https://github.com/NikitaMGrimm/slither-sim/pull/255))
-- *(client)* reject body blocks outside the view circle ([#253](https://github.com/NikitaMGrimm/slither-sim/pull/253))
-- *(client)* skip distant body blocks in recipient visibility ([#252](https://github.com/NikitaMGrimm/slither-sim/pull/252))
-- *(perf)* document mature broadcast fixture limits ([#251](https://github.com/NikitaMGrimm/slither-sim/pull/251))
-- *(client)* avoid hypot for clear visibility checks ([#249](https://github.com/NikitaMGrimm/slither-sim/pull/249))
-- *(perf)* measure official-density single-core host capacity ([#248](https://github.com/NikitaMGrimm/slither-sim/pull/248))
-- *(changelog)* note that Food is now Copy ([#247](https://github.com/NikitaMGrimm/slither-sim/pull/247))
-- *(client)* reduce bot frame materialization ([#245](https://github.com/NikitaMGrimm/slither-sim/pull/245))
-
 ### Added
 
 - A note on measuring the host with fully grown snakes. A 500-seat world
