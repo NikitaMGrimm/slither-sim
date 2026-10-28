@@ -4,7 +4,13 @@
 
 ### Added
 
-- A small-count turn study with its final inconclusive capture result.
+- A live capture meant to tell apart the two explanations left by the turn
+  study: dividing by 111, or by the stock client's 106 with a fixed offset in
+  the segment count. Two full 20-minute official sessions ran cleanly, and the
+  test snake reached 37 and 100 segments, but it never completed a turn that
+  met the frozen eligibility rules, so nothing was scored and the question
+  stays open. Game behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-turn-offset-capture/REPORT.md)).
 - A study of when prey start fleeing and how fast they flee. The current rules
   reproduce all 13 recorded test cases exactly, with flight-speed error 0.04
   against 0.38 for the older two-speed rule. Two close variants of each rule
