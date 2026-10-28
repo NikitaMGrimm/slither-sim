@@ -4,6 +4,7 @@
 
 ### Added
 
+- A small-count turn study protocol and its inconclusive preflight outcome.
 - A study of why the simulator's turning rule divides by 111 where the stock
   client divides by 106. On the recordings behind the original fit, 111 matches
   observed turning about five times better than 106, but a fixed offset of 7–8
