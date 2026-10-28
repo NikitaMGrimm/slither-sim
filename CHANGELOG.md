@@ -7,8 +7,8 @@
 - A note on measuring the host with fully grown snakes. A 500-seat world
   with snakes as long as #248's can be saved and restored exactly, but the
   host can't run from it: the checkpoint doesn't keep the food history the
-  host needs to show pellets to players. Performance results so far therefore
-  come from short-snake test worlds
+  host needs to show pellets to players. That study therefore reported only
+  short-snake performance results
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-broadcast/REPORT.md)).
 - A study of whether one core can run 2,281 snakes, the most the stock client
   can show at official density. It can't yet: with 2,280 bots and one player,
@@ -27,12 +27,20 @@
 
 ### Performance
 
+- When deciding what each player can see, the host now skips whole blocks of
+  eight body segments whose bounds are too far away, instead of checking every
+  segment. Output is byte-identical. With fully grown snakes, host ticks in
+  the 500-player official world run 22.9% fewer instructions with stock
+  clients and 22.5% with protocol 13, including the cost of building the
+  bounds; worlds of short snakes run 0.6–1.0% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-covered-bounds/REPORT.md)).
 
 - Each tick, the host decides which snakes and prey each player can see by
   comparing squared distances, and only near the edge of view falls back to
-  the slower exact distance it used before. Output is byte-identical, and host
-  ticks in the 500-player official fixture run 3.1–3.3% fewer instructions
-  with stock and protocol-13 clients (3.0% at 2,281 seats)
+  the slower exact distance it used before. Output is byte-identical. Host
+  ticks in a 500-player official world with fully grown snakes run 23.6% fewer
+  instructions with stock clients and 23.2% with protocol 13; with short
+  snakes the saving is 3.0–3.3%
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-broadcast-distance/REPORT.md)).
 
 - Bots running inside the server build their view of the game faster. They
