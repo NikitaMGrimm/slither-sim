@@ -809,14 +809,15 @@ fn oversized_legacy_cull_disconnects_that_player_while_stock_still_gets_pongs() 
     let reader = std::thread::spawn(move || {
         loop {
             let frame = stock.binary();
-            if packets(&frame[2..]).iter().any(|p| p == b"p") {
-                return;
-            }
             // Time the pong from the ping: the legacy listing and cull before it
-            // can take several seconds on slow CI runners. The socket's read
-            // timeout still catches a recipient that stops receiving frames.
+            // can take several seconds on slow CI runners. Checking before the
+            // pong rejects a late one; the socket's read timeout still catches a
+            // recipient that stops receiving frames.
             if let Some(sent) = reader_pinged.get() {
                 assert!(sent.elapsed() < WAIT, "stock did not receive its pong");
+            }
+            if packets(&frame[2..]).iter().any(|p| p == b"p") {
+                return;
             }
         }
     });
