@@ -44,8 +44,8 @@
    study/coordinator connection remained alive and continued returning block
    census output. A read-only local SSH configuration/certificate inspection
    found a certificate with a past validity endpoint; this does not establish
-   why earlier new connections had succeeded. The owner was asked to restore
-   SSH access. That diagnosis was premature: the owner verified fresh connections
+   why earlier new connections had succeeded. The maintaining agent was asked to
+   restore SSH access. That diagnosis was premature: the maintaining agent verified fresh connections
    with three SSH clients and identified the first alias block in the explicit
    local configuration as authoritative. Supplying that configuration explicitly
    restored command access without changing any credential or setting.
@@ -62,7 +62,8 @@
    sampler output now goes to task-owned files, with stdin detached; SSH
    transport loss can no longer break their progress-output pipes. Runtime,
    seed, affinity, warmup screen and holds are unchanged. No compilation.
-10. Before any hold, the owner extended warmup to three hours per case and
+10. Before any hold, the maintaining agent, acting on the owner's behalf,
+    extended warmup to three hours per case and
     authorized multi-core warming. An idempotent `taskset -a -p -c` operation
     plus explicit readback passed on all five existing host threads. Only the
     collector/sampler were replaced; the same host/client processes and live

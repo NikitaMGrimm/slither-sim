@@ -14,8 +14,8 @@ as an exploratory attempt, not pooled with primary results.
 - Real CLI `host --stats 5`, seed 7, official world, official delivery,
   default link/processing distributions, two default A4 bot workers. All server
   threads inherit one logical CPU. The server's mandatory player slot means
-  exactly 2,281 seats permit 2,280 background bots plus one player. Per owner's
-  clarification, use one loopback A4 NetworkBackend client on another CPU;
+  exactly 2,281 seats permit 2,280 background bots plus one player. Per the maintaining
+  agent's clarification, use one loopback A4 NetworkBackend client on another CPU;
   record its CPU separately. Reference: 500 background bots with the same
   socket client (501 occupied seats), explicitly report both counts.
 - Reuse the public portable_bot client, host counters, /proc thread sampling
@@ -69,9 +69,9 @@ as an exploratory attempt, not pooled with primary results.
   Run documentation checks and scan the diff before pushing. Open a research PR;
   do not merge.
 
-## Owner-approved warmup amendment, before any timed hold
+## Warmup amendment, before any timed hold
 
-The owner authorized up to three hours of warmup per case and allowed more
+The maintaining agent, acting on the owner's behalf, authorized up to three hours of warmup per case and allowed more
 vCPUs for warmup, provided every host thread is re-pinned before measurement.
 The mean-length and p90 rule above remains unchanged: maximum/minimum <=1.05
 over the last three 5,000-tick endpoint blocks, after at least 30,000 ticks.
@@ -98,9 +98,9 @@ do not symbolize kernel-context locations or infer callers of stripped shared
 libraries. Inline compiler frames are not dynamic call stacks. This supplements
 the exact phase brackets and changes no primary hold or settledness rule.
 
-## Owner-requested accounting splits, collection unchanged
+## Accounting splits, collection unchanged
 
-Before any holds, the owner requested both (a) all server work including bot
+Before any holds, the maintaining agent requested both (a) all server work including bot
 workers, and (b) simulation plus socket/I/O threads from those same holds.
 For (b), simulation includes per-recipient encoding for every configured bot
 and the socket player; socket CPU covers only the one real connection.

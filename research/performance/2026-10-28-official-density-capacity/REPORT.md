@@ -161,7 +161,7 @@ No outside game server, freezing, unloading, lower physics rate, replacement
 policy or authoritative observation shortcut is used. Overload defers ticks
 and slows world time; every executed tick advances the complete world.
 
-The owner later authorized multi-core warmup. After roughly 20,000 primary
+The maintaining agent later authorized multi-core warmup on the owner's behalf. After roughly 20,000 primary
 ticks on CPU 0, the same running host's allowed set became CPUs 0, 2 and 3;
 the reference uses that warmup set from startup. Warmup is excluded from the
 capacity windows. Before holds, all host tasks are re-pinned with
@@ -207,7 +207,7 @@ Warmup requires at least 30,000 completed ticks and three successive 5,000-tick
 endpoint blocks whose mean living length and p90 each span at most 5%.
 All warmup blocks and food-stock drift are retained. This screen is a bounded
 length-stability test, not proof of ecological stationarity. The initial
-90-minute ceiling was extended with the owner's approval before any hold;
+90-minute ceiling was extended on the owner's behalf before any hold;
 the amended ceiling is three elapsed warmup hours. A case
 that fails the screen still runs its holds, labelled **unsettled**.
 Three consecutive 300-second holds then preserve each window separately;
@@ -380,7 +380,8 @@ in the attempt ledger and excluded from final profiles.
 
 ## Ranked exact-behavior optimization work
 
-The owner-facing target is **(b), world work with clients elsewhere**. Bot-policy
+The owner's capacity target is real players on one core, so the deciding
+split is **(b), world work with clients elsewhere**. Bot-policy
 or client-view savings do not fix that budget. The rankings below identify
 concrete byte-preserving strategies, with measured **parent-path budgets**;
 they are not implemented candidates, validated speedups or promises that three
