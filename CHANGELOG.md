@@ -63,6 +63,10 @@
 
 ### Performance
 
+- In-process clients reuse ordered food snapshots between edits and fold
+  completed head-motion intervals once, reducing bot frame materialization
+  while preserving received observations and actions
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-client-frame-materialization/REPORT.md)).
 - Food pickup now works out each pellet's place in the food list from a
   bitmap, instead of rewriting the stored position of every later pellet after
   each removal. Stale entries are cleaned out 512 pellets per tick, so no
