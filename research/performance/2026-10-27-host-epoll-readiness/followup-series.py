@@ -15,6 +15,7 @@ for i,ref in enumerate(plan):
  marker=r/f'{mode}-{i}.started';marker.write_text(ref+'\n') if not marker.exists() else (_ for _ in ()).throw(RuntimeError('attempt already reserved'))
  before=set((r/'raw').glob('*/attempt.json'));env=dict(os.environ)
  if mode=='smoke':env['STUDY_SMOKE']='1'
+ else:env.pop('STUDY_SMOKE',None)  # pairs must never inherit the smoke hold
  print('START',mode,i,ref[:7],flush=True)
  with (r/f'followup-{mode}-{i}.log').open('x') as log:
   subprocess.run([str(r/'run.sh'),ref,'--preset','official','--count','8' if mode=='smoke' else '500'],cwd=r,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)

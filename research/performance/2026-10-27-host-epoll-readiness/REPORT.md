@@ -144,3 +144,13 @@ setup-followup.py, then followup-series.py smoke and pairs, then analyze-followu
 Builds/holds use the same lock; scripts reject -O. The frozen probe and analysis
 preserve the death correction. Full seconds/logs/binaries/sources stay local-only
 outside /tmp. No public raw download or further experiment is planned.
+
+## Post-measurement script corrections
+
+After review, `followup-series.py` clears an inherited `STUDY_SMOKE` in pairs mode,
+and `analyze-followup.py` also counts any newly deferred tick as a saturation episode,
+as the plan defines. Neither changes a result: every added primary window has
+17,223–17,228 executed ticks (full 120 s holds), and every added primary and post
+window has zero deferred ticks. Hashes in [results.json](results.json) identify the
+scripts as measured.
+

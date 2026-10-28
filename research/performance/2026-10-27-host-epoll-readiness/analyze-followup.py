@@ -55,7 +55,8 @@ for p in sorted((r/'raw').glob('*/summary.json')):
   episodes=[]
   for i in range(1,len(z)):
    x,y=z[i-1],z[i]
-   if (x['hostCpuPercent']>=95 and y['hostCpuPercent']>=95 and min(x['backlog'],y['backlog'])>=4 and y['backlog']>x['backlog']):episodes.append(round(y['second'],3))
+   # The plan counts any newly deferred tick as an episode, as well as sustained saturation.
+   if (y['deferred']>x['deferred'] or (x['hostCpuPercent']>=95 and y['hostCpuPercent']>=95 and min(x['backlog'],y['backlog'])>=4 and y['backlog']>x['backlog'])):episodes.append(round(y['second'],3))
   a,b=nearest(w,start+lo),nearest(w,start+hi)
   marginal=[{k:x[k] for k in ['second','hostCpuPercent','simCpuPercent','socketCpuPercent','simCpuMsPerTick','socketCpuMsPerTick','backlog','deferred']} for x in z if x['hostCpuPercent']>=95 or x['backlog']>=4]
   tt=[x for x in ticks if start+lo<=origin+x[0]*1e-9<start+hi]
