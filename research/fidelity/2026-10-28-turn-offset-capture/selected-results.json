@@ -4,8 +4,15 @@
       "ordinal": 1,
       "cells": {},
       "censored": [],
-      "qualified": false,
-      "archiveQualified": false
+      "qualified": true,
+      "archiveQualified": true
+    },
+    {
+      "ordinal": 2,
+      "cells": {},
+      "censored": [],
+      "qualified": true,
+      "archiveQualified": true
     }
   ],
   "decision": "inconclusive-development-coverage",
@@ -17,76 +24,135 @@
       "ordinal": 1,
       "members": [
         {
-          "sha256": "72e161850d7dd67c4fd941b7f4234c3142b6ed5a11fc9e72bdecf16036acc9df",
-          "incoming": 334,
-          "outgoing": 45,
-          "lives": 1,
-          "ownStateReceipts": 101,
+          "sha256": "9b29e303527db009e63b83fa167c1da6644d6355a89e492782dcd5a3c9ef930a",
+          "incoming": 119934,
+          "outgoing": 12679,
+          "lives": 10,
+          "ownStateReceipts": 53831,
           "integrityVerified": true,
-          "completed": false,
-          "stopReason": "external-integrity-stop",
+          "completed": true,
+          "stopReason": "deadline-with-close-reserve",
           "nativeAudit": [
             {
-              "anchors": 95,
-              "frames": 333,
+              "anchors": 52594,
+              "frames": 119924,
               "kind": "audit"
             }
           ],
-          "ownAnchors": 18
+          "ownAnchors": 4884
         },
         {
-          "sha256": "7c8b59b15f60a6f755a9518bbe78fcc3d13aa0b7c3ec80ee0045443d4a40b3ea",
-          "incoming": 439,
-          "outgoing": 21,
-          "lives": 1,
-          "ownStateReceipts": 187,
+          "sha256": "f7cb005f5d6a92ffb501851f1e7a34bf751157e751251392ed8c451ebef0ade0",
+          "incoming": 118717,
+          "outgoing": 13011,
+          "lives": 15,
+          "ownStateReceipts": 54201,
           "integrityVerified": true,
-          "completed": false,
-          "stopReason": "external-integrity-stop",
+          "completed": true,
+          "stopReason": "deadline-with-close-reserve",
           "nativeAudit": [
             {
-              "anchors": 171,
-              "frames": 438,
+              "anchors": 53101,
+              "frames": 118702,
               "kind": "audit"
             }
           ],
-          "ownAnchors": 18
+          "ownAnchors": 4786
         }
       ],
       "acquisition": {
-        "reason": "external-integrity-stop",
-        "elapsedSeconds": 4.483268816,
+        "reason": "deadline-with-close-reserve",
+        "elapsedSeconds": 1190.001736205,
         "socketsClosed": true,
         "maxCounts": [
-          3,
-          2
+          171,
+          55
         ],
         "controlsDone": [],
-        "interruptionCounts": {}
+        "interruptionCounts": {
+          "avoidance": 10,
+          "eligibility": 1,
+          "count-change-on-receipt": 1
+        }
+      }
+    },
+    {
+      "ordinal": 2,
+      "members": [
+        {
+          "sha256": "3b8b30cef3666235b768a8f484e410ed2ac3e6204ce5a9f2642aaba6ea911755",
+          "incoming": 115255,
+          "outgoing": 12838,
+          "lives": 11,
+          "ownStateReceipts": 48919,
+          "integrityVerified": true,
+          "completed": true,
+          "stopReason": "deadline-with-close-reserve",
+          "nativeAudit": [
+            {
+              "anchors": 47869,
+              "frames": 115244,
+              "kind": "audit"
+            }
+          ],
+          "ownAnchors": 4864
+        },
+        {
+          "sha256": "328a1b1ba4bb5c47c522a2ee7ea714a708fdddd496643af4f6328731ca3a8251",
+          "incoming": 122021,
+          "outgoing": 13905,
+          "lives": 11,
+          "ownStateReceipts": 52446,
+          "integrityVerified": true,
+          "completed": true,
+          "stopReason": "deadline-with-close-reserve",
+          "nativeAudit": [
+            {
+              "anchors": 51207,
+              "frames": 122010,
+              "kind": "audit"
+            }
+          ],
+          "ownAnchors": 4857
+        }
+      ],
+      "acquisition": {
+        "reason": "deadline-with-close-reserve",
+        "elapsedSeconds": 1190.006120217,
+        "socketsClosed": true,
+        "maxCounts": [
+          114,
+          77
+        ],
+        "controlsDone": [],
+        "interruptionCounts": {
+          "eligibility": 1
+        }
       }
     }
   ],
-  "nativeBinarySha256": "4d95ced79eeefdf6c65104f419408d98dac688974086c66c740df65e254a4a51",
+  "nativeBinarySha256": "a2d5b95d62a2e6145f80476c2d13aaa0bd2c27b5c9d582d2cc30cfdca0382705",
   "sourceSha256": {
     "analyze.py": "1d3303d641a313aa224cdfdfb43d04ffb959cbed7d4b8bcbfda60bac641993ae",
     "capture.mjs": "7277318d3b51567a6a221f358401c739f27bf38b8c6a1e5ccace1a5cf49b1f4a",
     "capture.test.mjs": "d78befced2eff9fe75115121ac5373e3f1aea2c8cc9acbfaba5970a0c8701b32",
-    "connection-monitor.ps1": "5687156f7a428ba4b4b99fa69c59645d2daac1c8fe9b454462ca23e4ee73a3c5",
-    "container-guard.mjs": "c0b03d9b241405656c17c365ab5608e42890f6816697d09e179877fbcc3a1a1d",
-    "container-guard.test.mjs": "f00f5614fd2d230df566be27b39e147009a4cc7d44e9cf25651b6b76778c491d",
+    "connection-monitor.ps1": "f456ec56b1217011557e3d369aa08a4abaf419912efa5d3f702a6361ea8389e5",
+    "container-guard.mjs": "3b1ead82d5028e3749a4a813f9235fdb7748cf3b3d9ac77d435e47053a7c43d1",
+    "container-guard.test.mjs": "155f5f68bf559b596827825e8fe75effecda9d97362c2c251b7e637a91fce60a",
     "discover.mjs": "1ffb267b5ff7caa41dbccb11a704af894841893836ede3f76618e9da79ff1d69",
     "guard.ps1": "b7f17ee1b4c692cc94ebebb5b44482b306dc61c4483355ac051058d8656912cb",
+    "namespace-census.mjs": "8e0baa30eec1a396ced722b44a2dd63f20558d72b07ba07ee901c6f80ed052ea",
     "preflight.ps1": "360988b0a7b291013eba8b4ccd704a6a3f4683cfa6f992721b20c2617a31fdc0",
     "preflight.test.ps1": "8a61ccb3cd6eab5a08598393bb972d9ebdf1244942f3c39f0d4e588e924aade2",
+    "rehearsal-audit.mjs": "c79eb53fafdde6f2b65cb1c9a294e0531f24625f95426b3860164628a5aee45d",
+    "rehearse.ps1": "410dd6333bc60c762302c8beedbc26eff56f845f965fd778d536e24d57ca5c58",
     "score.mjs": "174b2d5f974cb85bfd6bee058d502dbf7f619a92d01a0fdc0bea7aea65751fa8",
     "selection.mjs": "9b4228a8c69e2585d4d0be1a3cd20d563654199a82728cfd9eb0c105901c4c8e"
   },
-  "status": "inconclusive: attempt3 failed closed because socket ownership was unavailable",
-  "attempt": 3,
-  "containerGuardAmendmentCommits": [
-    "7d9a11b7",
-    "8a5f943a"
-  ],
+  "attempt": 4,
+  "status": "final inconclusive: development acquired no qualifying cells",
+  "finalAttempt": true,
+  "furtherAttemptsAuthorized": false,
   "retainedAttempts": [
     {
       "attempt": 1,
@@ -99,51 +165,75 @@
       "results": "attempt-2-results.json",
       "sha256": "2b88697b0ab89ccdecadf4eb066ffa2298ed7469eaf510c082755af802520038",
       "preservedUnchanged": true
+    },
+    {
+      "attempt": 3,
+      "results": "attempt-3-results.json",
+      "sha256": "295c119d051ecac0cc221a8d2f7ba2180d3325ab03ccd8fd867ffa377db837f2",
+      "preservedUnchanged": true
     }
   ],
+  "rehearsal": {
+    "summary": "REHEARSAL.md",
+    "proof": "rehearsal-proof.json",
+    "proofCommit": "0273234dd6376129f858ffb92e073f72403facb7",
+    "passed": true
+  },
   "preflight": {
-    "initialCheckPassed": true,
-    "rechecks": 0,
-    "waitingIntervals": 0,
+    "invocations": [
+      {
+        "ordinal": 1,
+        "initialCheckPassed": true,
+        "rechecks": 0,
+        "waitingIntervals": 0
+      },
+      {
+        "ordinal": 2,
+        "initialCheckPassed": true,
+        "rechecks": 0,
+        "waitingIntervals": 0
+      }
+    ],
     "newDiscoveryRequests": 0,
     "reusedBinding": true
   },
   "acquisition": {
-    "reservedOfficialInvocations": 1,
+    "reservedOfficialInvocations": 2,
     "limit": 4,
-    "officialGameSocketAttempts": 2,
+    "officialGameSocketAttempts": 47,
     "primaryCellsAcquired": 0,
     "optionalCellsAcquired": 0,
     "heldoutInvocations": 0,
     "socketsClosed": true,
-    "permanentStudyStop": true
+    "stoppedAtFrozenDevelopmentGate": true,
+    "permanentGuardFailure": false
   },
   "invocationStatus": [
     {
       "ordinal": 1,
       "split": "development",
-      "status": "interrupted after 4.483268816 seconds",
+      "status": "completed at close-reserve deadline",
       "primaryCellsAcquired": 0,
       "optionalCellsAcquired": 0
     },
     {
       "ordinal": 2,
       "split": "development",
-      "status": "not launched: permanent stop",
-      "primaryCellsAcquired": null,
-      "optionalCellsAcquired": null
+      "status": "completed at close-reserve deadline",
+      "primaryCellsAcquired": 0,
+      "optionalCellsAcquired": 0
     },
     {
       "ordinal": 3,
       "split": "heldout",
-      "status": "not launched: permanent stop",
+      "status": "not launched: development coverage gate failed",
       "primaryCellsAcquired": null,
       "optionalCellsAcquired": null
     },
     {
       "ordinal": 4,
       "split": "heldout",
-      "status": "not launched: permanent stop",
+      "status": "not launched: development coverage gate failed",
       "primaryCellsAcquired": null,
       "optionalCellsAcquired": null
     }
@@ -153,145 +243,256 @@
       "count": 37,
       "sign": 1,
       "primary": true,
-      "status": "not acquired: ownership monitor failed before target attained"
+      "status": "not acquired in either development invocation"
     },
     {
       "count": 37,
       "sign": -1,
       "primary": true,
-      "status": "not acquired: ownership monitor failed before target attained"
+      "status": "not acquired in either development invocation"
     },
     {
       "count": 100,
       "sign": 1,
       "primary": true,
-      "status": "not acquired: ownership monitor failed before target attained"
+      "status": "not acquired in either development invocation"
     },
     {
       "count": 100,
       "sign": -1,
       "primary": true,
-      "status": "not acquired: ownership monitor failed before target attained"
+      "status": "not acquired in either development invocation"
     },
     {
       "count": 174,
       "sign": 1,
       "primary": false,
-      "status": "not acquired: ownership monitor failed before target attained"
+      "status": "not acquired in either development invocation"
     },
     {
       "count": 174,
       "sign": -1,
       "primary": false,
-      "status": "not acquired: ownership monitor failed before target attained"
+      "status": "not acquired in either development invocation"
     }
   ],
-  "exposure": [
+  "accounting": [
     {
-      "member": 0,
-      "ownAnchors": 18,
-      "countRanges": {
-        "logical": [
-          2,
-          3
-        ],
-        "physical": [
-          3,
-          20
-        ],
-        "dying": [
-          1,
-          17
-        ],
-        "fam": [
-          0.12309617537833306,
-          0.7466205803525794
-        ],
-        "displayed_length": [
-          1.4263477488217458,
-          2.8611985958336947
-        ]
-      }
-    },
-    {
-      "member": 1,
-      "ownAnchors": 18,
-      "countRanges": {
-        "logical": [
-          2,
-          2
-        ],
-        "physical": [
-          3,
-          20
-        ],
-        "dying": [
-          1,
-          18
-        ],
-        "fam": [
-          0.28053911212319804,
-          0.7382374845884732
-        ],
-        "displayed_length": [
-          1.506700854333586,
-          2.138237484588473
-        ]
-      }
-    }
-  ],
-  "setupProtocols": [
-    {
-      "member": 0,
-      "protocols": [
-        19
+      "ordinal": 1,
+      "guardCompleted": true,
+      "guardFailed": false,
+      "conflictRecords": 0,
+      "namespaceSamples": 1155,
+      "maximumNamespaceConnections": 2,
+      "positiveTwoConnectionSamples": 1085,
+      "exposure": [
+        {
+          "member": 0,
+          "ownAnchors": 4884,
+          "afterCountRanges": {
+            "displayed_length": [
+              1.4,
+              171.33291735249264
+            ],
+            "dying": [
+              1,
+              23
+            ],
+            "fam": [
+              0.0,
+              1.0
+            ],
+            "logical": [
+              2,
+              171
+            ],
+            "physical": [
+              3,
+              194
+            ],
+            "physical_minus_dying": [
+              2,
+              171
+            ],
+            "scale": [
+              1.0,
+              2.5943396226415096
+            ],
+            "scang": [
+              0.5990712145484751,
+              1.0
+            ]
+          }
+        },
+        {
+          "member": 1,
+          "ownAnchors": 4786,
+          "afterCountRanges": {
+            "displayed_length": [
+              1.4,
+              54.583588523473665
+            ],
+            "dying": [
+              1,
+              24
+            ],
+            "fam": [
+              0.0,
+              1.0
+            ],
+            "logical": [
+              2,
+              55
+            ],
+            "physical": [
+              3,
+              77
+            ],
+            "physical_minus_dying": [
+              2,
+              55
+            ],
+            "scale": [
+              1.0,
+              1.5
+            ],
+            "scang": [
+              0.8610416666666666,
+              1.0
+            ]
+          }
+        }
       ]
     },
     {
-      "member": 1,
-      "protocols": [
-        19
+      "ordinal": 2,
+      "guardCompleted": true,
+      "guardFailed": false,
+      "conflictRecords": 0,
+      "namespaceSamples": 1155,
+      "maximumNamespaceConnections": 2,
+      "positiveTwoConnectionSamples": 1095,
+      "exposure": [
+        {
+          "member": 0,
+          "ownAnchors": 4864,
+          "afterCountRanges": {
+            "displayed_length": [
+              1.4,
+              113.8600417292143
+            ],
+            "dying": [
+              1,
+              23
+            ],
+            "fam": [
+              0.0,
+              1.0
+            ],
+            "logical": [
+              2,
+              114
+            ],
+            "physical": [
+              3,
+              135
+            ],
+            "physical_minus_dying": [
+              2,
+              114
+            ],
+            "scale": [
+              1.0,
+              2.0566037735849054
+            ],
+            "scang": [
+              0.7205648510739291,
+              1.0
+            ]
+          }
+        },
+        {
+          "member": 1,
+          "ownAnchors": 4857,
+          "afterCountRanges": {
+            "displayed_length": [
+              1.4,
+              76.77207802367676
+            ],
+            "dying": [
+              1,
+              24
+            ],
+            "fam": [
+              0.0,
+              1.0
+            ],
+            "logical": [
+              2,
+              77
+            ],
+            "physical": [
+              3,
+              100
+            ],
+            "physical_minus_dying": [
+              2,
+              77
+            ],
+            "scale": [
+              1.0,
+              1.7075471698113207
+            ],
+            "scang": [
+              0.8069097098611606,
+              1.0
+            ]
+          }
+        }
       ]
     }
   ],
-  "guardFailure": {
-    "controllerEndpointConnections": 0,
-    "separateEndpointConnections": 2,
-    "socketOwnerMetadataExposed": false,
-    "positiveOwnershipUnavailable": true,
-    "outsideConnectionRole": "not established",
-    "preparationGap": "positive own-socket attribution was not verified offline before collection"
+  "connectionCensus": {
+    "controllerAndHostSnapshots": 557,
+    "conflicts": 0,
+    "maximumCaptureNamespaceConnections": 2
   },
   "cleanup": {
-    "archiveSha256": "63178f0cebfec2a0454434318a48ce2bf7e4873f19ee4bce5703898449a4d652",
     "copiedAndVerified": true,
+    "bytes": 36901237,
+    "archiveSha256": "0cd74834bf882a0783b43376a011d3b98a9fda5fa0dafe762d2bc9ca1f0f7866",
+    "existingImagePreserved": true,
     "remoteScratchRemoved": true,
     "taskContainersRemaining": 0,
     "imagePulled": false,
-    "existingImagePreserved": true
+    "controllerEndpointConnections": 0,
+    "nativeTargetCleaned": true,
+    "vendorInputsRetainedBecauseDeletionBlocked": true
   },
   "environment": "a capped ephemeral Linux container on a separate machine",
   "interpretation": {
     "D111": "no eligible primary cell; not discriminated",
     "fixedOffsets6Through10": "no eligible primary cell; not discriminated",
     "originalCountD106": "previous conditional rejection unchanged",
-    "mechanicsCorrectionSupported": false
+    "mechanicsCorrectionSupported": false,
+    "qualifiedFlag": "unchanged scorer flag checks agreement and archive integrity; complete primary coverage is a separate decision gate"
   },
   "assembly": {
-    "baseAnalysisSha256": "11ac1cb1465a38ebcbfa9a1bdc96e13e6a620b1fb954e4ce1afb68338f695f05",
-    "additionalFields": "bounded attempt census, native count ranges and cleanup; unchanged frozen analysis"
+    "baseAnalysisSha256": "51bf059cc461376dd63589a59b4c799db2c9fe89a075575524bf48d0e18ec4dc",
+    "additionalFields": "bounded attempt, connection, count-range, retention and cleanup accounting; frozen analysis output preserved"
   },
   "verification": {
-    "containerGuardTests": 8,
+    "frozenSourcesVerified": 25,
+    "containerGuardTests": 10,
     "researchNodeTests": 9,
     "preflightAuthoredCases": 5,
     "existingCollectorNodeTests": 104,
     "priorPinnedNativePythonTests": 8,
     "documentationTests": 7,
-    "nativeNewGameReplays": 2,
-    "nativeValidatedFrames": 771,
-    "nativeAnchors": 266,
-    "archivePrefixesVerified": 2,
+    "nativeNewGameReplays": 4,
+    "nativeValidatedFrames": 475880,
+    "nativeAnchors": 204771,
+    "archivePrefixesVerified": 4,
     "independentReview": "source and retained evidence only; no independent tests, replay execution or remote inspection"
   }
 }

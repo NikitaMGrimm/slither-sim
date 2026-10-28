@@ -7,7 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
-| Fidelity | [Small-count turn-offset capture](fidelity/2026-10-28-turn-offset-capture/REPORT.md) | Attempt 3 stopped after 4.48 seconds because socket ownership was unavailable; no cells acquired and D111 versus fixed offsets remains unresolved. |
+| Fidelity | [Small-count turn-offset capture](fidelity/2026-10-28-turn-offset-capture/REPORT.md) | Final attempt passed offline rehearsal but acquired no qualifying cells in two development invocations; D111 versus fixed offsets remains unresolved. |
 | Fidelity | [Boost ramp](fidelity/2026-10-28-boost-ramp/REPORT.md) | Offline reproduction of all 1,567 original ramps: the Android-derived law fits best (slope RMSE 0.101 vs 0.145). Growth/loss candidates differ by under a fifth of a speed byte, and none of 72 capture schedules could separate them; no capture or mechanics change. |
 | Fidelity | [Prey flight and activation](fidelity/2026-10-28-prey-flight-activation/REPORT.md) | Five official recordings reproduce the original prey flight-speed (MAE 0.042 vs 0.383 for the old two-speed rule) and activation evidence. Two close flight laws and activation half-widths 315/320 stay unresolved, and no two-connection capture passes the power gate; no capture or mechanics change. |
 | Performance | [Persistent Linux readiness](performance/2026-10-27-host-epoll-readiness/REPORT.md) | Rejected: CPU saving not reproduced across seven pairs; candidate bursts remain unexplained. Prototype patch and measurement limits retained. |

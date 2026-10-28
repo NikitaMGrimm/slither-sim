@@ -4,7 +4,7 @@
 
 ### Added
 
-- A small-count turn study and its inconclusive captures, including an ownership-monitor failure.
+- A small-count turn study with its final inconclusive capture result.
 - A study of when prey start fleeing and how fast they flee. The current rules
   reproduce all 13 recorded test cases exactly, with flight-speed error 0.04
   against 0.38 for the older two-speed rule. Two close variants of each rule
