@@ -390,7 +390,10 @@ impl SimulatorBackend {
         // Physics, profiles and report opportunities stay fixed throughout this
         // broadcast. Only observe's stale flags accumulate between recipients;
         // they are consumed by the next broadcast's update_reports.
-        let mut snakes = SnakeBroadcast::new(self.world.snakes());
+        let mut snakes = SnakeBroadcast::new(
+            self.world.snakes(),
+            std::mem::take(&mut self.coverage_bounds),
+        );
         let mut board = None;
         let mut map = None;
         for slot in 0..self.slots.len() {
@@ -470,6 +473,7 @@ impl SimulatorBackend {
             self.hand_over_early(early, hand_over)?;
         }
         self.coverage_grid = Some(grid);
+        self.coverage_bounds = snakes.body_bounds;
         self.food_eaters.clear();
         self.prey_eaters.clear();
         Ok(())

@@ -60,11 +60,12 @@ pub(super) struct SnakeBroadcast {
 }
 
 impl SnakeBroadcast {
-    pub(super) fn new(snakes: &[Snake]) -> Self {
+    pub(super) fn new(snakes: &[Snake], mut body_bounds: BodyBounds) -> Self {
+        body_bounds.update(snakes);
         Self {
             deltas: vec![SnakeDeltaCache::default(); snakes.len()],
             candidates: Vec::new(),
-            body_bounds: BodyBounds::new(snakes),
+            body_bounds,
         }
     }
 }
@@ -73,11 +74,17 @@ const BODY_BOUND_EDGES: usize = 8;
 const BODY_BOUND_MIN_EDGES: usize = 16;
 const BODY_BOUND_LIMIT: f64 = 1e7;
 
-/// Consecutive edge blocks, shared by all recipients of one broadcast. Rebuild
-/// with the geometry, including external pose edits and non-tick broadcasts.
+/// Body-only bounds, retained between broadcasts and verified against every
+/// point before reuse. Anchor insertion contracts interior points too, so a
+/// matching head/tail or length alone cannot validate this cache.
 #[derive(Default)]
 pub(super) struct BodyBounds {
-    ranges: Vec<std::ops::Range<usize>>,
+    snakes: Vec<CachedBodyBounds>,
+}
+
+#[derive(Default)]
+struct CachedBodyBounds {
+    body: Vec<Point>,
     blocks: Vec<physics::Bounds>,
 }
 
@@ -86,46 +93,56 @@ fn boundable(point: Point) -> bool {
 }
 
 impl BodyBounds {
+    #[cfg(test)]
     fn new(snakes: &[Snake]) -> Self {
+        let mut result = Self::default();
+        result.update(snakes);
+        result
+    }
+
+    fn update(&mut self, snakes: &[Snake]) {
         let indexed = |snake: &Snake| snake.alive && snake.body.len() > BODY_BOUND_MIN_EDGES;
-        if !snakes.iter().any(indexed) {
-            return Self::default();
+        if self.snakes.is_empty() && !snakes.iter().any(indexed) {
+            return;
         }
-        let capacity = snakes
-            .iter()
-            .filter(|s| indexed(s))
-            .map(|s| (s.body.len() - 1).div_ceil(BODY_BOUND_EDGES))
-            .sum();
-        let mut index = Self {
-            ranges: vec![0..0; snakes.len()],
-            blocks: Vec::with_capacity(capacity),
-        };
-        for (slot, snake) in snakes.iter().enumerate().filter(|(_, s)| indexed(s)) {
-            let start = index.blocks.len();
+        self.snakes
+            .resize_with(snakes.len(), CachedBodyBounds::default);
+        for (snake, cached) in snakes.iter().zip(&mut self.snakes) {
+            if !indexed(snake) {
+                cached.body.clear();
+                cached.blocks.clear();
+                continue;
+            }
+            // Every coordinate bit is the reuse witness: even signed-zero or
+            // NaN-payload edits rebuild the complete set of blocks.
+            let same_body =
+                cached.body.len() == snake.body.len()
+                    && cached.body.iter().zip(&snake.body).all(|(a, b)| {
+                        a.x.to_bits() == b.x.to_bits() && a.y.to_bits() == b.y.to_bits()
+                    });
+            if same_body {
+                continue;
+            }
+            cached.body.clone_from(&snake.body);
+            cached.blocks.clear();
             for first in (0..snake.body.len() - 1).step_by(BODY_BOUND_EDGES) {
-                // Neighboring blocks share their endpoint, so every original
-                // edge belongs to exactly one block, including the final edge.
                 let end = (first + BODY_BOUND_EDGES + 1).min(snake.body.len());
                 let points = &snake.body[first..end];
                 if !points.iter().copied().all(boundable) {
-                    index.blocks.truncate(start);
+                    cached.blocks.clear();
                     break;
                 }
                 let mut bounds = physics::Bounds::between(points[0], points[0]);
                 for &point in &points[1..] {
                     bounds.include(point);
                 }
-                index.blocks.push(bounds);
+                cached.blocks.push(bounds);
             }
-            index.ranges[slot] = start..index.blocks.len();
         }
-        index
     }
 
     pub(super) fn for_snake(&self, slot: usize) -> &[physics::Bounds] {
-        self.ranges
-            .get(slot)
-            .map_or(&[], |range| &self.blocks[range.clone()])
+        self.snakes.get(slot).map_or(&[], |cached| &cached.blocks)
     }
 }
 
@@ -815,6 +832,139 @@ mod tests {
                     original_covered(Point::default(), s, coverage_bounds(s), 0.)
                 );
             }
+        }
+    }
+
+    #[test]
+    fn retained_body_bounds_follow_every_body_edit() {
+        let world = Simulator::new(crate::WorldOptions {
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["template".into()],
+                placement: crate::Placement::TestRing,
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let mut snakes = vec![world.snakes()[0].clone(); 3];
+        let mut cache = BodyBounds::default();
+        for scene in 0..256 {
+            let count = [3, 1, 0, 4][scene % 4];
+            snakes.resize(count, world.snakes()[0].clone());
+            for (slot, snake) in snakes.iter_mut().enumerate() {
+                snake.alive = (scene + slot) % 7 != 0;
+                snake.head = Point {
+                    x: 10000.,
+                    y: -10000.,
+                };
+                snake.body = (0..[0, 2, 16, 17, 33, 65][scene % 6])
+                    .map(|i| Point {
+                        x: (i as f64 - 16.) * 40.,
+                        y: slot as f64 * 500.,
+                    })
+                    .collect();
+            }
+            // Reuse, then edit a single interior point without changing length
+            // or the front/tail. A head/tail-only key would miss this change.
+            for edit in 0..4 {
+                if edit == 2 {
+                    for snake in &mut snakes {
+                        if snake.body.len() > 16 {
+                            snake.body[9] = Point { x: 500., y: 500. };
+                        }
+                    }
+                } else if edit == 3 {
+                    for snake in &mut snakes {
+                        if let Some(point) = snake.body.get_mut(9) {
+                            *point = Point {
+                                x: [0., -0., f64::NAN, 1e200][scene % 4],
+                                y: 0.,
+                            };
+                        }
+                    }
+                }
+                cache.update(&snakes);
+                for (slot, snake) in snakes.iter().enumerate() {
+                    let bounds = coverage_bounds(snake);
+                    for head in [Point::default(), Point { x: 500., y: 500. }, snake.head] {
+                        for radius in [0., 1., 500f64.next_down(), 500., 500f64.next_up(), 1e200] {
+                            assert_eq!(
+                                covered(head, snake, bounds, radius, cache.for_snake(slot)),
+                                original_covered(head, snake, bounds, radius),
+                                "scene={scene}, slot={slot}, edit={edit}, head={head:?}, radius={radius}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn retained_body_bounds_compare_each_coordinate() {
+        let world = Simulator::new(crate::WorldOptions {
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["template".into()],
+                placement: crate::Placement::TestRing,
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let mut snake = world.snakes()[0].clone();
+        snake.head = Point {
+            x: -10000.,
+            y: -10000.,
+        };
+        let mut cache = BodyBounds::default();
+        for axis in 0..2 {
+            for index in 0..65 {
+                let far = if axis == 0 {
+                    Point { x: 1000., y: 0. }
+                } else {
+                    Point { x: 0., y: 1000. }
+                };
+                snake.body = vec![far; 65];
+                for changed in [false, true, true, false] {
+                    snake.body[index] = if changed { Point::default() } else { far };
+                    cache.update(std::slice::from_ref(&snake));
+                    let bounds = coverage_bounds(&snake);
+                    for radius in [0., 1., 500f64.next_down(), 500., 500f64.next_up()] {
+                        assert_eq!(
+                            covered(Point::default(), &snake, bounds, radius, cache.for_snake(0)),
+                            original_covered(Point::default(), &snake, bounds, radius),
+                            "axis={axis}, index={index}, changed={changed}, radius={radius}"
+                        );
+                    }
+                    // The stored witness must include every edit, even when
+                    // distinct bit patterns describe the same geometric point.
+                    assert_eq!(
+                        cache.snakes[0].body[index].x.to_bits(),
+                        snake.body[index].x.to_bits()
+                    );
+                    assert_eq!(
+                        cache.snakes[0].body[index].y.to_bits(),
+                        snake.body[index].y.to_bits()
+                    );
+                }
+            }
+        }
+        snake.body = vec![Point::default(); 65];
+        for bits in [
+            0u64,
+            1u64 << 63,
+            0x7ff8_0000_0000_0001,
+            0x7ff8_0000_0000_0002,
+            0,
+        ] {
+            snake.body[9].x = f64::from_bits(bits);
+            cache.update(std::slice::from_ref(&snake));
+            assert_eq!(cache.snakes[0].body[9].x.to_bits(), bits);
+            let bounds = coverage_bounds(&snake);
+            assert_eq!(
+                covered(Point::default(), &snake, bounds, 1., cache.for_snake(0)),
+                original_covered(Point::default(), &snake, bounds, 1.)
+            );
         }
     }
 
