@@ -7,15 +7,15 @@
   "historical_retained": "c2fb7285febb4273034e30699dc880715a334423",
   "hashes": {
     "plan": "45a29512417d4b204d48bb24e57a75b98e060335fbbe1012aef6d8df0a797950",
-    "analyzer": "085fb5b1f75dae0b6f24767eb4eb45088f171ab94e5234d272c756c58a307a77",
+    "analyzer": "2cd0fe23a4a7b49161a8068e91101ad96364737172002643ffe55d9a1b590ef6",
     "decoder": "3f630502723afb19b7c2ba3e4d509084e3e793217e08e5ba53fa41d56126b3d9",
-    "tests": "c7ca06edc6a0534741440cf1523c6ddaca878463dd3ee00841ff1c4f51f25f29",
+    "tests": "3ce11eb1390e3fe97e6390c7aa2798626d6baf45edb7636f0b92ceefcfb044e8",
     "affinity_helper": "658986fab55cd631db30db2b71b6bbb926240e3e8ec2f8e4091a2d409f89327e",
     "fixture": "94a704bbf2073ac98c7324331b93d0bd35603edeaa4e1d768db1f6b4b2a68c0e"
   },
   "external_artifacts": {
     "changing-rows.json": "d3b2b74903c6b8b46d996fee12749c0eb01d5c6bf6b110b1618fa774fc7c30ac",
-    "changing-scores.json": "3a00d5cd92a9e1042ac24c3b563f929d32125afa2e44440844a6c5f77a1d55e6",
+    "changing-scores.json": "adea11e8201d30e85f858f0b32bfff6a4c583aaa0decd93926735525bfa85a3f",
     "fixed-rows.json": "043a28008f0b206e58f0926c3803053b9b8d1105ed961eba1eec3b0e51d52858",
     "power-cycles.json": "edcec699831c286453e473d7b4c20db12af4d3135d26b29942633b4f82c16c46"
   },
@@ -146,7 +146,7 @@
         "events": 60,
         "duration_s": 18.074,
         "progress_direct_max_separation": 0.005851388999117191,
-        "immediate_delayed_max_separation": 0.0043829127349681585,
+        "immediate_delayed_max_separation": 0.0018895558020410874,
         "direct_immediate_delayed_max_separation": 0.0013037480161894877,
         "progress_direct_separating_intervals": {
           "0": 0,
@@ -156,7 +156,7 @@
         },
         "models": {
           "P305": {
-            "interval_mean_rmse": 0.023482903245807932,
+            "interval_mean_rmse": 0.023488017036110226,
             "maximum_error": 0.08003753538491054,
             "gates": {
               "0": {
@@ -200,7 +200,7 @@
             }
           },
           "P0": {
-            "interval_mean_rmse": 0.7260273381387248,
+            "interval_mean_rmse": 0.7260222927737863,
             "maximum_error": 2.9856655124924316,
             "gates": {
               "0": {
@@ -222,7 +222,7 @@
             }
           },
           "P390": {
-            "interval_mean_rmse": 0.17023721559874463,
+            "interval_mean_rmse": 0.17024555337892544,
             "maximum_error": 0.6295267321812403,
             "gates": {
               "0": {
@@ -244,7 +244,7 @@
             }
           },
           "P305_equal": {
-            "interval_mean_rmse": 0.3622053886873083,
+            "interval_mean_rmse": 0.36221050247761055,
             "maximum_error": 1.7111002470476393,
             "gates": {
               "0": {
@@ -266,7 +266,7 @@
             }
           },
           "P305_offline": {
-            "interval_mean_rmse": 0.8073652948710459,
+            "interval_mean_rmse": 0.8073605411818041,
             "maximum_error": 1.7174426079838785,
             "gates": {
               "0": {
@@ -290,7 +290,7 @@
         },
         "delayed_models": {
           "P305_delay7": {
-            "interval_mean_rmse": 0.023508753599623147,
+            "interval_mean_rmse": 0.023493934738057044,
             "maximum_error": 0.07964045223698868
           },
           "V305_delay7": {
@@ -426,7 +426,7 @@
         "events": 82,
         "duration_s": 20.134,
         "progress_direct_max_separation": 0.006964316743124144,
-        "immediate_delayed_max_separation": 0.0025373312202390252,
+        "immediate_delayed_max_separation": 0.002651821284061384,
         "direct_immediate_delayed_max_separation": 0.0013514671132384137,
         "progress_direct_separating_intervals": {
           "0": 0,
@@ -436,7 +436,7 @@
         },
         "models": {
           "P305": {
-            "interval_mean_rmse": 0.031519246232752526,
+            "interval_mean_rmse": 0.0315301152382476,
             "maximum_error": 0.4102423854917472,
             "gates": {
               "0": {
@@ -480,7 +480,7 @@
             }
           },
           "P0": {
-            "interval_mean_rmse": 0.4726334358056738,
+            "interval_mean_rmse": 0.47263869965350663,
             "maximum_error": 2.2783438155136277,
             "gates": {
               "0": {
@@ -502,7 +502,7 @@
             }
           },
           "P390": {
-            "interval_mean_rmse": 0.12761923445019135,
+            "interval_mean_rmse": 0.12762984941755218,
             "maximum_error": 0.5786998565768364,
             "gates": {
               "0": {
@@ -524,7 +524,7 @@
             }
           },
           "P305_equal": {
-            "interval_mean_rmse": 0.3646682226468323,
+            "interval_mean_rmse": 0.36467909165232737,
             "maximum_error": 1.9521607294860566,
             "gates": {
               "0": {
@@ -546,7 +546,7 @@
             }
           },
           "P305_offline": {
-            "interval_mean_rmse": 0.8543435693198933,
+            "interval_mean_rmse": 0.8543395188279425,
             "maximum_error": 1.817337526205451,
             "gates": {
               "0": {
@@ -570,7 +570,7 @@
         },
         "delayed_models": {
           "P305_delay7": {
-            "interval_mean_rmse": 0.03156201876911414,
+            "interval_mean_rmse": 0.03155900460484631,
             "maximum_error": 0.4102423854917472
           },
           "V305_delay7": {
@@ -706,7 +706,7 @@
         "events": 549,
         "duration_s": 117.679,
         "progress_direct_max_separation": 0.009299231468366642,
-        "immediate_delayed_max_separation": 0.0047990311269465735,
+        "immediate_delayed_max_separation": 0.003934720572354777,
         "direct_immediate_delayed_max_separation": 0.0014098141448259938,
         "progress_direct_separating_intervals": {
           "0": 0,
@@ -716,7 +716,7 @@
         },
         "models": {
           "P305": {
-            "interval_mean_rmse": 0.02849949880868141,
+            "interval_mean_rmse": 0.028502618856674718,
             "maximum_error": 0.8371742050247848,
             "gates": {
               "0": {
@@ -760,7 +760,7 @@
             }
           },
           "P0": {
-            "interval_mean_rmse": 0.4349522337364234,
+            "interval_mean_rmse": 0.434950408977558,
             "maximum_error": 2.6720234495616104,
             "gates": {
               "0": {
@@ -782,7 +782,7 @@
             }
           },
           "P390": {
-            "interval_mean_rmse": 0.11635745035695924,
+            "interval_mean_rmse": 0.11636224515465912,
             "maximum_error": 0.6739765266064222,
             "gates": {
               "0": {
@@ -804,7 +804,7 @@
             }
           },
           "P305_equal": {
-            "interval_mean_rmse": 0.41452708970136837,
+            "interval_mean_rmse": 0.41453020974936167,
             "maximum_error": 1.96470379425201,
             "gates": {
               "0": {
@@ -826,7 +826,7 @@
             }
           },
           "P305_offline": {
-            "interval_mean_rmse": 0.8819645766901081,
+            "interval_mean_rmse": 0.8819630037754145,
             "maximum_error": 2.375199161425577,
             "gates": {
               "0": {
@@ -850,7 +850,7 @@
         },
         "delayed_models": {
           "P305_delay7": {
-            "interval_mean_rmse": 0.028499789872188933,
+            "interval_mean_rmse": 0.02849848322648103,
             "maximum_error": 0.8371742050247857
           },
           "V305_delay7": {
@@ -2017,7 +2017,7 @@
     "events": 691,
     "duration_s": 155.887,
     "progress_direct_max_separation": 0.009299231468366642,
-    "immediate_delayed_max_separation": 0.0047990311269465735,
+    "immediate_delayed_max_separation": 0.003934720572354777,
     "direct_immediate_delayed_max_separation": 0.0014098141448259938,
     "progress_direct_separating_intervals": {
       "0": 0,
@@ -2027,7 +2027,7 @@
     },
     "models": {
       "P305": {
-        "interval_mean_rmse": 0.028332247547699488,
+        "interval_mean_rmse": 0.028336590279915988,
         "maximum_error": 0.8371742050247848,
         "gates": {
           "0": {
@@ -2071,7 +2071,7 @@
         }
       },
       "P0": {
-        "interval_mean_rmse": 0.47216228436371405,
+        "interval_mean_rmse": 0.4721610176003881,
         "maximum_error": 2.9856655124924316,
         "gates": {
           "0": {
@@ -2093,7 +2093,7 @@
         }
       },
       "P390": {
-        "interval_mean_rmse": 0.12379910180413851,
+        "interval_mean_rmse": 0.12380504222646302,
         "maximum_error": 0.6739765266064222,
         "gates": {
           "0": {
@@ -2115,7 +2115,7 @@
         }
       },
       "P305_equal": {
-        "interval_mean_rmse": 0.4022718532767395,
+        "interval_mean_rmse": 0.402276196008956,
         "maximum_error": 1.96470379425201,
         "gates": {
           "0": {
@@ -2137,7 +2137,7 @@
         }
       },
       "P305_offline": {
-        "interval_mean_rmse": 0.8701071619957143,
+        "interval_mean_rmse": 0.8701049155612056,
         "maximum_error": 2.375199161425577,
         "gates": {
           "0": {
@@ -2161,7 +2161,7 @@
     },
     "delayed_models": {
       "P305_delay7": {
-        "interval_mean_rmse": 0.02834086709473656,
+        "interval_mean_rmse": 0.028337838482078014,
         "maximum_error": 0.8371742050247857
       },
       "V305_delay7": {
@@ -2487,12 +2487,12 @@
         },
         "event_type": "growth",
         "progress_direct_max_separation": 0.005729597687485821,
-        "immediate_delayed_max_separation": 0.0043829127349681585,
+        "immediate_delayed_max_separation": 0.001114354076793056,
         "direct_immediate_delayed_max_separation": 0.0013037480161894877,
         "delayed_models": {
           "P305_delay7": {
-            "rmse": 0.027646404807257448,
-            "maximum_error": 0.05240558881033319
+            "rmse": 0.0268856178647394,
+            "maximum_error": 0.04913703015215809
           },
           "V305_delay7": {
             "rmse": 0.029582576571855167,
@@ -2521,7 +2521,7 @@
         "events": 1,
         "models": {
           "P305": {
-            "rmse": 0.030553350869556937,
+            "rmse": 0.030532529515679644,
             "maximum_error": 0.05628554584547096,
             "gates": {
               "0": {
@@ -2565,7 +2565,7 @@
             }
           },
           "P0": {
-            "rmse": 0.10856555449865056,
+            "rmse": 0.10851251222808574,
             "maximum_error": 0.17512468720335583,
             "gates": {
               "0": {
@@ -2587,7 +2587,7 @@
             }
           },
           "P390": {
-            "rmse": 0.023907633631619397,
+            "rmse": 0.023949100190744508,
             "maximum_error": 0.04928920516672264,
             "gates": {
               "0": {
@@ -2609,7 +2609,7 @@
             }
           },
           "P305_equal": {
-            "rmse": 0.030553350869556937,
+            "rmse": 0.030532529515679644,
             "maximum_error": 0.05628554584547096,
             "gates": {
               "0": {
@@ -2654,8 +2654,8 @@
           }
         },
         "event_type": "loss",
-        "progress_direct_max_separation": 0.0005058582102641651,
-        "immediate_delayed_max_separation": 0.00029794968709495606,
+        "progress_direct_max_separation": 0.0005058582102659415,
+        "immediate_delayed_max_separation": 0.0005058582102641651,
         "direct_immediate_delayed_max_separation": 0.00034650011017589577,
         "delayed_models": {
           "P305_delay7": {
@@ -3161,11 +3161,11 @@
         },
         "event_type": "growth",
         "progress_direct_max_separation": 0.0008463794351349918,
-        "immediate_delayed_max_separation": 0.0004979135954350511,
+        "immediate_delayed_max_separation": 0.0002996399852506215,
         "direct_immediate_delayed_max_separation": 0.0003484658396999407,
         "delayed_models": {
           "P305_delay7": {
-            "rmse": 0.3899550818339867,
+            "rmse": 0.38988117129239147,
             "maximum_error": 0.4102423854917472
           },
           "V305_delay7": {

@@ -206,7 +206,7 @@ def trajectory(row, model, event_shift_ms=0):
     points = row["points"]
     n, v, t = points[0][2], points[0][1], points[0][0]
     q = min(1., max(0., (v - base(n)) / (14 - base(n))))
-    events = [[max(t, e[0]+event_shift_ms), e[1]] for e in row["events"]]
+    events = [(max(t, e[0]+event_shift_ms), e[2], e[1]) for e in row["events"]]
     ei, output = 0, [v]
 
     def advance(dt):
@@ -222,11 +222,15 @@ def trajectory(row, model, event_shift_ms=0):
             v = base(n) + (14-base(n))*q
 
     for p in points[1:]:
-        while ei < len(events) and events[ei][0] <= p[0]:
-            et, nn = events[ei]
+        while ei < len(events) and events[ei][:2] <= (p[0], p[3]):
+            et, _, nn = events[ei]
             advance((et-t)/1000)
             t, n = et, nn
-            # The first subsequent positive-time advance refreshes progress speed.
+            # PLAN candidates 1/3..5/7: immediate count effect recomposes
+            # interior progress without advancing q. Idle q=0 retains speed;
+            # V305 has no size-induced instantaneous refresh.
+            if model != "V305" and 0 < q < 1:
+                v = base(n) + (14-base(n))*q
             ei += 1
         advance((p[0]-t)/1000)
         t = p[0]

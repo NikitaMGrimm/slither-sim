@@ -163,14 +163,26 @@ integrates the frozen law through every count event. P305 retains q and refreshe
 speed from size while q moves; V305 integrates speed directly. There is no
 per-event reinitialization, parameter fit or selected favorable residual.
 
+For same-timestamp packets, prediction compares `(server_ms, packet_ordinal)`:
+a count after a speed report cannot affect that report, while a count before it
+is already effective. [PLAN.md, candidates 1 and 7](PLAN.md#exact-competing-predictions)
+state `v=b(n)+g(n)*q` and size effective "immediately at its received event";
+candidates 3..5 inherit the progress rule. We therefore recompose speed on a
+count change at interior `0<q<1`, without advancing q even if elapsed time is
+zero. V305 retains direct speed, idle q=0 retains stored speed, and full q=1
+remains 14. Ties introduced by shifted events also keep original ordinals.
+The plan does not explicitly spell out zero-elapsed packet ties; this is the
+immediate-event interpretation used here, not an amendment to its literal
+wording or a newly established authoritative server phase.
+
 | Model | Mean interval speed RMSE | Maximum speed error |
 | --- | ---: | ---: |
-| P305, normalized progress | .02833 | .83717 |
+| P305, normalized progress | .02834 | .83717 |
 | V305, direct speed | .02842 | .83679 |
 | P0 | .47216 | 2.98567 |
-| P390 | .12380 | .67398 |
-| Equal rates | .40227 | 1.96470 |
-| Offline 1.3 | .87011 | 2.37520 |
+| P390 | .12381 | .67398 |
+| Equal rates | .40228 | 1.96470 |
+| Offline 1.3 | .87010 | 2.37520 |
 
 The **maximum P305/V305 prediction separation is .0092992**, only **0.1674
 speed bytes**. Zero intervals separate them at any frozen sensitivity, including
@@ -191,7 +203,7 @@ are retained in selected JSON: a 7..8-segment rise, maximum error .41024, and a
 cases, so these residuals do not identify a correction to the growth rule.
 
 For old/new-size sensitivity, shifting every count's effect by one 7-ms loop
-changes P305 predictions by at most **.0047990** wire units; the direct-speed
+changes P305 predictions by at most **.0039347** wire units; the direct-speed
 analogue and both delayed-model scores are retained in JSON. This comparison
 cannot identify which size the authoritative server samples. The current
 simulator samples speed before boost loss and anchor growth; that source-order
@@ -292,6 +304,33 @@ Retained authoring failures/corrections:
   intermediate results remain outside Git.
 - The power calculation was tightened to allow growth to lengthen a rise;
   using only its initial-size duration would not be a valid growth ceiling.
+- A subsequent review found that prediction discarded retained packet ordinals
+  and deferred normalized-progress recomposition to positive elapsed time.
+  Both defects are corrected as described above. Four new trajectory regression
+  methods cover count packets before/after same-timestamp reports, both ramp
+  directions, growth/loss, all scored candidates, shifted ties and endpoints.
+  The previous predictor fails the new ordering regressions; the corrected
+  predictor passes. The complete three-archive analysis was regenerated in a
+  fresh external output directory; prior outputs remain retained.
+
+The packet-order correction changes the following point scores, with **no
+conclusion flip**:
+
+| Quantity | Before correction | After correction |
+| --- | ---: | ---: |
+| Size-crossing intervals / count events | 387 / 691 | 387 / 691 |
+| Maximum P305/V305 separation, wire units | .009299231468 | .009299231468 |
+| Same separation / one speed byte | .167386166431 | .167386166431 |
+| P305 mean interval RMSE | .028332247548 | .028336590280 |
+| P305 immediate/delayed maximum separation | .004799031127 | .003934720572 |
+| V305 mean interval RMSE | .028422602970 | .028422602970 |
+| Capture schedules / passing at j>=7 ms | 72 / 0 | 72 / 0 |
+
+All fixed-size scores, extracted input-row hashes, compatibility gates and the full
+power result remain unchanged. The speed-byte comparison is still under a
+fifth of a byte; no capture is proposed and no mechanics correction is supported.
+The owner's changelog and research-index wording from `f2b4d884` is preserved:
+none of the numbers or comparisons in those entries changed.
 
 Reproduce with access to the three pinned archives, using a fresh external
 output directory and their historical relative source names:
@@ -311,7 +350,7 @@ Tests use authored arithmetic/selection/lifecycle cases and archived inputs;
 they do not establish authoritative server internals. No fresh held-out,
 prospective, phone or browser validation is claimed.
 
-Local verification: **16 analysis tests and seven documentation tests pass**;
+Local verification: **20 analysis tests and seven documentation tests pass**;
 the complete three-archive extraction reproduces all fixture intervals and the
 selected JSON's source/tool hashes and totals verify. `git diff --check` passes.
 Rust suites were not run because no Rust/runtime/fixture/contract file changed.

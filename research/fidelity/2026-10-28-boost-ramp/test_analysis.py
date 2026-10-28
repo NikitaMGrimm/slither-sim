@@ -47,6 +47,50 @@ class AnalysisTests(unittest.TestCase):
         r = row(events=[[100,100,4]])
         self.assertNotEqual(a.trajectory(r,"P305",7),a.trajectory(r,"P305"))
 
+    def test_trajectory_count_before_same_timestamp_report(self):
+        for model in a.MODELS[:-1]:
+            for up in (True, False):
+                for nn in (36, 38):
+                    with self.subTest(model=model, up=up, count=nn):
+                        r = dict(up=up, points=[[0,8,37,1],[42,8,nn,4],[84,8,nn,6]],
+                                 events=[[42,nn,3]])
+                        q = (8-a.base(37))/(14-a.base(37)) + a.rate(37,up,model)/(14-a.base(37))*.042
+                        expected = 8+a.rate(37,up,model)*.042 if model == "V305" else a.base(nn)+(14-a.base(nn))*q
+                        predicted = a.trajectory(r,model)
+                        self.assertAlmostEqual(predicted[1],expected, places=12)
+                        self.assertAlmostEqual(predicted[2],expected+a.rate(nn,up,model)*.042, places=12)
+
+    def test_trajectory_count_after_same_timestamp_report(self):
+        for model in a.MODELS[:-1]:
+            for up in (True, False):
+                for nn in (36, 38):
+                    with self.subTest(model=model, up=up, count=nn):
+                        r = dict(up=up, points=[[0,8,37,1],[42,8,37,4],[42,8,nn,6],[84,8,nn,8]],
+                                 events=[[42,nn,5]])
+                        old = 8+a.rate(37,up,model)*.042
+                        q = (old-a.base(37))/(14-a.base(37))
+                        new = old if model == "V305" else a.base(nn)+(14-a.base(nn))*q
+                        predicted = a.trajectory(r,model)
+                        self.assertAlmostEqual(predicted[1],old, places=12)
+                        self.assertAlmostEqual(predicted[2],new, places=12)
+                        self.assertAlmostEqual(predicted[3],new+a.rate(nn,up,model)*.042, places=12)
+
+    def test_trajectory_shifted_count_tie_keeps_packet_ordinal(self):
+        for ordinal, count in ((3,38),(5,37)):
+            with self.subTest(ordinal=ordinal):
+                r = dict(up=True, points=[[0,8,37,1],[42,8,count,4],[84,8,38,6]],
+                         events=[[35,38,ordinal]])
+                q = (8-a.base(37))/(14-a.base(37)) + a.rate(37,True)/(14-a.base(37))*.042
+                self.assertAlmostEqual(a.trajectory(r,"P305",7)[1],a.base(count)+(14-a.base(count))*q, places=12)
+
+    def test_trajectory_zero_elapsed_count_preserves_idle_and_full_endpoints(self):
+        for up in (True,False):
+            for initial in (a.base(37)-.1,14):
+                r = dict(up=up, points=[[0,initial,37,1],[0,initial,38,3]], events=[[0,38,2]])
+                for model in a.MODELS[:-1]:
+                    with self.subTest(up=up,initial=initial,model=model):
+                        self.assertEqual(a.trajectory(r,model)[1],initial)
+
     def test_selector_trims_both_endpoints(self):
         selected = list(a.runs(row()["points"]))
         self.assertEqual(len(selected),1)
