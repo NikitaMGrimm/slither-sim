@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.7.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.0...v0.7.1) - 2026-10-28
+
 ### Added
 
 - A study of how the simulator's cost grows from 500 to 10,000 snakes on one
