@@ -9,6 +9,11 @@ import { reserveOrdinal } from './selection.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const ignored = new Set(['TIME-WAIT', 'CLOSED', 'LISTEN', 'BOUND']);
+export async function boundedDelay(deadline, maximum, { now = () => performance.now(), sleep = pause } = {}) {
+  const remaining = deadline - now();
+  if (remaining > 0) await sleep(Math.min(maximum, remaining));
+  return now() >= deadline;
+}
 export function classify(snapshot, endpoint, beforeLaunch = false) {
   if (!snapshot.windows?.ok || !snapshot.remote?.ok) throw Error('connection census unavailable');
   const owned = new Set(snapshot.remote.ownedPids.map(String));
@@ -126,7 +131,8 @@ export async function run(root, instance, { captureFile = path.join(HERE, 'captu
       if (state.conflicts.length) throw Error('post-launch connection conflict');
       if (failure) throw failure;
       if (fs.existsSync(path.join(root, 'STUDY-STOP.json'))) throw Error('capture permanent stop');
-      await pause(250);
+      const expired = await boundedDelay(started + 1200000, 250);
+      if (expired && !ended) throw Error('hard invocation deadline');
     }
     childExit = await exited;
     if (childExit.code !== 0) throw Error('capture child failed');
@@ -138,7 +144,7 @@ export async function run(root, instance, { captureFile = path.join(HERE, 'captu
     // considering another invocation. The next invocation has its own preflight.
     const last = read()?.sequence;
     while (read()?.sequence === last) {
-      await pause(100);
+      await boundedDelay(started + 1200000, 100);
       if (interrupted || performance.now() - started >= 1200000) throw Error('post-close census deadline');
     }
     const final = await check(false);
@@ -151,7 +157,9 @@ export async function run(root, instance, { captureFile = path.join(HERE, 'captu
       if (!fs.existsSync(path.join(root, 'STOP'))) fs.writeFileSync(path.join(root, 'STOP'), String(error), { flag: 'wx' });
       const remaining = Math.max(0, 1200000 - (performance.now() - started));
       const until = performance.now() + Math.min(5000, remaining);
-      while (!ended && performance.now() < until) await pause(50);
+      while (!ended && performance.now() < until) {
+        if (await boundedDelay(until, 50)) break;
+      }
       if (!ended) child.kill('SIGKILL');
       await exited;
     }

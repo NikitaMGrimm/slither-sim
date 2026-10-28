@@ -20,8 +20,8 @@
     "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
     "research/fidelity/2026-10-28-turn-offset-capture/preflight.ps1": "360988b0a7b291013eba8b4ccd704a6a3f4683cfa6f992721b20c2617a31fdc0",
     "research/fidelity/2026-10-28-turn-offset-capture/preflight.test.ps1": "8a61ccb3cd6eab5a08598393bb972d9ebdf1244942f3c39f0d4e588e924aade2",
-    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.mjs": "95e5fe53d3f2182279ccd92f2642af76806854f441ecd3302a74dd038b45fa99",
-    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.test.mjs": "30de1a32e01c57d3ecb651a793619f0606a48387fb0d0abd47f4ffbab99a8929",
+    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.mjs": "c0b03d9b241405656c17c365ab5608e42890f6816697d09e179877fbcc3a1a1d",
+    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.test.mjs": "f00f5614fd2d230df566be27b39e147009a4cc7d44e9cf25651b6b76778c491d",
     "research/fidelity/2026-10-28-turn-offset-capture/connection-probe.sh": "4dc18fb05697fa63d85c30e648fec5dec384bc42e3790fe19be1d036a8fc3f95",
     "research/fidelity/2026-10-28-turn-offset-capture/connection-monitor.ps1": "5687156f7a428ba4b4b99fa69c59645d2daac1c8fe9b454462ca23e4ee73a3c5"
   },

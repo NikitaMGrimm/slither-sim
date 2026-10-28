@@ -3,9 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { classify, preflight, snapshotReader, run } from './container-guard.mjs';
+import { classify, preflight, snapshotReader, run, boundedDelay } from './container-guard.mjs';
 const sample = ss => ({ windows: { ok: true, connections: [] },
   remote: { ok: true, ss, ownedPids: [21, 22], commandLines: { 99: 'authored foreign command' } } });
+test('poll and drain sleeps clamp to their remaining budget', async () => {
+  for (const maximum of [250, 100, 50]) {
+    let tick = 1199990; const delays = [];
+    const options = { now: () => tick, sleep: async ms => { delays.push(ms); tick += ms; } };
+    assert(await boundedDelay(1200000, maximum, options));
+    assert.deepEqual(delays, [10]); assert.equal(tick, 1200000);
+    assert(await boundedDelay(1200000, maximum, options)); assert.deepEqual(delays, [10]);
+  }
+});
 test('fresh preflight permits no connection and admits only two owned connections during capture', () => {
   assert.equal(classify(sample(''), 'peer:7', true).conflicts.length, 0);
   const line = 'ESTAB 0 0 local:8 peer:7 users:(("node",pid=22,fd=4))';
