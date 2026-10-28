@@ -1,14 +1,17 @@
 # Persistent Linux readiness, 2026-10-27
 
-**Keep #235 held.** Seven native pairs have mixed CPU results; added post-window
-telemetry catches a shorter candidate-only CPU/backlog burst. The original
-39-deferral stall remains unexplained. No latency/capacity improvement is claimed.
+**Rejected runtime experiment: the saving was not reproduced, and both candidate
+bursts remain unexplained.** This research-only record preserves the prototype;
+production sources are unchanged. No latency/capacity improvement is claimed.
 No hold was replaced or excluded. [Selected results](results.json), [plan](PLAN.md).
 
 Measured runtime: `4532a76f22958ae3abcca801e90edd30ed9f466f` ->
-`e10a20abb4f2b2fc072560787e20d918954a31ba`. The branch merges main through
-`f9154e92`, including #230/#231: those changes are **outside this frozen
-comparison**. Gateway/readiness sources remain the measured candidate.
+`e10a20abb4f2b2fc072560787e20d918954a31ba`. [prototype.patch](prototype.patch)
+is their exact runtime/test diff. Apply it to base
+`4532a76f22958ae3abcca801e90edd30ed9f466f` with
+`git -c core.autocrlf=false apply /path/to/prototype.patch` in a separate checkout.
+Application was checked to reproduce the candidate's complete Git tree exactly;
+the patch hash/tree are in results.json. Later main changes are unmeasured.
 
 ## Seven pairs
 
@@ -18,7 +21,7 @@ latency. Host CPU 0, one load shard on CPU 1, one build job. Original run.sh byt
 benchmark lock, owned adapter, port 18934. All fourteen arms pass traffic,
 affinity and generator-headroom gates.
 
-| Pair, order | Base CPU ms/tick | Candidate | Excess p 99 base/candidate ms | Deferred base/candidate |
+| Pair, order | Base CPU ms/tick | Candidate | Excess p99 base/candidate ms | Deferred base/candidate |
 | --- | ---: | ---: | --- | --- |
 | 1, AB | 4.4785 | 4.3665 | 10.171 / 470.346 | 0 / 39 |
 | 2, BA | 4.0594 | 3.8467 | 7.799 / 6.409 | 0 / 0 |
@@ -38,17 +41,15 @@ Pairs 1–3 retain their original binaries, 15 s warmup/120 s hold. Before pairs
 commit `3a2e3e7d` froze BA/AB/BA/AB, symmetric diagnostic rebuilds, the same
 warmup/primary window and 30 s of continued host/load controls afterward. Primary
 CPU boundaries/frame records remain clipped to 120 s. Original and diagnostic
-binary/load/probe hashes are separate. Every added arm retains 500 living snakes
-through both windows, with zero births/deaths inside either; generator CPU
-67.9–72.3%. All post-windows have zero deferrals.
+hashes are separate. Added arms retain 500 living snakes, zero births/deaths and
+zero deferrals in both windows; generator CPU67.9–72.3%.
 
 ## Retained-data diagnosis
 
 All six originals retain per-second completed ticks, /proc process/thread CPU,
 aggregate/CPU 0 busy and steal, and client lifecycle bins. World segments/mass/food
 and all-process inventories were **not recorded** and cannot be reconstructed
-from timings or sampled controls. Full second-by-second reductions remain local;
-JSON keeps selected comparisons.
+from timings or sampled controls. Full seconds stay local; JSON keeps comparisons.
 
 Simulation CPU/tick rises **before** backlog/deferrals: about 2.59 ms at 100.17 s,
 2.97 at 102.20 s and 3.13 at 104.22 s, while relative lag is within about one tick.
@@ -61,9 +62,9 @@ from slower execution.
 
 The other five holds span 2.05–2.52 simulation CPU ms/tick early and 2.39–2.78 in
 the final sampled window, against 2.24 ->4.06 in the bad hold. Only that hold has
-primary rejoins/deaths (10/11), following the initial cost rise, and finishes 499
-playing. Client bins omit the incomplete terminal interval; hold totals are
-authoritative. Host player counts measure connections, not exact living snakes.
+primary rejoins/deaths (10/11) after the cost rise, finishing 499 playing. Bins
+omit the terminal partial interval; hold totals are authoritative. Host player
+counts measure connections, not living snakes.
 
 Throughout **all six** originals, aggregate accounting shows about two cores
 of unattributed guest CPU beyond host+load (202–204% of one core). CPU 0 residual
@@ -86,7 +87,7 @@ a shorter post-window burst at primary seconds 136–138:
 | 137.340 | 127 | 4.724 | 3.228 | 100.0 | 34 |
 | 138.357 | 173 | 2.601 | 2.081 | 79.7 | 0 |
 
-Intervals are about 1.02 s; separately timed world snapshots are within 0.5 s.
+Intervals are about 1.02 s; world snapshots are within 0.5 s.
 Backlog 34 is about 238 ms of scheduled ticks; it clears without deferral. Post
 maximum start gap 14.158 ms, busy 14.156 ms. This resembles the original cost/catch-up
 shape at shorter duration; it does not establish read starvation or a mechanism.
@@ -97,7 +98,10 @@ show no discrete jump. There is no competing-process CPU or sampled CPU 0 steal
 spike. Counts omit spatial clustering, allocation events and execution conditions
 outside the guest: the trigger remains unclassified.
 
-The inventory does catch concurrent, non-owned work despite the correctly shared
+Measurement validity is limited by concurrent compiler activity in some holds
+and about two extra busy cores in all original holds: the shared lock did not
+ensure an otherwise quiet bench. Workload gates passing do not establish isolation.
+The inventory catches concurrent, non-owned work despite the correctly shared
 lock: rustc averages 54.5%/89.8% of a core in pair 4 base's primary/post windows,
 and 77.5%/32.5% in pair 7 candidate. A simulation study child averages 5.8% in pair 5
 base. Short-lived processes can be missed, so these are sampled lower bounds.
@@ -105,34 +109,37 @@ Node/cloudflared are typically below 1% each. All affected holds remain included
 Different live radii, food and mass further limit attribution; per-arm ranges
 are selected in JSON.
 
-The diagnostic death field initially summed an already cumulative history. The
-driver was paused while the running hold continued; recovery was validated before
-resuming without changing binaries/order or replacing holds. Analysis uses births
-minus alive before shutdown: empty initial world, death-only reconnects, no
-errors, monotone counts and load-counter agreement. Erroneous integrated history
-is retained raw. /proc CPU counters are 10 ms-quantized; tick busy is wall time.
+The study's own builds finished before the holds; its integration-check builds
+started after the series. The sampler retained process names/CPU, not project,
+parent or operator identity, so the overlapping compiler's ownership is unknown.
 
-Recommendation: retain the hold. The exact threshold episode did not recur,
-but a candidate-only marginal burst and mixed CPU results prevent a clean
-environmental/world-driven attribution or demonstrated steady CPU win. The
-owner decides landing; no further outcome-based reruns are added.
+The death probe summed cumulative history. The driver paused while the running
+hold continued; recovery was validated before resuming unchanged binaries/order.
+Deaths are births minus alive before shutdown: empty initial world, death-only
+reconnects, no errors, monotone/load-consistent counts. The erroneous field stays
+raw. /proc CPU is 10 ms-quantized; tick busy is wall time.
+
+Decision: reject the runtime change. Both bursts are in candidate holds (2/7,
+including the post-window burst) versus 0/7 base; the four added pairs do not
+reproduce a saving. The [kernel-tails study](../2026-10-27-host-kernel-tails/REPORT.md)
+puts c7a polling stacks at 2.88% of a core. An expected benefit of roughly 3%
+does not justify the unexplained tail risk. No further experiments are planned.
 
 ## Checks and reproduction
 
-Runtime patch unchanged: per-open ADD, compaction MOD, level-triggered zero-timeout
+Archived prototype: per-open ADD, compaction MOD, level-triggered zero-timeout
 query at the old snapshot point, original session-order loops and poll fallback.
-Fifteen complete stock/half 13/all 13/U and historical wire/state traces match at
+Fifteen complete stock/half13/all13/U and historical wire/state traces match at
 the measured refs. Original full Rust group:15 commands pass. Removing MOD fails
 the compaction oracle; restored tests pass. After merging main, native single-thread
-checks pass:46 server/readiness,21 loopback and 7 documentation tests. Fresh-head
-CI/review remain separate.
+checks passed:46 server/readiness,21 loopback and 7 documentation tests. These are
+historical prototype checks; the final research-only conversion needs docs checks.
 
-Original builds/traces: replay.py and setup-native.py with both archives and the
-retained native bench. Diagnostic run: put PLAN.md, followup-probes.py,
+Historical reproduction only: replay.py and setup-native.py use both archives and
+the retained bench. Put PLAN.md, followup-probes.py,
 setup-followup.py, followup-series.py and analyze-followup.py in a fresh sibling
 of the retained epoll-20261027 directory under ~/slither-bench/capacity. Run
 setup-followup.py, then followup-series.py smoke and pairs, then analyze-followup.py.
-Builds/holds take the same lock; scripts reject -O. The diagnostic probe remains
-frozen/reproducible; analysis contains the disclosed death correction. Full
-seconds, logs, binaries and sources stay local-only outside /tmp; no public raw
-download or machine identity.
+Builds/holds use the same lock; scripts reject -O. The frozen probe and analysis
+preserve the death correction. Full seconds/logs/binaries/sources stay local-only
+outside /tmp. No public raw download or further experiment is planned.
