@@ -409,7 +409,7 @@ impl Sink for Copies<'_, '_> {
         self.food.reserve(count);
     }
     fn food(&mut self, index: usize) {
-        self.food.push(self.world.food[index].clone());
+        self.food.push(self.world.food[index]);
     }
     fn prey(&mut self, index: usize) {
         self.prey.push(self.world.prey[index].clone());

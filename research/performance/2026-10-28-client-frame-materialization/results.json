@@ -1,0 +1,463 @@
+{
+  "baseline": "0aba6f97070a06c73b604869761d4c5c14965a78",
+  "500": {
+    "base": {
+      "broadcast": 65556.15782670127,
+      "decode": 13678.127764472458,
+      "frame": 43054.74802841883,
+      "policy": 59417.07945447075,
+      "metadata": 6658.301303698656,
+      "hud": 4865.192017476175,
+      "botDecisions": 99793,
+      "botStages": 181706.1130740633,
+      "nextFrame": 231058.92130710572,
+      "aliveRange": [
+        498,
+        500
+      ],
+      "pmuMinimumScheduled": 1.0,
+      "rowsSha256": "3845318f44e2413aa92ea2aefa2f8b1a01c1271bb56eefc1a72734fd31e34ea0"
+    },
+    "candidate": {
+      "broadcast": 65465.41024921588,
+      "decode": 14397.98642189332,
+      "frame": 36195.843896866514,
+      "policy": 59417.06983455754,
+      "metadata": 6681.08725060876,
+      "hud": 4959.238774262724,
+      "botDecisions": 99793,
+      "botStages": 175476.31040253324,
+      "nextFrame": 224773.12251360316,
+      "aliveRange": [
+        498,
+        500
+      ],
+      "pmuMinimumScheduled": 1.0,
+      "rowsSha256": "b68665d7141e3f260f8fbc056c990f7f6ada5efc6c33aebf526519554848a828"
+    },
+    "pairs": [
+      {
+        "repeat": -1,
+        "warmup": true,
+        "order": [
+          "base",
+          "candidate"
+        ],
+        "base": {
+          "instructions": 22878098302,
+          "perBotDecision": 229255.5419919233,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "926d3accf98f137a5d72cb03910cba605601eda14569088f02d80e0abc3ab279"
+        },
+        "candidate": {
+          "instructions": 22254995690,
+          "perBotDecision": 223011.59089314882,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "15877d95843c11a3ee6e101f64499c8d32be9a722b43a0d5cccba83136b5655f"
+        },
+        "ratio": 0.9727642304978851
+      },
+      {
+        "repeat": 0,
+        "warmup": false,
+        "order": [
+          "candidate",
+          "base"
+        ],
+        "base": {
+          "instructions": 22877775015,
+          "perBotDecision": 229252.30241600113,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "ac05125d22caa5a024e4b5be80fc2bdc996e8b8b66ac04dab6ad0c36372d1509"
+        },
+        "candidate": {
+          "instructions": 22249424709,
+          "perBotDecision": 222955.765524636,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "107f245fc733c28ca0e54b0be10ad4ae959d59f2829bd9ac8b398038de276224"
+        },
+        "ratio": 0.972534466066389
+      },
+      {
+        "repeat": 1,
+        "warmup": false,
+        "order": [
+          "base",
+          "candidate"
+        ],
+        "base": {
+          "instructions": 22877878464,
+          "perBotDecision": 229253.3390518373,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "1c252eaa02fcb81638b7c21ec971f32c0178fb90d964abe5e5ae1a048023ad17"
+        },
+        "candidate": {
+          "instructions": 22249512283,
+          "perBotDecision": 222956.64308117804,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "3f973383d7be3290ee6c52933fe74d311b2c5939d68fa3136238908a404dfc3e"
+        },
+        "ratio": 0.972533896358057
+      },
+      {
+        "repeat": 2,
+        "warmup": false,
+        "order": [
+          "candidate",
+          "base"
+        ],
+        "base": {
+          "instructions": 22877818940,
+          "perBotDecision": 229252.74257713466,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "3a3ee7acdca3ec6f87f678e0c531bf76646e51086e7973d468b1b36b385a8cea"
+        },
+        "candidate": {
+          "instructions": 22249432188,
+          "perBotDecision": 222955.84046977243,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "7dd565f6a9635e0c9f624bd20714903cbca65aedd406323d0773f7ffd013f2d8"
+        },
+        "ratio": 0.9725329257282775
+      },
+      {
+        "repeat": 3,
+        "warmup": false,
+        "order": [
+          "base",
+          "candidate"
+        ],
+        "base": {
+          "instructions": 22877871313,
+          "perBotDecision": 229253.26739350456,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "1f7e711b23c47654fa4c4c35c737f9e9881b4adade1472d9cb4fa9b5f09d223d"
+        },
+        "candidate": {
+          "instructions": 22249488272,
+          "perBotDecision": 222956.40247311935,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "284722d28af026bd8904df18575b0efcc2a2c0e7294e692b1a1b22b0e9d24d92"
+        },
+        "ratio": 0.9725331508162243
+      },
+      {
+        "repeat": 4,
+        "warmup": false,
+        "order": [
+          "candidate",
+          "base"
+        ],
+        "base": {
+          "instructions": 22877897614,
+          "perBotDecision": 229253.53094906456,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "3e9a6df144554282edf5047555754b55099076ccffab28956d0ba7dc09ed70cc"
+        },
+        "candidate": {
+          "instructions": 22249480523,
+          "perBotDecision": 222956.32482238233,
+          "pmuMinimumScheduled": 1.0,
+          "rowsSha256": "f69332b5ccb5137c6b75213bebe089a2cfb599098bbf5c653ee6bde07a07e7c9"
+        },
+        "ratio": 0.9725316940567369
+      }
+    ],
+    "medianRatio": 0.9725331508162243,
+    "ratioRange": [
+      0.9725316940567369,
+      0.972534466066389
+    ],
+    "perBotDecisionMedians": {
+      "base": 229253.26739350456,
+      "candidate": 222956.32482238233
+    },
+    "trace": {
+      "candidate": "5fcf1ae34b5a017c7d5349797ce0f0a7795e7ead432933e5d6b13e527bce3bf5",
+      "base": "5fcf1ae34b5a017c7d5349797ce0f0a7795e7ead432933e5d6b13e527bce3bf5",
+      "world.json": "91cac494d195aaa23fbc84296883bfea656d50358b31a7ac6a126586f88026c2"
+    }
+  },
+  "matrix": [
+    {
+      "case": "step-default",
+      "iterations": 32,
+      "base": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+      "candidate": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c"
+    },
+    {
+      "case": "step-food",
+      "iterations": 32,
+      "base": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+      "candidate": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807"
+    },
+    {
+      "case": "step-body",
+      "iterations": 32,
+      "base": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+      "candidate": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5"
+    },
+    {
+      "case": "observe",
+      "iterations": 32,
+      "base": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+      "candidate": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc"
+    },
+    {
+      "case": "portable",
+      "iterations": 32,
+      "base": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+      "candidate": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e"
+    },
+    {
+      "case": "protocol",
+      "iterations": 32,
+      "base": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+      "candidate": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"
+    },
+    {
+      "case": "sandbox-16-step",
+      "iterations": 32,
+      "base": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+      "candidate": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe"
+    },
+    {
+      "case": "sandbox-16-bot",
+      "iterations": 24,
+      "base": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+      "candidate": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b"
+    },
+    {
+      "case": "official-30-step",
+      "iterations": 32,
+      "base": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+      "candidate": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad"
+    },
+    {
+      "case": "official-30-bot",
+      "iterations": 16,
+      "base": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+      "candidate": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be"
+    },
+    {
+      "case": "official-100-step",
+      "iterations": 16,
+      "base": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+      "candidate": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780"
+    },
+    {
+      "case": "official-100-bot",
+      "iterations": 4,
+      "base": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+      "candidate": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f"
+    },
+    {
+      "case": "official-200-step",
+      "iterations": 8,
+      "base": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+      "candidate": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d"
+    },
+    {
+      "case": "official-200-bot",
+      "iterations": 2,
+      "base": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+      "candidate": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af"
+    },
+    {
+      "case": "official-500-step",
+      "iterations": 4,
+      "base": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+      "candidate": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e"
+    },
+    {
+      "case": "official-500-bot",
+      "iterations": 1,
+      "base": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+      "candidate": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820"
+    },
+    {
+      "case": "battledome-32-step",
+      "iterations": 16,
+      "base": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+      "candidate": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e"
+    },
+    {
+      "case": "battledome-32-bot",
+      "iterations": 4,
+      "base": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+      "candidate": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250"
+    },
+    {
+      "case": "official-128-step",
+      "iterations": 16,
+      "base": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+      "candidate": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98"
+    },
+    {
+      "case": "official-128-bot",
+      "iterations": 3,
+      "base": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+      "candidate": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1"
+    },
+    {
+      "case": "client-battledome-64",
+      "iterations": 4,
+      "base": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+      "candidate": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a"
+    },
+    {
+      "case": "client-official-500",
+      "iterations": 1,
+      "base": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+      "candidate": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df"
+    },
+    {
+      "case": "shared-forager-a4-mean-8",
+      "iterations": 16,
+      "base": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+      "candidate": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943"
+    }
+  ],
+  "traceValidation": {
+    "population": 500,
+    "decisions": 1200,
+    "backgroundActions": 597804,
+    "worldSnapshots": 202,
+    "controlledFrames": 1200,
+    "complete": true,
+    "byteIdentical": true,
+    "sha256": "5fcf1ae34b5a017c7d5349797ce0f0a7795e7ead432933e5d6b13e527bce3bf5"
+  },
+  "builds": {
+    "base": {
+      "runtimeCommit": "0aba6f97070a06c73b604869761d4c5c14965a78",
+      "archiveSha256": "c7070d46497f93a3d9635c77f75ab968eb29d867f7da549e0c429cdf40b9666e",
+      "donorArchiveSha256": "ec90c7b7e796471b94211fc637dda34b1d18c506efef758ca15af214033ddaa4",
+      "driverSha256": "fcf949b074dab8df03d2de3020e0ace76f87b2201a3ca048d1f91d6a63cebdec",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "study_bots": "ddb94d6734841de271642fd77fed8203764d67e0609d749db085f71de403a7d6",
+        "perf_baseline": "64236ca99c350dabe4f64de337a8171c1fdcce4d669851e945c43cdbab83290f"
+      },
+      "generatedRustSourceHashes": {
+        "src/client/protocol.rs": "51ad8a7400fac4c86d78381bce2e74559aa2f1abddc93ae7425089b284576298",
+        "src/model.rs": "8504f2d2388898c74f70388887bd5e898c25440a0f6ab0da998127e2477ae6f1",
+        "src/client/simulation.rs": "70a7ba92f9a2251c4c1ab7e8e93347163f96f10df2e575c0a2289c02ac903288",
+        "src/client/simulation/study_bots.rs": "cc2e7498a337baf3ad79cf701f27b1e50fee523dbb64a0b307ae1f8446bf1385",
+        "src/study_counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e",
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069"
+      }
+    },
+    "base-profile": {
+      "runtimeCommit": "0aba6f97070a06c73b604869761d4c5c14965a78",
+      "archiveSha256": "c7070d46497f93a3d9635c77f75ab968eb29d867f7da549e0c429cdf40b9666e",
+      "donorArchiveSha256": "ec90c7b7e796471b94211fc637dda34b1d18c506efef758ca15af214033ddaa4",
+      "driverSha256": "fcf949b074dab8df03d2de3020e0ace76f87b2201a3ca048d1f91d6a63cebdec",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "study_bots": "95dd18d746ef529d83b7b2040df2d88141656c0542d81fe6a106350995a2fc60"
+      },
+      "generatedRustSourceHashes": {
+        "src/client/protocol.rs": "58ea674e33a7bcd3bf87ddd039f05ff51ed25942d888abae27449c24d293a998",
+        "src/model.rs": "8504f2d2388898c74f70388887bd5e898c25440a0f6ab0da998127e2477ae6f1",
+        "src/client/simulation.rs": "d86d841560eb44f0386fb2b68d109dda9a60c591ce0a3d5a6428ea38b232136d",
+        "src/client/simulation/study_bots.rs": "cc2e7498a337baf3ad79cf701f27b1e50fee523dbb64a0b307ae1f8446bf1385",
+        "src/study_counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e",
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069"
+      }
+    },
+    "candidate": {
+      "runtimeCommit": "64490e2edf6339221ed5aeacef126e90b0da0df7",
+      "archiveSha256": "f5fb8d7b7ff429a4de03deeb8ce4e94e568c3df8581ca08cd384ccd34fe64150",
+      "donorArchiveSha256": "ec90c7b7e796471b94211fc637dda34b1d18c506efef758ca15af214033ddaa4",
+      "driverSha256": "aef9f3958f697dd0afdf1024cb860f4ce87e45f380156e427e3fdaf81e9794f9",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "study_bots": "d9b6575a71c3bf4f671693653acbf1cdca528116047d7c3eafcf1e642c0fadc8",
+        "perf_baseline": "966cd87d7688dd2dfc78446a0bd1f6e4e935ee9705009fd39c5f24be811eb74f"
+      },
+      "generatedRustSourceHashes": {
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/client/simulation.rs": "70a7ba92f9a2251c4c1ab7e8e93347163f96f10df2e575c0a2289c02ac903288",
+        "src/client/simulation/study_bots.rs": "cc2e7498a337baf3ad79cf701f27b1e50fee523dbb64a0b307ae1f8446bf1385",
+        "src/study_counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e",
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069"
+      }
+    },
+    "candidate-profile": {
+      "runtimeCommit": "64490e2edf6339221ed5aeacef126e90b0da0df7",
+      "archiveSha256": "f5fb8d7b7ff429a4de03deeb8ce4e94e568c3df8581ca08cd384ccd34fe64150",
+      "donorArchiveSha256": "ec90c7b7e796471b94211fc637dda34b1d18c506efef758ca15af214033ddaa4",
+      "driverSha256": "aef9f3958f697dd0afdf1024cb860f4ce87e45f380156e427e3fdaf81e9794f9",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "study_bots": "f5c7c662397428e64db9fba9eccc8d6d1b6d1aeade635cc233fc7618a9519d04"
+      },
+      "generatedRustSourceHashes": {
+        "src/client/protocol.rs": "7c8ee53d7ebd869274312532caa018aa33ab5c3e931314322e9d151dead380a6",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/client/simulation.rs": "d86d841560eb44f0386fb2b68d109dda9a60c591ce0a3d5a6428ea38b232136d",
+        "src/client/simulation/study_bots.rs": "cc2e7498a337baf3ad79cf701f27b1e50fee523dbb64a0b307ae1f8446bf1385",
+        "src/study_counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e",
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069"
+      }
+    },
+    "trace-base": {
+      "runtimeCommit": "0aba6f97070a06c73b604869761d4c5c14965a78",
+      "archiveSha256": "c7070d46497f93a3d9635c77f75ab968eb29d867f7da549e0c429cdf40b9666e",
+      "donorArchiveSha256": "ec90c7b7e796471b94211fc637dda34b1d18c506efef758ca15af214033ddaa4",
+      "driverSha256": "89ae46743440a3b5540d8ec0ad9175bf9838fe65e6fb596b9c2a00620f5d8dda",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "study_bots": "7083849714c14b84beb9ef5571e957392fba848d11cc2b0d72b56e602677e6b5"
+      },
+      "generatedRustSourceHashes": {
+        "src/client/protocol.rs": "51ad8a7400fac4c86d78381bce2e74559aa2f1abddc93ae7425089b284576298",
+        "src/model.rs": "8504f2d2388898c74f70388887bd5e898c25440a0f6ab0da998127e2477ae6f1",
+        "src/client/simulation.rs": "70a7ba92f9a2251c4c1ab7e8e93347163f96f10df2e575c0a2289c02ac903288",
+        "src/client/simulation/study_bots.rs": "d5e16f3ca88196064a8c2009c3796f8d3368367ffdcc2bb44c11edf3d9133b5f",
+        "src/study_counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e",
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069"
+      }
+    },
+    "trace-candidate": {
+      "runtimeCommit": "64490e2edf6339221ed5aeacef126e90b0da0df7",
+      "archiveSha256": "f5fb8d7b7ff429a4de03deeb8ce4e94e568c3df8581ca08cd384ccd34fe64150",
+      "donorArchiveSha256": "ec90c7b7e796471b94211fc637dda34b1d18c506efef758ca15af214033ddaa4",
+      "driverSha256": "aef9f3958f697dd0afdf1024cb860f4ce87e45f380156e427e3fdaf81e9794f9",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "study_bots": "1731bc52a356732a3354e4fe94804012f5093b8ba7633f0d0e1ff7d005ee4409"
+      },
+      "generatedRustSourceHashes": {
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/client/simulation.rs": "70a7ba92f9a2251c4c1ab7e8e93347163f96f10df2e575c0a2289c02ac903288",
+        "src/client/simulation/study_bots.rs": "d5e16f3ca88196064a8c2009c3796f8d3368367ffdcc2bb44c11edf3d9133b5f",
+        "src/study_counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e",
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069"
+      }
+    }
+  },
+  "matrixBytesRechecked": true,
+  "complete": true
+}

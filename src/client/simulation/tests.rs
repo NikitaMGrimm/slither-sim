@@ -319,7 +319,7 @@ fn shrinking_food_and_surplus_prey_leave_both_decoded_client_views_without_picku
             .food_presentation
             .births(&[crate::FoodSpawnEvent {
                 source: Some(0),
-                food: food.clone(),
+                food: *food,
             }])
             .unwrap();
     }
@@ -423,10 +423,10 @@ fn shrinking_food_cull(pit_only: bool) {
         .food_presentation
         .births(&[crate::FoodSpawnEvent {
             source: Some(0),
-            food: outside[2].clone(),
+            food: outside[2],
         }])
         .unwrap();
-    let mut food = vec![quiet.clone(), edge.clone()];
+    let mut food = vec![quiet, edge];
     food.extend(outside.iter().cloned());
     sim.backend.world.replace_food(food).unwrap();
     run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 2);
@@ -438,12 +438,12 @@ fn shrinking_food_cull(pit_only: bool) {
         .food_presentation
         .births(&[crate::FoodSpawnEvent {
             source: None,
-            food: hidden.clone(),
+            food: hidden,
         }])
         .unwrap();
     let color = sim.backend.food_presentation.newest(&hidden);
     sim.backend.food_index.add(&hidden, false, color);
-    sim.backend.world.insert_food(hidden.clone()).unwrap();
+    sim.backend.world.insert_food(hidden).unwrap();
     let key = |food: &Food| encode::food_key(food.point()).unwrap();
     let sector = |food: &Food| usize::from(FoodIndex::sector(food).unwrap().0);
     assert_eq!(sector(&hidden), sector(&quiet));
@@ -1382,7 +1382,7 @@ fn ground_colors_are_shared_across_connections_and_reconnects() {
     let mut a = Remote::connect(&mut sim, 0, "A");
     let mut b = Remote::connect(&mut sim, 1, "B");
     run(&mut sim, &mut [(0, &mut a), (1, &mut b)], 12);
-    let food = sim
+    let food = *sim
         .backend
         .world
         .food()
@@ -1398,8 +1398,7 @@ fn ground_colors_are_shared_across_connections_and_reconnects() {
                     && food.point().distance(sim.backend.world.snakes()[slot].head) > 100.
             })
         })
-        .expect("shared ground food")
-        .clone();
+        .expect("shared ground food");
     let key = encode::food_key(food.point()).unwrap();
     let style = |sim: &RawSimulator, slot: usize| {
         sim.backend.slots[slot].connection.food[&[key[0], key[1]]][&[key[2], key[3]]].style
@@ -2356,7 +2355,7 @@ fn a_listing_shows_its_own_pellets_color_beside_a_hidden_older_one() {
     };
     let death = Food {
         origin: Some(Origin::Death),
-        ..ambient.clone()
+        ..ambient
     };
     // Find a seed whose ambient color differs from the death palette's.
     let (presentation, ambient_color, death_color) = (1..100)
@@ -2367,7 +2366,7 @@ fn a_listing_shows_its_own_pellets_color_beside_a_hidden_older_one() {
                 presentation
                     .births(&[crate::FoodSpawnEvent {
                         source,
-                        food: food.clone(),
+                        food: *food,
                     }])
                     .unwrap();
                 presentation.newest(food)

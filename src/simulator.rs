@@ -1706,7 +1706,7 @@ impl Simulator {
                                 if let Some(events) = &mut self.food_spawn_events {
                                     events.push(FoodSpawnEvent {
                                         source: Some(i),
-                                        food: pellet.clone(),
+                                        food: pellet,
                                     });
                                 }
                                 self.food_cache.push(&pellet);
@@ -2038,7 +2038,7 @@ impl Simulator {
             if let Some(events) = &mut self.pickup_events {
                 events.push(PickupEvent {
                     eater: i,
-                    item: PickupItem::Food(f.clone()),
+                    item: PickupItem::Food(*f),
                 });
             }
             let s = &mut self.snakes[i];
@@ -2133,7 +2133,7 @@ impl Simulator {
                             if let Some(events) = &mut self.food_spawn_events {
                                 events.push(FoodSpawnEvent {
                                     source: None,
-                                    food: f.clone(),
+                                    food: f,
                                 });
                             }
                             self.food_cache.push(&f);
@@ -2739,7 +2739,7 @@ impl Simulator {
             if let Some(events) = &mut self.food_spawn_events {
                 events.push(FoodSpawnEvent {
                     source: Some(index),
-                    food: pellet.clone(),
+                    food: pellet,
                 });
             }
             self.food_cache.push(&pellet);
@@ -3158,7 +3158,7 @@ mod food_pickup_order_tests {
                     .iter()
                     .enumerate()
                     .filter(|(i, _)| mask & (1 << i) == 0)
-                    .map(|(_, f)| f.clone())
+                    .map(|(_, f)| *f)
                     .collect();
                 compact_food(&mut actual, (0..len).filter(|i| mask & (1 << i) != 0));
                 assert_eq!(bits(&actual), bits(&expected), "len {len}, mask {mask}");
@@ -3179,7 +3179,7 @@ mod food_pickup_order_tests {
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| !removed.contains(i))
-                .map(|(_, f)| f.clone())
+                .map(|(_, f)| *f)
                 .collect();
             compact_food(&mut actual, removed.iter().copied());
             assert_eq!(bits(&actual), bits(&expected));

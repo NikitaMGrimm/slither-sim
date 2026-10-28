@@ -433,12 +433,7 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                     slither_sim::InitialSpeed::Infer(speed),
                 ),
             )],
-            food: f
-                .initial
-                .food
-                .iter()
-                .map(|named| named.food.clone())
-                .collect(),
+            food: f.initial.food.iter().map(|named| named.food).collect(),
             prey: Vec::new(),
         },
     )?;
@@ -497,11 +492,11 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                     if known.iter().any(|(id, _)| id == &event.id) {
                         return Err(fail(format!("food ID already live: {}", event.id)));
                     }
-                    let food = event.food.as_ref().expect("validated add food").clone();
+                    let food = *event.food.as_ref().expect("validated add food");
                     if !food.point().finite() {
                         return Err(fail("invalid added food position"));
                     }
-                    world.insert_food(food.clone())?;
+                    world.insert_food(food)?;
                     known.push((event.id.clone(), food));
                     write(
                         &mut out,
@@ -597,7 +592,7 @@ fn run(f: Fixture, mode: &str, mut out: impl Write) -> Result<(), Box<dyn Error>
                 known.push(before[index].clone());
             } else {
                 generated_id += 1;
-                known.push((format!("sim:{generated_id}"), food.clone()));
+                known.push((format!("sim:{generated_id}"), *food));
             }
         }
         let mut eaten_before: Vec<_> = before

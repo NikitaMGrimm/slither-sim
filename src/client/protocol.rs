@@ -22,6 +22,7 @@ use crate::{
 };
 use std::collections::{BTreeMap, VecDeque};
 use std::f64::consts::TAU;
+use std::sync::OnceLock;
 
 pub const PROTOCOL_VERSION: u8 = 19;
 /// Sent commands retained to interpret server replies; a local budget.
@@ -30,8 +31,6 @@ const MAX_SENT_COMMANDS: usize = 64;
 const PING_RANGE_SECONDS: f64 = 5.;
 /// The stock client sends a game ping only after more than 250 ms.
 const PING_INTERVAL_SECONDS: f64 = 0.25;
-/// Bound on motion reports retained between anchors for head extrapolation.
-const MAX_MOTION_STEPS: usize = 256;
 /// The stock `setMscps` extends its score tables by this many repeated entries.
 const SCORE_TABLE_EXTENSION: usize = 2048;
 /// Decoder retention budgets: a hostile or broken server cannot grow received
@@ -670,10 +669,11 @@ struct Side {
     body_known: bool,
     /// Server time of the last exactly received position.
     anchor_server: f64,
+    /// Head after completed motion intervals, in their original addition order.
     base: Point,
     base_server: f64,
-    /// `(server seconds, heading, speed)` reports since `base_server`.
-    steps: Vec<(f64, f64, f64)>,
+    heading: f64,
+    speed: f64,
     profile: Profile,
     appeared_at: f64,
     /// Last `(count, receipt)` kill report for this appearance; the stock client
@@ -681,35 +681,31 @@ struct Side {
     kills: Option<(u32, f64)>,
 }
 impl Side {
-    /// Last exact position advanced through the received headings and speeds.
+    /// Completed reports plus the current report's unfinished interval.
     fn head_at(&self, server: f64) -> Point {
         let mut head = self.base;
-        for (i, &(start, heading, speed)) in self.steps.iter().enumerate() {
-            let end = self.steps.get(i + 1).map_or(server, |step| step.0);
-            let dt = (end.min(server) - start.max(self.base_server)).max(0.);
-            head.x += heading.cos() * speed * dt;
-            head.y += heading.sin() * speed * dt;
-        }
+        let dt = (server - self.base_server).max(0.);
+        head.x += self.heading.cos() * self.speed * dt;
+        head.y += self.heading.sin() * self.speed * dt;
         head
     }
     fn restart(&mut self, point: Point, server: f64, heading: f64, speed: f64) {
         self.anchor_server = server;
         self.base = point;
         self.base_server = server;
-        self.steps.clear();
-        self.steps.push((server, heading, speed));
+        self.heading = heading;
+        self.speed = speed;
     }
     fn report(&mut self, server: f64, heading: f64, speed: f64) {
-        self.steps.push((server, heading, speed));
-        if self.steps.len() > MAX_MOTION_STEPS {
-            // Fold the oldest report into the base; the result is still a prediction.
-            let (start, heading, speed) = self.steps.remove(0);
-            let next = self.steps[0].0;
-            let dt = (next - start.max(self.base_server)).max(0.);
-            self.base.x += heading.cos() * speed * dt;
-            self.base.y += heading.sin() * speed * dt;
-            self.base_server = next;
-        }
+        // apply rejects backwards server clocks. Earlier intervals are complete,
+        // so fold each once, preserving the replay's arithmetic and addition
+        // order (including equal-time reports). Polling then integrates only the
+        // last interval. Anchors still reset the prediction and receipt clock.
+        // research/performance/2026-10-28-client-frame-materialization/REPORT.md.
+        self.base = self.head_at(server);
+        self.base_server = server;
+        self.heading = heading;
+        self.speed = speed;
     }
 }
 
@@ -731,6 +727,8 @@ struct Session {
     own_dead: bool,
     credit: u8,
     food: BTreeMap<u32, Food>,
+    /// Ordered materialization, invalidated by every food edit. Frames own copies.
+    food_frame: OnceLock<Vec<Food>>,
     last_food_sector: Option<(u8, u8)>,
     last_eaten_sector: Option<(u8, u8)>,
     prey: BTreeMap<u16, Prey>,
@@ -1220,8 +1218,10 @@ impl ClientState {
                 if sector.is_some() {
                     session.last_eaten_sector = sector;
                 }
-                if let Some((sx, sy)) = session.last_eaten_sector {
-                    session.food.remove(&food_id(sx, sy, rx, ry));
+                if let Some((sx, sy)) = session.last_eaten_sector
+                    && session.food.remove(&food_id(sx, sy, rx, ry)).is_some()
+                {
+                    session.food_frame.take();
                 }
             }
             Packet::ClearSector(sx, sy) => {
@@ -1233,6 +1233,9 @@ impl ClientState {
                     .range(food_id(sx, sy, 0, 0)..=food_id(sx, sy, 255, 255))
                     .map(|(&id, _)| id)
                     .collect();
+                if !ids.is_empty() {
+                    session.food_frame.take();
+                }
                 for id in ids {
                     session.food.remove(&id);
                 }
@@ -1380,6 +1383,7 @@ impl ClientState {
             f64::from(sx) * sector + f64::from(rx) * (sector / 256.),
             f64::from(sy) * sector + f64::from(ry) * (sector / 256.),
         );
+        self.session.food_frame.take();
         self.session.food.insert(
             food_id(sx, sy, rx, ry),
             Food {
@@ -1450,7 +1454,8 @@ impl ClientState {
             anchor_server: server,
             base: head,
             base_server: server,
-            steps: Vec::new(),
+            heading: a.heading,
+            speed: a.speed,
             profile: a.profile,
             appeared_at: receipt,
             kills: None,
@@ -1757,7 +1762,14 @@ impl ClientState {
                     time: server,
                     me,
                     opponents,
-                    food: session.food.values().cloned().collect(),
+                    // Repeated frames copy a contiguous snapshot rather than
+                    // walking the same ordered tree. Mutations invalidate it;
+                    // visibility, values and order still come only from bytes.
+                    // research/performance/2026-10-28-client-frame-materialization/REPORT.md.
+                    food: session
+                        .food_frame
+                        .get_or_init(|| session.food.values().cloned().collect())
+                        .clone(),
                     prey: session.prey.values().cloned().collect(),
                     arena: Arena {
                         center: Point::default(),
@@ -1813,4 +1825,94 @@ impl ClientState {
 
 fn food_id(sx: u8, sy: u8, rx: u8, ry: u8) -> u32 {
     u32::from_be_bytes([sx, sy, rx, ry])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn completed_motion_matches_bounded_replay_bits() {
+        // Independent original replay, including its 256-report oldest fold.
+        let replay = |base: Point, base_server: f64, steps: &[(f64, f64, f64)], server: f64| {
+            let mut head = base;
+            for (i, &(start, heading, speed)) in steps.iter().enumerate() {
+                let end = steps.get(i + 1).map_or(server, |step| step.0);
+                let dt = (end.min(server) - start.max(base_server)).max(0.);
+                head.x += heading.cos() * speed * dt;
+                head.y += heading.sin() * speed * dt;
+            }
+            head
+        };
+        for (origin, epoch) in [
+            (Point { x: -0., y: -0. }, 0.),
+            (
+                Point {
+                    x: 13.25,
+                    y: -7.125,
+                },
+                0.007,
+            ),
+            (Point { x: 1e12, y: -1e12 }, 1e12),
+        ] {
+            let mut side = Side {
+                slot: 0,
+                iang: None,
+                body_known: true,
+                anchor_server: epoch,
+                base: origin,
+                base_server: epoch,
+                heading: -0.,
+                speed: 0.,
+                profile: Profile {
+                    name: String::new(),
+                    skin: 0,
+                    custom_skin: Vec::new(),
+                    cosmetic: 0,
+                },
+                appeared_at: 0.,
+                kills: None,
+            };
+            let mut base = origin;
+            let mut base_server = epoch;
+            let mut steps = vec![(epoch, -0., 0.)];
+            let mut server = epoch;
+            for index in 0..1100 {
+                server += [0., 0.007, 0., 0.042, 0.001][index % 5];
+                let heading = index as f64 * 0.0731 - 7.;
+                let speed = [0., 120., 203.125, 17.][index % 4];
+                side.report(server, heading, speed);
+                steps.push((server, heading, speed));
+                if steps.len() > 256 {
+                    let (start, heading, speed) = steps.remove(0);
+                    let next = steps[0].0;
+                    let dt = (next - start.max(base_server)).max(0.);
+                    base.x += heading.cos() * speed * dt;
+                    base.y += heading.sin() * speed * dt;
+                    base_server = next;
+                }
+                for at in [server, server + 0.007, server + 0.5] {
+                    let expected = replay(base, base_server, &steps, at);
+                    let actual = side.head_at(at);
+                    assert_eq!(
+                        (actual.x.to_bits(), actual.y.to_bits()),
+                        (expected.x.to_bits(), expected.y.to_bits()),
+                        "report {index}, server {at}"
+                    );
+                    let cloned = side.clone().head_at(at);
+                    assert_eq!(
+                        (actual.x.to_bits(), actual.y.to_bits()),
+                        (cloned.x.to_bits(), cloned.y.to_bits())
+                    );
+                }
+                // An anchor resets prediction, including after the old cap.
+                if index % 317 == 316 {
+                    side.restart(origin, server, heading, speed);
+                    base = origin;
+                    base_server = server;
+                    steps = vec![(server, heading, speed)];
+                }
+            }
+        }
+    }
 }

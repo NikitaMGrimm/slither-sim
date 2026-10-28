@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Performance
+
+- Bots running inside the server build their view of the game faster. They
+  copy the food list from a snapshot kept until the food changes, and update
+  other snakes' predicted heads once per motion report instead of replaying
+  every report on each frame. What bots see and do is unchanged, and the
+  500-seat official bot world runs 2.7% fewer instructions
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-client-frame-materialization/REPORT.md)).
+
 ## [0.7.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.0...v0.7.1) - 2026-10-28
 
 ### Added

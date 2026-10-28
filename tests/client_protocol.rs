@@ -760,6 +760,54 @@ fn food_sectors_pellets_eating_and_clears_are_centered() {
 }
 
 #[test]
+fn warmed_food_frames_match_fresh_replay_after_every_edit() {
+    let packets = [
+        straight(9, 0.),
+        vec![b'F', 72, 72, 0, 0, 0, 25, 0, 128, 64, 50],
+        vec![b'b', 73, 72, 0, 0, 7, 20],
+        vec![b'f', 1, 0, 30],
+        // Replacement at an existing key changes value without changing length.
+        vec![b'b', 73, 72, 0, 0, 7, 60],
+        vec![b'c', 72, 72, 0, 0],
+        vec![b'C', 128, 64],
+        vec![b'<', 73, 72, 0, 0, 0, 9],
+        vec![b'w', 73, 72],
+        vec![b'w', 73, 72],
+        vec![b'F', 72, 72, 0, 0, 0, 25],
+    ];
+    let mut warm = Client::new();
+    for (index, packet) in packets.iter().enumerate() {
+        warm.send(packet);
+        let mut cold = Client::new();
+        for packet in &packets[..=index] {
+            cold.send(packet);
+        }
+        // Only the warm decoder has been polled between edits. Compare the full
+        // frame, not just food, and keep an old owned frame across the next edit.
+        let expected = cold.frame();
+        let actual = warm.frame();
+        assert_eq!(actual, expected, "packet {index}");
+        assert_eq!(warm.frame(), expected);
+        assert_eq!(warm.state.clone().frame(warm.time).unwrap(), expected);
+        let mut held = actual;
+        held.observation.as_mut().unwrap().food.clear();
+        assert_eq!(warm.frame(), expected);
+        // Failed bundled edits must leave the warmed snapshot and clocks intact.
+        assert!(
+            warm.state
+                .receive_frame(&bundled(&[packet, b"w"]), warm.time)
+                .is_err()
+        );
+        assert_eq!(warm.frame(), expected);
+    }
+    warm.state.new_connection(warm.time).unwrap();
+    warm.send(&setup());
+    warm.send(&straight(9, 0.));
+    assert!(warm.me().body.len() > 1);
+    assert!(warm.frame().observation.unwrap().food.is_empty());
+}
+
+#[test]
 fn short_pellets_before_any_sector_are_not_invented() {
     let mut client = Client::new();
     client.send(&straight(9, 0.));

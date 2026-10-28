@@ -52,8 +52,7 @@ fn recorded_circle_retains_food_until_boost_exhaustion() {
         let mut collected_after = 0;
         while sim.time() < 12.0 {
             while next_drop < circle.drops.len() && circle.drops[next_drop].time <= sim.time() {
-                sim.insert_food(circle.drops[next_drop].food.clone())
-                    .unwrap();
+                sim.insert_food(circle.drops[next_drop].food).unwrap();
                 next_drop += 1;
             }
             sim.step(&[Some(Action {

@@ -1091,7 +1091,7 @@ fn boost_drops(world: &mut Simulator, ticks: usize) -> Vec<slither_sim::Food> {
     for _ in 0..ticks {
         world.step(&straight_boost(world)).unwrap();
         let events = world.food_spawn_events().unwrap();
-        drops.extend(events.iter().map(|event| event.food.clone()));
+        drops.extend(events.iter().map(|event| event.food));
     }
     drops
 }

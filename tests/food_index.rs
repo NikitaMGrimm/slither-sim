@@ -138,7 +138,7 @@ fn pellet_index_matches_scan_through_public_edits_compaction_and_restore() {
                 .collect();
             for world in [&mut indexed, &mut restored, &mut scanned] {
                 for pellet in &food {
-                    world.insert_food(pellet.clone()).unwrap();
+                    world.insert_food(*pellet).unwrap();
                 }
             }
         }

@@ -220,7 +220,7 @@ impl FoodIndex {
         };
         self.sectors.entry(sector).or_default().push(IndexedFood {
             offset,
-            food: food.clone(),
+            food: *food,
             shown,
             color,
         });
@@ -278,7 +278,7 @@ impl FoodIndex {
                 if !inside {
                     shown |= entry.shown;
                     hidden |= !entry.shown;
-                    culled.push(entry.food.clone());
+                    culled.push(entry.food);
                     self.count = self.count.wrapping_sub(1);
                 }
                 inside
@@ -721,7 +721,7 @@ mod tests {
             let mut active = Vec::new();
             for tick in 0..180 {
                 let addition = &foods[tick % foods.len()];
-                active.push(addition.clone());
+                active.push(*addition);
                 let removal = if tick % 3 == 1 {
                     Some(active.remove(0))
                 } else {

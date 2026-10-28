@@ -109,7 +109,10 @@ pub enum Origin {
     Death,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+// All fields are values. Copy also lets received food snapshots use bulk Vec
+// cloning instead of branching through each optional field per pellet.
+// research/performance/2026-10-28-client-frame-materialization/REPORT.md.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Food {
     pub x: f64,
     pub y: f64,
