@@ -4,7 +4,7 @@
 
 ### Added
 
-- A small-count turn study protocol and its interrupted, inconclusive capture.
+- A small-count turn study and its inconclusive captures, including an ownership-monitor failure.
 - A study of the boost speed-up and slow-down. The current rule, taken from
   the Android app's offline mode, reproduces all 1,567 recorded ramps behind it
   (slope error 0.10, against 0.15 for the older fitted formula). How speed

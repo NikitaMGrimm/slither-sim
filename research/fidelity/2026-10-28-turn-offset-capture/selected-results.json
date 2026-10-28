@@ -17,60 +17,63 @@
       "ordinal": 1,
       "members": [
         {
-          "sha256": "e268205dd2d626326e5ba385b2482409dd5baaf5772e65c27e683a58d0b0d2da",
-          "incoming": 4434,
-          "outgoing": 653,
+          "sha256": "72e161850d7dd67c4fd941b7f4234c3142b6ed5a11fc9e72bdecf16036acc9df",
+          "incoming": 334,
+          "outgoing": 45,
           "lives": 1,
-          "ownStateReceipts": 1469,
+          "ownStateReceipts": 101,
           "integrityVerified": true,
           "completed": false,
           "stopReason": "external-integrity-stop",
           "nativeAudit": [
             {
-              "anchors": 1420,
-              "frames": 4433,
+              "anchors": 95,
+              "frames": 333,
               "kind": "audit"
             }
           ],
-          "ownAnchors": 260
+          "ownAnchors": 18
         },
         {
-          "sha256": "55119bde27a96c615dec6232ed71f17df12226574edc5cdc27f76ce36947af2a",
-          "incoming": 4081,
-          "outgoing": 842,
+          "sha256": "7c8b59b15f60a6f755a9518bbe78fcc3d13aa0b7c3ec80ee0045443d4a40b3ea",
+          "incoming": 439,
+          "outgoing": 21,
           "lives": 1,
-          "ownStateReceipts": 1244,
+          "ownStateReceipts": 187,
           "integrityVerified": true,
           "completed": false,
           "stopReason": "external-integrity-stop",
           "nativeAudit": [
             {
-              "anchors": 1213,
-              "frames": 4080,
+              "anchors": 171,
+              "frames": 438,
               "kind": "audit"
             }
           ],
-          "ownAnchors": 260
+          "ownAnchors": 18
         }
       ],
       "acquisition": {
         "reason": "external-integrity-stop",
-        "elapsedSeconds": 61.5653047,
+        "elapsedSeconds": 4.483268816,
         "socketsClosed": true,
         "maxCounts": [
-          26,
-          11
+          3,
+          2
         ],
         "controlsDone": [],
         "interruptionCounts": {}
       }
     }
   ],
-  "nativeBinarySha256": "64f6251bf04566a0afc41a59919adb79e3223f2fce8bcc215ff42d4f96bdba42",
+  "nativeBinarySha256": "4d95ced79eeefdf6c65104f419408d98dac688974086c66c740df65e254a4a51",
   "sourceSha256": {
     "analyze.py": "1d3303d641a313aa224cdfdfb43d04ffb959cbed7d4b8bcbfda60bac641993ae",
     "capture.mjs": "7277318d3b51567a6a221f358401c739f27bf38b8c6a1e5ccace1a5cf49b1f4a",
     "capture.test.mjs": "d78befced2eff9fe75115121ac5373e3f1aea2c8cc9acbfaba5970a0c8701b32",
+    "connection-monitor.ps1": "5687156f7a428ba4b4b99fa69c59645d2daac1c8fe9b454462ca23e4ee73a3c5",
+    "container-guard.mjs": "c0b03d9b241405656c17c365ab5608e42890f6816697d09e179877fbcc3a1a1d",
+    "container-guard.test.mjs": "f00f5614fd2d230df566be27b39e147009a4cc7d44e9cf25651b6b76778c491d",
     "discover.mjs": "1ffb267b5ff7caa41dbccb11a704af894841893836ede3f76618e9da79ff1d69",
     "guard.ps1": "b7f17ee1b4c692cc94ebebb5b44482b306dc61c4483355ac051058d8656912cb",
     "preflight.ps1": "360988b0a7b291013eba8b4ccd704a6a3f4683cfa6f992721b20c2617a31fdc0",
@@ -78,46 +81,40 @@
     "score.mjs": "174b2d5f974cb85bfd6bee058d502dbf7f619a92d01a0fdc0bea7aea65751fa8",
     "selection.mjs": "9b4228a8c69e2585d4d0be1a3cd20d563654199a82728cfd9eb0c105901c4c8e"
   },
-  "status": "inconclusive: development invocation interrupted by postlaunch process-exclusivity guard",
-  "acquisitionSourceFreezeCommit": "2df58630fce4b7c16a0c1cbe43e399b8b1642196",
-  "zeroSocketPolicyAmendmentCommits": [
-    "20146991ad92bdc0de6548fe524216783dca62be",
-    "8ab600c2d5bfe331938149456f1293c184ec1d0d"
+  "status": "inconclusive: attempt3 failed closed because socket ownership was unavailable",
+  "attempt": 3,
+  "containerGuardAmendmentCommits": [
+    "7d9a11b7",
+    "8a5f943a"
   ],
   "retainedAttempts": [
     {
       "attempt": 1,
-      "status": "failed exclusivity preflight before game sockets",
       "results": "attempt-1-results.json",
       "sha256": "c7762d1e3bb2ebd211c62e46a8955202467e3314681bfd81da52b6144360a27d",
       "preservedUnchanged": true
     },
     {
       "attempt": 2,
-      "status": "postlaunch permanent stop",
-      "developmentInvocations": 1,
-      "heldoutInvocations": 0
+      "results": "attempt-2-results.json",
+      "sha256": "2b88697b0ab89ccdecadf4eb066ffa2298ed7469eaf510c082755af802520038",
+      "preservedUnchanged": true
     }
   ],
   "preflight": {
-    "reusedDiscoveryFromAttempt": 1,
-    "rawListSha256": "144331b750c891b7ed6b75e8c7a1154b26e10affaca2b010ceb477ae3d1169dc",
-    "boundEntryListedActive": true,
-    "newOfficialDiscoveryRequests": 0,
-    "totalOfficialDiscoveryRequests": 1,
-    "initialInvocationCheckPassed": true,
+    "initialCheckPassed": true,
     "rechecks": 0,
-    "waitingIntervals": 0
+    "waitingIntervals": 0,
+    "newDiscoveryRequests": 0,
+    "reusedBinding": true
   },
   "acquisition": {
     "reservedOfficialInvocations": 1,
     "limit": 4,
     "officialGameSocketAttempts": 2,
-    "developmentInvocations": 1,
-    "heldoutInvocations": 0,
     "primaryCellsAcquired": 0,
     "optionalCellsAcquired": 0,
-    "rawGameArchives": 2,
+    "heldoutInvocations": 0,
     "socketsClosed": true,
     "permanentStudyStop": true
   },
@@ -125,28 +122,28 @@
     {
       "ordinal": 1,
       "split": "development",
-      "status": "interrupted after 61.5653047 seconds",
+      "status": "interrupted after 4.483268816 seconds",
       "primaryCellsAcquired": 0,
       "optionalCellsAcquired": 0
     },
     {
       "ordinal": 2,
       "split": "development",
-      "status": "not launched: postlaunch permanent stop",
+      "status": "not launched: permanent stop",
       "primaryCellsAcquired": null,
       "optionalCellsAcquired": null
     },
     {
       "ordinal": 3,
       "split": "heldout",
-      "status": "not launched: postlaunch permanent stop",
+      "status": "not launched: permanent stop",
       "primaryCellsAcquired": null,
       "optionalCellsAcquired": null
     },
     {
       "ordinal": 4,
       "split": "heldout",
-      "status": "not launched: postlaunch permanent stop",
+      "status": "not launched: permanent stop",
       "primaryCellsAcquired": null,
       "optionalCellsAcquired": null
     }
@@ -156,89 +153,89 @@
       "count": 37,
       "sign": 1,
       "primary": true,
-      "status": "not acquired: actor did not attain target before postlaunch stop"
+      "status": "not acquired: ownership monitor failed before target attained"
     },
     {
       "count": 37,
       "sign": -1,
       "primary": true,
-      "status": "not acquired: actor did not attain target before postlaunch stop"
+      "status": "not acquired: ownership monitor failed before target attained"
     },
     {
       "count": 100,
       "sign": 1,
       "primary": true,
-      "status": "not acquired: actor did not attain target before postlaunch stop"
+      "status": "not acquired: ownership monitor failed before target attained"
     },
     {
       "count": 100,
       "sign": -1,
       "primary": true,
-      "status": "not acquired: actor did not attain target before postlaunch stop"
+      "status": "not acquired: ownership monitor failed before target attained"
     },
     {
       "count": 174,
       "sign": 1,
       "primary": false,
-      "status": "not acquired: actor did not attain target before postlaunch stop"
+      "status": "not acquired: ownership monitor failed before target attained"
     },
     {
       "count": 174,
       "sign": -1,
       "primary": false,
-      "status": "not acquired: actor did not attain target before postlaunch stop"
+      "status": "not acquired: ownership monitor failed before target attained"
     }
   ],
   "exposure": [
     {
       "member": 0,
-      "ownAnchors": 260,
+      "ownAnchors": 18,
       "countRanges": {
         "logical": [
           2,
-          26
+          3
         ],
         "physical": [
           3,
-          46
+          20
         ],
         "dying": [
           1,
-          22
+          17
         ],
         "fam": [
-          0.006020844341566822,
-          0.9953749773129807
+          0.12309617537833306,
+          0.7466205803525794
         ],
         "displayed_length": [
-          1.4099135982298332,
-          25.795984315632836
+          1.4263477488217458,
+          2.8611985958336947
         ]
       }
     },
     {
       "member": 1,
-      "ownAnchors": 260,
+      "ownAnchors": 18,
       "countRanges": {
         "logical": [
           2,
-          11
+          2
         ],
         "physical": [
           3,
-          33
+          20
         ],
         "dying": [
           1,
-          23
+          18
         ],
         "fam": [
-          0.0,
-          0.9738930448229935
+          0.28053911212319804,
+          0.7382374845884732
         ],
         "displayed_length": [
-          1.4,
-          11.257991686939699
+          1.506700854333586,
+          2.138237484588473
         ]
       }
     }
@@ -257,34 +254,44 @@
       ]
     }
   ],
-  "failureDiagnostics": {
-    "guardReason": "possible competing collector process",
-    "triggerIdentityRecorded": false,
-    "subsequentReadOnlyMatchingProcessCount": 0,
-    "finalizationDiagnostic": "EEXIST when writing the stop record already created by the guard; archives had already been sealed",
-    "archivePrefixIntegrityUnaffected": true,
-    "officialCollectorRoleEstablished": false
+  "guardFailure": {
+    "controllerEndpointConnections": 0,
+    "separateEndpointConnections": 2,
+    "socketOwnerMetadataExposed": false,
+    "positiveOwnershipUnavailable": true,
+    "outsideConnectionRole": "not established",
+    "preparationGap": "positive own-socket attribution was not verified offline before collection"
   },
+  "cleanup": {
+    "archiveSha256": "63178f0cebfec2a0454434318a48ce2bf7e4873f19ee4bce5703898449a4d652",
+    "copiedAndVerified": true,
+    "remoteScratchRemoved": true,
+    "taskContainersRemaining": 0,
+    "imagePulled": false,
+    "existingImagePreserved": true
+  },
+  "environment": "a capped ephemeral Linux container on a separate machine",
   "interpretation": {
     "D111": "no eligible primary cell; not discriminated",
     "fixedOffsets6Through10": "no eligible primary cell; not discriminated",
-    "originalCountD106": "previous long-174 rejection unchanged, conditional on previous angle/timing assumptions",
+    "originalCountD106": "previous conditional rejection unchanged",
     "mechanicsCorrectionSupported": false
   },
   "assembly": {
-    "baseAnalysisSha256": "308115e629b2a33debae912e3479715e5338eb54021c93509952e0d5faff1a18",
-    "additionalFields": "bounded acquisition/preflight census and native count ranges; frozen analysis unchanged"
+    "baseAnalysisSha256": "11ac1cb1465a38ebcbfa9a1bdc96e13e6a620b1fb954e4ce1afb68338f695f05",
+    "additionalFields": "bounded attempt census, native count ranges and cleanup; unchanged frozen analysis"
   },
   "verification": {
+    "containerGuardTests": 8,
     "researchNodeTests": 9,
     "preflightAuthoredCases": 5,
     "existingCollectorNodeTests": 104,
     "priorPinnedNativePythonTests": 8,
     "documentationTests": 7,
     "nativeNewGameReplays": 2,
-    "nativeValidatedFrames": 8513,
-    "nativeAnchors": 2633,
+    "nativeValidatedFrames": 771,
+    "nativeAnchors": 266,
     "archivePrefixesVerified": 2,
-    "independentReview": "source-only acquisition and amendment review; amendment timing finding corrected with an authored regression"
+    "independentReview": "source and retained evidence only; no independent tests, replay execution or remote inspection"
   }
 }

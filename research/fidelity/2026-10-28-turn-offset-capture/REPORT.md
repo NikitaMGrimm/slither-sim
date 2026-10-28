@@ -1,24 +1,30 @@
-# Small-count turn-offset capture: interrupted development
+# Small-count turn-offset capture: no qualifying cells
 
-**Decision: inconclusive. Attempt 2's first development invocation was stopped
-after 61.565 seconds by the post-launch process-exclusivity guard.** Both clients
-had joined protocol 19; the actor reached count **26**, the observer **11**.
-Neither primary target was attained and **zero cells** were acquired. Our two
-sockets closed. The original permanent-stop rule applies after sockets open, so
-invocations 2–4 were not launched and there was no held-out checkpoint.
+**Decision: inconclusive. Attempt 3's first development invocation stopped after
+4.483 seconds because the census did not expose socket-owner metadata.** The
+guard could not positively attribute the two connections to our process tree and
+failed closed. Both task sockets closed. The actor reached count **3**, the observer
+**2**, and **zero cells** were acquired. The post-launch permanent stop was honored;
+invocations 2–4 were not launched and no held-out checkpoint occurred.
+
+Preparation should have demonstrated positive own-socket attribution offline
+before opening game sockets. That capability check was missed. This is a guard
+capability failure, not evidence that a competing connection was established.
 
 Attempt 1's failed preflight opened no game socket. It remains unchanged in its
 original external archive, [attempt-1-results.json](attempt-1-results.json), and
 the original report at commit `d92f499a2ae4964ad7518ce2dc12a683dbd224f2`.
 The owner explicitly authorized attempt 2 and the narrowly scoped zero-socket
 preflight amendment before collection resumed.
+Attempt 2's result is preserved byte-for-byte in
+[attempt-2-results.json](attempt-2-results.json); its stop and archive are unchanged.
 
 | Outcome | Count |
 | --- | ---: |
-| Official discovery requests, both attempts combined | 1 |
-| New discovery requests in attempt 2 | 0 |
-| Reserved official invocations / maximum | 1 / 4 |
-| Task game-socket attempts, both attempts combined | 2 |
+| Official discovery requests, all attempts combined | 1 |
+| New discovery requests in attempt 3 | 0 |
+| Attempt 3 reserved invocations / fresh maximum | 1 / 4 |
+| Attempt 3 task game-socket attempts | 2 |
 | Primary cells acquired / planned | 0 / 4 |
 | Optional 174 cells acquired / planned | 0 / 2 |
 | Held-out invocations | 0 |
@@ -53,6 +59,14 @@ policy, its tests and policy hashes changed. Capture, native-client and analysis
 scoring sources, cells, durations, uncertainty and decision rules are unchanged.
 The manifest retains the original policy hashes alongside their amended versions.
 
+The owner subsequently authorized attempt 3 in **a capped ephemeral Linux container
+on a separate machine**, with connection-based exclusivity and a fresh ledger
+because attempt 2 scored zero eligible cells. The amendment was pushed to PR #239
+at `7d9a11b7`; the final guard deadline correction was pushed at `8a5f943a`, both
+before any attempt-3 game request. Only the outer guard/coordinator and tests were
+added. Previous capture, headless, native, analysis/scoring, cell/duration,
+uncertainty and decision-rule sources remain byte-identical.
+
 The fixed predictions and duration calculation are:
 
 ```text
@@ -82,7 +96,9 @@ primary cells in their union before an analysis checkpoint and two held-out
 invocations. Ordinals are flushed before launch; failed launches consume them.
 No favorable reruns after gameplay data are allowed. Attempt 1 reserved no ordinal;
 attempt 2 reserved ordinal 1 before launch. Its interruption consumes that ordinal.
-The other three ordinals remain unused because the post-launch stop is permanent.
+Attempt 2's other three ordinals were unused because its post-launch stop was
+permanent. The owner's distinct attempt-3 authorization permits a fresh ledger
+with the same four-invocation bounds; it did not erase or resume attempt 2.
 
 The frozen rejection rule requires **both** held-out invocations to have complete
 primary coverage and agreement. D111 is rejected in favor of an offset only if
@@ -155,11 +171,11 @@ Pinned-client replay validates **8,513 setup/gameplay frames** and reconstructs
 from the native gameplay audit. The raw incoming/outgoing counts are 4,434/653 for
 the actor and 4,081/842 for the observer. Received logical count ranges are 2–26
 and 2–11. Physical anchors, dying points, fam and displayed length are retained
-separately as bounded ranges in [selected-results.json](selected-results.json).
+separately as bounded ranges in [attempt-2-results.json](attempt-2-results.json).
 Those presentation diagnostics are not substitutions in the frozen rate formula.
 
 All six planned cells are marked **not acquired**. No primary or optional interval
-was scored, and no model residual or candidate rejection is reported. The final
+was scored, and no model residual or candidate rejection is reported. Attempt 2's
 decision remains `inconclusive-development-coverage`; there is neither the required
 development union nor any held-out replication. Interrupted archive integrity
 does not qualify an invocation or establish any server mechanic.
@@ -172,6 +188,52 @@ published. Discovery-response SHA-256:
 `144331b750c891b7ed6b75e8c7a1154b26e10affaca2b010ceb477ae3d1169dc`.
 The public report omits addresses, account/machine details and other players'
 identities. No official JS, assets, credentials or raw traffic were added to Git.
+
+## Attempt 3: connection ownership unavailable
+
+The source copy at the pushed PR head was verified against all **22 source
+hashes** in the fresh container before requests. The same private binding was
+reused without discovery or fallback. The existing image was used without a pull.
+Raw recordings used a bind mount so container removal could not erase them.
+
+The initial endpoint check passed. The connection coordinator subsequently saw
+zero matching connections on the controller and two on the separate machine.
+The latter records contained no socket-owner identities. The guard classified
+them as unattributed, recorded the census privately and interrupted the unchanged
+capture driver. It did **not** establish that either connection belonged to another
+collector. Available process-tree command lines were retained privately, but no
+positive socket-to-process mapping was available.
+
+The permanent-stop rule was honored after this post-launch failure. No second
+development or held-out invocation was launched. No amendment cleared the stop
+or reran the recording. Parsing tests and simulated ownership did not demonstrate
+that actual owner metadata was available. A future acquisition must establish
+that capability using authored non-game traffic before an official request;
+none was attempted after this stop.
+
+| Attempt-3 invocation | Split | Duration | Actor / observer maximum received count | Primary cells | Optional cells | Outcome |
+| --- | --- | ---: | --- | ---: | ---: | --- |
+| 1 | Development | 4.483 s | 3 / 2 | 0 / 4 | 0 / 2 | Ownership unavailable; fail-closed stop |
+| 2 | Development | — | — | Not acquired | Not acquired | Not launched: permanent stop |
+| 3 | Held-out | — | — | Not acquired | Not acquired | Not launched: permanent stop |
+| 4 | Held-out | — | — | Not acquired | Not acquired | Not launched: permanent stop |
+
+Both clients received protocol-19 setup and one life each. Raw archives contain
+334/45 incoming/outgoing actor frames and 439/21 observer frames. Both interrupted
+prefixes verify. Pinned-client replay validates **771 setup/gameplay frames** and
+**266 anchors**, including **18 own anchors per client**. The two challenge frames
+are excluded from the native frame count. Logical count ranges are 2–3 and 2–2;
+other presentation counters are retained separately in the selected JSON. No target
+was reached, no interval was scored, and no candidate gains new evidence.
+
+The archive bundle was copied home and its SHA-256 compared with the remote copy:
+`63178f0cebfec2a0454434318a48ce2bf7e4873f19ee4bce5703898449a4d652`.
+Both recording hashes also agree with their receipts. **The task scratch directory
+was removed and no task container remains. No image was pulled; the pre-existing
+image was preserved.** Task-owned packing and cleanup used capped ephemeral
+containers. No host configuration, installation, existing container, image or volume
+was changed. Full raw data and private connection/process records remain in the
+external local archive; no machine or endpoint identifiers are published here.
 
 ## Harness, verification and limits
 
@@ -196,6 +258,9 @@ Completed locally on one logical CPU, serially:
 - **5 authored preflight policy cases**, with simulated monotonic time: immediate
   success, later success, four failed re-checks, no retry for generic failures,
   and a deadline-crossing clock sample without a negative sleep duration.
+- **8 container-guard tests**, run locally and in the capped container with game
+  networking disabled: ownership, connection bounds, monitor lease, waiting budget,
+  deadline clamping and authored child interruption/sealing.
 - Two separate offline-only guard probes: a source-preflight failure consumes one
   synthetic ordinal; with permanent-stop handling, a second launch is refused and
   the ledger stays at one. These are authored preparation tests, not official
@@ -216,7 +281,13 @@ sleep duration at a re-check boundary. The remaining wait is now sampled once;
 the authored edge regression passes. Lock contention uses the same zero-socket
 waiting path. Both corrections were committed before attempt 2 opened sockets.
 The reviewer did not independently rerun tests; the final small corrections were
-verified by the main agent. No further collection followed the interruption.
+verified by the main agent. No further collection followed within attempt 2.
+
+The attempt-3 source review found fixed polling/drain sleeps could cross their
+deadlines. Remaining-budget clamping and an authored regression were committed
+before requests. That review used source reads only; neither it nor the authored
+tests established live socket-owner visibility. The missing environment capability
+remains an explicit failed preparation condition.
 
 Reproduction of offline checks, with shell affinity set to one available CPU and
 Cargo/Rayon/test thread counts set to one:
@@ -224,6 +295,7 @@ Cargo/Rayon/test thread counts set to one:
 ```powershell
 $study = 'research/fidelity/2026-10-28-turn-offset-capture'
 node --test --test-concurrency=1 "$study/capture.test.mjs"
+node --test --test-concurrency=1 "$study/container-guard.test.mjs"
 pwsh -NoProfile -File "$study/preflight.test.ps1"
 node --test --test-concurrency=1 tools/fidelity/slither-headless.test.mjs
 uv run --offline --no-project python -B -m unittest discover -s tools -p test_documentation.py
@@ -232,7 +304,7 @@ $prior = 'research/fidelity/2026-10-28-turn-count-phase'
 cargo build --offline --locked --release -j 1 --manifest-path "$prior/harness/Cargo.toml" --target-dir "$external/client-target"
 $env:TURN_COUNT_BINARY = "$external/client-target/release/turn-count-research.exe"
 uv run --offline --no-project python -B -m unittest discover -s "$prior" -p test_analysis.py
-# $archiveRoot is the retained external attempt-2 directory; $output must be new.
+# $archiveRoot contains a retained ledger and captures; $output must be new.
 uv run --offline --no-project python -B "$study/analyze.py" --archive-root "$archiveRoot" --binary "$env:TURN_COUNT_BINARY" --output "$output"
 ```
 
