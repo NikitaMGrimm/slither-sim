@@ -12,14 +12,14 @@
     "research/fidelity/2026-10-28-turn-offset-capture/capture.mjs": "7277318d3b51567a6a221f358401c739f27bf38b8c6a1e5ccace1a5cf49b1f4a",
     "research/fidelity/2026-10-28-turn-offset-capture/capture.test.mjs": "d78befced2eff9fe75115121ac5373e3f1aea2c8cc9acbfaba5970a0c8701b32",
     "research/fidelity/2026-10-28-turn-offset-capture/discover.mjs": "1ffb267b5ff7caa41dbccb11a704af894841893836ede3f76618e9da79ff1d69",
-    "research/fidelity/2026-10-28-turn-offset-capture/guard.ps1": "69cd082e9e30b11374394781b74d8b361170a4554380f77916619eff3e9f01f2",
+    "research/fidelity/2026-10-28-turn-offset-capture/guard.ps1": "b7f17ee1b4c692cc94ebebb5b44482b306dc61c4483355ac051058d8656912cb",
     "research/fidelity/2026-10-28-turn-offset-capture/PLAN.md": "43d24abd5a44a86376c00a8ab6deb6f80650ced616b46aa7827ec32729222c29",
     "research/fidelity/2026-10-28-turn-offset-capture/score.mjs": "174b2d5f974cb85bfd6bee058d502dbf7f619a92d01a0fdc0bea7aea65751fa8",
     "research/fidelity/2026-10-28-turn-offset-capture/selection.mjs": "9b4228a8c69e2585d4d0be1a3cd20d563654199a82728cfd9eb0c105901c4c8e",
     "tools/fidelity/collision-delay-scout.mjs": "5983f88928d1c407aab1e29bd59a3facfdfc0a54e9e5205646798c3470a7cffa",
     "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
-    "research/fidelity/2026-10-28-turn-offset-capture/preflight.ps1": "1b6c98d6fdfca405b04da0eb6a3f64b6706f148bb2a625828722ea428d1f5e21",
-    "research/fidelity/2026-10-28-turn-offset-capture/preflight.test.ps1": "2334c9a9f7beb954bd0003306a39eb43c8c52861ed241fc1f8933c5537767aa1"
+    "research/fidelity/2026-10-28-turn-offset-capture/preflight.ps1": "360988b0a7b291013eba8b4ccd704a6a3f4683cfa6f992721b20c2617a31fdc0",
+    "research/fidelity/2026-10-28-turn-offset-capture/preflight.test.ps1": "8a61ccb3cd6eab5a08598393bb972d9ebdf1244942f3c39f0d4e588e924aade2"
   },
   "policyAmendment": {
     "authorization": "Owner capture approval in PR239 conversation on 2026-10-28: attempt2 after zero-socket failed exclusivity preflight",

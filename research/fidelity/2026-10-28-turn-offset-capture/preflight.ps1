@@ -19,8 +19,10 @@ function Wait-TurnExclusive {
             if ($checkIndex -eq 4) { throw 'Exclusivity preflight exhausted four re-checks; permanent study stop.' }
             $nextCheckAt = $failedAt + 900000
             & $Record @{ checkIndex = $checkIndex; status = 'waiting'; nextCheckTick = $nextCheckAt }
-            while ((& $Now) -lt $nextCheckAt) {
-                & $Delay ([int][Math]::Min(30000, $nextCheckAt - (& $Now)))
+            while ($true) {
+                $remainingMs = $nextCheckAt - (& $Now)
+                if ($remainingMs -le 0) { break }
+                & $Delay ([int][Math]::Min(30000, $remainingMs))
             }
         }
     }

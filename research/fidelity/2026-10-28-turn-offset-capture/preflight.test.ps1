@@ -42,4 +42,24 @@ try {
 } catch { Assert-Equal $_.Exception.Message 'authored source failure' }
 Assert-Equal $generic.calls 1
 Assert-Equal $generic.delays 0
-Write-Output '4 authored preflight cases passed; no requests or sockets.'
+$edge = @{ calls = 0; clockCalls = 0; samples = @(0, 899999, 900001, 900002); delays = @() }
+Wait-TurnExclusive -Check {
+    $edge.calls++
+    if ($edge.calls -eq 1) {
+        $error = [InvalidOperationException]::new('authored edge failure')
+        $error.Data['TurnExclusivityFailure'] = $true
+        throw $error
+    }
+} -Record { param($Row) } -Now {
+    $i = [Math]::Min($edge.clockCalls, $edge.samples.Length - 1)
+    $edge.clockCalls++
+    $edge.samples[$i]
+} -Delay {
+    param($Milliseconds)
+    if ($Milliseconds -lt 0) { throw 'negative delay' }
+    $edge.delays += $Milliseconds
+}
+Assert-Equal $edge.calls 2
+Assert-Equal $edge.delays.Count 1
+Assert-Equal $edge.delays[0] 1
+Write-Output '5 authored preflight cases passed; no requests or sockets.'

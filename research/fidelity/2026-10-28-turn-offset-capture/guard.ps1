@@ -16,6 +16,7 @@ $guardCreated = $false
 $ordinal = $null
 $guardFailure = $null
 $processResultPath = $null
+$preflightStarted = $false
 . (Join-Path $PSScriptRoot 'preflight.ps1')
 
 function Throw-Exclusivity([string]$Message) {
@@ -40,11 +41,8 @@ function Assert-Exclusive([int]$AllowedPid) {
 }
 
 try {
-    $lock = [IO.File]::Open($lockPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     if (Test-Path -LiteralPath (Join-Path $ArchiveRoot 'STUDY-STOP.json')) { throw 'Study stop is permanent.' }
     if (Test-Path -LiteralPath (Join-Path $ArchiveRoot 'STOP')) { throw 'Integrity stop is permanent.' }
-    [IO.File]::WriteAllText($activePath, (@{ pid = $PID; action = $Action; started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json))
-    $guardCreated = $true
     $scriptName = if ($Action -eq 'Discover') { 'discover.mjs' } else { 'capture.mjs' }
     $prefix = if ($Action -eq 'Discover') { 'discovery' } else { 'capture-' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() }
     $stdout = Join-Path $ArchiveRoot ($prefix + '-stdout.txt')
@@ -69,7 +67,15 @@ try {
         }
     }
     # This gate precedes reservation/launch, so no game socket can yet exist.
-    Wait-TurnExclusive -Check { Assert-Exclusive 0 } -Record {
+    $preflightStarted = $true
+    Wait-TurnExclusive -Check {
+        if (-not $script:lock) {
+            try {
+                $script:lock = [IO.File]::Open($lockPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+            } catch [IO.IOException] { Throw-Exclusivity 'The exclusive capture lock is occupied; capture waits.' }
+        }
+        Assert-Exclusive 0
+    } -Record {
         param($Row)
         $Row.action = $Action
         $Row.invocation = $ordinal
@@ -78,6 +84,8 @@ try {
         [IO.File]::AppendAllText((Join-Path $ArchiveRoot 'preflight-checks-private.jsonl'), $text)
         Write-Output ($Row | ConvertTo-Json -Compress)
     }
+    [IO.File]::WriteAllText($activePath, (@{ pid = $PID; action = $Action; started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json))
+    $guardCreated = $true
     if ($Action -eq 'Capture') {
         $reservation = @{ ordinal = $ordinal; reservedWall = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json -Compress
         $ledger = [IO.File]::Open($ledgerPath, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::Read)
@@ -110,7 +118,7 @@ try {
     if ($process.ExitCode -ne 0) { throw 'Acquisition process failed; retained logs identify the failure.' }
 } catch {
     $guardFailure = $_.Exception.Message
-    if ($guardCreated -and -not (Test-Path -LiteralPath (Join-Path $ArchiveRoot 'STUDY-STOP.json'))) {
+    if (($guardCreated -or $preflightStarted) -and -not (Test-Path -LiteralPath (Join-Path $ArchiveRoot 'STUDY-STOP.json'))) {
         [IO.File]::WriteAllText((Join-Path $ArchiveRoot 'STUDY-STOP.json'),
             (@{ reason = 'exclusive-guard-or-child-failure'; ordinal = $ordinal; failure = $guardFailure } | ConvertTo-Json))
     }
