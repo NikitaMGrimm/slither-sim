@@ -4,6 +4,12 @@
 
 ### Added
 
+- A note on measuring the host with fully grown snakes. A 500-seat world
+  with snakes as long as #248's can be saved and restored exactly, but the
+  host can't run from it: the checkpoint doesn't keep the food history the
+  host needs to show pellets to players. Performance results so far therefore
+  come from short-snake test worlds
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-broadcast/REPORT.md)).
 - A study of whether one core can run 2,281 snakes, the most the stock client
   can show at official density. It can't yet: with 2,280 bots and one player,
   the server manages about 10 ticks per second against 143. Counting only the
@@ -21,11 +27,6 @@
 
 ### Performance
 
-- A bounded mature-length fixture study retains a 500-seat core world, but the
-  existing checkpoint cannot restore its food-presentation history for host
-  measurements. Mature savings remain unavailable; the report keeps short-body
-  budgets and ranks the next candidates with that limit
-  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-broadcast/REPORT.md)).
 
 - Each tick, the host decides which snakes and prey each player can see by
   comparing squared distances, and only near the edge of view falls back to
