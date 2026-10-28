@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- A single-core hosted capacity study at 2,281 official-density seats, with
+  a 500-bot reference, length-stability screening, thread CPU and instruction
+  phase budgets. The target uses 2,280 server bots and one loopback player;
+  the player's CPU is measured separately
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-official-density-capacity/REPORT.md)).
+
 ### Breaking
 
 - `Food` now implements `Copy`, so pellets are copied instead of cloned.

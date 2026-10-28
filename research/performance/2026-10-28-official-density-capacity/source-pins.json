@@ -1,0 +1,41 @@
+{
+  "archiveSha256": "c0d21a576310308710c883edbffce9540da8281c8f0df33f8c733b6c46752cd5",
+  "buildCommand": "cargo build --release --locked --offline -j 1 --bin slither-sim --example portable_bot",
+  "rustflags": "-C target-cpu=native",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "arms": {
+    "plain": {
+      "binarySha256": "03020e132d7c9f9e8d227415b94c0b2da9cb474b50011b5f0e568815491f00ae",
+      "clientSha256": "f4417457cb32d108e1c4d3169fd895a237346ed4a556f47bc2cf708f4bec4320",
+      "overlays": {}
+    },
+    "observe": {
+      "binarySha256": "411c1cdae7f39d4dd07f89d4a1bb7066e139dc6ca57a3ad0eac9578d3e0272bb",
+      "clientSha256": "f4417457cb32d108e1c4d3169fd895a237346ed4a556f47bc2cf708f4bec4320",
+      "overlays": {
+        "src/study_observe.rs": "ddca739c49fded87bcbc1dab7e3b4641512c09c3fb278c021c7c237c7f3088e1",
+        "src/lib.rs": "4b9c215edcd93c4f23538245e8ee6ed1c3618795b11bdfac47618f7185d3ed67",
+        "src/client/simulation.rs": "ed1c938a7119811a804b22d12deeb81f6f055bb6cdf51daf6896eca95e37e092",
+        "src/client/server.rs": "ab1663cb2d22c5494181923b0dd4edbf9b5f1804c8fe30f5c742030eebc1b27c",
+        "src/client/simulation/remote.rs": "653654348d6a78f8cd0580a48564d1bc80b2a3a7fcd44d216a97c86f8ce9e96b"
+      }
+    },
+    "profile": {
+      "binarySha256": "a4e6cc01532fad1d1342e80788bb6dfa530a1ac2365ff56f2508639cf0c6f693",
+      "clientSha256": "f4417457cb32d108e1c4d3169fd895a237346ed4a556f47bc2cf708f4bec4320",
+      "overlays": {
+        "src/lib.rs": "11d8449ccffc0792712472c69e3619708fac11843e91647e10fb9986584dbc56",
+        "src/study_observe.rs": "ddca739c49fded87bcbc1dab7e3b4641512c09c3fb278c021c7c237c7f3088e1",
+        "src/study_counter.rs": "808829770b3d8f59be0ca447f561f6e529ee0a9afd91a3efa2b5196ac39dc58c",
+        "src/simulator.rs": "644d74bb9593c8f7054c0bce8840f2a54f7a9e6ad2aac441f523c24d75ac548c",
+        "src/client/server.rs": "742ad22d5a83d1219bf203d5f42401305ec1a1850ad8c95c765d4d796e98d349",
+        "src/client/simulation.rs": "1b1e45a289c7d8aa149a1dd2535911757c9e6039786b7f9996a591b9fb3dc879",
+        "src/client/simulation/broadcast.rs": "68d52e5cf855230507006962fbe91f34a8c8d49c6719953f6a18eb22acd395c3",
+        "src/client/simulation/remote.rs": "653654348d6a78f8cd0580a48564d1bc80b2a3a7fcd44d216a97c86f8ce9e96b"
+      }
+    }
+  },
+  "sourceCommit": "d127acd1f0e9db2100c8a1dd5c2fa43e2deff506",
+  "receiptNote": "Pristine source archive plus read-only observation/profile overlays. Portable client binary copied from pristine arm. Complete final overlay hashes retained.",
+  "overlayRecipeVerified": true
+}
