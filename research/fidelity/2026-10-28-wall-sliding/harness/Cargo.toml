@@ -1,0 +1,11 @@
+[package]
+name = "wall-study-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+slither-sim = { path = "../../../..", default-features = false }
+serde_json = "1"
+
+[workspace]

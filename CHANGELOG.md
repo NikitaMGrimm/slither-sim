@@ -4,6 +4,13 @@
 
 ### Added
 
+- A study of how snakes slide along the arena edge. In three official
+  recordings with shallow edge contacts, the current sliding rule predicts
+  positions to about one world unit, against about 25 for free motion. The
+  recordings hold too few clean contacts to settle the rule's exact details,
+  and a local trial of a capture found none either, so no capture is planned
+  and the rule stays as it is
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-wall-sliding/REPORT.md)).
 - A live capture meant to tell apart the two explanations left by the turn
   study: dividing by 111, or by the stock client's 106 with a fixed offset in
   the segment count. Two full 20-minute official sessions ran cleanly, and the
