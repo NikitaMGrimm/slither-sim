@@ -10,6 +10,13 @@
   can't be told apart from five official recordings, and no capture with two
   connections could separate them, so the rules stay as they are
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-prey-flight-activation/REPORT.md)).
+- A study of the boost speed-up and slow-down. The current rule, taken from
+  the Android app's offline mode, reproduces all 1,567 recorded ramps behind it
+  (slope error 0.10, against 0.15 for the older fitted formula). How speed
+  carries over when a snake grows or shrinks mid-ramp can't be told apart from
+  the recordings, and none of the 72 capture schedules tested could do it
+  either, so the rule stays as it is
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-boost-ramp/REPORT.md)).
 - A study of why the simulator's turning rule divides by 111 where the stock
   client divides by 106. On the recordings behind the original fit, 111 matches
   observed turning about five times better than 106, but a fixed offset of 7–8
