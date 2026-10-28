@@ -66,6 +66,19 @@ export function snapshotReader(file, instance, now = () => performance.now()) {
   };
 }
 
+export function validateRehearsal(summary, sourceFingerprint) {
+  const baseline = summary.legs?.find(l => l.mode === 'baseline');
+  const conflict = summary.legs?.find(l => l.mode === 'conflict');
+  if (!summary.passed || summary.origin !== 'authored-local-rehearsal' || summary.officialRequests !== 0 ||
+      summary.sourceFreezeSha256 !== sourceFingerprint || !summary.windowsBranchUnitTested ||
+      !baseline?.bothSetups || !Number.isFinite(baseline.elapsedSeconds) || baseline.elapsedSeconds < 300 ||
+      !Number.isFinite(baseline.attributedSpanSeconds) || baseline.attributedSpanSeconds < 300 ||
+      !baseline.pairedControlObserved || !baseline.bothSocketsClosed ||
+      !conflict?.hostConflictDetected || !conflict.permanentStop || !conflict.bothSocketsClosed ||
+      summary.legs.some(l => l.sourceFreezeSha256 !== sourceFingerprint || !Array.isArray(l.sealedArchives) || l.sealedArchives.length !== 2))
+    throw Error('successful rehearsal does not match frozen sources');
+}
+
 function append(file, value) {
   const fd = fs.openSync(file, 'a');
   try { fs.writeSync(fd, JSON.stringify(value) + '\n'); fs.fsyncSync(fd); }
@@ -88,14 +101,18 @@ export async function run(root, instance, { captureFile = path.join(HERE, 'captu
   } else {
     const gate = JSON.parse(fs.readFileSync(path.join(root, 'attempt4-official-gate.json')));
     const digest = createHash('sha256').update(fs.readFileSync(path.join(HERE, 'SOURCE-FREEZE.json'))).digest('hex');
-    if (!gate.rehearsalPassed || !gate.summaryCommit || gate.sourceFreezeSha256 !== digest)
+    const summaryFile = path.join(HERE, 'rehearsal-proof.json');
+    const summaryBytes = fs.readFileSync(summaryFile);
+    if (!gate.rehearsalPassed || !gate.summaryCommit || gate.sourceFreezeSha256 !== digest ||
+        gate.summarySha256 !== createHash('sha256').update(summaryBytes).digest('hex'))
       throw Error('official rehearsal gate closed');
+    validateRehearsal(JSON.parse(summaryBytes), digest);
   }
   for (const name of ['STOP', 'STUDY-STOP.json']) if (fs.existsSync(path.join(root, name))) throw Error('permanent study stop');
   const lock = path.join(root, '.container-capture.lock');
   const lockFd = fs.openSync(lock, 'wx');
   const eventFile = path.join(root, `guard-${instance}-private.jsonl`);
-  const record = value => append(eventFile, { wall: Date.now(), ...value });
+  const record = value => append(eventFile, { wall: Date.now(), monotonicMs: performance.now(), ...value });
   let child = null, childExit = null, exited = null, ended = false, failure = null, ordinal = null, started = null;
   let interrupted = false;
   const signal = () => { interrupted = true; };
@@ -115,6 +132,7 @@ export async function run(root, instance, { captureFile = path.join(HERE, 'captu
     return state;
   };
   try {
+    record({ event: 'guard-source', sourceFreezeSha256: createHash('sha256').update(fs.readFileSync(path.join(HERE, 'SOURCE-FREEZE.json'))).digest('hex') });
     const ledgerPath = path.join(root, 'invocations.jsonl');
     const previous = fs.existsSync(ledgerPath) ? fs.readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
     ordinal = reserveOrdinal(previous);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { classify, preflight, snapshotReader, run, boundedDelay } from './container-guard.mjs';
+import { classify, preflight, snapshotReader, run, boundedDelay, validateRehearsal } from './container-guard.mjs';
 import { parseProc, namespaceCensus } from './namespace-census.mjs';
 const sample = ss => ({ windows: { ok: true, connections: [] },
   remote: { ok: true, ss, ownedPids: [21, 22], commandLines: { 99: 'authored foreign command' } } });
@@ -15,6 +15,20 @@ test('poll and drain sleeps clamp to their remaining budget', async () => {
     assert.deepEqual(delays, [10]); assert.equal(tick, 1200000);
     assert(await boundedDelay(1200000, maximum, options)); assert.deepEqual(delays, [10]);
   }
+});
+test('official gate requires the successful summary from the same rehearsed source', () => {
+  const fingerprint = 'a'.repeat(64);
+  const common = { sourceFreezeSha256: fingerprint, bothSocketsClosed: true, sealedArchives: [{}, {}] };
+  const summary = { origin: 'authored-local-rehearsal', officialRequests: 0, passed: true,
+    sourceFreezeSha256: fingerprint, windowsBranchUnitTested: true, legs: [
+      { ...common, mode: 'baseline', bothSetups: true, elapsedSeconds: 310, attributedSpanSeconds: 305, pairedControlObserved: true },
+      { ...common, mode: 'conflict', hostConflictDetected: true, permanentStop: true }] };
+  assert.doesNotThrow(() => validateRehearsal(summary, fingerprint));
+  assert.throws(() => validateRehearsal(summary, 'b'.repeat(64)));
+  const failed = structuredClone(summary); failed.legs[0].pairedControlObserved = false;
+  assert.throws(() => validateRehearsal(failed, fingerprint));
+  const incomplete = structuredClone(summary); delete incomplete.legs[0].elapsedSeconds;
+  assert.throws(() => validateRehearsal(incomplete, fingerprint));
 });
 test('fresh preflight permits no connection and admits only two owned connections during capture', () => {
   assert.equal(classify(sample(''), 'peer:7', true).conflicts.length, 0);

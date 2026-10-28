@@ -28,8 +28,11 @@ function Stop-Task([string]$Name) {
 }
 function Start-Docker([string]$Name, [string]$Command) {
     if ((Remote "docker ps -a -q --filter 'name=^/$Name$'").Trim()) { throw 'Fresh rehearsal name already occupied.' }
-    [IO.File]::WriteAllText((Join-Path $ArchiveRoot ($Name + '-command-private.txt')), $Command, $utf8)
-    $p = Start-Process -FilePath $SshExecutable -ArgumentList @($RemoteTarget, ('"' + $Command + '"')) -WindowStyle Hidden -PassThru `
+    $script = Join-Path $ArchiveRoot ($Name + '-command-private.sh')
+    [IO.File]::WriteAllText($script, $Command + "`n", $utf8)
+    & $ScpExecutable -q $script "${RemoteTarget}:${RemoteScratch}/$Name-command.sh"
+    if ($LASTEXITCODE -ne 0) { throw 'Rehearsal command transfer failed.' }
+    $p = Start-Process -FilePath $SshExecutable -ArgumentList @($RemoteTarget, ('"sh ' + "'$RemoteScratch/$Name-command.sh'" + '"')) -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $ArchiveRoot ($Name + '-stdout-private.txt')) -RedirectStandardError (Join-Path $ArchiveRoot ($Name + '-stderr-private.txt'))
     $p.ProcessorAffinity = 1
     $started.Add(@{ name = $Name; process = $p })
@@ -69,7 +72,7 @@ docker run --rm --pull never --name '__NAME__' --label research.turn-capture-ins
 '@
     $buildCommand = $buildCommand.Replace('__NAME__',$build).Replace('__ROOT__',$RemoteScratch).Replace('__IMAGE__',$RustImageId)
     $p = Start-Docker $build $buildCommand
-    $p.WaitForExit()
+    if (-not $p.WaitForExit(900000)) { Stop-Task $build; throw 'Capped release build deadline reached.' }
     if ($p.ExitCode -ne 0) { throw 'Capped offline release build failed.' }
     $config = @{ seed = 7; players = @{ max = 8 }; bots = @{ count = 0; threads = 1 };
         bind = ((@(0,0,0,0) -join '.') + ':8766'); simulation = @{ world = @{ radius = 1500; dynamicRadius = $false;
@@ -115,7 +118,12 @@ docker run --rm --pull never --name '__NAME__' --label research.turn-capture-ins
         $legs.Add($summary)
         $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $local 'rehearsal-leg-summary.json') -Encoding utf8NoBOM
     }
+    $unit = 'turn-rehearsal-unit-' + $nonce
+    Remote "docker run --rm --pull never --name '$unit' --network none --cpus 1 --memory 512m --memory-swap 512m --read-only --tmpfs /tmp:rw,nosuid,noexec,size=16m --mount type=bind,src=$RemoteScratch/source,dst=/source,readonly '$NodeImageId' node --test --test-concurrency=1 '/source/$study/container-guard.test.mjs'" | Set-Content -LiteralPath (Join-Path $ArchiveRoot 'rehearsal-unit-tests-private.txt') -Encoding utf8NoBOM
+    $fingerprint=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $PSScriptRoot 'SOURCE-FREEZE.json')).Hash.ToLowerInvariant()
+    if (@($legs | Where-Object sourceFreezeSha256 -ne $fingerprint).Count) { throw 'Rehearsed source does not match local source.' }
     $summary = @{ origin = 'authored-local-rehearsal'; passed = $true; officialRequests = 0;
+        sourceFreezeSha256 = $fingerprint; windowsBranchUnitTested = $true;
         legs = @($legs); windowsBranch = 'unit-tested; local server was not exposed to controller';
         innerLegacyOriginLabel = 'unchanged driver header; outer rehearsal marker identifies synthetic local data' }
     $summary | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $ArchiveRoot 'rehearsal-summary-private.json') -Encoding utf8NoBOM

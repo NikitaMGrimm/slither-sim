@@ -146,8 +146,9 @@ No host installation/configuration or existing container/image/volume is changed
 ## Final authorization on the owner's behalf: attempt 4
 
 Attempt 4 was authorized on the owner's behalf by the maintaining agent. There
-will be **no attempt 5**. If this final attempt yields no decision, PR #239 is to
-be landed as inconclusive and this investigation line stops.
+will be **no attempt 5**. If this final attempt yields no decision, it is reported
+as inconclusive and this investigation line stops. The maintaining agent will
+land PR #239; this capture task only pushes and reports, without merging.
 
 The capture container now uses Docker's default bridge and its own network
 namespace. Every matching connection in that namespace is ours; `/proc/net/tcp*`
@@ -157,6 +158,9 @@ The separate-machine host namespace is checked with `ss -tn` without `-p`:
 any matching connection there is a conflict because our sockets are not in that
 namespace. The controller retains connection-only checks. Census command errors,
 real conflicts, source/integrity failures and interruption fail closed.
+The census scope is the dedicated capture namespace, the host namespace and the
+controller. It relies on the maintaining agent's assurance that every other
+collector is idle; it does not inspect or alter unrelated container namespaces.
 
 The pre-launch waiting policy, post-launch permanent stop, four-invocation limit,
 two-connection limit, 1200-second bound and development/held-out rule are unchanged.

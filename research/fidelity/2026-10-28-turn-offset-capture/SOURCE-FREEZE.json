@@ -6,7 +6,7 @@
     "research/fidelity/2026-10-28-turn-count-phase/harness/Cargo.lock": "03b6fad90ac4d994b9019a307ae77db50d64b4544330d1d65abb4f5170e4137d",
     "research/fidelity/2026-10-28-turn-count-phase/harness/Cargo.toml": "fe156a787d255474b83f4b1eae5d444a2766edfda487a9ab9999a41044a4f646",
     "research/fidelity/2026-10-28-turn-count-phase/harness/src/main.rs": "fc5c5bba4bec9c00c0ae5e3ee1d178907f644b782eada41ce597427f25bb8a39",
-    "research/fidelity/2026-10-28-turn-offset-capture/ACQUISITION.md": "9222a385cd8ef28878c354133aa0374fe1972b661afef6e19b14ca190ec2bcd0",
+    "research/fidelity/2026-10-28-turn-offset-capture/ACQUISITION.md": "9e4aeaaf088d37208b9715b446292512f9e95a3a28e7b8384e8ede96982c060b",
     "research/fidelity/2026-10-28-turn-offset-capture/analyze.py": "1d3303d641a313aa224cdfdfb43d04ffb959cbed7d4b8bcbfda60bac641993ae",
     "research/fidelity/2026-10-28-turn-offset-capture/CAPTURE-PROTOCOL.json": "6b96d20e07149efebcd608328eb1a786049f9bdb0b810eceeac7b7b42cbbe424",
     "research/fidelity/2026-10-28-turn-offset-capture/capture.mjs": "7277318d3b51567a6a221f358401c739f27bf38b8c6a1e5ccace1a5cf49b1f4a",
@@ -20,13 +20,13 @@
     "tools/fidelity/slither-headless.mjs": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
     "research/fidelity/2026-10-28-turn-offset-capture/preflight.ps1": "360988b0a7b291013eba8b4ccd704a6a3f4683cfa6f992721b20c2617a31fdc0",
     "research/fidelity/2026-10-28-turn-offset-capture/preflight.test.ps1": "8a61ccb3cd6eab5a08598393bb972d9ebdf1244942f3c39f0d4e588e924aade2",
-    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.mjs": "aceae23f157ae59a2fe64aa5199cfc8afb1439c91a3b204e9f76a99fd23d0422",
-    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.test.mjs": "f541868a475c3eb5f15d318d5f962528292b304f8866539258d5049d64942f33",
+    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.mjs": "3b1ead82d5028e3749a4a813f9235fdb7748cf3b3d9ac77d435e47053a7c43d1",
+    "research/fidelity/2026-10-28-turn-offset-capture/container-guard.test.mjs": "155f5f68bf559b596827825e8fe75effecda9d97362c2c251b7e637a91fce60a",
     "research/fidelity/2026-10-28-turn-offset-capture/connection-probe.sh": "09628638177bca00469bc1e9b37d6e71eb02f5fc4c5f9de6e2a51993156aeaff",
     "research/fidelity/2026-10-28-turn-offset-capture/connection-monitor.ps1": "f456ec56b1217011557e3d369aa08a4abaf419912efa5d3f702a6361ea8389e5",
     "research/fidelity/2026-10-28-turn-offset-capture/namespace-census.mjs": "8e0baa30eec1a396ced722b44a2dd63f20558d72b07ba07ee901c6f80ed052ea",
-    "research/fidelity/2026-10-28-turn-offset-capture/rehearse.ps1": "a9a782410f84c98ca77a3b5bf1fb6dbc76420499729eb4b7f17d8a50cd7d9ee2",
-    "research/fidelity/2026-10-28-turn-offset-capture/rehearsal-audit.mjs": "52e51b79e438dc5c62e971637d77dba5fd971ae7dc5d92e2aa3c5bf3e90e2e18"
+    "research/fidelity/2026-10-28-turn-offset-capture/rehearse.ps1": "410dd6333bc60c762302c8beedbc26eff56f845f965fd778d536e24d57ca5c58",
+    "research/fidelity/2026-10-28-turn-offset-capture/rehearsal-audit.mjs": "c79eb53fafdde6f2b65cb1c9a294e0531f24625f95426b3860164628a5aee45d"
   },
   "policyAmendment": {
     "authorization": "Authorized on the owner's behalf: attempt2 after zero-socket failed exclusivity preflight",
