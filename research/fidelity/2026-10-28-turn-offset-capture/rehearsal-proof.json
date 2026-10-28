@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "windowsBranchUnitTested": true,
+  "innerLegacyOriginLabel": "unchanged driver header; outer rehearsal marker identifies synthetic local data",
+  "officialRequests": 0,
+  "origin": "authored-local-rehearsal",
+  "sourceFreezeSha256": "bfece38cc4074c6b5dc29311285c395a79b684381856077ad2b24e04c429711e",
+  "windowsBranch": "unit-tested; local server was not exposed to controller",
+  "legs": [
+    {
+      "origin": "authored-local-rehearsal",
+      "officialRequests": 0,
+      "mode": "baseline",
+      "sourceFreezeSha256": "bfece38cc4074c6b5dc29311285c395a79b684381856077ad2b24e04c429711e",
+      "attributedSpanSeconds": 315.67142814700003,
+      "pairedControlObserved": true,
+      "bothSetups": true,
+      "elapsedSeconds": 316.923257081,
+      "positiveTwoConnectionSamples": 307,
+      "samplesWithOptionalInodeOwners": 307,
+      "maximumNamespaceConnections": 2,
+      "hostConflictDetected": false,
+      "bothSocketsClosed": true,
+      "sealedArchives": [
+        {
+          "protocols": [
+            19
+          ],
+          "interrupted": true,
+          "sha256": "97486417484342002982eec8746b9efdb8fd52c95e5c7b8534daaa4032eba7b8"
+        },
+        {
+          "protocols": [
+            19
+          ],
+          "interrupted": true,
+          "sha256": "3249a22c09606c867c794f12179d24ca348d09b6d05dc943c0a85397fe07acd1"
+        }
+      ],
+      "permanentStop": true
+    },
+    {
+      "origin": "authored-local-rehearsal",
+      "officialRequests": 0,
+      "mode": "conflict",
+      "sourceFreezeSha256": "bfece38cc4074c6b5dc29311285c395a79b684381856077ad2b24e04c429711e",
+      "attributedSpanSeconds": 19.630377071999998,
+      "pairedControlObserved": true,
+      "bothSetups": true,
+      "elapsedSeconds": 20.642610901,
+      "positiveTwoConnectionSamples": 20,
+      "samplesWithOptionalInodeOwners": 20,
+      "maximumNamespaceConnections": 2,
+      "hostConflictDetected": true,
+      "bothSocketsClosed": true,
+      "sealedArchives": [
+        {
+          "protocols": [
+            19
+          ],
+          "interrupted": true,
+          "sha256": "aab7147d383c3ccf6d53f17fce22a8c0be8caadb652877d7574ec828d1b0d643"
+        },
+        {
+          "protocols": [
+            19
+          ],
+          "interrupted": true,
+          "sha256": "09f1bd5edef5ad62ebc8f1523a873ee6984de0db3d181fc08478609c96c8d05b"
+        }
+      ],
+      "permanentStop": true
+    }
+  ]
+}
