@@ -158,6 +158,9 @@ python3 "$STUDY/select_results.py" "$OUT" "$OUT/selected.json"
 
 Use `verify.py CLEAN_CANDIDATE CHECK_OUTPUT --cpu 1` for mutations and checks;
 on wrapper installations set `RUSTC`/`RUSTDOC` to the direct toolchain binaries.
+That commit predates this report, so its documentation tests can't check the
+study's links. Validate the final tree separately from the repository root:
+`python3 -B -m unittest discover -s tools -p test_documentation.py`.
 Raw source archives, generated Rust, per-arm build pins, copied binaries, logs,
 all attempts and compressed traces remain outside Git. Targets are bounded and
 deleted after copying/hash verification or completed tests. The final driver
