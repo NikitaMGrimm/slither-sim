@@ -133,7 +133,8 @@ Fifteen complete stock/half13/all13/U and historical wire/state traces match at
 the measured refs. Original full Rust group:15 commands pass. Removing MOD fails
 the compaction oracle; restored tests pass. After merging main, native single-thread
 checks passed:46 server/readiness,21 loopback and 7 documentation tests. These are
-historical prototype checks; the final research-only conversion needs docs checks.
+historical prototype checks. The research-only conversion passes 7 documentation
+tests; source/changelog match main and the archived patch reproduces its candidate.
 
 Historical reproduction only: replay.py and setup-native.py use both archives and
 the retained bench. Put PLAN.md, followup-probes.py,
