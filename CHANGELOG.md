@@ -5,6 +5,12 @@
 ### Added
 
 - A small-count turn study and its inconclusive captures, including an ownership-monitor failure.
+- A study of when prey start fleeing and how fast they flee. The current rules
+  reproduce all 13 recorded test cases exactly, with flight-speed error 0.04
+  against 0.38 for the older two-speed rule. Two close variants of each rule
+  can't be told apart from five official recordings, and no capture with two
+  connections could separate them, so the rules stay as they are
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-28-prey-flight-activation/REPORT.md)).
 - A study of the boost speed-up and slow-down. The current rule, taken from
   the Android app's offline mode, reproduces all 1,567 recorded ramps behind it
   (slope error 0.10, against 0.15 for the older fitted formula). How speed
