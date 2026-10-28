@@ -732,7 +732,7 @@ impl SimulatorBackend {
         let mut visible = BTreeMap::new();
         for index in prey_bounds.near(head) {
             let prey = &world.prey()[index];
-            if prey.position.distance(head) <= vision {
+            if prey.position.distance_le(head, vision) {
                 visible.entry(prey.id).or_insert(prey);
             }
         }

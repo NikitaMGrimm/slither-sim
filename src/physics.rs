@@ -508,15 +508,26 @@ pub fn death_food_size(segments: usize) -> f64 {
     ((13.6 + 1.375e-7 * n * n * n) * 5.0).round() / 5.0
 }
 pub fn segment_distance(p: Point, a: Point, b: Point) -> f64 {
+    p.distance(closest_on_segment(p, a, b))
+}
+
+/// The same projection and boundary result as `segment_distance(p, a, b) <= r`.
+/// Keep ambiguous distances on Point's original hypot path.
+#[cfg(feature = "networking")]
+pub(crate) fn segment_distance_le(p: Point, a: Point, b: Point, r: f64) -> bool {
+    p.distance_le(closest_on_segment(p, a, b), r)
+}
+
+fn closest_on_segment(p: Point, a: Point, b: Point) -> Point {
     let dx = b.x - a.x;
     let dy = b.y - a.y;
     let denom = dx * dx + dy * dy;
     let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / if denom == 0.0 { 1.0 } else { denom })
         .clamp(0.0, 1.0);
-    p.distance(Point {
+    Point {
         x: a.x + t * dx,
         y: a.y + t * dy,
-    })
+    }
 }
 pub fn swept_distance(a: Point, b: Point, c: Point, d: Point) -> f64 {
     fn cross(p: Point, q: Point, r: Point) -> f64 {
@@ -566,6 +577,81 @@ impl Bounds {
 #[cfg(test)]
 mod directed_geometry_tests {
     use super::*;
+
+    #[cfg(feature = "networking")]
+    #[test]
+    fn segment_comparison_matches_original_projection_and_hypot() {
+        // Freeze the original scalar projection independently of the shared
+        // helper, including its zero-length denominator and clamp order.
+        fn original(p: Point, a: Point, b: Point) -> f64 {
+            let dx = b.x - a.x;
+            let dy = b.y - a.y;
+            let denom = dx * dx + dy * dy;
+            let t = (((p.x - a.x) * dx + (p.y - a.y) * dy)
+                / if denom == 0.0 { 1.0 } else { denom })
+            .clamp(0.0, 1.0);
+            p.distance(Point {
+                x: a.x + t * dx,
+                y: a.y + t * dy,
+            })
+        }
+        let mut state = 0x73ac_128d_5479_u64;
+        let mut coordinate = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            ((state >> 11) as f64 / (1u64 << 53) as f64 - 0.5) * 65536.
+        };
+        let special = [
+            0.,
+            -0.,
+            f64::MIN_POSITIVE,
+            1e-200,
+            1e200,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
+        for i in 0..100_000 {
+            let p = Point {
+                x: coordinate(),
+                y: coordinate(),
+            };
+            let mut a = Point {
+                x: coordinate(),
+                y: coordinate(),
+            };
+            let mut b = Point {
+                x: coordinate(),
+                y: coordinate(),
+            };
+            match i % 5 {
+                0 => b = a,
+                1 => {
+                    a.x = special[i / 5 % special.len()];
+                    b.y = a.x;
+                }
+                _ => {}
+            }
+            let distance = original(p, a, b);
+            assert_eq!(segment_distance(p, a, b).to_bits(), distance.to_bits());
+            for r in [
+                distance,
+                distance.next_down(),
+                distance.next_up(),
+                coordinate().abs(),
+                special[i % special.len()],
+                -1.,
+            ] {
+                assert_eq!(
+                    segment_distance_le(p, a, b, r),
+                    distance <= r,
+                    "p={p:?}, a={a:?}, b={b:?}, r={r:?}"
+                );
+            }
+        }
+    }
 
     fn point_bits(point: Point) -> (u64, u64) {
         (point.x.to_bits(), point.y.to_bits())
