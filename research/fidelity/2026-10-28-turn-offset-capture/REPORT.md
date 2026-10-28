@@ -294,7 +294,8 @@ D111, adopting an offset or reviving original-count D106.
 
 The complete official bundle was copied home and hash-verified:
 `0cd74834bf882a0783b43376a011d3b98a9fda5fa0dafe762d2bc9ca1f0f7866`.
-Full rehearsal/official data and private connection records remain outside Git.
+Full rehearsal/official data and private connection records remain outside Git
+(access: local-only).
 **The remote task scratch directory was removed and no task container remains.
 No image was pulled; the pre-existing images were preserved.** Packing and cleanup
 used capped ephemeral containers; no existing container, image, volume, host
@@ -367,6 +368,7 @@ pwsh -NoProfile -File "$study/preflight.test.ps1"
 node --test --test-concurrency=1 tools/fidelity/slither-headless.test.mjs
 uv run --offline --no-project python -B -m unittest discover -s tools -p test_documentation.py
 # Build the prior standalone harness into a disposable external target.
+$external = Join-Path ([IO.Path]::GetTempPath()) 'turn-offset-capture-check'
 $prior = 'research/fidelity/2026-10-28-turn-count-phase'
 cargo build --offline --locked --release -j 1 --manifest-path "$prior/harness/Cargo.toml" --target-dir "$external/client-target"
 $env:TURN_COUNT_BINARY = "$external/client-target/release/turn-count-research.exe"
@@ -381,6 +383,28 @@ bounded attempt/preflight census and native count ranges; its base analysis hash
 and that assembly step are explicit. The byte-identical attempt-1 JSON and all
 original external root files were verified against their retained hashes.
 No formula, candidate, interval duration, eligibility gate or scoring rule changed.
+
+## Known tooling defects, not fixed
+
+Review after attempt 4 found these defects in the retired acquisition tooling. The
+sources stay byte-identical because their hashes are part of the frozen record and
+no further attempt will run them. None changes the reported outcome:
+
+- `guard.ps1` and `capture.mjs` accept any truthy `freezeCommit` for held-out
+  admission instead of requiring the post-development analysis checkpoint. Held-out
+  admission was never reached, because the coverage gate failed.
+- `guard.ps1` computes the next ordinal and checks permanent-stop markers before
+  waiting for the lock, not again after acquiring it. Two concurrent guards could
+  therefore reserve a stale ordinal or start after another guard's stop. Only one
+  guard ran at a time in every attempt.
+- An unframed challenge can leave a turn receipt with a null server clock, which
+  `score.mjs` would treat as zero in its stability gate. No cell was selected or
+  scored.
+- `container-guard.mjs` accepts the first census numbered after child exit as
+  post-close, although that census may have started before the sockets closed. That
+  could cause a false permanent stop. Both attempt-4 invocations closed without one.
+
+Fix these before reusing the tooling.
 
 Attempt 4 is complete and collection stops at the frozen development gate.
 There will be no attempt 5. This report supports no mechanics change.
