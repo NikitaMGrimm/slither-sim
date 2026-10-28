@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "status": "OWNER APPROVED revised smaller capture; first freeze before all official requests",
+  "simulatorSourceRevision": "f150f56d533a28d21aadcc39d9670e5af3b24783",
+  "clientRevision": "8d0772c015d6b9b73b80253db8c7349aa600b201",
+  "nativeAnalysisSourceRevision": "731a75c4803eed248cd940a7d1b9c635da49cc77",
+  "cellSpecifications": [
+    {
+      "count": 37,
+      "primary": true,
+      "wire_mode": "cruise",
+      "directions": [
+        "increasing",
+        "decreasing"
+      ],
+      "D111": 3.7577153589400214,
+      "D106_original": 3.7408801786667856,
+      "fixed_offsets": {
+        "6": 3.805185536445354,
+        "7": 3.8159652011391967,
+        "8": 3.8267626101370595,
+        "9": 3.8375777634389463,
+        "10": 3.848410661044856
+      },
+      "separation_seconds_at_j42": {
+        "6": 16.602374723786607,
+        "7": 13.545683848364973,
+        "8": 11.44074112606935,
+        "9": 9.902920146278621,
+        "10": 8.7302406228707
+      },
+      "minimum_interval_seconds": 25
+    },
+    {
+      "count": 100,
+      "primary": true,
+      "wire_mode": "cruise",
+      "directions": [
+        "increasing",
+        "decreasing"
+      ],
+      "D111": 3.146555981657333,
+      "D106_original": 3.104241166785333,
+      "fixed_offsets": {
+        "6": 3.161839177643289,
+        "7": 3.1715009511836962,
+        "8": 3.1811804690281242,
+        "9": 3.1908777311765752,
+        "10": 3.2005927376290497
+      },
+      "separation_seconds_at_j42": {
+        "6": 44.59045661700745,
+        "7": 27.352446256181274,
+        "8": 19.72964076068849,
+        "9": 15.431542573345116,
+        "10": 12.672462065232125
+      },
+      "minimum_interval_seconds": 60
+    },
+    {
+      "count": 174,
+      "primary": false,
+      "wire_mode": "cruise",
+      "directions": [
+        "increasing",
+        "decreasing"
+      ],
+      "D111": 2.5107113870627384,
+      "D106_original": 2.4463888394446425,
+      "fixed_offsets": {
+        "6": 2.4961083793164827,
+        "7": 2.5044570743592027,
+        "8": 2.512823513705945,
+        "9": 2.52120769735671,
+        "10": 2.5296096253114992
+      },
+      "separation_seconds_at_j42": {
+        "6": 39.09131523463334,
+        "7": 91.38660718678035,
+        "8": 270.9456686446603,
+        "9": 54.589108474163226,
+        "10": 30.35724164022921
+      },
+      "minimum_interval_seconds": 340
+    }
+  ],
+  "angularBudget": 0.07263554952022173,
+  "primaryEndpointJitterMs": 42,
+  "sensitivityEndpointJitterMs": [
+    0,
+    7,
+    14
+  ],
+  "invocationLimit": 4,
+  "secondsPerInvocationLimit": 1200,
+  "simultaneousConnectionsLimit": 2,
+  "split": {
+    "development": [
+      1,
+      2
+    ],
+    "heldout": [
+      3,
+      4
+    ]
+  },
+  "controls": {
+    "nickname": "Turn study",
+    "originProfile": "documented official origin",
+    "boost": false,
+    "collector": "existing tools/fidelity/slither-headless.mjs Bot/Recorder, unchanged transport and safety defaults",
+    "tickMs": 25,
+    "headingThrottleMs": 33,
+    "ownAndPeerAnchorMaxAgeMs": 300,
+    "observerMaxDistance": 800,
+    "postAndPreCountStabilitySeconds": 1
+  },
+  "selection": "First chronological eligible full interval per invocation/count/direction; actual received count; no replacement invocations or model-error exclusions",
+  "decision": "See PLAN.md fixed replicated held-out decision rule",
+  "planSha256": "43d24abd5a44a86376c00a8ab6deb6f80650ced616b46aa7827ec32729222c29",
+  "collectorSha256": "965acd0bda786ab1fc05a2c46f20b1bfb70de091dfea543d24bfa35d7b153ba3",
+  "discoveryDecoderSha256": "5983f88928d1c407aab1e29bd59a3facfdfc0a54e9e5205646798c3470a7cffa"
+}

@@ -1,0 +1,97 @@
+{
+  "invocations": [],
+  "decision": "inconclusive-development-coverage",
+  "schemaVersion": 1,
+  "freezeCommit": "fd8962419cd762952160e86942f694ac2390de7b",
+  "clientRevision": "8d0772c015d6b9b73b80253db8c7349aa600b201",
+  "summaries": [],
+  "nativeBinarySha256": "3fa67d9aabb5c7a5e8524ff7517d9a20a199fbc246c90d3a5019d09b9ca3f820",
+  "sourceSha256": {
+    "analyze.py": "1d3303d641a313aa224cdfdfb43d04ffb959cbed7d4b8bcbfda60bac641993ae",
+    "capture.mjs": "7277318d3b51567a6a221f358401c739f27bf38b8c6a1e5ccace1a5cf49b1f4a",
+    "capture.test.mjs": "d78befced2eff9fe75115121ac5373e3f1aea2c8cc9acbfaba5970a0c8701b32",
+    "discover.mjs": "1ffb267b5ff7caa41dbccb11a704af894841893836ede3f76618e9da79ff1d69",
+    "guard.ps1": "87ff82ed728680e2bd02231026bcabc73e71ac4c83c765d4b50dd00b87f1ae74",
+    "score.mjs": "174b2d5f974cb85bfd6bee058d502dbf7f619a92d01a0fdc0bea7aea65751fa8",
+    "selection.mjs": "9b4228a8c69e2585d4d0be1a3cd20d563654199a82728cfd9eb0c105901c4c8e"
+  },
+  "status": "inconclusive: frozen exclusivity stop before official game launch",
+  "acquisitionSourceFreezeCommit": "2df58630fce4b7c16a0c1cbe43e399b8b1642196",
+  "preflight": {
+    "officialDiscoveryRequests": 1,
+    "rawListSha256": "144331b750c891b7ed6b75e8c7a1154b26e10affaca2b010ceb477ae3d1169dc",
+    "listedEntries": 141,
+    "activeEntries": 35,
+    "preferredRetainedEntryWasActive": true,
+    "existingNonTaskConnectionsAtStop": 1,
+    "reason": "existing connection to bound server",
+    "permanentStudyStop": true,
+    "guardReleased": true
+  },
+  "acquisition": {
+    "reservedOfficialInvocations": 0,
+    "limit": 4,
+    "officialGameSocketAttempts": 0,
+    "developmentInvocations": 0,
+    "heldoutInvocations": 0,
+    "primaryCellsAcquired": 0,
+    "optionalCellsAcquired": 0,
+    "rawGameArchives": 0
+  },
+  "cellStatus": [
+    {
+      "count": 37,
+      "sign": 1,
+      "primary": true,
+      "status": "not acquired: preflight exclusivity stop"
+    },
+    {
+      "count": 37,
+      "sign": -1,
+      "primary": true,
+      "status": "not acquired: preflight exclusivity stop"
+    },
+    {
+      "count": 100,
+      "sign": 1,
+      "primary": true,
+      "status": "not acquired: preflight exclusivity stop"
+    },
+    {
+      "count": 100,
+      "sign": -1,
+      "primary": true,
+      "status": "not acquired: preflight exclusivity stop"
+    },
+    {
+      "count": 174,
+      "sign": 1,
+      "primary": false,
+      "status": "not acquired: preflight exclusivity stop"
+    },
+    {
+      "count": 174,
+      "sign": -1,
+      "primary": false,
+      "status": "not acquired: preflight exclusivity stop"
+    }
+  ],
+  "interpretation": {
+    "D111": "not tested by this study",
+    "fixedOffsets6Through10": "not tested by this study",
+    "originalCountD106": "previous long-174 rejection unchanged, conditional on previous angle/timing assumptions",
+    "mechanicsCorrectionSupported": false
+  },
+  "assembly": {
+    "baseAnalysisSha256": "6833748859078c4a40f4a1c6b03eff787cdc816759d29efeeb5ca2c55435d469",
+    "additionalFields": "bounded discovery/guard outcome; no scoring changes after source freeze"
+  },
+  "verification": {
+    "researchNodeTests": 9,
+    "existingCollectorNodeTests": 104,
+    "priorPinnedNativePythonTests": 8,
+    "documentationTests": 7,
+    "independentReview": "source-only acquisition review and four-finding correction recheck; no independent test execution",
+    "nativeNewGameReplays": 0
+  }
+}
