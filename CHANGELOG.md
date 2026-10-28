@@ -4,48 +4,6 @@
 
 ## [0.7.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.0...v0.7.1) - 2026-10-28
 
-### Fixed
-
-- *(config)* name the seat limit for seat-following arenas ([#243](https://github.com/NikitaMGrimm/slither-sim/pull/243))
-
-### Other
-
-- *(simulator)* skip distant bodies during spawn admission ([#244](https://github.com/NikitaMGrimm/slither-sim/pull/244))
-- *(perf)* measure one-core population scaling ([#242](https://github.com/NikitaMGrimm/slither-sim/pull/242))
-- *(fidelity)* compare retained wall sliding and capture power ([#241](https://github.com/NikitaMGrimm/slither-sim/pull/241))
-- *(fidelity)* retain inconclusive turn capture attempts ([#239](https://github.com/NikitaMGrimm/slither-sim/pull/239))
-- *(prey)* audit retained flight and activation evidence ([#240](https://github.com/NikitaMGrimm/slither-sim/pull/240))
-- *(fidelity)* audit boost ramp evidence and capture power ([#238](https://github.com/NikitaMGrimm/slither-sim/pull/238))
-- *(food)* derive pellet positions from live bits ([#230](https://github.com/NikitaMGrimm/slither-sim/pull/230))
-- *(fidelity)* audit turn counts and phase evidence ([#236](https://github.com/NikitaMGrimm/slither-sim/pull/236))
-- *(host)* reuse recipient update packet lists ([#231](https://github.com/NikitaMGrimm/slither-sim/pull/231))
-- *(fidelity)* compare stock client predictions ([#233](https://github.com/NikitaMGrimm/slither-sim/pull/233))
-- *(research)* recheck c7a current-main socket capacity ([#232](https://github.com/NikitaMGrimm/slither-sim/pull/232))
-- *(host)* refresh food subscriptions once per tick ([#229](https://github.com/NikitaMGrimm/slither-sim/pull/229))
-- *(core)* reuse heading and pickup geometry ([#228](https://github.com/NikitaMGrimm/slither-sim/pull/228))
-- *(host)* skip unchanged shared food sectors ([#226](https://github.com/NikitaMGrimm/slither-sim/pull/226))
-- preserve warm food caches during arena shrink ([#224](https://github.com/NikitaMGrimm/slither-sim/pull/224))
-- *(host)* skip unchanged snake deltas ([#225](https://github.com/NikitaMGrimm/slither-sim/pull/225))
-- *(host)* maintain snake coverage cell memberships ([#223](https://github.com/NikitaMGrimm/slither-sim/pull/223))
-- *(host)* document optional CPU-specific builds ([#220](https://github.com/NikitaMGrimm/slither-sim/pull/220))
-- *(host)* skip distant prey in recipient visibility ([#221](https://github.com/NikitaMGrimm/slither-sim/pull/221))
-- *(host)* share opt-in legacy full minimaps ([#219](https://github.com/NikitaMGrimm/slither-sim/pull/219))
-- avoid floor calls in collision and prey indexing ([#218](https://github.com/NikitaMGrimm/slither-sim/pull/218))
-- skip unchanged pellet position updates ([#216](https://github.com/NikitaMGrimm/slither-sim/pull/216))
-- *(host)* reuse protocol-13 packet buffers for frames ([#215](https://github.com/NikitaMGrimm/slither-sim/pull/215))
-- compact food pickup removals by range ([#213](https://github.com/NikitaMGrimm/slither-sim/pull/213))
-- reuse verified food mirrors across simulation ticks ([#212](https://github.com/NikitaMGrimm/slither-sim/pull/212))
-- *(perf)* recheck one-core host after indexed pickup ([#211](https://github.com/NikitaMGrimm/slither-sim/pull/211))
-- *(host)* skip unrelated recipient food hints ([#210](https://github.com/NikitaMGrimm/slither-sim/pull/210))
-- drive food pickup from indexed pellet cells ([#209](https://github.com/NikitaMGrimm/slither-sim/pull/209))
-- *(host)* index socket deliveries by slot ([#208](https://github.com/NikitaMGrimm/slither-sim/pull/208))
-- reduce food pickup cache bookkeeping ([#207](https://github.com/NikitaMGrimm/slither-sim/pull/207))
-- *(host)* skip empty Linux socket reads with readiness ([#205](https://github.com/NikitaMGrimm/slither-sim/pull/205))
-- *(host)* merge ordered snake candidates without per-player sorting ([#204](https://github.com/NikitaMGrimm/slither-sim/pull/204))
-- *(fidelity)* record inconclusive collision-delay study ([#202](https://github.com/NikitaMGrimm/slither-sim/pull/202))
-- *(perf)* recheck one-core host after tail fixes ([#201](https://github.com/NikitaMGrimm/slither-sim/pull/201))
-- *(host)* reject blocked spawn heads before body checks ([#199](https://github.com/NikitaMGrimm/slither-sim/pull/199))
-
 ### Added
 
 - A study of how the simulator's cost grows from 500 to 10,000 snakes on one
