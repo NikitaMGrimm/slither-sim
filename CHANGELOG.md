@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- A study of whether one core can run 2,281 snakes, the most the stock client
+  can show at official density. It can't yet: with 2,280 bots and one player,
+  the server manages about 10 ticks per second against 143. Counting only the
+  world's own work, as if every bot were a remote player, a tick costs 32–34 ms
+  against a 7 ms budget, before the socket cost of 2,281 real connections.
+  Three quarters of that is building each player's update; at 500 bots the
+  same work fits in 70–78% of a tick
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-official-density-capacity/REPORT.md)).
+
 ### Breaking
 
 - `Food` now implements `Copy`, so pellets are copied instead of cloned.
