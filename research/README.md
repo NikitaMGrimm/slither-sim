@@ -124,11 +124,18 @@ archive integrity establishes neither scientific rules nor product adoption.
   outcomes (including failure), limits, decision and reproduction/evidence links.
   Study amendments can stay together; a PR or agent turn is not a new study.
   Preserve frozen plans and historical conclusions.
-- Put only useful, bounded result data beside the report. Reuse the existing
+- Put only useful, bounded result data beside the report: the values it cites
+  and enough to recompute its tables, not every raw sample. Reuse the existing
   [evidence bundle format](../docs/evidence-format.md); do not add a parallel
   claims/status registry. Keep small regressions in `tests/fixtures/`, reusable
   tools in existing `tools/` paths. Source-snapshot tools do not automatically
   archive this tree.
+- Keep a patch only for code that does not land: measurement harnesses,
+  instrumentation, and rejected or losing prototypes. Squash merges keep only
+  the landed change, so such a patch may be its only copy. Code that lands in
+  the same PR needs no patch; cite the PR or commit.
+- Link an earlier study's scripts instead of copying them, and keep only what
+  this study changes.
 - Keep raw recordings, full traces, checkpoints, binaries and changing handoffs
   outside Git. When sharing is permitted, give a retrievable URL and digest;
   otherwise label access local-only, restricted or unavailable. Paths/hashes
