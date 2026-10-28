@@ -1,0 +1,2047 @@
+{
+  "refs": {
+    "base": "4532a76f22958ae3abcca801e90edd30ed9f466f",
+    "lazy": "8a75634407d8a106aa0480eeb5aab51d218026d1",
+    "candidate": "9a3f6f5fe85184e42b32c2251480b94356c9210e"
+  },
+  "builds": {
+    "base": {
+      "runtime": "4532a76f22958ae3abcca801e90edd30ed9f466f",
+      "archiveSha256": "2257985e1f585925ac56e1cfd9e1ba59991e091c69f16475935f2a55df705764",
+      "binarySha256": "f074cfb73f5e0b079090e47c31e79838ce7b7456212d5c31c1e542b825589fd0",
+      "overlaySha256": {
+        "src/food_grid.rs": "685007dfc931c8d454d093ad9c614a64b36c632cecd2ad388bcc40c522aeb256",
+        "src/simulator.rs": "b6af565d34520dc4d7f76a936119f2e0a6ffa7fa126e10fc1138aef7bc722cc4",
+        "src/study_rebuild_probe.rs": "8a4096217311aeac0c14bac92463c5a6221e63c1118828e46fd0b890a7dd45ef",
+        "src/client/simulation/study_long.rs": "12e6f7588f3c83da96e32b8ca5ff52fed04c09286246f82b27ff06519ee8c5c8"
+      }
+    },
+    "lazy": {
+      "runtime": "8a75634407d8a106aa0480eeb5aab51d218026d1",
+      "archiveSha256": "f73af2273dfb4e756cdc75872521245e2561e745bb42a227728b43f1c174f6d0",
+      "binarySha256": "1ee5e57c7d4368973d474b2b2d07f46b8f9e7178d2e5258a443f63a286636e4f",
+      "overlaySha256": {
+        "src/food_grid.rs": "50e8617242495bfd45dd1cd15551e4fd1f2b1c2a17bd2aabaf13cdaaf831f6c9",
+        "src/simulator.rs": "b6af565d34520dc4d7f76a936119f2e0a6ffa7fa126e10fc1138aef7bc722cc4",
+        "src/study_rebuild_probe.rs": "8a4096217311aeac0c14bac92463c5a6221e63c1118828e46fd0b890a7dd45ef",
+        "src/client/simulation/study_long.rs": "12e6f7588f3c83da96e32b8ca5ff52fed04c09286246f82b27ff06519ee8c5c8"
+      }
+    },
+    "candidate": {
+      "runtime": "9a3f6f5fe85184e42b32c2251480b94356c9210e",
+      "archiveSha256": "bf3d73156c72b4f084fd175e0b97520e499041579ed4c671d1eefa72f79d1ee5",
+      "binarySha256": "f33033c5baf15cdd6c960177017016a6a5c69572bc55ca36eba5f23d4e0bc826",
+      "overlaySha256": {
+        "src/food_grid.rs": "500d1262e05bfbdc53c380e1151a048bf184a4e4a8ba62c5f77160df7a0e491b",
+        "src/simulator.rs": "54f895f5d027e18a1b4ca8f99d18181ad14cb6385abbbc8c312928b117fb6d23",
+        "src/study_rebuild_probe.rs": "8a4096217311aeac0c14bac92463c5a6221e63c1118828e46fd0b890a7dd45ef",
+        "src/client/simulation/study_long.rs": "12e6f7588f3c83da96e32b8ca5ff52fed04c09286246f82b27ff06519ee8c5c8"
+      }
+    }
+  },
+  "cases": {
+    "official500": {
+      "base": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 342895495,
+          "case": "official500",
+          "dt": 0.007,
+          "endpointChecksum": 10483792961657333432,
+          "forcedReconnect": true,
+          "frames": 10015216,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 83500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 29999894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 1.2739333333333334,
+          "p50": 0.0,
+          "p99": 36.0,
+          "p999": 55.0,
+          "min": 0,
+          "max": 66
+        },
+        "birthsLast10000PerTick": 0.0204,
+        "food": {
+          "n": 60000,
+          "mean": 55716.5358,
+          "p50": 55288.0,
+          "p99": 58524.0,
+          "p999": 58604.001,
+          "min": 52637,
+          "max": 58630
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 499.99823333333336,
+          "p50": 500.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 499,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 5884502.561266666,
+          "p50": 5294138.0,
+          "p99": 9103895.490000002,
+          "p999": 10130877.702999994,
+          "min": 4703838.0,
+          "max": 175498524.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 5879785.227872412,
+          "p50": 5293190.0,
+          "p99": 9095826.04,
+          "p999": 10121853.237999998,
+          "min": 4703838.0,
+          "max": 18948834.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 7766546.491017964,
+          "p50": 7129213.0,
+          "p99": 11063324.52,
+          "p999": 11416165.374000002,
+          "min": 6654995.0,
+          "max": 11471744.0
+        },
+        "normalTickInstructions": {
+          "n": 59713,
+          "mean": 5874508.502017986,
+          "p50": 5291481.0,
+          "p99": 9074157.639999999,
+          "p999": 9922361.76000002,
+          "min": 4703838.0,
+          "max": 18948834.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 17921322.0,
+          "p50": 17921322.0,
+          "p99": 17921322.0,
+          "p999": 17921322.0,
+          "min": 17921322.0,
+          "max": 17921322.0
+        },
+        "maintenanceBatchInstructions": null,
+        "cyclesStarted": 0,
+        "cyclesCompleted": 0,
+        "maintenanceBatches": 0,
+        "firstStartTick": null,
+        "firstStartSeconds": null,
+        "intervalTicks": null,
+        "intervalSeconds": null,
+        "rightCensoredTicks": 60000,
+        "cycleDurationTicks": null,
+        "cycleInstructions": null,
+        "rawCountsSha256": "86e82f32f8f9a5a1b624cc972e06d98ac3f321cba5c4a34846054a0a7fa6d083"
+      },
+      "lazy": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 342895495,
+          "case": "official500",
+          "dt": 0.007,
+          "endpointChecksum": 10483792961657333432,
+          "forcedReconnect": true,
+          "frames": 10015216,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 83500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 29999894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 1.2739333333333334,
+          "p50": 0.0,
+          "p99": 36.0,
+          "p999": 55.0,
+          "min": 0,
+          "max": 66
+        },
+        "birthsLast10000PerTick": 0.0204,
+        "food": {
+          "n": 60000,
+          "mean": 55716.5358,
+          "p50": 55288.0,
+          "p99": 58524.0,
+          "p999": 58604.001,
+          "min": 52637,
+          "max": 58630
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 499.99823333333336,
+          "p50": 500.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 499,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 5881422.156333333,
+          "p50": 5287460.5,
+          "p99": 9061179.32,
+          "p999": 10134418.88599999,
+          "min": 4698204.0,
+          "max": 175241521.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 5877452.491633266,
+          "p50": 5286933.5,
+          "p99": 9056973.75,
+          "p999": 10124106.993999992,
+          "min": 4698204.0,
+          "max": 30783961.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 7820374.754491018,
+          "p50": 7201466.0,
+          "p99": 11177423.56,
+          "p999": 11401678.0,
+          "min": 6584714.0,
+          "max": 11443012.0
+        },
+        "normalTickInstructions": {
+          "n": 59712,
+          "mean": 5871601.498090836,
+          "p50": 5285482.5,
+          "p99": 9034106.53,
+          "p999": 9817449.848999979,
+          "min": 4698204.0,
+          "max": 18809925.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 18119643.0,
+          "p50": 18119643.0,
+          "p99": 18119643.0,
+          "p999": 18119643.0,
+          "min": 18119643.0,
+          "max": 18119643.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 1,
+          "mean": 25545617.0,
+          "p50": 25545617.0,
+          "p99": 25545617.0,
+          "p999": 25545617.0,
+          "min": 25545617.0,
+          "max": 25545617.0
+        },
+        "cyclesStarted": 1,
+        "cyclesCompleted": 1,
+        "maintenanceBatches": 1,
+        "firstStartTick": 8607,
+        "firstStartSeconds": 60.249,
+        "intervalTicks": null,
+        "intervalSeconds": null,
+        "rightCensoredTicks": 51393,
+        "cycleDurationTicks": {
+          "n": 1,
+          "mean": 1.0,
+          "p50": 1.0,
+          "p99": 1.0,
+          "p999": 1.0,
+          "min": 1,
+          "max": 1
+        },
+        "cycleInstructions": {
+          "n": 1,
+          "mean": 25545617.0,
+          "p50": 25545617.0,
+          "p99": 25545617.0,
+          "p999": 25545617.0,
+          "min": 25545617.0,
+          "max": 25545617.0
+        },
+        "rawCountsSha256": "ee2ab7a690b453e4f38144e9591515c8132c7258e650a323e185501285dc4335",
+        "trace": {
+          "sha256": "667ba0253d0ca70bfe29b44a0f7b3172eddfde63a69ea00c8201fbf5f8c5785a",
+          "bytes": 913693554
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 1,
+          "mean": 25553332.0,
+          "p50": 25553332.0,
+          "p99": 25553332.0,
+          "p999": 25553332.0,
+          "min": 25553332.0,
+          "max": 25553332.0
+        }
+      },
+      "candidate": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 342895495,
+          "case": "official500",
+          "dt": 0.007,
+          "endpointChecksum": 10483792961657333432,
+          "forcedReconnect": true,
+          "frames": 10015216,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 83500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 29999894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 1.2739333333333334,
+          "p50": 0.0,
+          "p99": 36.0,
+          "p999": 55.0,
+          "min": 0,
+          "max": 66
+        },
+        "birthsLast10000PerTick": 0.0204,
+        "food": {
+          "n": 60000,
+          "mean": 55716.5358,
+          "p50": 55288.0,
+          "p99": 58524.0,
+          "p999": 58604.001,
+          "min": 52637,
+          "max": 58630
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 499.99823333333336,
+          "p50": 500.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 499,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 5870527.665066667,
+          "p50": 5292559.0,
+          "p99": 9036491.360000001,
+          "p999": 10114603.081999904,
+          "min": 4689557.0,
+          "max": 175234147.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 5866556.286673347,
+          "p50": 5292118.0,
+          "p99": 9030767.139999997,
+          "p999": 10109838.723,
+          "min": 4689557.0,
+          "max": 18798907.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 7810623.850299401,
+          "p50": 7196641.0,
+          "p99": 11166985.68,
+          "p999": 11391668.22,
+          "min": 6574977.0,
+          "max": 11433223.0
+        },
+        "normalTickInstructions": {
+          "n": 59601,
+          "mean": 5859822.785238503,
+          "p50": 5289751.0,
+          "p99": 9001574.0,
+          "p999": 9807734.600000009,
+          "min": 4689557.0,
+          "max": 18798907.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 18119667.0,
+          "p50": 18119667.0,
+          "p99": 18119667.0,
+          "p999": 18119667.0,
+          "min": 18119667.0,
+          "max": 18119667.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 112,
+          "mean": 213683.82142857142,
+          "p50": 207203.5,
+          "p99": 272652.97,
+          "p999": 275859.95399999997,
+          "min": 139779.0,
+          "max": 276258.0
+        },
+        "cyclesStarted": 1,
+        "cyclesCompleted": 1,
+        "maintenanceBatches": 112,
+        "firstStartTick": 8607,
+        "firstStartSeconds": 60.249,
+        "intervalTicks": null,
+        "intervalSeconds": null,
+        "rightCensoredTicks": 51393,
+        "cycleDurationTicks": {
+          "n": 1,
+          "mean": 112.0,
+          "p50": 112.0,
+          "p99": 112.0,
+          "p999": 112.0,
+          "min": 112,
+          "max": 112
+        },
+        "cycleInstructions": {
+          "n": 1,
+          "mean": 23932588.0,
+          "p50": 23932588.0,
+          "p99": 23932588.0,
+          "p999": 23932588.0,
+          "min": 23932588.0,
+          "max": 23932588.0
+        },
+        "rawCountsSha256": "7a0fe39a83e850f7ba449bec483e72413827d1b1a5d29a74b825ea681e75e3c2",
+        "trace": {
+          "sha256": "667ba0253d0ca70bfe29b44a0f7b3172eddfde63a69ea00c8201fbf5f8c5785a",
+          "bytes": 913693554
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 112,
+          "mean": 332798.70535714284,
+          "p50": 328352.0,
+          "p99": 503937.98,
+          "p999": 510636.703,
+          "min": 119280.0,
+          "max": 511450.0
+        }
+      }
+    },
+    "official500-orbit": {
+      "base": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 702158704,
+          "case": "official500-orbit",
+          "dt": 0.007,
+          "endpointChecksum": 6457712725858146404,
+          "forcedReconnect": true,
+          "frames": 21040457,
+          "latencyRandom": "Random(12492876730130272709)",
+          "legacy": 0,
+          "maps": 83473,
+          "populationFinal": 500,
+          "populationMin": 494,
+          "populationSum": 29989524,
+          "reconnects": 293,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(3666972317983870446)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 9.901266666666666,
+          "p50": 2.0,
+          "p99": 69.0,
+          "p999": 76.0,
+          "min": 0,
+          "max": 83
+        },
+        "birthsLast10000PerTick": 12.7419,
+        "food": {
+          "n": 60000,
+          "mean": 124614.55046666667,
+          "p50": 128888.0,
+          "p99": 150227.01,
+          "p999": 150867.003,
+          "min": 52632,
+          "max": 150971
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 499.8254,
+          "p50": 500.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 494,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 11602450.499533333,
+          "p50": 10569267.0,
+          "p99": 25888895.87,
+          "p999": 28495617.835999917,
+          "min": 4785501.0,
+          "max": 175403665.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 11609559.234669339,
+          "p50": 10573990.5,
+          "p99": 25889153.27,
+          "p999": 28492587.819999997,
+          "min": 4785501.0,
+          "max": 34069247.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 13105358.814371258,
+          "p50": 12082786.0,
+          "p99": 25473365.520000003,
+          "p999": 26857240.326000005,
+          "min": 7146635.0,
+          "max": 27070009.0
+        },
+        "normalTickInstructions": {
+          "n": 59713,
+          "mean": 11605375.915629763,
+          "p50": 10568827.0,
+          "p99": 25890015.559999995,
+          "p999": 28493158.96,
+          "min": 4785501.0,
+          "max": 34069247.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 17921335.0,
+          "p50": 17921335.0,
+          "p99": 17921335.0,
+          "p999": 17921335.0,
+          "min": 17921335.0,
+          "max": 17921335.0
+        },
+        "maintenanceBatchInstructions": null,
+        "cyclesStarted": 0,
+        "cyclesCompleted": 0,
+        "maintenanceBatches": 0,
+        "firstStartTick": null,
+        "firstStartSeconds": null,
+        "intervalTicks": null,
+        "intervalSeconds": null,
+        "rightCensoredTicks": 60000,
+        "cycleDurationTicks": null,
+        "cycleInstructions": null,
+        "rawCountsSha256": "a101784f13546939962cf654ef1a6e95880568a8befdfe91ab6e743ad6793c6b"
+      },
+      "lazy": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 702158704,
+          "case": "official500-orbit",
+          "dt": 0.007,
+          "endpointChecksum": 6457712725858146404,
+          "forcedReconnect": true,
+          "frames": 21040457,
+          "latencyRandom": "Random(12492876730130272709)",
+          "legacy": 0,
+          "maps": 83473,
+          "populationFinal": 500,
+          "populationMin": 494,
+          "populationSum": 29989524,
+          "reconnects": 293,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(3666972317983870446)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 9.901266666666666,
+          "p50": 2.0,
+          "p99": 69.0,
+          "p999": 76.0,
+          "min": 0,
+          "max": 83
+        },
+        "birthsLast10000PerTick": 12.7419,
+        "food": {
+          "n": 60000,
+          "mean": 124614.55046666667,
+          "p50": 128888.0,
+          "p99": 150227.01,
+          "p999": 150867.003,
+          "min": 52632,
+          "max": 150971
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 499.8254,
+          "p50": 500.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 494,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 11071707.60475,
+          "p50": 10069528.5,
+          "p99": 25239061.400000002,
+          "p999": 27737029.506999966,
+          "min": 4724245.0,
+          "max": 175100456.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 11078551.542635271,
+          "p50": 10073463.0,
+          "p99": 25239169.4,
+          "p999": 27732319.865999997,
+          "min": 4724245.0,
+          "max": 55375944.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 12603354.820359282,
+          "p50": 11692831.0,
+          "p99": 24467448.380000003,
+          "p999": 26332390.016000006,
+          "min": 6627276.0,
+          "max": 26644723.0
+        },
+        "normalTickInstructions": {
+          "n": 59710,
+          "mean": 11072202.142924134,
+          "p50": 10068845.0,
+          "p99": 25229536.9,
+          "p999": 27672511.078999963,
+          "min": 4724245.0,
+          "max": 33743302.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 18119645.0,
+          "p50": 18119645.0,
+          "p99": 18119645.0,
+          "p999": 18119645.0,
+          "min": 18119645.0,
+          "max": 18119645.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 3,
+          "mean": 42200304.666666664,
+          "p50": 42284227.0,
+          "p99": 43181418.96,
+          "p999": 43197897.996,
+          "min": 41116958.0,
+          "max": 43199729.0
+        },
+        "cyclesStarted": 3,
+        "cyclesCompleted": 3,
+        "maintenanceBatches": 3,
+        "firstStartTick": 17091,
+        "firstStartSeconds": 119.637,
+        "intervalTicks": {
+          "n": 2,
+          "mean": 17067.5,
+          "p50": 17067.5,
+          "p99": 18280.25,
+          "p999": 18302.525,
+          "min": 15830,
+          "max": 18305
+        },
+        "intervalSeconds": {
+          "n": 2,
+          "mean": 119.4725,
+          "p50": 119.4725,
+          "p99": 127.96175,
+          "p999": 128.117675,
+          "min": 110.81,
+          "max": 128.135
+        },
+        "rightCensoredTicks": 8774,
+        "cycleDurationTicks": {
+          "n": 3,
+          "mean": 1.0,
+          "p50": 1.0,
+          "p99": 1.0,
+          "p999": 1.0,
+          "min": 1,
+          "max": 1
+        },
+        "cycleInstructions": {
+          "n": 3,
+          "mean": 42200304.666666664,
+          "p50": 42284227.0,
+          "p99": 43181418.96,
+          "p999": 43197897.996,
+          "min": 41116958.0,
+          "max": 43199729.0
+        },
+        "rawCountsSha256": "b87b9a9d33cb580bf9ea56745b19e088b2adc95938b39572b84aa411db4a545a",
+        "trace": {
+          "sha256": "352597e8e719c98dbe2954a0f8b8edc6f4c3d8d560a19ab37343a4bde50e89cb",
+          "bytes": 1898279931
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 3,
+          "mean": 41694995.333333336,
+          "p50": 41570321.0,
+          "p99": 42338075.54,
+          "p999": 42352177.154,
+          "min": 41160921.0,
+          "max": 42353744.0
+        }
+      },
+      "candidate": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 702158704,
+          "case": "official500-orbit",
+          "dt": 0.007,
+          "endpointChecksum": 6457712725858146404,
+          "forcedReconnect": true,
+          "frames": 21040457,
+          "latencyRandom": "Random(12492876730130272709)",
+          "legacy": 0,
+          "maps": 83473,
+          "populationFinal": 500,
+          "populationMin": 494,
+          "populationSum": 29989524,
+          "reconnects": 293,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(3666972317983870446)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 9.901266666666666,
+          "p50": 2.0,
+          "p99": 69.0,
+          "p999": 76.0,
+          "min": 0,
+          "max": 83
+        },
+        "birthsLast10000PerTick": 12.7419,
+        "food": {
+          "n": 60000,
+          "mean": 124614.55046666667,
+          "p50": 128888.0,
+          "p99": 150227.01,
+          "p999": 150867.003,
+          "min": 52632,
+          "max": 150971
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 499.8254,
+          "p50": 500.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 494,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 11050932.359666666,
+          "p50": 10052060.5,
+          "p99": 25214502.880000006,
+          "p999": 27703430.15299994,
+          "min": 4714324.0,
+          "max": 175094264.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 11057754.623096192,
+          "p50": 10055298.0,
+          "p99": 25215060.479999997,
+          "p999": 27665412.071999963,
+          "min": 4714324.0,
+          "max": 33605282.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 12586706.19760479,
+          "p50": 11684387.0,
+          "p99": 24455546.020000003,
+          "p999": 26186210.146000005,
+          "min": 6617918.0,
+          "max": 26471725.0
+        },
+        "normalTickInstructions": {
+          "n": 58934,
+          "mean": 11039961.750212101,
+          "p50": 10043723.0,
+          "p99": 25161787.979999997,
+          "p999": 27616123.31900002,
+          "min": 4714324.0,
+          "max": 33605282.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 18119666.0,
+          "p50": 18119666.0,
+          "p99": 18119666.0,
+          "p999": 18119666.0,
+          "min": 18119666.0,
+          "max": 18119666.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 780,
+          "mean": 185369.66794871795,
+          "p50": 181614.5,
+          "p99": 258549.83000000002,
+          "p999": 273594.787,
+          "min": 115084.0,
+          "max": 278617.0
+        },
+        "cyclesStarted": 3,
+        "cyclesCompleted": 3,
+        "maintenanceBatches": 780,
+        "firstStartTick": 17091,
+        "firstStartSeconds": 119.637,
+        "intervalTicks": {
+          "n": 2,
+          "mean": 17248.0,
+          "p50": 17248.0,
+          "p99": 18249.56,
+          "p999": 18267.956,
+          "min": 16226,
+          "max": 18270
+        },
+        "intervalSeconds": {
+          "n": 2,
+          "mean": 120.736,
+          "p50": 120.736,
+          "p99": 127.74692,
+          "p999": 127.875692,
+          "min": 113.58200000000001,
+          "max": 127.89
+        },
+        "rightCensoredTicks": 8413,
+        "cycleDurationTicks": {
+          "n": 3,
+          "mean": 260.0,
+          "p50": 258.0,
+          "p99": 272.7,
+          "p999": 272.97,
+          "min": 249,
+          "max": 273
+        },
+        "cycleInstructions": {
+          "n": 3,
+          "mean": 48196113.666666664,
+          "p50": 47780773.0,
+          "p99": 50446073.12,
+          "p999": 50495027.612,
+          "min": 46307101.0,
+          "max": 50500467.0
+        },
+        "rawCountsSha256": "69fa514adcb7a04887842986370935cb03b416e838aefe3ca6eb316f8be4e016",
+        "trace": {
+          "sha256": "352597e8e719c98dbe2954a0f8b8edc6f4c3d8d560a19ab37343a4bde50e89cb",
+          "bytes": 1898279931
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 780,
+          "mean": -247950.6076923077,
+          "p50": -226911.5,
+          "p99": 334012.2300000001,
+          "p999": 368630.8910000001,
+          "min": -1001865.0,
+          "max": 394549.0
+        }
+      }
+    },
+    "battledome80": {
+      "base": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 226151454,
+          "case": "battledome80",
+          "dt": 0.007,
+          "endpointChecksum": 11909943810076483224,
+          "forcedReconnect": false,
+          "frames": 4587131,
+          "latencyRandom": "Random(16523011955861848735)",
+          "legacy": 0,
+          "maps": 13212,
+          "populationFinal": 80,
+          "populationMin": 38,
+          "populationSum": 4743040,
+          "reconnects": 743,
+          "refused": 428,
+          "seats": 80,
+          "spawnRandom": "Random(10731995395763710742)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 2.6210166666666668,
+          "p50": 0.0,
+          "p99": 55.0,
+          "p999": 251.0,
+          "min": 0,
+          "max": 547
+        },
+        "birthsLast10000PerTick": 2.9417,
+        "food": {
+          "n": 60000,
+          "mean": 5141.644533333333,
+          "p50": 5594.0,
+          "p99": 6643.0,
+          "p999": 6760.0,
+          "min": 744,
+          "max": 6828
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 79.05066666666667,
+          "p50": 80.0,
+          "p99": 80.0,
+          "p999": 80.0,
+          "min": 38,
+          "max": 80
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 5098980.586533333,
+          "p50": 4965064.0,
+          "p99": 10499723.690000007,
+          "p999": 16323064.763999939,
+          "min": 745694.0,
+          "max": 23017132.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 5106433.488343353,
+          "p50": 4968016.0,
+          "p99": 10503363.529999997,
+          "p999": 16325196.443999985,
+          "min": 768541.0,
+          "max": 23017132.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 14934622.311377246,
+          "p50": 14900550.0,
+          "p99": 21227008.72,
+          "p999": 21662776.426000003,
+          "min": 8754121.0,
+          "max": 21731067.0
+        },
+        "normalTickInstructions": {
+          "n": 59713,
+          "mean": 5078946.885200878,
+          "p50": 4963596.0,
+          "p99": 10116300.759999998,
+          "p999": 14873989.304000005,
+          "min": 768541.0,
+          "max": 23017132.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 395531.0,
+          "p50": 395531.0,
+          "p99": 395531.0,
+          "p999": 395531.0,
+          "min": 395531.0,
+          "max": 395531.0
+        },
+        "maintenanceBatchInstructions": null,
+        "cyclesStarted": 0,
+        "cyclesCompleted": 0,
+        "maintenanceBatches": 0,
+        "firstStartTick": null,
+        "firstStartSeconds": null,
+        "intervalTicks": null,
+        "intervalSeconds": null,
+        "rightCensoredTicks": 60000,
+        "cycleDurationTicks": null,
+        "cycleInstructions": null,
+        "rawCountsSha256": "bd6f32bf4c2356f8f0b4652dbc12a8726c3bba8f552be5fb62ea6cab1bf56046"
+      },
+      "lazy": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 226151454,
+          "case": "battledome80",
+          "dt": 0.007,
+          "endpointChecksum": 11909943810076483224,
+          "forcedReconnect": false,
+          "frames": 4587131,
+          "latencyRandom": "Random(16523011955861848735)",
+          "legacy": 0,
+          "maps": 13212,
+          "populationFinal": 80,
+          "populationMin": 38,
+          "populationSum": 4743040,
+          "reconnects": 743,
+          "refused": 428,
+          "seats": 80,
+          "spawnRandom": "Random(10731995395763710742)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 2.6210166666666668,
+          "p50": 0.0,
+          "p99": 55.0,
+          "p999": 251.0,
+          "min": 0,
+          "max": 547
+        },
+        "birthsLast10000PerTick": 2.9417,
+        "food": {
+          "n": 60000,
+          "mean": 5141.644533333333,
+          "p50": 5594.0,
+          "p99": 6643.0,
+          "p999": 6760.0,
+          "min": 744,
+          "max": 6828
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 79.05066666666667,
+          "p50": 80.0,
+          "p99": 80.0,
+          "p999": 80.0,
+          "min": 38,
+          "max": 80
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 5088512.4407,
+          "p50": 4952846.5,
+          "p99": 10483888.660000017,
+          "p999": 16297918.2839999,
+          "min": 742497.0,
+          "max": 22979161.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 5095950.391382766,
+          "p50": 4955892.0,
+          "p99": 10492424.799999999,
+          "p999": 16301432.363999976,
+          "min": 765351.0,
+          "max": 22979161.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 14921625.34730539,
+          "p50": 14880779.0,
+          "p99": 21220824.14,
+          "p999": 21645906.878000002,
+          "min": 8750258.0,
+          "max": 21714808.0
+        },
+        "normalTickInstructions": {
+          "n": 59686,
+          "mean": 5067634.298093355,
+          "p50": 4950775.0,
+          "p99": 10105227.85,
+          "p999": 14865681.440000001,
+          "min": 765351.0,
+          "max": 22979161.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 403505.0,
+          "p50": 403505.0,
+          "p99": 403505.0,
+          "p999": 403505.0,
+          "min": 403505.0,
+          "max": 403505.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 27,
+          "mean": 1606238.2222222222,
+          "p50": 1629338.0,
+          "p99": 1793044.46,
+          "p999": 1794010.646,
+          "min": 1290178.0,
+          "max": 1794118.0
+        },
+        "cyclesStarted": 27,
+        "cyclesCompleted": 27,
+        "maintenanceBatches": 27,
+        "firstStartTick": 7780,
+        "firstStartSeconds": 54.46,
+        "intervalTicks": {
+          "n": 26,
+          "mean": 1965.9615384615386,
+          "p50": 1937.5,
+          "p99": 2660.75,
+          "p999": 2722.175,
+          "min": 1584,
+          "max": 2729
+        },
+        "intervalSeconds": {
+          "n": 26,
+          "mean": 13.76173076923077,
+          "p50": 13.5625,
+          "p99": 18.62525,
+          "p999": 19.055225000000004,
+          "min": 11.088000000000001,
+          "max": 19.103
+        },
+        "rightCensoredTicks": 1105,
+        "cycleDurationTicks": {
+          "n": 27,
+          "mean": 1.0,
+          "p50": 1.0,
+          "p99": 1.0,
+          "p999": 1.0,
+          "min": 1,
+          "max": 1
+        },
+        "cycleInstructions": {
+          "n": 27,
+          "mean": 1606238.2222222222,
+          "p50": 1629338.0,
+          "p99": 1793044.46,
+          "p999": 1794010.646,
+          "min": 1290178.0,
+          "max": 1794118.0
+        },
+        "rawCountsSha256": "a88640a037ea0cd49379fc14217a61e30c522dc78cfea2f357711d5cd1acaac1",
+        "trace": {
+          "sha256": "3f9abd29663464ec4a135873279b1dd6c0ae3e209ef33d88acc6982617c67e98",
+          "bytes": 483973307
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 27,
+          "mean": 1602931.888888889,
+          "p50": 1623481.0,
+          "p99": 1788776.22,
+          "p999": 1792286.922,
+          "min": 1297514.0,
+          "max": 1792677.0
+        }
+      },
+      "candidate": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 226151454,
+          "case": "battledome80",
+          "dt": 0.007,
+          "endpointChecksum": 11909943810076483224,
+          "forcedReconnect": false,
+          "frames": 4587131,
+          "latencyRandom": "Random(16523011955861848735)",
+          "legacy": 0,
+          "maps": 13212,
+          "populationFinal": 80,
+          "populationMin": 38,
+          "populationSum": 4743040,
+          "reconnects": 743,
+          "refused": 428,
+          "seats": 80,
+          "spawnRandom": "Random(10731995395763710742)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 2.6210166666666668,
+          "p50": 0.0,
+          "p99": 55.0,
+          "p999": 251.0,
+          "min": 0,
+          "max": 547
+        },
+        "birthsLast10000PerTick": 2.9417,
+        "food": {
+          "n": 60000,
+          "mean": 5141.644533333333,
+          "p50": 5594.0,
+          "p99": 6643.0,
+          "p999": 6760.0,
+          "min": 744,
+          "max": 6828
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 79.05066666666667,
+          "p50": 80.0,
+          "p99": 80.0,
+          "p999": 80.0,
+          "min": 38,
+          "max": 80
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 5086755.93505,
+          "p50": 4950968.0,
+          "p99": 10483918.780000003,
+          "p999": 16295127.354999902,
+          "min": 742522.0,
+          "max": 22981942.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 5094190.308650634,
+          "p50": 4954283.0,
+          "p99": 10485978.639999997,
+          "p999": 16298529.954999978,
+          "min": 765376.0,
+          "max": 22981942.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 14926420.125748502,
+          "p50": 14903149.0,
+          "p99": 21160647.52,
+          "p999": 21645883.522,
+          "min": 8750290.0,
+          "max": 21715111.0
+        },
+        "normalTickInstructions": {
+          "n": 59407,
+          "mean": 5063397.565758244,
+          "p50": 4947151.0,
+          "p99": 10098485.0,
+          "p999": 14883328.27999997,
+          "min": 765376.0,
+          "max": 22981942.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 403532.0,
+          "p50": 403532.0,
+          "p99": 403532.0,
+          "p999": 403532.0,
+          "min": 403532.0,
+          "max": 403532.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 309,
+          "mean": 169408.22977346278,
+          "p50": 173653.0,
+          "p99": 213736.88,
+          "p999": 216363.768,
+          "min": 5930.0,
+          "max": 216981.0
+        },
+        "cyclesStarted": 27,
+        "cyclesCompleted": 27,
+        "maintenanceBatches": 309,
+        "firstStartTick": 7780,
+        "firstStartSeconds": 54.46,
+        "intervalTicks": {
+          "n": 26,
+          "mean": 1984.3076923076924,
+          "p50": 1962.5,
+          "p99": 2661.0,
+          "p999": 2726.7000000000003,
+          "min": 1571,
+          "max": 2734
+        },
+        "intervalSeconds": {
+          "n": 26,
+          "mean": 13.890153846153847,
+          "p50": 13.7375,
+          "p99": 18.627000000000002,
+          "p999": 19.086900000000004,
+          "min": 10.997,
+          "max": 19.138
+        },
+        "rightCensoredTicks": 628,
+        "cycleDurationTicks": {
+          "n": 27,
+          "mean": 11.444444444444445,
+          "p50": 12.0,
+          "p99": 13.0,
+          "p999": 13.0,
+          "min": 9,
+          "max": 13
+        },
+        "cycleInstructions": {
+          "n": 27,
+          "mean": 1938783.0740740742,
+          "p50": 1987759.0,
+          "p99": 2162530.38,
+          "p999": 2166119.238,
+          "min": 1479296.0,
+          "max": 2166518.0
+        },
+        "rawCountsSha256": "f7e4bc4b851a9b2959d071a5b7d80e84f2c6126bbaa242ac2a170b015cc6ffa8",
+        "trace": {
+          "sha256": "3f9abd29663464ec4a135873279b1dd6c0ae3e209ef33d88acc6982617c67e98",
+          "bytes": 483973307
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 309,
+          "mean": 194665.53074433657,
+          "p50": 202803.0,
+          "p99": 257467.84000000003,
+          "p999": 334689.52000000066,
+          "min": -19609.0,
+          "max": 362890.0
+        }
+      }
+    },
+    "official500-shrink": {
+      "base": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 199595861,
+          "case": "official500-shrink",
+          "dt": 0.007,
+          "endpointChecksum": 1361087706818159511,
+          "forcedReconnect": true,
+          "frames": 6551222,
+          "latencyRandom": "Random(3625277232372826472)",
+          "legacy": 0,
+          "maps": 50722,
+          "populationFinal": 100,
+          "populationMin": 97,
+          "populationSum": 18239162,
+          "reconnects": 87,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(3962425003153697932)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 1.3983166666666667,
+          "p50": 0.0,
+          "p99": 36.0,
+          "p999": 55.0,
+          "min": 0,
+          "max": 66
+        },
+        "birthsLast10000PerTick": 0.39,
+        "food": {
+          "n": 60000,
+          "mean": 50717.71485,
+          "p50": 55243.5,
+          "p99": 58524.0,
+          "p999": 58604.001,
+          "min": 33802,
+          "max": 58630
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 303.98603333333335,
+          "p50": 499.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 97,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 4551967.177083333,
+          "p50": 4878736.0,
+          "p99": 9094764.790000001,
+          "p999": 9969599.742999936,
+          "min": 2168327.0,
+          "max": 175532208.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 4544581.831880428,
+          "p50": 4875027.5,
+          "p99": 9090636.01,
+          "p999": 9952591.688999996,
+          "min": 2168327.0,
+          "max": 18953623.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 5840264.958083833,
+          "p50": 6801138.0,
+          "p99": 11122474.66,
+          "p999": 11426550.250000002,
+          "min": 3026467.0,
+          "max": 11483343.0
+        },
+        "normalTickInstructions": {
+          "n": 59713,
+          "mean": 4540958.180714417,
+          "p50": 4874977.0,
+          "p99": 9080595.319999997,
+          "p999": 9809649.848000003,
+          "min": 2168327.0,
+          "max": 18953623.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 17921321.0,
+          "p50": 17921321.0,
+          "p99": 17921321.0,
+          "p999": 17921321.0,
+          "min": 17921321.0,
+          "max": 17921321.0
+        },
+        "maintenanceBatchInstructions": null,
+        "cyclesStarted": 0,
+        "cyclesCompleted": 0,
+        "maintenanceBatches": 0,
+        "firstStartTick": null,
+        "firstStartSeconds": null,
+        "intervalTicks": null,
+        "intervalSeconds": null,
+        "rightCensoredTicks": 60000,
+        "cycleDurationTicks": null,
+        "cycleInstructions": null,
+        "rawCountsSha256": "42d9c9e11cc4e98836727cec2ffe7eca35056467bcfdc045114933c3494f4e7f"
+      },
+      "lazy": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 199595861,
+          "case": "official500-shrink",
+          "dt": 0.007,
+          "endpointChecksum": 1361087706818159511,
+          "forcedReconnect": true,
+          "frames": 6551222,
+          "latencyRandom": "Random(3625277232372826472)",
+          "legacy": 0,
+          "maps": 50722,
+          "populationFinal": 100,
+          "populationMin": 97,
+          "populationSum": 18239162,
+          "reconnects": 87,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(3962425003153697932)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 1.3983166666666667,
+          "p50": 0.0,
+          "p99": 36.0,
+          "p999": 55.0,
+          "min": 0,
+          "max": 66
+        },
+        "birthsLast10000PerTick": 0.39,
+        "food": {
+          "n": 60000,
+          "mean": 50717.71485,
+          "p50": 55243.5,
+          "p99": 58524.0,
+          "p999": 58604.001,
+          "min": 33802,
+          "max": 58630
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 303.98603333333335,
+          "p50": 499.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 97,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 4490077.750466667,
+          "p50": 4870064.0,
+          "p99": 9035910.480000004,
+          "p999": 9898588.840999901,
+          "min": 2170142.0,
+          "max": 175185241.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 4483321.860020041,
+          "p50": 4865758.5,
+          "p99": 9034450.66,
+          "p999": 9880480.686999997,
+          "min": 2170142.0,
+          "max": 30774784.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 5811268.622754491,
+          "p50": 6737533.0,
+          "p99": 11214553.82,
+          "p999": 11321602.496000001,
+          "min": 3027366.0,
+          "max": 11341895.0
+        },
+        "normalTickInstructions": {
+          "n": 59711,
+          "mean": 4478930.597427609,
+          "p50": 4865485.0,
+          "p99": 9022961.4,
+          "p999": 9746110.100000003,
+          "min": 2170142.0,
+          "max": 18802057.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 18119643.0,
+          "p50": 18119643.0,
+          "p99": 18119643.0,
+          "p999": 18119643.0,
+          "min": 18119643.0,
+          "max": 18119643.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 2,
+          "mean": 20632113.0,
+          "p50": 20632113.0,
+          "p99": 25438390.7,
+          "p999": 25526669.27,
+          "min": 15727748.0,
+          "max": 25536478.0
+        },
+        "cyclesStarted": 2,
+        "cyclesCompleted": 2,
+        "maintenanceBatches": 2,
+        "firstStartTick": 8607,
+        "firstStartSeconds": 60.249,
+        "intervalTicks": {
+          "n": 1,
+          "mean": 45388.0,
+          "p50": 45388.0,
+          "p99": 45388.0,
+          "p999": 45388.0,
+          "min": 45388,
+          "max": 45388
+        },
+        "intervalSeconds": {
+          "n": 1,
+          "mean": 317.716,
+          "p50": 317.716,
+          "p99": 317.716,
+          "p999": 317.716,
+          "min": 317.716,
+          "max": 317.716
+        },
+        "rightCensoredTicks": 6005,
+        "cycleDurationTicks": {
+          "n": 2,
+          "mean": 1.0,
+          "p50": 1.0,
+          "p99": 1.0,
+          "p999": 1.0,
+          "min": 1,
+          "max": 1
+        },
+        "cycleInstructions": {
+          "n": 2,
+          "mean": 20632113.0,
+          "p50": 20632113.0,
+          "p99": 25438390.7,
+          "p999": 25526669.27,
+          "min": 15727748.0,
+          "max": 25536478.0
+        },
+        "rawCountsSha256": "1dc2a0a7ede7619de2ca302b7ff656453df03163bd0d9a49a8a0a07eead675b1",
+        "trace": {
+          "sha256": "4704dd45154a1a5a9514f6a448b92435488a9a545e14bf1d38004328f54fadb2",
+          "bytes": 574547301
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 2,
+          "mean": 20546411.0,
+          "p50": 20546411.0,
+          "p99": 25444275.58,
+          "p999": 25534236.358,
+          "min": 15548590.0,
+          "max": 25544232.0
+        }
+      },
+      "candidate": {
+        "ticks": 60000,
+        "summary": {
+          "bytes": 199595861,
+          "case": "official500-shrink",
+          "dt": 0.007,
+          "endpointChecksum": 1361087706818159511,
+          "forcedReconnect": true,
+          "frames": 6551222,
+          "latencyRandom": "Random(3625277232372826472)",
+          "legacy": 0,
+          "maps": 50722,
+          "populationFinal": 100,
+          "populationMin": 97,
+          "populationSum": 18239162,
+          "reconnects": 87,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(3962425003153697932)",
+          "ticks": 60000
+        },
+        "minimumScheduledPct": 100.0,
+        "birthsPerTick": {
+          "n": 60000,
+          "mean": 1.3983166666666667,
+          "p50": 0.0,
+          "p99": 36.0,
+          "p999": 55.0,
+          "min": 0,
+          "max": 66
+        },
+        "birthsLast10000PerTick": 0.39,
+        "food": {
+          "n": 60000,
+          "mean": 50717.71485,
+          "p50": 55243.5,
+          "p99": 58524.0,
+          "p999": 58604.001,
+          "min": 33802,
+          "max": 58630
+        },
+        "alive": {
+          "n": 60000,
+          "mean": 303.98603333333335,
+          "p50": 499.0,
+          "p99": 500.0,
+          "p999": 500.0,
+          "min": 97,
+          "max": 500
+        },
+        "allTickInstructions": {
+          "n": 60000,
+          "mean": 4481147.522466667,
+          "p50": 4861815.5,
+          "p99": 9012789.42,
+          "p999": 9869378.775999997,
+          "min": 2168270.0,
+          "max": 175179004.0
+        },
+        "steadyTickInstructions": {
+          "n": 59880,
+          "mean": 4474393.698931196,
+          "p50": 4857364.0,
+          "p99": 9009190.35,
+          "p999": 9847216.248999994,
+          "min": 2168270.0,
+          "max": 18791110.0
+        },
+        "mapTickInstructions": {
+          "n": 167,
+          "mean": 5801218.341317365,
+          "p50": 6715035.0,
+          "p99": 11203852.34,
+          "p999": 11311805.036,
+          "min": 3029617.0,
+          "max": 11332149.0
+        },
+        "normalTickInstructions": {
+          "n": 59526,
+          "mean": 4468870.992473877,
+          "p50": 4855852.0,
+          "p99": 8994818.5,
+          "p999": 9730827.399999976,
+          "min": 2168270.0,
+          "max": 18791110.0
+        },
+        "coldMaintenanceInstructions": {
+          "n": 1,
+          "mean": 18119666.0,
+          "p50": 18119666.0,
+          "p99": 18119666.0,
+          "p999": 18119666.0,
+          "min": 18119666.0,
+          "max": 18119666.0
+        },
+        "maintenanceBatchInstructions": {
+          "n": 187,
+          "mean": 207695.97860962566,
+          "p50": 202485.0,
+          "p99": 270489.22,
+          "p999": 275825.35599999997,
+          "min": 139932.0,
+          "max": 276598.0
+        },
+        "cyclesStarted": 2,
+        "cyclesCompleted": 2,
+        "maintenanceBatches": 187,
+        "firstStartTick": 8607,
+        "firstStartSeconds": 60.249,
+        "intervalTicks": {
+          "n": 1,
+          "mean": 45658.0,
+          "p50": 45658.0,
+          "p99": 45658.0,
+          "p999": 45658.0,
+          "min": 45658,
+          "max": 45658
+        },
+        "intervalSeconds": {
+          "n": 1,
+          "mean": 319.606,
+          "p50": 319.606,
+          "p99": 319.606,
+          "p999": 319.606,
+          "min": 319.606,
+          "max": 319.606
+        },
+        "rightCensoredTicks": 5735,
+        "cycleDurationTicks": {
+          "n": 2,
+          "mean": 93.5,
+          "p50": 93.5,
+          "p99": 111.63,
+          "p999": 111.963,
+          "min": 75,
+          "max": 112
+        },
+        "cycleInstructions": {
+          "n": 2,
+          "mean": 19419574.0,
+          "p50": 19419574.0,
+          "p99": 23837522.78,
+          "p999": 23918668.778,
+          "min": 14911463.0,
+          "max": 23927685.0
+        },
+        "rawCountsSha256": "4d6ac54dd0a6c2ccf7ba8e91fefb968c89a77cb81d5998dce18ba9d4a56f4d59",
+        "trace": {
+          "sha256": "4704dd45154a1a5a9514f6a448b92435488a9a545e14bf1d38004328f54fadb2",
+          "bytes": 574547301
+        },
+        "maintenanceTickDeltaFromBase": {
+          "n": 187,
+          "mean": 254156.70053475935,
+          "p50": 306268.0,
+          "p99": 445093.7799999999,
+          "p999": 466681.0219999998,
+          "min": -161799.0,
+          "max": 470675.0
+        }
+      }
+    }
+  },
+  "publishedRuntime": "9a3f6f5fe85184e42b32c2251480b94356c9210e",
+  "measuredRustInputsEqualPublished": true,
+  "measuredMaximumBatchBelow2M": true,
+  "measuredMaximumMaintenanceTickDeltaBelow2M": true,
+  "shortTraces": {
+    "official": {
+      "official500": {
+        "equal": true,
+        "sha256": "22925266683241795ca30451a36a28647172ae0584cb905521b10f098f4e2209",
+        "bytes": 37938956,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 9954005,
+          "case": "official500",
+          "forcedReconnect": true,
+          "frames": 317188,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 0,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-half": {
+        "equal": true,
+        "sha256": "f7ce7b7c9189bc9803cad563ce209be4cd2e4327d649c53cab8da59a8e4e16cb",
+        "bytes": 57556590,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10103063,
+          "case": "official500-half",
+          "forcedReconnect": true,
+          "frames": 664841,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 250,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      },
+      "official500-legacy": {
+        "equal": true,
+        "sha256": "e3b91c7fe32d7a1ce97f33f9cf8a27ef7cd1afc9235f6555701cf272b51695a3",
+        "bytes": 77137561,
+        "checkpointSha256": [
+          "c6093b7b57a873a13e0501b6ce2336081eadbc30bd7f6c864d8a963752964d66",
+          "91e74c4a516f51151561b562e136ccad7351c9eca1b34b3cef4f01f0eca71924"
+        ],
+        "summary": {
+          "bytes": 10253767,
+          "case": "official500-legacy",
+          "forcedReconnect": true,
+          "frames": 1011810,
+          "latencyRandom": "Random(8650339669496352976)",
+          "legacy": 500,
+          "maps": 1500,
+          "populationFinal": 500,
+          "populationMin": 499,
+          "populationSum": 539894,
+          "reconnects": 3,
+          "refused": 0,
+          "seats": 500,
+          "spawnRandom": "Random(6343971186635748709)",
+          "ticks": 1080
+        }
+      }
+    },
+    "stock": [
+      {
+        "case": "portable",
+        "equal": true,
+        "base": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "ee57620ecf8515a58884df3ed8d7a98f58bc78574d92fb35c8c0b97dd5a8b7d2"
+        },
+        "candidate": {
+          "bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "terminalKind": "report",
+          "binarySha256": "2d32bfeb023bff1b42aa0acd18b9de281448ada133d2df06fb4d397d232703cd"
+        }
+      },
+      {
+        "case": "protocol",
+        "equal": true,
+        "base": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "ee57620ecf8515a58884df3ed8d7a98f58bc78574d92fb35c8c0b97dd5a8b7d2"
+        },
+        "candidate": {
+          "bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "terminalKind": "report",
+          "binarySha256": "2d32bfeb023bff1b42aa0acd18b9de281448ada133d2df06fb4d397d232703cd"
+        }
+      },
+      {
+        "case": "client-official-500",
+        "equal": true,
+        "base": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "ee57620ecf8515a58884df3ed8d7a98f58bc78574d92fb35c8c0b97dd5a8b7d2"
+        },
+        "candidate": {
+          "bytes": 82283668,
+          "sha256": "f738a55d81d5c16deac32dee5f8668509e5103c0772cd9ff68a67103dc0d488e",
+          "terminalKind": "report",
+          "binarySha256": "2d32bfeb023bff1b42aa0acd18b9de281448ada133d2df06fb4d397d232703cd"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "ee57620ecf8515a58884df3ed8d7a98f58bc78574d92fb35c8c0b97dd5a8b7d2"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "2d32bfeb023bff1b42aa0acd18b9de281448ada133d2df06fb4d397d232703cd"
+        }
+      },
+      {
+        "case": "retained-step_all",
+        "equal": true,
+        "base": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "5b1378345d6ec81ffd67056d84c3f613f48da26ef639674625f4da466eff6b8c"
+        },
+        "candidate": {
+          "bytes": 1772204756,
+          "sha256": "2d4a4bef74feb829ec6582ab0db8123e2445bb966d9323ca49db64fdff56aa08",
+          "terminalKind": "report",
+          "binarySha256": "4cdf731773edec28c79d3b8e9418a8e70162915eb13dfd6f0ca6e5298f113ad8"
+        }
+      },
+      {
+        "case": "retained-next_frame",
+        "equal": true,
+        "base": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "5b1378345d6ec81ffd67056d84c3f613f48da26ef639674625f4da466eff6b8c"
+        },
+        "candidate": {
+          "bytes": 1736165882,
+          "sha256": "de7bb9d0cb805d4b0e9dfeef1f551c12c2a9e7435a7c3faaf76d810acdb53e07",
+          "terminalKind": "report",
+          "binarySha256": "4cdf731773edec28c79d3b8e9418a8e70162915eb13dfd6f0ca6e5298f113ad8"
+        }
+      }
+    ],
+    "battledome": [
+      {
+        "case": "client-battledome-40",
+        "equal": true,
+        "base": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "75346159023deaead6dac61f72718e63648d878b604e9ba57fa366aefe7d56d3"
+        },
+        "candidate": {
+          "bytes": 25201354,
+          "sha256": "e513753ab73acc2a1ceba7f6abdbea2178d1bfac23ec306599968a1ba323d420",
+          "terminalKind": "report",
+          "binarySha256": "b44eae3194b200aa0c3e9f0e5139fb7a3acc90277693cbb2787fc281954084ea"
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "equal": true,
+        "base": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "75346159023deaead6dac61f72718e63648d878b604e9ba57fa366aefe7d56d3"
+        },
+        "candidate": {
+          "bytes": 35965725,
+          "sha256": "55a439a03e16099cdba3cb113e9645bea49fd402f60284e7e40482da947d18a7",
+          "terminalKind": "report",
+          "binarySha256": "b44eae3194b200aa0c3e9f0e5139fb7a3acc90277693cbb2787fc281954084ea"
+        }
+      },
+      {
+        "case": "client-battledome-80",
+        "equal": true,
+        "base": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "75346159023deaead6dac61f72718e63648d878b604e9ba57fa366aefe7d56d3"
+        },
+        "candidate": {
+          "bytes": 52296445,
+          "sha256": "f511b01c9e8f985adf095cf5928f3ec5672f7e5fd79412f3fa1c4341cebc3eab",
+          "terminalKind": "report",
+          "binarySha256": "b44eae3194b200aa0c3e9f0e5139fb7a3acc90277693cbb2787fc281954084ea"
+        }
+      }
+    ]
+  },
+  "shortInstructions": {
+    "official500": {
+      "baseMedian": 8778657012,
+      "candidateMedian": 8554349235,
+      "pairedMedian": 0.9744483386546782,
+      "pairedRange": [
+        0.9744370785083362,
+        0.9744561075740565
+      ]
+    },
+    "official500-half": {
+      "baseMedian": 9134883406,
+      "candidateMedian": 8908245852,
+      "pairedMedian": 0.975186605369663,
+      "pairedRange": [
+        0.9751727189724106,
+        0.9752125759096963
+      ]
+    },
+    "official500-legacy": {
+      "baseMedian": 9476421969,
+      "candidateMedian": 9251833814,
+      "pairedMedian": 0.9763015398041783,
+      "pairedRange": [
+        0.9762889830728654,
+        0.9763208922054872
+      ]
+    }
+  },
+  "shortBuilds": {
+    "base": {
+      "runtimeCommit": "4532a76f22958ae3abcca801e90edd30ed9f466f",
+      "archiveSha256": "2257985e1f585925ac56e1cfd9e1ba59991e091c69f16475935f2a55df705764",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "b346cfe902c1d20423cd4b399ebe75c61d83eb57eb1cb6fb535b8bd74a07ecad",
+      "binaries": {
+        "study_protocols": "b346cfe902c1d20423cd4b399ebe75c61d83eb57eb1cb6fb535b8bd74a07ecad",
+        "perf_baseline": "ee57620ecf8515a58884df3ed8d7a98f58bc78574d92fb35c8c0b97dd5a8b7d2",
+        "perf_battledome": "75346159023deaead6dac61f72718e63648d878b604e9ba57fa366aefe7d56d3",
+        "perf_client_retained": "5b1378345d6ec81ffd67056d84c3f613f48da26ef639674625f4da466eff6b8c"
+      }
+    },
+    "candidate": {
+      "runtimeCommit": "9a3f6f5fe85184e42b32c2251480b94356c9210e",
+      "archiveSha256": "bf3d73156c72b4f084fd175e0b97520e499041579ed4c671d1eefa72f79d1ee5",
+      "fixtureSha256": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+      "counterSha256": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+      "binarySha256": "09ed2522e79a252071b0942a659e770debc694d3df7edaf80e7504a3a49c87e4",
+      "binaries": {
+        "study_protocols": "09ed2522e79a252071b0942a659e770debc694d3df7edaf80e7504a3a49c87e4",
+        "perf_baseline": "2d32bfeb023bff1b42aa0acd18b9de281448ada133d2df06fb4d397d232703cd",
+        "perf_battledome": "b44eae3194b200aa0c3e9f0e5139fb7a3acc90277693cbb2787fc281954084ea",
+        "perf_client_retained": "4cdf731773edec28c79d3b8e9418a8e70162915eb13dfd6f0ca6e5298f113ad8"
+      }
+    }
+  },
+  "minimumShortCounterScheduledPct": 100.0,
+  "checks": {
+    "runtime": "9a3f6f5fe85184e42b32c2251480b94356c9210e",
+    "rustPassed": true,
+    "rustLogSha256": "6b2f0ade5c661fef131f0393d7a05622010898d3ec0ebb85ff59a14bd60e72d4",
+    "focusedLogSha256": "fe219c0aaf815915e33e025f080a0e0fe37eb11b6a5fdd93b7683e24a22625b0",
+    "archiveSha256": "bf3d73156c72b4f084fd175e0b97520e499041579ed4c671d1eefa72f79d1ee5"
+  },
+  "mutation": {
+    "runtime": "9a3f6f5fe85184e42b32c2251480b94356c9210e",
+    "mutation": "keep copied pellet in old cell list",
+    "regressionFailed": true,
+    "originalFoodGridSha256": "b8366f879dd17dd92814b4572a973d6885f0790b5a46a158deccbccd51d5b726",
+    "mutatedFoodGridSha256": "363e908bee3492afa1eb12b86bfe7857b405b219c5ca6e93f647859e9b095d5d",
+    "logSha256": "97f900bb8a5d184130a83ba4a1d932d41dd5afe498dd29a5db90a21f04018986"
+  }
+}

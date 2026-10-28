@@ -2866,11 +2866,46 @@ fn indexed_hits<const PROFILE: bool>(
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
+    // Keep the original single-index iterator in ordinary ticks. Dispatch
+    // once per pickup phase, so a dormant migration adds no per-pellet union
+    // iterator work. Both paths use the same exact tests and final ordering.
+    if pellets.rebuilding() {
+        indexed_hits_by::<PROFILE, _>(
+            grid,
+            |cell| pellets.food(cell),
+            snakes,
+            eaters,
+            food,
+            hits,
+            profile,
+        );
+    } else {
+        indexed_hits_by::<PROFILE, _>(
+            grid,
+            |cell| pellets.own_food(cell),
+            snakes,
+            eaters,
+            food,
+            hits,
+            profile,
+        );
+    }
+}
+
+fn indexed_hits_by<const PROFILE: bool, I: Iterator<Item = usize>>(
+    grid: &EaterGrid,
+    food_in_cell: impl Fn(u32) -> I,
+    snakes: &[Snake],
+    eaters: &[(usize, Point, f64, Bounds)],
+    food: &[Food],
+    hits: &mut Vec<(usize, usize)>,
+    profile: &mut StepProfile,
+) {
     // Unique cells and one handle per pellet give at most one hit per pellet.
     // Reuse the exact tests and eater order; sorting restores the original
     // reverse-food event/mass/removal order before anything is applied.
     for (cell, candidates) in grid.occupied() {
-        for findex in pellets.food(cell) {
+        for findex in food_in_cell(cell) {
             if let Some(eater) = find_eater::<PROFILE>(
                 snakes,
                 food[findex].point(),

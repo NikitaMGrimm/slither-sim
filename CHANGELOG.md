@@ -36,6 +36,13 @@
 
 ### Performance
 
+- Food pickup now works out each pellet's place in the food list from a
+  bitmap, instead of rewriting the stored position of every later pellet after
+  each removal. Stale entries are cleaned out 512 pellets per tick, so no
+  single tick pays for a full index rebuild (each batch stays under 0.28M
+  instructions). Output is byte-identical, and the 500-player official fixture
+  runs 2.4–2.6% fewer instructions with stock and protocol-13 clients
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-pellet-bitset-ranks/REPORT.md)).
 - When a player's update has no pong or minimap in front of it, the host sends
   the update's packet list as it is instead of copying it into a new list.
   Output is byte-identical, and the 500-player official fixture runs 1.6–1.7%
