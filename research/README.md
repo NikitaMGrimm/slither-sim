@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Fidelity | [Wall sliding](fidelity/2026-10-28-wall-sliding/REPORT.md) | Current projection fits retained contacts to about one unit, but exact rules remain unresolved; power and full-selector local rehearsal fail, so no capture is proposed. |
 | Fidelity | [Boost ramp](fidelity/2026-10-28-boost-ramp/REPORT.md) | Offline reproduction of all 1,567 original ramps: the Android-derived law fits best (slope RMSE 0.101 vs 0.145). Growth/loss candidates differ by under a fifth of a speed byte, and none of 72 capture schedules could separate them; no capture or mechanics change. |
 | Fidelity | [Prey flight and activation](fidelity/2026-10-28-prey-flight-activation/REPORT.md) | Five official recordings reproduce the original prey flight-speed (MAE 0.042 vs 0.383 for the old two-speed rule) and activation evidence. Two close flight laws and activation half-widths 315/320 stay unresolved, and no two-connection capture passes the power gate; no capture or mechanics change. |
 | Performance | [Persistent Linux readiness](performance/2026-10-27-host-epoll-readiness/REPORT.md) | Rejected: CPU saving not reproduced across seven pairs; candidate bursts remain unexplained. Prototype patch and measurement limits retained. |

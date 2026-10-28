@@ -34,9 +34,18 @@ def parity(binary):
         error=math.dist(p,row[:2]);maximum=max(maximum,error)
         if dead!=row[2] or error>1e-9:
             mismatches.append(dict(input=case,python=[*p,dead],native=row,pointDifference=error))
+    requests=[dict(start=[100.,0.],initial=[0.,3.2,2.,8000.],dt=.007,
+        changes=[[.05,math.pi/2,3.2,2.,8000.],[.1,math.pi/2,3.2,2.,8000.]]),
+        dict(start=[7999.,0.],initial=[0.,14.,2.,8000.],dt=.007,changes=[[.1,0.,14.,2.,8000.]])]
+    execution=subprocess.run([str(binary.resolve())],input=''.join(json.dumps(r)+'\n' for r in requests),
+        text=True,capture_output=True,check=True)
+    executed=[json.loads(t) for t in execution.stdout.splitlines()]
+    if len(executed)!=2 or executed[0]['dead'] or math.dist(executed[0]['xy'],[105.,5.])>1e-9 or not executed[1]['dead']:
+        raise ValueError('native interval event/terminal contract failed')
     return dict(origin='authored synthetic points',cases=len(cases),maximumPointDifference=maximum,
         mismatchCount=len(mismatches),mismatches=mismatches,
         lethalFlagsIdentical=not any(r['python'][2]!=r['native'][2] for r in mismatches),
+        nativeIntervalContractCases=2,nativeIntervalContractPassed=True,
         nativeBinarySha256=wall.sha(binary))
 
 

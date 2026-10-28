@@ -4,6 +4,7 @@
 
 ### Added
 
+- A wall-sliding study using retained recordings and a local capture rehearsal.
 - A study of when prey start fleeing and how fast they flee. The current rules
   reproduce all 13 recorded test cases exactly, with flight-speed error 0.04
   against 0.38 for the older two-speed rule. Two close variants of each rule
