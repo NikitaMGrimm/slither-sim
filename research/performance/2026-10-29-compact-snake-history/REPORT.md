@@ -127,11 +127,16 @@ citing the relative 0.6–1.0% short-world costs accepted for mature wins in
 single-vector structure compared with the previous two-vector layout.
 
 No retry, tuning or threshold change is applied to the study. Its verdict
-remains rejection under its own gate. The measured implementation is adopted
-on main after #273, with only a short sorted-merge explanation restored in the
-runtime source. `measured-bounded.patch` preserves the historical measured
+remains rejection under its own gate. The measured implementation is restored
+in #274 against main after #273, with only a short sorted-merge explanation
+in the runtime source. `measured-bounded.patch` preserves the historical measured
 snapshot under its new name; it was previously `rejected-bounded.patch`.
-Integrated-head verification is recorded separately, without new timing.
+[Integrated-head verification](adoption-verification.json) repeats the focused
+oracle, its three mutations and restoration, the full Rust group, all 27
+traces, both wire-payload mutation controls and seven documentation tests.
+The complete stock warm stream (5,876,276,676 bytes per arm) and all six
+144-tick mature continuations match, each covering two maintenance ticks.
+No timing requests or new timing pairs are recorded.
 
 ## Method and provenance
 
@@ -205,8 +210,9 @@ superseded-primary observation enters the final-primary table.
 [Reproduction](REPRODUCE.md) documents the exact prerequisite receipt producer,
 mutations and source restore, imports from earlier studies, warm-stream and
 continuation checks, counter scope, pairs, gate and cleanup. The measurement
-overlay is retained as [harness.patch](harness.patch); the unlanded runtime and
-its regression oracle are retained as a separate rejected patch. Raw streams,
+overlay is retained as [harness.patch](harness.patch); the historical measured
+runtime snapshot and oracle remain in [measured-bounded.patch](measured-bounded.patch).
+The adopted runtime and oracle are part of #274. Raw streams,
 sources, binaries, counters, inventories and
 failed attempts remain local-only in verified ignored-output archives.
 [Archive identities and access](raw-access.json) identify that material without

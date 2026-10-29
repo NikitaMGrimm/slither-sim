@@ -28,6 +28,13 @@
       "bytes": 903805868,
       "sha256": "319ad89f33470ed5ce0bfa793e3c78c6a52f6aaecae3134e4fac0231d43a15ba",
       "verifiedFiles": 9573
+    },
+    {
+      "name": "compact-adoption-evidence.tar.gz",
+      "scope": "integrated adoption proofs on main after #273, generated sources, copied binaries and complete stock spot streams; no new timing",
+      "bytes": 622960681,
+      "sha256": "981946d0f39a6833daa960d25b5292b1cb3bfc1f312a0014db026127f8e94d60",
+      "verifiedFiles": 5883
     }
   ]
 }
