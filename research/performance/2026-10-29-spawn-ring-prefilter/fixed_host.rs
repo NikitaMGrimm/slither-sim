@@ -1,7 +1,9 @@
 //! Research-only child of client::server. Real queue and refusal/retry methods;
 //! synthetic fixed barriers guarantee many exhausted searches. No socket timing.
 use super::*;
-use std::{fs, io::{BufRead, Write}, path::Path};
+use std::io::Write;
+#[cfg(target_os="linux")]
+use std::{fs, io::BufRead, path::Path};
 
 const SEATS: usize = 80;
 
@@ -102,7 +104,14 @@ impl Fixture {
         }
         record(out, 3, &serde_json::to_vec(&self.state()).unwrap());
         // Timing/counter samples are excluded from the parity stream.
-        let summary = serde_json::json!({"ticks": ticks, "legacy": self.legacy, "waiting": self.sim.waiting.len()});
+        let sum = |index:usize, blocked:bool| rows.iter().filter(|r|r["blocked"]==blocked)
+            .map(|r|r["sample"]["events"][index].as_u64().unwrap()).sum::<u64>();
+        let searches=sum(0,true); let attempts=sum(1,true); let exhausted=sum(2,true);
+        assert!(searches>=ticks as u64/5 && exhausted==searches && attempts==4096*searches,
+            "blocked-band stress did not exhaust its exact candidate budget");
+        let summary = serde_json::json!({"ticks": ticks, "legacy": self.legacy, "waiting": self.sim.waiting.len(),
+            "blockedSearches":searches,"blockedAttempts":attempts,"blockedExhausted":exhausted,
+            "releaseSearches":sum(0,false),"releaseExhausted":sum(2,false)});
         record(out, 4, &serde_json::to_vec(&summary).unwrap());
         serde_json::json!({"summary":summary,"ticks":rows})
     }
@@ -116,7 +125,7 @@ pub fn run(legacy: bool, ticks: usize, measured: bool) {
     assert_eq!(fixture.sim.waiting.len(), SEATS - 8);
     if !measured {
         let result = fixture.window(ticks, &mut io::BufWriter::new(io::stdout().lock()), true);
-        eprintln!("{}", result["summary"]);
+        eprintln!("{}", result);
         return;
     }
     #[cfg(not(target_os = "linux"))]
