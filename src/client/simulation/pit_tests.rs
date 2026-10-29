@@ -662,6 +662,46 @@ fn pit_map_masks_outer_snakes_keeps_inner_cells_and_live_outline() {
 }
 
 #[test]
+fn cached_pit_projection_tracks_real_growth_shrink_and_snake_changes() {
+    let mut sim = RawSimulator::new(7, config(), 1).unwrap();
+    let mut cache = crate::client::minimap::PitProjectionCache::default();
+    for population in [1, 80, 320, 5, 160, 0] {
+        sim.backend.world.grow_for_seats(population, true);
+        sim.backend.world.retire(0).unwrap();
+        sim.backend
+            .world
+            .respawn(0, Point::default(), 0., 26)
+            .unwrap();
+        for tick in 0..80 {
+            let action = sim.backend.world.snakes()[0].alive.then_some(Action {
+                heading: tick as f64 * 0.02,
+                boost: tick % 3 != 0,
+            });
+            sim.backend.world.step(&[action]).unwrap();
+            if tick % 10 == 0 {
+                for side in [256, 136] {
+                    assert_eq!(
+                        cache.render_world(&sim.backend.world, side),
+                        crate::client::Minimap::from_world(&sim.backend.world, side)
+                    );
+                }
+            }
+        }
+    }
+    let ordinary = Simulator::new(crate::WorldOptions::default()).unwrap();
+    assert_eq!(
+        cache.render_world(&ordinary, 256),
+        crate::client::Minimap::from_world(&ordinary, 256)
+    );
+    for side in [0, 513, usize::MAX] {
+        assert_eq!(
+            cache.render_world(&ordinary, side),
+            crate::client::Minimap::from_world(&ordinary, side)
+        );
+    }
+}
+
+#[test]
 fn rolling_kill_board_retains_dead_disconnected_seats_until_expiry() {
     use super::broadcast::Board;
     let mut config = config();
