@@ -1,0 +1,35 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "label": "original",
+      "expectedFailure": false,
+      "exit": 0
+    },
+    {
+      "label": "whole-crossing-phase",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "double-count-parent",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "sum-component-p99",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "unrecovered-seconds-scale",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "restored",
+      "expectedFailure": false,
+      "exit": 0
+    }
+  ]
+}

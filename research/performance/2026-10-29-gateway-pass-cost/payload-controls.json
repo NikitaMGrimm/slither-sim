@@ -1,0 +1,22 @@
+[
+  {
+    "case": "official500",
+    "wireFramesComparedByteForByte": true,
+    "wireFramesDiffer": 315622,
+    "firstDifferentFrame": 21,
+    "frameCounts": {
+      "reference": 317188,
+      "mutation": 314678
+    }
+  },
+  {
+    "case": "official500-legacy",
+    "wireFramesComparedByteForByte": true,
+    "wireFramesDiffer": 1011183,
+    "firstDifferentFrame": 567,
+    "frameCounts": {
+      "reference": 1011810,
+      "mutation": 995490
+    }
+  }
+]

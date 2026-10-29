@@ -1,0 +1,12 @@
+{
+  "baseCommit": "539b37f3be969827b5eac67c2978e604f9e814e8",
+  "candidateWithTestsCommit": "afd7e03a021a75bcf5b167f4611a53e01b8b277c",
+  "runtimeCandidateCommit": "da7e65c26d0236156c24e23f43f9bd6dfcabca34",
+  "patchSha256": "1ee7f91c6488b05eec4ddffa15ddc4d934347490407fd0465f61a2534f934b32",
+  "reconstructedFilesMatch": [
+    "src/client/server.rs",
+    "src/client/server/readiness.rs",
+    "src/client/server/tests/gateway_readiness.rs"
+  ],
+  "decision": "not proposed: live series did not complete one qualified primary pair"
+}

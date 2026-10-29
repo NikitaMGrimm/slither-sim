@@ -1,0 +1,990 @@
+diff --git a/core_cpu.py b/core_cpu.py
+--- a/core_cpu.py
++++ b/core_cpu.py
+@@ -1,4 +1,4 @@
+-"""Read-only host-vCPU context, separate from the task CPU-accounting view."""
++"""Read-only host-vCPU context; IRQ/softirq/steal are outside task CPU clocks."""
+ from pathlib import Path
+ import os,time,json
+ r=Path(__file__).resolve().parent;os.sched_setaffinity(0,{3});start=time.monotonic();hz=os.sysconf('SC_CLK_TCK')
+diff --git a/overlay.py b/overlay.py
+new file mode 100644
+--- /dev/null
++++ b/overlay.py
+@@ -0,0 +1,67 @@
++"""Prepare a diagnostic archived host; no production source changes."""
++from pathlib import Path
++import hashlib,json,os,shutil,subprocess,sys
++r=Path(__file__).resolve().parent
++arm=sys.argv[1]; assert arm in ['attribution','attribution-v2','plain']
++with (r/(arm+'-prepare.log')).open('x') as log:subprocess.run(['python3',str(r/'build.py'),str(r/'shared248'),arm,'--prepare-only'],check=True,stdout=log,stderr=subprocess.STDOUT)
++source=r/arm/'source'
++def swap(path,old,new,count=1):
++ p=source/path;s=p.read_text(encoding='utf-8');assert s.count(old)==count,(path,old,s.count(old));p.write_text(s.replace(old,new),encoding='utf-8',newline='\n')
++def wrap_fn(path,needle,stage):
++ p=source/path;s=p.read_text(encoding='utf-8');assert s.count(needle)==1;at=s.index('{',s.index(needle))+1;s=s[:at]+f'\nlet _gateway_clock=crate::gateway_costs::Guard::new({stage});'+s[at:];p.write_text(s,encoding='utf-8',newline='\n')
++if arm.startswith('attribution'):
++ shutil.copy2(r/'gateway_costs.rs',source/'src/gateway_costs.rs')
++ p=source/'src/lib.rs';p.write_text(p.read_text(encoding='utf-8')+'\nmod gateway_costs;\n',encoding='utf-8',newline='\n')
++ swap('src/study_observe.rs','pub fn start_tick(tick:u64){','pub fn start_tick(tick:u64){if tick%100==0{crate::gateway_costs::configure();}')
++ swap('src/study_observe.rs','rows:Vec<[u64;3]>','rows:Vec<[u64;3]>,gateway:Vec<[u64;4]>')
++ swap('src/study_observe.rs','  s.rows.push([sim-s.last_sim','  s.gateway.push([tick,s.last_io,io,crate::gateway_costs::mode() as u64]);\n  s.rows.push([sim-s.last_sim')
++ swap('src/study_observe.rs','"rows":s.rows,"stages":s.stages','"rows":s.rows,"stages":s.stages,"gateway":s.gateway')
++ swap('src/study_observe.rs','s.rows.clear();s.stages=[0;16];','s.rows.clear();s.gateway.clear();s.stages=[0;16];')
++ # Exact food events, paired with the existing completed-tick coordinate.
++ swap('src/client/simulation/broadcast.rs','        if epoch > self.food_epoch {','        if epoch > self.food_epoch {\n            crate::study_observe::gateway_food_event(self.tick);')
++ p=source/'src/study_observe.rs';p.write_text(p.read_text(encoding='utf-8')+'\npub fn gateway_food_event(tick:u64){if active(){eprintln!("GATEWAY_FOOD {}",tick);}}\n',encoding='utf-8',newline='\n')
++ f='src/client/server.rs'
++ # Remove the older syscall timers before adding the separately gated brackets.
++ swap(f,'let guard=crate::study_observe::CpuGuard::new(10);let result = self.inner.read(&mut bytes[..limit]);drop(guard);', 'let _gateway_read=crate::gateway_costs::Guard::new(12);crate::gateway_costs::event(8,1);let result = self.inner.read(&mut bytes[..limit]);if let Ok(n)=&result{crate::gateway_costs::event(9,*n as u64);}if result.as_ref().is_err_and(|e|e.kind()==io::ErrorKind::WouldBlock){crate::gateway_costs::event(10,1);}drop(_gateway_read);')
++ swap(f,'let guard=crate::study_observe::CpuGuard::new(11);let result=self.inner.write(bytes);drop(guard);crate::study_observe::write_result(&result);result', 'let _gateway_write=crate::gateway_costs::Guard::new(13);crate::gateway_costs::event(5,1);let result=self.inner.write(bytes);if let Ok(n)=&result{crate::gateway_costs::event(6,*n as u64);}if result.as_ref().is_err_and(|e|e.kind()==io::ErrorKind::WouldBlock){crate::gateway_costs::event(7,1);}drop(_gateway_write);crate::study_observe::write_result(&result);result')
++ ready='src/client/server/readiness.rs'
++ swap(ready,'        let _poll=crate::study_observe::CpuGuard::new(12);\n','')
++ swap(ready,'        self.fds.clear();','        let array_clock=crate::gateway_costs::Guard::new(4);\n        self.fds.clear();')
++ swap(ready,'        // The gateway owns these descriptors','        drop(array_clock);let _poll_clock=crate::gateway_costs::Guard::new(5);\n        // The gateway owns these descriptors')
++ swap(f,'        crate::study_observe::register_socket();','        crate::study_observe::register_socket();\n        let _gateway_finish=crate::gateway_costs::Finish;')
++ swap(f,'        while !self.gate.shared.stopped() {','        while !self.gate.shared.stopped() {\n            crate::gateway_costs::checkpoint();')
++ swap(f,'            let next = self\n                .sessions','            let next_clock=crate::gateway_costs::Guard::new(10);\n            let next = self\n                .sessions')
++ swap(f,'            // Measured loopback polling','            drop(next_clock);\n            // Measured loopback polling')
++ swap(f,'if let Ok(batch) = self.deliveries.recv_timeout(MAX_IDLE) {','if let Ok(batch) = {let _wait=crate::gateway_costs::Guard::new(18);self.deliveries.recv_timeout(MAX_IDLE)} {\n                    let _delivery_wait=crate::gateway_costs::Guard::new(11);')
++ wrap_fn(f,'    fn poll(&mut self)',0)
++ swap(f,'        for session in &mut self.sessions {\n            session.rearm();','        let rearm_clock=crate::gateway_costs::Guard::new(1);\n        for session in &mut self.sessions {\n            session.rearm();')
++ swap(f,'        let now = Instant::now();\n        self.accept(now);','        drop(rearm_clock);\n        let now = Instant::now();\n        self.accept(now);\n        let drain_clock=crate::gateway_costs::Guard::new(3);')
++ swap(f,'        let wall = self.gate.shared.clock.wall(now);','        drop(drain_clock);\n        let wall = self.gate.shared.clock.wall(now);')
++ swap(f,'        for (index, session) in self.sessions.iter_mut().enumerate() {','        let service_clock=crate::gateway_costs::Guard::new(6);\n        crate::gateway_costs::event(0,self.sessions.len() as u64);\n        for (index, session) in self.sessions.iter_mut().enumerate() {')
++ swap(f,'        for session in &mut self.sessions {\n            let Stage::Open(open)', '        drop(service_clock);\n        let flush_clock=crate::gateway_costs::Guard::new(7);let mut flush_empty=0;let mut flush_pending=0;\n        for session in &mut self.sessions {\n            let Stage::Open(open)')
++ swap(f,'        self.retain_sessions();','        crate::gateway_costs::event(1,flush_empty+flush_pending);crate::gateway_costs::event(2,flush_empty);crate::gateway_costs::event(3,flush_pending);drop(flush_clock);\n        self.retain_sessions();\n        let players_clock=crate::gateway_costs::Guard::new(9);')
++ swap(f,'        self.gate.shared.players.store(players, Ordering::Relaxed);','        self.gate.shared.players.store(players, Ordering::Relaxed);\n        drop(players_clock);')
++ swap(f,'            if !open.flush(&mut self.gate) {','            if open.study_dirty {flush_pending+=1;}else{flush_empty+=1;}\n            if !open.flush(&mut self.gate) {')
++ wrap_fn(f,'    fn retain_sessions(',8);wrap_fn(f,'    fn accept(&mut self',2)
++ swap(f,'            let stream = match self.listener.accept() {','            crate::gateway_costs::event(12,1);\n            let stream = match self.listener.accept() {')
++ swap(f,'    queued_bytes: usize,\n}\n\nenum Stage','    queued_bytes: usize,\n    study_dirty: bool,\n}\n\nenum Stage')
++ swap(f,'            queued_bytes: 0,\n        }\n    }\n\n    /// Read within budget','            queued_bytes: 0,\n            study_dirty: true,\n        }\n    }\n\n    /// Read within budget')
++ swap(f,'            match self.socket.read() {','            self.study_dirty=true;\n            crate::gateway_costs::event(11,1);\n            let read_result={let _read=crate::gateway_costs::Guard::new(14);self.socket.read()};\n            match read_result {',2)
++ swap(f,'        match self.socket.write(Message::Binary(bytes)) {','        self.study_dirty=true;\n        crate::gateway_costs::event(4,1);\n        let write_result={let _write=crate::gateway_costs::Guard::new(15);self.socket.write(Message::Binary(bytes))};\n        match write_result {')
++ swap(f,'        match self.socket.flush() {\n            Ok(()) => true,','        let _flush=self.study_dirty.then(||crate::gateway_costs::Guard::new(17));\n        match self.socket.flush() {\n            Ok(()) => {self.study_dirty=false;true},')
++ swap(f,'        let _ = self.socket.close(Some(CloseFrame {','        self.study_dirty=true;\n        let _close=crate::gateway_costs::Guard::new(16);\n        let _ = self.socket.close(Some(CloseFrame {')
++ swap(f,'            let (_, message) = self.queued.pop_front().unwrap();','            crate::gateway_costs::event(14,1);\n            let (_, message) = self.queued.pop_front().unwrap();')
++ swap(f,'                let used = frames.iter().fold(open.queued_bytes,','                crate::gateway_costs::event(13,frames.len() as u64);\n                let used = frames.iter().fold(open.queued_bytes,')
++if '--prepare-only' in sys.argv:print('OVERLAY PREPARED',arm);raise SystemExit(0)
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-gateway-round3-target',CARGO_BUILD_JOBS='1',CARGO_PROFILE_RELEASE_DEBUG='0',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',RAYON_NUM_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS='-C target-cpu=native')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None);os.sched_setaffinity(0,{0})
++command=['cargo','build','--release','--locked','--offline','-j','1','--bin','slither-sim']
++with (r/arm/'build.log').open('x') as log:subprocess.run(command,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
++dest=r/arm/'bin';dest.mkdir();shutil.copy2(Path(env['CARGO_TARGET_DIR'])/'release/slither-sim',dest/'host')
++sha=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
++import tarfile
++with tarfile.open(r/(arm+'.tar')) as archive:commit=archive.pax_headers['comment']
++pin={'commit':commit,'archiveSha256':sha(r/(arm+'.tar')),'toolchain':subprocess.check_output([compiler,'--version'],text=True).strip(),'rustflags':env['RUSTFLAGS'],'binaries':{'host':sha(dest/'host')}};pin['overlaySources']={str(p.relative_to(source)):sha(p) for p in (source/'src').rglob('*.rs')};pin['gatewayOverlaySha256']=sha(r/'overlay.py');pin['gatewayModuleSha256']=sha(r/'gateway_costs.rs');pin['command']=command
++(r/arm/'pins.json').write_text(json.dumps(pin,indent=2)+'\n')
++print('OVERLAY BUILT',arm,flush=True)
+diff --git a/gateway_costs.rs b/gateway_costs.rs
+new file mode 100644
+--- /dev/null
++++ b/gateway_costs.rs
+@@ -0,0 +1,29 @@
++// Archived diagnostic only. Coordinates are the socket thread's CPU clock.
++use std::{cell::RefCell, fs::OpenOptions, io::{BufWriter,Write}, sync::atomic::{AtomicU8,Ordering}};
++const COUNTS:usize=15;
++pub static MODE:AtomicU8=AtomicU8::new(0);
++unsafe extern "C" {fn clock_gettime(id:i32,t:*mut Time)->i32;}
++#[repr(C)]struct Time{sec:i64,ns:i64}
++fn cpu()->u64{let mut t=Time{sec:0,ns:0};assert_eq!(unsafe{clock_gettime(3,&mut t)},0);t.sec as u64*4_000_000_000+t.ns as u64}
++#[derive(Default)]struct Data{counts:[u64;COUNTS],records:Vec<[u64;4+COUNTS]>,opened:bool}
++thread_local!{static DATA:RefCell<Data>=RefCell::new(Data::default());}
++pub fn configure(){let mode=std::env::var_os("CAPACITY_GATEWAY").and_then(|p|std::fs::read_to_string(p).ok()).and_then(|s|s.trim().parse().ok()).unwrap_or(0);assert!(mode<=2);MODE.store(mode,Ordering::Relaxed);}
++pub fn mode()->u8{MODE.load(Ordering::Relaxed)}
++pub fn event(i:usize,n:u64){if mode()!=0{DATA.with_borrow_mut(|s|s.counts[i]+=n);}}
++pub struct Guard{stage:usize,start:u64,mode:u8,counts:[u64;COUNTS]}
++impl Guard{
++ pub fn new(stage:usize)->Self{let mode=mode();let enabled=mode!=0&&(stage<12||stage==18||stage==20||mode==2);Self{stage,start:if enabled{cpu()}else{0},mode,counts:if enabled{DATA.with_borrow(|s|s.counts)}else{[0;COUNTS]}}}
++}
++impl Drop for Guard{fn drop(&mut self){if self.start==0{return;}let end=cpu();DATA.with_borrow_mut(|s|{assert!(s.records.len()<4_000_000,"diagnostic record ceiling");let mut row=[0;4+COUNTS];row[0]=self.mode as u64;row[1]=self.stage as u64;row[2]=self.start;row[3]=end;for i in 0..COUNTS{row[4+i]=s.counts[i]-self.counts[i];}s.records.push(row);});}}
++fn dump(terminal:bool){DATA.with_borrow_mut(|s|{
++ if s.records.is_empty()&&!terminal{return;}
++ let path=std::env::var_os("CAPACITY_GATEWAY_TRACE").expect("diagnostic trace path");
++ let file=if s.opened{OpenOptions::new().append(true).open(path)}else{OpenOptions::new().write(true).create_new(true).open(path)}.unwrap();s.opened=true;
++ let mut out=BufWriter::with_capacity(1<<20,file);
++ out.write_all(b"GWCPU003").unwrap();out.write_all(&(s.records.len() as u64).to_le_bytes()).unwrap();
++ for row in s.records.drain(..){for value in row{out.write_all(&value.to_le_bytes()).unwrap();}}
++ if terminal{out.write_all(b"GWCPUDON").unwrap();}out.flush().unwrap();
++});}
++pub fn checkpoint(){if mode()==0{dump(false);}}
++pub struct Finish;
++impl Drop for Finish{fn drop(&mut self){dump(true);}}
+diff --git a/run_attribution.py b/run_attribution.py
+new file mode 100644
+--- /dev/null
++++ b/run_attribution.py
+@@ -0,0 +1,19 @@
++"""Reuse the capacity runner; three separately labelled attribution modes."""
++from pathlib import Path
++import sys
++r=Path(__file__).resolve().parent
++s=(r/'run.py').read_text(encoding='utf-8')
++def swap(a,b):
++ global s
++ assert s.count(a)==1,(a,s.count(a));s=s.replace(a,b)
++swap('hold_count=1 if smoke or short_mature else 3','hold_count=3')
++swap('hold_seconds=20 if smoke else (30 if short_mature else 300)','hold_seconds=4 if smoke else 12')
++swap('settle_seconds=5 if smoke or short_mature else 60','settle_seconds=1 if smoke else 5')
++swap('diagnostic_seconds=5 if smoke else (15 if short_mature else 60)','diagnostic_seconds=3 if smoke else 4')
++swap("CAPACITY_DIAGNOSTIC=str(root/'DIAGNOSTIC')", "CAPACITY_DIAGNOSTIC=str(root/'DIAGNOSTIC'),CAPACITY_GATEWAY=str(root/'GATEWAY'),CAPACITY_GATEWAY_TRACE=str(root/'gateway.bin')")
++swap("    (root/'MEASURE').touch();hold_end=now+hold_seconds;", "    hold['gatewayMode']=len(meta['holds']);(root/'GATEWAY').write_text(str(hold['gatewayMode'])+'\\n');\n    (root/'MEASURE').touch();hold_end=now+(4 if smoke else [12,18,12][len(meta['holds'])]);")
++swap("     (root/'DIAGNOSTIC').touch();profile=now+diagnostic_seconds;", "     (root/'GATEWAY').write_text('0\\n');(root/'DIAGNOSTIC').touch();profile=now+diagnostic_seconds;")
++assert s.count('18767')==2;s=s.replace('18767','18769')
++if '--source-only' in sys.argv:
++ (r/'run.generated.py').write_text(s,encoding='utf-8',newline='\n');compile(s,str(r/'run.py'),'exec');print('Runner source compiles');raise SystemExit(0)
++exec(compile(s,str(r/'run.py'),'exec'),{'__file__':str(r/'run.py'),'__name__':'__main__'})
+diff --git a/analyze.py b/analyze.py
+new file mode 100644
+--- /dev/null
++++ b/analyze.py
+@@ -0,0 +1,177 @@
++"""CPU-coordinate attribution; reuse the checkpoint's per-window quality gates."""
++from pathlib import Path
++import bisect,json,math,statistics,struct,sys
++from collections import deque
++
++STAGES=['pollPass','rearm','accept','deliveryPoll','readinessBuild','pollSyscall',
++        'service','flush','retainIndex','occupancy','nextDeadline','deliveryWait',
++        'transportRead','transportWrite','websocketRead','websocketWrite',
++        'websocketClose','websocketFlush','channelWait']
++COUNTS=['sessions','flushCalls','provenEmptyFlushCalls','possibleFlushCalls',
++        'websocketWrites','transportWrites','transportWrittenBytes','writeBlocks',
++        'transportReads','transportReadBytes','readBlocks','websocketReads',
++        'acceptAttempts','deliveredFrames','dueFrames']
++
++def overlaps(start,end,rows,ends):
++    """Yield exact CPU overlap, including flat clocks and selected-window gaps."""
++    i=bisect.bisect_right(ends,start)
++    while i<len(rows) and rows[i]['cpuStart']<end:
++        row=rows[i];n=max(0,min(end,row['cpuEnd'])-max(start,row['cpuStart']))
++        if n:yield row,n
++        i+=1
++
++def decode_cpu(value,seconds_scale):
++    # The retained module used a 4e9 seconds multiplier after a record-limit edit.
++    # clock_gettime's fractional part is strictly below 1e9, making this inverse
++    # exact; no interpolation, timing correction or overhead subtraction occurs.
++    seconds,nanos=divmod(value,seconds_scale)
++    assert 0<=nanos<1_000_000_000,(value,seconds_scale,nanos)
++    return seconds*1_000_000_000+nanos
++
++def records(path,seconds_scale):
++    with path.open('rb') as f:
++        while magic:=f.read(8):
++            if magic==b'GWCPUDON':continue
++            assert magic==b'GWCPU003',(path,magic)
++            size=f.read(8);assert len(size)==8
++            for _ in range(struct.unpack('<Q',size)[0]):
++                data=f.read(152);assert len(data)==152,'truncated CPU record'
++                values=list(struct.unpack('<19Q',data))
++                values[2]=decode_cpu(values[2],seconds_scale)
++                values[3]=decode_cpu(values[3],seconds_scale)
++                assert values[0] in [1,2] and values[3]>=values[2]
++                yield values
++
++def quantile(values,p):
++    values=sorted(values);assert values
++    return values[math.ceil((len(values)-1)*p)]
++
++def summary(rows):
++    assert rows
++    phases={}
++    nested=['transportReadInWebsocketRead','transportWriteInWebsocketRead',
++            'transportWriteInWebsocketWrite','transportWriteInWebsocketClose',
++            'transportWriteInWebsocketFlush']
++    for name in [*STAGES,'flushEmptyOnlyLoop','flushPossiblyPendingLoop',*nested]:
++        values=[row['phases'].get(name,0)/1e6 for row in rows]
++        phases[name]={'mean':statistics.mean(values),'p50':quantile(values,.5),'p99':quantile(values,.99)}
++    # Inclusive parents are never added to their children.
++    disjoint=['rearm','accept','deliveryPoll','readinessBuild','pollSyscall',
++              'service','flush','retainIndex','occupancy','nextDeadline',
++              'deliveryWait','channelWait']
++    residual=[(row['socket']-sum(row['phases'].get(s,0) for s in disjoint))/1e6 for row in rows]
++    assert min(residual)>-0.00001,('overlapping disjoint phase intervals',min(residual))
++    exclusive={}
++    for parent,children in [('websocketRead',nested[:2]),('websocketWrite',nested[2:3]),
++                            ('websocketClose',nested[3:4]),('websocketFlush',nested[4:5])]:
++        values=[(r['phases'].get(parent,0)-sum(r['phases'].get(c,0) for c in children))/1e6 for r in rows]
++        assert min(values)>-0.00001,(parent,min(values))
++        exclusive[parent]={'mean':statistics.mean(values),'p50':quantile(values,.5),'p99':quantile(values,.99)}
++    return {'ticks':len(rows),'socketCpuMs':{'mean':statistics.mean(r['socket']/1e6 for r in rows),'p50':quantile([r['socket']/1e6 for r in rows],.5),'p99':quantile([r['socket']/1e6 for r in rows],.99)},
++            'worldCpuMs':{'mean':statistics.mean(r['world']/1e6 for r in rows),'p50':quantile([r['world']/1e6 for r in rows],.5),'p99':quantile([r['world']/1e6 for r in rows],.99)},
++            'phaseCpuMs':phases,'websocketCpuExcludingTransportMs':exclusive,'unassignedCpuMsMean':statistics.mean(residual)}
++
++def main(root,case):
++    run=root/'runs'/case;meta=json.loads((run/'summary.json').read_text());assert meta['status']=='complete'
++    smoke=meta['count']!=500
++    # Read the actual archived implementation; fail on an unrecognized encoding.
++    module=(root/meta['arm']/'source/src/gateway_costs.rs').read_text()
++    import re
++    match=re.search(r't\.sec as u64\*([0-9_]+)\+t\.ns as u64',module);assert match
++    seconds_scale=int(match[1].replace('_',''));assert seconds_scale in [1_000_000_000,4_000_000_000]
++    # Reuse every original quality predicate. Select each diagnostic mode
++    # independently; a fine-timer failure cannot silently validate or erase coarse.
++    original=(root/'select.py').read_text()
++    original=original[:original.index("selected={'machine'")]
++    needle=" for h in meta['holds']:"
++    assert original.count(needle)==1
++    original=original.replace(needle," for h in meta['holds'][hold_index:hold_index+1]:")
++    argv=sys.argv;sys.argv=['select.py',str(root),'unused.json']+(['--preflight'] if smoke else [])
++    quality=[]
++    try:
++        for index in range(3):
++            scope={'__file__':str(root/'select.py'),'__name__':'reused_quality','hold_index':index}
++            exec(compile(original,str(root/'select.py'),'exec'),scope)
++            try:
++                accepted=scope['reduce'](case)
++                quality.append({'mode':index,'passed':True,'selection':accepted['holds'][0]})
++            except (AssertionError,IndexError,ValueError) as error:
++                quality.append({'mode':index,'passed':False,'failure':str(error)})
++    finally:sys.argv=argv
++    census={};blocks={};foods=set()
++    for line in (run/'host.log').read_text().splitlines():
++        if line.startswith('CENSUS '):v=json.loads(line[7:]);census[v['tick']]=v
++        elif line.startswith('CAPACITY '):v=json.loads(line[9:]);blocks[v['tick']]=v
++        elif line.startswith('GATEWAY_FOOD '):foods.add(int(line.split()[1]))
++    rows=[]
++    for index,h in enumerate(meta['holds']):
++        for tick,b in sorted(blocks.items()):
++            if tick-100 not in census:continue
++            if census[tick-100]['unix']<h['startUnix']+(0 if smoke else 1.5) or census[tick]['unix']>h['endUnix']-(0 if smoke else .5):continue
++            assert len(b['rows'])==len(b['gateway'])==100
++            if any(v[3]!=index for v in b['gateway']):continue
++            for clocks,coords in zip(b['rows'],b['gateway']):
++                t,start,end,mode=coords
++                assert end-start==clocks[1] and start<=end
++                rows.append({'tick':t,'mode':mode,'cpuStart':start,'cpuEnd':end,'socket':clocks[1],
++                             'world':clocks[0]+clocks[1],'maintenance':t in foods,'phases':{}})
++    rows.sort(key=lambda x:x['cpuStart']);assert rows
++    assert all(a['cpuEnd']<=b['cpuStart'] for a,b in zip(rows,rows[1:]))
++    ends=[r['cpuEnd'] for r in rows]
++    complete={mode:{'gatewayPasses':0,'emptyOnlyFlushLoops':0,'pendingFlushLoops':0,
++                   'emptyCalls':0,'pendingCalls':0,'emptyLoopTransportWrites':0,
++                   'emptyLoopCpuNs':0,'emptyLoopSessions':0} for mode in [1,2]}
++    counts={1:[0]*15,2:[0]*15};raw_count=0;pending_io=deque()
++    for values in records(run/'gateway.bin',seconds_scale):
++        mode,stage,start,end,*events=values;raw_count+=1
++        assert stage<len(STAGES)
++        name=STAGES[stage]
++        if stage in [12,13]:pending_io.append((stage,start,end))
++        if stage in [14,15,16,17]:
++            while pending_io and pending_io[0][2]<=start:pending_io.popleft()
++            while pending_io and pending_io[0][2]<=end:
++                child,a,b=pending_io.popleft();assert a>=start
++                label=('transportRead' if child==12 else 'transportWrite')+'In'+name[0].upper()+name[1:]
++                for row,n in overlaps(a,b,rows,ends):row['phases'][label]=row['phases'].get(label,0)+n
++        for row,n in overlaps(start,end,rows,ends):
++            row['phases'][name]=row['phases'].get(name,0)+n
++            if stage==7:
++                label='flushEmptyOnlyLoop' if events[3]==0 else 'flushPossiblyPendingLoop'
++                row['phases'][label]=row['phases'].get(label,0)+n
++        # Exact whole-window counters from complete selected records. These can
++        # cross adjacent tick boundaries; no conditional event times are invented.
++        hits=list(overlaps(start,end,rows,ends)) if stage in [0,7,11] else []
++        if hits and sum(n for _,n in hits)==end-start and all(row['mode']==mode for row,_ in hits):
++            totals=complete[mode]
++            if stage in [0,11]:counts[mode]=[a+b for a,b in zip(counts[mode],events)]
++            if stage==0:totals['gatewayPasses']+=1
++            if stage==7:
++                totals['emptyCalls']+=events[2];totals['pendingCalls']+=events[3]
++                if events[3]==0:
++                    totals['emptyOnlyFlushLoops']+=1;totals['emptyLoopTransportWrites']+=events[5]
++                    totals['emptyLoopCpuNs']+=end-start;totals['emptyLoopSessions']+=events[1]
++                    assert events[5]==events[6]==0,'proven-empty loop wrote bytes'
++                else:totals['pendingFlushLoops']+=1
++    output={'machine':'a 4-vCPU Zen 5 EPYC KVM guest','case':case,'recipients':meta['count'],
++            'phaseClockEncoding':{'secondsScaleAsRun':seconds_scale,'canonicalNanosecondsPerSecond':1_000_000_000,
++                                  'exactInverse':'divmod(encoded, secondsScaleAsRun), require remainder < 1e9; seconds*1e9+remainder'},
++            'rawCpuRecords':raw_count,'qualityByMode':quality,'modes':{},'completeRecordCounters':complete,
++            'completeRecordEvents':{str(k):dict(zip(COUNTS,v)) for k,v in counts.items()},
++            'limits':'Archived-copy diagnostic. All timers, counters, pending classification and recorder overhead included; no correction. CPU intersections are exact in socket CPU coordinates. Counters use complete records within each selected window and omit its crossing edge records; events are not split conditionally between maintenance/other ticks. Modes are continued-world windows, not a matched performance comparison. No CPU/capacity gain follows.'}
++    for mode in range(3):
++        selected=[r for r in rows if r['mode']==mode]
++        if not selected:continue
++        if mode:
++            coverage=sum(sum(r['phases'].get(s,0) for s in ['pollPass','nextDeadline','deliveryWait','channelWait']) for r in selected)/sum(r['socket'] for r in selected)
++            assert .5<coverage<=1.000001,('CPU-coordinate coverage',mode,coverage)
++        output['modes'][str(mode)]={'qualityPassed':quality[mode]['passed'],'all':summary(selected),'tickRange':[selected[0]['tick'],selected[-1]['tick']],
++                                  'maintenance':summary([r for r in selected if r['maintenance']]),
++                                  'ordinary':summary([r for r in selected if not r['maintenance']])}
++        if mode:output['modes'][str(mode)]['inclusiveRootCoverage']=coverage
++    (run/'gateway-selected.json').write_text(json.dumps(output,indent=2)+'\n')
++    print(json.dumps({'case':case,'records':raw_count,'quality':[x['passed'] for x in quality],
++                     'modes':{m:{p:{'ticks':v[p]['ticks'],'socketMean':v[p]['socketCpuMs']['mean'],
++                     'phases':{k:x['mean'] for k,x in v[p]['phaseCpuMs'].items() if x['mean']>0}}
++                     for p in ['maintenance','ordinary']} for m,v in output['modes'].items()}},indent=2),flush=True)
++
++if __name__=='__main__':main(Path(__file__).resolve().parent,sys.argv[1])
+diff --git a/test_attribution.py b/test_attribution.py
+new file mode 100644
+--- /dev/null
++++ b/test_attribution.py
+@@ -0,0 +1,32 @@
++import unittest
++from analyze import overlaps,summary,decode_cpu
++
++class AttributionTests(unittest.TestCase):
++    def test_encoded_seconds_recover_exactly_across_second_boundaries(self):
++        for sec,nanos in [(0,0),(0,999_999_999),(1,0),(387,935_483_934),(404,999_999_999)]:
++            self.assertEqual(decode_cpu(sec*4_000_000_000+nanos,4_000_000_000),sec*1_000_000_000+nanos)
++        with self.assertRaises(AssertionError):decode_cpu(1_000_000_000,4_000_000_000)
++    def test_crossing_phase_splits_in_cpu_time_with_selected_gaps(self):
++        rows=[{'cpuStart':10,'cpuEnd':20},{'cpuStart':20,'cpuEnd':20},
++              {'cpuStart':20,'cpuEnd':40},{'cpuStart':60,'cpuEnd':80}]
++        ends=[r['cpuEnd'] for r in rows]
++        self.assertEqual([n for _,n in overlaps(15,70,rows,ends)],[5,20,10])
++        self.assertEqual(sum(n for _,n in overlaps(15,70,rows,ends)),35)
++        self.assertEqual(list(overlaps(40,60,rows,ends)),[])
++        self.assertEqual(list(overlaps(80,90,rows,ends)),[])
++    def test_exclusive_end_and_a_phase_inside_one_tick(self):
++        rows=[{'cpuStart':0,'cpuEnd':10},{'cpuStart':10,'cpuEnd':20}]
++        self.assertEqual([n for _,n in overlaps(2,9,rows,[10,20])],[7])
++        self.assertEqual([n for _,n in overlaps(0,10,rows,[10,20])],[10])
++    def test_inclusive_parents_are_not_added_to_the_disjoint_budget(self):
++        row={'socket':100,'world':200,'phases':{'pollPass':80,'rearm':10,'service':50,'flush':20}}
++        self.assertAlmostEqual(summary([row])['unassignedCpuMsMean'],20/1e6)
++    def test_transport_is_subtracted_only_from_its_containing_websocket_call(self):
++        row={'socket':100,'world':200,'phases':{'flush':80,'websocketFlush':60,
++             'transportWrite':80,'transportWriteInWebsocketFlush':40}}
++        self.assertAlmostEqual(summary([row])['websocketCpuExcludingTransportMs']['websocketFlush']['mean'],20/1e6)
++    def test_world_quantile_uses_aligned_sums(self):
++        rows=[{'socket':0,'world':100,'phases':{}},{'socket':60,'world':100,'phases':{}}]
++        self.assertAlmostEqual(summary(rows)['worldCpuMs']['p99'],100/1e6)
++
++if __name__=='__main__':unittest.main()
+diff --git a/check_math.py b/check_math.py
+new file mode 100644
+--- /dev/null
++++ b/check_math.py
+@@ -0,0 +1,24 @@
++"""Run exact CPU-math tests and three deliberate analytical faults locally."""
++from pathlib import Path
++import json,subprocess,sys
++r=Path(__file__).resolve().parent;out=r/(sys.argv[1] if len(sys.argv)>1 else 'math-controls');out.mkdir(exist_ok=False)
++original=(r/'analyze.py').read_bytes();tests=(r/'test_attribution.py').read_bytes();rows=[]
++def run(label,source,expected_failure):
++ root=out/label;root.mkdir();(root/'analyze.py').write_bytes(source);(root/'test_attribution.py').write_bytes(tests)
++ p=subprocess.run([sys.executable,'-B','-m','unittest','test_attribution'],cwd=root,capture_output=True,text=True)
++ (root/'test.log').write_text(p.stdout+p.stderr,encoding='utf-8',newline='\n')
++ assert (p.returncode!=0 and 'FAILED' in p.stderr) if expected_failure else p.returncode==0,(label,p.returncode,p.stderr)
++ rows.append({'label':label,'expectedFailure':expected_failure,'exit':p.returncode})
++run('original',original,False)
++for label,needle,replacement in [
++ ('whole-crossing-phase',b"n=max(0,min(end,row['cpuEnd'])-max(start,row['cpuStart']))",b'n=end-start'),
++ ('double-count-parent',b"disjoint=['rearm'",b"disjoint=['pollPass','rearm'"),
++ ('sum-component-p99',b"quantile([r['world']/1e6 for r in rows],.99)",b"quantile([r['socket']/1e6 for r in rows],.99)+quantile([(r['world']-r['socket'])/1e6 for r in rows],.99)"),
++ ('unrecovered-seconds-scale',b'return seconds*1_000_000_000+nanos',b'return value'),
++]:
++ assert original.count(needle)==1,(label,original.count(needle))
++ run(label,original.replace(needle,replacement),True)
++assert (r/'analyze.py').read_bytes()==original
++run('restored',original,False)
++(out/'results.json').write_text(json.dumps({'passed':True,'checks':rows},indent=2)+'\n',encoding='utf-8',newline='\n')
++print(json.dumps(rows))
+diff --git a/primary_build.py b/primary_build.py
+new file mode 100644
+--- /dev/null
++++ b/primary_build.py
+@@ -0,0 +1,33 @@
++"""Pinned checkpoint CPU/census overlay; unchanged runtime socket scheduling."""
++from pathlib import Path
++import hashlib,json,os,shutil,subprocess,sys,tarfile
++r=Path(__file__).resolve().parent;arm=sys.argv[1];assert arm in ['base','candidate']
++# The old fixture's optional poll timer assumes the old implementation's line.
++# Omit this diagnostic hook symmetrically; primary aligned task clocks remain.
++s=(r/'build.py').read_text();needle="p.swap(f,'        self.failed = !self.fds.is_empty()','        let _poll=crate::study_observe::CpuGuard::new(12);\\n        self.failed = !self.fds.is_empty()')"
++assert s.count(needle)==1;s=s.replace(needle,'')
++builder=r/'primary-common-build.py'
++if builder.exists():assert builder.read_text()==s
++else:builder.write_text(s)
++with (r/(arm+'-prepare.log')).open('x') as log:subprocess.run(['python3',str(builder),str(r/'shared248'),arm,'--prepare-only'],stdout=log,stderr=subprocess.STDOUT,check=True)
++source=r/arm/'source'
++# The post-hold diagnostic measures the whole readiness function in both arms.
++# CpuGuard stage 12 is disabled during selected primary holds.
++file=source/'src/client/server/readiness.rs';text=file.read_text();needle='    pub(super) fn poll';assert text.count(needle)==1
++at=text.index('{',text.index(needle))+1
++file.write_text(text[:at]+'\n        let _readiness_clock=crate::study_observe::CpuGuard::new(12);'+text[at:])
++# Actual epoch flags identify primary maintenance ticks, with one short event
++# per ~72 ticks only while the shared measurement marker is active.
++file=source/'src/client/simulation/broadcast.rs';text=file.read_text();needle='        if epoch > self.food_epoch {';assert text.count(needle)==1
++file.write_text(text.replace(needle,needle+'\n            crate::study_observe::primary_food_event(self.tick);'))
++file=source/'src/study_observe.rs';file.write_text(file.read_text()+'\npub fn primary_food_event(tick:u64){if active(){eprintln!("GATEWAY_FOOD {}",tick);}}\n')
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-gateway-round3-target',CARGO_BUILD_JOBS='1',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',CARGO_PROFILE_RELEASE_DEBUG='0',RAYON_NUM_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS='-C target-cpu=native')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None);os.sched_setaffinity(0,{0})
++command=['cargo','build','--release','--locked','--offline','-j','1','--bin','slither-sim']
++with (r/arm/'build.log').open('x') as log:subprocess.run(command,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
++dest=r/arm/'bin';dest.mkdir();shutil.copy2(Path(env['CARGO_TARGET_DIR'])/'release/slither-sim',dest/'host')
++sha=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
++with tarfile.open(r/(arm+'.tar')) as t:commit=t.pax_headers['comment']
++pin={'commit':commit,'archiveSha256':sha(r/(arm+'.tar')),'toolchain':subprocess.check_output([compiler,'--version'],text=True).strip(),'rustflags':env['RUSTFLAGS'],'command':command,'binaries':{'host':sha(dest/'host')},'overlays':{str(p.relative_to(source)):sha(p) for p in (source/'src').rglob('*.rs')}}
++(r/arm/'pins.json').write_text(json.dumps(pin,indent=2)+'\n');print('PRIMARY BUILT',arm,flush=True)
+diff --git a/check_integrated.py b/check_integrated.py
+new file mode 100644
+--- /dev/null
++++ b/check_integrated.py
+@@ -0,0 +1,27 @@
++"""Linux readiness oracles/mutations then complete offline Rust checks."""
++from pathlib import Path
++import json,os,subprocess,tarfile
++r=Path(__file__).resolve().parent;out=r/'checks-integrated';source=out/'source';source.mkdir(parents=True)
++with tarfile.open(r/'candidate.tar') as t:t.extractall(source,filter='data')
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-gateway-round3-target',CARGO_BUILD_JOBS='1',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',CARGO_PROFILE_TEST_DEBUG='0',CARGO_PROFILE_DEV_DEBUG='0',RUST_TEST_THREADS='1',RAYON_NUM_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS='-C target-cpu=native')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None);os.sched_setaffinity(0,{0});rows=[]
++def run(label,args,fault=False):
++ with (out/(label+'.log')).open('x') as log:p=subprocess.run(args,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT)
++ text=(out/(label+'.log')).read_text();assert (p.returncode!=0 and 'test result: FAILED' in text) if fault else p.returncode==0,(label,p.returncode)
++ rows.append({'label':label,'command':args,'expectedFailure':fault,'exit':p.returncode});(out/'results.json').write_text(json.dumps(rows,indent=2)+'\n');print(label,p.returncode,flush=True)
++suite=['cargo','test','--locked','-j','1','--lib','client::server::']
++run('server-oracles',suite)
++file=source/'src/client/server/readiness.rs';original=file.read_bytes()
++for label,a,b in [
++ ('missing-compaction-mod','if *previous != Some(index)','if previous.is_none()'),
++ ('missing-readable-event','fd.revents = 1;','fd.revents = 0;'),
++ ('missing-query-fallback','        self.failed = unsafe { poll(self.fds.as_mut_ptr(), self.fds.len() as c_ulong, 0) } < 0;','        self.failed = false;'),
++]:
++ try:
++  text=original.decode();assert text.count(a)==1,(label,text.count(a));file.write_text(text.replace(a,b),newline='\n')
++  run(label,['cargo','test','--locked','-j','1','--lib','client::server::readiness::tests'],True)
++ finally:file.write_bytes(original)
++run('restored-server-oracles',suite)
++run('rust-group',['python3','tools/check.py','rust'])
++(r/'required-checks-pass.json').write_text(json.dumps({'passed':True,'checks':rows},indent=2)+'\n');print('CHECKS COMPLETE',flush=True)
+diff --git a/check_final_tests.py b/check_final_tests.py
+new file mode 100644
+--- /dev/null
++++ b/check_final_tests.py
+@@ -0,0 +1,27 @@
++"""Additional Linux transport regressions; production prefix remains pinned."""
++from pathlib import Path
++import hashlib,json,os,subprocess,tarfile
++r=Path(__file__).resolve().parent;out=r/'checks-final-tests';source=out/'source';source.mkdir(parents=True)
++with tarfile.open(r/'verification-current.tar') as t:t.extractall(source,filter='data')
++with tarfile.open(r/'candidate.tar') as t:
++ old=t.extractfile('src/client/server.rs').read();new=(source/'src/client/server.rs').read_bytes();needle=b'#[cfg(test)]\nmod tests {'
++ assert old.count(needle)==new.count(needle)==1 and old.split(needle)[0]==new.split(needle)[0]
++ assert t.extractfile('src/client/server/readiness.rs').read()==(source/'src/client/server/readiness.rs').read_bytes()
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-gateway-round3-target',CARGO_BUILD_JOBS='1',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',CARGO_PROFILE_TEST_DEBUG='0',CARGO_PROFILE_DEV_DEBUG='0',RUST_TEST_THREADS='1',RAYON_NUM_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS='-C target-cpu=native')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None);os.sched_setaffinity(0,{0});rows=[]
++def run(label,args,fault=False):
++ with (out/(label+'.log')).open('x') as log:p=subprocess.run(args,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT)
++ text=(out/(label+'.log')).read_text();assert (p.returncode!=0 and 'test result: FAILED' in text) if fault else p.returncode==0,(label,p.returncode)
++ rows.append({'label':label,'command':args,'expectedFailure':fault,'exit':p.returncode});(out/'results.json').write_text(json.dumps(rows,indent=2)+'\n');print(label,p.returncode,flush=True)
++suite=['cargo','test','--locked','-j','1','--lib','client::server::tests::gateway_readiness']
++run('transport-controls',suite)
++file=source/'src/client/server.rs';original=file.read_bytes()
++try:
++ text=original.decode();needle='            socket.get_mut().read_blocked = false;';assert text.count(needle)==1
++ file.write_text(text.replace(needle,'            socket.get_mut().read_blocked = true;'),newline='\n')
++ run('blocked-new-buffered-session',suite,True)
++finally:file.write_bytes(original)
++run('restored-transport-controls',suite)
++run('final-rust-group',['python3','tools/check.py','rust'])
++(r/'final-tests-pass.json').write_text(json.dumps({'passed':True,'productionPrefixMatchesMeasuredCandidate':True,'checks':rows},indent=2)+'\n');print('FINAL TESTS COMPLETE',flush=True)
+diff --git a/live_series.py b/live_series.py
+new file mode 100644
+--- /dev/null
++++ b/live_series.py
+@@ -0,0 +1,66 @@
++"""Twelve independent mature cohorts: discard AB, five alternating pairs."""
++from pathlib import Path
++import hashlib,json,os,resource,signal,subprocess,time
++r=Path(__file__).resolve().parent;os.sched_setaffinity(0,{3})
++assert not Path('/tmp/slither-gateway-round3-target').exists()
++assert not (r/'series.json').exists()
++for arm in ['base','candidate']:
++ pin=json.loads((r/arm/'pins.json').read_text())
++ assert hashlib.file_digest((r/arm/'bin/host').open('rb'),'sha256').hexdigest()==pin['binaries']['host']
++old_receipt=r/'attribution-controller-v2.json'
++# The attribution sampler has already stopped; start a fresh combined log so
++# the unchanged selector can find context around every new live window.
++assert (r/'CORE_STOP').exists();(r/'CORE_STOP').unlink()
++with (r/'series-core.log').open('xb') as log:
++ sampler=subprocess.Popen(['python3',str(r/'core_cpu.py')],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
++state={'startedUnix':time.time(),'cpuCeilingHours':12,'warmupCeilingSeconds':2700,'samplerPid':sampler.pid,'attempts':[],
++       'budgetBasis':'Mature attribution ended with 890.37 host +1562.54 client CPU seconds (~0.681 CPUh/cohort); twelve independent cohorts project ~8.18 CPUh. 12 CPUh bounds class retries and normal variation. Builds/checks precede series.'}
++save=lambda:(r/'series.json').write_text(json.dumps(state,indent=2)+'\n')
++def usage():
++ v=resource.getrusage(resource.RUSAGE_CHILDREN);return v.ru_utime+v.ru_stime
++def active_host_client_cpu(name):
++ # Reuse the runner's existing telemetry rather than issue status probes in a
++ # counted window. Process counters include each arm's complete warmup.
++ p=r/'runs'/name/'telemetry.jsonl'
++ if not p.exists():return 0
++ with p.open('rb') as f:
++  f.seek(0,2);end=f.tell();f.seek(max(0,end-65536));lines=f.read().splitlines(keepends=True)
++ for line in reversed(lines):
++  if not line.endswith(b'\n'):continue
++  try:sample=json.loads(line)
++  except json.JSONDecodeError:continue
++  return sum(sample[a]['process'][k] for a in ['server','client'] for k in ['user','system'])
++ return 0
++save()
++try:
++ for pair in range(-1,5):
++  order=['base','candidate'] if pair<0 or pair%2==0 else ['candidate','base']
++  for arm in order:
++   for attempt in [1,2]:
++    assert usage()<12*3600,'series CPU ceiling reached before cohort'
++    name=f'pair-{pair}-{arm}-attempt-{attempt}'
++    row={'pair':pair,'arm':arm,'attempt':attempt,'name':name,'discarded':pair<0,'cpuBefore':usage()};state['attempts'].append(row);save()
++    with (r/(name+'-controller.log')).open('xb') as log:
++     proc=subprocess.Popen(['python3',str(r/'run.py'),arm,name,'500','--short-mature'],stdout=log,stderr=subprocess.STDOUT,stdin=subprocess.DEVNULL)
++     while proc.poll() is None:
++      if usage()+active_host_client_cpu(name)>=12*3600:
++       proc.send_signal(signal.SIGINT);proc.wait();raise AssertionError('series CPU ceiling reached inside cohort; partial retained')
++      time.sleep(.5)
++     assert proc.wait()==0,'cohort runtime failure; preserve and stop'
++    row['cpuAfter']=usage();save();assert usage()<12*3600,'series CPU ceiling exceeded; preserve collected data'
++    selected=r/(name+'-accepted.json')
++    with (r/(name+'-selection.log')).open('xb') as log:
++     p=subprocess.run(['python3',str(r/'select.py'),str(r),str(selected),name],stdout=log,stderr=subprocess.STDOUT)
++    if p.returncode==0:
++     row['accepted']=True;save()
++     accepted=json.loads(selected.read_text())['cases'][name]['holds'][0]
++     print('ACCEPTED',name,'cpuHours',round(usage()/3600,3),'world',accepted['worldCpuMsPerTick'],'gateway',accepted['socketCpuMsPerTick'],flush=True);break
++    row['accepted']=False;row['selectionFailure']=(r/(name+'-selection.log')).read_text();save()
++    assert attempt==1 and 'mature length class drift' in row['selectionFailure'],'non-class failure; no retry or timing-based substitution'
++    print('CLASS RETRY',name,flush=True)
++   else:raise AssertionError('both class attempts failed')
++ state['status']='complete';state['cpuSeconds']=usage();save();print('SERIES COMPLETE',flush=True)
++except BaseException as exc:
++ state['status']='failed';state['failureType']=type(exc).__name__;state['failure']=str(exc);save();raise
++finally:
++ (r/'CORE_STOP').touch();sampler.wait(timeout=10);state['cpuSeconds']=usage();save()
+diff --git a/start_series.py b/start_series.py
+new file mode 100644
+--- /dev/null
++++ b/start_series.py
+@@ -0,0 +1,8 @@
++from pathlib import Path
++import json,subprocess
++r=Path(__file__).resolve().parent
++assert not (r/'series-controller.json').exists()
++with (r/'series-controller.log').open('xb') as log:
++ p=subprocess.Popen(['python3',str(r/'live_series.py')],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
++(r/'series-controller.json').write_text(json.dumps({'pid':p.pid})+'\n')
++print('SERIES STARTED',p.pid,flush=True)
+diff --git a/series_follow.py b/series_follow.py
+new file mode 100644
+--- /dev/null
++++ b/series_follow.py
+@@ -0,0 +1,12 @@
++"""Forward existing cohort/controller logs; no process/status sampling."""
++from pathlib import Path
++import os,time
++r=Path(__file__).resolve().parent;os.sched_setaffinity(0,{3});offsets={}
++while True:
++ paths=[r/'series-controller.log',*sorted(r.glob('pair-*-controller.log'))]
++ for p in paths:
++  if not p.exists():continue
++  with p.open() as f:f.seek(offsets.get(p,0));text=f.read();offsets[p]=f.tell()
++  if text:print(p.name,text,end='' if text.endswith('\n') else '\n',flush=True)
++  if p.name=='series-controller.log' and ('SERIES COMPLETE' in text or 'Traceback (most recent call last)' in text):raise SystemExit(0)
++ time.sleep(1)
+diff --git a/reduce_live.py b/reduce_live.py
+new file mode 100644
+--- /dev/null
++++ b/reduce_live.py
+@@ -0,0 +1,69 @@
++"""Matched-order descriptive live pairs with exact per-tick maintenance flags."""
++from pathlib import Path
++import json,math,statistics,sys
++r=Path(__file__).resolve().parent
++state=json.loads((r/'series.json').read_text());assert state['status']=='complete'
++def q(values):
++ values=sorted(values);assert values
++ return {'mean':statistics.mean(values),'p50':values[math.ceil((len(values)-1)*.5)],'p99':values[math.ceil((len(values)-1)*.99)],'max':max(values)}
++def summarize(rows):
++ return {'ticks':len(rows),'gatewayCpuMs':q([v[1]/1e6 for v in rows]),
++         'simulationCpuMs':q([v[0]/1e6 for v in rows]),'worldCpuMs':q([(v[0]+v[1])/1e6 for v in rows]),
++         'tickBusyWallMs':q([v[2]/1e6 for v in rows])}
++cases={}
++for attempt in state['attempts']:
++ if not attempt.get('accepted'):continue
++ name=attempt['name'];root=r/'runs'/name
++ accepted=json.loads((r/(name+'-accepted.json')).read_text())['cases'][name]
++ meta=json.loads((root/'summary.json').read_text());assert len(meta['holds'])==1
++ hold=meta['holds'][0];census={};blocks={};foods=set()
++ for line in (root/'host.log').read_text().splitlines():
++  if line.startswith('CENSUS '):v=json.loads(line[7:]);census[v['tick']]=v
++  elif line.startswith('CAPACITY '):v=json.loads(line[9:]);blocks[v['tick']]=v
++  elif line.startswith('GATEWAY_FOOD '):foods.add(int(line.split()[1]))
++ ticks=sorted(t for t in blocks if t-100 in census and census[t-100]['unix']>=hold['startUnix'] and census[t]['unix']<=hold['endUnix'])
++ rows=[]
++ for t in ticks:
++  assert len(blocks[t]['rows'])==100
++  for i,values in enumerate(blocks[t]['rows']):
++   tick=t-99+i
++   expected=math.floor(tick*.007/.504)>math.floor((tick-1)*.007/.504)
++   assert (tick in foods)==expected,('actual epoch/cadence mismatch',tick)
++   rows.append((values,expected))
++ summary={phase:summarize([v for v,m in rows if phase=='all' or m==(phase=='maintenance')]) for phase in ['all','maintenance','ordinary']}
++ assert summary['all']['ticks']==accepted['holds'][0]['ticks']
++ for metric,key in [('worldCpuMs','worldCpuMsPerTick'),('gatewayCpuMs','socketCpuMsPerTick')]:
++  assert summary['all'][metric]==accepted['holds'][0][key],(name,metric)
++ diagnostic=accepted.get('syscallDiagnostic')
++ if diagnostic:
++  diagnostic=dict(diagnostic)
++  diagnostic['averageCpuMsPerTick']=dict(diagnostic['averageCpuMsPerTick'])
++  diagnostic['averageCpuMsPerTick']['readinessTotal']=diagnostic['averageCpuMsPerTick'].pop('readinessPoll')
++  diagnostic['limits']+=' Readiness is the whole function including array/query/registration, not a pure syscall. No separately qualified body/client/queue window; diagnostic only.'
++ cases[name]={'pair':attempt['pair'],'arm':attempt['arm'],'discarded':attempt['discarded'],
++              'summary':summary,'quality':accepted['holds'][0],'postHoldDiagnostic':diagnostic,
++              'pins':{'hostSha256':meta['hostSha256'],'clientSha256':meta['clientSha256']}}
++pairs=[]
++for pair in range(5):
++ arms={a:next(v for v in cases.values() if v['pair']==pair and v['arm']==a) for a in ['base','candidate']}
++ changes={phase:{metric:{stat:100*(arms['candidate']['summary'][phase][metric][stat]/arms['base']['summary'][phase][metric][stat]-1)
++                        for stat in ['mean','p50','p99']}
++                 for metric in ['gatewayCpuMs','worldCpuMs']}
++          for phase in ['all','maintenance','ordinary']}
++ pairs.append({'pair':pair,'order':'AB' if pair%2==0 else 'BA','arms':arms,'changePercent':changes})
++aggregates={}
++for phase in ['all','maintenance','ordinary']:
++ aggregates[phase]={}
++ for metric in ['gatewayCpuMs','worldCpuMs']:
++  aggregates[phase][metric]={}
++  for stat in ['mean','p50','p99']:
++   changes=[p['changePercent'][phase][metric][stat] for p in pairs]
++   medians={a:statistics.median(p['arms'][a]['summary'][phase][metric][stat] for p in pairs) for a in ['base','candidate']}
++   ranges={a:[min(p['arms'][a]['summary'][phase][metric][stat] for p in pairs),max(p['arms'][a]['summary'][phase][metric][stat] for p in pairs)] for a in ['base','candidate']}
++   aggregates[phase][metric][stat]={'medianPerArm':medians,'rangePerArm':ranges,'pairedChangePercent':{'median':statistics.median(changes),'range':[min(changes),max(changes)]}}
++output={'machine':'a 4-vCPU Zen 5 EPYC KVM guest','limits':'Independent live cohorts, five alternating pairs after one discarded AB pair; descriptive, not deterministic paired worlds or a capacity qualification. Actual food epochs verified against each selected tick. Component quantiles never added.',
++        'pairs':pairs,'aggregates':aggregates,'discarded':[v for v in cases.values() if v['discarded']],
++        'failedAttempts':[v for v in state['attempts'] if not v.get('accepted')],
++        'seriesCpuSeconds':state['cpuSeconds'],'cpuCeilingHours':state['cpuCeilingHours']}
++(r/'live-selected.json').write_text(json.dumps(output,indent=2)+'\n')
++print(json.dumps(aggregates,indent=2),flush=True)
+diff --git a/cleanup_target.py b/cleanup_target.py
+new file mode 100644
+--- /dev/null
++++ b/cleanup_target.py
+@@ -0,0 +1,17 @@
++"""Remove only this study's bounded target, with no active compiler/study host."""
++from pathlib import Path
++import json,shutil
++r=Path(__file__).resolve().parent
++target=Path('/tmp/slither-gateway-round3-target')
++assert target.resolve()==target and target.parent==Path('/tmp')
++active=[]
++for p in Path('/proc').glob('[0-9]*'):
++ try:
++  exe=(p/'exe').resolve();args=(p/'cmdline').read_bytes()
++  if exe.name in ['cargo','rustc'] or (str(r).encode() in args and exe.name in ['host','slither-sim','clients']):active.append(int(p.name))
++ except (FileNotFoundError,PermissionError,ProcessLookupError):pass
++assert not active,active
++if target.exists():shutil.rmtree(target)
++receipt={'removed':not target.exists(),'activeTaskExecutables':active}
++(r/'target-cleanup.json').write_text(json.dumps(receipt,indent=2)+'\n')
++print(json.dumps(receipt),flush=True)
+diff --git a/prepare_fixed.py b/prepare_fixed.py
+new file mode 100644
+--- /dev/null
++++ b/prepare_fixed.py
+@@ -0,0 +1,23 @@
++"""Link unchanged prior fixture helpers; use the round's only bounded target."""
++from pathlib import Path
++import shutil,subprocess
++r=Path(__file__).resolve().parent;fixed=r/'fixed';fixed.mkdir()
++prior=Path('/var/tmp/slither-food-maintenance-20261029')
++for name in ['base.tar','candidate.tar']:(fixed/name).symlink_to(r/name)
++for name in ['serve.py','measure.py','queue249.py','accept249.py','compare.py','parity.py','run_fixed.py','select_fixed.py']:
++ shutil.copy2(prior/name,fixed/name)
++shutil.copytree(prior/'shared',fixed/'shared',ignore=shutil.ignore_patterns('__pycache__'))
++code='''from pathlib import Path
++p=Path('/var/tmp/slither-food-maintenance-20261029/build.py')
++s=p.read_text().replace('/tmp/slither-food-maintenance-target-20261029','/tmp/slither-gateway-round3-target')
++exec(compile(s,str(p),'exec'),{'__file__':__file__,'__name__':'__main__'})
++'''
++(fixed/'build.py').write_text(code)
++shutil.copy2(r/'required-checks-pass.json',fixed/'required-checks-pass.json')
++shutil.copy2(Path('/tmp/slither-maintenance-round2-20261029/held-final/verify_wire_mutation.py'),fixed/'verify_wire_mutation.py')
++shutil.copy2(Path('/tmp/slither-maintenance-round2-20261029/held-final/archive_session.py'),fixed/'archive_session.py')
++for arm in ['base','candidate','mutation']:
++ subprocess.run(['python3',str(fixed/'build.py'),arm],check=True)
++subprocess.run(['python3',str(fixed/'parity.py')],check=True)
++subprocess.run(['python3',str(fixed/'verify_wire_mutation.py')],check=True)
++print('FIXED BUILDS AND PARITY COMPLETE',flush=True)
+diff --git a/run_fixed_all.py b/run_fixed_all.py
+new file mode 100644
+--- /dev/null
++++ b/run_fixed_all.py
+@@ -0,0 +1,16 @@
++"""Complete the unchanged no-socket parity cohorts before live timing."""
++from pathlib import Path
++import json,os,subprocess,time
++r=Path(__file__).resolve().parent;fixed=r/'fixed';os.sched_setaffinity(0,{3})
++assert json.loads((r/'builds-complete.json').read_text())['passed']
++assert not Path('/tmp/slither-gateway-round3-target').exists()
++assert not (r/'fixed-controller.json').exists()
++commands=[['measure.py','short','base','candidate','--warm','0','--ticks','1080'],
++          ['run_fixed.py','stock'],['run_fixed.py','legacy'],['select_fixed.py']]
++(r/'fixed-controller.json').write_text(json.dumps({'pid':os.getpid(),'startUnix':time.time()})+'\n')
++for command in commands:
++ print('START FIXED',*command,flush=True)
++ subprocess.run(['python3',str(fixed/command[0]),*command[1:]],check=True)
++ print('FINISHED FIXED',*command,flush=True)
++(r/'fixed-complete.json').write_text(json.dumps({'passed':True,'allThreeRows':True})+'\n')
++print('FIXED COMPLETE',flush=True)
+diff --git a/rebuild_primary.py b/rebuild_primary.py
+new file mode 100644
+--- /dev/null
++++ b/rebuild_primary.py
+@@ -0,0 +1,18 @@
++"""Add symmetric post-hold readiness brackets before any primary timing."""
++from pathlib import Path
++import hashlib,json,os,shutil,subprocess,sys
++r=Path(__file__).resolve().parent;arm=sys.argv[1];source=r/arm/'source'
++file=source/'src/client/server/readiness.rs';text=file.read_text();needle='    pub(super) fn poll';assert text.count(needle)==1
++assert '_readiness_clock' not in text
++(r/arm/'readiness-before-post-bracket.rs').write_text(text)
++at=text.index('{',text.index(needle))+1;file.write_text(text[:at]+'\n        let _readiness_clock=crate::study_observe::CpuGuard::new(12);'+text[at:])
++shutil.copy2(r/arm/'bin/host',r/arm/'host-before-post-bracket')
++shutil.copy2(r/arm/'pins.json',r/arm/'pins-before-post-bracket.json')
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-gateway-round3-target',CARGO_BUILD_JOBS='1',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',CARGO_PROFILE_RELEASE_DEBUG='0',RAYON_NUM_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS='-C target-cpu=native')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None);os.sched_setaffinity(0,{0})
++with (r/arm/'post-bracket-build.log').open('x') as log:subprocess.run(['cargo','build','--release','--locked','--offline','-j','1','--bin','slither-sim'],cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
++shutil.copy2(Path(env['CARGO_TARGET_DIR'])/'release/slither-sim',r/arm/'bin/host')
++sha=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
++pin=json.loads((r/arm/'pins.json').read_text());pin['binaries']['host']=sha(r/arm/'bin/host');pin['overlays']={str(p.relative_to(source)):sha(p) for p in (source/'src').rglob('*.rs')};pin['postHoldReadinessScope']='whole function; stage12 disabled during primary holds';pin['postBracketBuilderSha256']=sha(r/'rebuild_primary.py')
++(r/arm/'pins.json').write_text(json.dumps(pin,indent=2)+'\n');print('PRIMARY POST-BRACKET BUILT',arm,flush=True)
+diff --git a/launch_v2.py b/launch_v2.py
+new file mode 100644
+--- /dev/null
++++ b/launch_v2.py
+@@ -0,0 +1,17 @@
++"""Detach one bounded mature attribution cohort and its retained sampler."""
++from pathlib import Path
++import json,os,subprocess,time
++r=Path(__file__).resolve().parent
++assert not (r/'attribution-controller-v2.json').exists()
++assert not Path('/tmp/slither-gateway-round3-target').exists()
++os.sched_setaffinity(0,{3})
++def launch(args,log):
++ with (r/log).open('xb') as stream:
++  return subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
++sampler_pid=json.loads((r/'attribution-controller.json').read_text())['samplerPid']
++cohort=launch(['python3',str(r/'run_attribution.py'),'attribution-v2','mature-attribution-2','500','--short-mature'],'mature-attribution-2-controller.log')
++receipt={'samplerPid':sampler_pid,'cohortPid':cohort.pid,'case':'mature-attribution-2',
++         'startUnix':time.time(),'maximumWarmupSeconds':2700,'diagnosticCpuCeilingHours':3.25,
++         'limits':'One cohort, runner warm timeout plus finite 42-second holds/4-second drain. Ceiling exceeds four-vCPU theoretical runtime bound; no retry launched automatically.'}
++(r/'attribution-controller-v2.json').write_text(json.dumps(receipt,indent=2)+'\n')
++print(json.dumps(receipt),flush=True)
+diff --git a/resume_builds.py b/resume_builds.py
+new file mode 100644
+--- /dev/null
++++ b/resume_builds.py
+@@ -0,0 +1,8 @@
++from pathlib import Path
++import json,subprocess
++r=Path(__file__).resolve().parent
++assert json.loads((r/'required-checks-pass.json').read_text())['passed']
++for command in [['primary_build.py','base'],['primary_build.py','candidate'],['prepare_fixed.py'],['cleanup_target.py']]:
++ print('START',*command,flush=True);subprocess.run(['python3',str(r/command[0]),*command[1:]],check=True);print('FINISHED',*command,flush=True)
++(r/'builds-complete.json').write_text(json.dumps({'passed':True,'primary':['base','candidate'],'catalogAndWireParity':True,'checksReceipt':'required-checks-pass.json','targetRemoved':True})+'\n')
++print('ALL BUILDS CHECKS AND CATALOG PARITY COMPLETE',flush=True)
+diff --git a/reduce_incomplete.py b/reduce_incomplete.py
+new file mode 100644
+--- /dev/null
++++ b/reduce_incomplete.py
+@@ -0,0 +1,121 @@
++"""Retain a failed isolation gate without qualifying or replacing its window."""
++from pathlib import Path
++import bisect,json,math,re,shutil,statistics,sys,tarfile
++
++r=Path(__file__).resolve().parent
++root=r/'incomplete-analysis';root.mkdir(exist_ok=True)
++with tarfile.open(r/'final-complete.tar.gz') as archive:
++ state=json.load(archive.extractfile('series.json'))
++ assert state['status']=='failed' and len(state['attempts'])==4
++ names=[a['name'] for a in state['attempts']]
++ files=['series.json','select.py','core-telemetry.jsonl']
++ for name in names:
++  assert re.fullmatch(r'pair--?\d+-(?:base|candidate)-attempt-\d+',name)
++  files.extend('runs/'+name+'/'+file for file in ['summary.json','host.log','client.log','telemetry.jsonl',
++      'hold-0-start-processes.txt','hold-0-end-processes.txt'])
++ for name in files:
++  file=root/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_bytes(archive.extractfile(name).read())
++ accepted={a['name']:json.load(archive.extractfile(a['name']+'-accepted.json'))['cases'][a['name']]
++           for a in state['attempts'] if a.get('accepted')}
++shared=root/'shared248';shared.mkdir(exist_ok=True)
++prior=Path(sys.argv[1]) if len(sys.argv)>1 else r.parents[1]/'research/performance/2026-10-28-official-density-capacity/select_results.py'
++shutil.copyfile(prior,shared/'select_results.py')
++code=(root/'select.py').read_text();code=code[:code.index("selected={'machine'")]
++needle="   assert row['backgroundProcessScreen']['passes'],'competing process CPU'"
++assert code.count(needle)==1
++# Analysis only: expose the original rejected row after recording its failure.
++# No accepted receipt is written, and this does not feed the primary reducer.
++code=code.replace(needle,'   # Original isolation gate failure is retained by this diagnostic.')
++scope={'__file__':str(root/'select.py'),'__name__':'failed_gate_diagnostic'}
++saved_argv=sys.argv;sys.argv=['select.py',str(root),'unused.json']
++try:exec(compile(code,str(root/'select.py'),'exec'),scope)
++finally:sys.argv=saved_argv
++failed=state['attempts'][-1]
++assert 'competing process CPU' in failed['selectionFailure'] and not failed.get('accepted')
++diagnostic=scope['reduce'](failed['name'])
++assert len(diagnostic['holds'])==1
++screen=diagnostic['holds'][0]['backgroundProcessScreen'];assert not screen['passes']
++
++def q(values):
++ values=sorted(values);assert values
++ return {key:(statistics.mean(values) if key=='mean' else values[math.ceil((len(values)-1)*fraction)])
++         for key,fraction in [('mean',0),('p50',.5),('p99',.99)]}
++
++def split(name,quality):
++ meta=json.loads((root/'runs'/name/'summary.json').read_text());hold=meta['holds'][0]
++ census={};blocks={};foods=set()
++ for line in (root/'runs'/name/'host.log').read_text().splitlines():
++  if line.startswith('CENSUS '):v=json.loads(line[7:]);census[v['tick']]=v
++  elif line.startswith('CAPACITY '):v=json.loads(line[9:]);blocks[v['tick']]=v
++  elif line.startswith('GATEWAY_FOOD '):foods.add(int(line.split()[1]))
++ ticks=sorted(t for t in blocks if t-100 in census and census[t-100]['unix']>=hold['startUnix'] and census[t]['unix']<=hold['endUnix'])
++ rows=[]
++ for t in ticks:
++  assert len(blocks[t]['rows'])==100
++  for i,values in enumerate(blocks[t]['rows']):
++   tick=t-99+i;m=math.floor(tick*.007/.504)>math.floor((tick-1)*.007/.504)
++   assert (tick in foods)==m,(name,tick)
++   rows.append((values,m))
++ result={}
++ for phase in ['all','maintenance','ordinary']:
++  selected=[v for v,m in rows if phase=='all' or m==(phase=='maintenance')]
++  result[phase]={'ticks':len(selected),'gatewayCpuMs':q([v[1]/1e6 for v in selected]),
++       'worldCpuMs':q([(v[0]+v[1])/1e6 for v in selected])}
++ assert result['all']['ticks']==quality['ticks']
++ for metric,key in [('gatewayCpuMs','socketCpuMsPerTick'),('worldCpuMs','worldCpuMsPerTick')]:
++  assert all(result['all'][metric][stat]==quality[key][stat] for stat in ['mean','p50','p99'])
++ return result
++
++cases={}
++for name,case in [*accepted.items(),(failed['name'],diagnostic)]:
++ attempt=next(a for a in state['attempts'] if a['name']==name)
++ cases[name]={'arm':attempt['arm'],'discarded':attempt['discarded'],
++     'qualifiedPrimary':False,'selectorPassed':bool(attempt.get('accepted')),
++     'exclusion':'discarded control' if attempt['discarded'] else 'failed competing-process CPU gate',
++     'summary':split(name,case['holds'][0]),'quality':case['holds'][0]}
++
++# Diagnose the isolation maximum using exactly the selector's sampled endpoints.
++name=failed['name'];meta=json.loads((root/'runs'/name/'summary.json').read_text());hold=meta['holds'][0]
++census={};capacity={}
++for line in (root/'runs'/name/'host.log').read_text().splitlines():
++ if line.startswith('CENSUS '):v=json.loads(line[7:]);census[v['tick']]=v
++ elif line.startswith('CAPACITY '):v=json.loads(line[9:]);capacity[v['tick']]=v
++ticks=sorted(t for t in capacity if t-100 in census and census[t-100]['unix']>=hold['startUnix'] and census[t]['unix']<=hold['endUnix'])
++start=census[ticks[0]-100]['unix'];end=census[ticks[-1]]['unix']
++core=scope['core_data']();times=[v['unix'] for v in core]
++before=core[bisect.bisect_right(times,start)-1]['processes'];after=core[bisect.bisect_right(times,end)-1]['processes']
++old={v['pid']:v for v in before}
++other=[(v['cpu']-old[v['pid']]['cpu'],v['pid']) for v in after if v['pid'] in old and old[v['pid']]['start']==v['start'] and not v['study'] and not v['kernel']]
++maximum,pid=max(other)
++assert maximum==screen['largestOtherUserProcessCpuSeconds']
++observed=sorted({round(v['cpu']*1e9) for row in core for v in row['processes'] if v['pid']==pid})
++quantum=math.gcd(*(b-a for a,b in zip(observed,observed[1:])))
++assert quantum==10_000_000
++screen['observedOtherProcessCpuQuantumSeconds']=quantum/1e9
++# Retain only an executable basename, never its arguments or account fields.
++program=None
++for line in (root/'runs'/name/'hold-0-start-processes.txt').read_text().splitlines():
++ fields=line.split(None,4)
++ if len(fields)==5 and fields[0]==str(pid):
++  program=Path(fields[4].split()[0]).name
++  assert re.fullmatch(r'[a-zA-Z0-9_.-]+',program)
++  break
++output={'machine':'a 4-vCPU Zen 5 EPYC KVM guest','status':'unqualified; no primary pair completed',
++ 'limits':'Discarded controls and one isolation-failed base window only. No before/after performance conclusion; no failed window is promoted. Actual food flags are checked for every reduced tick.',
++ 'seriesCpuSeconds':state['cpuSeconds'],'cpuCeilingHours':state['cpuCeilingHours'],
++ 'attempts':[{k:a[k] for k in ['pair','arm','attempt','name','discarded','accepted']} for a in state['attempts']],
++ 'isolationFailure':dict(screen,programBasename=program,selectedWallSeconds=end-start),
++ 'cases':cases,'completedPrimaryPairs':0}
++bad=next(a for a in state['attempts'] if 'mature length class drift' in a.get('selectionFailure',''))
++meta=json.loads((root/'runs'/bad['name']/'summary.json').read_text());hold=meta['holds'][0]
++census={};capacity={}
++for line in (root/'runs'/bad['name']/'host.log').read_text().splitlines():
++ if line.startswith('CENSUS '):v=json.loads(line[7:]);census[v['tick']]=v
++ elif line.startswith('CAPACITY '):v=json.loads(line[9:]);capacity[v['tick']]=v
++ticks=sorted(t for t in capacity if t-100 in census and census[t-100]['unix']>=hold['startUnix'] and census[t]['unix']<=hold['endUnix'])
++lengths=[census[ticks[0]-100],*[census[t] for t in ticks]]
++output['classFailure']={'name':bad['name'],'censusSamples':len(lengths),
++ 'ranges':{key:[min(v[key] for v in lengths),max(v[key] for v in lengths)] for key in ['living','meanSegments','p90Segments','p99Segments']}}
++(r/'live-incomplete.json').write_text(json.dumps(output,indent=2)+'\n',newline='\n')
++print(json.dumps({'isolationFailure':output['isolationFailure'],'seriesCpuHours':state['cpuSeconds']/3600,
++ 'cases':{k:v['summary'] for k,v in cases.items()}},indent=2))
+diff --git a/archive_final.py b/archive_final.py
+new file mode 100644
+--- /dev/null
++++ b/archive_final.py
+@@ -0,0 +1,66 @@
++"""Verify, preserve and remove only this completed task's guest artifacts."""
++from pathlib import Path
++import hashlib,json,os,pwd,shutil,subprocess,sys,tarfile
++
++r=Path(__file__).resolve().parent
++assert r==Path('/tmp/slither-gateway-round3-20261029') and r.resolve()==r
++archive=r.with_name(r.name+'-final.tar.gz')
++target=Path('/tmp/slither-gateway-round3-target')
++sha=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
++
++def idle():
++    assert not target.exists()
++    assert (r/'CORE_STOP').exists()
++    active=[]
++    for p in Path('/proc').glob('[0-9]*'):
++        try:
++            if int(p.name)==os.getpid():continue
++            command=(p/'cmdline').read_bytes().split(b'\0')
++            if any(arg.startswith(str(r).encode()+b'/') for arg in command):active.append(int(p.name))
++        except (FileNotFoundError,PermissionError,ProcessLookupError):pass
++    assert not active,('task processes remain',active)
++    return active
++
++def anonymous(member):
++    member.uid=member.gid=0;member.uname=member.gname='';return member
++
++idle()
++if sys.argv[1]=='pack':
++    assert not archive.exists()
++    state=json.loads((r/'series.json').read_text());assert state['status'] in ['complete','failed']
++    pins={}
++    for arm in ['base','candidate']:
++        pin=json.loads((r/arm/'pins.json').read_text())
++        assert sha(r/arm/'bin/host')==pin['binaries']['host']
++        assert {str(p.relative_to(r/arm/'source')):sha(p) for p in (r/arm/'source/src').rglob('*.rs')}==pin['overlays']
++        pins[arm]={'commit':pin['commit'],'hostSha256':pin['binaries']['host']}
++    common=r/'common-client';client_pin=json.loads((common/'pins.json').read_text())
++    assert sha(common/'bin/clients')==client_pin['binarySha256']
++    commands=subprocess.check_output(['ps','-eo','pid,ppid,stat,pcpu,args','-ww'],text=True)
++    commands=commands.replace(pwd.getpwuid(os.getuid()).pw_name,'<redacted-account>')
++    (r/'final-boundary-processes.txt').write_text(commands)
++    (r/'final-boundary.json').write_text(json.dumps({'seriesStatus':state['status'],'taskProcesses':[],
++        'targetAbsent':True,'pins':pins,'client':client_pin},indent=2)+'\n')
++    with tarfile.open(archive,'x:gz',compresslevel=1) as t:
++        for p in sorted(r.iterdir()):t.add(p,arcname=p.name,filter=anonymous)
++        # The common client is a read-only donor symlink in the execution tree.
++        # Preserve its actual source/binary/pins too, without mutating the donor.
++        if common.is_symlink():t.add(common.resolve(),arcname='retained-common-client',filter=anonymous)
++    print(json.dumps({'sha256':sha(archive),'bytes':archive.stat().st_size,'seriesStatus':state['status']}),flush=True)
++elif sys.argv[1]=='prune':
++    assert sha(archive)==sys.argv[2]
++    files={str(p.relative_to(r)):p for p in r.rglob('*') if p.is_file() or p.is_symlink()};seen=set()
++    with tarfile.open(archive,'r|gz') as t:
++        for m in t:
++            if m.name not in files:continue
++            p=files[m.name]
++            if p.is_symlink():assert m.issym() and m.linkname==str(p.readlink())
++            else:
++                assert p.resolve().is_relative_to(r) and m.isfile() and m.size==p.stat().st_size
++                assert hashlib.file_digest(t.extractfile(m),'sha256').hexdigest()==sha(p)
++            seen.add(m.name)
++    assert seen==files.keys(),sorted(files.keys()-seen)
++    idle()
++    receipt={'verifiedSha256':sys.argv[2],'taskRootRemoved':str(r),'targetAbsent':True,'taskProcesses':[],'filesVerified':len(files)}
++    shutil.rmtree(r);archive.unlink();print(json.dumps(receipt),flush=True)
++else:raise AssertionError(sys.argv[1])
