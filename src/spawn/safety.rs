@@ -24,6 +24,7 @@ impl Edge {
 struct Obstacle {
     valid: bool,
     edges: Vec<Edge>,
+    head_blocks: Vec<Bounds>,
     bounds: Bounds,
     body_width: f64,
     path: Edge,
@@ -33,6 +34,57 @@ struct Obstacle {
     departure_width: f64,
     departure_path_width: f64,
     head_width: f64,
+}
+
+const HEAD_BLOCK_EDGES: usize = 8;
+const HEAD_BLOCK_LIMIT: f64 = 1e7;
+
+fn head_boundable(point: Point) -> bool {
+    point.finite() && point.x.abs() <= HEAD_BLOCK_LIMIT && point.y.abs() <= HEAD_BLOCK_LIMIT
+}
+
+fn head_blocks(edges: &[Edge]) -> Vec<Bounds> {
+    if edges.len() <= HEAD_BLOCK_EDGES
+        || !edges
+            .iter()
+            .all(|edge| head_boundable(edge.a) && head_boundable(edge.b))
+    {
+        return Vec::new();
+    }
+    edges
+        .chunks(HEAD_BLOCK_EDGES)
+        .map(|chunk| {
+            let mut bounds = chunk[0].bounds;
+            for edge in &chunk[1..] {
+                bounds.include(edge.a);
+                bounds.include(edge.b);
+            }
+            bounds
+        })
+        .collect()
+}
+
+impl Obstacle {
+    fn blocks_head(&self, head: Point) -> bool {
+        let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, self.head_width);
+        if self.head_blocks.is_empty()
+            || !head_boundable(head)
+            || !(0. ..=HEAD_BLOCK_LIMIT).contains(&self.head_width)
+        {
+            return self.edges.iter().any(blocked);
+        }
+        // As in visibility's eight-edge bounds, one unit exceeds projection/
+        // hypot roundoff at this finite scale. Borderline boxes keep every
+        // original edge test, in order; extreme/non-finite inputs stay linear.
+        // research/performance/2026-10-29-spawn-head-blocks/REPORT.md
+        let query = Bounds::between(head, head);
+        self.head_blocks
+            .iter()
+            .zip(self.edges.chunks(HEAD_BLOCK_EDGES))
+            .any(|(&bounds, edges)| {
+                bounds.near(query, self.head_width + 1.) && edges.iter().any(blocked)
+            })
+    }
 }
 
 /// Immutable neighbors, with a reused candidate buffer. Built after excluding
@@ -99,6 +151,7 @@ impl Safety {
                 );
                 Obstacle {
                     valid: path.a.finite() && path.b.finite() && s.body.iter().all(|p| p.finite()),
+                    head_blocks: head_blocks(&edges),
                     edges,
                     bounds,
                     body_width: contact.max(clearance),
@@ -238,12 +291,7 @@ impl Safety {
         !self.obstacles.iter().any(|obstacle| {
             !obstacle.valid
                 || (near(head_bounds, obstacle.bounds, obstacle.head_width)
-                    && obstacle
-                        .edges
-                        .iter()
-                        // Keep projection and inclusive thresholds; ambiguous
-                        // distances retain the original hypot comparison.
-                        .any(|edge| segment_distance_le(head, edge.a, edge.b, obstacle.head_width)))
+                    && obstacle.blocks_head(head))
         })
     }
 
