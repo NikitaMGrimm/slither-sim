@@ -2,10 +2,7 @@ diff --git a/src/client/simulation/snakes.rs b/src/client/simulation/snakes.rs
 index 1e33d52d..d563c62e 100644
 --- a/src/client/simulation/snakes.rs
 +++ b/src/client/simulation/snakes.rs
-@@ -291,49 +291,49 @@ impl SnakeReports {
- /// What one connection has been told about each snake slot.
- #[derive(Clone, Debug, Default)]
- pub(super) struct KnownSnakes {
+@@ -294,4 +294,6 @@ pub(super) struct KnownSnakes {
 -    by_slot: Vec<Option<KnownSnake>>,
 -    /// Ascending occupied slots: broadcasts usually know only a few peers,
 -    /// so enumerating them must not scan every world slot for every recipient.
@@ -16,8 +13,7 @@ index 1e33d52d..d563c62e 100644
 +    ///
 +    /// [diagnostic]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-simulation-memory/REPORT.md
 +    entries: Vec<(usize, KnownSnake)>,
- }
- impl KnownSnakes {
+@@ -299,0 +302,10 @@ impl KnownSnakes {
 +    fn index(&self, slot: usize) -> Option<usize> {
 +        // Bound linear work for crowded views without reserving sparse slots.
 +        if self.entries.len() <= 8 {
@@ -28,16 +24,14 @@ index 1e33d52d..d563c62e 100644
 +                .ok()
 +        }
 +    }
-     pub(super) fn contains_key(&self, slot: usize) -> bool {
+@@ -301 +313 @@ impl KnownSnakes {
 -        self.by_slot.get(slot).is_some_and(Option::is_some)
 +        self.index(slot).is_some()
-     }
-     pub(super) fn get_mut(&mut self, slot: usize) -> Option<&mut KnownSnake> {
+@@ -304 +316,2 @@ impl KnownSnakes {
 -        self.by_slot.get_mut(slot)?.as_mut()
 +        let index = self.index(slot)?;
 +        self.entries.get_mut(index).map(|(_, known)| known)
-     }
-     pub(super) fn remove(&mut self, slot: usize) -> Option<KnownSnake> {
+@@ -307,7 +320,2 @@ impl KnownSnakes {
 -        let known = self.by_slot.get_mut(slot)?.take()?;
 -        let index = self
 -            .slots
@@ -47,8 +41,7 @@ index 1e33d52d..d563c62e 100644
 -        Some(known)
 +        let index = self.index(slot)?;
 +        Some(self.entries.remove(index).1)
-     }
-     pub(super) fn insert(&mut self, slot: usize, known: KnownSnake) {
+@@ -316,6 +324,3 @@ impl KnownSnakes {
 -        if self.by_slot.len() <= slot {
 -            self.by_slot.resize(slot + 1, None);
 -        }
@@ -58,46 +51,28 @@ index 1e33d52d..d563c62e 100644
 +        match self.entries.binary_search_by_key(&slot, |(key, _)| *key) {
 +            Ok(index) => self.entries[index].1 = known,
 +            Err(index) => self.entries.insert(index, (slot, known)),
-         }
+@@ -323 +327,0 @@ impl KnownSnakes {
 -        self.by_slot[slot] = Some(known);
-     }
-     #[cfg(test)]
-     pub(super) fn slots(&self) -> impl Iterator<Item = usize> + '_ {
+@@ -327 +331 @@ impl KnownSnakes {
 -        self.slots.iter().copied()
 +        self.entries.iter().map(|(key, _)| *key)
-     }
+@@ -329,4 +332,0 @@ impl KnownSnakes {
 -
 -    /// CoverageGrid and known slots are ascending and unique. Merge them once,
 -    /// instead of sorting the same nearby candidates for every recipient.
 -    /// Copy the membership before updates: removals and appearances mutate it.
-     pub(super) fn candidates(&self, nearby: &[usize], out: &mut Vec<usize>) {
-         out.clear();
+@@ -335,2 +335,2 @@ impl KnownSnakes {
 -        out.reserve(nearby.len() + self.slots.len());
 -        let mut known = self.slots.iter().copied().peekable();
 +        out.reserve(nearby.len() + self.entries.len());
 +        let mut known = self.entries.iter().map(|(key, _)| *key).peekable();
-         for &slot in nearby {
-             while let Some(slot) = known.next_if(|&known| known < slot) {
-                 out.push(slot);
-@@ -635,6 +635,9 @@ pub(super) fn changes(
-     Ok(())
- }
- 
+@@ -637,0 +638,3 @@ pub(super) fn changes(
 +#[cfg(test)]
 +mod known_tests;
 +
- #[cfg(test)]
- mod tests {
-     use super::*;
-@@ -1178,7 +1181,7 @@ mod tests {
-             cloned.get_mut(slot).unwrap().kills += 1;
-             assert_eq!(
-                 cloned.remove(slot).unwrap().kills,
+@@ -1181 +1184 @@ mod tests {
 -                known.by_slot[slot].as_ref().unwrap().kills + 1
 +                reference[&slot].kills + 1
-             );
-         }
-         assert!(cloned.slots().next().is_none());
 diff --git a/src/client/simulation/snakes/known_tests.rs b/src/client/simulation/snakes/known_tests.rs
 new file mode 100644
 index 00000000..e69be1ab

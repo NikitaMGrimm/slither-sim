@@ -1,0 +1,20 @@
+diff --git a/src/client/simulation/snakes.rs b/src/client/simulation/snakes.rs
+index d563c62e..a8b772a8 100644
+--- a/src/client/simulation/snakes.rs
++++ b/src/client/simulation/snakes.rs
+@@ -300,14 +300,7 @@ pub(super) struct KnownSnakes {
+ }
+ impl KnownSnakes {
+     fn index(&self, slot: usize) -> Option<usize> {
+-        // Bound linear work for crowded views without reserving sparse slots.
+-        if self.entries.len() <= 8 {
+-            self.entries.iter().position(|(key, _)| *key == slot)
+-        } else {
+-            self.entries
+-                .binary_search_by_key(&slot, |(key, _)| *key)
+-                .ok()
+-        }
++        self.entries.iter().position(|(key, _)| *key == slot)
+     }
+     pub(super) fn contains_key(&self, slot: usize) -> bool {
+         self.index(slot).is_some()

@@ -48,6 +48,11 @@
 
 ### Performance
 
+- A compact per-player snake-history layout was measured and rejected. It
+  reduced CPU by 14–18% in the fully grown 500-player offline fixture with
+  byte-identical output, but failed the frozen small-world regression gate.
+  The runtime remains unchanged; the study retains the attempted layouts
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-compact-snake-history/REPORT.md)).
 - Battledome spawn searches now decide whether a candidate head clears an
   older body edge from the squared distance, and fall back to the exact
   `hypot` only when the result is too close to call. Spawn positions, random
