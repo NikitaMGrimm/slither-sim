@@ -98,6 +98,13 @@ Repeat the first command for the four verified labels from `assemble_results.py`
 The verified prefix ends at base-320; 480 is not measured after credential expiry.
 The assembler accepts only a four-row prefix or the complete six-row plan and
 does not mutate the original private collector state.
+Before reduction, the selector checks the archive size/digest and matches every
+raw input file to its archive member, then records `sourceArchiveSha256`.
+Assembly requires that digest to match the row's retrieval receipt and the actual
+archive. It requires a complete, source-verified receipt for primary rows;
+supplementary rows with failed receipt gates remain explicitly unverified and
+are excluded from numerical tables. Each generator segment carries its own
+topology from retained instance-type metadata.
 The optional interrupted root retains the two earlier completed 160-seat
 reductions separately, verifies their archives/source identity and records the
 hash-verified surviving host archive. It does not reconstruct the generator
@@ -130,6 +137,8 @@ to rerun its synthetic aligned-clock, cadence, histogram, headroom, concurrent
 log-tail, archive-failure and source-preservation controls. The native treatment
 regression verifies heading bits and the received-rule gate, not human play.
 Documentation checks need no Rust build.
+Run the small provenance/receipt/topology controls with
+`python -B -m unittest discover -s research/performance/2026-10-29-battledome-live-recheck -p test_assembly.py`.
 
 Frame jitter is receipt-gap minus elapsed-header increment. Frame excess is
 receipt time minus cumulative elapsed headers relative to a reset running

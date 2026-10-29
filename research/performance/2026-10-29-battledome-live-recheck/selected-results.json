@@ -4,9 +4,6 @@
     "vcpus": 1
   },
   "generator": {
-    "vcpus": 8,
-    "physicalCores": 8,
-    "threadsPerCore": 1,
     "workers": 6,
     "primarySegments": [
       {
@@ -15,13 +12,19 @@
           2,
           3
         ],
-        "type": "c8a.4xlarge"
+        "type": "c8a.4xlarge",
+        "vcpus": 16,
+        "physicalCores": 16,
+        "threadsPerCore": 1
       },
       {
         "rows": [
           4
         ],
-        "type": "c8a.2xlarge"
+        "type": "c8a.2xlarge",
+        "vcpus": 8,
+        "physicalCores": 8,
+        "threadsPerCore": 1
       }
     ]
   },
@@ -58,16 +61,17 @@
     "collectorBundleSha256": "365608b82eea1dd704a970cc6986a4f041c9329ecbeb962eb391c68a35014ee3",
     "analysisSha256": {
       "priorSelector": "9842b4692b2d4e6d27bab004afebf910f1d43ce75e791359eda59f722d87f52d",
-      "selector": "ecfc0ca77f5acbe6708b5e17d31782c0a7ffb2f29c7b242370feef08d4251873",
+      "selector": "23f4fdd4d67c43845948530bf6883be199daa8443353efd316264404d7cfa7f1",
       "reducer": "b55e57735838a980e7b0c5a9899b94d4dc29a3cb62bf77c6b333a5b13ee8be3a",
       "portableQueueReducer": "33dc432ce6b26450c9171f43cd1daa478a81ac6c8bce9a9d5df1e1ad9512b813",
-      "assembler": "b584daebec9eedfd92690c772b1ce7a36e8c6ca8da4cb2e52771150db628466e"
+      "assembler": "d084f81bf2dc755045894a063111acd13b6f0224f51f30b1ebaf2e5ba9b9075f"
     }
   },
   "rows": [
     {
       "label": "01-base-160",
       "arm": "base",
+      "sourceArchiveSha256": "46fb7ccd2e0b781a7e88b770dc2c05913976ce997c4109cbc0b3fd877df5157b",
       "primary": {
         "bots": 160,
         "ticks": 12800,
@@ -746,17 +750,20 @@
         "minimumBoostShareIncludingCalibration": 0.9986003561305185,
         "humanSeats": 0
       },
-      "order": 1,
-      "generatorType": "c8a.4xlarge",
+      "evidenceStatus": "verified",
       "archive": {
         "archiveSha256": "46fb7ccd2e0b781a7e88b770dc2c05913976ce997c4109cbc0b3fd877df5157b",
         "archiveBytes": 22760172,
-        "requiredSourcesVerified": true
-      }
+        "requiredSourcesVerified": true,
+        "status": "complete"
+      },
+      "order": 1,
+      "generatorType": "c8a.4xlarge"
     },
     {
       "label": "02-candidate-160",
       "arm": "candidate",
+      "sourceArchiveSha256": "ee09a609d4ef543d350cd004f415fd9a3a61d7cd4f96f25bd6e029ea762c1266",
       "primary": {
         "bots": 160,
         "ticks": 12800,
@@ -1428,17 +1435,20 @@
         "minimumBoostShareIncludingCalibration": 0.9985875152806946,
         "humanSeats": 0
       },
-      "order": 2,
-      "generatorType": "c8a.4xlarge",
+      "evidenceStatus": "verified",
       "archive": {
         "archiveSha256": "ee09a609d4ef543d350cd004f415fd9a3a61d7cd4f96f25bd6e029ea762c1266",
         "archiveBytes": 22749897,
-        "requiredSourcesVerified": true
-      }
+        "requiredSourcesVerified": true,
+        "status": "complete"
+      },
+      "order": 2,
+      "generatorType": "c8a.4xlarge"
     },
     {
       "label": "03-candidate-320",
       "arm": "candidate",
+      "sourceArchiveSha256": "9cc041d85a1614c1050676954e3b3212c73c2273b43a94bed7ef49caa325682a",
       "primary": {
         "bots": 320,
         "ticks": 12300,
@@ -2137,17 +2147,20 @@
         "minimumBoostShareIncludingCalibration": 0.9966678212890505,
         "humanSeats": 0
       },
-      "order": 3,
-      "generatorType": "c8a.4xlarge",
+      "evidenceStatus": "verified",
       "archive": {
         "archiveSha256": "9cc041d85a1614c1050676954e3b3212c73c2273b43a94bed7ef49caa325682a",
         "archiveBytes": 48835019,
-        "requiredSourcesVerified": true
-      }
+        "requiredSourcesVerified": true,
+        "status": "complete"
+      },
+      "order": 3,
+      "generatorType": "c8a.4xlarge"
     },
     {
       "label": "04-base-320",
       "arm": "base",
+      "sourceArchiveSha256": "2dae195f06971cf832d2556c2b1246352649c5ac0baa4f4ddf880f228e0e8722",
       "primary": {
         "bots": 320,
         "ticks": 12000,
@@ -2836,13 +2849,15 @@
         "minimumBoostShareIncludingCalibration": 0.9958394696922644,
         "humanSeats": 0
       },
-      "order": 4,
-      "generatorType": "c8a.2xlarge",
+      "evidenceStatus": "verified",
       "archive": {
         "archiveSha256": "2dae195f06971cf832d2556c2b1246352649c5ac0baa4f4ddf880f228e0e8722",
         "archiveBytes": 49710649,
-        "requiredSourcesVerified": true
-      }
+        "requiredSourcesVerified": true,
+        "status": "complete"
+      },
+      "order": 4,
+      "generatorType": "c8a.2xlarge"
     }
   ],
   "notMeasured": [
@@ -2870,8 +2885,10 @@
         "archive": {
           "archiveSha256": "d13da9c91aa111eab4942d9f9741ffb768b61742b67140cb8b94e9b6a2d15c1c",
           "archiveBytes": 22247314,
-          "requiredSourcesVerified": true
+          "requiredSourcesVerified": true,
+          "status": "complete"
         },
+        "evidenceStatus": "verified",
         "totalDeferredTicks": 0,
         "primary": {
           "bots": 160,
@@ -2940,8 +2957,10 @@
         "archive": {
           "archiveSha256": "734acc20227a7a97b47cfac880c4553cf1f40bba0b006c54918f850968803c6f",
           "archiveBytes": 21707335,
-          "requiredSourcesVerified": true
+          "requiredSourcesVerified": true,
+          "status": "complete"
         },
+        "evidenceStatus": "verified",
         "totalDeferredTicks": 0,
         "primary": {
           "bots": 160,
@@ -3045,8 +3064,10 @@
         "archive": {
           "archiveSha256": "32b22192d5e148f40eb8d6e4646907dd15e98e6b0b70eec4a856655c0550fcbd",
           "archiveBytes": 22422025,
-          "requiredSourcesVerified": true
+          "requiredSourcesVerified": true,
+          "status": "complete"
         },
+        "evidenceStatus": "verified",
         "totalDeferredTicks": 0,
         "primary": {
           "bots": 160,
@@ -3115,8 +3136,10 @@
         "archive": {
           "archiveSha256": "61f1b7aa2482b0a2f50a69584c39e43d7b99951335c7865dcfa67f035802d3be",
           "archiveBytes": 22244543,
-          "requiredSourcesVerified": true
+          "requiredSourcesVerified": true,
+          "status": "complete"
         },
+        "evidenceStatus": "verified",
         "totalDeferredTicks": 0,
         "primary": {
           "bots": 160,
@@ -3185,8 +3208,10 @@
         "archive": {
           "archiveSha256": "a17e2d8195467bf0f46498879053d62f40d3b39695e75d7a6def883e1ab71d1e",
           "archiveBytes": 48180742,
-          "requiredSourcesVerified": true
+          "requiredSourcesVerified": true,
+          "status": "complete"
         },
+        "evidenceStatus": "verified",
         "totalDeferredTicks": 381,
         "primary": {
           "bots": 320,

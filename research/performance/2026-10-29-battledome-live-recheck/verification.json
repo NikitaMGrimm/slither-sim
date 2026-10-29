@@ -29,8 +29,6 @@
   "generatorInstances": 3,
   "generatorTransition": "Spot c8a.4xlarge to approved On-Demand c8a.2xlarge",
   "generatorReplacementAfterPrimaryRow": 3,
-  "generatorPhysicalCores": 8,
-  "generatorThreadsPerCore": 1,
   "sameNativeBinariesAcrossAllBuilds": true,
   "oneSharedClientBinaryForBothArms": true,
   "sourcePins": "selected-results.json only; no duplicated instrumented per-file maps",
@@ -80,5 +78,15 @@
   "rustChecks": "Portable native release builds and override regressions on seven generators; no full local Rust group for this research-only change",
   "documentationCheck": "7 documentation tests passed; report tables exactly recomputed",
   "privacyCheck": "All public study files plus index/changelog checked for cloud identifiers, addresses, account numbers and known private resource names; Python syntax and JSON parse pass",
-  "cleanupReceipt": "cleanup.json"
+  "cleanupReceipt": "cleanup.json",
+  "generatorTopology": "selected-results.json: generator.primarySegments (16 cores for rows 1-3, 8 for row 4; one thread per core)",
+  "archiveBindingReview": {
+    "qualifiedRowsReplayedWithRawFilesMatchingTheirOwnArchive": 9,
+    "rejectedGeneratorDiagnosticRowsRawArchiveMatched": 2,
+    "allNumericalResultsUnchanged": true,
+    "realEarlierAttemptSelectionRejectedAgainstLaterArchive": true,
+    "syntheticProvenanceReceiptAndTopologyTestsPassed": 4,
+    "allFiveSupplementaryReceiptsCompleteAndRequiredSourcesVerified": true,
+    "incompleteSupplementaryRowsRetainedAsUnverifiedAndExcluded": true
+  }
 }

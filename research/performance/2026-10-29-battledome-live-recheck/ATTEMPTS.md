@@ -178,3 +178,13 @@
   nonterminated instances, open/active Spot requests, available/all volumes,
   Elastic IPs and this study's key pairs/groups. Protected resources were untouched.
   Appended the final receipt without erasing the initial pending-cleanup state.
+- The maintaining agent requested verification of three CodeRabbit findings.
+  Confirmed the missing selection/archive binding, last-generator-only topology
+  and missing supplementary receipt gates. Replayed all nine qualified rows
+  after matching every raw file to its own archive, and independently checked
+  both rejected-generator diagnostics. All numerical results and report tables
+  are unchanged. An actual earlier-attempt row is rejected against the later
+  archive. Four small synthetic controls cover provenance, incomplete receipts
+  and per-segment topology; all pass, as do seven documentation tests.
+  Source-unverified/incomplete supplementary receipts remain labelled unverified
+  and excluded from numerical tables. Current supplementary receipts all pass.

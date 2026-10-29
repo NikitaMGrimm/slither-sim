@@ -53,6 +53,9 @@ def main():
         print("| --- | --- | --- | ---: | ---: | ---: | ---: |")
         for attempt, row in supplementary:
             w = row["primary"]
+            if row["evidenceStatus"] != "verified":
+                print(f"| {attempt} (unverified archive; excluded) | {w['bots']} | {row['arm']} | — | — | — | — |")
+                continue
             t = w["slowestCpu1Percent"]
             print(f"| {attempt} | {w['bots']} | {row['arm']} | {triple(w['worldCpuMsPerTick'], ('p99', 'max'))} | {w['deferredTicks']} | {f(w['spawns']['respawns']['p95'])} | {t['eventTicks']['searchRefused']} / {t['n']} |")
 

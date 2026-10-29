@@ -7,6 +7,7 @@ from pathlib import Path
 import hashlib
 import json
 import sys
+from select_results import bind_archive
 
 ORDER = [("base", 160), ("candidate", 160), ("candidate", 320), ("base", 320), ("base", 480), ("candidate", 480)]
 
@@ -16,10 +17,30 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def row_archive(row, folder, *, primary=False):
+    receipt = json.loads((folder / "retrieval-verification.json").read_text())
+    archive = folder / "results.tar.gz"
+    assert archive.stat().st_size == receipt["archiveBytes"]
+    assert row["sourceArchiveSha256"] == receipt["archiveSha256"] == sha(archive), "Selected row belongs to a different archive"
+    assert (row["label"], row["arm"], row["primary"]["bots"]) == (receipt["label"], receipt["arm"], receipt["target"])
+    verified = receipt["requiredSourcesVerified"] is True and receipt["status"] == "complete"
+    if primary:
+        assert verified, "Primary archive receipt is incomplete or source-unverified"
+    row["evidenceStatus"] = "verified" if verified else "unverified"
+    row["archive"] = {k: receipt[k] for k in ["archiveSha256", "archiveBytes", "requiredSourcesVerified", "status"]}
+    return receipt
+
+
+def generator_segment(state, types, rows):
+    topology = next(v["VCpuInfo"] for v in types if v["InstanceType"] == state["type"])
+    return {"rows": rows, "type": state["type"], "vcpus": topology["DefaultVCpus"],
+            "physicalCores": topology["DefaultCores"], "threadsPerCore": topology["DefaultThreadsPerCore"]}
+
+
 def supplementary(row):
     """Bound earlier rows to cited comparisons and their qualification receipts."""
     w = row["primary"]
-    return {k: row[k] for k in ["label", "arm", "verification", "archive", "totalDeferredTicks"]} | {
+    return {k: row[k] for k in ["label", "arm", "verification", "archive", "evidenceStatus", "totalDeferredTicks"]} | {
         "primary": {k: w[k] for k in ["bots", "ticks", "worldCpuMsPerTick", "deferredTicks", "boost", "clientValid"]} | {
             "spawns": {"respawns": w["spawns"]["respawns"]},
             "slowestCpu1Percent": {k: w["slowestCpu1Percent"][k] for k in ["n", "worldMeanMs", "eventTicks"]},
@@ -34,7 +55,7 @@ def main():
     state = json.loads((root / "state-private.json").read_text())
     recovered_generator = "generatorOld" in state
     split = state.get("replacementStartsAtRow", 3)
-    topology = next(v for v in json.loads((root / "types-private.json").read_text())["InstanceTypes"] if v["InstanceType"] == state["generator"]["type"])["VCpuInfo"]
+    types = json.loads((root / "types-private.json").read_text())["InstanceTypes"]
     if recovered_generator:
         assert build == json.loads((root / "build-pins-before-replacement-private.json").read_text())
         assert state["server"]["id"] == json.loads((root / "state-before-generator-replacement-private.json").read_text())["server"]["id"]
@@ -46,16 +67,12 @@ def main():
         label = f"{order:02d}-{arm}-{seats}"
         row = json.loads((root / "analysis" / f"{label}.json").read_text())
         assert row["arm"] == arm and row["primary"]["bots"] == seats
-        receipt = json.loads((root / "rows" / label / "retrieval-verification.json").read_text())
-        assert receipt["requiredSourcesVerified"] and receipt["status"] == "complete"
-        archive = root / "rows" / label / "results.tar.gz"
-        assert archive.stat().st_size == receipt["archiveBytes"] and sha(archive) == receipt["archiveSha256"]
+        row_archive(row, root / "rows" / label, primary=True)
         if analysis is None:
             analysis = row["analysisSha256"]
         assert row.pop("analysisSha256") == analysis
         row["order"] = order
         row["generatorType"] = state["generatorOld"]["type"] if recovered_generator and order < split else state["generator"]["type"]
-        row["archive"] = {k: receipt[k] for k in ["archiveSha256", "archiveBytes", "requiredSourcesVerified"]}
         rows.append(row)
 
     arms = {}
@@ -70,7 +87,7 @@ def main():
     assert shared["sharedPolicySha256"] == build["arms"]["base"]["sharedPolicySha256"]
     output = {
         "server": {"type": "c7a.medium", "vcpus": 1},
-        "generator": {"vcpus": topology["DefaultVCpus"], "physicalCores": topology["DefaultCores"], "threadsPerCore": topology["DefaultThreadsPerCore"], "workers": 6, "primarySegments": [{"rows": list(range(1, split)), "type": state["generatorOld"]["type"]}, {"rows": list(range(split, accepted + 1)), "type": state["generator"]["type"]}] if recovered_generator else [{"rows": list(range(1, accepted + 1)), "type": state["generator"]["type"]}]},
+        "generator": {"workers": 6, "primarySegments": [generator_segment(state["generatorOld"], types, list(range(1, split))), generator_segment(state["generator"], types, list(range(split, accepted + 1)))] if recovered_generator else [generator_segment(state["generator"], types, list(range(1, accepted + 1)))]},
         "sameTargetServerAcrossAllPrimaryRows": True,
         "pins": {
             "arms": arms,
@@ -97,10 +114,7 @@ def main():
             label = f"{order:02d}-{arm}-160"
             row = json.loads((interrupted / "analysis" / f"{label}.json").read_text())
             assert row.pop("analysisSha256") == analysis
-            receipt = json.loads((interrupted / "rows" / label / "retrieval-verification.json").read_text())
-            archive = interrupted / "rows" / label / "results.tar.gz"
-            assert archive.stat().st_size == receipt["archiveBytes"] and sha(archive) == receipt["archiveSha256"]
-            row["archive"] = {k: receipt[k] for k in ["archiveSha256", "archiveBytes", "requiredSourcesVerified"]}
+            row_archive(row, interrupted / "rows" / label)
             retained.append(row)
         salvage = json.loads((interrupted / "interruption-salvage.json").read_text())
         archive = interrupted / "rows/03-candidate-320/interrupted-server-results.tar.gz"
@@ -140,18 +154,15 @@ def main():
             row = json.loads((earlier / "analysis" / f"{label}.json").read_text())
             assert row.pop("analysisSha256") == analysis
             assert row["verification"]["allGeneratorAndQueueGatesPass"]
-            receipt = json.loads((earlier / "rows" / label / "retrieval-verification.json").read_text())
-            archive = earlier / "rows" / label / "results.tar.gz"
-            assert archive.stat().st_size == receipt["archiveBytes"] and sha(archive) == receipt["archiveSha256"]
-            row["archive"] = {k: receipt[k] for k in ["archiveSha256", "archiveBytes", "requiredSourcesVerified"]}
+            row_archive(row, earlier / "rows" / label)
             retained.append(supplementary(row))
         bad = earlier / "rows/03-candidate-320"
         summary = json.loads((bad / "raw/run-summary.json").read_text())
         window = next(w for w in summary["windows"] if w["bots"] == 320)
         v = window["result"]
         assert not v["clientValid"] and v["client"]["worstInputP99Ms"] >= 42
-        receipt = json.loads((bad / "retrieval-verification.json").read_text())
-        assert (bad / "results.tar.gz").stat().st_size == receipt["archiveBytes"] and sha(bad / "results.tar.gz") == receipt["archiveSha256"]
+        receipt = bind_archive(bad / "raw")
+        assert receipt["requiredSourcesVerified"] is True and receipt["status"] == "complete"
         salvage = json.loads((earlier / "interruption-salvage.json").read_text())
         archive = earlier / "rows/interrupted-04-base-320/interrupted-server-results.tar.gz"
         assert archive.stat().st_size == salvage["archiveBytes"] and sha(archive) == salvage["archiveSha256"]
@@ -179,8 +190,8 @@ def main():
         summary = json.loads((folder / "raw/run-summary.json").read_text())
         value = next(w["result"] for w in summary["windows"] if w["bots"] == 160)
         assert not value["clientValid"] and value["client"]["worstInputP99Ms"] >= 42
-        receipt = json.loads((folder / "retrieval-verification.json").read_text())
-        assert (folder / "results.tar.gz").stat().st_size == receipt["archiveBytes"] and sha(folder / "results.tar.gz") == receipt["archiveSha256"]
+        receipt = bind_archive(folder / "raw")
+        assert receipt["requiredSourcesVerified"] is True and receipt["status"] == "complete"
         output["physicalCoreGeneratorFailure"] = {
             "scope": "Unqualified online diagnostic only; no primary comparison",
             "generatorType": "c7a.2xlarge", "bots": 160, "arm": "base", "clientValid": False,

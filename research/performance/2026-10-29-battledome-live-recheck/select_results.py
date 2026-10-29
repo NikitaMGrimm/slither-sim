@@ -8,6 +8,7 @@ from pathlib import Path
 import hashlib
 import json
 import sys
+import tarfile
 import tempfile
 import types
 
@@ -23,11 +24,36 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def bind_archive(raw):
+    """Bind the exact reducer inputs to the retrieved archive, before selection."""
+    receipt = json.loads((raw.parent / "retrieval-verification.json").read_text())
+    archive = raw.parent / "results.tar.gz"
+    assert archive.stat().st_size == receipt["archiveBytes"]
+    assert sha(archive) == receipt["archiveSha256"]
+    seen = set()
+    with tarfile.open(archive, "r|gz") as stream:
+        for member in stream:
+            if member.isdir():
+                continue
+            assert member.isfile(), "Only regular raw files may supply selection"
+            path = Path(member.name)
+            assert not path.is_absolute() and ".." not in path.parts
+            assert member.name not in seen, "Duplicate archive input"
+            with stream.extractfile(member) as source:
+                assert hashlib.file_digest(source, "sha256").hexdigest() == sha(raw / path), member.name
+            seen.add(member.name)
+    assert seen == {p.relative_to(raw).as_posix() for p in raw.rglob("*") if p.is_file()}
+    return receipt
+
+
 def main():
     raw, harness, destination = map(Path, sys.argv[1:4])
+    receipt = bind_archive(raw)
+    assert receipt["status"] == "complete" and receipt["requiredSourcesVerified"] is True
     arm = sys.argv[4]
     build = json.loads(Path(sys.argv[5]).read_text())
     summary = json.loads((raw / "run-summary.json").read_text())
+    assert (receipt["label"], receipt["arm"], receipt["target"]) == (summary["runLabel"], arm, summary["primaryTarget"])
     pins = json.loads((raw / "pins.json").read_text())
     master = build["arms"][arm]
     assert summary["runtime"] == pins["runtime"] == master["runtime"] == RUNTIMES[arm]
@@ -93,6 +119,7 @@ def main():
     keep = ["bots", "ticks", "tickRange", "wallSeconds", "worldCpuMsPerTick", "deferredTicks", "clientValid", "client", "socket", "alive", "occupied", "census", "boost", "spawns", "allTicks", "slowestCpu1Percent", "accounting", "hostCoreContextMsPerTick"]
     output = {
         "label": summary["runLabel"], "arm": arm,
+        "sourceArchiveSha256": receipt["archiveSha256"],
         "primary": {k: primary[k] for k in keep},
         "calibrations": [{k: w[k] for k in ["bots", "ticks", "worldCpuMsPerTick", "deferredTicks", "clientValid", "boost"]} for w in windows if w is not primary],
         "totalDeferredTicks": selected["totalDeferredTicks"],

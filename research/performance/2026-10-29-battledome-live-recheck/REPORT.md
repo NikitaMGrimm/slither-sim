@@ -143,6 +143,9 @@ of one c8a.4xlarge, with control on CPU 7. Its 16 vCPUs are 16 physical
 cores with one thread each; extra CPUs are unused by clients. This supplies
 primary rows 1–3. After two further Spot interruptions, the maintaining agent
 approved one On-Demand c8a.2xlarge (eight physical cores), supplying row 4.
+Thus base-160, candidate-160 and candidate-320 use the 16-core generator;
+base-320 uses the eight-core generator. Each segment's topology is recorded
+beside its row numbers in the selected JSON, without a single top-level count.
 The same six workers, native client,
 policy and target server remain. The 320 comparison spans this generator
 instance/size/market transition; it contributes to the unreplicated run/network
@@ -209,6 +212,14 @@ size/hash/source-verified. Exact online replay and independent aligned-task
 clock reconciliation pass; all primary generator, treatment and queue gates
 pass. Both alternative-generator failures remain excluded. The seven remote
 generator builds each passed the heading/rule regression for both arms.
+After review, every qualified selection was replayed with its exact raw files
+checked against its own archive before recording the archive digest. Assembly
+requires that recorded digest to match the retrieval receipt and actual archive.
+All four primary rows, five supplementary rows and both rejected-generator
+diagnostics were rechecked against their cited archives; numerical results are
+unchanged. Supplementary receipts must be complete and source-verified to appear
+as verified comparisons. An incomplete/source-unverified supplementary entry is
+retained with an explicit unverified label and excluded from numerical tables.
 See [verification](verification.json). No local Cargo or SSH bench work was used
 for this study. Documentation and privacy checks are recorded there; no
 independent review or human play acceptance is claimed.
