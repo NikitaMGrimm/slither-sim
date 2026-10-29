@@ -1,0 +1,47 @@
+{
+  "scope": "Research only; production sources unchanged",
+  "offlineControls": {
+    "passed": true,
+    "alignedComponentSums": true,
+    "completeBlockCount": true,
+    "growingQueueRejected": true,
+    "lateInputsRejected": true,
+    "humanOccupancyLabeled": true,
+    "deferredTicksRejected": true
+  },
+  "documentationTests": {
+    "passed": true,
+    "tests": 7
+  },
+  "selection": {
+    "reproducesOnlineResults": true,
+    "windows": 10,
+    "ticks": 41900,
+    "allOriginalGatesPass": true,
+    "maxClockMinusTaskMeanAbsoluteMsPerTick": 0.004779227827315324,
+    "publishedHarnessMatchesMeasuredHashes": true
+  },
+  "build": {
+    "completed": true,
+    "runtime": "692cd561714b8af3ea95adb3adcbd807b3a48734",
+    "portableCpuTarget": "x86-64",
+    "hostCopiedBinaryHashVerified": true,
+    "boundedCargoTargetDeleted": true
+  },
+  "replacement": {
+    "aborted": true,
+    "jobNotPrepared": true,
+    "warmupNotStarted": true,
+    "capacityWindows": 0
+  },
+  "limits": [
+    "No new Rust production changes; full Rust check group not rerun.",
+    "No independent agent review performed.",
+    "No 6.8 ms boundary, fully mature 750-player qualification, extrapolation or uptime claim."
+  ],
+  "privacy": {
+    "exactPrivateValuesAbsent": true,
+    "identifierPatternScanPassed": true,
+    "utf8AndLfPassed": true
+  }
+}
