@@ -108,7 +108,11 @@ retained visibility check runner and the same sole target. The spot check makes
 no timing requests. No measured runtime source changes or new timing series.
 
 Keep raw sources, binaries, traces, snapshots and full inventories local-only.
-Stream archives off the guest with normalized owner metadata, compare transfer
-digests and stream them back for member-by-member comparison before pruning.
+After all windows, create one bounded archive in guest tmpfs if space permits,
+reserving at least 256 MiB free; normalize owner metadata. Compare every archive
+member with its source bytes on the guest, transfer by SFTP and compare the
+transferred SHA-256 before pruning. This avoids a second large upload solely
+for verification. If a temporary archive cannot fit, use the original streaming
+method instead. Archiving occurs after timing and changes no observations.
 Only after verification remove the task's own directories/target, announce the
 guest free and update #277's template body/footer. Do not merge.
