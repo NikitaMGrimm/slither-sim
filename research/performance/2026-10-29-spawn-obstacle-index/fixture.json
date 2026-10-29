@@ -1,0 +1,20 @@
+{
+  "aliveDecisionSamples": 4809264,
+  "boostShare": 0.9984469557088154,
+  "boostingDecisionSamples": 4801795,
+  "census": {
+    "boosting": 318,
+    "food": 18346,
+    "headRadiusP50": 5700.025952806362,
+    "living": 318,
+    "meanSegments": 58.886792452830186,
+    "p90Segments": 150,
+    "p99Segments": 221,
+    "radius": 11333.603134043473
+  },
+  "dataOrigin": "deterministic in-process received-frame A4 warmup; synthetic fixture, not live capture",
+  "refusedSeed": 40,
+  "seconds": 642.684,
+  "successfulSeed": 0,
+  "waitedSeconds": 0.0
+}
