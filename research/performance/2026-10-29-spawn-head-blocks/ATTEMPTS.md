@@ -16,3 +16,7 @@
   which removes barriers halfway through. Its mixed-window profile is retained
   and excluded. Before any production edit, rerun a wholly blocked 3,600-tick
   window and require 1,800 exhausted searches/7,372,800 poses and 72 waiters.
+- The first focused mutation dispatch passed two positional Cargo filters, so
+  Cargo rejected the command before testing. The source was restored in `finally`.
+  Keep that CLI error and rerun with one filter; add explicit finite-guard domain
+  boundary/cancellation cases before completing the proof group.

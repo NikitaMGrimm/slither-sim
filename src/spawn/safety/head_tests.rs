@@ -350,3 +350,70 @@ fn randomized_multiblock_worlds_match_independent_linear_oracle() {
         }
     }
 }
+
+#[test]
+fn block_guard_domain_edges_and_cancellation_keep_scalar_verdicts() {
+    for scale in [
+        1e-200,
+        1e-50,
+        1.,
+        HEAD_BLOCK_LIMIT.next_down(),
+        HEAD_BLOCK_LIMIT,
+        HEAD_BLOCK_LIMIT.next_up(),
+        1e50,
+        f64::MAX,
+    ] {
+        for sign in [-1., 1.] {
+            let head = Point {
+                x: sign * scale,
+                y: -sign * scale,
+            };
+            let mut vertices: Vec<_> = (0..34)
+                .map(|i| {
+                    if i % 2 == 0 {
+                        Point {
+                            x: -scale,
+                            y: scale,
+                        }
+                    } else {
+                        Point {
+                            x: scale,
+                            y: -scale,
+                        }
+                    }
+                })
+                .collect();
+            vertices[16] = Point {
+                x: head.x + 400.,
+                y: head.y,
+            };
+            for width in [
+                -0.,
+                0.,
+                400_f64.next_down(),
+                400.,
+                400_f64.next_up(),
+                HEAD_BLOCK_LIMIT.next_down(),
+                HEAD_BLOCK_LIMIT,
+                HEAD_BLOCK_LIMIT.next_up(),
+                f64::NAN,
+                f64::INFINITY,
+            ] {
+                let raw = RawObstacle {
+                    valid: true,
+                    vertices: vertices.clone(),
+                    width,
+                    bounds: [-f64::INFINITY, -f64::INFINITY, f64::INFINITY, f64::INFINITY],
+                };
+                assert_head(head, std::slice::from_ref(&raw));
+                let query = candidate(std::slice::from_ref(&raw));
+                assert_eq!(
+                    query.obstacles[0].blocks_head(head),
+                    raw.vertices
+                        .windows(2)
+                        .any(|p| original_segment(head, p[0], p[1]) <= width)
+                );
+            }
+        }
+    }
+}
