@@ -56,7 +56,9 @@ impl SectorInterest {
             if let Some(previous) = self.center {
                 for sector in stencil(previous) {
                     self.last_seen.insert(sector, self.touched);
-                    if !current(sector) {
+                    // Existing non-current times cannot exceed the previous
+                    // touch, so only an empty minimum needs a new witness.
+                    if self.oldest.is_none() && !current(sector) {
                         note_oldest(&mut self.oldest, sector, self.touched);
                     }
                 }
@@ -228,8 +230,8 @@ mod tests {
         actual = SectorInterest::default();
         reference = SectorInterest::default();
         // An added deadline rounds up to now, despite strictly expired age.
-        let now = 1e12_f64;
-        let seen = (now - RETENTION_SECONDS).next_down();
+        let seen = 0.119_f64;
+        let now = seen + RETENTION_SECONDS;
         assert!(now - seen > RETENTION_SECONDS);
         assert!(now <= seen + RETENTION_SECONDS);
         compare_advance(&mut actual, &mut reference, Point::default(), 0., seen);
