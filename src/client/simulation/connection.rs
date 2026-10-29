@@ -324,21 +324,21 @@ impl SimulatorBackend {
     /// Frame packets emitted at `now`. A packet too long for a length prefix (a
     /// dense large minimap) travels alone in its own frame, in stream order.
     /// Aggregate broadcasts are split to fit the bounded socket transports.
-    pub(super) fn emit(
+    pub(super) fn emit<P: AsRef<[u8]>>(
         &mut self,
         slot: usize,
         now: f64,
-        packets: &[Vec<u8>],
+        packets: &[P],
     ) -> Result<(), String> {
         self.emit_presented(slot, now, packets, None)
     }
 
-    pub(super) fn emit_presented(
+    pub(super) fn emit_presented<P: AsRef<[u8]>>(
         &mut self,
         slot: usize,
         now: f64,
-        packets: &[Vec<u8>],
-        physical: Option<&[Vec<u8>]>,
+        packets: &[P],
+        physical: Option<&[P]>,
     ) -> Result<(), String> {
         if self.slots[slot].connection.output_fault.is_some() {
             return Ok(());
@@ -495,23 +495,23 @@ impl SimulatorBackend {
 
 /// Consume legacy packet buffers while borrowing stock bundles. Both paths
 /// keep the same queue preflight and per-frame latency/header progression.
-enum FrameGroups<'a> {
+enum FrameGroups<'a, P> {
     Legacy(std::vec::IntoIter<Vec<u8>>),
-    Stock(std::vec::IntoIter<&'a [Vec<u8>]>),
+    Stock(std::vec::IntoIter<&'a [P]>),
 }
 
-enum FrameGroup<'a> {
+enum FrameGroup<'a, P> {
     Legacy(Vec<u8>),
-    Stock(&'a [Vec<u8>]),
+    Stock(&'a [P]),
 }
 
-impl FrameGroups<'_> {
+impl<P> FrameGroups<'_, P> {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
 
-impl FrameGroup<'_> {
+impl<P: AsRef<[u8]>> FrameGroup<'_, P> {
     fn frame(self, elapsed: u16) -> Result<Vec<u8>, String> {
         match self {
             Self::Legacy(packet) => encode::frame_owned(elapsed, packet),
@@ -520,8 +520,8 @@ impl FrameGroup<'_> {
     }
 }
 
-impl<'a> Iterator for FrameGroups<'a> {
-    type Item = FrameGroup<'a>;
+impl<'a, P> Iterator for FrameGroups<'a, P> {
+    type Item = FrameGroup<'a, P>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -536,7 +536,7 @@ impl<'a> Iterator for FrameGroups<'a> {
     }
 }
 
-impl ExactSizeIterator for FrameGroups<'_> {
+impl<P> ExactSizeIterator for FrameGroups<'_, P> {
     fn len(&self) -> usize {
         match self {
             Self::Legacy(packets) => packets.len(),
@@ -555,11 +555,12 @@ fn session_id(serial: u32, key: u32) -> u32 {
 }
 
 /// Stock transport grouping, shared by physical scheduling and presentation.
-fn frame_groups(packets: &[Vec<u8>]) -> Vec<&[Vec<u8>]> {
-    let mut groups: Vec<&[Vec<u8>]> = Vec::new();
+fn frame_groups<P: AsRef<[u8]>>(packets: &[P]) -> Vec<&[P]> {
+    let mut groups: Vec<&[P]> = Vec::new();
     let mut start = 0;
     let mut bytes = 2; // Elapsed-ms header.
     for (index, packet) in packets.iter().enumerate() {
+        let packet = packet.as_ref();
         if !encode::frameable(packet) {
             if start < index {
                 groups.push(&packets[start..index]);
@@ -610,6 +611,96 @@ mod tests {
         let packet = vec![b'i'; 8192];
         assert!(!encode::frameable(&packet));
         vec![packet; frames]
+    }
+
+    fn shared(packets: &[Vec<u8>]) -> Vec<encode::Packet> {
+        let bytes = std::rc::Rc::new(packets.concat());
+        let mut start = 0;
+        packets
+            .iter()
+            .map(|packet| {
+                let end = start + packet.len();
+                let view = encode::Packet::Shared {
+                    bytes: bytes.clone(),
+                    range: start..end,
+                };
+                start = end;
+                view
+            })
+            .collect()
+    }
+
+    #[test]
+    fn shared_packets_keep_group_boundaries_and_framing_errors() {
+        for packets in [
+            Vec::new(),
+            vec![Vec::new()],
+            vec![vec![31], vec![b'p']],
+            vec![vec![b'i'; 8192], vec![b'p']],
+            vec![vec![b'i'; 8191]; 130],
+        ] {
+            let views = shared(&packets);
+            let expected = frame_groups(&packets);
+            let actual = frame_groups(&views);
+            assert_eq!(
+                actual.iter().map(|g| g.len()).collect::<Vec<_>>(),
+                expected.iter().map(|g| g.len()).collect::<Vec<_>>()
+            );
+            for (a, b) in actual.iter().zip(expected) {
+                for elapsed in [0, 7, 65535] {
+                    assert_eq!(encode::frame(elapsed, a), encode::frame(elapsed, b));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn shared_packets_keep_stock_legacy_headers_and_physical_draws() {
+        for legacy in [false, true] {
+            let mut actual = backend();
+            let mut reference = backend();
+            if legacy {
+                actual.slots[0].connection.legacy =
+                    Some(Box::new(crate::client::encode13::Encoder::new(0)));
+                reference.slots[0].connection.legacy =
+                    Some(Box::new(crate::client::encode13::Encoder::new(0)));
+            }
+            let style = encode::FoodStyle {
+                color: 4,
+                size: 20,
+                snake_food: false,
+            };
+            let packets = vec![
+                encode::pong(),
+                encode::food_add([108, 108, 1, 2], style),
+                encode::food_remove([108, 108, 1, 2], Some(17)),
+            ];
+            let views = shared(&packets);
+            for now in [0., 0.0004, 0.0006, 1000.] {
+                actual
+                    .emit_presented(0, now, &views, Some(&views[..1]))
+                    .unwrap();
+                reference
+                    .emit_presented(0, now, &packets, Some(&packets[..1]))
+                    .unwrap();
+                assert_eq!(
+                    actual.slots[0].connection.take_downlink(),
+                    reference.slots[0].connection.take_downlink()
+                );
+                assert_eq!(
+                    actual.slots[0].connection.header_ms,
+                    reference.slots[0].connection.header_ms
+                );
+                assert_eq!(
+                    format!("{:?}", actual.random),
+                    format!("{:?}", reference.random)
+                );
+                assert_eq!(
+                    format!("{:?}", actual.slots[0].connection.link),
+                    format!("{:?}", reference.slots[0].connection.link)
+                );
+            }
+        }
     }
 
     #[test]

@@ -909,7 +909,7 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
 
 /// Diff against freshly allocated listings, as after a changed broadcast.
 fn diff_food(
-    packets: &mut Vec<Vec<u8>>,
+    packets: &mut Vec<encode::Packet>,
     connection: &mut Connection,
     sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
     eaters: &BTreeMap<(u64, u64), u16>,
@@ -1035,7 +1035,11 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
         &BTreeMap::new(),
         &BTreeSet::from([[sx, sy]]),
     );
-    assert!(packets.contains(&vec![b'F', sx, sy, 3, rx, ry, 20]));
+    assert!(
+        packets
+            .iter()
+            .any(|packet| packet.as_ref() == [b'F', sx, sy, 3, rx, ry, 20])
+    );
     sectors.get_mut(&[sx, sy]).unwrap().insert([rx, ry], second);
     let eaters = BTreeMap::from([(food_identity(point), 2)]);
     packets.clear();

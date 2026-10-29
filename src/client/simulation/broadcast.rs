@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Rows the stock leaderboard shows.
 pub(super) const LEADERBOARD_ROWS: usize = 10;
 /// Physical packets, plus a browser view when pit decoration is active.
-type PacketViews = (Vec<Vec<u8>>, Option<Vec<Vec<u8>>>);
+type PacketViews = (Vec<encode::Packet>, Option<Vec<encode::Packet>>);
 /// One prey's correction clock, shared by every recipient: official
 /// corrections for one prey align across clients, and a new viewer does not
 /// restart it.
@@ -427,7 +427,7 @@ impl SimulatorBackend {
             let mut prefix = if pongs == 0 {
                 Vec::new()
             } else {
-                vec![encode::pong(); pongs]
+                vec![encode::Packet::from(encode::pong()); pongs]
             };
             let (updates, presented_updates) = self.updates(
                 slot,
@@ -438,7 +438,7 @@ impl SimulatorBackend {
                 &mut snakes,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
-                prefix.push(packet);
+                prefix.push(packet.into());
             }
             // Most broadcasts have neither pongs nor a map. Keep updates' own
             // allocation instead of moving every packet through another Vec.
@@ -460,9 +460,9 @@ impl SimulatorBackend {
                 .filter(|_| leaderboard_due && (alive || was_over));
             let hud = self.hud(slot, live_board)?;
             if let Some(presented) = &mut presented {
-                presented.extend(hud.iter().cloned());
+                presented.extend(hud.iter().cloned().map(encode::Packet::from));
             }
-            packets.extend(hud);
+            packets.extend(hud.into_iter().map(encode::Packet::from));
             if let Some(presented) = presented {
                 self.emit_presented(slot, now, &presented, Some(&packets))?;
             } else if !packets.is_empty() {
@@ -617,29 +617,29 @@ impl SimulatorBackend {
             let known = connection.snakes.remove(slot);
             let fam = encode::fam_u24(me.fam);
             if known.as_ref().is_some_and(|known| known.fam != fam) {
-                packets.push(encode::fam(id, fam));
+                packets.push((encode::fam(id, fam)).into());
             }
             // The stock game-over score adds the credit to the final mass.
             let credit = encode::segment_credit(me.score, me.segments, fam);
             if connection.credit != credit {
                 connection.credit = credit;
-                packets.push(encode::credit(credit));
+                packets.push((encode::credit(credit)).into());
             }
             // The local record rule qualifies this life; the stock v1 flag
             // offers its player a victory-message input.
-            packets.push(encode::game_over(record));
+            packets.push((encode::game_over(record)).into());
             if known.is_some() {
-                packets.push(encode::removal(id, true));
+                packets.push((encode::removal(id, true)).into());
             }
         }
         let radius = world.radius().round() as u32;
         if connection.radius != radius {
             connection.radius = radius;
-            packets.push(encode::radius(world.radius())?);
+            packets.push((encode::radius(world.radius())?).into());
         }
         let rules = world.rules();
         if connection.rules_enabled && connection.rules_sent != Some(rules) {
-            packets.push(crate::client::rules_packet::encode(rules));
+            packets.push((crate::client::rules_packet::encode(rules)).into());
             connection.rules_sent = Some(rules);
         }
         let vision = world.config().vision;
@@ -682,14 +682,14 @@ impl SimulatorBackend {
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
-                    packets.push(encode::removal(id, died));
+                    packets.push((encode::removal(id, died)).into());
                     connection.snakes.remove(i);
                 }
                 (None, false) => {}
                 (known, true) => {
                     let wanted = physics::quantize_heading(control);
                     if known.is_some() {
-                        packets.push(encode::removal(id, true));
+                        packets.push((encode::removal(id, true)).into());
                     }
                     full(&mut packets, own, id, snake, wanted, profile)?;
                     let known = KnownSnake::new(life, snake, wanted)?;
@@ -706,10 +706,10 @@ impl SimulatorBackend {
                 let credit = encode::segment_credit(snake.score, snake.segments, fam);
                 if connection.credit != credit {
                     connection.credit = credit;
-                    packets.push(encode::credit(credit));
+                    packets.push((encode::credit(credit)).into());
                 }
                 if std::mem::take(&mut connection.session_pending) {
-                    packets.push(encode::session(id, connection.session));
+                    packets.push((encode::session(id, connection.session)).into());
                 }
             }
         }
@@ -753,10 +753,9 @@ impl SimulatorBackend {
             .collect();
         for id in gone {
             let known = connection.prey.remove(&id).expect("known prey");
-            packets.push(encode::prey_removal(
-                known.wire,
-                self.prey_eaters.get(&id).copied(),
-            ));
+            packets.push(
+                (encode::prey_removal(known.wire, self.prey_eaters.get(&id).copied())).into(),
+            );
         }
         for (id, prey) in visible {
             let wire = self.prey_wire[&id];
@@ -769,11 +768,11 @@ impl SimulatorBackend {
                 ],
             };
             match connection.prey.get(&id) {
-                None => packets.push(encode::prey_appearance(wire, prey)?),
+                None => packets.push((encode::prey_appearance(wire, prey)?).into()),
                 // Keep corrections even when quantized position is still.
                 Some(known) if self.prey_clocks[&id].due => {
                     let changed = known.motion != current.motion;
-                    packets.push(encode::prey_motion(wire, prey, changed)?)
+                    packets.push((encode::prey_motion(wire, prey, changed)?).into())
                 }
                 Some(_) => continue,
             }

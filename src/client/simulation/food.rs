@@ -11,6 +11,7 @@ use crate::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
+    rc::Rc,
     sync::Arc,
 };
 
@@ -160,13 +161,13 @@ pub(super) struct FoodChanges {
 pub(super) struct SectorDiff {
     previous: Arc<SectorFood>,
     current: Arc<SectorFood>,
-    packets: Vec<Vec<u8>>,
+    packets: Vec<encode::Packet>,
 }
 
 impl FoodChanges {
     fn append_diff(
         &self,
-        packets: &mut Vec<Vec<u8>>,
+        packets: &mut Vec<encode::Packet>,
         sector: [u8; 2],
         previous: &Arc<SectorFood>,
         current: &Arc<SectorFood>,
@@ -181,17 +182,45 @@ impl FoodChanges {
                 SectorDiff {
                     previous: previous.clone(),
                     current: current.clone(),
-                    packets,
+                    packets: shared_packets(packets),
                 }
             });
         if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
             packets.extend_from_slice(&diff.packets);
         } else {
             // A recipient skipped an earlier broadcast and holds an older view.
-            sector_changes(packets, sector, previous, current, eaters);
+            let mut owned = Vec::new();
+            sector_changes(&mut owned, sector, previous, current, eaters);
+            packets.extend(owned.into_iter().map(encode::Packet::from));
         }
     }
 }
+
+/// One allocation of encoded bytes per sector transition, with packet boundaries
+/// retained for the existing framing and protocol-13 conversion paths.
+fn shared_packets(packets: Vec<Vec<u8>>) -> Vec<encode::Packet> {
+    if packets.is_empty() {
+        return Vec::new();
+    }
+    let mut bytes = Vec::with_capacity(packets.iter().map(Vec::len).sum());
+    let ranges: Vec<_> = packets
+        .into_iter()
+        .map(|packet| {
+            let start = bytes.len();
+            bytes.extend_from_slice(&packet);
+            start..bytes.len()
+        })
+        .collect();
+    let bytes = Rc::new(bytes);
+    ranges
+        .into_iter()
+        .map(|range| encode::Packet::Shared {
+            bytes: bytes.clone(),
+            range,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 impl std::ops::Index<&[u8; 2]> for KnownSectors {
     type Output = SectorFood;
@@ -478,7 +507,7 @@ impl SimulatorBackend {
 /// nonempty `F`, then births/pickups; see docs/server-rules.md#food-sector-delivery.
 /// `sectors` lists every subscribed sector.
 pub(super) fn food_updates(
-    packets: &mut Vec<Vec<u8>>,
+    packets: &mut Vec<encode::Packet>,
     known: &mut KnownSectors,
     interest: &SectorInterest,
     sectors: &[Option<Arc<SectorFood>>],
@@ -536,7 +565,7 @@ pub(super) fn food_updates(
     for (sector, _) in &held {
         while subscriptions.next_if(|next| *next < sector).is_some() {}
         if subscriptions.peek() != Some(&sector) {
-            packets.push(encode::sector_clear(*sector));
+            packets.push((encode::sector_clear(*sector)).into());
         }
     }
     let mut held = held.into_iter().peekable();
@@ -553,7 +582,11 @@ pub(super) fn food_updates(
             None => {
                 let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
                 if !foods.is_empty() {
-                    packets.extend(encode::food_sector(sector, &foods));
+                    packets.extend(
+                        encode::food_sector(sector, &foods)
+                            .into_iter()
+                            .map(encode::Packet::from),
+                    );
                 }
             }
             // The same listing without a pickup at its points sends nothing.
@@ -643,6 +676,31 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_packet_storage_preserves_boundaries_and_outlives_the_diff() {
+        let expected = vec![vec![b'c', 1, 2, 3, 4], vec![b'f', 1, 2, 3, 4, 5, 6]];
+        let first = shared_packets(expected.clone());
+        let second = first.clone();
+        assert_eq!(first, expected);
+        let encode::Packet::Shared { bytes, .. } = &first[0] else {
+            panic!("shared bytes")
+        };
+        for (a, b) in first.iter().zip(&second) {
+            let encode::Packet::Shared { bytes: other, .. } = a else {
+                panic!("shared bytes")
+            };
+            assert!(Rc::ptr_eq(bytes, other), "one sector buffer");
+            assert_eq!(
+                a.as_ref().as_ptr(),
+                b.as_ref().as_ptr(),
+                "no recipient copy"
+            );
+        }
+        drop(first);
+        assert_eq!(second, expected);
+        assert!(shared_packets(Vec::new()).is_empty());
+    }
 
     #[test]
     fn shared_diffs_match_uncached_lifetimes_views_and_older_recipients() {

@@ -99,19 +99,70 @@ fn with_id(code: u8, own: bool, id: u16) -> Vec<u8> {
     packet
 }
 
+/// Recipient packet storage. Food diffs share one encoded sector buffer;
+/// ordinary packet producers retain their existing owned allocations. Shared
+/// views stay on the simulation thread; only final owned frames cross to sockets.
+#[derive(Clone, Debug)]
+pub(crate) enum Packet {
+    Owned(Vec<u8>),
+    Shared {
+        bytes: std::rc::Rc<Vec<u8>>,
+        range: std::ops::Range<usize>,
+    },
+}
+
+impl From<Vec<u8>> for Packet {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self::Owned(bytes)
+    }
+}
+
+impl AsRef<[u8]> for Packet {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared { bytes, range } => &bytes[range.clone()],
+        }
+    }
+}
+
+impl std::ops::Deref for Packet {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        self.as_ref()
+    }
+}
+
+#[cfg(test)]
+impl PartialEq for Packet {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+#[cfg(test)]
+impl PartialEq<Vec<u8>> for Packet {
+    fn eq(&self, other: &Vec<u8>) -> bool {
+        self.as_ref() == other.as_slice()
+    }
+}
+
 /// Whether a packet can share a frame behind a two-byte length prefix.
 pub(crate) fn frameable(packet: &[u8]) -> bool {
     !packet.is_empty() && packet.len() <= MAX_PACKET
 }
 
 /// Two-byte elapsed-ms header, then one raw packet or length-prefixed packets.
-pub(crate) fn frame(elapsed_ms: u16, packets: &[Vec<u8>]) -> Result<Vec<u8>, String> {
+pub(crate) fn frame<P: AsRef<[u8]>>(elapsed_ms: u16, packets: &[P]) -> Result<Vec<u8>, String> {
     let mut out = u16be(elapsed_ms).to_vec();
     match packets {
         [] => return Err("Empty frame".into()),
-        [packet] if packet.first().is_some_and(|&code| code >= 32) => out.extend(packet),
+        [packet] if packet.as_ref().first().is_some_and(|&code| code >= 32) => {
+            out.extend_from_slice(packet.as_ref())
+        }
         _ => {
             for packet in packets {
+                let packet = packet.as_ref();
                 if !frameable(packet) {
                     return Err("Packet length cannot be framed".into());
                 }
@@ -743,7 +794,7 @@ mod tests {
         let many = frame(300, &packets).unwrap();
         assert_eq!(&many[..2], &300u16.to_be_bytes());
         assert_eq!(split(&many), packets);
-        assert!(frame(0, &[]).is_err());
+        assert!(frame::<Vec<u8>>(0, &[]).is_err());
         assert!(frame(0, &[vec![b'F'; MAX_PACKET + 1], pong()]).is_err());
     }
 
