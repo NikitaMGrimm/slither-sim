@@ -5,7 +5,9 @@
 ### Added
 
 - Exact rejection of blocked spawn heads before constructing their circular
-  bodies, with frozen-search and complete protocol byte-trace controls
+  bodies. In a synthetic stress row with 72 waiting joins and exhausted searches,
+  total instructions fall 36.7% in both protocols; candidate poses, RNG,
+  admission rules and complete wire bytes stay unchanged
   ([evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-ring-prefilter/REPORT.md)).
 - A follow-up Battledome check with the bots boosting almost all the time,
   the way Battledome players do. 80 players still play smoothly, with

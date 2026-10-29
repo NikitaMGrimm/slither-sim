@@ -4,6 +4,8 @@ Baseline `23eddca8`, implementation `bd8915c8`; the selected trace archive's
 candidate `edab3287` has the same production Rust source and adds only harness
 qualification. Full logs, copied binaries and traces remain local-only.
 [Plan](PLAN.md), [attempts](ATTEMPTS.md), [selected correctness](correctness.json).
+These are native timing pins. The final branch also integrates #264; its
+untimed Rust and fresh full-byte checks are recorded separately.
 
 Run focused tests and the full Rust group serially with `CARGO_BUILD_JOBS=1`
 and `RUST_TEST_THREADS=1`. The search oracle is frozen from the baseline and
@@ -14,8 +16,10 @@ block, then require the restored oracle to pass. See the retained results.
 
 ## Portable byte traces
 
-Reuse the minimap study's `prepare_traces.py` and `trace_matrix.py` by reference
-from its pinned branch/PR, staging both in an external directory. The scripts
+Reuse the minimap study's
+[prepare_traces.py](https://github.com/NikitaMGrimm/slither-sim/blob/f1f426784354c9691f2c74c95a75d97d7e37c1d7/research/performance/2026-10-29-pit-minimap-cache/prepare_traces.py) and
+[trace_matrix.py](https://github.com/NikitaMGrimm/slither-sim/blob/f1f426784354c9691f2c74c95a75d97d7e37c1d7/research/performance/2026-10-29-pit-minimap-cache/trace_matrix.py)
+by reference, staging both in an external directory. The scripts
 reuse the existing [protocol fixture](../2026-10-27-host-snake-candidates/protocol_fixture.rs)
 and [catalog validator](../../../tools/perf_baseline.py); do not duplicate them
 in this study. [prepare.py](prepare.py) wraps that preparation to add only this
@@ -136,4 +140,36 @@ independent candidate/baseline builds. Minimap staging uses
 `FIXED_TRACE_TICKS=720` so new viewers receive a full map after barrier release.
 The marker study's wrapper instead drops marker-sector hints. Preserve
 each candidate's own source pin and checks; do not treat another candidate's
-gates as its evidence. No bench measurements have run yet.
+gates as its evidence. The spawn and minimap measurements are now complete;
+marker measurements remain pending.
+
+## Selected results and retrieval
+
+The native reducer's `selected-fixed-spawn.json` is retained as
+[spawn-pairs.json](spawn-pairs.json). Reuse the minimap study's
+[summarize.py](https://github.com/NikitaMGrimm/slither-sim/blob/f1f426784354c9691f2c74c95a75d97d7e37c1d7/research/performance/2026-10-29-pit-minimap-cache/summarize.py)
+outside this tree to recompute the report, without duplicating that helper:
+
+```sh
+python summarize.py spawn-pairs.json --markdown
+python summarize.py spawn-pairs.json
+```
+
+The second form gives every per-quantile median/range. Counted windows are
+360 ticks, with 180 searches, all exhausted at 4,096 poses and all 72 joins
+still waiting. Complete repeated-fork and direct-parent proofs bind the work
+to the immutable full-host state. The release-phase control remains separate
+and untimed so admitted poses/RNG/bytes are checked as well as refusals.
+
+After merging #264, repeat the serial portable preparation/matrices/fixed
+controls with baseline `cc1bb1e9` and integrated candidate `25a40fa9`, including
+the fallback mutation. Those Windows clocks/counters are disabled; do not use
+their elapsed durations as performance evidence. Native runtime pins remain
+the earlier matched comparison.
+
+For safe retrieval, finish and close the archive, tar-read it, compute its
+digest and size, then atomically publish readiness. Download only after that
+receipt; verify size/hash, safely extract, verify all per-file hashes and every
+step's exit status before deleting any remote source/results. Keep failure
+artifacts. Remove only this task's guest files, targets and processes after
+local verification, and record the final cleanup receipt.

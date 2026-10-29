@@ -85,3 +85,40 @@
   absent optional environment variable after all nine stages had completed.
   All manifests/files were independently verified; no failed compilation or
   measurement was substituted.
+
+## Released native bench
+
+- After explicit release, the minimap candidate ran first and this candidate
+  next, against its own frozen baseline. Three serial native release builds
+  have distinct executable hashes after per-arm package-artifact clearing.
+  All 23 catalog, six host and two queued complete-byte traces pass; both
+  protocol wire mutations are detected. No native attempt in this collection
+  failed or was dropped.
+- Repeated-fork, cross-arm and direct-parent proofs match complete bytes. Both
+  protocols finish one discarded AB warmup and five AB/BA/AB/BA/AB pairs. All
+  counted PMU time is scheduled. Every primary window keeps 72 queued joins
+  and executes 180 refusals / 737,280 candidate poses, exactly 4,096 per search.
+  The separate uncounted release-phase trace still checks actual admissions.
+- The archive was closed, tar-read and hashed before atomic readiness. Its
+  downloaded size/hash and all 3,994 retained file hashes were verified before
+  clearing remote source/results. The supplementary warmed minimap collection
+  used the same sequence after this run; all original cold results remain.
+- The shared table export first failed under Windows' default cp1252 when
+  writing an arrow. Explicit UTF-8 fixed the export without touching measured
+  data. Other shared documentation-tool failures and the cold/warm method
+  amendment are retained in the
+  [minimap attempt log](https://github.com/NikitaMGrimm/slither-sim/blob/f1f426784354c9691f2c74c95a75d97d7e37c1d7/research/performance/2026-10-29-pit-minimap-cache/ATTEMPTS.md).
+- After local verification of all three collections, final cleanup removes
+  only this task's guest directory and verifies no task process or target
+  remains. Unrelated retained work is untouched. The guest is released for
+  handoff; no further guest use or AWS collection is needed.
+- Merged #264 without changing the pinned spawn prefilter. Resolved only the
+  research-index insertion conflict, retaining both rows and the maintaining
+  agent's earlier study wording. Fresh integrated-source checks are untimed
+  local validation; native timing retains its pre-#264 runtime pins.
+- All 15 integrated-main Rust commands pass serially with one Cargo job and
+  one test thread. Fresh baseline/candidate/mutation binaries are distinct;
+  all 23 catalog, six host and two queued full-byte traces pass against #264,
+  and both wire mutations are detected. All nine public shared harness files
+  match the executed private copies exactly. Every selected slow-tail tick is
+  an exhausted 4,096-pose search; no tail saving is attributed from other work.
