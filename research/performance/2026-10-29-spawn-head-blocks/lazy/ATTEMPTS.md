@@ -18,3 +18,26 @@
   storing lazy cells in a Safety-owned table allocated only on the first
   supported query after outer near. The residual CPU shift's cause is not
   established; this is a measured follow-up, not an asserted diagnosis.
+- The second full Rust group and catalog passed. Reusing compiled main/eager
+  directories also copied old host outputs; the fresh host matrix refused to
+  overwrite the first existing `.bin` and stopped before that host run. Moved
+  only copied prior trace outputs aside, retained the failure, and repeated
+  the host matrix and remaining byte gates. No source or measured row changed.
+- The table-based revision passed all seven focused tests, the wrong-skip
+  control/restoration, all 15 Rust commands and the complete byte/wire gates.
+  All six three-arm pair sets and construction runs completed with verified
+  retrieval of both proof and timing archives. Main/eager staged source identity
+  was rechecked against complete manifests before final selection.
+- AWS Spot reclaimed the builder immediately after complete verified collection.
+  A redundant separate table SCP then failed; its already archived text was
+  recovered from the verified final delta and bound to that manifest. No required
+  source or result was lost, and no replacement builder was needed.
+- The second result retains a 63.18% exhausted-row instruction saving and
+  meets the requested successful-search mean-CPU bar on all four controls.
+  All CPU ratio ranges cross one; small instruction differences and the
+  whole-window legacy-160 p99 increase remain disclosed. No universal timing
+  equivalence or causal hardware explanation is asserted.
+- The task key/group were removed after Spot termination. At 18:58:39 UTC,
+  every enabled region (17) scanned clean. Both lazy attempts together are
+  bounded by $0.40 including noncompute, below $1; no timer extension, new
+  instance or SSH guest was needed for the second attempt.

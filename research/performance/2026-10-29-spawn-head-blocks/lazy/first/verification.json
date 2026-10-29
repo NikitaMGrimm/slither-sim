@@ -1,0 +1,156 @@
+{
+  "allRequiredProofsPass": true,
+  "catalogTraces": 23,
+  "hostTraces": 6,
+  "queuedTraces": 2,
+  "protocols": [
+    19,
+    13
+  ],
+  "wireMutationControls": 2,
+  "focusedWrongSkipMutationControls": 1,
+  "fullRustCommandsPassed": 15,
+  "measurementWindows": 90,
+  "discardedWarmupWindows": 18,
+  "alternatingPairsPerRowAndProtocol": 5,
+  "repeatedForkAndDirectParentProofs": true,
+  "qualifiedRows": [
+    {
+      "row": "spawn",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 737280,
+        "blockedExhausted": 180,
+        "blockedSearches": 180,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 72
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "spawn",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 737280,
+        "blockedExhausted": 180,
+        "blockedSearches": 180,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 72
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats80",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats80",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats80",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats80",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats160",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats160",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats160",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats160",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    }
+  ],
+  "nativeByteProofArchive": {
+    "archiveSha256": "f947888941f5172cdb11ea6500ca92060864830a1f3fda62992e1723d4035bff",
+    "archiveBytes": 754432425,
+    "manifestSha256": "3a2aed0fa3850e6e594979d6a8ab8efa2017006103390859d87d8030b332c3d4",
+    "allManifestMembersVerified": true
+  },
+  "timingContext": {
+    "instanceType": "c7i.xlarge",
+    "region": "Frankfurt",
+    "market": "Spot",
+    "physicalCoresAssigned": 2,
+    "threadsPerCore": 1,
+    "workerCpu": 0,
+    "controllerCpu": 1,
+    "scope": "AWS virtualized Intel; portable release; one pinned core; no concurrent build/test work; no dedicated physical-host or live-capacity claim"
+  },
+  "pmu": "Hardware instructions:u, >=99% scheduled time per tick; root task access without changing kernel/security settings.",
+  "localNativeWork": false,
+  "sshGuestUsed": false,
+  "independentReview": false,
+  "studySelectionSha256": "ec5e0a26c45f325b9429f11004ed74aae69c6fd065abcc80804ba57d3cc5cee4",
+  "focusedTestsPassed": 7,
+  "lazyEagerVerdictsAndUnbuiltCacheTest": true,
+  "initialProfileReference": "../profile.json",
+  "armRoles": {
+    "base": "main e860ec23",
+    "eager": "reviewed head 78f7d1ec",
+    "candidate": "lazy revision"
+  },
+  "additionalEagerProofScope": "All measured full-state/byte windows, repeated-fork and direct-parent proofs; catalog/host/queued matrix compares main against lazy.",
+  "revisionHelperSha256": {
+    "prepare.py": "3dfc96ab94f929e84812c6462db46a98cf1e1aac3b53bd833ee448b43cdc6a2a",
+    "run_pairs.py": "c8e9e70c0a9e8c0a36a41a2946c4d7a7025f28d1a7db715c566d208cc748a053",
+    "reduce.py": "c52e787662c441e9571f291d4d9a12ef5b4d66ceb54092fa072d78c960b4943e",
+    "tables.py": "7484bc6945faaa0b398ef65cc14b6c6cdded967d74fa97edf214aef0eaa7b93b"
+  },
+  "documentationCheck": {
+    "testsPassed": 7,
+    "exit": 0,
+    "context": "Remote after selected JSON/tables; final verdict and cleanup prose completed after verified retrieval."
+  }
+}
