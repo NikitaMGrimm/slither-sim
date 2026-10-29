@@ -48,6 +48,12 @@
 
 ### Performance
 
+- Battledome spawn searches skip distant groups of eight body edges using
+  conservative cached bounds, preserving exact thresholds, poses and admission
+  rules. A synthetic exhausted-search row uses 63% fewer instructions, including
+  construction; ordinary 80/160-viewer controls use about 0.1% more. Extreme and
+  non-finite geometry retains the original linear scan
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-head-blocks/REPORT.md)).
 - Battledome spawn searches now decide whether a candidate head clears an
   older body edge from the squared distance, and fall back to the exact
   `hypot` only when the result is too close to call. Spawn positions, random

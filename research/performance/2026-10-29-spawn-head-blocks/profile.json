@@ -1,0 +1,31 @@
+{
+  "runtime": "3c55991d",
+  "build": "Portable default release; debug line info only for separate profile; no target-cpu override",
+  "warmupExcluded": true,
+  "sampleEvent": "cpu-clock:u",
+  "frequencyHz": 499,
+  "samples": 1333,
+  "groups": {
+    "headPredicate": 998,
+    "other": 192,
+    "ringGeometry": 136,
+    "safetyConstruction": 7
+  },
+  "headParts": {
+    "projectionOrComparison": 833,
+    "headLoopAndOther": 165
+  },
+  "binarySha256": "319a02b7ec0332ae3e40ce7960337404f76cba542a19da142db1be65d5276dd1",
+  "stackSha256": "2c9072bfa2db046a50b1dc79fdb39ea819e1b5cc53241fab15559676eaf49009",
+  "qualification": {
+    "blockedAttempts": 7372800,
+    "blockedExhausted": 1800,
+    "blockedSearches": 1800,
+    "legacy": false,
+    "releaseExhausted": 0,
+    "releaseSearches": 0,
+    "row": "spawn",
+    "ticks": 3600,
+    "waiting": 72
+  }
+}

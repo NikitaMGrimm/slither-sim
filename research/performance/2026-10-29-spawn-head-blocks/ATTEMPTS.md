@@ -20,3 +20,19 @@
   Cargo rejected the command before testing. The source was restored in `finally`.
   Keep that CLI error and rerun with one filter; add explicit finite-guard domain
   boundary/cancellation cases before completing the proof group.
+- All selected pairs and construction diagnostics completed and remote docs
+  passed. Final packaging first ran unprivileged and could not read the
+  root-owned perf capture. It failed before archive readiness; no source was
+  deleted or partial archive retrieved. Repeated only packaging with the root
+  task controller, preserving the original error and all measured results.
+- The corrected final run passed six focused tests, the wrong-skip control,
+  exact restoration, all 15 Rust commands, every catalog/host/queued trace and
+  both wire controls. All six five-pair sets and separate construction runs
+  completed. Every counted tick qualified at 1.0 PMU scheduling. Immutable
+  proof archives and the final timing delta were retrieved/hash-verified and
+  selected files bound to their manifests before termination was requested.
+- The first cleanup scan found one active implicit Spot request belonging to
+  the already terminated builder, with no instances/volumes/keys/groups left.
+  Explicitly cancelled that request, then repeated the full all-region scan.
+  At 18:06:19 UTC all 17 enabled regions were clean. The final combined bound is
+  $0.35, including the shared noncompute allowance; the guest was untouched.
