@@ -28,6 +28,12 @@
 
 ### Performance
 
+- Reuse unchanged food-sector listing handles when a player's subscriptions
+  change. Output is byte-identical. Fully grown 500-player food-update ticks
+  use about 0.23% fewer instructions with stock clients; no live CPU-time or
+  tail improvement is established
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-food-packet-bytes/REPORT.md)).
+
 - On the food-update tick, the host now skips each player's sector cleanup
   until one of their retained sectors can actually expire. Output is
   byte-identical. In a fully grown 500-player world those ticks run about
