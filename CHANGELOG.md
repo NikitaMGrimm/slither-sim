@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- A capacity checkpoint for 500 real WebSocket players with fully grown snakes,
+  comparing the host before and after the recent broadcast optimizations.
+  It measures world CPU time on one core, checks that clients on the other
+  cores keep up, and separates simulation from socket work
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-capacity-checkpoint/REPORT.md)).
+
 ## [0.8.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.1...v0.8.0) - 2026-10-28
 
 ### Added

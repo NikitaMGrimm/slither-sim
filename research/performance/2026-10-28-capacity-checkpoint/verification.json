@@ -1,0 +1,165 @@
+{
+  "sourceReconstruction": {
+    "hostOverlays": [
+      {
+        "arm": "base",
+        "overlaysMatch": true,
+        "files": 8
+      },
+      {
+        "arm": "candidate",
+        "overlaysMatch": true,
+        "files": 8
+      }
+    ],
+    "diagnosticSources": [
+      {
+        "arm": "base",
+        "sourceMatchesReconstruction": true,
+        "rustSourceFiles": 72
+      },
+      {
+        "arm": "candidate",
+        "sourceMatchesReconstruction": true,
+        "rustSourceFiles": 72
+      }
+    ],
+    "commonClientProductionSourcesUnchanged": true,
+    "commonClientSourceMatchesPin": true
+  },
+  "negativeMetrologyControls": {
+    "controls": [
+      {
+        "control": "cpu-clock",
+        "detected": true
+      },
+      {
+        "control": "client-saturation",
+        "detected": true
+      },
+      {
+        "control": "queue-growth",
+        "detected": true
+      }
+    ],
+    "originalFilesUnchanged": true
+  },
+  "diagnosticArithmeticControl": {
+    "synthetic": true,
+    "periodicTail72Ticks": true,
+    "topOnePercentTwentyTicks": true,
+    "topTwoPercentMeanMs": 7.05,
+    "ipcAndTickInterpolation": true,
+    "zeroInterruptControl": true
+  },
+  "cleanup": {
+    "trackedTaskProcessesStillRunning": 0,
+    "coreStopExists": true,
+    "cargoTargetAbsent": true,
+    "processInventorySha256": "04e35c25ce30b6bd29b537a8ef151cb6b2cb7ca9860107520d99fac9a0311e83"
+  },
+  "quietExcludedAttempt": {
+    "case": "base-cohort-2-attempt-1",
+    "excludedReason": "background process quiet screen",
+    "windowSeconds": 29.40490984916687,
+    "thresholdCpuSeconds": 0.2940490984916687,
+    "largestOtherCpuSeconds": 0.3200000000000003,
+    "noCapacityNumberAccepted": true
+  },
+  "longHoldDriftControl": {
+    "screen": {
+      "tick": 193000,
+      "meanSegments": 51.15230460921844,
+      "p90Segments": 175,
+      "p99Segments": 247
+    },
+    "first300Seconds": {
+      "ticks": 42800,
+      "meanFirst": 59.064,
+      "meanLast": 86.478,
+      "p90First": 157,
+      "p90Last": 170
+    }
+  },
+  "longHoldHostClientCpu": {
+    "hostAndClientCpuSeconds": 3120.75,
+    "reason": "length drift during long hold"
+  },
+  "helperSourceRefinements": {
+    "exactLfMatches": [
+      "build.py",
+      "client.rs",
+      "timing.rs",
+      "run.py",
+      "select.py",
+      "stages.py",
+      "check_controls.py",
+      "reconstruct.py",
+      "build_diagnostics.py",
+      "perf_window.py",
+      "run_diagnostics.py",
+      "core_detail.py",
+      "analyze_diagnostics.py",
+      "diagnostic_stages.py",
+      "check_diagnostic_math.py",
+      "primary_tail.py",
+      "repeat_base_diagnostic.py",
+      "check_boundaries.py"
+    ],
+    "reproductionOnlyDifferences": {
+      "core_cpu.py": "docstring only; remaining AST identical",
+      "client_build.py": "skip renaming an absent old cleanup receipt on a fresh reproduction; compiled source unchanged"
+    }
+  },
+  "patchValidation": {
+    "helperCount": 20,
+    "appliesOutsideRepository": true,
+    "exactLfSourceBytes": true,
+    "pythonSyntax": true,
+    "sha256": "6668776c2da3eac97aa71dc38edd97aec29680193091292f01bd2b6b8c197ee6"
+  },
+  "primaryBoundaryAudit": {
+    "base-cohort-1-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 3.469866
+    },
+    "candidate-cohort-1-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 4.122668
+    },
+    "base-cohort-2-attempt-2": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 2.594507
+    },
+    "candidate-cohort-2-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 6.389552
+    },
+    "base-cohort-3-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 3.151637
+    },
+    "candidate-cohort-3-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 2.709469
+    }
+  }
+}
