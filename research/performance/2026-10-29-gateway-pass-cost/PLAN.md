@@ -145,3 +145,22 @@ divide by 4e9, require remainder <1e9, then combine seconds*1e9+remainder. Prese
 the module as run and failed first reduction. The selected decoder verifies every
 timestamp, disjoint CPU budgets and independent canonical socket-clock coverage.
 This is exact decoding, with no overhead subtraction or inferred timing values.
+
+## Primary-base refresh before candidate timing
+
+Main landed #265/#266 during the initial candidate checks. Before any candidate
+timing or primary binary build, integrate them into both arms: base
+`539b37f3be969827b5eac67c2978e604f9e814e8`, candidate
+`da7e65c26d0236156c24e23f43f9bd6dfcabca34`. The gateway change is identical;
+repeat focused controls/full Rust checks and all parity against these pins.
+Attribution remains explicitly pinned to the earlier baseline. Keep original
+pre-integration check receipts separately; never substitute their runtime pins.
+
+The attribution cohort consumed approximately 890.37 host plus 1,562.54 client
+CPU seconds through its last hold. Twelve independent primary cohorts project
+about 8.18 CPU-hours. The primary series has a 12 CPU-hour ceiling, with only
+one retry for a failed mature length-class window and no timing-based retry.
+Discard one AB pair before five AB/BA/AB/BA/AB pairs. Stop on any other quality
+failure; retain all attempts. Primary hooks keep the common aligned task clocks,
+CPU/census/queue telemetry and actual food-epoch flags; no new gateway-phase
+or syscall timer runs in the selected primary holds.
