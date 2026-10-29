@@ -43,3 +43,19 @@ elif (r/'live-results.json').exists():
                 values=entry['medianPerArm']; change=entry['pairedChangePercent']; lo,hi=change['range']
                 print(phase,metric,stat,f"{values['base']:.6f} -> {values['candidate']:.6f}",
                       f"{change['median']:+.3f}% [{lo:+.3f}%, {hi:+.3f}%]")
+
+if (r/'fresh-results.json').exists():
+    fresh=json.loads((r/'fresh-results.json').read_text())
+    print('\nFresh amended series:',fresh['completedPrimaryPairs'],'qualified complete pair(s)')
+    print('Adoption:',fresh['adoption'])
+    print('Isolation failure:',fresh['isolationFailure'])
+    for pair in fresh['pairs']:
+        arms={arm:fresh['cases'][name] for arm,name in pair['caseNames'].items()}
+        for phase in ['all','maintenance','ordinary']:
+            for metric in ['gatewayCpuMs','worldCpuMs']:
+                for stat in ['mean','p50','p99']:
+                    base=arms['base']['summary'][phase][metric][stat]
+                    candidate=arms['candidate']['summary'][phase][metric][stat]
+                    change=100*(candidate/base-1)
+                    assert change==pair['changePercent'][phase][metric][stat]
+                    print(pair['pair'],phase,metric,stat,f'{base:.6f} -> {candidate:.6f}',f'{change:+.3f}%')

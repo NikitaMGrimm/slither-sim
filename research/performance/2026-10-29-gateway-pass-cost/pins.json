@@ -54,5 +54,7 @@
     "hostBinarySha256": "b756642936b8741ccfe4a711cc98911c8ed0292f4f89097f8f70bb6bb343bd6c"
   },
   "harnessPatchSha256": "ecd863ef693cc7f40c3f7d79e751bfd315899eabae0ef23355a848c410ff4bda",
-  "access": "Per-file forensic inventories remain in local-only archives; public pins identify whole artifacts."
+  "access": "Per-file forensic inventories remain in local-only archives; public pins identify whole artifacts.",
+  "freshFrozenPlanCommit": "9ef4d81377ba12eb4286a0175ecbd40416f54b52",
+  "freshHarnessPatchSha256": "b70431a6f61fa5713b4ed86646825ea94b70ea27f9b176b135466db75a671638"
 }

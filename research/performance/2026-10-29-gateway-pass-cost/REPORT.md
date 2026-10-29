@@ -1,11 +1,14 @@
 # Gateway socket-task attribution after #264
 
-**Live confirmation is incomplete; no runtime change or speedup is proposed.**
-Attribution supports testing persistent readiness first, and the candidate passes
-the offline correctness bar. The frozen live series stops at the first primary
-base window's marginal competing-process CPU failure. No primary pair completes.
-The candidate is retained as an exact patch; production source is restored to
-the integrated baseline. [Plan](PLAN.md), [reproduction](REPRODUCE.md),
+**Epoll is rejected under the final frozen adoption rule; this is a research-only
+record.** Attribution supports testing persistent readiness first, and the
+candidate passes the offline correctness bar. The original series stops at a
+marginal isolation gate; the authorized fresh series stops at a larger isolation
+failure after one qualified pair. In that pair gateway mean CPU falls 3.71%,
+while world p99 rises 0.44%. The required five-pair bar is unmet. No speedup or
+capacity gain is claimed, and no further epoll trials are planned. The candidate
+is retained as a patch; production source matches the integrated baseline.
+[Plan](PLAN.md), [reproduction](REPRODUCE.md),
 [table inputs](attribution.json), [table script](tables.py).
 
 Baseline runtime cc1bb1e9935094a00cf513413d7922d858dd5c1e, mature official-density
@@ -122,7 +125,7 @@ The [retained runtime/test patch](rejected-readiness.patch) applies to
 The source restoration matches the baseline exactly; there is no changelog entry
 because no runtime change is proposed.
 
-## Live attempt and frozen stop
+## Original series: unchanged frozen stop
 
 The series plans discarded AB, then five AB/BA/AB/BA/AB pairs. Each independent
 world warms from tick zero to at least tick 193,000, discards five seconds, counts
@@ -171,6 +174,69 @@ During the first discarded candidate warmup, the SSH connection service reports
 a cooldown until 11:08:35 UTC. The detached controller resumes the same warmup
 after reconnection; this interruption occurs before any counted hold and is
 retained. It supplies no reason to relax a later gate.
+
+## Fresh series under the one-quantum amendment
+
+The maintaining agent authorizes one fresh series. Amendment `9ef4d813` is
+committed before any new collection. Only the other-process CPU allowance changes:
+add 0.010 seconds to the original threshold, once, to account for the observed
+10 ms endpoint quantization. No process is excluded by name. The old failed
+series, its excluded windows and its original gate remain unchanged.
+
+Main is still `539b37f3`, so the validated base/candidate binaries and common
+client are reused. Storage and series identities are separate. The same warmup,
+class/retry rules, discarded AB, five AB/BA pairs and 12-CPU-hour ceiling apply.
+Adoption requires five qualified pairs, non-overlapping ranges of all-tick mean
+gateway CPU with every candidate mean below every base mean, and no candidate
+world-p99 increase in any pair. Diagnostic timers cannot qualify it.
+
+The fresh series runs **1.948724 wall hours** and **3.115825 CPU-hours**. Both
+discarded controls and primary pair 1 pass all gates. Pair 2's first arm
+(candidate, BA order) fails isolation: the largest other userspace process uses
+**0.330 CPU-seconds**, exceeding the amended **0.304059-second** allowance
+(original component 0.294059 plus 0.010). Total other userspace CPU is 0.430
+seconds. The controller stops without retry. There is no fresh class retry.
+
+Exactly **one primary pair** completes, with 4,200 ticks per arm: 59 maintenance
+and 4,141 ordinary ticks. These are descriptive independent worlds, not five-pair
+evidence or a causal attribution of the world-tail difference:
+
+| All ticks, ms/tick | Base | Candidate | Change |
+| --- | ---: | ---: | ---: |
+| Gateway mean | 1.977415 | 1.904110 | -3.707% |
+| Gateway median | 1.930370 | 1.882700 | -2.469% |
+| Gateway p99 | 4.275500 | 4.013020 | -6.139% |
+| World mean | 4.363450 | 4.370434 | +0.160% |
+| World median | 4.298220 | 4.335650 | +0.871% |
+| World p99 | 7.936630 | 7.971240 | +0.436% |
+
+| Tick class | Gateway mean, base / candidate | World mean | World p99 |
+| --- | ---: | ---: | ---: |
+| Maintenance | 3.190328 / 3.071857 | 8.105924 / 8.202764 | 10.316990 / 12.383930 |
+| Ordinary | 1.960134 / 1.887473 | 4.310128 / 4.315831 | 6.984340 / 6.781780 |
+
+The maintenance p99 equals the maximum of only 59 samples. Full median/p99 splits,
+discarded controls and the excluded candidate remain in
+[fresh-results.json](fresh-results.json). No failed arm is promoted and no
+five-pair range is inferred from the single pair. The partial reducer verifies
+every food flag and exact agreement with the original selector's all-tick values.
+Its first diagnostic attempt reused a temporary name and stopped before emitting
+a result; the failed source/error and corrected version are retained.
+
+The acceptance predicate has four focused policy tests; three deliberate
+relaxations (ignore overlap, allow touching ranges, accept median-only tails)
+fail, then the restored tests pass on the guest.
+[Receipt](fresh-method-checks.json), [fresh helper delta](fresh-harness.patch).
+The delta is reapplied to the two earlier published harness patches on the guest,
+and every resulting helper matches its execution source. A follower disconnect
+during primary-candidate warmup reconnects to the same detached world, without a
+restart or a changed window. No test or reduction runs during timed collection.
+
+**Decision: reject persistent epoll for good**, alongside the
+[2026-10-27 experiment](../2026-10-27-host-epoll-readiness/REPORT.md). It fails the
+complete five-pair bar; the one qualified pair also has a higher world p99.
+This does not prove a universal runtime regression. Runtime and changelog remain
+unchanged; the attribution and both attempts are retained in this research PR.
 
 
 ## Selection and limits
@@ -268,8 +334,7 @@ analytical faults each fail at runtime; original and restored analysis pass.
 ## Remaining measured budget
 
 Polling remains the largest isolated fixed cost: 0.266/0.162 ms per
-maintenance/other tick. A new live attempt needs a predeclared treatment of
-10 ms process-counter quantization, then the full five qualified pairs.
+maintenance/other tick. The persistent-epoll attempt is closed by the final rule.
 Read-budget rearm is next at 0.032/0.019 ms; retain/index is only 0.006/0.004 ms.
 The 2.207/1.545 ms flush loop and 0.575/0.358 ms service loop are inclusive
 budgets. Their proven-empty/idle subsets need isolated cost evidence before a

@@ -172,3 +172,58 @@ every prospective deleted file with its archive, then prune task-owned duplicate
 Raw archives are local-only. Selected aggregates and computation/reproduction
 deltas are the only public report inputs. Preserve all rejected code as a patch,
 no patch for a runtime change that lands. No merge is authorized.
+
+## Fresh series amendment and final rejection
+
+Amendment `9ef4d813` is committed before fresh collection. The original failed
+series and `live-incomplete.json` remain unchanged. Main is checked again and
+still matches `539b37f3`, so this run reuses the already-verified base/candidate
+binaries, common client and correctness receipts. No new build is needed.
+
+Apply `fresh-harness.patch` after the #256 harness patch and this study's original
+`harness.patch`, in a separate execution directory. The delta changes only the
+isolation allowance plus diagnostic fields and fresh-series bookkeeping; runtime
+binary code, client, windows and other gates remain pinned. The guest replay
+applies those three patches in order and compares every resulting helper with its
+execution source. Public evidence uses whole-artifact pins, not source-file maps.
+
+`setup_fresh.py` verifies the retained `prior-complete.tar.gz` (the original final
+archive identified in the report), extracts only immutable host/client inputs and
+unchanged helpers, then adds `.010` to `3*(end-start)/300`. It does not import old
+runs as fresh rows. Use the public #248 helpers as `shared248`. Without access to
+the retained local-only archive, reconstruct and build the pinned hosts/client
+using the earlier commands, then apply the same selector delta. The full source
+and archived-code patch remain sufficient for rebuilding; raw evidence is not
+published as a download.
+
+After `preflight.py`, `start_series.py` launches one fresh discarded AB then five
+AB/BA/AB/BA/AB pairs under the unchanged 12-CPU-hour bound and retry policy. The
+controller records the frozen plan commit and new series identity. `adoption.py`
+implements the predeclared all-tick gateway-mean range separation and per-pair
+world-p99 guard; the complete-series reducer requires all five pairs.
+
+This series stops at pair 2's candidate isolation failure: 0.330 CPU-seconds
+against 0.304059 allowed. No retry is launched. After the controller and sampler
+stop, run on the guest:
+
+```sh
+python3 reduce_partial.py
+python3 publish_fresh.py
+python3 check_adoption.py
+```
+
+The partial reducer reuses the complete reducer's math and actual food-flag
+checks, exposes the failed screen only in memory, and writes no accepted receipt.
+It pairs only accepted primary arms and records that the five-pair adoption test
+is unavailable. `publish_fresh.py` removes duplicated case bodies and uncited
+submetrics without changing values or acceptance. Copy `fresh-results.json`
+beside the report. `tables.py` recomputes its percentages from case values and
+requires exact agreement with the selected paired changes. The policy-test
+receipt is retained as `fresh-method-checks.json`.
+
+All fresh collection is on the guest; after the new local-CPU restriction, all
+remaining tests and reductions also run there outside timed windows. Final
+report/navigation checks precede verified archival cleanup and guest release.
+No runtime code is proposed, no Performance changelog entry is added, and one
+research PR records both attempts. The PR body contains only the assistance
+footer, as requested by the maintaining agent. No further epoll trial is planned.
