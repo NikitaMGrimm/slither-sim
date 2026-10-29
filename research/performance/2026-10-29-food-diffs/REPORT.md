@@ -101,6 +101,10 @@ reductions are not claimed as equal CPU reductions.
 | Mature 13 | 4.794 -> 4.594 | 1.886 -> 1.807 | 4.828 -> 4.553 |
 | Short 19 | 3.435 -> 3.170 | 1.490 -> 1.484 | 3.516 -> 3.395 |
 
+The short guard's other-tick p99 rises from 2.907 to 3.042 ms despite its
+slightly lower mean. Timing ranges overlap; no uniform CPU improvement is
+claimed across individual tick classes.
+
 All 27 catalog/host traces match complete decompressed bytes, with terminal-record
 checks. Both stock/protocol-13 deliberate wire perturbations are detected. Mature
 stock compares 5,876,276,676 warm bytes per arm; protocol 13 compares

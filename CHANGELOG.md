@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- A capacity check on one core of an AWS c7a.medium, with real WebSocket bots
+  on a second machine. Starting from fully grown snakes and adding bots in
+  steps, it reached its preset 750-bot limit at 6.4 ms median and 9.9 ms p99
+  per tick without falling behind, so the 7 ms limit itself wasn't found. The
+  p99 first passed 7 ms between 500 and 550 bots. Bots added during the climb
+  started small, so the busiest steps had younger snakes than a fully grown
+  server
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-c7a-mature-capacity/REPORT.md)).
+
 ### Performance
 
 - The host reuses shared food-sector updates while preserving packet bytes,

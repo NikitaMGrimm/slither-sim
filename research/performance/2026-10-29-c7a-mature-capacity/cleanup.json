@@ -1,0 +1,25 @@
+{
+  "regionsAttempted": 34,
+  "regionsFullyScanned": 17,
+  "regionsUnavailable": 17,
+  "nonterminatedInstances": 0,
+  "openOrActiveSpotRequests": 0,
+  "volumes": 0,
+  "elasticIPs": 0,
+  "allFourInstancesTerminated": true,
+  "createdKeysDeleted": true,
+  "createdSecurityGroupsDeleted": true,
+  "endpointFileAbsent": true,
+  "finishedUTC": "2026-10-29T02:11:00.724171+00:00",
+  "maintainingAgentVerification": {
+    "reportedApproximateUTC": "2026-10-29 02:15 UTC",
+    "enabledRegions": 17,
+    "nonterminatedInstances": 0,
+    "openOrActiveSpotRequests": 0,
+    "volumes": 0,
+    "elasticIPs": 0,
+    "allFourSpotRequestsClosedOrCancelled": true,
+    "bothRunsKeysAndSecurityGroupsGone": true,
+    "unrelatedResourcesLeftUntouched": true
+  }
+}
