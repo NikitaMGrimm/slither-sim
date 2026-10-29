@@ -1,7 +1,6 @@
 --- a/src/client/simulation.rs
 +++ b/src/client/simulation.rs
-@@ -643,3 +643,5 @@
- 
+@@ -644,2 +644,4 @@
  #[cfg(test)]
  mod tests;
 +
