@@ -1,0 +1,176 @@
+{
+  "allRequiredProofsPass": true,
+  "catalogTraces": 23,
+  "hostTraces": 6,
+  "queuedTraces": 2,
+  "protocols": [
+    19,
+    13
+  ],
+  "wireMutationControls": 2,
+  "focusedBoundaryMutationControls": 1,
+  "fullRustCommandsPassed": 15,
+  "measurementWindows": 60,
+  "discardedWarmupWindows": 12,
+  "alternatingPairsPerRowAndProtocol": 5,
+  "repeatedForkAndDirectParentProofs": true,
+  "qualifiedRows": [
+    {
+      "row": "spawn",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 737280,
+        "blockedExhausted": 180,
+        "blockedSearches": 180,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 72
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "spawn",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 737280,
+        "blockedExhausted": 180,
+        "blockedSearches": 180,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 72
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats80",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats80",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats80",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats80",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats160",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats160",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats160",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats160",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    }
+  ],
+  "timingContext": {
+    "instanceType": "c7i.xlarge",
+    "region": "Frankfurt",
+    "market": "Spot",
+    "cpu": "virtualized Intel x86-64",
+    "physicalCoresAssigned": 2,
+    "threadsPerCore": 1,
+    "workerCpu": 0,
+    "controllerCpu": 1,
+    "scope": "One pinned core; no concurrent build/test work; no dedicated physical-host or live capacity claim",
+    "fullRustContext": "15 passing commands retained from source-identical C8a run; focused native controls and all byte traces rerun on final C7i"
+  },
+  "retainedRustSourceBinding": {
+    "sourceArchiveIdentical": true,
+    "candidateSourceArchiveSha256": "4d16d5f7364eed7177d2f67692e4aa711b0c081dfcd3e67ca983c8f0253aa025",
+    "retainedRustArchiveSha256": "9cbd3c58d88775c540c179ad74be409ebc74e33890f375ba1958c532e28e9d75",
+    "retainedRustManifestSha256": "24f66a905d493745845683a0602c04740c7de2823950730c0b313fe83efb6933",
+    "context": "Complete Rust group retained from source-identical C8a run; final focused controls and all native traces rerun on C7i"
+  },
+  "nativeByteProofArchive": {
+    "archiveSha256": "53274a4e16a1d5446a78c28eb4bf5c63db887afc7828ed4d99940be6f047643d",
+    "archiveBytes": 735896451,
+    "manifestSha256": "73d046176b7c31ba82846076248542bf3e24582f6f9382ee0dff6f1bfa0bfefe",
+    "allManifestMembersVerified": true
+  },
+  "pmu": "Hardware instructions:u; root-owned task process access; no kernel/security settings changed; >=99% scheduled time required each tick.",
+  "localNativeWork": false,
+  "sshGuestUsed": false,
+  "independentReview": false,
+  "studySelectionSha256": "7644e275185dd8f60841ae4ba316c46ef86d27b68f1bfd52619bc16b1b1ad0d9",
+  "retrieval": {
+    "requiredSourcesVerified": true,
+    "verifiedBeforeTeardown": true,
+    "timingDeltaArchiveSha256": "5892b5e93c1015189fd4e00eb85290bd8c348c21074257b391d289f666aa91ec",
+    "timingDeltaManifestSha256": "7bfdd898c9bb9073c6b44a4c1b4756755be4d9cf20a31098c345fc774d89da5f",
+    "method": "All source/trace/timing manifest members verified remotely in closed archives before readiness; every downloaded archive size/SHA verified locally; bounded selected files independently checked against the final delta manifest; delta binds the immutable proof archive.",
+    "nativeProofPinReference": "nativeByteProofArchive"
+  },
+  "cleanupReceipt": "cleanup.json",
+  "costReceipt": "cost.json",
+  "documentationCheck": {
+    "testsPassed": 7,
+    "exit": 0,
+    "context": "Final documentation checked on AWS; final cleanup prose and lean receipts completed afterward.",
+    "finalShortLocalRecheck": {
+      "testsPassed": 7,
+      "exit": 0,
+      "seconds": 2.088,
+      "scope": "Documentation only after cleanup text; no native work"
+    }
+  },
+  "publishedRustSourceBinding": {
+    "validatedCommit": "1601fa651df1083137de3e3b2b870f76c669b070",
+    "srcTreeSha": "d3d5a49d8aef65c67f7c38f7ca1c34df3b866a32",
+    "productionAndTestsUnchanged": true,
+    "postValidationMainMerge": "research/docs only; no src, Cargo or Rust check runner changes"
+  },
+  "privacyScan": {
+    "passed": true,
+    "scope": "Published study, index, changelog and changed Rust; identifier patterns and exact private-state tokens; JSON fractional-number false positives excluded"
+  }
+}

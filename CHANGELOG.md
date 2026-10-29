@@ -4,6 +4,19 @@
 
 ### Added
 
+- A memory study of the simulation thread in a fully grown 500-player world.
+  Each player's snake history reserves a slot for every snake, 20.38 MB in
+  total, to hold 176.7 kB of snakes that players actually know, and those
+  paths take 44% of sampled address-translation misses on ordinary ticks.
+  The test machine lacked deeper cache counters, so the study doesn't show
+  that the thread is memory-bound overall. No runtime change
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-simulation-memory/REPORT.md)).
+- A breakdown of the socket thread's CPU with 500 real sockets in a fully
+  grown world: about 3.3 ms per food-update tick and 2.2 ms otherwise, mostly
+  the sends themselves. An epoll version kept output byte-identical, but its
+  live measurements never met the bar, so epoll is rejected and its code is
+  kept only as a patch
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-gateway-pass-cost/REPORT.md)).
 - A real-socket Battledome recheck of the minimap and spawn-search speedups,
   with bots boosting almost all the time. At 160 players neither version falls
   behind, and frame jitter drops from 2.2 to 1.6 ms. At 320 the server still
@@ -35,6 +48,15 @@
 
 ### Performance
 
+- Battledome spawn searches now decide whether a candidate head clears an
+  older body edge from the squared distance, and fall back to the exact
+  `hypot` only when the result is too close to call. Spawn positions, random
+  draws and admission rules are unchanged, and output is byte-identical. In a
+  synthetic overload where every spawn search fails, the host uses 40.5% fewer
+  instructions and its slowest ticks take about half the CPU time (p99 3.3 to
+  1.6 ms). In ordinary 80- and 160-player checks, instructions are unchanged
+  but median tick CPU is 4–17 µs higher, which the study could not attribute
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-head-distance/REPORT.md)).
 - Battledome spawn searches no longer build a candidate body whose head spot
   is already blocked, since the search would reject it anyway. Spawn positions,
   random draws and admission rules are unchanged, and output is byte-identical.
@@ -52,14 +74,12 @@
   byte-identical. In a fully grown 500-player world, food-update ticks run
   about 0.2% fewer instructions; no CPU-time change was measurable
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-food-packet-bytes/REPORT.md)).
-
 - On the food-update tick, the host now skips each player's sector cleanup
   until one of their retained sectors can actually expire. Output is
   byte-identical. In a fully grown 500-player world those ticks run about
   3.6% fewer instructions, while other ticks run about 0.15% more, so total
   work is unchanged; the CPU-time saving is within measurement noise
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-subscription-cleanup/REPORT.md)).
-
 - On the food-update tick every 504 ms, the host now works out each sector's
   food changes once and shares them with every player holding the same
   previous view, instead of recomputing them for each player. Output is
