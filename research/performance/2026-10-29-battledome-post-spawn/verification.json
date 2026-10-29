@@ -59,5 +59,18 @@
       "manifestSha256": "004f099085fe6b80c762d46c841cabe224e5bb0ec87b300a93ed9eb0115a8e63"
     }
   },
-  "privacyCheck": "Public study files and new index/changelog text checked for cloud/host identifiers, addresses, account numbers and private resource names; JSON/Python syntax and LF checked"
+  "privacyCheck": "Public study files and new index/changelog text checked for cloud/host identifiers, addresses, account numbers and private resource names; JSON/Python syntax and LF checked",
+  "archiveBuildPinBindingReview": {
+    "rowsVerified": 4,
+    "selectedResultsUnchangedExceptAssemblerHash": true,
+    "sharedCandidateClientBoundForBothArms": true,
+    "mutationControlsPassed": [
+      "runtime mismatch rejected against archived row pins",
+      "archiveSha256 mismatch rejected against archived row pins",
+      "instrumentedManifestSha256 mismatch rejected against archived row pins",
+      "clientSourceSha256 mismatch rejected against archived row pins",
+      "hostBinary mismatch rejected against archived row pins",
+      "clientBinary mismatch rejected against archived row pins"
+    ]
+  }
 }

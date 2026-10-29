@@ -45,7 +45,10 @@ metrics, shared248 and shared256 helpers. Replay original online ranges
 exactly; require canonical task-clock reconciliation, complete inventories,
 decoding/headroom/queue gates and received boost duty. Selection records the
 archive digest at selection; [assemble_results.py](assemble_results.py) requires
-that same digest to match the complete receipt and actual archive. Write
+that same digest to match the complete receipt and actual archive. It also reads
+`pins.json` directly from that verified archive and matches runtime/source/manifest/
+client-source/host-binary pins to the arm in `pins-master.json`, and client binary
+to its one shared candidate client. Write
 `order.json`, `generator-segments.json` and `not-measured.json` from verified
 collection state, then assemble remotely. Each generator segment has its own
 topology/market; no last-generator counts describe other rows.

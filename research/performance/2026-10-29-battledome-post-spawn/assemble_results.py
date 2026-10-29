@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import sys
+import tarfile
 
 root, destination = map(Path, sys.argv[1:3])
 
@@ -29,6 +30,17 @@ for number, (arm, seats) in enumerate(order, 1):
     assert (receipt["label"], receipt["arm"], receipt["target"]) == (label, arm, seats)
     assert archive.stat().st_size == receipt["archiveBytes"]
     assert selected["sourceArchiveSha256"] == receipt["archiveSha256"] == sha(archive)
+    with tarfile.open(archive, "r:gz") as bundle:
+        stream = bundle.extractfile("pins.json")
+        assert stream is not None
+        with stream:
+            row_pins = json.load(stream)
+    expected = build["arms"][arm]
+    for key in ["runtime", "archiveSha256", "instrumentedManifestSha256", "clientSourceSha256"]:
+        assert row_pins[key] == expected[key], (label, key)
+    assert row_pins["binaries"]["host"] == expected["binaries"]["host"], (label, "hostBinary")
+    # Every arm uses the one candidate client, rather than its unused arm-local build.
+    assert row_pins["binaries"]["clients"] == build["sharedClientSha256"], (label, "clientBinary")
     assert selected["label"] == label
     assert selected["primary"]["bots"] == seats and selected["arm"] == arm
     assert selected["verification"]["allGeneratorAndQueueGatesPass"]

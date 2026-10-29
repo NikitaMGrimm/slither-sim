@@ -41,3 +41,10 @@
 - The first privacy scan mistook 12-digit fractional parts of metric values
   for account numbers. Inspected the matches and excluded decimal fractions
   from that rule; the identifier/address/private-name scan then passed.
+- Review found that selection and assembly could use different master build
+  files. Bound each row's archived pins directly to the published master pins.
+  Reassembled all four original archives on AWS: selected results are identical
+  apart from the assembler digest. Six master-pin mutations (runtime, source
+  archive, instrumented manifest, client source, host binary, shared client binary)
+  fail at the archived-row binding. The unused base client is not the shared
+  candidate client; both rows bind to the actual common client hash.
