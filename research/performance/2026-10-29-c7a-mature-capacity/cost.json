@@ -1,0 +1,53 @@
+{
+  "currency": "USD",
+  "status": "rate-times-duration estimate, not an invoice",
+  "instances": [
+    {
+      "attempt": 1,
+      "role": "server",
+      "instanceType": "c7a.medium",
+      "instanceSeconds": 1874.0,
+      "spotComputeEstimateUSD": 0.014419388888888888,
+      "rootVolumeGiB": 10,
+      "weightedSpotUSDPerHour": 0.0277
+    },
+    {
+      "attempt": 1,
+      "role": "generator",
+      "instanceType": "c8a.2xlarge",
+      "instanceSeconds": 1876.0,
+      "spotComputeEstimateUSD": 0.09659341666666665,
+      "rootVolumeGiB": 24,
+      "weightedSpotUSDPerHour": 0.18536050106609805
+    },
+    {
+      "attempt": 2,
+      "role": "server",
+      "instanceType": "c7a.medium",
+      "instanceSeconds": 68.0,
+      "spotComputeEstimateUSD": 0.0005232222222222222,
+      "rootVolumeGiB": 10,
+      "weightedSpotUSDPerHour": 0.0277
+    },
+    {
+      "attempt": 2,
+      "role": "generator",
+      "instanceType": "c8a.2xlarge",
+      "instanceSeconds": 71.0,
+      "spotComputeEstimateUSD": 0.003703833333333333,
+      "rootVolumeGiB": 24,
+      "weightedSpotUSDPerHour": 0.18779999999999997
+    }
+  ],
+  "spotComputeEstimateUSD": 0.11523986111111109,
+  "publicIPv4EstimateUSD": 0.005401388888888889,
+  "storageAllowanceUSD": 0.004008447488584475,
+  "storageAllowanceRateUSDPerGiBMonth": 0.15,
+  "storageAllowanceExtraSecondsPerVolume": 60,
+  "computeIPv4StorageEstimateUSD": 0.12464969748858445,
+  "internetEgressAndTaxes": "not metered separately; not included in this subtotal",
+  "noncomputeReserveUSD": 2,
+  "computePlusNoncomputeReserveUSD": 2.115239861111111,
+  "hardCapUSD": 3,
+  "replacementAttempt": "aborted before warmup/counting; included in costs"
+}
