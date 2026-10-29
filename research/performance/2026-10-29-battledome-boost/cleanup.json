@@ -1,0 +1,16 @@
+{
+  "regionsAttempted": 34,
+  "enabledRegionsFullyScanned": 17,
+  "regionsUnavailable": 17,
+  "nonterminatedInstances": 0,
+  "openOrActiveSpotRequests": 0,
+  "volumes": 0,
+  "elasticIPs": 0,
+  "taskInstancesTerminated": 2,
+  "taskKeysDeleted": 1,
+  "taskGroupsDeleted": 1,
+  "taskVolumesAbsent": true,
+  "sessionRefreshed": false,
+  "verifiedUTC": "2026-10-29T04:56:03.372522+00:00",
+  "endpointFileAbsent": true
+}
