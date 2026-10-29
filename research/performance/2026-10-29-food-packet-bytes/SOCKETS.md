@@ -97,6 +97,7 @@ layout, put the runtime archive at `base.tar`, and name the inventory wrapper
 `python3 run_socket_counts.py`. The latter owns only its child host/counter and
 eight clients, uses a new loopback listener, and has a 45-second collection cap.
 Both use the round's sole Cargo target; finish them before timing anything else.
+The builder's `tarfile` extraction filter needs Python 3.11.4 or later.
 
 The x86-64 Linux counter uses `PTRACE_TRACEME`, follows only its own child's
 threads, counts syscall entries and validates complete write-call brackets.

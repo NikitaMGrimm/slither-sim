@@ -6,7 +6,9 @@ The backend fixture, controls, warmup, complete-stream comparer, fork requests,
 counter, 27-row matrix and selector are unchanged. Use one bounded target,
 `/tmp/slither-maintenance-round2-target`, instead of the builder's old target.
 Archive base `23eddca8` and implementation `a15bfc7a` as `base.tar` and
-`candidate.tar` in the external execution directory. Both include #261.
+`candidate.tar` in the external execution directory. Both include #261. The
+study scripts extract archives with `tarfile` filters, so use Python 3.11.4 or
+later.
 
 Reconstruct the external execution layout described by that earlier study and
 bind its historical helper paths to that layout. Its `setup.py` populates the
