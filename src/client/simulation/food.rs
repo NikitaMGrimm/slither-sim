@@ -156,6 +156,7 @@ pub(super) struct FoodChanges {
 /// One transition per current listing, shared only within this broadcast, when
 /// the pickup set is fixed. Keep both identities alive so addresses cannot be
 /// reused. Physical and decorated listings can differ in the same sector.
+/// https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-food-diffs/REPORT.md
 pub(super) struct SectorDiff {
     previous: Arc<SectorFood>,
     current: Arc<SectorFood>,
