@@ -9,6 +9,7 @@ use crate::{
     physics,
 };
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
@@ -149,6 +150,46 @@ pub(super) struct FoodChanges {
     // broadcast error must fall back to the full diff against its older view.
     pub(super) previous: Arc<()>,
     pub(super) current: Arc<()>,
+    pub(super) diffs: RefCell<FastMap<(u16, usize), SectorDiff>>,
+}
+
+/// One transition per current listing, shared only within this broadcast, when
+/// the pickup set is fixed. Keep both identities alive so addresses cannot be
+/// reused. Physical and decorated listings can differ in the same sector.
+pub(super) struct SectorDiff {
+    previous: Arc<SectorFood>,
+    current: Arc<SectorFood>,
+    packets: Vec<Vec<u8>>,
+}
+
+impl FoodChanges {
+    fn append_diff(
+        &self,
+        packets: &mut Vec<Vec<u8>>,
+        sector: [u8; 2],
+        previous: &Arc<SectorFood>,
+        current: &Arc<SectorFood>,
+        eaters: &BTreeMap<(u64, u64), u16>,
+    ) {
+        let mut diffs = self.diffs.borrow_mut();
+        let diff = diffs
+            .entry((u16::from_be_bytes(sector), Arc::as_ptr(current) as usize))
+            .or_insert_with(|| {
+                let mut packets = Vec::new();
+                sector_changes(&mut packets, sector, previous, current, eaters);
+                SectorDiff {
+                    previous: previous.clone(),
+                    current: current.clone(),
+                    packets,
+                }
+            });
+        if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
+            packets.extend_from_slice(&diff.packets);
+        } else {
+            // A recipient skipped an earlier broadcast and holds an older view.
+            sector_changes(packets, sector, previous, current, eaters);
+        }
+    }
 }
 #[cfg(test)]
 impl std::ops::Index<&[u8; 2]> for KnownSectors {
@@ -427,6 +468,7 @@ impl SimulatorBackend {
             eaten,
             previous,
             current,
+            ..Default::default()
         })
     }
 }
@@ -457,7 +499,7 @@ pub(super) fn food_updates(
                 .as_ref()
                 .expect("subscribed sectors are listed");
             if !Arc::ptr_eq(previous, current) || changes.eaten.contains(&sector) {
-                sector_changes(packets, sector, previous, current, eaters);
+                changes.append_diff(packets, sector, previous, current, eaters);
                 if !Arc::ptr_eq(previous, current) {
                     previous.clone_from(current);
                 }
@@ -517,7 +559,7 @@ pub(super) fn food_updates(
             Some(previous)
                 if Arc::ptr_eq(&previous, current) && !changes.eaten.contains(&sector) => {}
             Some(previous) => {
-                sector_changes(packets, sector, &previous, current, eaters);
+                changes.append_diff(packets, sector, &previous, current, eaters);
             }
         }
         known.entries.push((sector, current.clone()));
@@ -601,6 +643,78 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn shared_diffs_match_uncached_lifetimes_views_and_older_recipients() {
+        let sector = [108, 108];
+        let point = Point::default();
+        let wire = encode::food_key(point).unwrap();
+        let offset = [wire[2], wire[3]];
+        let food = KnownFood {
+            point,
+            decorative: false,
+            style: encode::FoodStyle {
+                color: 4,
+                size: 20,
+                snake_food: false,
+            },
+        };
+        let old = Arc::new(SectorFood(vec![(offset, food)]));
+        let older = Arc::new(SectorFood::default());
+        let physical = Arc::new(SectorFood(vec![
+            (offset, food),
+            (
+                [200, 200],
+                KnownFood {
+                    point: Point { x: 100., y: 100. },
+                    ..food
+                },
+            ),
+        ]));
+        let decorated = Arc::new(SectorFood(vec![(
+            offset,
+            KnownFood {
+                decorative: true,
+                ..food
+            },
+        )]));
+        let eaters = BTreeMap::from([(food_identity(point), 17)]);
+        let changes = FoodChanges::default();
+        // One shared physical transition and one decorated transition; an older
+        // view falls back without replacing the common transition. Also cover
+        // pickups with no listing change and distinct sectors sharing handles.
+        for (key, previous, current) in [
+            (sector, &old, &physical),
+            (sector, &old, &decorated),
+            (sector, &older, &physical),
+            (sector, &old, &physical),
+            (sector, &decorated, &decorated),
+            ([107, 108], &old, &physical),
+        ] {
+            let mut expected = Vec::new();
+            sector_changes(&mut expected, key, previous, current, &eaters);
+            for _ in 0..3 {
+                let mut actual = Vec::new();
+                changes.append_diff(&mut actual, key, previous, current, &eaters);
+                assert_eq!(actual, expected);
+            }
+        }
+        assert_eq!(changes.diffs.borrow().len(), 3);
+        // A new broadcast must not reuse the preceding pickup set, even when
+        // both listing identities remain the same.
+        let next = FoodChanges::default();
+        let mut actual = Vec::new();
+        next.append_diff(&mut actual, sector, &old, &old, &BTreeMap::new());
+        assert!(actual.is_empty());
+        changes.append_diff(&mut actual, sector, &old, &old, &eaters);
+        assert_eq!(
+            actual,
+            [
+                encode::food_remove(wire, Some(17)),
+                encode::food_add(wire, food.style)
+            ]
+        );
+    }
+
     // Frozen exhaustive union walk: independent of sparse work hints.
     fn reference_sync_food_sectors(backend: &mut SimulatorBackend) -> Result<FoodChanges, String> {
         let eaten = eaten_sectors(&backend.food_eaters);
@@ -667,6 +781,7 @@ mod tests {
             eaten,
             previous,
             current,
+            ..Default::default()
         })
     }
 
