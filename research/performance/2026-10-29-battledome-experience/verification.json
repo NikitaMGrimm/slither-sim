@@ -1,0 +1,31 @@
+{
+  "runtime": "165a5bb764aba6cbf39f42503e090f9b5e3c4d22",
+  "completedWindows": 8,
+  "canonicalCpuClocksReconcile": true,
+  "maximumClockTaskMeanDifferenceMs": 0.0020726843632097314,
+  "allGeneratorAndQueueGatesPass": true,
+  "allBoundaryInventoriesPresent": true,
+  "onlineRangesReproduced": true,
+  "canonicalServerLogUsed": true,
+  "copiedBinaryIdentityVerified": true,
+  "sourceArchiveSha256": "dca0bee387e372bbdc6f45fd7b66a4e3cd87aed23f62dde538133c93ee5b56e9",
+  "rawArchiveSha256": "d89344ba863f513abdb343b0c04dc92b7f42227ea4907742444f694f4855d7bc",
+  "rawArchiveBytes": 145764712,
+  "archiveReadyOnlyAfterVerification": true,
+  "localRetrievalVerifiedBeforeSourceCleanup": true,
+  "collectorAndAnalysisHashesVerified": true,
+  "productionDiffEmpty": true,
+  "syntheticControls": [
+    "Synthetic aligned-clock, cadence, histogram and headroom controls passed",
+    "Unterminated concurrent-log tail control passed",
+    "Archive verification failure and terminal-readiness controls passed",
+    "Source-cleanup verification guard controls passed"
+  ],
+  "cleanupVerified": true,
+  "allFourPairsCosted": true,
+  "independentReview": false,
+  "humanBrowserAcceptance": false,
+  "rustChecks": "Native portable release build and real network exercise; no local full Rust check group",
+  "documentationCheck": "7 documentation/link tests passed",
+  "privacyCheck": "Private identifier and address scan passed"
+}

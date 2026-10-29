@@ -1,0 +1,116 @@
+{
+  "kind": "Conservative estimate, not an invoice; ignores free credits",
+  "runs": [
+    {
+      "attemptPair": 1,
+      "instances": [
+        {
+          "role": "server",
+          "instanceType": "c7a.medium",
+          "secondsUpperBound": 960,
+          "quotedSpotUSDPerHour": 0.0277,
+          "bidCapUSDPerHour": 0.06,
+          "rootGiB": 10,
+          "computeEstimateUSD": 0.007386666666666666,
+          "computeAtBidCapUSD": 0.015999999999999997
+        },
+        {
+          "role": "generator",
+          "instanceType": "c8a.2xlarge",
+          "secondsUpperBound": 960,
+          "quotedSpotUSDPerHour": 0.1878,
+          "bidCapUSDPerHour": 0.3,
+          "rootGiB": 24,
+          "computeEstimateUSD": 0.05007999999999999,
+          "computeAtBidCapUSD": 0.08
+        }
+      ]
+    },
+    {
+      "attemptPair": 2,
+      "instances": [
+        {
+          "role": "server",
+          "instanceType": "c7a.medium",
+          "secondsUpperBound": 300,
+          "quotedSpotUSDPerHour": 0.0277,
+          "bidCapUSDPerHour": 0.06,
+          "rootGiB": 10,
+          "computeEstimateUSD": 0.0023083333333333337,
+          "computeAtBidCapUSD": 0.005
+        },
+        {
+          "role": "generator",
+          "instanceType": "c8a.2xlarge",
+          "secondsUpperBound": 300,
+          "quotedSpotUSDPerHour": 0.1878,
+          "bidCapUSDPerHour": 0.3,
+          "rootGiB": 24,
+          "computeEstimateUSD": 0.015649999999999997,
+          "computeAtBidCapUSD": 0.025
+        }
+      ]
+    },
+    {
+      "attemptPair": 3,
+      "instances": [
+        {
+          "role": "server",
+          "instanceType": "c7a.medium",
+          "secondsUpperBound": 1680,
+          "quotedSpotUSDPerHour": 0.0277,
+          "bidCapUSDPerHour": 0.06,
+          "rootGiB": 10,
+          "computeEstimateUSD": 0.012926666666666668,
+          "computeAtBidCapUSD": 0.028
+        },
+        {
+          "role": "generator",
+          "instanceType": "c8a.2xlarge",
+          "secondsUpperBound": 1680,
+          "quotedSpotUSDPerHour": 0.1878,
+          "bidCapUSDPerHour": 0.3,
+          "rootGiB": 24,
+          "computeEstimateUSD": 0.08764000000000001,
+          "computeAtBidCapUSD": 0.14
+        }
+      ]
+    },
+    {
+      "attemptPair": 4,
+      "instances": [
+        {
+          "role": "server",
+          "instanceType": "c7a.medium",
+          "secondsUpperBound": 1980,
+          "quotedSpotUSDPerHour": 0.0277,
+          "bidCapUSDPerHour": 0.06,
+          "rootGiB": 10,
+          "computeEstimateUSD": 0.015234999999999999,
+          "computeAtBidCapUSD": 0.033
+        },
+        {
+          "role": "generator",
+          "instanceType": "c8a.2xlarge",
+          "secondsUpperBound": 1980,
+          "quotedSpotUSDPerHour": 0.1878,
+          "bidCapUSDPerHour": 0.3,
+          "rootGiB": 24,
+          "computeEstimateUSD": 0.10328999999999999,
+          "computeAtBidCapUSD": 0.165
+        }
+      ]
+    }
+  ],
+  "computeAtLaunchQuotesUSD": 0.29451666666666665,
+  "computeAtBidCapsUSD": 0.49200000000000005,
+  "publicIPv4AllowanceUSD": 0.013666666666666667,
+  "storageAllowanceUSD": 0.007638356164383561,
+  "publicTransferPayloadUpperBytes": 9588755795,
+  "transferAndMiscAllowanceUSD": 1.4007808344800001,
+  "estimatedTotalUSD": 1.716602523977717,
+  "capRateTotalUSD": 1.9140858573110504,
+  "taskBudgetUSD": 3,
+  "prelaunchWholeTaskWorstCaseUSD": 2.3323426528,
+  "basis": "Round launch-to-completed-cleanup upper lifetimes up to one minute. Same-AZ launch quotes; bid caps separately bound compute. IPv4 allowance $0.005/address-hour; storage $0.12/GiB-month, 730 hours. Control transfer upper: terminal retained status payload +1 MiB times a conservative polling-count bound, downloaded archives and 10 MiB per pair, then 20% overhead at $0.12/GB plus $0.02 misc. No charge inferred for private same-AZ bot traffic."
+}

@@ -1,0 +1,115 @@
+{
+  "status": "excluded-from-game-tail-conclusions",
+  "reason": "Phase-log serialization dominated 100-tick cadence; interrupted before full ladder",
+  "sourceRuntime": "165a5bb764aba6cbf39f42503e090f9b5e3c4d22",
+  "firstCompleted80SeatWindow": {
+    "label": "up-80",
+    "bots": 80,
+    "worldCpuMsPerTick": {
+      "p50": 1.16842,
+      "p95": 1.681442,
+      "p99": 3.147332,
+      "max": 13.334,
+      "mean": 1.308280263125,
+      "n": 12800
+    },
+    "deferredTicks": 0,
+    "slowestCpu1Percent": {
+      "n": 128,
+      "worldMeanMs": 11.5202894921875,
+      "phasesMs": {
+        "movement": 0.0313030703125,
+        "collisionBuild": 0.0200694765625,
+        "collisionQuery": 0.1000454609375,
+        "deathFood": 0.002534921875,
+        "pickupFoodCache": 0.015194,
+        "prey": 0.001282578125,
+        "ambient": 0.001207265625,
+        "admission": 0.0006025,
+        "broadcast": 0.462191203125,
+        "socket": 0.8869561796875,
+        "simulationOther": 9.9989028359375
+      },
+      "nestedMs": {
+        "sharedFood": 0.0094383671875,
+        "coverage": 0.0421001171875,
+        "recipients": 0.3969430234375,
+        "minimap": 0.0839508515625,
+        "killBoard": 0.000288984375,
+        "markerUpdate": 0.00087546875
+      },
+      "eventTicks": {
+        "foodEpoch": 0,
+        "minimapDue": 1,
+        "leaderboardDue": 1,
+        "admissionSearch": 1,
+        "strictAccepted": 1,
+        "fallbackAccepted": 0,
+        "searchRefused": 0,
+        "markerChanged": 0
+      },
+      "tickModulo72": {
+        "17": 7,
+        "9": 7,
+        "25": 7,
+        "13": 7,
+        "61": 8,
+        "49": 7,
+        "53": 7,
+        "69": 7,
+        "21": 7,
+        "33": 7,
+        "45": 7,
+        "41": 7,
+        "5": 7,
+        "37": 7,
+        "57": 7,
+        "29": 7,
+        "65": 7,
+        "1": 7,
+        "58": 1
+      },
+      "tickModulo100": {
+        "1": 127,
+        "66": 1
+      },
+      "foodEpochOrPreviousTick": 7
+    },
+    "accounting": {
+      "reconciles": true,
+      "taskWorldMeanMs": 1.308277863231371,
+      "clockMinusTaskMs": 2.3998936289348904e-06,
+      "collectorCpuMsPerTick": 0.04950205611839135,
+      "hostProcessMsPerTick": 1.3087866511530133,
+      "threads": [
+        {
+          "role": "host",
+          "userMsPerTick": 0.0007812499999999999,
+          "kernelMsPerTick": 0.00078125,
+          "affinity": [
+            0
+          ]
+        },
+        {
+          "role": "slither-simulat",
+          "userMsPerTick": 0.09952315860317196,
+          "kernelMsPerTick": 0.678195177615016,
+          "affinity": [
+            0
+          ]
+        },
+        {
+          "role": "slither-sockets",
+          "userMsPerTick": 0.0,
+          "kernelMsPerTick": 0.530559527013183,
+          "affinity": [
+            0
+          ]
+        }
+      ]
+    },
+    "inventoryComplete": false
+  },
+  "archiveSha256": "aa6c0f558a31232414190987e4b8592a2db719de5ab1a1f0e4241e07418c7760",
+  "rawAccess": "Local-only complete first failed archive; no public download"
+}
