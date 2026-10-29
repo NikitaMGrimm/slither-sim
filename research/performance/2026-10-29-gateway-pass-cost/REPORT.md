@@ -170,9 +170,9 @@ on maintenance/other ticks are 3.327472/2.272636, 2.633108/1.882740 and
 JSON; no component quantiles are added. No five-pair instruction or live-tail
 result is invented from this incomplete series.
 
-During the first discarded candidate warmup, the SSH connection service reports
-a cooldown until 11:08:35 UTC. The detached controller resumes the same warmup
-after reconnection; this interruption occurs before any counted hold and is
+During the first discarded candidate warmup, the controlling SSH connection was
+unavailable for a while. The detached controller resumed the same warmup after
+reconnection; this interruption occurred before any counted hold and is
 retained. It supplies no reason to relax a later gate.
 
 ## Fresh series under the one-quantum amendment
