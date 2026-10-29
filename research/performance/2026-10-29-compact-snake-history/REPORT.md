@@ -14,6 +14,8 @@ study compares that storage with a sorted vector containing occupied records.
 Selected [results](results.json), [pilot observations](pilot-results.json),
 [verification](verification.json), [table calculator](tables.py) and
 [reproduction](REPRODUCE.md) retain the measurements and checks.
+Final [delivery checks](postprocessing-checks.json) cover documentation,
+independent table/gate recalculation and source-exact patch round trips.
 
 ## Design and exactness
 
@@ -181,5 +183,6 @@ continuation checks, counter scope, pairs, gate and cleanup. The measurement
 overlay is retained as [harness.patch](harness.patch); the unlanded runtime and
 its regression oracle are retained as a separate rejected patch. Raw streams,
 sources, binaries, counters, inventories and
-failed attempts remain local-only in verified ignored-output archives. Digests
-identify those archives without making them publicly downloadable.
+failed attempts remain local-only in verified ignored-output archives.
+[Archive identities and access](raw-access.json) identify that material without
+making it publicly downloadable.

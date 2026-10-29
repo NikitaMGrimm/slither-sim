@@ -114,3 +114,12 @@ Before pruning task-owned storage, archive it, verify archive members against
 their source files, transfer it and compare SHA-256. The selected public data
 and table calculator are sufficient to recompute the report's tables without
 those local-only archives.
+
+For final delivery checks, create `final-delivery.tar` with `git archive` of the
+research PR checkout, alongside the two measured-arm archives. Run
+`python3 postchecks.py` from the helper patch in a fresh execution directory.
+It runs the seven documentation tests, independently recomputes the public
+tables and frozen gate, checks all three patch round trips and requires the
+bounded patch's two source files to equal the measured candidate archive.
+[postprocessing-checks.json](postprocessing-checks.json) records its exact
+commands and exits. These checks do not rebuild or retime either arm.

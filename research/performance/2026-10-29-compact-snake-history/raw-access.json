@@ -1,0 +1,33 @@
+{
+  "access": "local-only",
+  "note": "Raw evidence is retained in verified ignored-output archives; these names and digests are not public download links.",
+  "cleanup": {
+    "allArchiveTransfersSha256Verified": true,
+    "guestTaskRootRemoved": true,
+    "boundedCargoTargetAbsent": true,
+    "remainingTaskProcesses": 0
+  },
+  "archives": [
+    {
+      "name": "compact-pilot-root.tar.gz",
+      "scope": "initial two-design pilot, proofs, controls, generated sources and copied binaries",
+      "bytes": 156117643,
+      "sha256": "751f13344f3a84a1332ad092e6bfe3550f3bee0d97c7445da52661a20aeb28ab",
+      "verifiedFiles": 5672
+    },
+    {
+      "name": "compact-superseded-primary.tar.gz",
+      "scope": "superseded primary proofs, generated sources and copied binaries; no primary timing",
+      "bytes": 868255657,
+      "sha256": "f00665e14dda146baaf8b1cdf8850f1e9b218f4bdc11568265014f7002206ea0",
+      "verifiedFiles": 6061
+    },
+    {
+      "name": "compact-current-primary.tar.gz",
+      "scope": "refreshed primary pairs, complete proof continuations, controls, generated sources, copied binaries and final delivery checks",
+      "bytes": 903805868,
+      "sha256": "319ad89f33470ed5ce0bfa793e3c78c6a52f6aaecae3134e4fac0231d43a15ba",
+      "verifiedFiles": 9573
+    }
+  ]
+}

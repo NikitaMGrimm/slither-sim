@@ -491,3 +491,40 @@
 +pub fn record(start:[u64;6],end:[u64;6],tick:u64,maintenance:bool,ns:u64){let delta=std::array::from_fn::<_,6,_>(|i|end[i]-start[i]);assert!(delta[0]>0 && delta[1] as f64/delta[0] as f64>=0.99,"PMU group multiplexed");C.with_borrow_mut(|c|{let c=c.as_mut().unwrap();for(i,v)in delta.iter().enumerate(){c.total[i]+=v;}c.rows.push([tick,u64::from(maintenance),ns,delta[2],delta[3],delta[4],delta[5],delta[0],delta[1]]);});}
 +pub fn result()->serde_json::Value{C.with_borrow(|c|{let c=c.as_ref().unwrap();let mut ins=[0u64;16];let mut calls=[0u64;16];ins[2]=c.total[2];calls[2]=c.rows.len() as u64;serde_json::json!({"instructions":ins,"calls":calls,"pmuMode":c.mode,"rows":c.rows,"total":c.total,"rowColumns":["tick","maintenance","cpuNs","instructions","cycles","L1d","dTLB","enabledNs","runningNs"]})})}
 +pub fn finish(){unsafe{pmu_close()};C.with_borrow_mut(|c|*c=None);}
+--- /dev/null
++++ b/postchecks.py
+@@ -0,0 +1,34 @@
++from pathlib import Path
++import json,subprocess,sys,tarfile,hashlib
++r=Path(__file__).resolve().parent
++source=r/'final-check-source';source.mkdir()
++with tarfile.open(r/'final-delivery.tar') as t:t.extractall(source,filter='data')
++study=source/'research/performance/2026-10-29-compact-snake-history'
++rows=[]
++def run(label,args,cwd):
++ with (r/(label+'.log')).open('x') as out:p=subprocess.run(args,cwd=cwd,stdout=out,stderr=subprocess.STDOUT)
++ rows.append({'label':label,'command':args,'exit':p.returncode})
++ assert p.returncode==0,label
++ print(label,'PASS',flush=True)
++run('documentation-tests',[sys.executable,'-B','-m','unittest','discover','-s','tools','-p','test_documentation.py'],source)
++run('public-table-recalculation',[sys.executable,str(study/'tables.py')],study)
++base=r/'patch-check-source';base.mkdir()
++with tarfile.open(r/'base.tar') as t:t.extractall(base,filter='data')
++for patch in ['rejected-bounded.patch','separate-vectors.patch','unrestricted-linear.patch']:
++ if patch!='rejected-bounded.patch':
++  subprocess.run(['git','apply','--unidiff-zero',str(study/'rejected-bounded.patch')],cwd=base,check=True)
++ path=study/patch
++ run(patch+'-applies',['git','apply','--unidiff-zero','--check',str(path)],base)
++ run(patch+'-apply',['git','apply','--unidiff-zero',str(path)],base)
++ if patch=='rejected-bounded.patch':
++  with tarfile.open(r/'candidate.tar') as t:
++   for name in ['src/client/simulation/snakes.rs','src/client/simulation/snakes/known_tests.rs']:
++    assert (base/name).read_bytes()==t.extractfile(name).read(),name
++ run(patch+'-reverse',['git','apply','--unidiff-zero','--reverse',str(path)],base)
++ if patch!='rejected-bounded.patch':
++  subprocess.run(['git','apply','--unidiff-zero','--reverse',str(study/'rejected-bounded.patch')],cwd=base,check=True)
++ with tarfile.open(r/'base.tar') as t:
++  name='src/client/simulation/snakes.rs';assert (base/name).read_bytes()==t.extractfile(name).read()
++ assert not (base/'src/client/simulation/snakes/known_tests.rs').exists()
++(r/'postprocessing-checks.json').write_text(json.dumps({'passed':True,'checks':rows,'boundedPatchMatchesMeasuredCandidateExactly':True,'allPatchesReverseToPristineBase':True},indent=2)+'\n')
++print('ALL POSTPROCESSING CHECKS PASS',flush=True)
