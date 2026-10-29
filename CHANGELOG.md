@@ -4,6 +4,19 @@
 
 ### Added
 
+- A memory study of the simulation thread in a fully grown 500-player world.
+  Each player's snake history reserves a slot for every snake, 20.38 MB in
+  total, to hold 176.7 kB of snakes that players actually know, and those
+  paths take 44% of sampled address-translation misses on ordinary ticks.
+  The test machine lacked deeper cache counters, so the study doesn't show
+  that the thread is memory-bound overall. No runtime change
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-simulation-memory/REPORT.md)).
+- A breakdown of the socket thread's CPU with 500 real sockets in a fully
+  grown world: about 3.3 ms per food-update tick and 2.2 ms otherwise, mostly
+  the sends themselves. An epoll version kept output byte-identical, but its
+  live measurements never met the bar, so epoll is rejected and its code is
+  kept only as a patch
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-gateway-pass-cost/REPORT.md)).
 - A real-socket Battledome recheck of the minimap and spawn-search speedups,
   with bots boosting almost all the time. At 160 players neither version falls
   behind, and frame jitter drops from 2.2 to 1.6 ms. At 320 the server still
