@@ -1,0 +1,92 @@
+{
+  "primaryWindows": 4,
+  "notMeasured": [
+    480
+  ],
+  "primaryPairCountPerSeat": 1,
+  "calibrationWindows": 6,
+  "qualifiedSupplementaryWindows": 5,
+  "unqualifiedGeneratorRows": 2,
+  "onlineRangesReproduced": true,
+  "canonicalHostLogsUsed": true,
+  "allQualifiedCanonicalTaskClocksReconcile": true,
+  "maximumClockTaskMeanDifferenceMs": 0.0020128698246733023,
+  "allQualifiedBoundaryInventoriesPresent": true,
+  "allPrimaryGeneratorAndQueueGatesPass": true,
+  "invalidGeneratorRetainedAndExcluded": true,
+  "minimumQualifiedLivingTickBoostShareIncludingCalibration": 0.9958394696922644,
+  "maximumPrimaryWorkerCpuP99Fraction": 0.2152869483220916,
+  "worstPrimaryInputP99Ms": 22.180149,
+  "primaryCollectorCpuMsPerTickRange": [
+    0.05156250000000001,
+    0.057998767496578674
+  ],
+  "hostAffinity": [
+    0
+  ],
+  "sameTargetServerForAllMeasuredPrimaryRows": true,
+  "sameGeneratorFamilyForAllPrimaryRows": true,
+  "generatorInstances": 3,
+  "generatorTransition": "Spot c8a.4xlarge to approved On-Demand c8a.2xlarge",
+  "generatorReplacementAfterPrimaryRow": 3,
+  "sameNativeBinariesAcrossAllBuilds": true,
+  "oneSharedClientBinaryForBothArms": true,
+  "sourcePins": "selected-results.json only; no duplicated instrumented per-file maps",
+  "nativeBoostHeadingRuleRegressionsPassed": 14,
+  "nativeBuildLogsSha256": {
+    "first interrupted": "ed4bd4e30752e8a61a795e5c45b5207c37318d62cd304a7875aa1865a53b3919",
+    "second interrupted": "b2f677704d1c396fe301cc418cda1c9348d102c372c370a1f4d2349ec2bbaba9",
+    "unqualified replacement": "0d05372c6a98a65d5a9a3193d80540fbeadb26a6c66849066d2b604559d68c86",
+    "unqualified physical-core generator": "4c1944943d1dc50a1e0b5f2a9958e7b66a52c10327789503903341ece1751c69",
+    "Zen5 before final interruption": "91a6636aac403555df0955bd633694360db0c3cde9548c252c5fef1650f7018d",
+    "second Spot finalization": "0614b2e41a618b560863538c4e8765ec7f7ba8802b171e35b988ffc84139fa56",
+    "approved On-Demand": "793ffb8faa0b3a88ca7b27de07d0acd8d386001086d9f1169877025f4370e7e7"
+  },
+  "collectionControllersSha256": {
+    "controller.py": "06515a8eca3bff39c92c68c401b571b8198eab437a50d0693da7bd383a10d39d",
+    "recover_generator.py": "e7ef85cbed086c3cfa1c89b63e43a43eb7233976a8067816a2719ac99e1bd183",
+    "recover_ondemand.py": "b808c1b98e189b191d7fa0e45c29cabe36be7577fd07360de20fa75a8bb5cf03",
+    "collect_ondemand.py": "8ee468be17df175a6943f5371294b9b684dcd939add4498805973ce5d9a371ab"
+  },
+  "inheritedSyntheticControls": {
+    "syntheticControlsPassed": [
+      "aligned CPU sums",
+      "periodic tail selection",
+      "histogram ranks",
+      "generator rejection",
+      "whole client report boundaries",
+      "canonical versus streamed logs",
+      "unterminated concurrent tail",
+      "archive verification failure",
+      "terminal archive readiness",
+      "source cleanup guard"
+    ],
+    "selectorMutationControlsPassed": [
+      "runtime mismatch rejected",
+      "host binary mismatch rejected"
+    ]
+  },
+  "allMeasuredPrimaryArchivesVerifiedBeforeTeardown": true,
+  "earlierLostGeneratorReceipts": "Four Spot-reclaimed generator disks were deleted; all surviving host sources verified before release. Both invalid alternative-generator rows were retrieved completely.",
+  "cleanupVerified": true,
+  "allPaidInstancesIncludedInTimerBound": 11,
+  "paidPairs": 4,
+  "additionalGeneratorsCosted": 3,
+  "humanSeats": 0,
+  "independentReview": false,
+  "humanBrowserAcceptance": false,
+  "rustChecks": "Portable native release builds and override regressions on seven generators; no full local Rust group for this research-only change",
+  "documentationCheck": "7 documentation tests passed; report tables exactly recomputed",
+  "privacyCheck": "All public study files plus index/changelog checked for cloud identifiers, addresses, account numbers and known private resource names; Python syntax and JSON parse pass",
+  "cleanupReceipt": "cleanup.json",
+  "generatorTopology": "selected-results.json: generator.primarySegments (16 cores for rows 1-3, 8 for row 4; one thread per core)",
+  "archiveBindingReview": {
+    "qualifiedRowsReplayedWithRawFilesMatchingTheirOwnArchive": 9,
+    "rejectedGeneratorDiagnosticRowsRawArchiveMatched": 2,
+    "allNumericalResultsUnchanged": true,
+    "realEarlierAttemptSelectionRejectedAgainstLaterArchive": true,
+    "syntheticProvenanceReceiptAndTopologyTestsPassed": 4,
+    "allFiveSupplementaryReceiptsCompleteAndRequiredSourcesVerified": true,
+    "incompleteSupplementaryRowsRetainedAsUnverifiedAndExcluded": true
+  }
+}

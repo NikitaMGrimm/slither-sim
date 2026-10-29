@@ -1,0 +1,95 @@
+--- a/src/client/simulation.rs
++++ b/src/client/simulation.rs
+@@ -644,2 +644,4 @@
+ #[cfg(test)]
+ mod tests;
++
++pub mod study_host;
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -39,3 +39,5 @@
+     InitialPopulation, InitialSpeed, PickupEvent, PickupItem, PitConfig, Placement, Preset,
+     ReplayLife, ReplayPrey, Scenario, Simulator, WorldOptions,
+ };
++
++pub mod study_counter;
+--- a/src/client/simulation/snakes.rs
++++ b/src/client/simulation/snakes.rs
+@@ -1454,3 +1454,8 @@
+         }
+     }
+ }
++
++
++impl KnownSnakes{pub(super) fn study_footprint(&self)->[usize;4]{[self.by_slot.len(),self.by_slot.capacity(),self.slots.len(),self.slots.capacity()]}}
++impl BodyBounds{pub(super) fn study_footprint(&self)->serde_json::Value{serde_json::json!({"headersCapacity":self.snakes.capacity(),"headerSize":std::mem::size_of::<CachedBodyBounds>(),"bodyLen":self.snakes.iter().map(|s|s.body.len()).sum::<usize>(),"bodyCapacity":self.snakes.iter().map(|s|s.body.capacity()).sum::<usize>(),"blocksLen":self.snakes.iter().map(|s|s.blocks.len()).sum::<usize>(),"blocksCapacity":self.snakes.iter().map(|s|s.blocks.capacity()).sum::<usize>(),"blockSize":std::mem::size_of::<physics::Bounds>()})}}
++
+--- a/src/client/visibility.rs
++++ b/src/client/visibility.rs
+@@ -542,3 +542,7 @@
+         assert_eq!(interest.last_seen.len(), 45);
+     }
+ }
++
++
++impl SectorInterest{pub(super) fn study_footprint(&self)->[usize;2]{[self.subscribed.len(),self.last_seen.len()]}}
++
+--- a/src/client/simulation/food.rs
++++ b/src/client/simulation/food.rs
+@@ -1694,3 +1694,11 @@
+         );
+     }
+ }
++
++
++impl SimulatorBackend{pub(super) fn study_food_footprint(&self)->serde_json::Value{
++let mut unique=std::collections::BTreeMap::new();let mut held=0;let mut heldcap=0;
++for run in self.food_sectors.iter().chain(&self.decorated_food_sectors).flatten(){unique.insert(Arc::as_ptr(run) as usize,run);}
++for slot in &self.slots{for known in [&slot.connection.food,&slot.connection.decorated_food]{held+=known.entries.len();heldcap+=known.entries.capacity();for (_,run) in &known.entries{unique.insert(Arc::as_ptr(run) as usize,run);}}}
++serde_json::json!({"heldEntries":held,"heldCapacity":heldcap,"uniqueListings":unique.len(),"listingLen":unique.values().map(|r|r.0.len()).sum::<usize>(),"listingCapacity":unique.values().map(|r|r.0.capacity()).sum::<usize>(),"physicalTableCapacity":self.food_sectors.capacity(),"decoratedTableCapacity":self.decorated_food_sectors.capacity(),"subscriptionCountsCapacity":self.food_subscriptions.counts.capacity(),"subscriptionHeldCapacity":self.food_subscriptions.held.iter().map(|h|h.sectors.capacity()).sum::<usize>(),"indexSectors":self.food_index.sectors.len(),"indexEntries":self.food_index.sectors.values().map(Vec::len).sum::<usize>(),"indexCapacity":self.food_index.sectors.values().map(Vec::capacity).sum::<usize>(),"indexEntrySize":std::mem::size_of::<IndexedFood>()})}}
++
+--- /dev/null
++++ b/src/study_events.c
+@@ -0,0 +1,29 @@
++#define _GNU_SOURCE
++#include <linux/perf_event.h>
++#include <sys/syscall.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <string.h>
++#include <sys/mman.h>
++static void *ring;
++static size_t pagesize;
++static FILE *samples;
++int md_sample_open(int event,const char *path);
++void md_drain(int maintenance){if(!ring||ring==MAP_FAILED)return;struct perf_event_mmap_page *p=ring;uint64_t head=__atomic_load_n(&p->data_head,__ATOMIC_ACQUIRE),tail=p->data_tail;char *data=(char*)ring+pagesize;size_t size=pagesize*256;while(tail<head){struct perf_event_header h;for(size_t i=0;i<sizeof(h);i++)((char*)&h)[i]=data[(tail+i)%size];if(h.size<8)abort();uint64_t record[3]={(uint64_t)maintenance,h.type,0};if(h.type==PERF_RECORD_SAMPLE){for(int i=0;i<8;i++)((char*)&record[2])[i]=data[(tail+8+i)%size];}else if(h.type==PERF_RECORD_LOST){for(int i=0;i<8;i++)((char*)&record[2])[i]=data[(tail+16+i)%size];}fwrite(record,24,1,samples);tail+=h.size;}__atomic_store_n(&p->data_tail,tail,__ATOMIC_RELEASE);}
++void md_sample_finish(void){if(samples){fflush(samples);fclose(samples);samples=0;}if(ring&&ring!=MAP_FAILED){munmap(ring,pagesize*257);ring=0;}}
++static const char *names[]={"instructions","cycles","branch-misses","l1d-load-misses","ll-load-misses","dtlb-load-misses","cache-misses","frontend-stalls"};
++static uint32_t types[]={0,0,0,3,3,3,0,0};
++static uint64_t configs[]={1,0,5,0x10000,0x10002,0x10003,3,7};
++int md_open(int event){struct perf_event_attr a={0};a.size=sizeof(a);a.type=types[event];a.config=configs[event];a.disabled=1;a.exclude_kernel=1;a.exclude_hv=1;a.read_format=PERF_FORMAT_TOTAL_TIME_ENABLED|PERF_FORMAT_TOTAL_TIME_RUNNING;return syscall(__NR_perf_event_open,&a,0,-1,-1,0);}
++int md_sample_open(int event,const char *path){struct perf_event_attr a={0};a.size=sizeof(a);a.type=types[event];a.config=configs[event];a.disabled=1;a.exclude_kernel=1;a.exclude_hv=1;a.sample_period=event==1?1000003:1009;a.sample_type=PERF_SAMPLE_IP;a.read_format=PERF_FORMAT_TOTAL_TIME_ENABLED|PERF_FORMAT_TOTAL_TIME_RUNNING;a.wakeup_events=1;int fd=syscall(__NR_perf_event_open,&a,0,-1,-1,0);if(fd<0)return fd;pagesize=sysconf(_SC_PAGESIZE);ring=mmap(0,pagesize*257,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);if(ring==MAP_FAILED){close(fd);return -1;}samples=fopen(path,"wb");if(!samples)abort();return fd;}
++void md_enable(int fd){ioctl(fd,PERF_EVENT_IOC_ENABLE,0);}
++void md_disable(int fd){ioctl(fd,PERF_EVENT_IOC_DISABLE,0);}
++int md_read(int fd,uint64_t *out){return read(fd,out,24);}
++#ifdef PROBE
++static volatile uint64_t sink;
++int main(){size_t sizes[]={4096,64ul<<20};printf("[");for(int e=0;e<8;e++){errno=0;int fd=md_open(e);int err=errno;printf("%s{\"event\":\"%s\",\"type\":%u,\"config\":%llu,\"fd\":%d,\"errno\":%d,\"controls\":[",e?",":"",names[e],types[e],(unsigned long long)configs[e],fd,err);if(fd>=0){for(int c=0;c<2;c++){size_t n=sizes[c]/8;uint64_t *p=malloc(sizes[c]);for(size_t i=0;i<n;i++)p[i]=(i+65537)%n;uint64_t a[3],b[3];md_read(fd,a);md_enable(fd);uint64_t x=0;for(size_t i=0;i<8000000;i++)x=p[x];sink=x;md_disable(fd);md_read(fd,b);printf("%s{\"bytes\":%zu,\"count\":%llu,\"enabled\":%llu,\"running\":%llu}",c?",":"",sizes[c],(unsigned long long)(b[0]-a[0]),(unsigned long long)(b[1]-a[1]),(unsigned long long)(b[2]-a[2]));free(p);}close(fd);}printf("]}");}puts("]");}
++#endif
+--- /dev/null
++++ b/src/study_counter.rs
+@@ -0,0 +1,10 @@
++use std::{cell::RefCell,ffi::CString};
++unsafe extern "C" { fn md_open(event:i32)->i32; fn md_enable(fd:i32); fn md_disable(fd:i32); fn md_read(fd:i32,out:*mut u64)->i32; fn md_sample_open(event:i32,path:*const i8)->i32; fn md_drain(maintenance:i32); fn md_sample_finish(); fn close(fd:i32)->i32; }
++struct Counter{fds:[i32;2],sample:i32,rows:Vec<serde_json::Value>,start:[[u64;3];2],event:i32}
++thread_local!{static C:RefCell<Option<Counter>>=const{RefCell::new(None)};}
++fn read(fd:i32)->[u64;3]{let mut v=[0;3];assert_eq!(unsafe{md_read(fd,v.as_mut_ptr())},24);v}
++pub fn configure(event:i32,sample:bool,path:&str){C.with_borrow_mut(|c|{assert!(c.is_none());let fds=[unsafe{md_open(0)},unsafe{md_open(event)}];assert!(fds.iter().all(|&f|f>=0),"PMU open: {}",std::io::Error::last_os_error());let samplefd=if sample{let p=CString::new(format!("{path}.samples")).unwrap();let fd=unsafe{md_sample_open(event,p.as_ptr())};assert!(fd>=0,"sampling open: {}",std::io::Error::last_os_error());fd}else{-1};*c=Some(Counter{fds,sample:samplefd,rows:Vec::new(),start:[[0;3];2],event});});}
++pub fn begin(){C.with_borrow_mut(|c|{let c=c.as_mut().unwrap();for (i,&fd) in c.fds.iter().enumerate(){c.start[i]=read(fd);unsafe{md_enable(fd)}}if c.sample>=0{unsafe{md_enable(c.sample)}}});}
++pub fn end(tick:u64,maintenance:bool,ns:u64){C.with_borrow_mut(|c|{let c=c.as_mut().unwrap();for &fd in &c.fds{unsafe{md_disable(fd)}}if c.sample>=0{unsafe{md_disable(c.sample)}}let mut delta=[[0;3];2];for (i,&fd) in c.fds.iter().enumerate(){let b=read(fd);for j in 0..3{delta[i][j]=b[j]-c.start[i][j];}}if c.sample>=0{unsafe{md_drain(i32::from(maintenance))}}c.rows.push(serde_json::json!({"tick":tick,"maintenance":maintenance,"cpuNs":ns,"counters":delta}));});}
++pub fn result()->serde_json::Value{C.with_borrow(|c|{let c=c.as_ref().unwrap();serde_json::json!({"event":c.event,"rows":c.rows,"samplerCount":if c.sample>=0{Some(read(c.sample))}else{None}})})}
++pub fn finish(){C.with_borrow_mut(|c|{if let Some(c)=c.take(){for f in c.fds{unsafe{close(f)};}if c.sample>=0{unsafe{close(c.sample);md_sample_finish();}}}});}

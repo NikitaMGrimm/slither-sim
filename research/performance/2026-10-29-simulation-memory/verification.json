@@ -1,0 +1,92 @@
+{
+  "runtime": "539b37f3be969827b5eac67c2978e604f9e814e8",
+  "archiveSha256": "d26d81627df0a66d6595282e4bc7b6d7739a58f1a55da221fb357414cb1fab34",
+  "binarySha256": "1884a56c9d43329ae5ef7c60a1376e9eb3ccdacc2a5a988764222ed76c2706e8",
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "buildCommand": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--example",
+    "study_host"
+  ],
+  "codegen": "portable release, thin LTO, one codegen unit, debug symbols; no affinity",
+  "lowerRateBinarySha256": "af36bd0397ee140e00454d28b4d414fb0bafb360b587a48e0803b4638fc34df1",
+  "frozenPlanCommit": "7260e8d3",
+  "samplingCorrectionCommit": "9c060bdb",
+  "reconstruction": {
+    "allGeneratedRustMatchAfterNewlineNormalization": true,
+    "allGeneratedRustMatchByteForByte": true,
+    "rustFiles": 180,
+    "normalizedAggregateRustSha256": "72121b58959b3da7f081ab5d98cf884c47e63800aa3c1d92cb25b659ddf34164",
+    "normalizedCollectorSha256": "b851cf9a88bbee6a4b56517a67f1f8bfeaa2572744d8d1dd9307416e0bf77b66"
+  },
+  "counterRuns": 36,
+  "counterTicksPerRun": 1080,
+  "maintenanceTicksPerRun": 15,
+  "ordinaryTicksPerRun": 1065,
+  "minimumCounterRunningFraction": 1.0,
+  "sameProtocolForkSummariesEqual": true,
+  "allPrimaryProfilesUnthrottledAndLossless": true,
+  "rawAccess": "local-only",
+  "unavailable": {
+    "perfExecutable": true,
+    "L2Alias": true,
+    "genericLLCLoadMissErrno": 2,
+    "preciseIP": true,
+    "zenTopDownMetrics": true
+  },
+  "census": {
+    "stock": {
+      "startTick": 193000,
+      "start": {
+        "anchors": 27610,
+        "food": 28897,
+        "living": 499,
+        "max": 271,
+        "mean": 55.33066132264529,
+        "p90": 176,
+        "p99": 247,
+        "prey": 20
+      },
+      "endTick": 194080,
+      "end": {
+        "anchors": 28080,
+        "food": 29096,
+        "living": 500,
+        "max": 271,
+        "mean": 56.16,
+        "p90": 176,
+        "p99": 247,
+        "prey": 22
+      }
+    },
+    "legacy": {
+      "startTick": 193000,
+      "start": {
+        "anchors": 27610,
+        "food": 28897,
+        "living": 499,
+        "max": 271,
+        "mean": 55.33066132264529,
+        "p90": 176,
+        "p99": 247,
+        "prey": 20
+      },
+      "endTick": 194080,
+      "end": {
+        "anchors": 28080,
+        "food": 29096,
+        "living": 500,
+        "max": 271,
+        "mean": 56.16,
+        "p90": 176,
+        "p99": 247,
+        "prey": 22
+      }
+    }
+  }
+}

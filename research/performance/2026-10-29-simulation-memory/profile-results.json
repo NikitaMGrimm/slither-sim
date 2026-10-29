@@ -1,0 +1,2634 @@
+[
+  {
+    "protocol": "stock",
+    "event": "cycles",
+    "maintenance": false,
+    "series": "initial",
+    "primary": true,
+    "period": 1000003,
+    "samples": 7816,
+    "lost": 0,
+    "recordTypes": {
+      "9": 8061
+    },
+    "samplerCounter": [
+      8061360581,
+      2048382729,
+      2048382729
+    ],
+    "unresolved": 1070,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 1070
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 605
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 330
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 315
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 232
+      },
+      {
+        "function": "<alloc::sync::Arc<()> as core::clone::Clone>::clone",
+        "samples": 215
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 520
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 348
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 231
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 174
+      },
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 167
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 138
+      },
+      {
+        "site": "src/model.rs:39",
+        "samples": 130
+      },
+      {
+        "site": "src/physics.rs:268",
+        "samples": 124
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 2182
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 1070
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 934
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 818
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 648
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 585
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 382
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 328
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 286
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 283
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 115
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 70
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 37
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 36
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 16
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 7
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 7
+      },
+      {
+        "source": "src/client/minimap.rs",
+        "samples": 6
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/simulator/initialization.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/simulation.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "cycles",
+    "maintenance": true,
+    "series": "initial",
+    "primary": true,
+    "period": 1000003,
+    "samples": 245,
+    "lost": 0,
+    "recordTypes": {
+      "9": 8061
+    },
+    "samplerCounter": [
+      8061360581,
+      2048382729,
+      2048382729
+    ],
+    "unresolved": 24,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 24
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::ops::drop::Drop>::drop",
+        "samples": 12
+      },
+      {
+        "function": "<u8 as core::slice::cmp::SliceOrd>::compare",
+        "samples": 11
+      },
+      {
+        "function": "<[([u8; 2], alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood>)]>::binary_search_by_key::<[u8; 2], slither_sim::client::simulation::food::food_updates::{closure#5}>::{closure#0}",
+        "samples": 8
+      },
+      {
+        "function": "core::ptr::write::<([u8; 2], alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood>)>",
+        "samples": 8
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 6
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 14
+      },
+      {
+        "site": "src/client/visibility.rs:101",
+        "samples": 13
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 8
+      },
+      {
+        "site": "src/client/visibility.rs:49",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:545",
+        "samples": 5
+      },
+      {
+        "site": "src/client/visibility.rs:108",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:85",
+        "samples": 4
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 73
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 35
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 33
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 24
+      },
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 24
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 19
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 14
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 7
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "L1d-load-misses",
+    "maintenance": false,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 118675,
+    "lost": 0,
+    "recordTypes": {
+      "9": 121466,
+      "5": 1374,
+      "6": 1373
+    },
+    "samplerCounter": [
+      122561620,
+      4422665868,
+      4422665868
+    ],
+    "unresolved": 26720
+  },
+  {
+    "protocol": "stock",
+    "event": "L1d-load-misses",
+    "maintenance": true,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 2791,
+    "lost": 0,
+    "recordTypes": {
+      "9": 121466,
+      "5": 1374,
+      "6": 1373
+    },
+    "samplerCounter": [
+      122561620,
+      4422665868,
+      4422665868
+    ],
+    "unresolved": 447
+  },
+  {
+    "protocol": "stock",
+    "event": "dTLB-load-misses",
+    "maintenance": false,
+    "series": "initial",
+    "primary": true,
+    "period": 1009,
+    "samples": 12099,
+    "lost": 0,
+    "recordTypes": {
+      "9": 12402
+    },
+    "samplerCounter": [
+      12514161,
+      2396766229,
+      2396766229
+    ],
+    "unresolved": 1902,
+    "leafFunctions": [
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 2443
+      },
+      {
+        "function": "unresolved/shared-library",
+        "samples": 1902
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 750
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 572
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 501
+      },
+      {
+        "function": "<alloc::sync::Arc<()> as core::clone::Clone>::clone",
+        "samples": 364
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 2302
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 802
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 376
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 310
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 277
+      },
+      {
+        "site": "src/food_grid.rs:?",
+        "samples": 244
+      },
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 235
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:189",
+        "samples": 203
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 5291
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 1902
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 1066
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 728
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 713
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 697
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 634
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 627
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 170
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 118
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 72
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 25
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 21
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 16
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 12
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/client/simulation.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/lib.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "dTLB-load-misses",
+    "maintenance": true,
+    "series": "initial",
+    "primary": true,
+    "period": 1009,
+    "samples": 303,
+    "lost": 0,
+    "recordTypes": {
+      "9": 12402
+    },
+    "samplerCounter": [
+      12514161,
+      2396766229,
+      2396766229
+    ],
+    "unresolved": 35,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 35
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 31
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::ops::drop::Drop>::drop",
+        "samples": 19
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 13
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::clone::Clone>::clone",
+        "samples": 10
+      },
+      {
+        "function": "libc.so.6::malloc",
+        "samples": 10
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 30
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 16
+      },
+      {
+        "site": "src/client/visibility.rs:101",
+        "samples": 10
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 9
+      },
+      {
+        "site": "src/client/simulation/food.rs:505",
+        "samples": 9
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:344",
+        "samples": 7
+      },
+      {
+        "site": "src/model.rs:40",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:659",
+        "samples": 5
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 82
+      },
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 78
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 37
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 35
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 20
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 18
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 9
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 9
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 9
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "generic-cache-misses",
+    "maintenance": false,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 74676,
+    "lost": 0,
+    "recordTypes": {
+      "9": 76227,
+      "5": 851,
+      "6": 850
+    },
+    "samplerCounter": [
+      76913044,
+      3505122908,
+      3505122908
+    ],
+    "unresolved": 11282
+  },
+  {
+    "protocol": "stock",
+    "event": "generic-cache-misses",
+    "maintenance": true,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 1551,
+    "lost": 0,
+    "recordTypes": {
+      "9": 76227,
+      "5": 851,
+      "6": 850
+    },
+    "samplerCounter": [
+      76913044,
+      3505122908,
+      3505122908
+    ],
+    "unresolved": 232
+  },
+  {
+    "protocol": "stock",
+    "event": "L1d-load-misses",
+    "maintenance": false,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 31501,
+    "lost": 0,
+    "recordTypes": {
+      "9": 32088
+    },
+    "samplerCounter": [
+      321113951,
+      2606251700,
+      2606251700
+    ],
+    "unresolved": 4077,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 4077
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 3655
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 1857
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 1362
+      },
+      {
+        "function": "<core::iter::adapters::zip::Zip<core::slice::iter::Iter<slither_sim::model::Point>, core::slice::iter::Iter<slither_sim::model::Point>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::all::check<(&slither_sim::model::Point, &slither_sim::model::Point), <slither_sim::client::simulation::snakes::BodyBounds>::update::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+        "samples": 1354
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 1273
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 3463
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 2003
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 1834
+      },
+      {
+        "site": "src/physics.rs:268",
+        "samples": 769
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:373",
+        "samples": 631
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 617
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:371",
+        "samples": 586
+      },
+      {
+        "site": "src/simulator.rs:1790",
+        "samples": 515
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 11281
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 4077
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 4040
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 3030
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 2155
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 1914
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 1398
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 1316
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 1013
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 655
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 227
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 154
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 124
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 66
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 30
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 10
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 6
+      },
+      {
+        "source": "src/lib.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/minimap.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/simulator/initialization.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "L1d-load-misses",
+    "maintenance": true,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 587,
+    "lost": 0,
+    "recordTypes": {
+      "9": 32088
+    },
+    "samplerCounter": [
+      321113951,
+      2606251700,
+      2606251700
+    ],
+    "unresolved": 70,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 70
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 66
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 27
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 22
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 21
+      },
+      {
+        "function": "<core::iter::adapters::zip::Zip<core::slice::iter::Iter<slither_sim::model::Point>, core::slice::iter::Iter<slither_sim::model::Point>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::all::check<(&slither_sim::model::Point, &slither_sim::model::Point), <slither_sim::client::simulation::snakes::BodyBounds>::update::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+        "samples": 16
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 66
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 29
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 24
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 14
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:371",
+        "samples": 13
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 12
+      },
+      {
+        "site": "src/physics.rs:268",
+        "samples": 10
+      },
+      {
+        "site": "src/physics.rs:?",
+        "samples": 10
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 168
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 93
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 70
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 59
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 52
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 43
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 25
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 25
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 20
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 12
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 10
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "generic-cache-misses",
+    "maintenance": false,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 10758,
+    "lost": 0,
+    "recordTypes": {
+      "9": 11030
+    },
+    "samplerCounter": [
+      110387019,
+      2308927399,
+      2308927399
+    ],
+    "unresolved": 1269,
+    "leafFunctions": [
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 1569
+      },
+      {
+        "function": "unresolved/shared-library",
+        "samples": 1269
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 755
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 545
+      },
+      {
+        "function": "<core::iter::adapters::zip::Zip<core::slice::iter::Iter<slither_sim::model::Point>, core::slice::iter::Iter<slither_sim::model::Point>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::all::check<(&slither_sim::model::Point, &slither_sim::model::Point), <slither_sim::client::simulation::snakes::BodyBounds>::update::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+        "samples": 497
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 416
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 1472
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 808
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 573
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 249
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 224
+      },
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 199
+      },
+      {
+        "site": "src/model.rs:44",
+        "samples": 197
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:338",
+        "samples": 178
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 4480
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 1269
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 856
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 825
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 819
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 642
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 590
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 586
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 404
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 87
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 82
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 38
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 31
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 14
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 11
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 8
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/simulator/initialization.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/minimap.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/study_counter.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/prey.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/simulation/remote.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "generic-cache-misses",
+    "maintenance": true,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 272,
+    "lost": 0,
+    "recordTypes": {
+      "9": 11030
+    },
+    "samplerCounter": [
+      110387019,
+      2308927399,
+      2308927399
+    ],
+    "unresolved": 36,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 36
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 23
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 12
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 10
+      },
+      {
+        "function": "<u8 as core::slice::cmp::SliceOrd>::compare",
+        "samples": 10
+      },
+      {
+        "function": "core::ptr::write::<([u8; 2], alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood>)>",
+        "samples": 8
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 23
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 10
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 10
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 9
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 8
+      },
+      {
+        "site": "src/physics.rs:?",
+        "samples": 6
+      },
+      {
+        "site": "src/client/visibility.rs:49",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:93",
+        "samples": 4
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 75
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 73
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 36
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 26
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 17
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 15
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 11
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 7
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "cycles",
+    "maintenance": false,
+    "series": "initial",
+    "primary": true,
+    "period": 1000003,
+    "samples": 8887,
+    "lost": 0,
+    "recordTypes": {
+      "9": 9150
+    },
+    "samplerCounter": [
+      9150459632,
+      2310419419,
+      2310419419
+    ],
+    "unresolved": 1413,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 1413
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 685
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 367
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 300
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 256
+      },
+      {
+        "function": "<alloc::sync::Arc<()> as core::clone::Clone>::clone",
+        "samples": 230
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 622
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 331
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 243
+      },
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 212
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 212
+      },
+      {
+        "site": "src/model.rs:39",
+        "samples": 154
+      },
+      {
+        "site": "src/physics.rs:268",
+        "samples": 127
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:338",
+        "samples": 119
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 2278
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 1413
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 1125
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 915
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 741
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 564
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 394
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 349
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 310
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 302
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 163
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 116
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 89
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 52
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 31
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 21
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 8
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/minimap.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "cycles",
+    "maintenance": true,
+    "series": "initial",
+    "primary": true,
+    "period": 1000003,
+    "samples": 263,
+    "lost": 0,
+    "recordTypes": {
+      "9": 9150
+    },
+    "samplerCounter": [
+      9150459632,
+      2310419419,
+      2310419419
+    ],
+    "unresolved": 41,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 41
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 12
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::ops::drop::Drop>::drop",
+        "samples": 10
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 7
+      },
+      {
+        "function": "<[([u8; 2], alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood>)]>::binary_search_by_key::<[u8; 2], slither_sim::client::simulation::food::food_updates::{closure#5}>::{closure#0}",
+        "samples": 7
+      },
+      {
+        "function": "<u8 as core::slice::cmp::SliceOrd>::compare",
+        "samples": 7
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 13
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 12
+      },
+      {
+        "site": "src/client/visibility.rs:101",
+        "samples": 10
+      },
+      {
+        "site": "src/client/visibility.rs:108",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:545",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:505",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:420",
+        "samples": 4
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 77
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 41
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 39
+      },
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 32
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 26
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 12
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 10
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 8
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 6
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "L1d-load-misses",
+    "maintenance": false,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 122693,
+    "lost": 0,
+    "recordTypes": {
+      "9": 125505,
+      "5": 1472,
+      "6": 1471
+    },
+    "samplerCounter": [
+      126634561,
+      4375687478,
+      4375687478
+    ],
+    "unresolved": 26550
+  },
+  {
+    "protocol": "legacy",
+    "event": "L1d-load-misses",
+    "maintenance": true,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 2812,
+    "lost": 0,
+    "recordTypes": {
+      "9": 125505,
+      "5": 1472,
+      "6": 1471
+    },
+    "samplerCounter": [
+      126634561,
+      4375687478,
+      4375687478
+    ],
+    "unresolved": 436
+  },
+  {
+    "protocol": "legacy",
+    "event": "dTLB-load-misses",
+    "maintenance": false,
+    "series": "initial",
+    "primary": true,
+    "period": 1009,
+    "samples": 13026,
+    "lost": 0,
+    "recordTypes": {
+      "9": 13360
+    },
+    "samplerCounter": [
+      13480971,
+      2528789939,
+      2528789939
+    ],
+    "unresolved": 2406,
+    "leafFunctions": [
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 2584
+      },
+      {
+        "function": "unresolved/shared-library",
+        "samples": 2406
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 784
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 546
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 468
+      },
+      {
+        "function": "<alloc::sync::Arc<()> as core::clone::Clone>::clone",
+        "samples": 427
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 2444
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 829
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 441
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 341
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 299
+      },
+      {
+        "site": "src/food_grid.rs:?",
+        "samples": 270
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:189",
+        "samples": 241
+      },
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 234
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 5469
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 2406
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 1069
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 813
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 724
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 684
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 666
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 593
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 186
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 134
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 101
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 70
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 58
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 21
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 17
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/lib.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/simulation.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "dTLB-load-misses",
+    "maintenance": true,
+    "series": "initial",
+    "primary": true,
+    "period": 1009,
+    "samples": 334,
+    "lost": 0,
+    "recordTypes": {
+      "9": 13360
+    },
+    "samplerCounter": [
+      13480971,
+      2528789939,
+      2528789939
+    ],
+    "unresolved": 59,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 59
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 35
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::clone::Clone>::clone",
+        "samples": 17
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 12
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::ops::drop::Drop>::drop",
+        "samples": 10
+      },
+      {
+        "function": "core::ptr::write::<([u8; 2], alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood>)>",
+        "samples": 9
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 33
+      },
+      {
+        "site": "src/client/visibility.rs:101",
+        "samples": 15
+      },
+      {
+        "site": "src/client/simulation/food.rs:505",
+        "samples": 11
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 9
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:567",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:515",
+        "samples": 5
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 80
+      },
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 69
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 59
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 45
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 23
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 18
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 13
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 11
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 8
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "generic-cache-misses",
+    "maintenance": false,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 77621,
+    "lost": 0,
+    "recordTypes": {
+      "9": 79204,
+      "5": 900,
+      "6": 900
+    },
+    "samplerCounter": [
+      79916942,
+      3613220820,
+      3613220820
+    ],
+    "unresolved": 13547
+  },
+  {
+    "protocol": "legacy",
+    "event": "generic-cache-misses",
+    "maintenance": true,
+    "series": "initial",
+    "primary": false,
+    "period": 1009,
+    "samples": 1583,
+    "lost": 0,
+    "recordTypes": {
+      "9": 79204,
+      "5": 900,
+      "6": 900
+    },
+    "samplerCounter": [
+      79916942,
+      3613220820,
+      3613220820
+    ],
+    "unresolved": 264
+  },
+  {
+    "protocol": "legacy",
+    "event": "L1d-load-misses",
+    "maintenance": false,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 31771,
+    "lost": 0,
+    "recordTypes": {
+      "9": 32366
+    },
+    "samplerCounter": [
+      323892872,
+      2897363859,
+      2897363859
+    ],
+    "unresolved": 4242,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 4242
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 3668
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 2197
+      },
+      {
+        "function": "<core::iter::adapters::zip::Zip<core::slice::iter::Iter<slither_sim::model::Point>, core::slice::iter::Iter<slither_sim::model::Point>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::all::check<(&slither_sim::model::Point, &slither_sim::model::Point), <slither_sim::client::simulation::snakes::BodyBounds>::update::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+        "samples": 1418
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 1263
+      },
+      {
+        "function": "<f64>::max",
+        "samples": 1242
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 3446
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 2318
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 1833
+      },
+      {
+        "site": "src/physics.rs:268",
+        "samples": 772
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:371",
+        "samples": 646
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 600
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:373",
+        "samples": 574
+      },
+      {
+        "site": "src/simulator.rs:1790",
+        "samples": 538
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 11499
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 4242
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 3933
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 3005
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 2103
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 1914
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 1326
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 1320
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 1036
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 648
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 209
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 168
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 127
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 95
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 53
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 44
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 26
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 8
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/simulator/initialization.rs",
+        "samples": 4
+      },
+      {
+        "source": "src/client/minimap.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/lib.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/client/simulation/remote.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "L1d-load-misses",
+    "maintenance": true,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 595,
+    "lost": 0,
+    "recordTypes": {
+      "9": 32366
+    },
+    "samplerCounter": [
+      323892872,
+      2897363859,
+      2897363859
+    ],
+    "unresolved": 79,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 79
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 50
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 20
+      },
+      {
+        "function": "<f64>::max",
+        "samples": 17
+      },
+      {
+        "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+        "samples": 17
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 16
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 50
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 22
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 21
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 13
+      },
+      {
+        "site": "src/physics.rs:268",
+        "samples": 12
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:510",
+        "samples": 11
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 11
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 11
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 155
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 102
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 79
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 57
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 52
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 49
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 28
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 19
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 14
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 12
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 8
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 6
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "generic-cache-misses",
+    "maintenance": false,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 11073,
+    "lost": 0,
+    "recordTypes": {
+      "9": 11352
+    },
+    "samplerCounter": [
+      113603656,
+      2436146740,
+      2436146740
+    ],
+    "unresolved": 1609,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 1609
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 1462
+      },
+      {
+        "function": "<core::option::Option<slither_sim::client::simulation::snakes::KnownSnake>>::as_mut",
+        "samples": 690
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 521
+      },
+      {
+        "function": "slither_sim::client::simulation::snakes::covered",
+        "samples": 438
+      },
+      {
+        "function": "<core::iter::adapters::zip::Zip<core::slice::iter::Iter<slither_sim::model::Point>, core::slice::iter::Iter<slither_sim::model::Point>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::all::check<(&slither_sim::model::Point, &slither_sim::model::Point), <slither_sim::client::simulation::snakes::BodyBounds>::update::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+        "samples": 399
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 1364
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 736
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:120",
+        "samples": 486
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 218
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:338",
+        "samples": 200
+      },
+      {
+        "site": "src/client/simulation/broadcast.rs:371",
+        "samples": 190
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:495",
+        "samples": 179
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:344",
+        "samples": 171
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 4181
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 1609
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 917
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 841
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 780
+      },
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 716
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 570
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 555
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 433
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 138
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 134
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 63
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 46
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 37
+      },
+      {
+        "source": "src/client/latency.rs",
+        "samples": 18
+      },
+      {
+        "source": "src/client/simulation/prey_visibility.rs",
+        "samples": 11
+      },
+      {
+        "source": "src/client/presentation.rs",
+        "samples": 10
+      },
+      {
+        "source": "src/kiosk.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/minimap.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/boundary.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/simulation/remote.rs",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "generic-cache-misses",
+    "maintenance": true,
+    "series": "lower-rate",
+    "primary": true,
+    "period": 10007,
+    "samples": 279,
+    "lost": 0,
+    "recordTypes": {
+      "9": 11352
+    },
+    "samplerCounter": [
+      113603656,
+      2436146740,
+      2436146740
+    ],
+    "unresolved": 39,
+    "leafFunctions": [
+      {
+        "function": "unresolved/shared-library",
+        "samples": 39
+      },
+      {
+        "function": "<slither_sim::client::simulation::snakes::SnakeDeltaCache>::changes::<<slither_sim::client::simulation::SimulatorBackend>::updates::{closure#3}>",
+        "samples": 22
+      },
+      {
+        "function": "slither_sim::physics::closest_on_segment",
+        "samples": 11
+      },
+      {
+        "function": "<alloc::sync::Arc<slither_sim::client::simulation::food::SectorFood> as core::ops::drop::Drop>::drop",
+        "samples": 11
+      },
+      {
+        "function": "<slither_sim::model::Point>::distance_order",
+        "samples": 8
+      },
+      {
+        "function": "<slither_sim::client::simulation::SimulatorBackend>::updates",
+        "samples": 8
+      }
+    ],
+    "sourceSites": [
+      {
+        "site": "src/client/simulation/snakes.rs:180",
+        "samples": 22
+      },
+      {
+        "site": "src/client/simulation/snakes.rs:304",
+        "samples": 8
+      },
+      {
+        "site": "src/physics.rs:528",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:545",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:85",
+        "samples": 4
+      },
+      {
+        "site": "src/physics.rs:525",
+        "samples": 4
+      },
+      {
+        "site": "src/client/visibility.rs:108",
+        "samples": 4
+      }
+    ],
+    "sourceGroups": [
+      {
+        "source": "src/client/simulation/food.rs",
+        "samples": 63
+      },
+      {
+        "source": "src/client/simulation/snakes.rs",
+        "samples": 57
+      },
+      {
+        "source": "unresolved/shared-library",
+        "samples": 39
+      },
+      {
+        "source": "allocator/standard-library/external",
+        "samples": 32
+      },
+      {
+        "source": "src/client/simulation/broadcast.rs",
+        "samples": 22
+      },
+      {
+        "source": "src/physics.rs",
+        "samples": 18
+      },
+      {
+        "source": "src/client/visibility.rs",
+        "samples": 14
+      },
+      {
+        "source": "src/model.rs",
+        "samples": 10
+      },
+      {
+        "source": "src/food_grid.rs",
+        "samples": 9
+      },
+      {
+        "source": "src/client/simulation/connection.rs",
+        "samples": 5
+      },
+      {
+        "source": "src/client/encode13.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/simulator.rs",
+        "samples": 3
+      },
+      {
+        "source": "src/client/fast_hash.rs",
+        "samples": 2
+      },
+      {
+        "source": "src/client/encode.rs",
+        "samples": 1
+      },
+      {
+        "source": "src/bounds_index.rs",
+        "samples": 1
+      }
+    ]
+  }
+]
