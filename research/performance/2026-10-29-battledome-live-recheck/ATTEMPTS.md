@@ -29,3 +29,23 @@
   Six tests passed; the link check failed because the reproduction recipe
   already linked the not-yet-generated selected results. Retained this result;
   rerun the full documentation check after assembling the evidence.
+- The second placement completed base-160 and candidate-160; both full archives
+  were locally verified and their canonical reductions passed. Spot then
+  terminated the generator during candidate-320 warmup. The CLI session was
+  still valid. Bounded SSH retries stopped, and the controller preserved the
+  surviving source server under its boot timer. No 320 primary window completed.
+- The first manual salvage command had an unterminated nested string and failed
+  to parse before taking any remote action. Moved it to a private script. The
+  restored command stopped the surviving host, closed/gzip-verified/hashed its
+  available sources and locally size/hash/source-verified the recovered archive.
+  The generator's root disk was already deleted by Spot; incomplete third-row
+  client receipts are unavailable, not silently reconstructed.
+- [The pre-repeat amendment](PLAN-ADDENDUM.md) keeps both verified 160 rows as
+  interrupted-attempt evidence and repeats all six primary rows together on a
+  fresh pair. No pooling or selective replacement. The combined full-timer
+  ceiling is $2.51, including the interrupted pair and all noncompute reserve.
+- The interrupted-pair cleanup removed both instances, volumes, key and group,
+  but its first all-region scan still found one own fulfilled Spot request
+  active. The zero-resource assertion failed rather than claiming success.
+  Retained that scan and cancelled the request using its captured request ID;
+  a fresh all-region scan is required before any replacement launch.
