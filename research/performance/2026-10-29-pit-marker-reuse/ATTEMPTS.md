@@ -20,3 +20,11 @@
   after enabling stock decorations. All 15 full Rust-group commands passed
   serially with one Cargo job/test thread; seven documentation tests passed.
   Production Rust/Cargo files match the selected trace archive exactly.
+
+- The final common audit enables stock decorations, assigns nonzero generations
+  to all 80 live viewers and tags actual marker decisions including retirement.
+  A separate pre-staged Cargo batch was rejected after all arm hashes proved
+  identical; the corrected builder explicitly rebuilds this package per arm in
+  its verified task-owned target. Final distinct executables again pass the
+  complete shrinking-row comparison and dropped-hint wire control in both
+  protocols. All source manifests remain intact. No timings or PMU ran locally.

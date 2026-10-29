@@ -75,5 +75,133 @@
   "pmuRun": false,
   "sshGuestUsed": false,
   "independentReview": false,
-  "finalCommonFixtureAudit": "Routing generations and retirement-only marker event hook staged; local compilation/qualification pending"
+  "finalCommonFixtureAudit": "Passed: all 80 sessions decorated/nonzero, actual marker events include retirement; distinct rebuilt arms pass complete shrinking-row byte/mutation controls",
+  "finalShrinkingRowParity": [
+    {
+      "protocol": 19,
+      "base": {
+        "sha256": "a2de92079a0848007b1c1aafe7e67ef620d90c5f6488c16d8f269e86cf8aa246",
+        "bytes": 2729706,
+        "wireSha256": "7eb27d137bef0de8a5899b1b0fd166dd35f6f2bbda47eccc664d05e0120cced1",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": false,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "candidate": {
+        "sha256": "a2de92079a0848007b1c1aafe7e67ef620d90c5f6488c16d8f269e86cf8aa246",
+        "bytes": 2729706,
+        "wireSha256": "7eb27d137bef0de8a5899b1b0fd166dd35f6f2bbda47eccc664d05e0120cced1",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": false,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "mutation": {
+        "sha256": "f5fb9b8d79438156179eac453e4440ace4380a8d4b81725a930f6674a01cf05d",
+        "bytes": 2528763,
+        "wireSha256": "c33e4b2d3012d24a3c7d2fc35fe12bba0dfe2356dcf4160e5f7b7540d1800b73",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": false,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "wireMutationDetected": true
+    },
+    {
+      "protocol": 13,
+      "base": {
+        "sha256": "fead0a6de0cb42f940a8e8a87ca1569d1131e9a3aacb187240dca3fb2746ecd7",
+        "bytes": 5478893,
+        "wireSha256": "d6bbe3ae01c63e439a621291b60d33d3ebf1dd9678caea12ceba8ea9d5ab0b89",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": true,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "candidate": {
+        "sha256": "fead0a6de0cb42f940a8e8a87ca1569d1131e9a3aacb187240dca3fb2746ecd7",
+        "bytes": 5478893,
+        "wireSha256": "d6bbe3ae01c63e439a621291b60d33d3ebf1dd9678caea12ceba8ea9d5ab0b89",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": true,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "mutation": {
+        "sha256": "d059e9311c5fcc1eca4ad836504cad93815b0c1f4807a70991042cbc98fa959b",
+        "bytes": 3769708,
+        "wireSha256": "eb96f92496d6adef1bf897c8cb11d6eb7bba69f89acad93b1aa7b28d664c50f9",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": true,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "wireMutationDetected": true
+    }
+  ],
+  "finalLocalBinaries": {
+    "base": {
+      "study_fixed.exe": "d39032826fc8117ff2eb8f54e046a3245e2560be67d46d012f9acc984bbd50c6"
+    },
+    "candidate": {
+      "study_fixed.exe": "44351e52206e50d86aad2e59ddbc23824a79f2bdd792935f08742e7c894f5221"
+    },
+    "mutation": {
+      "study_fixed.exe": "67c51c70487a708d597bad49fbdf95208e24cace56ede90183578f23e3e977b9"
+    }
+  },
+  "stagedNativeManifests": {
+    "base": "021dfc469aae65ca28b66767befb2d8934e20c1285e908b77c0539eaa44a77cb",
+    "candidate": "53da7e295b2e08af89fda15346f2d13992bcfd0a35f06a688db29f47e3906582",
+    "mutation": "e81a47a38c7567055916060f9ee78399256aac1b9c6a860b773ca417629c6c9c"
+  }
 }

@@ -56,7 +56,10 @@ separate from these production-source correctness pins.
 
 ## Remaining evidence
 
-Finish final common-fixture qualification. Only
+Final common-fixture qualification passes: every live viewer has decorations
+and a nonzero routing generation, actual marker events include retirement-only
+updates, and separately rebuilt arms again pass complete bytes and both wire
+mutations. Only
 after the maintaining agent releases the SSH guest, run native full-byte gates,
 repeated-fork/direct-parent proofs and five alternating instructions:u pairs,
 with marker/food/minimap and slowest-CPU-1% groups separate. Report CPU
