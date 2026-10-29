@@ -30,12 +30,12 @@ receipt = {'commands': commands, 'finalRuntimeSourceEqualsMeasuredArm': arm,
            'bothRuntimeFilesByteChecked': True}
 if arm == 'base':
     patch = study / 'rejected-layout.patch'
-    subprocess.run(['git', 'apply', '--check', str(patch)], cwd=source, check=True)
-    subprocess.run(['git', 'apply', str(patch)], cwd=source, check=True)
+    subprocess.run(['git', 'apply', '--unidiff-zero', '--check', str(patch)], cwd=source, check=True)
+    subprocess.run(['git', 'apply', '--unidiff-zero', str(patch)], cwd=source, check=True)
     with tarfile.open(r / 'candidate.tar') as archive:
         for path in paths:
             assert (source / path).read_bytes() == archive.extractfile(path).read(), path
-    subprocess.run(['git', 'apply', '-R', str(patch)], cwd=source, check=True)
+    subprocess.run(['git', 'apply', '--unidiff-zero', '-R', str(patch)], cwd=source, check=True)
     with tarfile.open(r / 'base.tar') as archive:
         for path in paths:
             assert (source / path).read_bytes() == archive.extractfile(path).read(), path

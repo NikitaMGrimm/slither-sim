@@ -2,19 +2,10 @@ diff --git a/src/client/simulation/food.rs b/src/client/simulation/food.rs
 index 332af305..438ba3c3 100644
 --- a/src/client/simulation/food.rs
 +++ b/src/client/simulation/food.rs
-@@ -1207,7 +1207,7 @@ mod tests {
-                 reference_updates(
-                     &mut expected,
-                     &mut reference,
+@@ -1210 +1210 @@ mod tests {
 -                    interest.subscribed(),
 +                    &interest.subscribed().iter().copied().collect(),
-                     &sectors,
-                     &eaters,
-                 );
-@@ -1305,7 +1305,13 @@ mod tests {
-                 let mut actual = Vec::new();
-                 let mut expected = Vec::new();
-                 food_updates(&mut actual, held, &interest, table, &changes, &eaters);
+@@ -1308 +1308,7 @@ mod tests {
 -                reference_updates(&mut expected, oracle, interest.subscribed(), table, &eaters);
 +                reference_updates(
 +                    &mut expected,
@@ -23,26 +14,14 @@ index 332af305..438ba3c3 100644
 +                    table,
 +                    &eaters,
 +                );
-                 assert_eq!(actual, expected, "step={step}");
-                 assert_eq!(
-                     held.entries.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
-@@ -1403,7 +1409,7 @@ mod tests {
-             reference_updates(
-                 &mut expected,
-                 &mut reference,
+@@ -1406 +1412 @@ mod tests {
 -                interest.subscribed(),
 +                &interest.subscribed().iter().copied().collect(),
-                 &backend.decorated_food_sectors,
-                 &backend.food_eaters,
-             );
 diff --git a/src/client/visibility.rs b/src/client/visibility.rs
 index b1e7b7bc..4fa6c3a2 100644
 --- a/src/client/visibility.rs
 +++ b/src/client/visibility.rs
-@@ -6,10 +6,9 @@
- 
- use super::encode;
- use crate::model::Point;
+@@ -9,4 +9,3 @@ use crate::model::Point;
 -use std::{
 -    collections::{BTreeMap, BTreeSet},
 -    sync::Arc,
@@ -50,19 +29,11 @@ index b1e7b7bc..4fa6c3a2 100644
 +#[cfg(test)]
 +use std::collections::{BTreeMap, BTreeSet};
 +use std::sync::Arc;
- 
- const HEADING_LEAD: f64 = 100.;
- const RETENTION_SECONDS: f64 = 2.6;
-@@ -18,13 +17,15 @@ pub(super) const CLEANUP_SECONDS: f64 = 0.504;
- /// Recipient state, reset with its connection rather than shared with the world.
- #[derive(Clone, Debug, Default)]
- pub(super) struct SectorInterest {
+@@ -21 +20,2 @@ pub(super) struct SectorInterest {
 -    subscribed: BTreeSet<[u8; 2]>,
 +    /// Ascending unique membership keys, shared with the timestamp vector.
 +    subscribed: Vec<[u8; 2]>,
-     // Held food listings share this identity, avoiding a key-by-key comparison
-     // on every broadcast. Replace it only when membership actually changes.
-     revision: Arc<()>,
+@@ -25,3 +25,4 @@ pub(super) struct SectorInterest {
 -    /// Keys are exactly the subscribed sectors. Sectors of the current stencil
 -    /// were last seen at `touched`; their stored values may be older.
 -    last_seen: BTreeMap<[u8; 2], f64>,
@@ -70,40 +41,17 @@ index b1e7b7bc..4fa6c3a2 100644
 +    /// duplicate key set. Current-stencil sectors were last seen at `touched`;
 +    /// their stored values may be older.
 +    last_seen: Vec<f64>,
-     /// Minimum stored time outside the current stencil, with a sector witness.
-     /// Current sectors use `touched`, so their older stored times do not count.
-     oldest: Option<([u8; 2], f64)>,
-@@ -55,7 +56,7 @@ impl SectorInterest {
-             let refresh_oldest = self.oldest.is_some_and(|(sector, _)| current(sector));
-             if let Some(previous) = self.center {
-                 for sector in stencil(previous) {
+@@ -58 +59 @@ impl SectorInterest {
 -                    self.last_seen.insert(sector, self.touched);
 +                    self.set_seen(sector, self.touched);
-                     // Existing non-current times cannot exceed the previous
-                     // touch, so only an empty minimum needs a new witness.
-                     if self.oldest.is_none() && !current(sector) {
-@@ -64,15 +65,14 @@ impl SectorInterest {
-                 }
-             }
-             for sector in stencil([cx, cy]) {
+@@ -67,2 +68 @@ impl SectorInterest {
 -                changed |= self.subscribed.insert(sector);
 -                self.last_seen.insert(sector, now);
 +                changed |= self.set_seen(sector, now);
-             }
-             self.center = Some([cx, cy]);
-             // Only a re-entering minimum can invalidate the witness. The old
-             // stencil above becomes non-current at its previous touch time.
-             if refresh_oldest {
-                 self.oldest = None;
+@@ -75 +75 @@ impl SectorInterest {
 -                for (&sector, &seen) in &self.last_seen {
 +                for (&sector, &seen) in self.subscribed.iter().zip(&self.last_seen) {
-                     if !current(sector) {
-                         note_oldest(&mut self.oldest, sector, seen);
-                     }
-@@ -95,20 +95,30 @@ impl SectorInterest {
-                 .oldest
-                 .is_some_and(|(_, oldest)| now - oldest > RETENTION_SECONDS)
-             {
+@@ -98,5 +98,6 @@ impl SectorInterest {
 -                let subscribed = &mut self.subscribed;
 -                let oldest = &mut self.oldest;
 -                *oldest = None;
@@ -115,16 +63,15 @@ index b1e7b7bc..4fa6c3a2 100644
 +                    let sector = self.subscribed[read];
 +                    let seen = self.last_seen[read];
 +                    let keep = if current(sector) {
-                         true
+@@ -104,2 +105,2 @@ impl SectorInterest {
 -                    } else if now - *last_seen <= RETENTION_SECONDS {
 -                        note_oldest(oldest, *sector, *last_seen);
 +                    } else if now - seen <= RETENTION_SECONDS {
 +                        note_oldest(&mut self.oldest, sector, seen);
-                         true
-                     } else {
+@@ -108 +109 @@ impl SectorInterest {
 -                        changed |= subscribed.remove(sector);
 +                        changed = true;
-                         false
+@@ -109,0 +111,7 @@ impl SectorInterest {
 +                    };
 +                    if keep {
 +                        if kept != read {
@@ -132,18 +79,12 @@ index b1e7b7bc..4fa6c3a2 100644
 +                            self.last_seen[kept] = seen;
 +                        }
 +                        kept += 1;
-                     }
+@@ -111 +119,3 @@ impl SectorInterest {
 -                });
 +                }
 +                self.subscribed.truncate(kept);
 +                self.last_seen.truncate(kept);
-             }
-         }
-         if changed {
-@@ -116,7 +126,23 @@ impl SectorInterest {
-         }
-     }
- 
+@@ -119 +129,17 @@ impl SectorInterest {
 -    pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
 +    /// Keep keys and exact times at matching indexes. Old-stencil keys already
 +    /// exist; newly entered keys are inserted in wire order.
@@ -162,23 +103,11 @@ index b1e7b7bc..4fa6c3a2 100644
 +    }
 +
 +    pub(super) fn subscribed(&self) -> &[[u8; 2]] {
-         &self.subscribed
-     }
- 
-@@ -127,7 +153,8 @@ impl SectorInterest {
-     /// Synthetic retained membership for wire-diff regressions.
-     #[cfg(test)]
-     pub(super) fn from_subscribed(subscribed: BTreeSet<[u8; 2]>) -> Self {
+@@ -130 +156,2 @@ impl SectorInterest {
 -        let last_seen = subscribed.iter().map(|&sector| (sector, 0.)).collect();
 +        let subscribed: Vec<_> = subscribed.into_iter().collect();
 +        let last_seen = vec![0.; subscribed.len()];
-         let oldest = subscribed.first().map(|&sector| (sector, 0.));
-         Self {
-             subscribed,
-@@ -168,10 +195,39 @@ mod tests {
- 
-     const FAR: Point = Point { x: 10_000., y: 0. };
- 
+@@ -171,4 +198,33 @@ mod tests {
 -    fn assert_full_state(actual: &SectorInterest, reference: &SectorInterest) {
 -        assert_eq!(actual.subscribed, reference.subscribed);
 -        assert_eq!(actual.last_seen, reference.last_seen);
@@ -216,92 +145,37 @@ index b1e7b7bc..4fa6c3a2 100644
 +            actual.center.map(|c| c.map(f64::to_bits)),
 +            reference.center.map(|c| c.map(f64::to_bits))
 +        );
-         assert_eq!(actual.touched.to_bits(), reference.touched.to_bits());
-         assert_eq!(actual.cleanup_epoch, reference.cleanup_epoch);
-         let expected = reference
-@@ -191,32 +247,33 @@ mod tests {
-             expected.map(f64::to_bits)
-         );
-         if let Some((sector, seen)) = actual.oldest {
+@@ -194 +250,2 @@ mod tests {
 -            assert_eq!(actual.last_seen[&sector].to_bits(), seen.to_bits());
 +            let index = actual.subscribed.binary_search(&sector).unwrap();
 +            assert_eq!(actual.last_seen[index].to_bits(), seen.to_bits());
-         }
-     }
- 
-     fn compare_advance(
-         actual: &mut SectorInterest,
+@@ -200 +257 @@ mod tests {
 -        reference: &mut SectorInterest,
 +        reference: &mut ReferenceInterest,
-         head: Point,
-         heading: f64,
-         now: f64,
-     ) {
-         let old = actual.revision().clone();
+@@ -206 +263 @@ mod tests {
 -        let reference_old = reference.revision().clone();
 +        let reference_old = reference.revision.clone();
-         actual.advance(head, heading, now);
-         full_sweep(reference, head, heading, now);
-         assert_full_state(actual, reference);
-         assert_eq!(
-             Arc::ptr_eq(&old, actual.revision()),
+@@ -212 +269 @@ mod tests {
 -            Arc::ptr_eq(&reference_old, reference.revision())
 +            Arc::ptr_eq(&reference_old, &reference.revision)
-         );
-     }
- 
-     #[test]
-     fn oldest_matches_full_sweep_through_reentries_resets_and_rounding() {
-         let mut actual = SectorInterest::default();
+@@ -219 +276 @@ mod tests {
 -        let mut reference = actual.clone();
 +        let mut reference = ReferenceInterest::default();
-         for (head, now) in [
-             (Point::default(), 0.),
-             (FAR, 0.007),
-@@ -229,7 +286,7 @@ mod tests {
-             compare_advance(&mut actual, &mut reference, head, 0., now);
-         }
-         actual = SectorInterest::default();
+@@ -232 +289 @@ mod tests {
 -        reference = SectorInterest::default();
 +        reference = ReferenceInterest::default();
-         // An added deadline rounds up to now, despite strictly expired age.
-         let seen = 0.119_f64;
-         let now = seen + RETENTION_SECONDS;
-@@ -245,14 +302,14 @@ mod tests {
-         for seed in [1_u64, 7, 42, 0xfeed_beef] {
-             let mut random = seed;
-             let mut actual = SectorInterest::default();
+@@ -248 +305 @@ mod tests {
 -            let mut reference = actual.clone();
 +            let mut reference = ReferenceInterest::default();
-             let mut head = Point::default();
-             let mut now = 0.;
-             for step in 0..12_000 {
-                 random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
-                 if step % 367 == 0 {
-                     actual = SectorInterest::default();
+@@ -255 +312 @@ mod tests {
 -                    reference = SectorInterest::default();
 +                    reference = ReferenceInterest::default();
-                 }
-                 if step % 257 == 0 {
-                     head = at_wire_sector((random >> 16) as u8 as u16, (random >> 24) as u8 as u16);
-@@ -278,7 +335,7 @@ mod tests {
-     }
- 
-     // Frozen full-sweep owner from 23e987f3, independent of the minimum hint.
+@@ -281 +338 @@ mod tests {
 -    fn full_sweep(interest: &mut SectorInterest, head: Point, heading: f64, now: f64) {
 +    fn full_sweep(interest: &mut ReferenceInterest, head: Point, heading: f64, now: f64) {
-         let mut changed = false;
-         let size = f64::from(encode::SECTOR_SIZE);
-         let center = f64::from(encode::GRID_CENTER);
-@@ -470,9 +527,9 @@ mod tests {
-     fn a_final_stationary_pose_is_touched_before_cleanup() {
-         let mut interest = SectorInterest::default();
-         interest.advance(Point::default(), 0., 0.);
+@@ -473 +530 @@ mod tests {
 -        let original = interest.subscribed().clone();
 +        let original = interest.subscribed().to_vec();
-         interest.advance(Point::default(), 0., 1_000_000_000_000.);
+@@ -475 +532 @@ mod tests {
 -        assert_eq!(interest.subscribed(), &original);
 +        assert_eq!(interest.subscribed(), original.as_slice());
-         assert_eq!(interest.last_seen.len(), 45);
-     }
- 

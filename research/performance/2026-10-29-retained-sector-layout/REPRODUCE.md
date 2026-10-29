@@ -67,6 +67,10 @@ tree-backed oracle are in the candidate archive. Copy this study's four
 `retained-{check,setup-primary,prep-primary,select-primary}.py` helpers there,
 and reuse [#274's harness.patch](../2026-10-29-compact-snake-history/harness.patch)
 as `harness.patch` without copying it into this study.
+The rejected prototype is also retained in [rejected-layout.patch](rejected-layout.patch).
+Apply or reverse it on the pinned baseline with `git apply --unidiff-zero`;
+its zero-context representation avoids whitespace-only context lines and is
+byte-checked against both measured archives by the final delivery checks.
 
 ```sh
 python3 retained-setup-primary.py
