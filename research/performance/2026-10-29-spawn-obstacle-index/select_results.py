@@ -32,6 +32,10 @@ def summarize(records):
 
 manifest_path = root / "measurement-pins.json"
 manifest = json.loads(manifest_path.read_text())
+assert sha(root.parent / "fixture/world.json") == manifest["fixtureSha256"]
+fixture_metadata = sha(root.parent / "fixture/fixture.json")
+if "fixtureMetadataSha256" in manifest:
+    assert fixture_metadata == manifest["fixtureMetadataSha256"]
 builds = {}
 for arm in ["base", "candidate", "mutation"]:
     path = root / arm / "pins.json"
@@ -90,6 +94,7 @@ for row in ["live-refused", "live-successful", "spawn", "seats80", "seats160"]:
                      "minimumPmuFraction":min(p[a]["all"]["minimumPmuFraction"] for p in selected_pairs for a in ["base", "candidate"])})
 output = {"builds":builds, "measurementManifestSha256":sha(manifest_path),
           "runnerSha256":manifest["runnerSha256"], "fixtureSha256":manifest["fixtureSha256"],
+          "fixtureMetadataSha256":fixture_metadata, "fixtureMetadataBoundAtCount":"fixtureMetadataSha256" in manifest,
           "selectorSha256":sha(Path(__file__)), "warmupWindowsDiscardedPerRow":1,
           "gate":{"passed":all(r["gatePass"] for r in rows), "failedRows":[[r["row"],r["protocolLabel"]] for r in rows if not r["gatePass"]]},
           "allRowsBoundToFrozenBuildPins":True, "rows":rows}

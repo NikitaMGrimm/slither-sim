@@ -57,3 +57,11 @@ noncompute allowance, combined cap $1.50. Preserve sources and failed attempts;
 download only closed/member-verified archives and verify size/SHA before source
 deletion. Then terminate task resources and scan every enabled region. No local
 native work or SSH guest. Lean evidence, template PR body/footer, never merge.
+
+Budget accounting correction before final collection: archive-transfer allowance
+is $0.30, giving a full 180-minute bid-cap bound of $1.453 including root storage.
+No timer extension, additional builder or increased $1.50 cap is authorized.
+
+Final archive accounting correction: cumulative retrieval is about 3.13 GB.
+Reserve $0.33 for transfer, storage and public IPv4, giving a full-timer bound
+of $1.483. The $1.50 cap, single builder and terminate timer remain unchanged.

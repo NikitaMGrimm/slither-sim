@@ -10,6 +10,7 @@ import sys
 root, inventory = map(Path, sys.argv[1:3])
 protocol, row = int(sys.argv[3]), sys.argv[4]
 assert protocol in [19, 13]
+fixture = root.parent / "fixture"
 manifest_path = root / "measurement-pins.json"
 manifest_bytes = manifest_path.read_bytes()
 manifest = json.loads(manifest_bytes)
@@ -18,6 +19,9 @@ assert hashlib.sha256(Path(__file__).read_bytes()).hexdigest() == manifest["runn
 
 def verify_pins():
     assert manifest_path.read_bytes() == manifest_bytes
+    for name, key in [("world.json", "fixtureSha256"), ("fixture.json", "fixtureMetadataSha256")]:
+        with (fixture / name).open("rb") as stream:
+            assert hashlib.file_digest(stream, "sha256").hexdigest() == manifest[key]
     for arm in ["base", "candidate"]:
         pins_path = root / arm / "pins.json"
         assert hashlib.sha256(pins_path.read_bytes()).hexdigest() == manifest["arms"][arm]["pinsFileSha256"]
@@ -54,7 +58,6 @@ os.sched_setaffinity(0, {1})
 spec = importlib.util.spec_from_file_location("inventory", inventory)
 shared = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(shared)
-fixture = root.parent / "fixture"
 prefix = f"{row}-{protocol}"
 expected = [1, 4096, 1, 0] if row == "live-refused" else [1, 1638, 0, 0]
 

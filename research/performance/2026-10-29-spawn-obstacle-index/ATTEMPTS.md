@@ -38,7 +38,7 @@
   gate writing and the remaining live-admission parity checks. No timing ran
   before all gates passed.
 - Initial fixed-work attempt (`e64d74cc` runtime): live-like refused CPU ratios
-  are 0.2342�0.2365 and successful ratios 0.2509�0.2612 across both labels;
+  are 0.2342–0.2365 and successful ratios 0.2509–0.2612 across both labels;
   all 80/160 controls pass. The old seven-ring row adds 70.617/72.429 microseconds
   at median tick CPU (19/13) and 14.6% instructions, failing this study's stricter
   old-row gate. Preserved every pair and selected result. No gate or workload
@@ -47,3 +47,56 @@
 - The first counting-manifest write lacked permissions in the root-owned proof
   directory. No counting ran; created it through the existing sudo path and
   completed all ten combinations with frozen source/binary bindings.
+- The revised candidate (`7d34ef8c`) repeated the 18 focused tests, wrong-skip
+  control/restoration, all 15 Rust commands, full trace matrix, both wire controls
+  and both raw-byte frozen admission traces. Its first timing matrix completed,
+  but was excluded because counting began before explicit confirmation that the
+  proof archive download had exited. No claim is made from that matrix. Retained
+  every file and the exclusion receipt; confirmed the old process tree empty and
+  the proof download complete with matching size/SHA, then dispatched a fresh
+  full matrix using the identical binaries, checkpoint, seeds and frozen gates.
+- A read-only status command had another Windows shell quoting error; replaced it
+  with a small private Python controller file. It ran no native work locally.
+- Clean revised timing still fails the frozen old-row gate: +66.548/+65.225
+  microseconds median tick CPU (19/13), despite live-like refused ratios
+  0.2393–0.2422 and successful ratios 0.2545–0.2598. All 80/160 gates pass.
+  Preserved this second valid attempt. A third implementation (`c717b268`)
+  puts the large indexed traversal in a non-inlined helper, leaving the small
+  linear loop outside its register allocation. Repeated the complete proof
+  sequence before any new counting; no fixture or threshold changed.
+- A metadata-only checkpoint inspection assumed a `snakes` key instead of
+  checkpoint-v2 `slots` and failed. Corrected it; the remote census now records
+  actual radius, body-point spacing and nearest-head distributions. No source
+  or frozen fixture changed. Current main was merged without rebasing measured
+  commits; its additions are release and study metadata, not Rust source changes.
+- A local report-edit metadata script used the Windows default text encoding
+  and failed on UTF-8 punctuation; switched to explicit UTF-8 and corrected the
+  affected dash rendering. No scientific data or runtime sources changed.
+- Final `c717b268` proof matrix passes completely. Five alternating pairs for
+  every row/label again improve live-like refused/successful admission and pass
+  80/160 controls, but the old row adds 103.027/102.786 microseconds p50 and
+  14.008% complete-tick instructions. Search ticks account for the increase;
+  non-search instructions are essentially unchanged. Symbol-size inspection
+  shows a larger generated admission function but does not identify the precise
+  optimizer cause. No further parameter tuning or gate change: reject this
+  prototype under the complete frozen plan and publish a research-only PR.
+  Preserve the implementation branch and all three valid matrices, plus the
+  excluded overlapping-dispatch attempt. Marker reuse remains parked at
+  `perf/pit-marker-reuse` (`58145ae`), without a PR or timing.
+- Source-only documentation staging first hit root-owned checkout permissions;
+  restored write access within the task checkout and retried. The initial
+  documentation check caught the missing study index row; retained that failure,
+  added the row and reran successfully (seven tests). Table generation and exact
+  regeneration pass. The retrieval controller then failed only while printing
+  Unicode arrows through the Windows console; retrieved the already-passing
+  remote receipts/table directly and switched controller output to UTF-8.
+- The final evidence transfer totals about 3.13 GB across retained archives.
+  Raised the noncompute reserve to $0.33 (transfer, root storage and public IPv4),
+  giving a full-timer conservative bound of $1.483 within the unchanged $1.50
+  cap. No additional instance or timer extension was used.
+- Final archive was closed/member-verified, then retrieved with matching size
+  and SHA before termination. Verified all nine instrumented source arms and
+  listed binaries against archived members. Cancelled the task Spot request,
+  terminated the builder, deleted its key/group, and completed the 17-region
+  scan: zero instances, active/open Spot requests, volumes, Elastic IPs or
+  project/task keys/groups. No SSH guest use; protected resources untouched.

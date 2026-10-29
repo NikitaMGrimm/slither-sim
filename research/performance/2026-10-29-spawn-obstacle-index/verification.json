@@ -1,0 +1,364 @@
+{
+  "candidateRuntime": "c717b268b49aed0337b63639192ab6ffc7a35ad2",
+  "sourceBinding": {
+    "allProductionSourcesMatchCandidateCommit": true,
+    "candidate": "c717b268b49aed0337b63639192ab6ffc7a35ad2",
+    "productionManifestSha256": "e6369d023d5cdad84cd981c78069b8a5eb581d21ca0bb62df1b2a2885b7eb8b5"
+  },
+  "focusedSafetyTests": 18,
+  "wrongSkipMutation": {
+    "restoredSourceSha256": "ac72fe1f5c9a8dd1fa5f85f2185ce38fba4fc7f8980757cddc88801dc4e6ce55",
+    "wrongSkipFailedByTestAssertion": true
+  },
+  "rustCommands": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--workspace",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "logSha256": "7890e1a7c74e69d87d86bee1753f7ebb9c5e2282cf006e84645c557781fe754e"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "logSha256": "d406543f224718b237022a6f718b7b5c4163f285ff7b447252247fd16fb99e75"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "bot",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "logSha256": "d406543f224718b237022a6f718b7b5c4163f285ff7b447252247fd16fb99e75"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "networking",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "logSha256": "9a41c6fb97188b4571a24c11978605fb2edf9345fdd5c6c46fd993d2bb834c8f"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "parallel",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "logSha256": "47d1ebe904a90b00c5b9e4f31a52db52e92ee8caeaa47e1a29a4a65b6baf0c9d"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "5a7fcdb6b8e3ecfbb2adaac688a8f9bf1bce3ef545f665e8330757fb66fbbb64"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--no-default-features",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "d29271897d08e7e0a0ba455657eec90274b5cdfdd0ea204184fecfa7d758ff3a"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "bot",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "03ed869d671a32a3f0440ee4beadfa2b27ca168227a7473ecf432c4ffab9cdd0"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "networking",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "6589c95d09b0c051df532cdbccc07709aef8901cf2618d14839a6a70da230f6b"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--doc",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "3353474e126782fa73a95555c64d1e92e59188789477bc17869a6bad41adebd6"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--doc",
+        "--no-default-features",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "962d9cc1600e01f75963bea232bf6f67cc852b9ff5c9669a7c0d07f41676fd2b"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "slither-sim-ffi",
+        "--all-targets",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "968b826266cecc9cde8abd5f24b0f410499b8a585678208795b50e422dfa48ec"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "slither-sim-py",
+        "--all-targets",
+        "--locked"
+      ],
+      "exit": 0,
+      "logSha256": "d406543f224718b237022a6f718b7b5c4163f285ff7b447252247fd16fb99e75"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "--example",
+        "basic"
+      ],
+      "exit": 0,
+      "logSha256": "2b44459e821ac273ca2095d0bc481ddc43d748469494487fb838dc7436fbdf0d"
+    }
+  ],
+  "traceParity": {
+    "passed": true,
+    "catalog": 23,
+    "host": 6,
+    "fixed": 2,
+    "wireMutations": 2
+  },
+  "liveAdmissionParity": {
+    "passed": true,
+    "rows": 2
+  },
+  "completeLiveTraceBytesCompared": true,
+  "independentReview": false,
+  "selectedGate": {
+    "passed": false,
+    "failedRows": [
+      [
+        "spawn",
+        19
+      ],
+      [
+        "spawn",
+        13
+      ]
+    ]
+  },
+  "initialRejectedGate": {
+    "passed": false,
+    "failedRows": [
+      [
+        "spawn",
+        19
+      ],
+      [
+        "spawn",
+        13
+      ]
+    ]
+  },
+  "noCountingTransferBuildTestOverlapInSelectedAttempt": true,
+  "selectedCountingExclusivity": {
+    "proofControllersExited": true,
+    "noArchiveTransferActive": true,
+    "selectedCountingStartsAfterProofExit": true
+  },
+  "retrieval": {
+    "requiredSourcesVerified": true,
+    "verifiedBeforeTeardown": true,
+    "verifiedUTC": "2026-10-29T23:04:06.599533+00:00",
+    "archiveChain": [
+      {
+        "stage": "attempt-one",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "fe50f023c4328a9442c11548e09463c79c2c8334f5325a41d8185be964f55179",
+        "archiveBytes": 759769605,
+        "manifestSha256": "d9e3d958fafa37cab6274ac1e49bf93082b1bd2f579666670ada0566f6a914d5",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "final",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "90a9f14bebfa1ae5867e814af339526fded356f7f45879f3a80b14652fb37623",
+        "archiveBytes": 780499086,
+        "manifestSha256": "ecc05eb865bbae7ca35177d924ceb32bbdc4d06e972741fe7c4689fc76744ff2",
+        "baseArchiveSha256": "3bbd8cc43b4369fe25d3dabe058df5d0d8de22b7eb264beaefce0fc290453d1b",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "profile",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "b6e631a22520a8c6bdfc44b11a236855ca6d2d879fac5f32535ecd327ac9669d",
+        "archiveBytes": 97276130,
+        "manifestSha256": "950b1d628e8dc47c72acced76949bfef3b0be266bf81219529a0d956fde36dbb",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "proofs",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "d00161564573a63feb96a459d04fdf3b426f3ee1829bf8ca81a19300d59dbd3e",
+        "archiveBytes": 744512098,
+        "manifestSha256": "cd17cb58bbc896b71908dd3125b7a5bd516951ee7f44299b1f9328a3633d9f0e",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "round2-proofs",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "3bbd8cc43b4369fe25d3dabe058df5d0d8de22b7eb264beaefce0fc290453d1b",
+        "archiveBytes": 711957308,
+        "manifestSha256": "06e1e5ca3d43abcd3d4365da78ed87c08df1454a50d32377cb73e81e00a094b8",
+        "baseArchiveSha256": "e9a15aa6e973500d93f5c18e9c39d9e1bef828499e4befaad255d33cc7eb0c17",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "round2-rust",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "e9a15aa6e973500d93f5c18e9c39d9e1bef828499e4befaad255d33cc7eb0c17",
+        "archiveBytes": 8234039,
+        "manifestSha256": "623d03005683e8b24e5b79cfd3bc0e69bb9ab17d716271e7eb69939151beef16",
+        "baseArchiveSha256": "fe50f023c4328a9442c11548e09463c79c2c8334f5325a41d8185be964f55179",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "rust",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "c4bbc827d4a10dac6db11a935cf0f15851ef7048dcadfdad3442bef2c8b9fe6a",
+        "archiveBytes": 8230127,
+        "manifestSha256": "ced4b1b257f5763cbb02d1004bdbfe7b755efc6194679619c08eef2ad934d409",
+        "downloadSizeAndSha256Verified": true
+      },
+      {
+        "stage": "rust-final",
+        "complete": true,
+        "allManifestMembersVerified": true,
+        "archiveSha256": "0af7424bd51a2e57595c9825dc6b9da81e6f6c33eac8e28303734507d1a4e676",
+        "archiveBytes": 16452631,
+        "manifestSha256": "ae9b24ade2f0cd775abe09b7718d4967780ea0d1bb90687e1fea911bfd19d262",
+        "downloadSizeAndSha256Verified": true
+      }
+    ],
+    "sourceVerification": {
+      "requiredSourcesVerified": true,
+      "instrumentedArmsVerified": 9,
+      "sourceManifestsAndEveryListedSourceMemberBound": true,
+      "allListedBinariesBound": true,
+      "fullManifestSha256": "0732063f28c39279db1092540b3a3921c352498b2c2a8b70ecc172fbeee65c38"
+    }
+  },
+  "documentation": {
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_documentation.py"
+    ],
+    "exit": 0,
+    "logSha256": "42f5f02d30573244fcb241c47a91d16348a6fcf2303ca2f4b394bad5e870907e"
+  },
+  "tableRegeneration": {
+    "command": [
+      "python3",
+      "/srv/spawn-profile/docs-check/research/performance/2026-10-29-spawn-obstacle-index/tables.py",
+      "--check"
+    ],
+    "exit": 0,
+    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "measurementsSha256": "812567f680753299898b9d22ae9ccee532d0c3fee9c348ceaa99b08b160ab081",
+  "tablesSha256": "cee5fe9dc66de5337423513c6f345f565c68d7c6e1988bff240b590111b6523a"
+}
