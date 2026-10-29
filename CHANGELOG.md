@@ -4,8 +4,10 @@
 
 ### Added
 
-- Exact pit minimap projection reuse with independent threshold oracles and
-  complete protocol-13/19 byte-trace checks
+- Exact pit minimap projection reuse: warmed map ticks use about 52% fewer
+  instructions in a synthetic 80-viewer check (about 0.6% over all ticks).
+  First construction costs about 13% more map-tick instructions; protocol-13/19
+  bytes remain identical
   ([evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-pit-minimap-cache/REPORT.md)).
 - A follow-up Battledome check with the bots boosting almost all the time,
   the way Battledome players do. 80 players still play smoothly, with

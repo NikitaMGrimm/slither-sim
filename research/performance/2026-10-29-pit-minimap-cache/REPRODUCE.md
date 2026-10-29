@@ -1,8 +1,10 @@
 # Reproduce the correctness checks
 
-Baseline `cf67b80e`; implementation `af420c84`. Later commits add only these
-trace helpers and evidence notes. Full sources, logs, copied executables and
-traces stay local-only outside Git. No timing result is produced here.
+Native timing pins are baseline `cf67b80e` and implementation `af420c84`.
+The final branch also integrates main's subsequent #264 food-listing change;
+its checks and fresh full-byte traces are recorded separately. Full sources,
+logs, copied executables and traces stay local-only outside Git. The portable
+correctness commands below do not produce timing evidence.
 
 Use one Cargo job and one Rust test thread. The focused commands are:
 
@@ -63,7 +65,51 @@ Use mode `battledome` instead of `host` for that supplementary-only execution.
 The optional `CARGO_TARGET_DIR` lets both execution directories share one bounded
 build target; copied executables and per-directory pins remain immutable.
 
-The required Linux `instructions:u` fixed-work pairs and slow-tick splits have
-not run. Follow the [frozen plan](PLAN.md) and its
-[fixed-work amendment](PLAN-ADDENDUM.md) only after the maintaining agent
-releases the SSH bench. Do not substitute these debug checks for measurements.
+## Native fixed-work collection
+
+The maintaining agent released the guest before these measurements. Reuse the
+common [spawn-study harness at its frozen preparation commit](https://github.com/NikitaMGrimm/slither-sim/tree/dc12d8781cd3ce1594d7d930e859c80b3f8532a1/research/performance/2026-10-29-spawn-ring-prefilter),
+including its preparation wrapper, accessors, full-host fixture, native builder,
+per-tick counter, pair runner, gate writer and raw reducer. Link those scripts;
+do not copy them into this study. Use this study's portable trace helper as the
+wrapper's `PRIOR_PREPARE`. Stage baseline `cf67b80e`, candidate `af420c84` and
+mutation `af420c84` with `STUDY_STAGE_ONLY=1` and `STUDY_MUTATION=map`. All
+builds remain locked/offline and serial. The native builder clears only package
+artifacts in its verified task-owned target before each arm.
+
+For the original cold row, keep 300 warm ticks. For a fresh independent warm
+row, run `python warm_stage.py STAGED_OUTPUT` before the three native builds;
+this reproduces the recorded 600-tick source manifests. Do not edit production
+code. Build all three arms; run the native catalog and host matrices; run the
+queued fixed parity with `FIXED_TRACE_TICKS=720`; bind the completed local Rust
+receipt and native gates with `write_gates.py`. Then run:
+
+```sh
+python run_pairs.py OUTPUT PRIOR_REPRODUCE 19 minimap
+python run_pairs.py OUTPUT PRIOR_REPRODUCE 13 minimap
+python tables.py OUTPUT minimap
+python summarize.py minimap-pairs.json --markdown
+python summarize.py minimap-warm-pairs.json --markdown
+```
+
+The first three scripts are the linked common harness. `PRIOR_REPRODUCE` is the
+[earlier inventory helper](../2026-10-28-broadcast-distance/reproduce.py).
+The two selected files correspond to separate cold/warm output directories;
+copy the raw reducer's `selected-fixed-minimap.json` under the respective name.
+Omit `--markdown` for all per-quantile medians/ranges. Complete native
+identities, gates and raw archive hashes are selected beside the report.
+Full raw archives are local-only, not public downloads.
+
+Freeze complete host state and compare repeated-fork/direct-parent and
+cross-arm full bytes before accepting counts. One AB warmup is discarded, then
+five AB/BA/AB/BA/AB pairs per protocol count 360 actual ticks on one CPU. No
+status, build or profiler process runs during counted windows. CPU 1 runs the
+controller. Retain inventories, failures and every pair; require at least 99%
+PMU scheduling. These results are current-thread CPU/user instructions for
+synthetic work, not sockets, network latency or live deferred ticks.
+
+For retrieval, close and tar-read the archive, compute its size and digest,
+then publish an atomic ready receipt. Download only after readiness, verify
+size/digest, safely extract, and verify every per-file size/hash and successful
+step receipt. Never remove remote source/results before that verification.
+Finally remove only task-owned targets/processes/files and record cleanup.

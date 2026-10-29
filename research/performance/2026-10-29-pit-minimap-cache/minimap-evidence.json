@@ -1938,6 +1938,16 @@
       "finishedUTC": "2026-10-29T07:04:02Z"
     }
   ],
+  "context": {
+    "architecture": "x86_64",
+    "cpuFamily": "AMD EPYC",
+    "availableLogicalCpus": 4,
+    "nativeWorkerLogicalCpu": 0,
+    "controllerLogicalCpu": 1,
+    "releaseBuildJobs": 1,
+    "minimumCountedPmuScheduledFraction": 1.0,
+    "inventoryReview": "No competing build/measurement workload; ordinary guest services remain. Private process inventories retained; snapshots are not continuous isolation."
+  },
   "resourceBounds": {
     "scratchFilesystemBytes": 4175650816,
     "maxObservedFilesystemUsedBytes": 2455298048,

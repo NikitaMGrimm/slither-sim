@@ -1,6 +1,6 @@
 """Recompute report instruction and CPU tables from selected per-pair results.
 
-Usage: python summarize.py SELECTED_JSON
+Usage: python summarize.py SELECTED_JSON [--markdown]
 All five counted pairs are retained; the discarded warmup is excluded.
 CPU quantiles are medians and ranges of per-window quantiles, never summed.
 """
@@ -22,4 +22,18 @@ for protocol,item in data.items():
             'cpuMs':{a:{q:spread([p[a][group]['cpuMs'][q] for p in pairs]) for q in ['p50','p99','max']} for a in ['base','candidate']},
             'ticksPerWindow':{a:sorted({p[a][group]['n'] for p in pairs}) for a in ['base','candidate']}}
     output[protocol]=groups
-print(json.dumps(output,indent=2))
+if '--markdown' not in sys.argv:
+    print(json.dumps(output,indent=2))
+else:
+    print('| Protocol | Tick group | Ticks/window | Instructions change, median [min, max] | CPU p50 / p99 / worst, ms: baseline to candidate |')
+    print('| --- | --- | ---: | ---: | --- |')
+    for protocol,groups in output.items():
+        for group,values in groups.items():
+            if group=='exhausted':continue  # Same ticks as search in these rows.
+            if group=='other' and values['ticksPerWindow']==groups['all']['ticksPerWindow']:continue
+            delta=values['instructionsChangePercent']
+            percent=f"{delta['median']:+.6f}% [{delta['min']:+.6f}, {delta['max']:+.6f}]"
+            def cpu(arm):
+                c=values['cpuMs'][arm]
+                return ' / '.join(f'{v:.5f}' for v in [c['p50']['median'],c['p99']['median'],c['max']['max']])
+            print(f"| {protocol} | {group} | {values['ticksPerWindow']['base'][0]} | {percent} | {cpu('base')} to {cpu('candidate')} |")

@@ -54,3 +54,51 @@
   default/core/bot/networking, doctest, C ABI, Python build and basic-example
   commands passed. One Cargo job and one test thread were set for every command.
   This check run is validation only; its durations are not speed measurements.
+
+## Released native bench
+
+- After explicit release, built all three native release arms serially, with
+  package-artifact clearing and distinct binary hashes. All 23 catalog, six
+  host and two queued full-byte traces pass; both wire mutations are detected.
+  Repeated-fork, cross-arm and direct-parent bytes agree. Both protocols finish
+  all five alternating pairs after the discarded warmup, with fully scheduled
+  user-instruction counters. Full private logs and inventories are retained.
+- The original 300-tick fixture measured cold construction, not reuse: no map
+  had reached a viewer when the parent froze. Its map tick costs about 12.7%
+  more instructions. Keep every pair as valid cold evidence. Recorded
+  `PLAN-WARM.md` before adding the 600-tick warm-cache row; a discarded child
+  cannot warm the immutable parent's derived cache. The production cache is
+  unchanged. The public warm-stage helper reproduces all three new native
+  source manifests exactly.
+- The first selected-table export used Windows' default cp1252 and failed to
+  write an arrow. Reran explicitly with UTF-8; no measured data changed. An
+  empty documentation patch hunk was rejected before editing any file; applied
+  the concrete append instead. These are tooling failures, not counted runs.
+- Each archive is closed, tar-read and hashed before an atomic ready receipt.
+  Downloaded the cold archive, checked its exact size and SHA-256, extracted it
+  safely and verified all 3,950 retained file hashes before clearing its guest
+  source. The independently collected spawn archive used the same ordering.
+- Merged main's completed food-listing optimization without changing the pinned
+  minimap implementation. Kept both research index rows when resolving their
+  insertion conflict. Native measurements remain comparisons of the recorded
+  pre-merge runtime pins; integrated-head checks are recorded separately.
+- The warm run completed all native gates and five pairs in each protocol.
+  It freezes after the first map delivery (`nextMinimap: 2`), keeps 80 decorated
+  lives and zero waiting joins, and measures the next map opportunity. Its
+  archive and all 3,951 file hashes were verified locally before deletion.
+- Final cleanup verified no task process or target, removed only this task's
+  guest directory and rechecked absence. The guest is released for other work;
+  no further connection or measurement is needed. Main-integrated full Rust
+  checks pass all 15 commands serially. Fresh integrated-main parity is a
+  separate untimed local check; it does not replace the native timing pins.
+- A shell-based reproduction-note edit failed its substring check because
+  PowerShell consumed Markdown backticks. No file was changed by that attempt;
+  applied the exact edit with the patch tool instead. Measurement data is intact.
+- A later report-audit command used a Bash-style brace path that PowerShell
+  rejected before execution; reran with explicit path filters. No check result
+  or artifact was substituted.
+- Fresh integrated-main builds have distinct baseline/candidate/mutation
+  executable hashes. All 23 catalog, six host and two queued complete-byte
+  traces pass against #264's main; both queued wire mutations are detected.
+  These local untimed controls qualify the integrated production source without
+  replacing the native pre-#264 performance measurements.
