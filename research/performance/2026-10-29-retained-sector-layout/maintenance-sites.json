@@ -1,0 +1,578 @@
+[
+  {
+    "protocol": "stock",
+    "event": "cycles",
+    "maintenance": true,
+    "samples": 718,
+    "sites": [
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 40
+      },
+      {
+        "site": "src/client/visibility.rs:101",
+        "samples": 36
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 25
+      },
+      {
+        "site": "src/client/simulation/food.rs:93",
+        "samples": 19
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 13
+      },
+      {
+        "site": "src/client/visibility.rs:108",
+        "samples": 12
+      },
+      {
+        "site": "src/client/simulation/food.rs:545",
+        "samples": 12
+      },
+      {
+        "site": "src/client/simulation/food.rs:31",
+        "samples": 11
+      },
+      {
+        "site": "src/client/visibility.rs:49",
+        "samples": 10
+      },
+      {
+        "site": "src/client/simulation/food.rs:505",
+        "samples": 10
+      },
+      {
+        "site": "src/client/simulation/food.rs:342",
+        "samples": 9
+      },
+      {
+        "site": "src/client/simulation/food.rs:101",
+        "samples": 8
+      },
+      {
+        "site": "src/client/simulation/food.rs:377",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:562",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:85",
+        "samples": 6
+      },
+      {
+        "site": "src/client/visibility.rs:51",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:?",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:420",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:343",
+        "samples": 5
+      },
+      {
+        "site": "src/client/visibility.rs:?",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:592",
+        "samples": 5
+      },
+      {
+        "site": "src/client/visibility.rs:104",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:84",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:183",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:593",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:547",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:419",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:417",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 3
+      },
+      {
+        "site": "src/client/visibility.rs:142",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:408",
+        "samples": 2
+      },
+      {
+        "site": "src/client/visibility.rs:115",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:82",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:100",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:515",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:453",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:574",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:108",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:355",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:567",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:177",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:568",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:23",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:500",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:102",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:523",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:363",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:563",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:105",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:424",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:491",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:284",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:544",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:372",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:91",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:407",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:561",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:503",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:94",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:341",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:643",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:82",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:508",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:54",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:514",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:143",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:74",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "cycles",
+    "maintenance": true,
+    "samples": 803,
+    "sites": [
+      {
+        "site": "src/client/visibility.rs:101",
+        "samples": 36
+      },
+      {
+        "site": "src/client/simulation/food.rs:570",
+        "samples": 31
+      },
+      {
+        "site": "src/client/simulation/food.rs:522",
+        "samples": 28
+      },
+      {
+        "site": "src/client/simulation/food.rs:537",
+        "samples": 17
+      },
+      {
+        "site": "src/client/simulation/food.rs:31",
+        "samples": 12
+      },
+      {
+        "site": "src/client/simulation/food.rs:562",
+        "samples": 11
+      },
+      {
+        "site": "src/client/simulation/food.rs:85",
+        "samples": 9
+      },
+      {
+        "site": "src/client/simulation/food.rs:505",
+        "samples": 8
+      },
+      {
+        "site": "src/client/simulation/food.rs:342",
+        "samples": 8
+      },
+      {
+        "site": "src/client/visibility.rs:108",
+        "samples": 8
+      },
+      {
+        "site": "src/client/visibility.rs:49",
+        "samples": 8
+      },
+      {
+        "site": "src/client/simulation/food.rs:84",
+        "samples": 8
+      },
+      {
+        "site": "src/client/simulation/food.rs:93",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:183",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:420",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:377",
+        "samples": 7
+      },
+      {
+        "site": "src/client/simulation/food.rs:545",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:182",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:101",
+        "samples": 6
+      },
+      {
+        "site": "src/client/simulation/food.rs:567",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:500",
+        "samples": 5
+      },
+      {
+        "site": "src/client/simulation/food.rs:177",
+        "samples": 4
+      },
+      {
+        "site": "src/client/visibility.rs:?",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:544",
+        "samples": 4
+      },
+      {
+        "site": "src/client/simulation/food.rs:68",
+        "samples": 4
+      },
+      {
+        "site": "src/client/visibility.rs:104",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:188",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:355",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:572",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:91",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:514",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:343",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:417",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:515",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:574",
+        "samples": 3
+      },
+      {
+        "site": "src/client/simulation/food.rs:95",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:83",
+        "samples": 2
+      },
+      {
+        "site": "src/client/visibility.rs:46",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:547",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:82",
+        "samples": 2
+      },
+      {
+        "site": "src/client/visibility.rs:102",
+        "samples": 2
+      },
+      {
+        "site": "src/client/visibility.rs:51",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:592",
+        "samples": 2
+      },
+      {
+        "site": "src/client/visibility.rs:54",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:523",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:643",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:94",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:531",
+        "samples": 2
+      },
+      {
+        "site": "src/client/simulation/food.rs:?",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:158",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:96",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:498",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:397",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:536",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:66",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:610",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:549",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:605",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:568",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:593",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:539",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:108",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:180",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:100",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:187",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:563",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:263",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:599",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:602",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:32",
+        "samples": 1
+      },
+      {
+        "site": "src/client/visibility.rs:115",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:419",
+        "samples": 1
+      },
+      {
+        "site": "src/client/simulation/food.rs:363",
+        "samples": 1
+      }
+    ]
+  }
+]

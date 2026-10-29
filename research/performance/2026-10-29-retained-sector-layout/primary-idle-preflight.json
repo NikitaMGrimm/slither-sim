@@ -1,0 +1,12 @@
+{
+  "elapsedSeconds": 2.007858849974582,
+  "logicalCpus": 4,
+  "loadAverage": [
+    1.40478515625,
+    2.9208984375,
+    2.27685546875
+  ],
+  "processesOverTwoCpuQuanta": [],
+  "targetAbsent": true,
+  "buildPinsCommit": "09a419bc"
+}
