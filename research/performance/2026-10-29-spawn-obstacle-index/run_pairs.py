@@ -10,9 +10,40 @@ import sys
 root, inventory = map(Path, sys.argv[1:3])
 protocol, row = int(sys.argv[3]), sys.argv[4]
 assert protocol in [19, 13]
+manifest_path = root / "measurement-pins.json"
+manifest_bytes = manifest_path.read_bytes()
+manifest = json.loads(manifest_bytes)
+assert hashlib.sha256(Path(__file__).read_bytes()).hexdigest() == manifest["runnerSha256"]
+
+
+def verify_pins():
+    assert manifest_path.read_bytes() == manifest_bytes
+    for arm in ["base", "candidate"]:
+        pins_path = root / arm / "pins.json"
+        assert hashlib.sha256(pins_path.read_bytes()).hexdigest() == manifest["arms"][arm]["pinsFileSha256"]
+        pins = json.loads(pins_path.read_text())
+        for binary, digest in pins["binaries"].items():
+            with (root / arm / "bin" / binary).open("rb") as stream:
+                assert hashlib.file_digest(stream, "sha256").hexdigest() == digest
+
+
+verify_pins()
+binding_path = root / f"{row}-{protocol}-measurement-binding.json"
+binding = {"measurementManifestSha256": hashlib.sha256(manifest_bytes).hexdigest(), "status": "started"}
+with binding_path.open("x") as stream:
+    json.dump(binding, stream)
+
+
+def completed():
+    verify_pins()
+    binding["status"] = "complete"
+    binding_path.write_text(json.dumps(binding) + "\n")
+
+
 if not row.startswith("live-"):
     prior = Path(__file__).resolve().parents[1] / "2026-10-29-spawn-head-distance/run_pairs.py"
     exec(compile(prior.read_text(), str(prior), "exec"), {"__file__": str(prior), "__name__": "__main__"})
+    completed()
     raise SystemExit(0)
 
 assert row in ["live-refused", "live-successful"]
@@ -67,3 +98,4 @@ for pair in range(-1, 5):
     pairs.append({"pair": pair, "warmup": pair < 0, "paths": paths})
     (root / f"pairs-{prefix}.json").write_text(json.dumps(pairs, indent=2) + "\n")
 print("Five live-like admission pairs complete", protocol, row)
+completed()
