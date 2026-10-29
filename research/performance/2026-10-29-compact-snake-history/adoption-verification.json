@@ -1,0 +1,711 @@
+{
+  "base": "a1535902328475df3a1ce4002d7ef5c3f2d21041",
+  "integratedRuntime": "245e960eb2cc8cc2071a488f3ca8068c4018b81b",
+  "sourceEquivalence": {
+    "measuredRuntime": "d781ff000d2dfee10627ab1b8a4c07bfff3638c0",
+    "integratedRuntime": "245e960eb2cc8cc2071a488f3ca8068c4018b81b",
+    "knownSnakeSourceDiffersOnlyByMergeComment": true,
+    "oracleUnchanged": true
+  },
+  "checks": {
+    "passed": true,
+    "sourceRestored": true,
+    "candidateArchiveSha256": "1e9cd5c784fef6baacb3cdbf87520dfec9698d917fe982f44d82a2378e9eaca7",
+    "checks": [
+      {
+        "label": "focused-snake-oracles",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--lib",
+          "client::simulation::snakes"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      },
+      {
+        "label": "wrong-removal",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--lib",
+          "client::simulation::snakes::known_tests"
+        ],
+        "expectedFailure": true,
+        "exit": 101
+      },
+      {
+        "label": "lost-replacement",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--lib",
+          "client::simulation::snakes::known_tests"
+        ],
+        "expectedFailure": true,
+        "exit": 101
+      },
+      {
+        "label": "reverse-enumeration",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--lib",
+          "client::simulation::snakes::known_tests"
+        ],
+        "expectedFailure": true,
+        "exit": 101
+      },
+      {
+        "label": "restored-snake-oracles",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--lib",
+          "client::simulation::snakes"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      },
+      {
+        "label": "rust-group",
+        "command": [
+          "/usr/bin/python3",
+          "tools/check.py",
+          "rust"
+        ],
+        "expectedFailure": false,
+        "exit": 0
+      }
+    ]
+  },
+  "parity": [
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "step-default",
+        "32"
+      ],
+      "base": {
+        "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+        "bytes": 4747394
+      },
+      "candidate": {
+        "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+        "bytes": 4747394
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "step-food",
+        "32"
+      ],
+      "base": {
+        "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+        "bytes": 114813212
+      },
+      "candidate": {
+        "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+        "bytes": 114813212
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "step-body",
+        "32"
+      ],
+      "base": {
+        "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+        "bytes": 26873819
+      },
+      "candidate": {
+        "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+        "bytes": 26873819
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "observe",
+        "32"
+      ],
+      "base": {
+        "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+        "bytes": 210433034
+      },
+      "candidate": {
+        "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+        "bytes": 210433034
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "portable",
+        "32"
+      ],
+      "base": {
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "bytes": 17260699
+      },
+      "candidate": {
+        "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+        "bytes": 17260699
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "protocol",
+        "32"
+      ],
+      "base": {
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "bytes": 8343664
+      },
+      "candidate": {
+        "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+        "bytes": 8343664
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "sandbox-16-step",
+        "32"
+      ],
+      "base": {
+        "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+        "bytes": 8039178
+      },
+      "candidate": {
+        "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+        "bytes": 8039178
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "sandbox-16-bot",
+        "24"
+      ],
+      "base": {
+        "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+        "bytes": 54871500
+      },
+      "candidate": {
+        "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+        "bytes": 54871500
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-30-step",
+        "32"
+      ],
+      "base": {
+        "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+        "bytes": 20728651
+      },
+      "candidate": {
+        "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+        "bytes": 20728651
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-30-bot",
+        "16"
+      ],
+      "base": {
+        "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+        "bytes": 54020496
+      },
+      "candidate": {
+        "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+        "bytes": 54020496
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-100-step",
+        "16"
+      ],
+      "base": {
+        "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+        "bytes": 42173472
+      },
+      "candidate": {
+        "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+        "bytes": 42173472
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-100-bot",
+        "4"
+      ],
+      "base": {
+        "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+        "bytes": 59803592
+      },
+      "candidate": {
+        "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+        "bytes": 59803592
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-200-step",
+        "8"
+      ],
+      "base": {
+        "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+        "bytes": 41669943
+      },
+      "candidate": {
+        "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+        "bytes": 41669943
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-200-bot",
+        "2"
+      ],
+      "base": {
+        "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+        "bytes": 57425821
+      },
+      "candidate": {
+        "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+        "bytes": 57425821
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-500-step",
+        "4"
+      ],
+      "base": {
+        "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+        "bytes": 59311550
+      },
+      "candidate": {
+        "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+        "bytes": 59311550
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-500-bot",
+        "1"
+      ],
+      "base": {
+        "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+        "bytes": 78389779
+      },
+      "candidate": {
+        "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+        "bytes": 78389779
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "battledome-32-step",
+        "16"
+      ],
+      "base": {
+        "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+        "bytes": 17701194
+      },
+      "candidate": {
+        "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+        "bytes": 17701194
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "battledome-32-bot",
+        "4"
+      ],
+      "base": {
+        "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+        "bytes": 19456951
+      },
+      "candidate": {
+        "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+        "bytes": 19456951
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-128-step",
+        "16"
+      ],
+      "base": {
+        "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+        "bytes": 53280691
+      },
+      "candidate": {
+        "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+        "bytes": 53280691
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "official-128-bot",
+        "3"
+      ],
+      "base": {
+        "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+        "bytes": 60841865
+      },
+      "candidate": {
+        "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+        "bytes": 60841865
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "client-battledome-64",
+        "4"
+      ],
+      "base": {
+        "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+        "bytes": 36608905
+      },
+      "candidate": {
+        "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+        "bytes": 36608905
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "client-official-500",
+        "1"
+      ],
+      "base": {
+        "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+        "bytes": 82283629
+      },
+      "candidate": {
+        "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+        "bytes": 82283629
+      }
+    },
+    {
+      "binary": "perf_baseline",
+      "args": [
+        "shared-forager-a4-mean-8",
+        "16"
+      ],
+      "base": {
+        "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+        "bytes": 8549310
+      },
+      "candidate": {
+        "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+        "bytes": 8549310
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official500"
+      ],
+      "base": {
+        "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+        "bytes": 37938956
+      },
+      "candidate": {
+        "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+        "bytes": 37938956
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official500-half"
+      ],
+      "base": {
+        "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+        "bytes": 57556590
+      },
+      "candidate": {
+        "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+        "bytes": 57556590
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official500-legacy"
+      ],
+      "base": {
+        "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+        "bytes": 77137561
+      },
+      "candidate": {
+        "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+        "bytes": 77137561
+      }
+    },
+    {
+      "binary": "study_protocols",
+      "args": [
+        "official2281"
+      ],
+      "base": {
+        "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+        "bytes": 180734869
+      },
+      "candidate": {
+        "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+        "bytes": 180734869
+      }
+    }
+  ],
+  "wireMutations": [
+    {
+      "case": "official500",
+      "fullTraceMutationDetected": true,
+      "wirePayloadMutationDetected": true,
+      "candidateFrames": 317188,
+      "mutantFrames": 314678,
+      "sha256": "298032eea5138d888f780941668fa7912fe9dd9186b488bf9550f5d957b3db10",
+      "bytes": 37678174
+    },
+    {
+      "case": "official500-legacy",
+      "fullTraceMutationDetected": true,
+      "wirePayloadMutationDetected": true,
+      "candidateFrames": 1011810,
+      "mutantFrames": 995490,
+      "sha256": "2fca3fb5af76db8c37662a9698f7e21c33cb5abae43cf798d95785dac7c1c640",
+      "bytes": 76106770
+    }
+  ],
+  "documentation": {
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_documentation.py"
+    ],
+    "tests": 7,
+    "exit": 0
+  },
+  "builds": {
+    "base": {
+      "archiveCommit": "a1535902328475df3a1ce4002d7ef5c3f2d21041",
+      "archiveSha256": "320a95b477652b243f0566d92738b9e1fd421de1e2314661306daee92c9758cc",
+      "generatedRustAggregateSha256": "a9ab92b1f3886d6391a230217c0a2813c6dec8aa65f6008a591bf11badc96282",
+      "binaries": {
+        "perf_baseline": "0d40b3550984ad5b52f46c64a1709fefec4542e5781608e360c423f2d652efac",
+        "study_protocols": "be5a728b30d3d3b0d3949259e05345a478a25d026c29b08bbead86c7eee68af5",
+        "study_host": "3f0f06b3960c33163b2cdfbcd662857f24f68c46356c2e50205de94cdc20928f"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "portableCodegen": true,
+      "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "layout": "base"
+    },
+    "candidate": {
+      "archiveCommit": "245e960eb2cc8cc2071a488f3ca8068c4018b81b",
+      "archiveSha256": "1e9cd5c784fef6baacb3cdbf87520dfec9698d917fe982f44d82a2378e9eaca7",
+      "generatedRustAggregateSha256": "c5a3a44de50fedc19eb7ce4ab7b1a524efa70570492555bd0da1c497e08dc81d",
+      "binaries": {
+        "perf_baseline": "4f144a5346001b661bf5d9494f75473701dc4ae64b08b3ed9a7c79304469d30c",
+        "study_protocols": "7c1a307877ae52b5598b07d783b8893cc7e20669ad69a056e40f2acc7c22ec31",
+        "study_host": "499c5aab9ea9d73b589950484a1fd89cd10384e82914296fae666f8452c96fa7"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "portableCodegen": true,
+      "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "layout": "candidate"
+    },
+    "mutation": {
+      "archiveCommit": "245e960eb2cc8cc2071a488f3ca8068c4018b81b",
+      "archiveSha256": "1e9cd5c784fef6baacb3cdbf87520dfec9698d917fe982f44d82a2378e9eaca7",
+      "generatedRustAggregateSha256": "76c7195fc366295d678d6f38c4d438479d5ba4356a983956225415292ce33389",
+      "binaries": {
+        "perf_baseline": "100a44af810e5f92159bd9221b9bd241efbe812efc13a21d09e2b0e2a14fca05",
+        "study_protocols": "4928d29438b48d835825bfdabfacf7b9e68f0eaf6dbf1cd0918fec2499ad62d0",
+        "study_host": "a6c82e7f08af0d185140661578f8b77e69be5521e890679c90160a0669fb4ac7"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "portableCodegen": true,
+      "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "layout": "mutation"
+    }
+  },
+  "spot": {
+    "protocol": 19,
+    "warmTicks": 193000,
+    "windowTicks": 144,
+    "maintenanceTicksPerContinuation": 2,
+    "completeWarmStreamsEqual": true,
+    "warmBytes": {
+      "base": 5876276676,
+      "candidate": 5876276676
+    },
+    "warmSha256": {
+      "base": "e97aeb8d4579f0ed1d5228dc76cec361ed2151faeadc9e9fe7b40ac475e1a26c",
+      "candidate": "e97aeb8d4579f0ed1d5228dc76cec361ed2151faeadc9e9fe7b40ac475e1a26c"
+    },
+    "census": {
+      "anchors": 27610,
+      "food": 28897,
+      "living": 499,
+      "max": 271,
+      "mean": 55.33066132264529,
+      "p90": 176,
+      "p99": 247,
+      "prey": 20
+    },
+    "allSixCompleteContinuationStreamsEqual": true,
+    "receipts": [
+      {
+        "label": "proof-base-0",
+        "completeTraceSha256": "97a0369865d89fb498242856d21fffc34709b62cba73916adf3f8f6ab45bd0e3",
+        "wirePayloadSha256": "116860287b2a0b22eca9b5a005ab84ffcaedafe759e6617dc7d57aa0c4e4457b",
+        "frames": 29988,
+        "wireBytes": 777524,
+        "terminalValidated": true
+      },
+      {
+        "label": "proof-base-1",
+        "completeTraceSha256": "97a0369865d89fb498242856d21fffc34709b62cba73916adf3f8f6ab45bd0e3",
+        "wirePayloadSha256": "116860287b2a0b22eca9b5a005ab84ffcaedafe759e6617dc7d57aa0c4e4457b",
+        "frames": 29988,
+        "wireBytes": 777524,
+        "terminalValidated": true
+      },
+      {
+        "label": "proof-candidate-0",
+        "completeTraceSha256": "97a0369865d89fb498242856d21fffc34709b62cba73916adf3f8f6ab45bd0e3",
+        "wirePayloadSha256": "116860287b2a0b22eca9b5a005ab84ffcaedafe759e6617dc7d57aa0c4e4457b",
+        "frames": 29988,
+        "wireBytes": 777524,
+        "terminalValidated": true
+      },
+      {
+        "label": "proof-candidate-1",
+        "completeTraceSha256": "97a0369865d89fb498242856d21fffc34709b62cba73916adf3f8f6ab45bd0e3",
+        "wirePayloadSha256": "116860287b2a0b22eca9b5a005ab84ffcaedafe759e6617dc7d57aa0c4e4457b",
+        "frames": 29988,
+        "wireBytes": 777524,
+        "terminalValidated": true
+      },
+      {
+        "label": "proof-base-parent",
+        "completeTraceSha256": "97a0369865d89fb498242856d21fffc34709b62cba73916adf3f8f6ab45bd0e3",
+        "wirePayloadSha256": "116860287b2a0b22eca9b5a005ab84ffcaedafe759e6617dc7d57aa0c4e4457b",
+        "frames": 29988,
+        "wireBytes": 777524,
+        "terminalValidated": true
+      },
+      {
+        "label": "proof-candidate-parent",
+        "completeTraceSha256": "97a0369865d89fb498242856d21fffc34709b62cba73916adf3f8f6ab45bd0e3",
+        "wirePayloadSha256": "116860287b2a0b22eca9b5a005ab84ffcaedafe759e6617dc7d57aa0c4e4457b",
+        "frames": 29988,
+        "wireBytes": 777524,
+        "terminalValidated": true
+      }
+    ]
+  },
+  "newTimingPairs": 0,
+  "newTimingRequests": 0,
+  "finalDocumentation": {
+    "command": [
+      "/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_documentation.py"
+    ],
+    "tests": 7,
+    "exit": 0
+  }
+}
