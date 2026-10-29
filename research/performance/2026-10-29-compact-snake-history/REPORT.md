@@ -1,10 +1,13 @@
 # Compact occupied recipient snake histories
 
+The following study verdict is historical and unchanged. The separate
+[post-result maintainer decision](#maintainer-decision) adopts the layout.
+
 **Rejected under the frozen short-world gate.** Compact histories reduce
 mature-500 whole-window CPU in all ten protocol-specific pairs, with median
 paired ratios **0.8579 / 0.8199**, but three short controls exceed 1.02 in all
 five pairs. Production code remains unchanged; the complete implementation and
-oracle are retained in [rejected-bounded.patch](rejected-bounded.patch).
+oracle are retained in [measured-bounded.patch](measured-bounded.patch).
 
 The [memory diagnostic](../2026-10-29-simulation-memory/REPORT.md) identified
 sparse recipient histories as the strongest portable layout lead: hundreds of
@@ -107,6 +110,28 @@ fails in three short rows. Their shifts are small in absolute terms (roughly
 instrumentation overhead and were not attributed to a specific instruction or
 cache mechanism. The predeclared gate still rejects this implementation. There
 is no post-result threshold change, retry, layout tuning or runtime adoption.
+
+## Maintainer decision
+
+**Post-result adoption by the maintaining agent; not the study's verdict.**
+The maintaining agent overrides the adoption gate for #274 while preserving
+the frozen study's rejection, results and tables. The whole-window short-world
+costs are about 70 ns per tick at one seat and 1.6 µs at 50 protocol-13 seats,
+below 0.03% of the 7 ms tick budget. The target mature-500 world saves about
+265–400 µs per tick (14% stock, 18% protocol 13); young-500 saves about 20%.
+
+The maintaining agent judges those absolute short-world costs acceptable,
+citing the relative 0.6–1.0% short-world costs accepted for mature wins in
+[#252](https://github.com/NikitaMGrimm/slither-sim/pull/252) and
+[#255](https://github.com/NikitaMGrimm/slither-sim/pull/255), and the simpler
+single-vector structure compared with the previous two-vector layout.
+
+No retry, tuning or threshold change is applied to the study. Its verdict
+remains rejection under its own gate. The measured implementation is adopted
+on main after #273, with only a short sorted-merge explanation restored in the
+runtime source. `measured-bounded.patch` preserves the historical measured
+snapshot under its new name; it was previously `rejected-bounded.patch`.
+Integrated-head verification is recorded separately, without new timing.
 
 ## Method and provenance
 

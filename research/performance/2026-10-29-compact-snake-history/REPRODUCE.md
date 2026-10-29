@@ -1,5 +1,21 @@
 # Reproduce compact occupied histories
 
+## Post-result integrated adoption checks
+
+The maintaining agent adopts the measured implementation while preserving the
+original study's rejected verdict and every timing observation. For the
+integrated checks, archive current main as `base.tar` and the adopted PR head as
+`candidate.tar` in a fresh external directory, apply `harness.patch` there and
+copy [adoption.py](adoption.py) alongside it. Run `python3 adoption.py` on the
+guest with the same retained import paths (or bind them as described below).
+This repeats the focused oracle, all three runtime mutations and restoration,
+the full Rust group, 27 traces, wire mutation controls and documentation tests.
+It then compares stock complete warm streams through tick 193,000 and six
+144-tick continuations, spanning two food-maintenance cycles. It removes the
+timing request path from its proof-validator copy. No timing series is rerun.
+
+## Original measured study
+
 Use existing Rust 1.99, Python 3.11.4 or later, a C compiler, binutils, locked
 offline dependencies and permission for current-thread user PMU counters. No
 installation, system change, affinity or outside game server is needed. All
@@ -11,8 +27,9 @@ and candidate `d781ff000d2dfee10627ab1b8a4c07bfff3638c0`. Archive each with
 `git archive REV > ARM.tar` in a fresh external execution directory. Apply
 `harness.patch` there; its files are execution helpers, not production changes.
 The candidate's production change and oracle are already in its archive.
-The final PR is research-only: [rejected-bounded.patch](rejected-bounded.patch)
-also reconstructs that code and oracle on the base. Apply either pilot patch
+The original research-only delivery retained the measured code and oracle in
+`rejected-bounded.patch`, now [measured-bounded.patch](measured-bounded.patch).
+It reconstructs that code and oracle on the base. Apply either pilot patch
 on top of that bounded implementation to recover its container, reusing the
 same oracle. Reverse the pilot patch before switching to the other layout.
 Use `git apply --unidiff-zero` for the bounded patch and its reverse; its
@@ -115,8 +132,9 @@ their source files, transfer it and compare SHA-256. The selected public data
 and table calculator are sufficient to recompute the report's tables without
 those local-only archives.
 
-For final delivery checks, create `final-delivery.tar` with `git archive` of the
-research PR checkout, alongside the two measured-arm archives. Run
+For historical delivery checks, create `final-delivery.tar` with `git archive`
+of the original research-only checkout `e379ffd9`, which retains the original
+patch filename, alongside the two measured-arm archives. Run
 `python3 postchecks.py` from the helper patch in a fresh execution directory.
 It runs the seven documentation tests, independently recomputes the public
 tables and frozen gate, checks all three patch round trips and requires the

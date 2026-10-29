@@ -48,10 +48,12 @@
 
 ### Performance
 
-- A compact per-player snake-history layout was measured and rejected. It
-  reduced CPU by 14–18% in the fully grown 500-player offline fixture with
-  byte-identical output, but failed the frozen small-world regression gate.
-  The runtime remains unchanged; the study retains the attempted layouts
+- Each player's known-snake history now stores only occupied records in one
+  sorted vector. Output is byte-identical; the mature 500-player offline
+  fixture uses 14–18% less CPU. The maintaining agent adopted the layout after
+  overriding the study's small-world gate: its measured costs are about 70 ns
+  per tick at one player and 1.6 µs at 50 protocol-13 players. The original
+  study verdict and measurements remain unchanged
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-compact-snake-history/REPORT.md)).
 - Battledome spawn searches now skip groups of eight body edges that are
   provably too far from a candidate head. Each group's bounds are built only
