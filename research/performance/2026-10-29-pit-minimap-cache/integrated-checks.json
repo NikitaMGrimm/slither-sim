@@ -1,0 +1,77 @@
+{
+  "scope": "Integrated main #264 plus minimap implementation; validation timings are not benchmark results.",
+  "sourceCommit": "79b616df09f91b6e4fe0da4f09813f92929fbdba",
+  "command": "python tools/check.py rust",
+  "cargoBuildJobs": 1,
+  "rustTestThreads": 1,
+  "commands": [
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --workspace --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features parallel",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test -p slither-sim-ffi --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo check -p slither-sim-py --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo run --locked --example basic",
+      "exit": 0
+    }
+  ],
+  "logSha256": "34a5229dd5366c1924c8cd2a742fe84ff8cc66cd84896f08730bc611f0a2f20b",
+  "allPassed": true,
+  "documentation": {
+    "command": "python -B -m unittest discover -s tools -p test_documentation.py",
+    "tests": 7,
+    "exit": 0,
+    "logSha256": "2b539da5cf4ce11573e46164e6ec41231c2f015ba847b1c2125410726a2947db"
+  }
+}

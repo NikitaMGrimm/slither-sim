@@ -7,13 +7,7 @@ use super::{
     prey_visibility::PreyBounds,
     snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
 };
-use crate::{
-    Simulator,
-    client::{Minimap, encode},
-    model::Snake,
-    physics,
-    simulator::PickupItem,
-};
+use crate::{Simulator, client::encode, model::Snake, physics, simulator::PickupItem};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Rows the stock leaderboard shows.
@@ -580,10 +574,10 @@ impl SimulatorBackend {
             return Ok(None);
         }
         if map.is_none() {
-            *map = Some(MinimapBroadcast::new(Minimap::from_world(
-                &self.world,
-                self.config.minimap_side(),
-            )?));
+            *map = Some(MinimapBroadcast::new(
+                self.pit_projection
+                    .render_world(&self.world, self.config.minimap_side())?,
+            ));
         }
         let map = map.as_mut().expect("minimap was just constructed");
         let packet = map.packet19(connection.minimap_sent.as_ref())?;

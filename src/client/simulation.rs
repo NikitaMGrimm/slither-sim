@@ -67,6 +67,8 @@ mod remote;
 #[cfg(test)]
 mod rules_tests;
 mod snakes;
+#[cfg(test)]
+mod spawn_prefilter_tests;
 
 pub use config::{DeliveryProfile, SimulationConfig};
 pub(crate) use remote::RawSimulator;
@@ -111,6 +113,7 @@ pub struct SimulatorBackend {
     food_epoch: u64,
     /// Next minimap and leaderboard periods; see `broadcast::clock_due`.
     next_minimap: u64,
+    pit_projection: super::minimap::PitProjectionCache,
     /// Full U conversions live for one broadcast; recipients retain immutable
     /// decoded baselines independently of the broadcast-local packet cache.
     legacy_maps: crate::client::encode13::FullMapCache,
@@ -202,6 +205,7 @@ impl SimulatorBackend {
             food_index: FoodIndex::default(),
             food_epoch: 0,
             next_minimap: 1,
+            pit_projection: super::minimap::PitProjectionCache::default(),
             legacy_maps: crate::client::encode13::FullMapCache::default(),
             next_leaderboard: 1,
             prey_clocks: BTreeMap::new(),
@@ -456,7 +460,7 @@ impl SimulatorBackend {
 
     fn spawn_pose_waited(&mut self, slot: usize, waited: f64) -> Result<(Vec<Point>, f64), String> {
         let circular = self.world.config().spawn_radius.is_some();
-        let mut safety = None;
+        let mut safety: Option<spawn::Safety> = None;
         let mut floor = None;
         let mut open: Option<(f64, Vec<Point>, f64)> = None;
         let attempts = if circular {
@@ -476,6 +480,21 @@ impl SimulatorBackend {
                 x: angle.cos() * distance,
                 y: angle.sin() * distance,
             };
+            let fallback = circular
+                && waited >= 2.
+                && attempt < 256
+                && self.world.config().min_score.is_some();
+            // All three draws have happened. Only skip constructing rings that
+            // are already rejected, outside the directional fallback window.
+            // The first body still initializes exact segment counts/geometry;
+            // rejects_ring_head preserves later construction errors as well.
+            if !fallback
+                && safety
+                    .as_ref()
+                    .is_some_and(|query| query.rejects_ring_head(head))
+            {
+                continue;
+            }
             // Local policy: official joins keep a median 925 units from
             // visible bodies, but three came within 550-600.
             let (body, heading) = self
@@ -502,7 +521,7 @@ impl SimulatorBackend {
                 return Ok((body, heading));
             }
             if circular {
-                if waited >= 2. && attempt < 256 && self.world.config().min_score.is_some() {
+                if fallback {
                     let query = floor.get_or_insert_with(|| {
                         spawn::Safety::departure_floor(&self.world, slot, body.len())
                     });

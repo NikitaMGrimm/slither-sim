@@ -28,6 +28,18 @@
 
 ### Performance
 
+- Battledome spawn searches no longer build a candidate body whose head spot
+  is already blocked, since the search would reject it anyway. Spawn positions,
+  random draws and admission rules are unchanged, and output is byte-identical.
+  In a synthetic overload with 72 players waiting to spawn, where every search
+  tries all 4,096 candidates, the host uses 36.7% fewer instructions
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-ring-prefilter/REPORT.md)).
+- Battledome's pit minimap now reuses its outline mask between updates
+  instead of recomputing each cell's distance from the pit edge. Output is
+  byte-identical. In a synthetic 80-player check, minimap ticks use about 52%
+  fewer instructions (about 0.6% over all ticks); the first map, and any map
+  after the outline changes, costs about 13% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-pit-minimap-cache/REPORT.md)).
 - When a player's view moves, the host keeps its existing reference to each
   unchanged food sector instead of dropping and re-taking it. Output is
   byte-identical. In a fully grown 500-player world, food-update ticks run
