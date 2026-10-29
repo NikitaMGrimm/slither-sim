@@ -1068,10 +1068,7 @@
         "study_fixed.exe": "669fc67c5fb9968d71be1caf07c00ffbe6d92ac503bdebcb4618b3cd988a7f32",
         "study_protocols.exe": "703f7415bfe7616279cbb72c717ffce6c461cf9e44d605668ba501b9cee1a4af"
       },
-      "generatedRustSourcesSha256": "7f3b01f3eddf52ab408aadc50029d7233cb5875eceb77ec60bce09fb7f629db9",
-      "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
-      "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
-      "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
+      "generatedRustSourcesSha256": "7f3b01f3eddf52ab408aadc50029d7233cb5875eceb77ec60bce09fb7f629db9"
     },
     "candidate": {
       "commit": "e51e5bef8182a60a1ea488308311379d167c929b",
@@ -1081,10 +1078,7 @@
         "study_fixed.exe": "e5f18239ed8bb4714cb392f63682a8b9421a08f2126622d09d0bb2ea4547a51b",
         "study_protocols.exe": "d0c264f2fc3c8f603e4a42f59f570ed41068665dc8f208e4422d2f0e9cb1f010"
       },
-      "generatedRustSourcesSha256": "4f4957cec72edeb212f90006ebc043db758616e00f0b58c55bdaaecba8c97e32",
-      "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
-      "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
-      "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
+      "generatedRustSourcesSha256": "4f4957cec72edeb212f90006ebc043db758616e00f0b58c55bdaaecba8c97e32"
     },
     "mutation": {
       "commit": "e51e5bef8182a60a1ea488308311379d167c929b",
@@ -1094,10 +1088,13 @@
         "study_fixed.exe": "8a8368030431d0ad0a11ca63313a0425d8f7204b3dfee1e5acfe36d626d7b8a7",
         "study_protocols.exe": "0ddaf49311ed21a9ffc137570c0c59f14cf69e71f82e15eee36ab20cf42018f5"
       },
-      "generatedRustSourcesSha256": "4e433f4c682b1c274eb2189fd2039b28df1ed2764c15ffb422713ce7e7317727",
-      "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
-      "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
-      "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
+      "generatedRustSourcesSha256": "4e433f4c682b1c274eb2189fd2039b28df1ed2764c15ffb422713ce7e7317727"
     }
+  },
+  "preparation": {
+    "revision": "fbe5b453",
+    "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
+    "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
+    "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
   }
 }

@@ -1,0 +1,182 @@
+{
+  "scope": "Offline local validation of retained sorted-vector marker coverage; no performance measurements.",
+  "baseline": "cc1bb1e9",
+  "candidate": "46823eeadda95d06001f7ba72e4a099f1efbb5b6",
+  "cargoJobsAtMost": 2,
+  "rustTestThreads": 1,
+  "offlineDependencies": true,
+  "fullRustCommands": [
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --workspace --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features parallel",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test -p slither-sim-ffi --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo check -p slither-sim-py --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo run --locked --example basic",
+      "exit": 0
+    }
+  ],
+  "focused": [
+    {
+      "label": "coverage",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-j",
+        "2",
+        "--lib",
+        "affected_sectors_cover_growth_shrink_overlap_and_exact_expiry"
+      ],
+      "exit": 0,
+      "expected": 0
+    },
+    {
+      "label": "coverage-mutation",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-j",
+        "2",
+        "--lib",
+        "affected_sectors_cover_growth_shrink_overlap_and_exact_expiry"
+      ],
+      "exit": 101,
+      "expected": 101
+    },
+    {
+      "label": "coverage-restored",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-j",
+        "2",
+        "--lib",
+        "affected_sectors_cover_growth_shrink_overlap_and_exact_expiry"
+      ],
+      "exit": 0,
+      "expected": 0
+    },
+    {
+      "label": "food",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-j",
+        "2",
+        "--lib",
+        "client::simulation::food"
+      ],
+      "exit": 0,
+      "expected": 0
+    },
+    {
+      "label": "pit_tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-j",
+        "2",
+        "--lib",
+        "client::simulation::pit_tests"
+      ],
+      "exit": 0,
+      "expected": 0
+    },
+    {
+      "label": "protocol13_tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-j",
+        "2",
+        "--lib",
+        "client::simulation::protocol13_tests"
+      ],
+      "exit": 0,
+      "expected": 0
+    }
+  ],
+  "logs": {
+    "coverage-mutation.log": "8a06cb8235a92d042f8100948a14d720c2bfb738264d8977a5918ac5cfe4e6d8",
+    "coverage-restored.log": "7f3f8cb54d89628f62a6bc291f82133cfd29b819f5bf169cb2f0f34fbf3133b2",
+    "coverage.log": "09aa03abbd72eb55a52a561aa27a7c01d499b264e363fca1e5f72e6a6291839b",
+    "food.log": "fc557a8a2a5f41cd10228f80a951b27b2fad7935fe5f973452e8851545c9925a",
+    "pit_tests.log": "cf9806fa74dc430757ba3b3b9c71408e22cedc7ffb0e2ef4b9b528af08ca5220",
+    "protocol13_tests.log": "969bf8419ad391c747a59b72ba9cd5a8ee65f9da951a72a61e5161b9a88d468e",
+    "rust-group.log": "3c673781c827416a7c62ac085c4cad0d1e1efa384ba94bf38facbeb620752b1f",
+    "documentation.log": "4f355c7561a929931e513f6212381bfa35e3ab919d56fdbbf0488c124608fa07"
+  },
+  "sshGuestUsed": false,
+  "pmuRun": false,
+  "focusedMutationDetected": true,
+  "mutatedSourceSha256": "672ff5604d13d9c358142f9824e4a8d72b552120dd3dbd26d2c8d85e8b356ffb",
+  "documentation": {
+    "command": "python -B -m unittest discover -s tools -p test_documentation.py",
+    "tests": 7,
+    "exit": 0,
+    "log": "documentation.log"
+  }
+}

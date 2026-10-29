@@ -10,7 +10,7 @@ root=Path(sys.argv[3]).resolve();arm=sys.argv[4]
 text=prior.read_text()
 for old,new in [
     ("p=source/'src/client/minimap.rs';payload=p.read_text()","p=source/'src/client/simulation/markers.rs';payload=p.read_text()"),
-    ("old='pit / world.radius() * side as f64 / 2.';assert payload.count(old)>=1","old='self.affected.contains(&sector)';assert payload.count(old)==1"),
+    ("old='pit / world.radius() * side as f64 / 2.';assert payload.count(old)>=1","old='self.affected.binary_search(&sector).is_ok()';assert payload.count(old)==1"),
     ("payload.replace(old,old+' * 0.98')","payload.replace(old,old+' && false')"),
 ]:
     assert text.count(old)==1,old

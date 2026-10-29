@@ -1,0 +1,328 @@
+{
+  "scope": "Untimed synthetic operation census; not CPU, instruction or allocation counts.",
+  "qualificationRef": "local-current.json",
+  "qualificationSha256": "9c03691109841ad1ab8b3d10f4d4b7ea1bbc3cfd960567150b628061716fe129",
+  "counterNames": [
+    "sectorVisits",
+    "overlayCalls",
+    "emptyOverlays",
+    "nonemptyOverlays",
+    "coverageQueries",
+    "coverageInputKeys",
+    "coverageUniqueKeys"
+  ],
+  "harnesses": {
+    "count_work.py": "680e5c497d7fe1b7cf6918e6b6ce8f3abfd32934e7a29ebd948241b8d11d3129",
+    "work_counts.rs": "411dbb64992ecb9c4cb63ce72d408b899304d02b0325f40cb9e7d8c253163157"
+  },
+  "arms": {
+    "base": {
+      "qualifiedArm": "base",
+      "sourceManifestSha256": "459cda17e167a2394e2add091f8fd9277b403f36634439b6769131e827c6d280",
+      "binarySha256": "be60120dd9601c17214e5812c68b03af3d597d0536619c23e7d921155a03819e"
+    },
+    "candidate": {
+      "qualifiedArm": "candidate",
+      "sourceManifestSha256": "3ccc344cb495ae85a6ea0d061dd765054809f6c6decd618d712c0570002358b9",
+      "binarySha256": "f39158ab48017a65e1d9db62b493f3186761eb2fbdb2f6ef428bb580989c301e"
+    }
+  },
+  "rows": {
+    "markers-19": {
+      "base": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 694,
+            "overlayCalls": 694,
+            "emptyOverlays": 468,
+            "nonemptyOverlays": 226,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "marker": {
+            "ticks": 5,
+            "sectorVisits": 585,
+            "overlayCalls": 585,
+            "emptyOverlays": 407,
+            "nonemptyOverlays": 178,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "other": {
+            "ticks": 355,
+            "sectorVisits": 109,
+            "overlayCalls": 109,
+            "emptyOverlays": 61,
+            "nonemptyOverlays": 48,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "a2de92079a0848007b1c1aafe7e67ef620d90c5f6488c16d8f269e86cf8aa246",
+        "traceBytes": 2729706
+      },
+      "candidate": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 694,
+            "overlayCalls": 295,
+            "emptyOverlays": 69,
+            "nonemptyOverlays": 226,
+            "coverageQueries": 585,
+            "coverageInputKeys": 944,
+            "coverageUniqueKeys": 350
+          },
+          "marker": {
+            "ticks": 5,
+            "sectorVisits": 585,
+            "overlayCalls": 186,
+            "emptyOverlays": 8,
+            "nonemptyOverlays": 178,
+            "coverageQueries": 585,
+            "coverageInputKeys": 944,
+            "coverageUniqueKeys": 350
+          },
+          "other": {
+            "ticks": 355,
+            "sectorVisits": 109,
+            "overlayCalls": 109,
+            "emptyOverlays": 61,
+            "nonemptyOverlays": 48,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "a2de92079a0848007b1c1aafe7e67ef620d90c5f6488c16d8f269e86cf8aa246",
+        "traceBytes": 2729706
+      }
+    },
+    "markers-13": {
+      "base": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 694,
+            "overlayCalls": 694,
+            "emptyOverlays": 468,
+            "nonemptyOverlays": 226,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "marker": {
+            "ticks": 5,
+            "sectorVisits": 585,
+            "overlayCalls": 585,
+            "emptyOverlays": 407,
+            "nonemptyOverlays": 178,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "other": {
+            "ticks": 355,
+            "sectorVisits": 109,
+            "overlayCalls": 109,
+            "emptyOverlays": 61,
+            "nonemptyOverlays": 48,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "fead0a6de0cb42f940a8e8a87ca1569d1131e9a3aacb187240dca3fb2746ecd7",
+        "traceBytes": 5478893
+      },
+      "candidate": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 694,
+            "overlayCalls": 295,
+            "emptyOverlays": 69,
+            "nonemptyOverlays": 226,
+            "coverageQueries": 585,
+            "coverageInputKeys": 944,
+            "coverageUniqueKeys": 350
+          },
+          "marker": {
+            "ticks": 5,
+            "sectorVisits": 585,
+            "overlayCalls": 186,
+            "emptyOverlays": 8,
+            "nonemptyOverlays": 178,
+            "coverageQueries": 585,
+            "coverageInputKeys": 944,
+            "coverageUniqueKeys": 350
+          },
+          "other": {
+            "ticks": 355,
+            "sectorVisits": 109,
+            "overlayCalls": 109,
+            "emptyOverlays": 61,
+            "nonemptyOverlays": 48,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "fead0a6de0cb42f940a8e8a87ca1569d1131e9a3aacb187240dca3fb2746ecd7",
+        "traceBytes": 5478893
+      }
+    },
+    "minimap-19": {
+      "base": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "marker": {
+            "ticks": 0,
+            "sectorVisits": 0,
+            "overlayCalls": 0,
+            "emptyOverlays": 0,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "other": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+        "traceBytes": 538374
+      },
+      "candidate": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "marker": {
+            "ticks": 0,
+            "sectorVisits": 0,
+            "overlayCalls": 0,
+            "emptyOverlays": 0,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "other": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+        "traceBytes": 538374
+      }
+    },
+    "minimap-13": {
+      "base": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "marker": {
+            "ticks": 0,
+            "sectorVisits": 0,
+            "overlayCalls": 0,
+            "emptyOverlays": 0,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "other": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+        "traceBytes": 1054862
+      },
+      "candidate": {
+        "groups": {
+          "all": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "marker": {
+            "ticks": 0,
+            "sectorVisits": 0,
+            "overlayCalls": 0,
+            "emptyOverlays": 0,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          },
+          "other": {
+            "ticks": 360,
+            "sectorVisits": 81,
+            "overlayCalls": 81,
+            "emptyOverlays": 81,
+            "nonemptyOverlays": 0,
+            "coverageQueries": 0,
+            "coverageInputKeys": 0,
+            "coverageUniqueKeys": 0
+          }
+        },
+        "traceSha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+        "traceBytes": 1054862
+      }
+    }
+  }
+}
