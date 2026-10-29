@@ -64,11 +64,15 @@ Run the earlier catalog/host trace matrix, queued fixed parity and both protocol
 wire controls. The inherited
 [write_gates.py](../2026-10-29-spawn-ring-prefilter/write_gates.py) consumes the
 completed correctness/build inventory and 15-command Rust receipt, writing
-`OUTPUT/required-checks-pass.json` and `OUTPUT/parity-pass.json`. It does not
-produce the additional live-admission receipt.
+`OUTPUT/required-checks-pass.json` and `OUTPUT/parity-pass.json`. It records
+only pass flags and does not produce the additional live-admission receipt.
 
 [prepare_counting.py](prepare_counting.py) exposes the original private
-controllers' two remaining steps. Its `parity` command runs
+controllers' remaining steps. Its `gates` command runs write_gates.py and binds
+its receipts to the hashes of the fixture and each arm's `study_live` and
+`pins.json` in `OUTPUT/gates-bound.json`; `parity` and `pins` refuse to run if
+any of them changed afterwards. The recorded run called write_gates.py directly,
+so its archive has no `gates-bound.json`. The `parity` command runs
 `OUTPUT/ARM/bin/study_live admission OUTPUT/../fixture ROW 3` for both arms and
 both refused/successful rows. It checks repeated results, unchanged world state
 and complete raw byte equality (including result bodies/errors and RNG), then
@@ -81,7 +85,7 @@ must pass before freezing. These commands create fresh files exclusively;
 restore archived receipts/manifests unchanged when replaying retained evidence.
 
 ```sh
-python ../2026-10-29-spawn-ring-prefilter/write_gates.py OUTPUT CORRECTNESS_JSON RUST_RECEIPTS_JSON
+python prepare_counting.py OUTPUT gates CORRECTNESS_JSON RUST_RECEIPTS_JSON
 python prepare_counting.py OUTPUT parity
 python prepare_counting.py OUTPUT pins
 python run_pairs.py OUTPUT ../2026-10-28-broadcast-distance/reproduce.py 19 live-refused

@@ -1,6 +1,8 @@
-"""Expose the retained private controllers' live-parity and pin-freezing steps.
+"""Expose the retained private controllers' gate, live-parity and pin-freezing steps.
 
-Run on the remote builder: prepare_counting.py OUTPUT {parity,pins}.
+Run on the remote builder:
+  prepare_counting.py OUTPUT gates CORRECTNESS_JSON RUST_RECEIPTS_JSON
+  prepare_counting.py OUTPUT {parity,pins}
 Creates fresh receipts only; never replaces an archived receipt or manifest.
 """
 from pathlib import Path
@@ -12,10 +14,8 @@ import sys
 
 root = Path(sys.argv[1]).resolve()
 mode = sys.argv[2]
-assert mode in ["parity", "pins"]
+assert mode in ["gates", "parity", "pins"]
 fixture = root.parent / "fixture"
-for name in ["required-checks-pass.json", "parity-pass.json"]:
-    assert json.loads((root / name).read_text())["passed"]
 
 
 def sha(path):
@@ -24,7 +24,7 @@ def sha(path):
 
 
 def tested():
-    # The exact files the parity traces ran; pins mode refuses any later change.
+    # The exact files the gate and parity checks ran; later steps refuse any change.
     return {
         "fixture": {"worldSha256": sha(fixture / "world.json"),
                     "metadataSha256": sha(fixture / "fixture.json")},
@@ -33,6 +33,26 @@ def tested():
                  for arm in ["base", "candidate"]},
     }
 
+
+if mode == "gates":
+    # The inherited write_gates.py records only pass flags, so bind its receipts
+    # here to the arms it checked; later steps refuse a rebuilt arm.
+    receipts = ["required-checks-pass.json", "parity-pass.json", "gates-bound.json"]
+    assert not any((root / name).exists() for name in receipts), "receipts exist"
+    files = tested()
+    subprocess.run([sys.executable, str(Path(__file__).parent.parent
+                    / "2026-10-29-spawn-ring-prefilter/write_gates.py"),
+                    str(root), *sys.argv[3:5]], check=True)
+    assert tested() == files, "artifacts changed during gate checks"
+    with (root / "gates-bound.json").open("x") as output:
+        json.dump(files, output, indent=2)
+        output.write("\n")
+    sys.exit()
+
+for name in ["required-checks-pass.json", "parity-pass.json"]:
+    assert json.loads((root / name).read_text())["passed"]
+assert json.loads((root / "gates-bound.json").read_text()) == tested(), \
+    "binary, pins or fixture changed after the gate checks"
 
 if mode == "parity":
     files = tested()
