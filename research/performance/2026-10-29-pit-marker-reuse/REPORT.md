@@ -26,8 +26,9 @@ disappearing generations and expiry at adjacent floats/exact equality. Every
 changed overlay must be covered; unchanged updates clear the hints. Dropping
 all hints fails that oracle. After source restoration, the existing full-union
 oracle still matches the entire changed-hint inventory and both listing views.
-Existing food/listing, pit and protocol-13 regressions pass locally. The full
-Rust-group receipt is recorded when its serial run completes.
+Existing food/listing, pit and protocol-13 regressions pass locally. All 15 required
+Rust-group commands and seven documentation tests pass; see
+[verification](verification.json).
 
 All 23 catalog and six host traces compare complete bytes and terminal records.
 The latter include four historical stock/mixed/protocol-13/2,281-seat fixtures
@@ -55,7 +56,7 @@ separate from these production-source correctness pins.
 
 ## Remaining evidence
 
-Finish the serial full Rust group and final common-fixture qualification. Only
+Finish final common-fixture qualification. Only
 after the maintaining agent releases the SSH guest, run native full-byte gates,
 repeated-fork/direct-parent proofs and five alternating instructions:u pairs,
 with marker/food/minimap and slowest-CPU-1% groups separate. Report CPU

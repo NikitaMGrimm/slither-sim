@@ -15,3 +15,8 @@
   blocked further evidence collection. Fixed the shared research harness (on
   its own branch), added an explicit 80-decorated-viewer gate and prepared a
   fresh run. The failed sources, binaries and partial wire outputs are retained.
+
+- All 31 complete byte comparisons and both marker-hint wire mutations passed
+  after enabling stock decorations. All 15 full Rust-group commands passed
+  serially with one Cargo job/test thread; seven documentation tests passed.
+  Production Rust/Cargo files match the selected trace archive exactly.
