@@ -15,6 +15,13 @@
 
 ### Performance
 
+- Skip a player's periodic food-sector cleanup until a retained sector can
+  expire, preserving output byte for byte. In the mature 500-player fixture,
+  food-update ticks use 3.5–3.7% fewer instructions, with about 0.15% more on
+  other ticks and nearly unchanged total work. CPU-time and tail improvements
+  remain unconfirmed
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-subscription-cleanup/REPORT.md)).
+
 - On the food-update tick every 504 ms, the host now works out each sector's
   food changes once and shares them with every player holding the same
   previous view, instead of recomputing them for each player. Output is
