@@ -7,6 +7,12 @@
 - Exact pit minimap projection reuse with independent threshold oracles and
   complete protocol-13/19 byte-trace checks
   ([evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-pit-minimap-cache/REPORT.md)).
+- A follow-up Battledome check with the bots boosting almost all the time,
+  the way Battledome players do. 80 players still play smoothly, with
+  sub-millisecond jitter. At 160 there are occasional slow ticks, and at 320
+  the server falls behind and respawns take over a second. Searching for safe
+  spawn spots takes most of the time in the slowest ticks
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-boost/REPORT.md)).
 - A Battledome check on one core of an AWS c7a.medium, with real WebSocket
   bots on a second machine, from 80 to 640 players. At 80 the median tick
   takes 1.1 ms. Up to 320 players the slowest tick stays under 7.5 ms, with no
