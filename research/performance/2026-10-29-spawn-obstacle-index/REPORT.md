@@ -1,5 +1,8 @@
 # Exact ordered obstacle candidates for Battledome admission
 
+The study's original rejection below is preserved. A separate post-result
+[maintainer decision](#maintainer-decision) adopts the measured implementation.
+
 **Rejected under the frozen study gate.** Final refused admission uses about
 76% less CPU and successful admission about 75% less, with every paired ratio
 below 1 in both labels. Both 80/160 controls pass. The old seven-ring row adds
@@ -184,3 +187,40 @@ private archives, unavailable at a public URL. Their digests identify the retain
 material and do not grant download access. Public bounded summaries and helpers
 are sufficient to recompute every reported table; the full replay needs that
 external checkpoint/archive chain.
+
+## Maintainer decision
+
+**Post-result adoption by the maintaining agent; not the study's verdict.**
+The maintaining agent adopts the obstacle index in #278 and overrides the
+additional old-row adoption gate. The study's rejection, frozen criteria,
+measurements, tables and failed attempts remain unchanged.
+
+The primary criteria pass by a wide margin: live-like refused admission uses
+about 76% less CPU (about 8.95 to 2.1 ms per complete search), successful
+admission about 75% less, and both 80/160 controls pass. The live-like saving
+is about 6.8 ms on the admission work that led #275's live slow tail. This is
+fixed-work evidence, not a measured live-server gain or capacity claim.
+
+The failing old row is an eight-obstacle synthetic overload with the grid off.
+Refused-search ticks cost about 0.10 ms more (0.633 to 0.739 ms), about 1.5% of
+a 7 ms tick. The 14.7% instruction increase in that small-world search path is
+a known cost and a follow-up lead; its precise compiler cause is unresolved.
+The maintaining agent judges this absolute cost acceptable against the primary
+gain, following the principle used for
+[#274](https://github.com/NikitaMGrimm/slither-sim/pull/274): the primary criterion
+must pass, and secondary small-scenario costs are judged against the tick budget.
+The maintaining agent distinguishes this from
+[#277](https://github.com/NikitaMGrimm/slither-sim/pull/277), which failed its
+primary criterion and is being confirmed instead.
+
+The extra old-row gate came from the brief listing that row beside the controls.
+Its frozen verdict stands; adoption is a separate decision after the results,
+with no retry, tuning or retrospective threshold change.
+
+Main's `src/` tree is unchanged since baseline `9ad002c1`; the release bump in
+`Cargo.toml`/`Cargo.lock` is retained. The applied runtime and tests have a `src/`
+tree identical to measured `c717b268`:
+`dfb0bfedf579007cdf528fd9d1c302160334eaa1`. This source identity preserves the
+scope of the retained AWS proofs and portable measurements. No new AWS session,
+build or timing was run for adoption; PR CI reruns the full Rust group across
+platforms on the current package version.

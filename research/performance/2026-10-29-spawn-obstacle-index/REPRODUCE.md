@@ -5,7 +5,9 @@ Read the frozen [plan](PLAN.md), [attempts](ATTEMPTS.md) and [report](REPORT.md)
 The external checkpoint, full logs, source manifests, binaries and complete
 traces are retained in verified private archives. Public selected summaries
 pin those archives and instrumented sources without repeating per-file maps.
-The study PR contains no production changes. Fetch the
+The study was initially published without production changes. The separate
+[maintainer decision](REPORT.md#maintainer-decision) now adopts the identical
+measured source in #278 without new builds or timing. Fetch the
 [`perf/spawn-obstacle-index` prototype branch](https://github.com/NikitaMGrimm/slither-sim/tree/perf/spawn-obstacle-index)
 for source and oracle tests: `98371b98` includes the final evidence helpers and
 has the same production Rust as measured runtime `c717b268`.
