@@ -42,6 +42,11 @@ python3 retained-profile-driver.py
 python3 retained-profile-reduce.py
 ```
 
+Run [attribution-tables.py](attribution-tables.py) beside the selected profile,
+site and counter JSON files to recompute the published scope shares and medians.
+The source ranges are pinned to the generated diagnostic tree in
+`attribution-build.json`, not to subsequent runtime line numbers.
+
 The driver warms one complete backend per protocol through tick 193,000 and
 forks each 1,080-tick window. It collects three counter-only and three sampled
 windows for cycles, L1d and dTLB, with instructions alongside each. Actual
@@ -109,6 +114,12 @@ python3 compact-time-primary.py
 python3 retained-select-primary.py
 ```
 
+Copy and run [select-proofs.py](select-proofs.py) in the execution directory
+after the selector to collect the actual prerequisite, trace and mutation
+receipts as `proofs.json`. It byte-checks the restored oracle source against the
+candidate archive and requires complete warm/six-continuation proofs on all
+ten cohorts.
+
 No extra guest commands, builds, checks or reductions run during counted windows.
 The reused controller records redacted full process commands at every boundary.
 Each row/protocol has one discarded AB, then five AB/BA/AB/BA/AB pairs. The
@@ -131,3 +142,12 @@ inventories outside Git. Before pruning task-owned files, archive them, verify
 members against their source files, transfer the archive and verify its SHA-256.
 Selected observations and table calculations belong beside the report; no
 per-file source-hash maps or duplicated earlier harnesses are needed.
+
+For final delivery checks, archive the completed PR checkout as
+`final-delivery.tar` alongside the measured-arm archives and copy
+[postchecks.py](postchecks.py) there. Run `python3 postchecks.py` after timing.
+It runs the seven documentation tests, independently recomputes every selected
+table and the frozen gate, and compares both final runtime files against the
+measured arm. If rejected, it additionally checks the retained patch in both
+directions against the two measured archives. It neither rebuilds nor retimes
+the arms. `postprocessing-checks.json` records the commands and outcomes.

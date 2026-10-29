@@ -48,6 +48,12 @@
 
 ### Performance
 
+- A post-compact-history study tests contiguous retained-sector keys and exact
+  timestamps. Fully grown 500-player food-update ticks use 6.4–6.9% fewer
+  instructions, with lower CPU in every pair, but whole-window CPU is mixed
+  and young protocol-13 worlds exceed the preset +10 µs/tick control limit.
+  The prototype is rejected and kept as a patch; runtime behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-retained-sector-layout/REPORT.md)).
 - Each player's record of the snakes it has been told about now keeps only
   those snakes, in one sorted list, instead of a slot for every snake in the
   world. Output is byte-identical. In a fully grown 500-player world, ticks

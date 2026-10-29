@@ -1207,7 +1207,7 @@ mod tests {
                 reference_updates(
                     &mut expected,
                     &mut reference,
-                    &interest.subscribed().iter().copied().collect(),
+                    interest.subscribed(),
                     &sectors,
                     &eaters,
                 );
@@ -1305,13 +1305,7 @@ mod tests {
                 let mut actual = Vec::new();
                 let mut expected = Vec::new();
                 food_updates(&mut actual, held, &interest, table, &changes, &eaters);
-                reference_updates(
-                    &mut expected,
-                    oracle,
-                    &interest.subscribed().iter().copied().collect(),
-                    table,
-                    &eaters,
-                );
+                reference_updates(&mut expected, oracle, interest.subscribed(), table, &eaters);
                 assert_eq!(actual, expected, "step={step}");
                 assert_eq!(
                     held.entries.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
@@ -1409,7 +1403,7 @@ mod tests {
             reference_updates(
                 &mut expected,
                 &mut reference,
-                &interest.subscribed().iter().copied().collect(),
+                interest.subscribed(),
                 &backend.decorated_food_sectors,
                 &backend.food_eaters,
             );

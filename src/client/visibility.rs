@@ -6,9 +6,10 @@
 
 use super::encode;
 use crate::model::Point;
-#[cfg(test)]
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 const HEADING_LEAD: f64 = 100.;
 const RETENTION_SECONDS: f64 = 2.6;
@@ -17,15 +18,13 @@ pub(super) const CLEANUP_SECONDS: f64 = 0.504;
 /// Recipient state, reset with its connection rather than shared with the world.
 #[derive(Clone, Debug, Default)]
 pub(super) struct SectorInterest {
-    /// Ascending unique membership keys, shared with the timestamp vector.
-    subscribed: Vec<[u8; 2]>,
+    subscribed: BTreeSet<[u8; 2]>,
     // Held food listings share this identity, avoiding a key-by-key comparison
     // on every broadcast. Replace it only when membership actually changes.
     revision: Arc<()>,
-    /// Exact stored times parallel to `subscribed`, without tree nodes or a
-    /// duplicate key set. Current-stencil sectors were last seen at `touched`;
-    /// their stored values may be older.
-    last_seen: Vec<f64>,
+    /// Keys are exactly the subscribed sectors. Sectors of the current stencil
+    /// were last seen at `touched`; their stored values may be older.
+    last_seen: BTreeMap<[u8; 2], f64>,
     /// Minimum stored time outside the current stencil, with a sector witness.
     /// Current sectors use `touched`, so their older stored times do not count.
     oldest: Option<([u8; 2], f64)>,
@@ -56,7 +55,7 @@ impl SectorInterest {
             let refresh_oldest = self.oldest.is_some_and(|(sector, _)| current(sector));
             if let Some(previous) = self.center {
                 for sector in stencil(previous) {
-                    self.set_seen(sector, self.touched);
+                    self.last_seen.insert(sector, self.touched);
                     // Existing non-current times cannot exceed the previous
                     // touch, so only an empty minimum needs a new witness.
                     if self.oldest.is_none() && !current(sector) {
@@ -65,14 +64,15 @@ impl SectorInterest {
                 }
             }
             for sector in stencil([cx, cy]) {
-                changed |= self.set_seen(sector, now);
+                changed |= self.subscribed.insert(sector);
+                self.last_seen.insert(sector, now);
             }
             self.center = Some([cx, cy]);
             // Only a re-entering minimum can invalidate the witness. The old
             // stencil above becomes non-current at its previous touch time.
             if refresh_oldest {
                 self.oldest = None;
-                for (&sector, &seen) in self.subscribed.iter().zip(&self.last_seen) {
+                for (&sector, &seen) in &self.last_seen {
                     if !current(sector) {
                         note_oldest(&mut self.oldest, sector, seen);
                     }
@@ -95,30 +95,20 @@ impl SectorInterest {
                 .oldest
                 .is_some_and(|(_, oldest)| now - oldest > RETENTION_SECONDS)
             {
-                self.oldest = None;
-                let mut kept = 0;
-                for read in 0..self.subscribed.len() {
-                    let sector = self.subscribed[read];
-                    let seen = self.last_seen[read];
-                    let keep = if current(sector) {
+                let subscribed = &mut self.subscribed;
+                let oldest = &mut self.oldest;
+                *oldest = None;
+                self.last_seen.retain(|sector, last_seen| {
+                    if current(*sector) {
                         true
-                    } else if now - seen <= RETENTION_SECONDS {
-                        note_oldest(&mut self.oldest, sector, seen);
+                    } else if now - *last_seen <= RETENTION_SECONDS {
+                        note_oldest(oldest, *sector, *last_seen);
                         true
                     } else {
-                        changed = true;
+                        changed |= subscribed.remove(sector);
                         false
-                    };
-                    if keep {
-                        if kept != read {
-                            self.subscribed[kept] = sector;
-                            self.last_seen[kept] = seen;
-                        }
-                        kept += 1;
                     }
-                }
-                self.subscribed.truncate(kept);
-                self.last_seen.truncate(kept);
+                });
             }
         }
         if changed {
@@ -126,23 +116,7 @@ impl SectorInterest {
         }
     }
 
-    /// Keep keys and exact times at matching indexes. Old-stencil keys already
-    /// exist; newly entered keys are inserted in wire order.
-    fn set_seen(&mut self, sector: [u8; 2], seen: f64) -> bool {
-        match self.subscribed.binary_search(&sector) {
-            Ok(index) => {
-                self.last_seen[index] = seen;
-                false
-            }
-            Err(index) => {
-                self.subscribed.insert(index, sector);
-                self.last_seen.insert(index, seen);
-                true
-            }
-        }
-    }
-
-    pub(super) fn subscribed(&self) -> &[[u8; 2]] {
+    pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
         &self.subscribed
     }
 
@@ -153,8 +127,7 @@ impl SectorInterest {
     /// Synthetic retained membership for wire-diff regressions.
     #[cfg(test)]
     pub(super) fn from_subscribed(subscribed: BTreeSet<[u8; 2]>) -> Self {
-        let subscribed: Vec<_> = subscribed.into_iter().collect();
-        let last_seen = vec![0.; subscribed.len()];
+        let last_seen = subscribed.iter().map(|&sector| (sector, 0.)).collect();
         let oldest = subscribed.first().map(|&sector| (sector, 0.));
         Self {
             subscribed,
@@ -195,39 +168,10 @@ mod tests {
 
     const FAR: Point = Point { x: 10_000., y: 0. };
 
-    // Literal tree-backed state for the frozen full-sweep owner below.
-    #[derive(Clone, Debug, Default)]
-    struct ReferenceInterest {
-        subscribed: BTreeSet<[u8; 2]>,
-        revision: Arc<()>,
-        last_seen: BTreeMap<[u8; 2], f64>,
-        cleanup_epoch: u64,
-        center: Option<[f64; 2]>,
-        touched: f64,
-    }
-
-    fn assert_full_state(actual: &SectorInterest, reference: &ReferenceInterest) {
-        assert_eq!(actual.subscribed.len(), actual.last_seen.len());
-        assert_eq!(
-            actual.subscribed,
-            reference.subscribed.iter().copied().collect::<Vec<_>>()
-        );
-        assert_eq!(
-            actual
-                .last_seen
-                .iter()
-                .map(|t| t.to_bits())
-                .collect::<Vec<_>>(),
-            reference
-                .last_seen
-                .values()
-                .map(|t| t.to_bits())
-                .collect::<Vec<_>>()
-        );
-        assert_eq!(
-            actual.center.map(|c| c.map(f64::to_bits)),
-            reference.center.map(|c| c.map(f64::to_bits))
-        );
+    fn assert_full_state(actual: &SectorInterest, reference: &SectorInterest) {
+        assert_eq!(actual.subscribed, reference.subscribed);
+        assert_eq!(actual.last_seen, reference.last_seen);
+        assert_eq!(actual.center, reference.center);
         assert_eq!(actual.touched.to_bits(), reference.touched.to_bits());
         assert_eq!(actual.cleanup_epoch, reference.cleanup_epoch);
         let expected = reference
@@ -247,33 +191,32 @@ mod tests {
             expected.map(f64::to_bits)
         );
         if let Some((sector, seen)) = actual.oldest {
-            let index = actual.subscribed.binary_search(&sector).unwrap();
-            assert_eq!(actual.last_seen[index].to_bits(), seen.to_bits());
+            assert_eq!(actual.last_seen[&sector].to_bits(), seen.to_bits());
         }
     }
 
     fn compare_advance(
         actual: &mut SectorInterest,
-        reference: &mut ReferenceInterest,
+        reference: &mut SectorInterest,
         head: Point,
         heading: f64,
         now: f64,
     ) {
         let old = actual.revision().clone();
-        let reference_old = reference.revision.clone();
+        let reference_old = reference.revision().clone();
         actual.advance(head, heading, now);
         full_sweep(reference, head, heading, now);
         assert_full_state(actual, reference);
         assert_eq!(
             Arc::ptr_eq(&old, actual.revision()),
-            Arc::ptr_eq(&reference_old, &reference.revision)
+            Arc::ptr_eq(&reference_old, reference.revision())
         );
     }
 
     #[test]
     fn oldest_matches_full_sweep_through_reentries_resets_and_rounding() {
         let mut actual = SectorInterest::default();
-        let mut reference = ReferenceInterest::default();
+        let mut reference = actual.clone();
         for (head, now) in [
             (Point::default(), 0.),
             (FAR, 0.007),
@@ -286,7 +229,7 @@ mod tests {
             compare_advance(&mut actual, &mut reference, head, 0., now);
         }
         actual = SectorInterest::default();
-        reference = ReferenceInterest::default();
+        reference = SectorInterest::default();
         // An added deadline rounds up to now, despite strictly expired age.
         let seen = 0.119_f64;
         let now = seen + RETENTION_SECONDS;
@@ -302,14 +245,14 @@ mod tests {
         for seed in [1_u64, 7, 42, 0xfeed_beef] {
             let mut random = seed;
             let mut actual = SectorInterest::default();
-            let mut reference = ReferenceInterest::default();
+            let mut reference = actual.clone();
             let mut head = Point::default();
             let mut now = 0.;
             for step in 0..12_000 {
                 random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
                 if step % 367 == 0 {
                     actual = SectorInterest::default();
-                    reference = ReferenceInterest::default();
+                    reference = SectorInterest::default();
                 }
                 if step % 257 == 0 {
                     head = at_wire_sector((random >> 16) as u8 as u16, (random >> 24) as u8 as u16);
@@ -335,7 +278,7 @@ mod tests {
     }
 
     // Frozen full-sweep owner from 23e987f3, independent of the minimum hint.
-    fn full_sweep(interest: &mut ReferenceInterest, head: Point, heading: f64, now: f64) {
+    fn full_sweep(interest: &mut SectorInterest, head: Point, heading: f64, now: f64) {
         let mut changed = false;
         let size = f64::from(encode::SECTOR_SIZE);
         let center = f64::from(encode::GRID_CENTER);
@@ -527,9 +470,9 @@ mod tests {
     fn a_final_stationary_pose_is_touched_before_cleanup() {
         let mut interest = SectorInterest::default();
         interest.advance(Point::default(), 0., 0.);
-        let original = interest.subscribed().to_vec();
+        let original = interest.subscribed().clone();
         interest.advance(Point::default(), 0., 1_000_000_000_000.);
-        assert_eq!(interest.subscribed(), original.as_slice());
+        assert_eq!(interest.subscribed(), &original);
         assert_eq!(interest.last_seen.len(), 45);
     }
 
