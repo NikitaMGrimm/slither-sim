@@ -4,11 +4,6 @@
 
 ### Added
 
-- Exact pit minimap projection reuse: warmed map ticks use about 52% fewer
-  instructions in a synthetic 80-viewer check (about 0.6% over all ticks).
-  First construction costs about 13% more map-tick instructions; protocol-13/19
-  bytes remain identical
-  ([evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-pit-minimap-cache/REPORT.md)).
 - A follow-up Battledome check with the bots boosting almost all the time,
   the way Battledome players do. 80 players still play smoothly, with
   sub-millisecond jitter. At 160 there are occasional slow ticks, and at 320
@@ -33,6 +28,12 @@
 
 ### Performance
 
+- Battledome's pit minimap now reuses its outline mask between updates
+  instead of recomputing each cell's distance from the pit edge. Output is
+  byte-identical. In a synthetic 80-player check, minimap ticks use about 52%
+  fewer instructions (about 0.6% over all ticks); the first map, and any map
+  after the outline changes, costs about 13% more
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-pit-minimap-cache/REPORT.md)).
 - When a player's view moves, the host keeps its existing reference to each
   unchanged food sector instead of dropping and re-taking it. Output is
   byte-identical. In a fully grown 500-player world, food-update ticks run
