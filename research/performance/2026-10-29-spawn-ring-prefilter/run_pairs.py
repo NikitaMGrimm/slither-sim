@@ -41,9 +41,9 @@ class Parent:
         self.pins=json.loads((root/arm/'pins.json').read_text());assert self.pins['releaseBuild']
         assert sha(self.exe)==self.pins['binaries']['study_fixed']
         self.log=(root/f'parent-{prefix}-{arm}.log').open('x');self.lines=queue.Queue()
-        self.process=subprocess.Popen([str(self.exe),str(protocol),'360','--measure',row],stdin=subprocess.PIPE,
+        self.process=subprocess.Popen(['taskset','-c','0',str(self.exe),str(protocol),'360','--measure',row],stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,bufsize=1,
-            env=dict(os.environ,RAYON_NUM_THREADS='1'),preexec_fn=lambda:os.sched_setaffinity(0,{0}))
+            env=dict(os.environ,RAYON_NUM_THREADS='1'))
         def read():
             for line in self.process.stderr:
                 self.log.write(line);self.log.flush();self.lines.put(line.rstrip())

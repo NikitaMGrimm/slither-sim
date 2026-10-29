@@ -63,8 +63,11 @@ hashes identifying them but no public download.
 
 ## Pending measurement
 
-Local focused tests, the full 15-command Rust group, seven documentation tests
-and all six fixed-work row/protocol work gates pass. The marker control has five
+Local focused tests, the full 15-command Rust group and seven documentation
+tests pass. The final audited fixed-work examples compile separately for all
+nine study/arm stages, with distinct executables and all six protocol wire
+mutations detected. The 80-viewer minimap row also compares complete bytes in
+both protocols with stock decorations and nonzero routing generations. The marker control has five
 actual marker-change ticks in each protocol; both no-backlog controls retain
 80 live viewers. Synthetic reducer checks validate group arithmetic and exclude
 the discarded warmup. See [verification](verification.json). Then, only

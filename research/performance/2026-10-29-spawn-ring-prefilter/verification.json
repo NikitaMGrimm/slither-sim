@@ -74,7 +74,7 @@
   "documentationTests": 7,
   "pmuRun": false,
   "sshGuestUsed": false,
-  "additionalControlCompilation": "Prior view-only marker qualification withdrawn: decoration delivery was disabled; corrected rebuild pending",
+  "additionalControlCompilation": "Final audited source stages compiled serially with per-package rebuild; all row/protocol work, byte and mutation gates pass",
   "independentReview": false,
   "controls": [
     {
@@ -188,12 +188,423 @@
     "study_protocols.exe": "977bb7ff7aea9102085dab109fae197329d8a21432940192d40ee0e7cfe13e9f"
   },
   "stagedNativeManifests": {
-    "minimap/base": "b2abfa3fa58913a6b285c1dae9f0011dbc71aedbf8c977f3b8c9ff7706d7fa8b",
-    "minimap/candidate": "ab8a5631af066bf06a3bae07798bb55b085dcdf64be50a7e73765487f3076e44",
-    "minimap/mutation": "16d1bbbf889db7cfeefec016ee72778b38e988bda101bbe9082a3d8194fac179",
-    "spawn/base": "b2e262cd3a143f543196a310f94ade295b9d182e13d6059bd4ef6831c8c71b56",
-    "spawn/candidate": "72497aa2fcef7963ced9d9e98421fb6cd9a4cebd44790b09d5a7040dd12cf9e3",
-    "spawn/mutation": "7eaafa35aa7b69f942d9c3373c9dca07d44127d1a125462fd27095cd67bb0977"
+    "minimap/base": "303a2b4008b63784054a6773b493b72259cea17f85a84dc00acb5d9c45e98119",
+    "minimap/candidate": "4343b78af56111b158721d98be3a4392dc5adee9a7dff4a77bc44afc4e35739e",
+    "minimap/mutation": "9b6eecd78911e9083badc564c89026916180d7327ce217e6564fa5869c21fe9f",
+    "spawn/base": "897d1d91fa7fd73051acf56193d4c43377a1e38739491eb58db3b9816c1b2f49",
+    "spawn/candidate": "0c05e790205ef80619e5654afd329bfe97f7139273d4ef9cad6a99472ae07c00",
+    "spawn/mutation": "500ee816bc568bc80d2cbd45a2e1d0ad0a5dc73f9e61b49747fbb6f7eeec969b",
+    "markers/base": "021dfc469aae65ca28b66767befb2d8934e20c1285e908b77c0539eaa44a77cb",
+    "markers/candidate": "53da7e295b2e08af89fda15346f2d13992bcfd0a35f06a688db29f47e3906582",
+    "markers/mutation": "e81a47a38c7567055916060f9ee78399256aac1b9c6a860b773ca417629c6c9c"
   },
-  "stagedNativeManifestsStatus": "Superseded after decoration gate correction; do not measure these stages"
+  "stagedNativeManifestsStatus": "Final native-final stages hash-verified before/after compilation; earlier native-staging1/2 superseded",
+  "finalCommonAudit": {
+    "nonzeroLiveRoutingGenerations": true,
+    "stockDecorationsEnabled": true,
+    "actualMarkerUpdateIncludesRetirement": true,
+    "preexecCallbackRemoved": true,
+    "staleCargoBatchRejected": true,
+    "perArmPackageRebuildEnforced": true,
+    "linuxPmuEnabledLocally": false
+  },
+  "finalLocalBinaries": {
+    "minimap/base": "f34a02e41e2d6b3b4d08cd36fefcff9db762ec2e6272362f0234e37462107921",
+    "minimap/candidate": "77371c6117d8b73970cccb0a60f9ef7430299935623dadaf29a19aa74297fff6",
+    "minimap/mutation": "abbcf3d8c98558e5900c9aa19ae7ce36f503670794bc7b137df8155d1f4a3448",
+    "spawn/base": "81474ec6f253d0bef7c182a7fa45fba33c71323314188b10c5c8c7840eeb114f",
+    "spawn/candidate": "e039cdedf2d6ffd0f9115c85cf4dca0def49a9b65ccb19027cba15bed2369390",
+    "spawn/mutation": "db6d9c2e752ba1ab3059070bc3451b11525d3f3b41ae61ed3abbe093a6320864",
+    "markers/base": "d39032826fc8117ff2eb8f54e046a3245e2560be67d46d012f9acc984bbd50c6",
+    "markers/candidate": "44351e52206e50d86aad2e59ddbc23824a79f2bdd792935f08742e7c894f5221",
+    "markers/mutation": "67c51c70487a708d597bad49fbdf95208e24cace56ede90183578f23e3e977b9"
+  },
+  "finalFixedParity": {
+    "minimap": [
+      {
+        "protocol": 19,
+        "base": {
+          "sha256": "09ce5230119581384b7dd34ccac80cad200e0c09927f3d598704be3e811ca405",
+          "bytes": 574232,
+          "wireSha256": "5b061fd195ee9bae544bd420045a20dba495df5df8d4c94a582fce0da120a1fb",
+          "frames": 1006,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": false,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "candidate": {
+          "sha256": "09ce5230119581384b7dd34ccac80cad200e0c09927f3d598704be3e811ca405",
+          "bytes": 574232,
+          "wireSha256": "5b061fd195ee9bae544bd420045a20dba495df5df8d4c94a582fce0da120a1fb",
+          "frames": 1006,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": false,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "mutation": {
+          "sha256": "f2c3befbbc0dd8cc2e8a2202c755738ab1055424346ea6a9077975fde909f894",
+          "bytes": 574472,
+          "wireSha256": "ada2814ddb014849c12bceefe7139c4a63b66a38b73c43b05817499dfed34dc5",
+          "frames": 1006,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": false,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "wireMutationDetected": true
+      },
+      {
+        "protocol": 13,
+        "base": {
+          "sha256": "14f7a32c713a92d600dd26f6e7f3eda38e9b3d8566708c07cdb210c1eeb619f5",
+          "bytes": 592516,
+          "wireSha256": "47c960d0c7c7431854d23fa01a9dbae29fdc5ea562306d04618f5413dd6ef530",
+          "frames": 1274,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": true,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "candidate": {
+          "sha256": "14f7a32c713a92d600dd26f6e7f3eda38e9b3d8566708c07cdb210c1eeb619f5",
+          "bytes": 592516,
+          "wireSha256": "47c960d0c7c7431854d23fa01a9dbae29fdc5ea562306d04618f5413dd6ef530",
+          "frames": 1274,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": true,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "mutation": {
+          "sha256": "5958d3bdc7925c58b7f6242321623f33af0a3e576291e2b3324c18c1734976c1",
+          "bytes": 592756,
+          "wireSha256": "aabc40a04c867ad0f3238fdeace2dc202280f6b865781dfafd91d051b9a0199c",
+          "frames": 1274,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": true,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "wireMutationDetected": true
+      }
+    ],
+    "spawn": [
+      {
+        "protocol": 19,
+        "base": {
+          "sha256": "74f804db4a0687311b003c379d7e2968dfd161dbb7f201801f4dccea9cb067f4",
+          "bytes": 503137,
+          "wireSha256": "412491c9e0166f213117556d710de4031c3656168bca4a38eb82743ab7051146",
+          "frames": 343,
+          "summary": {
+            "blockedAttempts": 368640,
+            "blockedExhausted": 90,
+            "blockedSearches": 90,
+            "legacy": false,
+            "releaseExhausted": 90,
+            "releaseSearches": 99,
+            "row": "spawn",
+            "ticks": 360,
+            "waiting": 54
+          }
+        },
+        "candidate": {
+          "sha256": "74f804db4a0687311b003c379d7e2968dfd161dbb7f201801f4dccea9cb067f4",
+          "bytes": 503137,
+          "wireSha256": "412491c9e0166f213117556d710de4031c3656168bca4a38eb82743ab7051146",
+          "frames": 343,
+          "summary": {
+            "blockedAttempts": 368640,
+            "blockedExhausted": 90,
+            "blockedSearches": 90,
+            "legacy": false,
+            "releaseExhausted": 90,
+            "releaseSearches": 99,
+            "row": "spawn",
+            "ticks": 360,
+            "waiting": 54
+          }
+        },
+        "mutation": {
+          "sha256": "077eb9b945c8aaaefa0541bfccd1fd446fdb2413d8e7ef83f7ac7efccdf52743",
+          "bytes": 495571,
+          "wireSha256": "ca669b56fbde384c9ec77f559bffcc5e6ef65f650bf5c51e2d3d8ec32febdf82",
+          "frames": 261,
+          "summary": {
+            "blockedAttempts": 368640,
+            "blockedExhausted": 90,
+            "blockedSearches": 90,
+            "legacy": false,
+            "releaseExhausted": 89,
+            "releaseSearches": 98,
+            "row": "spawn",
+            "ticks": 360,
+            "waiting": 57
+          }
+        },
+        "wireMutationDetected": true
+      },
+      {
+        "protocol": 13,
+        "base": {
+          "sha256": "01eabf6bc23fde74956b89e52968a4b991e9a31220eeb3970d79503cfc51480f",
+          "bytes": 511201,
+          "wireSha256": "5236b4c0d7845bd8e3ea400356714c710192fd0f7f8d0d52f855f9207a09554e",
+          "frames": 458,
+          "summary": {
+            "blockedAttempts": 368640,
+            "blockedExhausted": 90,
+            "blockedSearches": 90,
+            "legacy": true,
+            "releaseExhausted": 90,
+            "releaseSearches": 99,
+            "row": "spawn",
+            "ticks": 360,
+            "waiting": 54
+          }
+        },
+        "candidate": {
+          "sha256": "01eabf6bc23fde74956b89e52968a4b991e9a31220eeb3970d79503cfc51480f",
+          "bytes": 511201,
+          "wireSha256": "5236b4c0d7845bd8e3ea400356714c710192fd0f7f8d0d52f855f9207a09554e",
+          "frames": 458,
+          "summary": {
+            "blockedAttempts": 368640,
+            "blockedExhausted": 90,
+            "blockedSearches": 90,
+            "legacy": true,
+            "releaseExhausted": 90,
+            "releaseSearches": 99,
+            "row": "spawn",
+            "ticks": 360,
+            "waiting": 54
+          }
+        },
+        "mutation": {
+          "sha256": "bc768ffe38150ed95fca6536ea78aa8a06967ea5c61e21a5cdc39cc4b370176a",
+          "bytes": 501783,
+          "wireSha256": "5f72803d3558b7d52985f2250445aff776c84d44c3816e6f5d9ea0a28b7560eb",
+          "frames": 349,
+          "summary": {
+            "blockedAttempts": 368640,
+            "blockedExhausted": 90,
+            "blockedSearches": 90,
+            "legacy": true,
+            "releaseExhausted": 89,
+            "releaseSearches": 98,
+            "row": "spawn",
+            "ticks": 360,
+            "waiting": 57
+          }
+        },
+        "wireMutationDetected": true
+      }
+    ],
+    "markers": [
+      {
+        "protocol": 19,
+        "base": {
+          "sha256": "a2de92079a0848007b1c1aafe7e67ef620d90c5f6488c16d8f269e86cf8aa246",
+          "bytes": 2729706,
+          "wireSha256": "7eb27d137bef0de8a5899b1b0fd166dd35f6f2bbda47eccc664d05e0120cced1",
+          "summary": {
+            "blockedAttempts": 0,
+            "blockedExhausted": 0,
+            "blockedSearches": 0,
+            "legacy": false,
+            "releaseExhausted": 0,
+            "releaseSearches": 0,
+            "row": "markers",
+            "ticks": 360,
+            "waiting": 0
+          },
+          "markerTicks": 5
+        },
+        "candidate": {
+          "sha256": "a2de92079a0848007b1c1aafe7e67ef620d90c5f6488c16d8f269e86cf8aa246",
+          "bytes": 2729706,
+          "wireSha256": "7eb27d137bef0de8a5899b1b0fd166dd35f6f2bbda47eccc664d05e0120cced1",
+          "summary": {
+            "blockedAttempts": 0,
+            "blockedExhausted": 0,
+            "blockedSearches": 0,
+            "legacy": false,
+            "releaseExhausted": 0,
+            "releaseSearches": 0,
+            "row": "markers",
+            "ticks": 360,
+            "waiting": 0
+          },
+          "markerTicks": 5
+        },
+        "mutation": {
+          "sha256": "f5fb9b8d79438156179eac453e4440ace4380a8d4b81725a930f6674a01cf05d",
+          "bytes": 2528763,
+          "wireSha256": "c33e4b2d3012d24a3c7d2fc35fe12bba0dfe2356dcf4160e5f7b7540d1800b73",
+          "summary": {
+            "blockedAttempts": 0,
+            "blockedExhausted": 0,
+            "blockedSearches": 0,
+            "legacy": false,
+            "releaseExhausted": 0,
+            "releaseSearches": 0,
+            "row": "markers",
+            "ticks": 360,
+            "waiting": 0
+          },
+          "markerTicks": 5
+        },
+        "wireMutationDetected": true
+      },
+      {
+        "protocol": 13,
+        "base": {
+          "sha256": "fead0a6de0cb42f940a8e8a87ca1569d1131e9a3aacb187240dca3fb2746ecd7",
+          "bytes": 5478893,
+          "wireSha256": "d6bbe3ae01c63e439a621291b60d33d3ebf1dd9678caea12ceba8ea9d5ab0b89",
+          "summary": {
+            "blockedAttempts": 0,
+            "blockedExhausted": 0,
+            "blockedSearches": 0,
+            "legacy": true,
+            "releaseExhausted": 0,
+            "releaseSearches": 0,
+            "row": "markers",
+            "ticks": 360,
+            "waiting": 0
+          },
+          "markerTicks": 5
+        },
+        "candidate": {
+          "sha256": "fead0a6de0cb42f940a8e8a87ca1569d1131e9a3aacb187240dca3fb2746ecd7",
+          "bytes": 5478893,
+          "wireSha256": "d6bbe3ae01c63e439a621291b60d33d3ebf1dd9678caea12ceba8ea9d5ab0b89",
+          "summary": {
+            "blockedAttempts": 0,
+            "blockedExhausted": 0,
+            "blockedSearches": 0,
+            "legacy": true,
+            "releaseExhausted": 0,
+            "releaseSearches": 0,
+            "row": "markers",
+            "ticks": 360,
+            "waiting": 0
+          },
+          "markerTicks": 5
+        },
+        "mutation": {
+          "sha256": "d059e9311c5fcc1eca4ad836504cad93815b0c1f4807a70991042cbc98fa959b",
+          "bytes": 3769708,
+          "wireSha256": "eb96f92496d6adef1bf897c8cb11d6eb7bba69f89acad93b1aa7b28d664c50f9",
+          "summary": {
+            "blockedAttempts": 0,
+            "blockedExhausted": 0,
+            "blockedSearches": 0,
+            "legacy": true,
+            "releaseExhausted": 0,
+            "releaseSearches": 0,
+            "row": "markers",
+            "ticks": 360,
+            "waiting": 0
+          },
+          "markerTicks": 5
+        },
+        "wireMutationDetected": true
+      }
+    ]
+  },
+  "final80ViewerParity": [
+    {
+      "study": "minimap",
+      "protocol": 19,
+      "arm": "base",
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    },
+    {
+      "study": "minimap",
+      "protocol": 19,
+      "arm": "candidate",
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    },
+    {
+      "study": "minimap",
+      "protocol": 13,
+      "arm": "base",
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    },
+    {
+      "study": "minimap",
+      "protocol": 13,
+      "arm": "candidate",
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    }
+  ]
 }

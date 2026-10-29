@@ -58,3 +58,30 @@
   and added a counted decorated-viewer gate. Existing primary spawn proofs are
   unaffected (their observer used the real host join path). Retained all prior
   control builds and native staging; they are superseded, not silently reused.
+- The final common-fixture audit gives every synthetic live connection a
+  nonzero routing generation and counts the actual marker-update decision,
+  including retirement-only changes. The pair launcher uses `taskset` instead
+  of a Python pre-exec callback after reader threads have started. These are
+  research-tool corrections, with fresh staged manifests/serial compilation;
+  none changes the pinned production search or its selected correctness traces.
+- Final batch compilation exposed a Cargo timestamp/cache hazard: independently
+  pre-staged trees older than the shared target reused the first arm's binary
+  (all nine hashes identical, later builds about 0.08 seconds). Rejected that
+  batch before running any measurement. Earlier accepted per-arm preparations
+  rebuilt after each overlay, had distinct binary hashes and detected their
+  wire mutations. The native builder now clears only `slither-sim` package
+  artifacts in its verified task-owned target before every arm, keeping cached
+  dependencies and every copied proof binary outside the target. The failed
+  batch and logs are retained; corrected serial compilation uses fresh outputs.
+
+- The corrected final build explicitly rebuilt each arm after clearing only
+  task-owned package artifacts. All nine manifests remained byte-intact; every
+  study has distinct baseline/candidate/mutation executable hashes. Final queued
+  minimap/spawn and shrinking-marker wire proofs pass in both protocols; all
+  six wire mutations are detected. The 80-viewer no-backlog minimap row is also
+  byte-identical in both protocols, with stock decorations and nonzero routing
+  generations verified from complete initial/final records. No PMU was enabled.
+- One source-staging shell command ended nonzero only while removing an already
+  absent optional environment variable after all nine stages had completed.
+  All manifests/files were independently verified; no failed compilation or
+  measurement was substituted.

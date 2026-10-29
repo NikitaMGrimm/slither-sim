@@ -38,6 +38,10 @@ old='        if circular {\\n            if let Some((_, body, heading)) = open 
 assert payload.count(old)==1
 payload=payload.replace(old,'        crate::study_tick::exhaust();\\n'+old)
 p.write_text(payload,newline='\\n')
+food=source/'src/client/simulation/food.rs';food_source=food.read_text()
+needle='        let retired = self.food_subscriptions.sync(self.slots.iter().map(|slot| {'
+assert food_source.count(needle)==1
+food.write_text(food_source.replace(needle,'        if pit_changed { crate::study_tick::marker(); }\\n'+needle),newline='\\n')
 (source / 'src/client/server/study_fixed.rs').write_text((STUDY/'fixed_host.rs').read_text(),newline='\\n')
 p=source/'src/client/server.rs';p.write_text(p.read_text()+'\\npub mod study_fixed;\\n',newline='\\n')
 counter=repo/'research/performance/2026-10-28-broadcast-distance/counter.rs'

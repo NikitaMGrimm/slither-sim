@@ -62,6 +62,7 @@ impl Fixture {
         }
         if row!="spawn" {
             sim.waiting.clear();
+            sim.generations.fill(1);
             sim.world.study_viewers(legacy,true);
         }
         Self { sim, deliveries, _commands: commands, legacy, row:row.into() }
@@ -90,6 +91,7 @@ impl Fixture {
         self.sim.hand_over().unwrap();
         let sample = crate::study_tick::end(samples);
         let after = self.sim.world.study_flags();
+        let marker_changed=sample["events"][3].as_u64().unwrap()>0;
         let mut trace = trace;
         while let Ok(batch) = self.deliveries.try_recv() {
             for delivery in batch {
@@ -107,7 +109,7 @@ impl Fixture {
             }
         }
         serde_json::json!({"tick": self.sim.ticks, "waitingBefore": waiting, "waitingAfter": self.sim.waiting.len(),
-            "foodEpoch": flags[0]!=after[0], "minimap": flags[1]!=after[1], "marker": flags[2]!=after[2],
+            "foodEpoch": flags[0]!=after[0], "minimap": flags[1]!=after[1], "marker": marker_changed,
             "blocked": blocked, "sample": sample})
     }
 

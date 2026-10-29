@@ -84,7 +84,10 @@ before using them. The manifest hashes every staged file with portable path
 separators. Once released, [build_staged.py](build_staged.py) verifies all files
 and builds locked/offline native release executables serially in one bounded
 target, using the existing toolchain/dependencies. No installation, service or
-guest setting change is needed. Keep the source and binary hashes.
+guest setting change is needed. Before each arm it clears only this package's
+artifacts in that verified task-owned target: pre-staged source mtimes must not
+allow Cargo to reuse another arm's runtime. Cached dependencies and copied proof
+binaries remain. Keep the source and binary hashes and the clean/build commands.
 
 Run the same native trace matrix and fixed parity controls before counting,
 then [write_gates.py](write_gates.py) binds those results to the selected
@@ -106,7 +109,9 @@ python tables.py NATIVE_OUTPUT spawn
 The [pair runner](run_pairs.py) reuses the earlier
 [process inventory](../2026-10-28-broadcast-distance/reproduce.py), keeps its
 controller on CPU 1 and native parents/children on CPU 0, and checks that the
-full host parent has one thread. Repeat fork proof traces twice per arm and
+full host parent has one thread. `taskset` launches each parent on its core;
+there is no pre-exec Python callback after reader threads start. Repeat fork
+proof traces twice per arm and
 compare both arms; compare each direct-parent continuation too. One discarded
 AB warmup precedes five AB/BA/AB/BA/AB pairs. Every pair compares its complete
 wire/state trace and rechecks copied executable hashes. Build/test work finishes
@@ -115,7 +120,8 @@ status commands during counting.
 
 [tick_samples.rs](tick_samples.rs) counts the entire command/admission plus
 world/broadcast/hand-over tick, checking >=99% PMU scheduling. Identical
-per-search/attempt/exhaustion hooks remain included on both arms; there is no
+per-search/attempt/exhaustion and actual marker-update hooks remain included on
+both arms; the latter includes retirement-only updates. There is no
 per-body diagnostic whose elimination could inflate the saving. Held-pose
 edits, trace serialization and table reduction stay outside the interval.
 The [tables](tables.py) retain every pair, all ticks, search/exhaustion/other,
@@ -125,7 +131,9 @@ are never added. The result is fixed-work user instructions and process CPU,
 not real socket time, network latency or a live deferred-tick capacity test.
 
 Use the same harness with the `minimap` and `markers` row names for those
-independent candidate/baseline builds. Their source-staging wire mutation uses
-`STUDY_MUTATION=map` rather than this spawn-specific fallback mutation. Preserve
+independent candidate/baseline builds. Minimap staging uses
+`STUDY_MUTATION=map`; its queued wire-mutation control uses
+`FIXED_TRACE_TICKS=720` so new viewers receive a full map after barrier release.
+The marker study's wrapper instead drops marker-sector hints. Preserve
 each candidate's own source pin and checks; do not treat another candidate's
 gates as its evidence. No bench measurements have run yet.
