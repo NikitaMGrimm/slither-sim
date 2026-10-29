@@ -164,3 +164,68 @@ Discard one AB pair before five AB/BA/AB/BA/AB pairs. Stop on any other quality
 failure; retain all attempts. Primary hooks keep the common aligned task clocks,
 CPU/census/queue telemetry and actual food-epoch flags; no new gateway-phase
 or syscall timer runs in the selected primary holds.
+
+## Fresh-series amendment, frozen before new collection
+
+The maintaining agent authorizes one fresh series after the original stop. Keep
+the failed series, its excluded windows, original gate and 2.648503 CPU-hour
+receipt unchanged. New rows use separate storage and a separate series identity;
+they cannot replace, qualify or be pooled with those earlier windows.
+
+On 2026-10-29, `origin/main` is still
+`539b37f3be969827b5eac67c2978e604f9e814e8`, with no runtime change since the
+previous check. Reuse that base and candidate
+`da7e65c26d0236156c24e23f43f9bd6dfcabca34`, their immutable validated host
+binaries and the identical common client. The additive tests at `afd7e03a` remain
+verification-only. Source archives, build flags and parity receipts remain pinned.
+If main changes in runtime code before this series starts, refresh both arms and
+repeat the affected correctness checks before any timing.
+
+The **only quality-gate change** is the competing-process CPU allowance:
+
+```text
+old: largest_other_process_cpu <= 3 * selected_wall_seconds / 300
+new: largest_other_process_cpu <= 3 * selected_wall_seconds / 300 + 0.010
+```
+
+The retained cumulative process counters advance in 10 ms increments. Subtracting
+the sampled endpoints quantizes the measured interval; a sub-quantum excess
+cannot be distinguished from endpoint rounding. Add one quantum to the existing
+maximum-process threshold, once, without subtracting measured CPU or excluding a
+process by name. This does not alter the original failed receipt. Retain the raw
+maximum, base allowance, added quantum and final allowance for the fresh windows.
+All other class, client/cadence/headroom, queue/backpressure, reconciliation and
+isolation checks remain unchanged.
+
+Use the same full tick-zero warmup, at least tick 193,000 and three mature
+endpoints, five-second settle, 30-second primary hold and separate 15-second
+post-hold diagnostic. Discard one fresh AB pair, then collect five fresh
+AB/BA/AB/BA/AB pairs. Keep the original single class-only retry per cohort, preserve
+every attempt, and stop on any other quality failure. No timing-based retry or
+window substitution. The fresh series has its own **12 CPU-hour ceiling**,
+including all host/client warmups and retries; the earlier series stays accounted
+separately. Expected collection is about 4.5 hours before class retries. If it
+runs substantially past six wall hours, send the maintaining agent a status.
+
+Freeze the adoption calculation as follows, using the five qualified pairs only:
+
+1. For each arm/cohort, calculate **mean gateway CPU per completed tick over all
+   selected primary ticks**. Require every candidate value to be lower than every
+   base value: `max(candidate_means) < min(base_means)`. Report the five paired
+   percentage changes, median and full range; all must favor the candidate.
+2. Compute world p99 from each tick's aligned simulation-plus-gateway CPU sum.
+   Require candidate world p99 to be no greater than its paired base in **each of
+   the five pairs**. Report per-arm medians/ranges and all paired tail changes.
+3. Require the complete five-pair quality bar and all existing exactness checks.
+   Maintenance and ordinary tick summaries remain separate report rows, using
+   actual food-epoch flags. Diagnostic timers do not decide adoption.
+
+Adopt epoll only when all three conditions pass. Otherwise reject it for good,
+alongside the 2026-10-27 counterevidence; preserve the implementation as a patch.
+Do not add an empty-flush or idle-service optimization to this experiment.
+
+Open one research PR either way, containing this attribution and fresh result.
+Include runtime code in that same PR only if it qualifies. Keep public evidence
+lean: runtime/archive/binary and whole-harness pins, selected values and table
+recomputation, with no per-file source-hash maps. Keep raw forensic inventories
+local-only. The PR body contains only the agent-assistance footer. Do not merge.
