@@ -291,36 +291,33 @@ impl SnakeReports {
 /// What one connection has been told about each snake slot.
 #[derive(Clone, Debug, Default)]
 pub(super) struct KnownSnakes {
-    by_slot: Vec<Option<KnownSnake>>,
-    /// Ascending occupied slots: broadcasts usually know only a few peers,
-    /// so enumerating them must not scan every world slot for every recipient.
+    /// Views usually hold few peers. Search compact keys instead of reserving
+    /// an optional history through the highest world slot each viewer has seen.
     slots: Vec<usize>,
+    /// Each history belongs to the slot at the same index.
+    records: Vec<KnownSnake>,
 }
 impl KnownSnakes {
     pub(super) fn contains_key(&self, slot: usize) -> bool {
-        self.by_slot.get(slot).is_some_and(Option::is_some)
+        self.slots.binary_search(&slot).is_ok()
     }
     pub(super) fn get_mut(&mut self, slot: usize) -> Option<&mut KnownSnake> {
-        self.by_slot.get_mut(slot)?.as_mut()
+        let index = self.slots.binary_search(&slot).ok()?;
+        self.records.get_mut(index)
     }
     pub(super) fn remove(&mut self, slot: usize) -> Option<KnownSnake> {
-        let known = self.by_slot.get_mut(slot)?.take()?;
-        let index = self
-            .slots
-            .binary_search(&slot)
-            .expect("occupied snake slot");
+        let index = self.slots.binary_search(&slot).ok()?;
         self.slots.remove(index);
-        Some(known)
+        Some(self.records.remove(index))
     }
     pub(super) fn insert(&mut self, slot: usize, known: KnownSnake) {
-        if self.by_slot.len() <= slot {
-            self.by_slot.resize(slot + 1, None);
+        match self.slots.binary_search(&slot) {
+            Ok(index) => self.records[index] = known,
+            Err(index) => {
+                self.slots.insert(index, slot);
+                self.records.insert(index, known);
+            }
         }
-        if self.by_slot[slot].is_none() {
-            let index = self.slots.binary_search(&slot).unwrap_err();
-            self.slots.insert(index, slot);
-        }
-        self.by_slot[slot] = Some(known);
     }
     #[cfg(test)]
     pub(super) fn slots(&self) -> impl Iterator<Item = usize> + '_ {
@@ -634,6 +631,9 @@ pub(super) fn changes(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod known_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1178,7 +1178,7 @@ mod tests {
             cloned.get_mut(slot).unwrap().kills += 1;
             assert_eq!(
                 cloned.remove(slot).unwrap().kills,
-                known.by_slot[slot].as_ref().unwrap().kills + 1
+                reference[&slot].kills + 1
             );
         }
         assert!(cloned.slots().next().is_none());
