@@ -4,10 +4,11 @@
 
 ### Added
 
-- A capacity checkpoint for 500 real WebSocket players with fully grown snakes,
-  comparing the host before and after the recent broadcast optimizations.
-  It measures world CPU time on one core, checks that clients on the other
-  cores keep up, and separates simulation from socket work
+- A capacity check with 500 real WebSocket players and fully grown snakes,
+  with the host on one core of a Zen 5 EPYC. The median tick takes 4.3–4.9 ms
+  of the 7 ms budget, but the slowest 1% take 8.8–9.2 ms, almost all of them
+  the food update every 504 ms. The recent broadcast speedups removed 58% of
+  the simulation thread's instructions but only about a third of its CPU time
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-capacity-checkpoint/REPORT.md)).
 
 ## [0.8.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.7.1...v0.8.0) - 2026-10-28
