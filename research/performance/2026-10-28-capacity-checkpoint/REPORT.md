@@ -207,7 +207,7 @@ work; they are not an exact decomposition of the primary socket CPU samples.
 ## Primary tail cadence
 
 A separate read-only reduction verifies the source-derived food-maintenance
-opportunity against 4,200 measured diagnostic event flags, then applies it to
+opportunity against 8,600 measured diagnostic ticks in both arms, then applies it to
 all six unchanged primary traces. It reproduces every selected primary p99.
 On current main, 88.1–97.6% of the slowest 1% of ticks coincide with this
 nominal 504-ms (about 72-tick) cadence; the slowest 2% contain 69.0–70.2%
@@ -234,7 +234,10 @@ conditional mean CPU costs, ms/tick:
 
 Thirty-nine food-maintenance events are exactly 72 ticks apart. Twenty of the
 28 slowest coarse ticks are maintenance ticks; seven occur just after the
-100-tick diagnostic log flush. That reporting contribution is instrumentation,
+100-tick diagnostic log flush, where tick % 100 == 1. `postReportTickCount` in
+[diagnostics](diagnostics.json) counts such tail ticks; the retained
+`analyze_diagnostics.py` does not emit it, so recount it from the detail rows
+with that predicate. That reporting contribution is instrumentation,
 not a production target; the unchanged primary traces above corroborate the
 food tail without it. There are zero minimap, leaderboard, death or connection
 flags in the coarse top 1%. Anchors occur on every tick and average 15.61 on

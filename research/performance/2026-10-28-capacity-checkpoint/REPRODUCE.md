@@ -141,7 +141,10 @@ primary selection path is unchanged. Keep its original failure record.
 `repeat_base_diagnostic.py` is the one body-class repeat used in this session,
 queued after the initial base/current diagnostics, retaining all previous CPU
 against the same two-hour diagnostic ceiling. It is optional on a fresh run:
-invoke it only when the first base PMU window has left the primary class. In
+invoke it only when the first base PMU window has left the primary class.
+It reads this session's resumed-controller receipt,
+`diagnostic-controller-boundary-resume.json`; a fresh run has only
+`diagnostic-controller.json`, so point the script at that receipt instead. In
 this session the repeat qualified for length but failed client cadence, so its
 host measurements are excluded. The final explanatory selection is therefore:
 
