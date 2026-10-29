@@ -14,14 +14,16 @@
 
 ### Performance
 
-- Battledome spawn searches skip distant obstacles in their original order,
-  preserving every verdict, pose and output byte. A frozen 318-snake boosting
-  world uses about 76% less CPU for refused admission and 75% less for success;
-  80/160 controls pass. The maintaining agent adopts the change despite about
-  0.10 ms more per refused-search tick in an eight-obstacle overload with the
-  grid off; the study's rejection under its additional gate remains recorded
-  ([#278](https://github.com/NikitaMGrimm/slither-sim/pull/278),
-  [study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
+- Battledome spawn searches now check each candidate spot only against
+  nearby snakes, using a grid built on demand in arenas with at least 32
+  snakes. Every verdict, spawn position and output byte is unchanged. In a
+  frozen 318-snake world built to match the live 320-player load, a failed
+  spawn search uses about 76% less CPU (about 9 to 2 ms) and a successful one
+  75% less; 80- and 160-player checks stay within 10 µs per tick. The study's
+  frozen limit for an eight-snake overload rejected the change, because each
+  failed search there costs 0.1 ms more; it was adopted anyway after the
+  results, since that is about 1.5% of a 7 ms tick
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
 
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
 
