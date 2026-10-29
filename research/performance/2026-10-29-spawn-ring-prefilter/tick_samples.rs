@@ -8,7 +8,6 @@ fn event(i: usize) { EVENTS.with(|v| { let mut a=v.get(); a[i]+=1; v.set(a); });
 pub fn search() { event(0); }
 pub fn attempt() { event(1); }
 pub fn exhaust() { event(2); }
-pub fn body() { event(3); }
 
 #[cfg(target_os="linux")]
 fn cpu() -> u64 {

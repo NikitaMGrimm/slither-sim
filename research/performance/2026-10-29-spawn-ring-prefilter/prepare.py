@@ -4,7 +4,7 @@ Usage: python prepare.py PRIOR_PREPARE REPO OUTPUT ARM REF
 PRIOR_PREPARE is the minimap study's prepare_traces.py, staged from its branch.
 """
 from pathlib import Path
-import sys
+import hashlib,json,os,sys
 
 prior=Path(sys.argv.pop(1)).resolve()
 study=Path(__file__).resolve().parent
@@ -29,9 +29,6 @@ payload=payload.replace(old,'        crate::study_tick::search();\\n'+old)
 old='        for attempt in 0..attempts {'
 assert payload.count(old)==1
 payload=payload.replace(old,old+'\\n            crate::study_tick::attempt();')
-old='            let (body, heading) = self\\n                .world\\n                .spawn_body(head, heading)'
-assert payload.count(old)==1
-payload=payload.replace(old,'            crate::study_tick::body();\\n'+old)
 old='        if circular {\\n            if let Some((_, body, heading)) = open {'
 assert payload.count(old)==1
 payload=payload.replace(old,'        crate::study_tick::exhaust();\\n'+old)
@@ -48,8 +45,17 @@ text=text.replace("'--example', 'study_protocols', '--example', 'perf_baseline']
                   "'--example', 'study_protocols', '--example', 'perf_baseline', '--example', 'study_fixed']")
 text=text.replace("for binary in ['study_protocols', 'perf_baseline']:",
                   "for binary in ['study_protocols', 'perf_baseline', 'study_fixed']:")
+if os.environ.get('STUDY_RELEASE')=='1':
+    text=text.replace("'--example', 'study_protocols', '--example', 'perf_baseline', '--example', 'study_fixed']",
+                      "'--release', '--example', 'study_protocols', '--example', 'perf_baseline', '--example', 'study_fixed']")
+    text=text.replace("'debug/examples'", "'release/examples'")
 # This Windows overlay does not compile Linux-only syscall code. The same file
 # is used unchanged on the released Linux bench and opens the real PMU there.
 text=text.replace("p=source/'src/lib.rs';p.write_text(p.read_text()+'\\npub mod study_counter;\\npub mod study_tick;\\n',newline='\\n')",
                   "p=source/'src/lib.rs';p.write_text(p.read_text()+'\\n#[cfg(target_os=\\\"linux\\\")]\\npub mod study_counter;\\npub mod study_tick;\\n',newline='\\n')")
 exec(compile(text,str(prior),'exec'),{'__file__':str(Path(__file__).resolve()),'__name__':'__main__','STUDY':study})
+root=Path(sys.argv[2]).resolve();arm=sys.argv[3]
+p=root/arm/'pins.json';pins=json.loads(p.read_text())
+pins['priorPrepareSha256']=hashlib.sha256(prior.read_bytes()).hexdigest()
+pins['releaseBuild']=os.environ.get('STUDY_RELEASE')=='1'
+p.write_text(json.dumps(pins,indent=2)+'\n',newline='\n')
