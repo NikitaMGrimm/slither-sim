@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
+
 ### Added
 
 - A real-socket Battledome recheck after the two spawn-search speedups, with
