@@ -1,0 +1,734 @@
+diff --git a/src/client/encode.rs b/src/client/encode.rs
+index 9a27e507..1cbef3bd 100644
+--- a/src/client/encode.rs
++++ b/src/client/encode.rs
+@@ -105,13 +105,16 @@ pub(crate) fn frameable(packet: &[u8]) -> bool {
+ }
+ 
+ /// Two-byte elapsed-ms header, then one raw packet or length-prefixed packets.
+-pub(crate) fn frame(elapsed_ms: u16, packets: &[Vec<u8>]) -> Result<Vec<u8>, String> {
++pub(crate) fn frame<P: AsRef<[u8]>>(elapsed_ms: u16, packets: &[P]) -> Result<Vec<u8>, String> {
+     let mut out = u16be(elapsed_ms).to_vec();
+     match packets {
+         [] => return Err("Empty frame".into()),
+-        [packet] if packet.first().is_some_and(|&code| code >= 32) => out.extend(packet),
++        [packet] if packet.as_ref().first().is_some_and(|&code| code >= 32) => {
++            out.extend_from_slice(packet.as_ref())
++        }
+         _ => {
+             for packet in packets {
++                let packet = packet.as_ref();
+                 if !frameable(packet) {
+                     return Err("Packet length cannot be framed".into());
+                 }
+@@ -743,7 +746,7 @@ mod tests {
+         let many = frame(300, &packets).unwrap();
+         assert_eq!(&many[..2], &300u16.to_be_bytes());
+         assert_eq!(split(&many), packets);
+-        assert!(frame(0, &[]).is_err());
++        assert!(frame::<Vec<u8>>(0, &[]).is_err());
+         assert!(frame(0, &[vec![b'F'; MAX_PACKET + 1], pong()]).is_err());
+     }
+ 
+diff --git a/src/client/encode13.rs b/src/client/encode13.rs
+index a8757cec..a13453f5 100644
+--- a/src/client/encode13.rs
++++ b/src/client/encode13.rs
+@@ -77,16 +77,17 @@ impl Encoder {
+         });
+     }
+ 
+-    pub(crate) fn packets(
++    pub(crate) fn packets<P: AsRef<[u8]>>(
+         &mut self,
+-        packets: &[Vec<u8>],
++        packets: &[P],
+         maps: &mut FullMapCache,
+     ) -> Result<Vec<Vec<u8>>, String> {
+         let mut out = Vec::with_capacity(packets.len());
+         for p in packets {
++            let p = p.as_ref();
+             match p[0] {
+                 b'a' => {
+-                    let mut p = p.clone();
++                    let mut p = p.to_vec();
+                     p[23] = 13;
+                     self.spacing = f64::from(p[24]);
+                     if let Some(map) = &mut self.full_map {
+@@ -98,7 +99,7 @@ impl Encoder {
+                 b's' if p.len() > 7 => out.push(self.appearance(p)?),
+                 b's' => {
+                     self.fronts.remove(&u16_at(p, 1));
+-                    out.push(p.clone());
++                    out.push(p.to_vec());
+                 }
+                 b'd' | b'7' => {
+                     let mut q = vec![if p[0] == b'd' { b'e' } else { b'E' }];
+@@ -153,19 +154,19 @@ impl Encoder {
+                     out.push(if let Some(map) = &mut self.full_map {
+                         map.packet(p, maps)?
+                     } else {
+-                        p.clone()
++                        p.to_vec()
+                     });
+                 }
+                 b'z' => {
+                     if let Some(map) = &mut self.full_map {
+                         map.radius = u24_at(p, 1);
+                     }
+-                    out.push(p.clone());
++                    out.push(p.to_vec());
+                 }
+                 // Common catalog families, plus existing local score/record/rules
+                 // presentation. Never forward a new 19-only layout silently.
+                 b'e' | b'E' | b'3' | b'4' | b'5' | b'h' | b'r' | b'w' | b'y' | b'j' | b'l'
+-                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.clone()),
++                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.to_vec()),
+                 _ => return Err(format!("No protocol-13 encoding for code {}", p[0])),
+             }
+         }
+diff --git a/src/client/simulation/broadcast.rs b/src/client/simulation/broadcast.rs
+index 38ab3cc2..e62e65b8 100644
+--- a/src/client/simulation/broadcast.rs
++++ b/src/client/simulation/broadcast.rs
+@@ -2,7 +2,7 @@
+ use super::{
+     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
+     connection::KnownPrey,
+-    food::{FoodChanges, food_identity, food_updates},
++    food::{FoodChanges, FoodPackets, food_identity, food_updates},
+     minimap::MinimapBroadcast,
+     prey_visibility::PreyBounds,
+     snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
+@@ -19,7 +19,24 @@ use std::collections::{BTreeMap, BTreeSet};
+ /// Rows the stock leaderboard shows.
+ pub(super) const LEADERBOARD_ROWS: usize = 10;
+ /// Physical packets, plus a browser view when pit decoration is active.
+-type PacketViews = (Vec<Vec<u8>>, Option<Vec<Vec<u8>>>);
++struct PacketViews {
++    packets: Vec<Vec<u8>>,
++    food: FoodPackets,
++    presented_food: Option<FoodPackets>,
++    food_start: usize,
++}
++
++fn packet_slices<'a>(
++    packets: &'a [Vec<u8>],
++    food_start: usize,
++    food: &'a FoodPackets,
++) -> Vec<&'a [u8]> {
++    let mut views = Vec::with_capacity(packets.len() + food.len());
++    views.extend(packets[..food_start].iter().map(Vec::as_slice));
++    views.extend(food.iter());
++    views.extend(packets[food_start..].iter().map(Vec::as_slice));
++    views
++}
+ /// One prey's correction clock, shared by every recipient: official
+ /// corrections for one prey align across clients, and a new viewer does not
+ /// restart it.
+@@ -429,7 +446,12 @@ impl SimulatorBackend {
+             } else {
+                 vec![encode::pong(); pongs]
+             };
+-            let (updates, presented_updates) = self.updates(
++            let PacketViews {
++                packets: updates,
++                food,
++                presented_food,
++                mut food_start,
++            } = self.updates(
+                 slot,
+                 &food_changes,
+                 &bounds,
+@@ -442,16 +464,12 @@ impl SimulatorBackend {
+             }
+             // Most broadcasts have neither pongs nor a map. Keep updates' own
+             // allocation instead of moving every packet through another Vec.
+-            let (mut packets, mut presented) = if prefix.is_empty() {
+-                (updates, presented_updates)
++            let mut packets = if prefix.is_empty() {
++                updates
+             } else {
+-                let presented = presented_updates.map(|updates| {
+-                    let mut presented = prefix.clone();
+-                    presented.extend(updates);
+-                    presented
+-                });
++                food_start += prefix.len();
+                 prefix.extend(updates);
+-                (prefix, presented)
++                prefix
+             };
+             // The stock client ignores a leaderboard after game over, so the
+             // death broadcast omits it; a record may follow.
+@@ -459,14 +477,18 @@ impl SimulatorBackend {
+                 .as_ref()
+                 .filter(|_| leaderboard_due && (alive || was_over));
+             let hud = self.hud(slot, live_board)?;
+-            if let Some(presented) = &mut presented {
+-                presented.extend(hud.iter().cloned());
+-            }
+             packets.extend(hud);
+-            if let Some(presented) = presented {
+-                self.emit_presented(slot, now, &presented, Some(&packets))?;
+-            } else if !packets.is_empty() {
+-                self.emit(slot, now, &packets)?;
++            if let Some(presented_food) = presented_food {
++                let physical = packet_slices(&packets, food_start, &food);
++                let presented = packet_slices(&packets, food_start, &presented_food);
++                self.emit_presented(slot, now, &presented, Some(&physical))?;
++            } else if food.is_empty() {
++                if !packets.is_empty() {
++                    self.emit(slot, now, &packets)?;
++                }
++            } else {
++                let views = packet_slices(&packets, food_start, &food);
++                self.emit(slot, now, &views)?;
+             }
+         }
+         if early >= self.slots.len() {
+@@ -715,17 +737,17 @@ impl SimulatorBackend {
+         }
+         let connection = &mut self.slots[slot].connection;
+         let food_start = packets.len();
++        let mut food = FoodPackets::default();
+         food_updates(
+-            &mut packets,
++            &mut food,
+             &mut connection.food,
+             &connection.food_interest,
+             &self.food_sectors,
+             food_changes,
+             &self.food_eaters,
+         );
+-        let food_end = packets.len();
+-        let mut presented = if connection.decorations && self.pit_markers.is_some() {
+-            let mut presented = packets[..food_start].to_vec();
++        let presented_food = if connection.decorations && self.pit_markers.is_some() {
++            let mut presented = FoodPackets::default();
+             food_updates(
+                 &mut presented,
+                 &mut connection.decorated_food,
+@@ -779,10 +801,12 @@ impl SimulatorBackend {
+             }
+             connection.prey.insert(id, current);
+         }
+-        if let Some(presented) = &mut presented {
+-            presented.extend_from_slice(&packets[food_end..]);
+-        }
+-        Ok((packets, presented))
++        Ok(PacketViews {
++            packets,
++            food,
++            presented_food,
++            food_start,
++        })
+     }
+ 
+     /// Leaderboard when `board` is given, then an unsent record. Both wait for
+@@ -900,6 +924,37 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn food_views_keep_insertion_order_and_borrow_all_packet_bytes() {
++        let packets = vec![vec![b'p'], vec![b's'], vec![b'y'], vec![b'l']];
++        let food = FoodPackets::from_packets(vec![vec![b'f'], vec![b'c']]);
++        for (start, codes) in [(0, b"fcpsyl"), (2, b"psfcyl"), (4, b"psylfc")] {
++            let views = packet_slices(&packets, start, &food);
++            assert_eq!(views.iter().map(|p| p[0]).collect::<Vec<_>>(), codes);
++            for view in &views {
++                let original = packets
++                    .iter()
++                    .map(Vec::as_slice)
++                    .chain(food.iter())
++                    .find(|p| p[0] == view[0])
++                    .unwrap();
++                assert_eq!(view.as_ptr(), original.as_ptr());
++            }
++            let expected: Vec<Vec<u8>> = codes.iter().map(|&c| vec![c]).collect();
++            for elapsed in [0, 7, 65535] {
++                assert_eq!(
++                    encode::frame(elapsed, &views),
++                    encode::frame(elapsed, &expected)
++                );
++            }
++        }
++        let empty = FoodPackets::default();
++        assert_eq!(
++            encode::frame(7, &packet_slices(&packets, 2, &empty)),
++            encode::frame(7, &packets)
++        );
++    }
++
+     #[test]
+     fn tick_and_standalone_broadcast_keep_subscription_history() {
+         let mut backend = backend();
+diff --git a/src/client/simulation/connection.rs b/src/client/simulation/connection.rs
+index 46300075..c2adc2a8 100644
+--- a/src/client/simulation/connection.rs
++++ b/src/client/simulation/connection.rs
+@@ -324,21 +324,21 @@ impl SimulatorBackend {
+     /// Frame packets emitted at `now`. A packet too long for a length prefix (a
+     /// dense large minimap) travels alone in its own frame, in stream order.
+     /// Aggregate broadcasts are split to fit the bounded socket transports.
+-    pub(super) fn emit(
++    pub(super) fn emit<P: AsRef<[u8]>>(
+         &mut self,
+         slot: usize,
+         now: f64,
+-        packets: &[Vec<u8>],
++        packets: &[P],
+     ) -> Result<(), String> {
+         self.emit_presented(slot, now, packets, None)
+     }
+ 
+-    pub(super) fn emit_presented(
++    pub(super) fn emit_presented<P: AsRef<[u8]>>(
+         &mut self,
+         slot: usize,
+         now: f64,
+-        packets: &[Vec<u8>],
+-        physical: Option<&[Vec<u8>]>,
++        packets: &[P],
++        physical: Option<&[P]>,
+     ) -> Result<(), String> {
+         if self.slots[slot].connection.output_fault.is_some() {
+             return Ok(());
+@@ -495,23 +495,23 @@ impl SimulatorBackend {
+ 
+ /// Consume legacy packet buffers while borrowing stock bundles. Both paths
+ /// keep the same queue preflight and per-frame latency/header progression.
+-enum FrameGroups<'a> {
++enum FrameGroups<'a, P> {
+     Legacy(std::vec::IntoIter<Vec<u8>>),
+-    Stock(std::vec::IntoIter<&'a [Vec<u8>]>),
++    Stock(std::vec::IntoIter<&'a [P]>),
+ }
+ 
+-enum FrameGroup<'a> {
++enum FrameGroup<'a, P> {
+     Legacy(Vec<u8>),
+-    Stock(&'a [Vec<u8>]),
++    Stock(&'a [P]),
+ }
+ 
+-impl FrameGroups<'_> {
++impl<P> FrameGroups<'_, P> {
+     fn is_empty(&self) -> bool {
+         self.len() == 0
+     }
+ }
+ 
+-impl FrameGroup<'_> {
++impl<P: AsRef<[u8]>> FrameGroup<'_, P> {
+     fn frame(self, elapsed: u16) -> Result<Vec<u8>, String> {
+         match self {
+             Self::Legacy(packet) => encode::frame_owned(elapsed, packet),
+@@ -520,8 +520,8 @@ impl FrameGroup<'_> {
+     }
+ }
+ 
+-impl<'a> Iterator for FrameGroups<'a> {
+-    type Item = FrameGroup<'a>;
++impl<'a, P> Iterator for FrameGroups<'a, P> {
++    type Item = FrameGroup<'a, P>;
+ 
+     fn next(&mut self) -> Option<Self::Item> {
+         match self {
+@@ -536,7 +536,7 @@ impl<'a> Iterator for FrameGroups<'a> {
+     }
+ }
+ 
+-impl ExactSizeIterator for FrameGroups<'_> {
++impl<P> ExactSizeIterator for FrameGroups<'_, P> {
+     fn len(&self) -> usize {
+         match self {
+             Self::Legacy(packets) => packets.len(),
+@@ -555,11 +555,12 @@ fn session_id(serial: u32, key: u32) -> u32 {
+ }
+ 
+ /// Stock transport grouping, shared by physical scheduling and presentation.
+-fn frame_groups(packets: &[Vec<u8>]) -> Vec<&[Vec<u8>]> {
+-    let mut groups: Vec<&[Vec<u8>]> = Vec::new();
++fn frame_groups<P: AsRef<[u8]>>(packets: &[P]) -> Vec<&[P]> {
++    let mut groups: Vec<&[P]> = Vec::new();
+     let mut start = 0;
+     let mut bytes = 2; // Elapsed-ms header.
+     for (index, packet) in packets.iter().enumerate() {
++        let packet = packet.as_ref();
+         if !encode::frameable(packet) {
+             if start < index {
+                 groups.push(&packets[start..index]);
+@@ -612,6 +613,83 @@ mod tests {
+         vec![packet; frames]
+     }
+ 
++    fn shared(packets: &[Vec<u8>]) -> Vec<&[u8]> {
++        packets.iter().map(Vec::as_slice).collect()
++    }
++
++    #[test]
++    fn shared_packets_keep_group_boundaries_and_framing_errors() {
++        for packets in [
++            Vec::new(),
++            vec![Vec::new()],
++            vec![vec![31], vec![b'p']],
++            vec![vec![b'i'; 8192], vec![b'p']],
++            vec![vec![b'i'; 8191]; 130],
++        ] {
++            let views = shared(&packets);
++            let expected = frame_groups(&packets);
++            let actual = frame_groups(&views);
++            assert_eq!(
++                actual.iter().map(|g| g.len()).collect::<Vec<_>>(),
++                expected.iter().map(|g| g.len()).collect::<Vec<_>>()
++            );
++            for (a, b) in actual.iter().zip(expected) {
++                for elapsed in [0, 7, 65535] {
++                    assert_eq!(encode::frame(elapsed, a), encode::frame(elapsed, b));
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn shared_packets_keep_stock_legacy_headers_and_physical_draws() {
++        for legacy in [false, true] {
++            let mut actual = backend();
++            let mut reference = backend();
++            if legacy {
++                actual.slots[0].connection.legacy =
++                    Some(Box::new(crate::client::encode13::Encoder::new(0)));
++                reference.slots[0].connection.legacy =
++                    Some(Box::new(crate::client::encode13::Encoder::new(0)));
++            }
++            let style = encode::FoodStyle {
++                color: 4,
++                size: 20,
++                snake_food: false,
++            };
++            let packets = vec![
++                encode::pong(),
++                encode::food_add([108, 108, 1, 2], style),
++                encode::food_remove([108, 108, 1, 2], Some(17)),
++            ];
++            let views = shared(&packets);
++            for now in [0., 0.0004, 0.0006, 1000.] {
++                actual
++                    .emit_presented(0, now, &views, Some(&views[..1]))
++                    .unwrap();
++                reference
++                    .emit_presented(0, now, &packets, Some(&packets[..1]))
++                    .unwrap();
++                assert_eq!(
++                    actual.slots[0].connection.take_downlink(),
++                    reference.slots[0].connection.take_downlink()
++                );
++                assert_eq!(
++                    actual.slots[0].connection.header_ms,
++                    reference.slots[0].connection.header_ms
++                );
++                assert_eq!(
++                    format!("{:?}", actual.random),
++                    format!("{:?}", reference.random)
++                );
++                assert_eq!(
++                    format!("{:?}", actual.slots[0].connection.link),
++                    format!("{:?}", reference.slots[0].connection.link)
++                );
++            }
++        }
++    }
++
+     #[test]
+     fn owned_legacy_frames_keep_physical_draws_and_elapsed_allocation() {
+         let mut actual = backend();
+diff --git a/src/client/simulation/food.rs b/src/client/simulation/food.rs
+index 77f369a2..eff806ab 100644
+--- a/src/client/simulation/food.rs
++++ b/src/client/simulation/food.rs
+@@ -11,6 +11,7 @@ use crate::{
+ use std::{
+     cell::RefCell,
+     collections::{BTreeMap, BTreeSet},
++    rc::Rc,
+     sync::Arc,
+ };
+ 
+@@ -160,13 +161,13 @@ pub(super) struct FoodChanges {
+ pub(super) struct SectorDiff {
+     previous: Arc<SectorFood>,
+     current: Arc<SectorFood>,
+-    packets: Vec<Vec<u8>>,
++    packets: Rc<Vec<Vec<u8>>>,
+ }
+ 
+ impl FoodChanges {
+     fn append_diff(
+         &self,
+-        packets: &mut Vec<Vec<u8>>,
++        packets: &mut FoodPackets,
+         sector: [u8; 2],
+         previous: &Arc<SectorFood>,
+         current: &Arc<SectorFood>,
+@@ -181,17 +182,99 @@ impl FoodChanges {
+                 SectorDiff {
+                     previous: previous.clone(),
+                     current: current.clone(),
+-                    packets,
++                    packets: Rc::new(packets),
+                 }
+             });
+         if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
+-            packets.extend_from_slice(&diff.packets);
++            packets.shared(diff.packets.clone());
+         } else {
+             // A recipient skipped an earlier broadcast and holds an older view.
+-            sector_changes(packets, sector, previous, current, eaters);
++            let mut owned = Vec::new();
++            sector_changes(&mut owned, sector, previous, current, eaters);
++            packets.extend(owned);
++        }
++    }
++}
++/// Food packet ownership is separate from ordinary packet production. One
++/// shared group retains a whole sector diff without per-packet reference counts.
++#[derive(Clone, Debug, Default)]
++pub(super) struct FoodPackets {
++    groups: Vec<FoodGroup>,
++    count: usize,
++}
++
++#[derive(Clone, Debug)]
++enum FoodGroup {
++    Owned(Vec<u8>),
++    Shared(Rc<Vec<Vec<u8>>>),
++}
++
++impl FoodPackets {
++    fn push(&mut self, packet: Vec<u8>) {
++        self.count += 1;
++        self.groups.push(FoodGroup::Owned(packet));
++    }
++
++    fn extend(&mut self, packets: impl IntoIterator<Item = Vec<u8>>) {
++        for packet in packets {
++            self.push(packet);
+         }
+     }
++
++    fn shared(&mut self, packets: Rc<Vec<Vec<u8>>>) {
++        if !packets.is_empty() {
++            self.count += packets.len();
++            self.groups.push(FoodGroup::Shared(packets));
++        }
++    }
++
++    pub(super) fn len(&self) -> usize {
++        self.count
++    }
++    pub(super) fn is_empty(&self) -> bool {
++        self.count == 0
++    }
++    pub(super) fn iter(&self) -> impl Iterator<Item = &[u8]> {
++        self.groups
++            .iter()
++            .flat_map(|group| match group {
++                FoodGroup::Owned(packet) => std::slice::from_ref(packet).iter(),
++                FoodGroup::Shared(packets) => packets.iter(),
++            })
++            .map(Vec::as_slice)
++    }
++
++    #[cfg(test)]
++    pub(super) fn from_packets(packets: Vec<Vec<u8>>) -> Self {
++        let mut out = Self::default();
++        out.extend(packets);
++        out
++    }
++
++    #[cfg(test)]
++    pub(super) fn clear(&mut self) {
++        self.groups.clear();
++        self.count = 0;
++    }
++    #[cfg(test)]
++    pub(super) fn contains(&self, packet: &[u8]) -> bool {
++        self.iter().any(|p| p == packet)
++    }
++}
++
++#[cfg(test)]
++impl PartialEq<Vec<Vec<u8>>> for FoodPackets {
++    fn eq(&self, other: &Vec<Vec<u8>>) -> bool {
++        self.iter().eq(other.iter().map(Vec::as_slice))
++    }
+ }
++#[cfg(test)]
++impl<const N: usize> PartialEq<[Vec<u8>; N]> for FoodPackets {
++    fn eq(&self, other: &[Vec<u8>; N]) -> bool {
++        self.iter().eq(other.iter().map(Vec::as_slice))
++    }
++}
++
+ #[cfg(test)]
+ impl std::ops::Index<&[u8; 2]> for KnownSectors {
+     type Output = SectorFood;
+@@ -478,7 +561,7 @@ impl SimulatorBackend {
+ /// nonempty `F`, then births/pickups; see docs/server-rules.md#food-sector-delivery.
+ /// `sectors` lists every subscribed sector.
+ pub(super) fn food_updates(
+-    packets: &mut Vec<Vec<u8>>,
++    packets: &mut FoodPackets,
+     known: &mut KnownSectors,
+     interest: &SectorInterest,
+     sectors: &[Option<Arc<SectorFood>>],
+@@ -644,6 +727,32 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn shared_groups_preserve_packet_boundaries_and_outlive_the_cache() {
++        let expected = vec![vec![b'c', 1, 2, 3, 4], vec![b'f', 1, 2, 3, 4, 5, 6]];
++        let cached = Rc::new(expected.clone());
++        let mut first = FoodPackets::default();
++        first.shared(cached.clone());
++        let mut second = FoodPackets::default();
++        second.shared(cached.clone());
++        assert_eq!(first.len(), 2);
++        assert_eq!(first.groups.len(), 1);
++        assert_eq!(first, expected);
++        assert!(
++            first
++                .iter()
++                .zip(second.iter())
++                .all(|(a, b)| a.as_ptr() == b.as_ptr())
++        );
++        drop(first);
++        drop(cached);
++        assert_eq!(second, expected);
++        second.shared(Rc::new(Vec::new()));
++        assert_eq!(second.len(), 2);
++        second.clear();
++        assert!(second.is_empty());
++    }
++
+     #[test]
+     fn shared_diffs_match_uncached_lifetimes_views_and_older_recipients() {
+         let sector = [108, 108];
+@@ -694,7 +803,7 @@ mod tests {
+             let mut expected = Vec::new();
+             sector_changes(&mut expected, key, previous, current, &eaters);
+             for _ in 0..3 {
+-                let mut actual = Vec::new();
++                let mut actual = FoodPackets::default();
+                 changes.append_diff(&mut actual, key, previous, current, &eaters);
+                 assert_eq!(actual, expected);
+             }
+@@ -703,7 +812,7 @@ mod tests {
+         // A new broadcast must not reuse the preceding pickup set, even when
+         // both listing identities remain the same.
+         let next = FoodChanges::default();
+-        let mut actual = Vec::new();
++        let mut actual = FoodPackets::default();
+         next.append_diff(&mut actual, sector, &old, &old, &BTreeMap::new());
+         assert!(actual.is_empty());
+         changes.append_diff(&mut actual, sector, &old, &old, &eaters);
+@@ -1115,7 +1224,7 @@ mod tests {
+                     food_revision: Some(changes.previous.clone()),
+                 };
+                 let mut reference = known.entries.iter().cloned().collect();
+-                let mut actual = Vec::new();
++                let mut actual = FoodPackets::default();
+                 let mut expected = Vec::new();
+                 food_updates(
+                     &mut actual,
+@@ -1223,7 +1332,7 @@ mod tests {
+                 if step == 12 && stream == 1 {
+                     continue; // This stream must catch up from an older snapshot.
+                 }
+-                let mut actual = Vec::new();
++                let mut actual = FoodPackets::default();
+                 let mut expected = Vec::new();
+                 food_updates(&mut actual, held, &interest, table, &changes, &eaters);
+                 reference_updates(&mut expected, oracle, interest.subscribed(), table, &eaters);
+@@ -1311,7 +1420,7 @@ mod tests {
+                     ));
+                 }
+             }
+-            let mut actual = Vec::new();
++            let mut actual = FoodPackets::default();
+             let mut expected = Vec::new();
+             food_updates(
+                 &mut actual,
+@@ -1558,7 +1667,7 @@ mod tests {
+         sectors[3] = Some(Arc::new(SectorFood::default()));
+         let interest = SectorInterest::from_subscribed(BTreeSet::from([[0, 1], [0, 2]]));
+         let mut known = KnownSectors::default();
+-        let mut packets = Vec::new();
++        let mut packets = FoodPackets::default();
+         let eaters = BTreeMap::new();
+         let initial = FoodChanges::default();
+         food_updates(
+diff --git a/src/client/simulation/tests.rs b/src/client/simulation/tests.rs
+index b34d6e61..ea3b32a3 100644
+--- a/src/client/simulation/tests.rs
++++ b/src/client/simulation/tests.rs
+@@ -12,7 +12,10 @@ use std::collections::BTreeSet;
+ use super::{
+     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
+     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},
+-    food::{FoodChanges, KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
++    food::{
++        FoodChanges, FoodPackets, KnownFood, KnownSectors, eaten_sectors, food_identity,
++        food_updates,
++    },
+     snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
+ };
+ 
+@@ -909,7 +912,7 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
+ 
+ /// Diff against freshly allocated listings, as after a changed broadcast.
+ fn diff_food(
+-    packets: &mut Vec<Vec<u8>>,
++    packets: &mut FoodPackets,
+     connection: &mut Connection,
+     sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
+     eaters: &BTreeMap<(u64, u64), u16>,
+@@ -953,7 +956,7 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
+         Some(Arc::new(SectorFood(vec![([rx, ry], food)])));
+     let interest = SectorInterest::from_subscribed(BTreeSet::from([[sx, sy]]));
+     let mut known = KnownSectors::default();
+-    let mut packets = Vec::new();
++    let mut packets = FoodPackets::default();
+     let none = BTreeMap::new();
+     let initial = FoodChanges::default();
+     let unchanged = FoodChanges {
+@@ -1027,7 +1030,7 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
+     };
+     let mut connection = Connection::default();
+     let mut sectors = BTreeMap::from([([sx, sy], BTreeMap::from([([rx, ry], first)]))]);
+-    let mut packets = Vec::new();
++    let mut packets = FoodPackets::default();
+     diff_food(
+         &mut packets,
+         &mut connection,
+@@ -1035,7 +1038,7 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
+         &BTreeMap::new(),
+         &BTreeSet::from([[sx, sy]]),
+     );
+-    assert!(packets.contains(&vec![b'F', sx, sy, 3, rx, ry, 20]));
++    assert!(packets.contains(&[b'F', sx, sy, 3, rx, ry, 20]));
+     sectors.get_mut(&[sx, sy]).unwrap().insert([rx, ry], second);
+     let eaters = BTreeMap::from([(food_identity(point), 2)]);
+     packets.clear();
+@@ -1110,7 +1113,7 @@ fn presentation_telemetry_preserves_physics_and_source_colors() {
+ #[test]
+ fn sector_announcements_follow_subscription_entries_and_exits() {
+     let mut connection = Connection::default();
+-    let mut packets = Vec::new();
++    let mut packets = FoodPackets::default();
+     let sectors = BTreeMap::new();
+     let eaters = BTreeMap::new();
+     diff_food(
