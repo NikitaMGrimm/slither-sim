@@ -107,6 +107,15 @@ spot check through tick 193,000 with six 144-tick continuations. This reuses
 retained visibility check runner and the same sole target. The spot check makes
 no timing requests. No measured runtime source changes or new timing series.
 
+Confirmation failed, so that conditional adoption branch was not entered.
+No post-adoption rebuild or spot check is claimed. For the final research-only
+delivery, put `final-delivery.tar`, `base.tar`, `candidate.tar` and
+[confirmation-postchecks.py](confirmation-postchecks.py) in a fresh external
+execution directory and run `python3 confirmation-postchecks.py`. It separately
+recomputes both series' tables/gates, reruns docs, compares the final runtime
+files with the baseline and checks the rejected patch round trip against both
+confirmation archives. It makes no timing requests.
+
 Keep raw sources, binaries, traces, snapshots and full inventories local-only.
 After all windows, create one bounded archive in guest tmpfs if space permits,
 reserving at least 256 MiB free; normalize owner metadata. Compare every archive

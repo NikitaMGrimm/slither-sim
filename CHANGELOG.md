@@ -15,10 +15,11 @@
 ### Performance
 
 - A post-compact-history study tests contiguous retained-sector keys and exact
-  timestamps. Fully grown 500-player food-update ticks use 6.4–6.9% fewer
-  instructions, with lower CPU in every pair, but whole-window CPU is mixed
-  and young protocol-13 worlds exceed the preset +10 µs/tick control limit.
-  The prototype is rejected and kept as a patch; runtime behavior is unchanged
+  timestamps. After the first series failed, a separately pre-registered
+  ten-pair confirmation still improves food-update CPU in every mature pair,
+  but only 5/10 stock whole-window pairs improve against the required 8/10.
+  The candidate is rejected for good and kept as a patch; both series remain
+  separate and runtime behavior is unchanged
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-retained-sector-layout/REPORT.md)).
 
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29

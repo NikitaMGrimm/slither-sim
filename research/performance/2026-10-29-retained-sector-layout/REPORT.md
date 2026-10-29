@@ -1,5 +1,14 @@
 # Contiguous retained-sector state after compact snake histories
 
+**Final status: rejected for good after the separate confirmation.** The
+ten-pair confirmation improves mature stock whole-window CPU in only 5/10
+pairs, below its pre-registered 8/10 requirement. No further series will run.
+The original five-pair report and rejection below are preserved; the
+[post-result maintainer decision and confirmation](#separate-post-result-confirmation)
+are reported separately, without pooling observations or changing either gate.
+
+*Original five-pair series:*
+
 **Rejected under the frozen gate; no runtime change.** Contiguous retained-
 sector state lowers mature maintenance CPU in all ten pairs, with median paired
 savings of 662 microseconds/tick stock and 543 for protocol 13. However, both
@@ -213,3 +222,96 @@ it is not publicly downloadable. The evidence archive is streamed off the guest
 without allocating another guest copy, then streamed back for member-by-member
 byte comparison with the stable source files before pruning. A transferred
 archive digest and verification counts are retained in `archive-receipt.json`.
+
+## Separate post-result confirmation
+
+After the first series failed, the maintaining agent declined an override and
+authorized exactly one separate confirmation. [CONFIRMATION-PLAN.md](CONFIRMATION-PLAN.md)
+was committed and pushed as `a6dfc764` before any new observations. This is a
+**post-result maintainer decision**, not a revision of the original study's
+verdict. Adoption rests on the confirmation alone. If it fails, the candidate
+stays rejected for good; no third series, tuning or extra pairs are allowed.
+
+The new arms are main `b750004a` (only 0.8.2 version metadata and research #275
+beyond the first runtime) and candidate `9a2f3bbc`. The exact original patch is
+applied without edits; both affected runtime files match `5edb5b2d` byte-for-byte.
+[confirmation-build.json](confirmation-build.json) pins both fresh builds and
+the Python controller/C collector aggregate, committed as `26d3a2cc` before
+timing. The Rust fixture, portable code generation, four grouped counters and
+advance brackets are unchanged. New Python boundary reads record background
+CPU outside the measured advance.
+
+Four rows use fresh complete-backend parents: mature-500 at tick 193,000 and
+young-500 at zero, both protocols. Each has one retained discarded AB, then
+ten AB/BA alternating pairs of 1,080 ticks. The previously passed 1/10/50-seat
+controls are not repeated. Mature start/end censuses match the first fixture;
+young worlds start with 500 living two-anchor snakes and end with 500 living,
+mean length 4.728, p90 6 and maximum 13. All within-series endpoint records match.
+
+The confirmation-only gate requires a mature median paired whole-window CPU
+ratio below one and at least 8/10 improving pairs in **each** protocol, mature
+maintenance median paired ratio below one in each, and young median paired
+absolute CPU cost at most +10 µs/tick in each. Even medians average the middle
+two values; exact rational/integer comparisons decide the boundaries.
+
+| Mature protocol | Improving whole-window pairs | Median whole CPU ratio [range] | Median maintenance CPU ratio [range] | Gate |
+| --- | ---: | ---: | ---: | --- |
+| Stock | **5/10** | 0.987482 [0.878007, 1.055279] | 0.859030 [0.736831, 0.929779] | **Fail: fewer than 8 wins** |
+| Protocol 13 | 8/10 | 0.957239 [0.891392, 1.061125] | 0.850463 [0.789021, 0.913717] | Pass |
+
+| Young protocol | Median paired cost, µs/tick | Full paired cost range | +10 gate |
+| --- | ---: | ---: | --- |
+| Stock | -31.986611 | [-110.523897, +79.981259] | Pass |
+| Protocol 13 | -2.689671 | [-70.388379, +86.954306] | Pass |
+
+Maintenance CPU improves in all twenty reported mature pairs, with median
+paired savings of 540.476 µs/tick stock and 557.440 for protocol 13. Mature
+maintenance instructions fall 6.90% / 6.49%, and ordinary instructions fall
+0.98% / 0.92%. All four whole-window instruction medians improve. This does
+not satisfy the failed stock CPU quorum and does not change the decision.
+Whole-window CPU p99 arm medians are 3.531690→3.079925 ms stock and
+3.735635→3.373615 ms protocol 13, with overlapping ranges. These are descriptive
+no-socket fixture tails, not a live official-500 capacity result.
+
+[CONFIRMATION-TABLES.md](CONFIRMATION-TABLES.md) retains the new ordinary and
+maintenance CPU, instructions, cycles, L1d/dTLB MPKI and p99 tables. The new
+[confirmation-results.json](confirmation-results.json) retains all eleven
+pairs per row and every arm's background diagnostics. The original
+`results.json`, `TABLES.md`, plan and selection are unchanged. The independent
+[confirmation calculator](confirmation-tables.py) verifies only this series;
+the original calculator separately reproduces the original rejection.
+
+### Background and exactness
+
+The [idle preflight](confirmation-idle-preflight.json) passes after the
+[notice](confirmation-timing-notice.json). All 88 windows, including discarded
+ABs, remain retained; none are filtered or corrected. Counters are fully
+scheduled in every interval. Visible non-study CPU ranges from 0 to 50 ms per
+request, with row medians of 20–30 ms; aggregate busy-minus-study CPU ranges
+from -30 to 170 ms, with medians of 55–90 ms. The 10 ms quantum and boundary
+alignment permit negative residuals, which are preserved. Aggregate steal totals
+220 ms across all request spans; no new/exited non-study process is observed at
+the boundaries. The request spans include untimed policy/drains and cover all
+guest CPUs. These diagnostics do not establish the cause of CPU variation and
+never enter the gate.
+
+On the fresh arms, the thirteen-test visibility suite, four detected runtime
+mutations and byte-checked restoration, full offline Rust group, all 27 traces,
+both wire controls, stream-byte control and seven documentation tests pass.
+Both complete mature warm streams and all four cohorts' six continuation
+streams match. Nine synthetic gate/accounting controls pass. Actual commands,
+exits and receipts are in [confirmation-proofs.json](confirmation-proofs.json).
+No conditional runtime adoption or post-adoption rebuild/spot check is claimed:
+that branch was not entered because confirmation failed.
+
+**Decision: keep the runtime unchanged and retain the original prototype patch.
+This candidate is rejected for good under the maintaining agent's confirmation
+rule. No observations are pooled, excluded or retried; no further series.**
+
+[CONFIRMATION-REPRODUCE.md](CONFIRMATION-REPRODUCE.md) gives the separate recipe.
+Final research-only checks recompute both series independently, rerun docs and
+compare the retained patch in both directions against the measured archives;
+their receipt is `confirmation-postprocessing-checks.json`. Full raw evidence
+is local-only. The confirmation archive is bounded in guest tmpfs, compared
+member-by-member before SFTP transfer, and checked by SHA-256 after transfer;
+`confirmation-archive-receipt.json` records its identity and verification.
