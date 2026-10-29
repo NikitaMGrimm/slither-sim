@@ -4,10 +4,13 @@
 
 ### Added
 
-- A one-core c7a.medium socket capacity study: a mature-start ladder reaches
-  its 750-bot slot ceiling at 6.41 ms median world CPU and 9.93 ms p99, with
-  zero deferred ticks. The 6.8 ms boundary is unmeasured, and newly joined
-  snakes make upper windows younger than the initial mature class
+- A capacity check on one core of an AWS c7a.medium, with real WebSocket bots
+  on a second machine. Starting from fully grown snakes and adding bots in
+  steps, it reached its preset 750-bot limit at 6.4 ms median and 9.9 ms p99
+  per tick without falling behind, so the 7 ms limit itself wasn't found. The
+  p99 first passed 7 ms between 500 and 550 bots. Bots added during the climb
+  started small, so the busiest steps had younger snakes than a fully grown
+  server
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-c7a-mature-capacity/REPORT.md)).
 
 ## [0.8.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.0...v0.8.1) - 2026-10-29
