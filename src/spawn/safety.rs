@@ -4,7 +4,10 @@ use crate::{
     Point, Simulator,
     physics::{Bounds, base_speed, collision_distance, segment_distance_le, swept_distance},
 };
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
+
+mod index;
+use index::ObstacleIndex;
 
 struct Edge {
     a: Point,
@@ -69,6 +72,8 @@ fn head_blocks(edges: &[Edge]) -> Vec<Bounds> {
 pub(crate) struct Safety {
     obstacles: Vec<Obstacle>,
     head_blocks: OnceCell<Vec<OnceCell<Vec<Bounds>>>>,
+    obstacle_index: OnceCell<Option<ObstacleIndex>>,
+    index_queries: Cell<u8>,
     candidate: Vec<Edge>,
     wall_limit: f64,
     segments: usize,
@@ -92,6 +97,35 @@ fn near(a: Bounds, b: Bounds, width: f64) -> bool {
 }
 
 impl Safety {
+    fn all_obstacles(
+        &self,
+        query: Bounds,
+        mut predicate: impl FnMut(usize, &Obstacle) -> bool,
+    ) -> bool {
+        // Short successful searches and small obstacle sets keep the original
+        // loop. Repeated queries amortize the one bounded grid construction.
+        // research/performance/2026-10-29-spawn-obstacle-index/REPORT.md
+        if self.obstacles.len() >= 32 && index::boundable(query) {
+            let queries = self.index_queries.get();
+            if queries >= 16 {
+                if let Some(index) = self
+                    .obstacle_index
+                    .get_or_init(|| ObstacleIndex::build(&self.obstacles))
+                {
+                    return index
+                        .candidates(query)
+                        .all(|slot| predicate(slot, &self.obstacles[slot]));
+                }
+            } else {
+                self.index_queries.set(queries + 1);
+            }
+        }
+        self.obstacles
+            .iter()
+            .enumerate()
+            .all(|(slot, obstacle)| predicate(slot, obstacle))
+    }
+
     fn blocks_head(&self, index: usize, head: Point) -> bool {
         let obstacle = &self.obstacles[index];
         let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, obstacle.head_width);
@@ -187,6 +221,8 @@ impl Safety {
         Self {
             obstacles,
             head_blocks: OnceCell::new(),
+            obstacle_index: OnceCell::new(),
+            index_queries: Cell::new(0),
             candidate: Vec::with_capacity(segments.saturating_sub(1)),
             wall_limit: world.radius() - crate::simulator::SPAWN_WALL_MARGIN,
             segments,
@@ -228,7 +264,7 @@ impl Safety {
         for &point in &body[1..] {
             bounds.include(point);
         }
-        self.obstacles.iter().all(|obstacle| {
+        self.all_obstacles(bounds, |_, obstacle| {
             if !obstacle.valid {
                 return false;
             }
@@ -294,10 +330,10 @@ impl Safety {
             return false;
         }
         let head_bounds = Bounds::between(head, head);
-        !self.obstacles.iter().enumerate().any(|(index, obstacle)| {
-            !obstacle.valid
-                || (near(head_bounds, obstacle.bounds, obstacle.head_width)
-                    && self.blocks_head(index, head))
+        self.all_obstacles(head_bounds, |index, obstacle| {
+            obstacle.valid
+                && (!near(head_bounds, obstacle.bounds, obstacle.head_width)
+                    || !self.blocks_head(index, head))
         })
     }
 
@@ -337,7 +373,7 @@ impl Safety {
             .take(if self.inward_only { 1 } else { 2 })
             .all(|end| {
                 let query = Bounds::between(head, end);
-                self.obstacles.iter().all(|obstacle| {
+                self.all_obstacles(query, |_, obstacle| {
                     let width = obstacle.departure_width;
                     (!near(query, obstacle.path.bounds, obstacle.departure_path_width)
                         || swept_distance(head, end, obstacle.path.a, obstacle.path.b)
@@ -358,6 +394,8 @@ impl Safety {
 
 #[cfg(test)]
 mod head_tests;
+#[cfg(test)]
+mod index_tests;
 
 #[cfg(test)]
 mod tests {

@@ -9,7 +9,7 @@ struct RawObstacle {
     width: f64,
 }
 
-fn original_segment(p: Point, a: Point, b: Point) -> f64 {
+pub(super) fn original_segment(p: Point, a: Point, b: Point) -> f64 {
     let dx = b.x - a.x;
     let dy = b.y - a.y;
     let denominator = dx * dx + dy * dy;
@@ -19,7 +19,7 @@ fn original_segment(p: Point, a: Point, b: Point) -> f64 {
     (p.x - (a.x + t * dx)).hypot(p.y - (a.y + t * dy))
 }
 
-fn original_swept(a: Point, b: Point, c: Point, d: Point) -> f64 {
+pub(super) fn original_swept(a: Point, b: Point, c: Point, d: Point) -> f64 {
     fn cross(p: Point, q: Point, r: Point) -> f64 {
         (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
     }
@@ -102,6 +102,8 @@ fn candidate(obstacles: &[RawObstacle]) -> Safety {
             })
             .collect(),
         head_blocks: OnceCell::new(),
+        obstacle_index: OnceCell::new(),
+        index_queries: Cell::new(0),
         candidate: Vec::new(),
         wall_limit: 1e10,
         segments: 26,

@@ -102,6 +102,7 @@ pub fn admission(path: &str, row: &str, count: usize, measured: bool) {
     let world=Simulator::from_checkpoint(&fs::read(folder.join("world.json")).unwrap(),crate::RestoreOptions::default()).unwrap();
     let mut backend=probe(world);
     assert_eq!(fs::read_dir("/proc/self/task").unwrap().count(),1);
+    let state_before=serde_json::to_vec(&backend.world.checkpoint().unwrap()).unwrap();
     let seed=fixture[if row=="refused" {"refusedSeed"} else {"successfulSeed"}].as_u64().unwrap();
     if std::env::var_os("STUDY_PROFILE").is_some() {
         profile_control("enable");
@@ -126,7 +127,8 @@ pub fn admission(path: &str, row: &str, count: usize, measured: bool) {
         records.push(serde_json::json!({"sample":sample,"result":result,
             "random":format!("{:?}",backend.spawn_random)}));
     }
-    println!("{}",serde_json::json!({"row":row,"records":records}));
+    assert_eq!(state_before,serde_json::to_vec(&backend.world.checkpoint().unwrap()).unwrap());
+    println!("{}",serde_json::json!({"row":row,"stateUnchanged":true,"records":records}));
 }
 
 fn profile_control(command: &str) {
