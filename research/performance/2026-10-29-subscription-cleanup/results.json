@@ -1,0 +1,1322 @@
+{
+  "fixed": {
+    "machine": "a 4-vCPU Zen 5 EPYC KVM guest",
+    "access": "raw ticks, complete traces, sources, binaries and command inventories local-only",
+    "rows": {
+      "short": {
+        "warmTicks": 0,
+        "ticksPerWindow": 1080,
+        "warmBytesPerArm": 9719935,
+        "completeWindowSha256": "88e814aeaa445d82116ac5185d54a26b3c29cd1c57ce589721f4ff42ff141db4",
+        "startCensus": {
+          "anchors": 1000,
+          "food": 52781,
+          "living": 500,
+          "max": 2,
+          "mean": 2.0,
+          "p90": 2,
+          "p99": 2,
+          "prey": 71
+        },
+        "endCensus": {
+          "anchors": 2364,
+          "food": 48953,
+          "living": 500,
+          "max": 13,
+          "mean": 4.728,
+          "p90": 6,
+          "p99": 11,
+          "prey": 58
+        },
+        "pairs": [
+          {
+            "pair": 0,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914365.856481481,
+                "cpuMsMean": 1.7563755916666666,
+                "cpuMsP99": 3.72302
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 14676633.266666668,
+                "cpuMsMean": 3.718442,
+                "cpuMsP99": 4.60037
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5790953.639436619,
+                "cpuMsMean": 1.7287408535211268,
+                "cpuMsP99": 3.32905
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914605.427777777,
+                "cpuMsMean": 1.7573580555555555,
+                "cpuMsP99": 3.68828
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 13873218.333333334,
+                "cpuMsMean": 3.7180513333333334,
+                "cpuMsP99": 4.98427
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5802512.288262911,
+                "cpuMsMean": 1.7297426572769952,
+                "cpuMsP99": 3.29681
+              }
+            }
+          },
+          {
+            "pair": 1,
+            "order": "BA",
+            "base": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914366.934259259,
+                "cpuMsMean": 1.7192696574074073,
+                "cpuMsP99": 3.65079
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 14676637.333333334,
+                "cpuMsMean": 3.6633546666666663,
+                "cpuMsP99": 4.29134
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5790954.675117371,
+                "cpuMsMean": 1.6918881784037558,
+                "cpuMsP99": 3.32162
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914605.913888888,
+                "cpuMsMean": 1.7370975,
+                "cpuMsP99": 3.45225
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 13873227.6,
+                "cpuMsMean": 3.49595,
+                "cpuMsP99": 4.46015
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5802512.6507042255,
+                "cpuMsMean": 1.7123249295774647,
+                "cpuMsP99": 3.31645
+              }
+            }
+          },
+          {
+            "pair": 2,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914366.002777778,
+                "cpuMsMean": 1.806985462962963,
+                "cpuMsP99": 3.84937
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 14676632.933333334,
+                "cpuMsMean": 3.822796,
+                "cpuMsP99": 4.92002
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5790953.792488263,
+                "cpuMsMean": 1.778593765258216,
+                "cpuMsP99": 3.36569
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914605.21574074,
+                "cpuMsMean": 1.7183653796296297,
+                "cpuMsP99": 3.4633
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 13873218.333333334,
+                "cpuMsMean": 3.4879113333333334,
+                "cpuMsP99": 4.44809
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5802512.073239436,
+                "cpuMsMean": 1.6934421971830986,
+                "cpuMsP99": 3.27729
+              }
+            }
+          },
+          {
+            "pair": 3,
+            "order": "BA",
+            "base": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914365.593518519,
+                "cpuMsMean": 1.7605392222222223,
+                "cpuMsP99": 3.87545
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 14676631.933333334,
+                "cpuMsMean": 3.7310526666666664,
+                "cpuMsP99": 4.56129
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5790953.391549296,
+                "cpuMsMean": 1.7327855117370892,
+                "cpuMsP99": 3.3287
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914605.337037037,
+                "cpuMsMean": 1.770248072222222,
+                "cpuMsP99": 3.61448
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 13873220.4,
+                "cpuMsMean": 3.6376252666666664,
+                "cpuMsP99": 4.55307
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5802512.16713615,
+                "cpuMsMean": 1.743946984976526,
+                "cpuMsP99": 3.33434
+              }
+            }
+          },
+          {
+            "pair": 4,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914366.212962963,
+                "cpuMsMean": 1.8453720546296297,
+                "cpuMsP99": 3.829269
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 14676633.466666667,
+                "cpuMsMean": 3.977151933333333,
+                "cpuMsP99": 5.78236
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5790953.998122065,
+                "cpuMsMean": 1.815346985915493,
+                "cpuMsP99": 3.41019
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 1080,
+                "instructionsMean": 5914606.434259259,
+                "cpuMsMean": 1.7223522777777778,
+                "cpuMsP99": 3.46097
+              },
+              "maintenance": {
+                "ticks": 15,
+                "instructionsMean": 13873221,
+                "cpuMsMean": 3.477462,
+                "cpuMsP99": 4.51289
+              },
+              "ordinary": {
+                "ticks": 1065,
+                "instructionsMean": 5802513.271361502,
+                "cpuMsMean": 1.6976324225352113,
+                "cpuMsP99": 3.27163
+              }
+            }
+          }
+        ]
+      },
+      "stock": {
+        "warmTicks": 193000,
+        "ticksPerWindow": 360,
+        "warmBytesPerArm": 5876276676,
+        "completeWindowSha256": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+        "startCensus": {
+          "anchors": 27610,
+          "food": 28897,
+          "living": 499,
+          "max": 271,
+          "mean": 55.33066132264529,
+          "p90": 176,
+          "p99": 247,
+          "prey": 20
+        },
+        "endCensus": {
+          "anchors": 27942,
+          "food": 28610,
+          "living": 500,
+          "max": 271,
+          "mean": 55.884,
+          "p90": 176,
+          "p99": 247,
+          "prey": 21
+        },
+        "pairs": [
+          {
+            "pair": 0,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8453423,
+                "cpuMsMean": 1.9605239166666668,
+                "cpuMsP99": 4.85641
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18327658.2,
+                "cpuMsMean": 4.691832,
+                "cpuMsP99": 5.14271
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8314349.264788732,
+                "cpuMsMean": 1.9220547887323944,
+                "cpuMsP99": 3.6043
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8455937.372222222,
+                "cpuMsMean": 1.7009112222222222,
+                "cpuMsP99": 3.95324
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 17642100.2,
+                "cpuMsMean": 3.99791,
+                "cpuMsP99": 4.35763
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8326554.797183098,
+                "cpuMsMean": 1.6685591267605633,
+                "cpuMsP99": 2.9074
+              }
+            }
+          },
+          {
+            "pair": 1,
+            "order": "BA",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8453421.822222222,
+                "cpuMsMean": 1.721546302777778,
+                "cpuMsP99": 4.30829
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18327656.2,
+                "cpuMsMean": 4.415444,
+                "cpuMsP99": 5.07625
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8314348.098591549,
+                "cpuMsMean": 1.6836040816901408,
+                "cpuMsP99": 3.12497
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8455937.997222222,
+                "cpuMsMean": 1.7031348333333332,
+                "cpuMsP99": 3.86362
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 17642100.6,
+                "cpuMsMean": 4.00472,
+                "cpuMsP99": 4.37449
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8326555.425352112,
+                "cpuMsMean": 1.6707181408450704,
+                "cpuMsP99": 2.88122
+              }
+            }
+          },
+          {
+            "pair": 2,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8453421.711111112,
+                "cpuMsMean": 1.7579530277777777,
+                "cpuMsP99": 4.54531
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18327658,
+                "cpuMsMean": 4.51183,
+                "cpuMsP99": 4.86403
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8314347.96056338,
+                "cpuMsMean": 1.719166028169014,
+                "cpuMsP99": 2.94632
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8455937.175,
+                "cpuMsMean": 1.7249872222222222,
+                "cpuMsP99": 3.92378
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 17642100.4,
+                "cpuMsMean": 4.009016,
+                "cpuMsP99": 4.45537
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8326554.5943661975,
+                "cpuMsMean": 1.6928178028169014,
+                "cpuMsP99": 2.89947
+              }
+            }
+          },
+          {
+            "pair": 3,
+            "order": "BA",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8453423.913888888,
+                "cpuMsMean": 1.7641395833333333,
+                "cpuMsP99": 4.35791
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18327657.2,
+                "cpuMsMean": 4.431066,
+                "cpuMsP99": 4.89713
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8314350.205633803,
+                "cpuMsMean": 1.7265772394366197,
+                "cpuMsP99": 3.25137
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8455937.402777778,
+                "cpuMsMean": 1.8496401666666666,
+                "cpuMsP99": 4.2116
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 17642100.2,
+                "cpuMsMean": 4.258272,
+                "cpuMsP99": 4.57145
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8326554.828169014,
+                "cpuMsMean": 1.8157157746478874,
+                "cpuMsP99": 3.24237
+              }
+            }
+          },
+          {
+            "pair": 4,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8453421.647222223,
+                "cpuMsMean": 1.7380503333333333,
+                "cpuMsP99": 4.40205
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18327656.4,
+                "cpuMsMean": 4.420034,
+                "cpuMsP99": 4.95883
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8314347.918309859,
+                "cpuMsMean": 1.7002759154929576,
+                "cpuMsP99": 3.30881
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8455938.055555556,
+                "cpuMsMean": 2.3303873333333334,
+                "cpuMsP99": 5.22809
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 17642102,
+                "cpuMsMean": 5.382488,
+                "cpuMsP99": 5.9336
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8326555.464788732,
+                "cpuMsMean": 2.2874,
+                "cpuMsP99": 3.79456
+              }
+            }
+          }
+        ]
+      },
+      "legacy": {
+        "warmTicks": 193000,
+        "ticksPerWindow": 360,
+        "warmBytesPerArm": 10132210980,
+        "completeWindowSha256": "62d61009cffbc71a910cfadd6a045747a31d3df9ff8e37dfb5bc5c126f05f5e7",
+        "startCensus": {
+          "anchors": 27610,
+          "food": 28897,
+          "living": 499,
+          "max": 271,
+          "mean": 55.33066132264529,
+          "p90": 176,
+          "p99": 247,
+          "prey": 20
+        },
+        "endCensus": {
+          "anchors": 27942,
+          "food": 28610,
+          "living": 500,
+          "max": 271,
+          "mean": 55.884,
+          "p90": 176,
+          "p99": 247,
+          "prey": 21
+        },
+        "pairs": [
+          {
+            "pair": 0,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8776465.994444445,
+                "cpuMsMean": 2.0174935555555553,
+                "cpuMsP99": 4.78232
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 19535557.4,
+                "cpuMsMean": 4.788452,
+                "cpuMsP99": 5.06664
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8624929.495774647,
+                "cpuMsMean": 1.978465971830986,
+                "cpuMsP99": 4.2877
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8779063.594444444,
+                "cpuMsMean": 2.0598689444444447,
+                "cpuMsP99": 4.41042
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18847290.4,
+                "cpuMsMean": 4.41474,
+                "cpuMsP99": 4.77876
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8637257.583098592,
+                "cpuMsMean": 2.0267017464788735,
+                "cpuMsP99": 4.12373
+              }
+            }
+          },
+          {
+            "pair": 1,
+            "order": "BA",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8776467.005555555,
+                "cpuMsMean": 2.2808792194444445,
+                "cpuMsP99": 5.646
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 19535559.6,
+                "cpuMsMean": 5.614218,
+                "cpuMsP99": 5.758
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8624930.490140846,
+                "cpuMsMean": 2.233930785915493,
+                "cpuMsP99": 4.21947
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8779063.575,
+                "cpuMsMean": 1.9681455,
+                "cpuMsP99": 4.41726
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18847289.2,
+                "cpuMsMean": 4.291368,
+                "cpuMsP99": 4.61968
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8637257.58028169,
+                "cpuMsMean": 1.9354240563380283,
+                "cpuMsP99": 3.91485
+              }
+            }
+          },
+          {
+            "pair": 2,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8776466.083333334,
+                "cpuMsMean": 2.031679083333333,
+                "cpuMsP99": 5.01666
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 19535558.2,
+                "cpuMsMean": 5.354798,
+                "cpuMsP99": 7.53883
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8624929.574647887,
+                "cpuMsMean": 1.9848745915492958,
+                "cpuMsP99": 4.44853
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8779064.097222222,
+                "cpuMsMean": 2.0373050805555555,
+                "cpuMsP99": 4.63119
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18847290.4,
+                "cpuMsMean": 4.372314,
+                "cpuMsP99": 4.86517
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8637258.092957746,
+                "cpuMsMean": 2.0044176309859156,
+                "cpuMsP99": 4.28439
+              }
+            }
+          },
+          {
+            "pair": 3,
+            "order": "BA",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8776465.938888889,
+                "cpuMsMean": 2.199246361111111,
+                "cpuMsP99": 5.06292
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 19535556.8,
+                "cpuMsMean": 5.418328,
+                "cpuMsP99": 6.57153
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8624929.447887324,
+                "cpuMsMean": 2.153907183098591,
+                "cpuMsP99": 4.23154
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8779063.277777778,
+                "cpuMsMean": 2.04683175,
+                "cpuMsP99": 4.47679
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18847291.2,
+                "cpuMsMean": 4.75762,
+                "cpuMsP99": 5.42381
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8637257.250704225,
+                "cpuMsMean": 2.008651633802817,
+                "cpuMsP99": 4.35047
+              }
+            }
+          },
+          {
+            "pair": 4,
+            "order": "AB",
+            "base": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8776466.61388889,
+                "cpuMsMean": 2.116988777777778,
+                "cpuMsP99": 4.8673
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 19535557,
+                "cpuMsMean": 5.05593,
+                "cpuMsP99": 5.55351
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8624930.129577465,
+                "cpuMsMean": 2.0755952394366197,
+                "cpuMsP99": 4.09247
+              }
+            },
+            "candidate": {
+              "all": {
+                "ticks": 360,
+                "instructionsMean": 8779063.872222222,
+                "cpuMsMean": 2.1392494166666665,
+                "cpuMsP99": 5.19857
+              },
+              "maintenance": {
+                "ticks": 5,
+                "instructionsMean": 18847291.6,
+                "cpuMsMean": 5.350544,
+                "cpuMsP99": 7.38785
+              },
+              "ordinary": {
+                "ticks": 355,
+                "instructionsMean": 8637257.847887324,
+                "cpuMsMean": 2.0940199154929577,
+                "cpuMsP99": 4.21407
+              }
+            }
+          }
+        ]
+      }
+    },
+    "pins": {
+      "base": {
+        "commit": "23e987f37b061ac80307404c24f6b7fecc71a770",
+        "archiveSha256": "cfeb34861bc9884300af6e42666dac9db4160f0223ae4d8826d9241ae0f22f3b",
+        "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+        "rustflags": "-C target-cpu=native",
+        "rustSourcesDigest": "f7680c9b5b9eb5ded3e3f5a960a6ba546be617a1c58095406f06156d4a4660dd",
+        "binaries": {
+          "perf_baseline": "af39b32cd3b6779db887dee26c1f95e6e72c6e886a1fbc53719388df92da5b3a",
+          "study_protocols": "5f13dd4c5a448055948d5bf18259a21c6305e7c166d43db128ccd955e53df2d6",
+          "study_host": "4fe6be93ca993192dedb769a497e88baa7c4721328b87d64c36a929321122480"
+        }
+      },
+      "candidate": {
+        "commit": "7a384183d0816ed903402e4b4062f410d584b0f2",
+        "archiveSha256": "7f6a215d70fec71c957a40288c74b509bb2cd183a41344f022468206be002c8d",
+        "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+        "rustflags": "-C target-cpu=native",
+        "rustSourcesDigest": "2f6ca48a7cf971d4835e4d2f7dcb6050cf31f9c0b49880020f5a9da752cc098c",
+        "binaries": {
+          "perf_baseline": "91cdca3d64e45aa6eca9eec80130aeabca1a0fccfcbe2cef8993981dc198f79b",
+          "study_protocols": "361f537d8c3af5767f84ce8e8dd95d0e25a9c2dfb5f0463261ae38215d6f6a81",
+          "study_host": "b1188f1a1d127d926bed36fd25c0ded7310aeb1eacb7711eadae2874a2b3bd8a"
+        }
+      },
+      "mutation": {
+        "commit": "7a384183d0816ed903402e4b4062f410d584b0f2",
+        "archiveSha256": "7f6a215d70fec71c957a40288c74b509bb2cd183a41344f022468206be002c8d",
+        "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+        "rustflags": "-C target-cpu=native",
+        "rustSourcesDigest": "65a233769dd81810705d53fc1688909c13162938cd7382ede7d7f1db08bd4713",
+        "binaries": {
+          "perf_baseline": "cfa89f0b034e59cd6b68377b6e16ae6a396fb46157ab724ef215d33cdf11f088",
+          "study_protocols": "36493c6cfd32bcf322e51bb901399e186af6e4fe8b2010afad634d67eb75326d",
+          "study_host": "85ffea9391936eeb7a319ef88afd6bf9f0a4f819cab9c56e6e716a0bdb7d32a9"
+        }
+      }
+    },
+    "catalogParity": [
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "step-default",
+          "32"
+        ],
+        "base": {
+          "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+          "bytes": 4747394
+        },
+        "candidate": {
+          "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c",
+          "bytes": 4747394
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "step-food",
+          "32"
+        ],
+        "base": {
+          "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+          "bytes": 114813212
+        },
+        "candidate": {
+          "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807",
+          "bytes": 114813212
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "step-body",
+          "32"
+        ],
+        "base": {
+          "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+          "bytes": 26873819
+        },
+        "candidate": {
+          "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5",
+          "bytes": 26873819
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "observe",
+          "32"
+        ],
+        "base": {
+          "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+          "bytes": 210433034
+        },
+        "candidate": {
+          "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc",
+          "bytes": 210433034
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "portable",
+          "32"
+        ],
+        "base": {
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "bytes": 17260699
+        },
+        "candidate": {
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e",
+          "bytes": 17260699
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "protocol",
+          "32"
+        ],
+        "base": {
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "bytes": 8343664
+        },
+        "candidate": {
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c",
+          "bytes": 8343664
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "sandbox-16-step",
+          "32"
+        ],
+        "base": {
+          "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+          "bytes": 8039178
+        },
+        "candidate": {
+          "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+          "bytes": 8039178
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "sandbox-16-bot",
+          "24"
+        ],
+        "base": {
+          "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+          "bytes": 54871500
+        },
+        "candidate": {
+          "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+          "bytes": 54871500
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-30-step",
+          "32"
+        ],
+        "base": {
+          "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+          "bytes": 20728651
+        },
+        "candidate": {
+          "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+          "bytes": 20728651
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-30-bot",
+          "16"
+        ],
+        "base": {
+          "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+          "bytes": 54020496
+        },
+        "candidate": {
+          "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+          "bytes": 54020496
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-100-step",
+          "16"
+        ],
+        "base": {
+          "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+          "bytes": 42173472
+        },
+        "candidate": {
+          "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+          "bytes": 42173472
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-100-bot",
+          "4"
+        ],
+        "base": {
+          "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+          "bytes": 59803592
+        },
+        "candidate": {
+          "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+          "bytes": 59803592
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-200-step",
+          "8"
+        ],
+        "base": {
+          "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+          "bytes": 41669943
+        },
+        "candidate": {
+          "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+          "bytes": 41669943
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-200-bot",
+          "2"
+        ],
+        "base": {
+          "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+          "bytes": 57425821
+        },
+        "candidate": {
+          "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+          "bytes": 57425821
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-500-step",
+          "4"
+        ],
+        "base": {
+          "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+          "bytes": 59311550
+        },
+        "candidate": {
+          "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+          "bytes": 59311550
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-500-bot",
+          "1"
+        ],
+        "base": {
+          "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+          "bytes": 78389779
+        },
+        "candidate": {
+          "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+          "bytes": 78389779
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "battledome-32-step",
+          "16"
+        ],
+        "base": {
+          "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+          "bytes": 17701194
+        },
+        "candidate": {
+          "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+          "bytes": 17701194
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "battledome-32-bot",
+          "4"
+        ],
+        "base": {
+          "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+          "bytes": 19456951
+        },
+        "candidate": {
+          "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+          "bytes": 19456951
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-128-step",
+          "16"
+        ],
+        "base": {
+          "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+          "bytes": 53280691
+        },
+        "candidate": {
+          "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+          "bytes": 53280691
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "official-128-bot",
+          "3"
+        ],
+        "base": {
+          "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+          "bytes": 60841865
+        },
+        "candidate": {
+          "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+          "bytes": 60841865
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "client-battledome-64",
+          "4"
+        ],
+        "base": {
+          "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+          "bytes": 36608905
+        },
+        "candidate": {
+          "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+          "bytes": 36608905
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "client-official-500",
+          "1"
+        ],
+        "base": {
+          "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+          "bytes": 82283629
+        },
+        "candidate": {
+          "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+          "bytes": 82283629
+        }
+      },
+      {
+        "binary": "perf_baseline",
+        "args": [
+          "shared-forager-a4-mean-8",
+          "16"
+        ],
+        "base": {
+          "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+          "bytes": 8549310
+        },
+        "candidate": {
+          "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943",
+          "bytes": 8549310
+        }
+      },
+      {
+        "binary": "study_protocols",
+        "args": [
+          "official500"
+        ],
+        "base": {
+          "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+          "bytes": 37938956
+        },
+        "candidate": {
+          "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+          "bytes": 37938956
+        }
+      },
+      {
+        "binary": "study_protocols",
+        "args": [
+          "official500-half"
+        ],
+        "base": {
+          "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+          "bytes": 57556590
+        },
+        "candidate": {
+          "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+          "bytes": 57556590
+        }
+      },
+      {
+        "binary": "study_protocols",
+        "args": [
+          "official500-legacy"
+        ],
+        "base": {
+          "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+          "bytes": 77137561
+        },
+        "candidate": {
+          "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+          "bytes": 77137561
+        }
+      },
+      {
+        "binary": "study_protocols",
+        "args": [
+          "official2281"
+        ],
+        "base": {
+          "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+          "bytes": 180734869
+        },
+        "candidate": {
+          "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+          "bytes": 180734869
+        }
+      }
+    ],
+    "mutations": [
+      {
+        "case": "official500",
+        "detected": true,
+        "sha256": "298032eea5138d888f780941668fa7912fe9dd9186b488bf9550f5d957b3db10",
+        "bytes": 37678174
+      },
+      {
+        "case": "official500-legacy",
+        "detected": true,
+        "sha256": "2fca3fb5af76db8c37662a9698f7e21c33cb5abae43cf798d95785dac7c1c640",
+        "bytes": 76106770
+      }
+    ],
+    "checks": {
+      "passed": true,
+      "checks": [
+        {
+          "label": "visibility-oracles",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "client::visibility::tests"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "wrong-stencil-touch",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "client::visibility::tests"
+          ],
+          "expectedFailure": true,
+          "exit": 101
+        },
+        {
+          "label": "missing-reentry-refresh",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "client::visibility::tests"
+          ],
+          "expectedFailure": true,
+          "exit": 101
+        },
+        {
+          "label": "rounded-deadline",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "client::visibility::tests"
+          ],
+          "expectedFailure": true,
+          "exit": 101
+        },
+        {
+          "label": "restored-visibility",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--lib",
+            "client::visibility::tests"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        },
+        {
+          "label": "rust-group",
+          "command": [
+            "python3",
+            "tools/check.py",
+            "rust"
+          ],
+          "expectedFailure": false,
+          "exit": 0
+        }
+      ],
+      "recovery": "Host restart detached stdout. The check runner durably recorded the full Rust group exit 0 before its final stdout print; reconstruct only the missing aggregate receipt. Verified all archived source files unchanged."
+    }
+  },
+  "payloadMutationControls": [
+    {
+      "case": "official500",
+      "wireFramesComparedByteForByte": true,
+      "wireFramesDiffer": 315622,
+      "firstDifferentFrame": 21,
+      "frameCounts": {
+        "reference": 317188,
+        "mutation": 314678
+      }
+    },
+    {
+      "case": "official500-legacy",
+      "wireFramesComparedByteForByte": true,
+      "wireFramesDiffer": 1011183,
+      "firstDifferentFrame": 567,
+      "frameCounts": {
+        "reference": 1011810,
+        "mutation": 995490
+      }
+    }
+  ],
+  "retainedArchives": [
+    {
+      "case": "short",
+      "access": "local-only externally verified complete cohort",
+      "sha256": "e42fbbcec904e13933ed5ec512938ce23d4b5c66398e325979f635ced0d51af8"
+    },
+    {
+      "case": "stock",
+      "access": "local-only externally verified complete cohort",
+      "sha256": "0972ddcf40cb9753812deaf4857d515eab9f6eae3dac02f48ecf6c55c026c11a"
+    },
+    {
+      "case": "legacy",
+      "access": "local-only externally verified complete cohort",
+      "sha256": "730ecfa2e7fb33e7e6a604cc6f2957306fc5f7c489555d6dcc84ed1863fa39f4"
+    }
+  ]
+}

@@ -25,6 +25,9 @@ pub(super) struct SectorInterest {
     /// Keys are exactly the subscribed sectors. Sectors of the current stencil
     /// were last seen at `touched`; their stored values may be older.
     last_seen: BTreeMap<[u8; 2], f64>,
+    /// Minimum stored time outside the current stencil, with a sector witness.
+    /// Current sectors use `touched`, so their older stored times do not count.
+    oldest: Option<([u8; 2], f64)>,
     cleanup_epoch: u64,
     /// Grid center of the latest stencil.
     center: Option<[f64; 2]>,
@@ -42,11 +45,22 @@ impl SectorInterest {
         // add it before flooring, including for negative world coordinates.
         let cx = ((head.x + center + HEADING_LEAD * heading.cos()) / size).floor();
         let cy = ((head.y + center + HEADING_LEAD * heading.sin()) / size).floor();
+        let current = |sector: [u8; 2]| {
+            let dx = (f64::from(sector[0]) - cx).abs();
+            let dy = (f64::from(sector[1]) - cy).abs();
+            dx <= 3. && dy <= 3. && !(dx == 3. && dy == 3.)
+        };
         // An unchanged stencil touches the same sectors, so only `touched` moves.
         if self.center != Some([cx, cy]) {
+            let refresh_oldest = self.oldest.is_some_and(|(sector, _)| current(sector));
             if let Some(previous) = self.center {
                 for sector in stencil(previous) {
                     self.last_seen.insert(sector, self.touched);
+                    // Existing non-current times cannot exceed the previous
+                    // touch, so only an empty minimum needs a new witness.
+                    if self.oldest.is_none() && !current(sector) {
+                        note_oldest(&mut self.oldest, sector, self.touched);
+                    }
                 }
             }
             for sector in stencil([cx, cy]) {
@@ -54,6 +68,16 @@ impl SectorInterest {
                 self.last_seen.insert(sector, now);
             }
             self.center = Some([cx, cy]);
+            // Only a re-entering minimum can invalidate the witness. The old
+            // stencil above becomes non-current at its previous touch time.
+            if refresh_oldest {
+                self.oldest = None;
+                for (&sector, &seen) in &self.last_seen {
+                    if !current(sector) {
+                        note_oldest(&mut self.oldest, sector, seen);
+                    }
+                }
+            }
         }
         self.touched = now;
 
@@ -63,19 +87,29 @@ impl SectorInterest {
         let epoch = (now / CLEANUP_SECONDS).floor() as u64;
         if epoch > self.cleanup_epoch {
             self.cleanup_epoch = epoch;
-            let subscribed = &mut self.subscribed;
-            let [cx, cy] = [cx, cy];
-            self.last_seen.retain(|sector, last_seen| {
-                let dx = (f64::from(sector[0]) - cx).abs();
-                let dy = (f64::from(sector[1]) - cy).abs();
-                let current = dx <= 3. && dy <= 3. && !(dx == 3. && dy == 3.);
-                if current || now - *last_seen <= RETENTION_SECONDS {
-                    true
-                } else {
-                    changed |= subscribed.remove(sector);
-                    false
-                }
-            });
+            // Subtraction is monotone in the stored time for fixed finite now.
+            // Keep the original subtraction: adding a future deadline can round
+            // differently at the strict expiry boundary.
+            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-subscription-cleanup/REPORT.md
+            if self
+                .oldest
+                .is_some_and(|(_, oldest)| now - oldest > RETENTION_SECONDS)
+            {
+                let subscribed = &mut self.subscribed;
+                let oldest = &mut self.oldest;
+                *oldest = None;
+                self.last_seen.retain(|sector, last_seen| {
+                    if current(*sector) {
+                        true
+                    } else if now - *last_seen <= RETENTION_SECONDS {
+                        note_oldest(oldest, *sector, *last_seen);
+                        true
+                    } else {
+                        changed |= subscribed.remove(sector);
+                        false
+                    }
+                });
+            }
         }
         if changed {
             self.revision = Arc::new(());
@@ -94,11 +128,19 @@ impl SectorInterest {
     #[cfg(test)]
     pub(super) fn from_subscribed(subscribed: BTreeSet<[u8; 2]>) -> Self {
         let last_seen = subscribed.iter().map(|&sector| (sector, 0.)).collect();
+        let oldest = subscribed.first().map(|&sector| (sector, 0.));
         Self {
             subscribed,
             last_seen,
+            oldest,
             ..Self::default()
         }
+    }
+}
+
+fn note_oldest(oldest: &mut Option<([u8; 2], f64)>, sector: [u8; 2], seen: f64) {
+    if oldest.is_none_or(|(_, previous)| seen < previous) {
+        *oldest = Some((sector, seen));
     }
 }
 
@@ -125,6 +167,164 @@ mod tests {
     use std::f64::consts::FRAC_PI_2;
 
     const FAR: Point = Point { x: 10_000., y: 0. };
+
+    fn assert_full_state(actual: &SectorInterest, reference: &SectorInterest) {
+        assert_eq!(actual.subscribed, reference.subscribed);
+        assert_eq!(actual.last_seen, reference.last_seen);
+        assert_eq!(actual.center, reference.center);
+        assert_eq!(actual.touched.to_bits(), reference.touched.to_bits());
+        assert_eq!(actual.cleanup_epoch, reference.cleanup_epoch);
+        let expected = reference
+            .last_seen
+            .iter()
+            .filter(|(sector, _)| {
+                reference.center.is_none_or(|[cx, cy]| {
+                    let dx = (f64::from(sector[0]) - cx).abs();
+                    let dy = (f64::from(sector[1]) - cy).abs();
+                    !(dx <= 3. && dy <= 3. && !(dx == 3. && dy == 3.))
+                })
+            })
+            .map(|(_, &seen)| seen)
+            .min_by(f64::total_cmp);
+        assert_eq!(
+            actual.oldest.map(|(_, t)| t.to_bits()),
+            expected.map(f64::to_bits)
+        );
+        if let Some((sector, seen)) = actual.oldest {
+            assert_eq!(actual.last_seen[&sector].to_bits(), seen.to_bits());
+        }
+    }
+
+    fn compare_advance(
+        actual: &mut SectorInterest,
+        reference: &mut SectorInterest,
+        head: Point,
+        heading: f64,
+        now: f64,
+    ) {
+        let old = actual.revision().clone();
+        let reference_old = reference.revision().clone();
+        actual.advance(head, heading, now);
+        full_sweep(reference, head, heading, now);
+        assert_full_state(actual, reference);
+        assert_eq!(
+            Arc::ptr_eq(&old, actual.revision()),
+            Arc::ptr_eq(&reference_old, reference.revision())
+        );
+    }
+
+    #[test]
+    fn oldest_matches_full_sweep_through_reentries_resets_and_rounding() {
+        let mut actual = SectorInterest::default();
+        let mut reference = actual.clone();
+        for (head, now) in [
+            (Point::default(), 0.),
+            (FAR, 0.007),
+            (Point::default(), 1.),
+            (FAR, 2.52),
+            (FAR, 3.024),
+            (Point::default(), 3.025),
+            (FAR, 1e12),
+        ] {
+            compare_advance(&mut actual, &mut reference, head, 0., now);
+        }
+        actual = SectorInterest::default();
+        reference = SectorInterest::default();
+        // An added deadline rounds up to now, despite strictly expired age.
+        let seen = 0.119_f64;
+        let now = seen + RETENTION_SECONDS;
+        assert!(now - seen > RETENTION_SECONDS);
+        assert!(now <= seen + RETENTION_SECONDS);
+        compare_advance(&mut actual, &mut reference, Point::default(), 0., seen);
+        compare_advance(&mut actual, &mut reference, FAR, 0., now);
+        assert_eq!(actual.subscribed.len(), 45);
+    }
+
+    #[test]
+    fn random_walk_skip_matches_full_sweep_and_exact_oldest() {
+        for seed in [1_u64, 7, 42, 0xfeed_beef] {
+            let mut random = seed;
+            let mut actual = SectorInterest::default();
+            let mut reference = actual.clone();
+            let mut head = Point::default();
+            let mut now = 0.;
+            for step in 0..12_000 {
+                random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+                if step % 367 == 0 {
+                    actual = SectorInterest::default();
+                    reference = SectorInterest::default();
+                }
+                if step % 257 == 0 {
+                    head = at_wire_sector((random >> 16) as u8 as u16, (random >> 24) as u8 as u16);
+                } else if step % 11 != 0 {
+                    head.x += ((random >> 32) as i8) as f64;
+                    head.y += ((random >> 40) as i8) as f64;
+                }
+                now += if step % 997 == 0 {
+                    1e12
+                } else if step % 113 == 0 {
+                    3.024
+                } else {
+                    0.007
+                };
+                let heading = (random >> 48) as f64 / 65536. * std::f64::consts::TAU;
+                compare_advance(&mut actual, &mut reference, head, heading, now);
+                if step % 509 == 0 {
+                    actual = actual.clone();
+                    reference = reference.clone();
+                }
+            }
+        }
+    }
+
+    // Frozen full-sweep owner from 23e987f3, independent of the minimum hint.
+    fn full_sweep(interest: &mut SectorInterest, head: Point, heading: f64, now: f64) {
+        let mut changed = false;
+        let size = f64::from(encode::SECTOR_SIZE);
+        let center = f64::from(encode::GRID_CENTER);
+        // The wire origin is half a sector from the centered world origin, so
+        // add it before flooring, including for negative world coordinates.
+        let cx = ((head.x + center + HEADING_LEAD * heading.cos()) / size).floor();
+        let cy = ((head.y + center + HEADING_LEAD * heading.sin()) / size).floor();
+        // An unchanged stencil touches the same sectors, so only `touched` moves.
+        if interest.center != Some([cx, cy]) {
+            if let Some(previous) = interest.center {
+                for sector in stencil(previous) {
+                    interest.last_seen.insert(sector, interest.touched);
+                }
+            }
+            for sector in stencil([cx, cy]) {
+                changed |= interest.subscribed.insert(sector);
+                interest.last_seen.insert(sector, now);
+            }
+            interest.center = Some([cx, cy]);
+        }
+        interest.touched = now;
+
+        // Absolute epochs keep phase at multiples of 0.504 from virtual zero.
+        // Touch before cleanup; a large jump needs only one bounded sweep and
+        // never advances the clock by repeatedly adding a floating interval.
+        let epoch = (now / CLEANUP_SECONDS).floor() as u64;
+        if epoch > interest.cleanup_epoch {
+            interest.cleanup_epoch = epoch;
+            let subscribed = &mut interest.subscribed;
+            let [cx, cy] = [cx, cy];
+            interest.last_seen.retain(|sector, last_seen| {
+                let dx = (f64::from(sector[0]) - cx).abs();
+                let dy = (f64::from(sector[1]) - cy).abs();
+                let current = dx <= 3. && dy <= 3. && !(dx == 3. && dy == 3.);
+                if current || now - *last_seen <= RETENTION_SECONDS {
+                    true
+                } else {
+                    changed |= subscribed.remove(sector);
+                    false
+                }
+            });
+        }
+        if changed {
+            interest.revision = Arc::new(());
+        }
+    }
 
     #[test]
     fn revision_tracks_membership_across_cloning_revisits_and_cleanup() {

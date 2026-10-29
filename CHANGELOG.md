@@ -4,6 +4,12 @@
 
 ### Added
 
+- A follow-up Battledome check with the bots boosting almost all the time,
+  the way Battledome players do. 80 players still play smoothly, with
+  sub-millisecond jitter. At 160 there are occasional slow ticks, and at 320
+  the server falls behind and respawns take over a second. Searching for safe
+  spawn spots takes most of the time in the slowest ticks
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-boost/REPORT.md)).
 - A Battledome check on one core of an AWS c7a.medium, with real WebSocket
   bots on a second machine, from 80 to 640 players. At 80 the median tick
   takes 1.1 ms. Up to 320 players the slowest tick stays under 7.5 ms, with no
@@ -21,6 +27,13 @@
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-c7a-mature-capacity/REPORT.md)).
 
 ### Performance
+
+- On the food-update tick, the host now skips each player's sector cleanup
+  until one of their retained sectors can actually expire. Output is
+  byte-identical. In a fully grown 500-player world those ticks run about
+  3.6% fewer instructions, while other ticks run about 0.15% more, so total
+  work is unchanged; the CPU-time saving is within measurement noise
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-subscription-cleanup/REPORT.md)).
 
 - On the food-update tick every 504 ms, the host now works out each sector's
   food changes once and shares them with every player holding the same
