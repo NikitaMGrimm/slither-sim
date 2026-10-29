@@ -306,6 +306,8 @@ archives; they are not public download links:
   `325a0099cae4025980b27aaf9f42007ecc8b9c15a649e12d9266a8202f6831f3`.
 - `final-complete.tar.gz`, 78,866,176 bytes:
   `d4a4d38020b737a20f699387d1c9b6a99bec25f8c6674f25f57d4dd96fefab6e`.
+- `fresh-complete.tar.gz`, 132,739,883 bytes:
+  `a413678f05b4fbe7adb7c390e727cbebe73e0dc46a0e834845a2b2197a18d825`.
 
 Each archive is copied outside the guest and SHA-256 verified before pruning.
 Every prospective removed file/link is compared with the archive. The first
@@ -315,6 +317,11 @@ The final cleanup verifies 2,721 entries, exact primary source/binary pins and t
 common client. All task processes stop, the sole Cargo target is absent, and the
 task root is removed. Read-only earlier-study donor directories are untouched.
 The guest is released before completing the local report.
+
+The fresh cleanup likewise compares 5,150 entries before removing its own task
+root. All fresh-series processes are stopped and the sole Cargo target is absent.
+Final navigation/table/source/privacy checks run on the guest after timing and
+before this cleanup; only archive identifiers are appended afterward.
 
 ## Timestamp encoding incident
 
