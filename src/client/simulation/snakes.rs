@@ -300,7 +300,14 @@ pub(super) struct KnownSnakes {
 }
 impl KnownSnakes {
     fn index(&self, slot: usize) -> Option<usize> {
-        self.entries.iter().position(|(key, _)| *key == slot)
+        // Bound linear work for crowded views without reserving sparse slots.
+        if self.entries.len() <= 8 {
+            self.entries.iter().position(|(key, _)| *key == slot)
+        } else {
+            self.entries
+                .binary_search_by_key(&slot, |(key, _)| *key)
+                .ok()
+        }
     }
     pub(super) fn contains_key(&self, slot: usize) -> bool {
         self.index(slot).is_some()
