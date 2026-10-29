@@ -11,6 +11,7 @@ impl RawSimulator {
             "nextMinimap": self.backend.next_minimap,
             "nextLeaderboard": self.backend.next_leaderboard,
             "living": self.backend.world.living(),
+            "decoratedViewers": self.backend.slots.iter().filter(|s|s.connection.open && s.connection.decorations).count(),
         })
     }
 
@@ -57,6 +58,7 @@ impl RawSimulator {
                 b.slots[slot].living=None;b.slots[slot].life+=1;
                 b.slots[slot].control=Action { heading:0.,boost:true };
                 b.connect(slot).unwrap();
+                b.slots[slot].connection.decorations=true;
                 if legacy { self.protocol13(slot); }
             }
             let len=self.backend.world.snakes()[slot].body.len();

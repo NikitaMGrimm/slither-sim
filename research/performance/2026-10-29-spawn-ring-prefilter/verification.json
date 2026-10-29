@@ -74,7 +74,7 @@
   "documentationTests": 7,
   "pmuRun": false,
   "sshGuestUsed": false,
-  "additionalControlCompilation": "Compiled locally; all six row/protocol work gates pass",
+  "additionalControlCompilation": "Prior view-only marker qualification withdrawn: decoration delivery was disabled; corrected rebuild pending",
   "independentReview": false,
   "controls": [
     {
@@ -194,5 +194,6 @@
     "spawn/base": "b2e262cd3a143f543196a310f94ade295b9d182e13d6059bd4ef6831c8c71b56",
     "spawn/candidate": "72497aa2fcef7963ced9d9e98421fb6cd9a4cebd44790b09d5a7040dd12cf9e3",
     "spawn/mutation": "7eaafa35aa7b69f942d9c3373c9dca07d44127d1a125462fd27095cd67bb0977"
-  }
+  },
+  "stagedNativeManifestsStatus": "Superseded after decoration gate correction; do not measure these stages"
 }

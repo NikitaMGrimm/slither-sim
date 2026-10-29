@@ -51,3 +51,10 @@
   the minimap row has a minimap update with no admission work. Both keep 80 live
   viewers. Independent synthetic reducer arithmetic and warmup exclusion pass.
   These are qualification checks only, with clocks/PMU disabled.
+- The later marker-specific wire mutation exposed a gap in the view-only
+  controls: direct backend connection setup had left decorations disabled.
+  The 80-live/marker-event gates passed but did not establish visible marker
+  work. Withdrew that marker qualification, enabled stock decorations explicitly
+  and added a counted decorated-viewer gate. Existing primary spawn proofs are
+  unaffected (their observer used the real host join path). Retained all prior
+  control builds and native staging; they are superseded, not silently reused.

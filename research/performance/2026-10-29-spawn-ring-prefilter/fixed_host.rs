@@ -125,7 +125,11 @@ impl Fixture {
         if self.row=="spawn" {
             assert!(searches>=ticks as u64/5 && exhausted==searches && attempts==4096*searches,
                 "blocked-band stress did not exhaust its exact candidate budget");
-        } else { assert_eq!(self.sim.world.study_state()["living"],SEATS); }
+        } else {
+            let state=self.sim.world.study_state();
+            assert_eq!(state["living"],SEATS);
+            assert_eq!(state["decoratedViewers"],SEATS);
+        }
         let summary = serde_json::json!({"ticks": ticks, "legacy": self.legacy, "waiting": self.sim.waiting.len(),
             "row":self.row,
             "blockedSearches":searches,"blockedAttempts":attempts,"blockedExhausted":exhausted,
