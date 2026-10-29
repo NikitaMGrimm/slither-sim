@@ -29,3 +29,11 @@
   not an assumption of exact division for subnormal inputs. This changes no
   implementation arithmetic. Parameters were chosen before timing: 1,024-unit
   cells, 32-obstacle minimum, 16-query lazy threshold and bounded storage.
+- Both portable native arms and the wire-mutation arm built successfully.
+  All 23 catalog, six host and two queued traces match; both protocol wire
+  controls differ. Both frozen admission outcomes match complete returned
+  bodies/errors and RNG states across repeated calls, leaving the world intact.
+  The first gate-writing invocation used the wrong final Rust receipt filename;
+  retained the error, read the actual 15-command passing receipt and reran only
+  gate writing and the remaining live-admission parity checks. No timing ran
+  before all gates passed.
