@@ -1,0 +1,1956 @@
+{
+  "scope": "Synthetic full-host fixed work; user instructions and current-thread CPU. No sockets or live capacity.",
+  "rawAccess": "local-only; no public download",
+  "rawArchive": {
+    "archiveSha256": "afc834723f9b8fee3526304d510b923c109a644722c46def7d1859241eeff7c4",
+    "archiveBytes": 701282013,
+    "files": 3950
+  },
+  "retrieval": {
+    "success": true,
+    "archiveSha256": "afc834723f9b8fee3526304d510b923c109a644722c46def7d1859241eeff7c4",
+    "archiveBytes": 701282013,
+    "verifiedFiles": 3950,
+    "steps": 10,
+    "UTC": "2026-10-29T07:11:55Z"
+  },
+  "pins": {
+    "base": {
+      "ref": "cf67b80e",
+      "commit": "cf67b80e14daef056a1e78c3051c19c79859f022",
+      "archiveSha256": "d1bd77d71e2de702af64de2d244db04f2f339b8e8579db8857b68a8cd00c48d5",
+      "prepareSha256": "09fff9f8f4acb50ba335bcb5878a219b3920ab5a418134a1e590d613469ce94b",
+      "releaseBuild": true,
+      "rustflags": "-C target-cpu=native",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "perf_baseline": "808eb4732324cc3dcfb828a4495b30ff221b5e13da19ee913169799a54f816be",
+        "study_protocols": "509e030739884ecb658933a2134682169b8b9d24b7f188b5a25aa14a408c7253",
+        "study_fixed": "92f346b6d75687625882588b94a5a90cd84400f9467e861636a2182b1515524a"
+      },
+      "sourceManifestSha256": "303a2b4008b63784054a6773b493b72259cea17f85a84dc00acb5d9c45e98119",
+      "instrumentedSources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "examples/basic.rs": "5aa2b6538a4804ee7224f00969b2605ca5fd57dbda58eba51dcde33f7281dbb3",
+        "examples/collision_curve.rs": "a6fc2d5f95be02920a9a018ff97aeaf36a9d23f94d4a7107ada12991ed63e448",
+        "examples/collision_delay.rs": "d858e894c1a0812d175463906184a89bed4303961f5b21576dbe57d208b7b27f",
+        "examples/fidelity_metrics.rs": "b025c42c0b4f38fd2b7e8427cc86fa9dd2c27aad746a96256286db06c2ec08d4",
+        "examples/fidelity_replay.rs": "19f5725386fe6344abf6b605e89932221f695da912fddf190bae1d2d38c4f9ad",
+        "examples/forager.rs": "3b8602b0c3a371cb27c20ab852baf83935641efdba8d9176357740d67a722d1e",
+        "examples/host_load.rs": "7df2046945a1eec02927602bd7ceed67d337d76deb752a8ef1dff96f6be61d09",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/perf_client_retained.rs": "c6bfec4fea2240681298d36670d36b5301eee1adbc0521579f7c4fd7e3ae5aef",
+        "examples/perf_observation.rs": "52f67b67bfc0eba9b041d0f8d5ea6f83076c016a479ce0288406722ea88a9a67",
+        "examples/perf_radius.rs": "6a1b3c1225ffcc940e6b88189c6f07c7077d2b2bd0c94a46dda7fd9b0cf4dc88",
+        "examples/perf_session.rs": "e9a8849cf8f8011fd70a523c6fc5d2c76d788e4c41a9990c521124a1fe416c65",
+        "examples/portable_bot.rs": "9582d85cb02cc0bd62e3676257c2927c0068a928b85e08a6fd2608ee2e3469d1",
+        "examples/study_fixed.rs": "d2ef4e1fa954f681fc0cdeee603c9ae6955882dfb374cc3dc637af8a4530e8e2",
+        "examples/study_protocols.rs": "3ab603e773581eeb057f9fece7ceef12397eab1fe4c2b1732b382450faefdcf3",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/lib.rs": "54c1bd504892f671a834edd86c0254445d6e8e06b70d0013e8af125836cce0a7",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/study_counter.rs": "84d917a10d9422cc1ed5f567ca331f5e943a06ef955f4dfa9048bbdb537c4d00",
+        "src/study_tick.rs": "84ededf5d137219af94bcfd7eba37eb600bcc062b86122ab5a4b0e75a32df2a9",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "tests/ambient_food.rs": "5041db84dd5ea4880def81edafa41e8c9aca8708a640e5af8ceaf447ed93ac7f",
+        "tests/battledome.rs": "7bda7fb261d19ce5e91d7e3201c51ef7cab5d6846b4d0c161c4c17d9f6fadf8a",
+        "tests/boost_food.rs": "3c409904afb1b2e426baf4f8b9ac41e8b28b06f3da1e66507c0675522dae53b4",
+        "tests/boundary.rs": "997bab5ae256dedb4b5be54f6bf528268de5a2d56494f4fae40c5f2ff847074a",
+        "tests/checkpoint.rs": "a850e4efbff1d19037973a45586d401405fef67aead113c46f3d260f3c9b1035",
+        "tests/circle_pickup.rs": "eff8d9056c9098a3379b5299ba8b7ddab234f8b547d6acd21cc826bdfad51f73",
+        "tests/client_challenge.rs": "5a3a7d4ae2767ac3ccc566a734d191f90f851526d1e37c8a760d72324335ac91",
+        "tests/client_contract.rs": "0e984bf1a7c05704ba9ef44189d219f311a6c70fd35c65b7b7bd180203ddfc28",
+        "tests/client_hud.rs": "e133375ec7037aab1a5ac6c4329c29179933e2307668d1a6dc70706087b2f113",
+        "tests/client_network.rs": "8c075e9e172fa59a6808aac54f01fd32e5c34267c975d0a86fefcc650633a15a",
+        "tests/client_protocol.rs": "63f3f89d4251e64503d570a75ca18133a76933d8ed8ba316029dab2ee914efc7",
+        "tests/client_received.rs": "8ddfb7a4e56bb8621c8b48517183c1dc62235b21ca5ccf81955d3cc0d8380a97",
+        "tests/client_runner.rs": "aae9cec2e0ff55bfb43ad5d5c943e11535acbf6f5672aff2362bb5e6077fa780",
+        "tests/client_server.rs": "83d6b4486f0cc7c765f799eb8997af8ad689120b842fd5dc115215f364d6f8c1",
+        "tests/client_simulation.rs": "cbfb0b0a56c79372a478bc3c03f80041c1ec2c19a1be129849a19be4f5713e1b",
+        "tests/client_spawn.rs": "2d615ac493958d2f09896208c399f6ad82986c96940e2efbfd37fcb84bec32fd",
+        "tests/client_transport.rs": "36393837c846d415f79d23c7c2718b1815db3e8b1d8776786401e19240c741c9",
+        "tests/config.rs": "52998c915c61bca9ba71f734289a9298edcc466a8c7acb551d65af5d58880d3a",
+        "tests/core_consumer.rs": "531d90342ef553903e764323d9e2a3d9f226a2b928cd760f65dc2b481387c7fa",
+        "tests/cruise_growth_retention.rs": "a217b68e549d86ccc0de790989714311c355859926465c793e5072ae2e314e52",
+        "tests/death_food.rs": "ed2f126816d63cda8977addb15cccfa8945c153aded9f037fa009344197c3e92",
+        "tests/errors.rs": "e1c2e106f1f0a74030c449c05b9a293847e19b1a81c833e9131d6246ea4fc137",
+        "tests/food_index.rs": "14b8cea7c5c3457335567b46962542162b5b407fa0b45762273b778cb65bf4ba",
+        "tests/kiosk.rs": "00ac8be87a7af62fc700dfce93454cae9629781240fdef34168f4f4826452470",
+        "tests/movement_turns.rs": "f1f385d7812d248a6a2d8d50b049d2cff12a2a5eb71c559ed1feddbbcd0f906c",
+        "tests/physics.rs": "0b6e5fdd837541f78d3b348a354fa70c026a15eeb31ac2ac98dda1d4857884ad",
+        "tests/pickup_events.rs": "4d7d4cf83227aa495f656f500e88f0a98a9494abd7bc1d466ef87ad296e93f9d",
+        "tests/prey.rs": "e17ddb614f81c427240d16688500fcd8cdb033369631e7fc2a98cd5f317c4434",
+        "tests/prey_activation.rs": "5860f2f72532c7aee446dd288717682f18226179fa9e5607d6ef7654027f6829",
+        "tests/prey_decisions.rs": "9bf0e0f46273d96c3307381ff5a0309493c97b19e07dbd67bcfa9e9ad419eb9b",
+        "tests/prey_outward.rs": "d2a6ae96eaf8a9fb648317e34f91425add55d6e54efeb0f71012f4a55b86ce7f",
+        "tests/replay_controls.rs": "b226dec97bf9693290f7d57ee61d4bb50cda45e72efc3742f89f3a454ec9b051",
+        "tests/runtime_radius_alloc.rs": "51fe60737a47c1e3a55c985962b72b255b72d3c95b684fd75495b1d879f2f42d",
+        "tests/seat_radius.rs": "66d400757a70512e6c63dbf13718c767f4dc9c045f1b1684ce289c46e0578bdc",
+        "tests/server_body.rs": "257834fff420fd88623209e8dc01c3cec053461361f50876becabef49e6cff11",
+        "tests/spawn.rs": "d9a61359623d65844105c47dd41c891e588e3d25912cc01590a76f2d8678218d",
+        "tests/speed_state.rs": "5ffb25a0957bc366967b4e905f3d4fbc6a5d9fb4e1d34b86f925ac2b3a5d9b4a",
+        "tests/transport.rs": "c189bb9ed7ba2c07c84a7f4e2ff05ce4ce1c6165d160d8e79ec354c07884312a",
+        "tests/transport_memory.rs": "054dbf048b1bd722a54afa89eb3fb4e2f680303c4b575f7a4b5be961563e9ca9",
+        "tests/world_rules.rs": "e8e7e725631a6178a239fb8b2895ebe62d42376b66664aa313094b17e643650c",
+        "tools/perf_observation_phases.rs": "cb4a56adb6a1cb40647da5cbab314924ac4ebcf258e96562fda19a084261b985",
+        "tools/fixtures/observation-phases/examples/perf_observation.rs": "7408978a598c19115f95aff242677e14e67545bf05f7a06cac6b4d4eb6b1d8e8",
+        "tools/fixtures/observation-phases/src/model.rs": "b3f90b7b51a37b2c2e2f2aa3bfb905223f451342e5a2c1bb01377503a9a6e8c0",
+        "tools/fixtures/observation-phases/src/physics.rs": "8024f15928b2c65eb5e72477481ef7680daefa943e2cea4e821ce0dc489d6faa",
+        "tools/fixtures/observation-phases/src/observation/mod.rs": "85cbc8f2f0f474567d1d9a26cfa251a323745b05b15f18bade5e24cb1376c151",
+        "tests/support/mod.rs": "cb251f967a8048895155d473c1fb62b914df6b0392cdc3550be97eecbb6e737a",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/minimap.rs": "b6f2c79bc9ef405bff76a4b15c0bb96708d9595fdf01d82ea5c31341a98ff82b",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/server.rs": "702af6d08c30a4307737ab96e7442e8b08da1b6c3e354849dbd03ff14d079e32",
+        "src/client/simulation.rs": "09be49ed6512153534b70e5a0938b60a82b807c162d856565048cbbd9b7f787e",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/visibility.rs": "9173ce760bda95a7ae5b3073c38ea68349d0b92c3d0ce3fa26f7284c8354379c",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/study_fixed.rs": "6a37ca5dd2e31c63b11e1763c29402dd99ebd689122000d6e25c61b6be2a749b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/broadcast.rs": "1070698c20640f510aa914bb0a9c83141148db3c57ba8fc15db6f462f5f1a590",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/food.rs": "0c01e8fafa3eddc891465bf6804ff6621a6207821b2f4a3e59bc49044d1a9bf4",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/pit_tests.rs": "bc5a73a97b3fa7c21c4316cd1ad7b641e624342a7c55faf868fa9fde14867aaf",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/snakes.rs": "8762c21a11bb383bd5b08e59b1d438f64ae2d6d8fbc9cafc9a2c8ac352979272",
+        "src/client/simulation/study_protocols.rs": "cb14b6199e7111b0b31b27fd6d885cdf9a427b2d25d49963481a42340fb41717",
+        "src/client/simulation/study_spawn_fixture.rs": "2d4914b4a957947396c818a60d6c1c38bc3ee2e0dc8013f76ad072422440011e",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/study_protocols/tick_counter.rs": "143d16e3087ac3e13acb2b52d7d34a40e279cce22f0916baabc75f7a10f68728",
+        "research/performance/2026-10-26-500-bot-qualification/host_qualification.rs": "4881584f7ff9ed89c46270c2c9c433e56e95274ef0a0b83e007ea11e20fa703e",
+        "research/performance/2026-10-26-host-capacity/host_capacity_load.rs": "0e05b2ffcd897f99b2ce6464f09cf63b338c1ff25c44e78e1d69905ca6dd1020",
+        "research/performance/2026-10-26-host-capacity/host_probe.rs": "89fa27f8f9cdff6524f25f527eca04f0b289afbbe62b53efd7ae9cb87f643e84",
+        "research/performance/2026-10-27-food-compaction/counter.rs": "c35afb6016d369ce486bda83431bf8f1a02193c0740173ee01c5c2339aef7b44",
+        "research/performance/2026-10-27-host-admission-heads/admission_fixture.rs": "b43b23afa69d21ea7caf0b81405829f0d8db07e3722ece4a8401f384dec232c4",
+        "research/performance/2026-10-27-host-cpu-targets/math_probe.rs": "be6115674d68a66a6f60c6fefb17162d041324de592a8a1fcfba91e23683263e",
+        "research/performance/2026-10-27-host-delivery-index/gateway.rs": "a5cf724c7159739fcfb77c7fcef00aeaf5d4db8181cd4561948825235718f4c8",
+        "research/performance/2026-10-27-host-food-ranges/profile.rs": "fc0df24cf34c92ca1d75c4299696e7d5f9e6a84e99eb0bb4da882b1b7579031d",
+        "research/performance/2026-10-27-host-minimap-sharing/burst_instrument.rs": "bb6d4ced9b696ab4e25a4a63b29c2def74868b395e8296c80e892a464a8c9a7d",
+        "research/performance/2026-10-27-host-snake-candidates/protocol_fixture.rs": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+        "research/performance/2026-10-27-host-snake-candidates/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+        "research/performance/2026-10-27-host-socket-readiness/idle.rs": "9e56cb8eb5634d5dedef4cb3da112dfa33f17dd9ae8baafd0c39254e6af04f54",
+        "research/performance/2026-10-27-host-socket-readiness/socket_study.rs": "c210c4fb5611c8f72206b84544fccebe2e0135db2f21d7d9546c9cd221441160",
+        "research/performance/2026-10-27-mirrored-food-retention/retention_fixture.rs": "076744d3f86aa0d8d2013e4d01c8173da15fd1c49999a85694222f45c8a39d8e",
+        "research/performance/2026-10-27-pellet-bitset-ranks/long_counter.rs": "8a4096217311aeac0c14bac92463c5a6221e63c1118828e46fd0b890a7dd45ef",
+        "research/performance/2026-10-27-pellet-bitset-ranks/long_fixture.rs": "12e6f7588f3c83da96e32b8ca5ff52fed04c09286246f82b27ff06519ee8c5c8",
+        "research/performance/2026-10-27-population-scaling/bots.rs": "dd538310eefd3e32528cbabcbe485193dbf02cd7b61c9af5e51043caf88507af",
+        "research/performance/2026-10-27-population-scaling/bounded_probe.rs": "af472888bd1806a27ff57e072df1ef0ef33e92bb9ca79c8c42451c67a10a5cf7",
+        "research/performance/2026-10-27-population-scaling/checkpoint_shape.rs": "d67b18d7f01f2215842eee440503b9742eb4089a62566a6f1366ba50fcaac783",
+        "research/performance/2026-10-27-population-scaling/cliff_probe.rs": "375d72df2e312cedc5dfec0ebeb138fc38b11e9e70ce1af5bed0646ab32271fd",
+        "research/performance/2026-10-27-population-scaling/counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "research/performance/2026-10-27-population-scaling/physics.rs": "aa055ffeb12e124a18b0d318016937d26a8f361b744df46577365fb03f1f58fe",
+        "research/performance/2026-10-27-population-scaling/warm_bounds.rs": "87ea82d0868f28a8016654370cfe371b34baac8f60f7a54ceb3fb7abde8e2823",
+        "research/performance/2026-10-28-broadcast-distance/counter.rs": "84d917a10d9422cc1ed5f567ca331f5e943a06ef955f4dfa9048bbdb537c4d00",
+        "research/performance/2026-10-28-mature-broadcast/extend.rs": "c9e12851a44623c4d8697d2884de13da160b38707aed4127f0df7aed3a18529a",
+        "research/performance/2026-10-28-mature-broadcast/mature.rs": "6138cbfc9d0027a38d645fc71502c762ebdd749379cdd9942deb73a85e479f7d",
+        "research/performance/2026-10-28-mature-covered-bounds/fixture.rs": "84575a706a150d10f79c73fefea7d16df2bb54f00e7bc485a18a166b90b9c5b4",
+        "research/performance/2026-10-28-official-density-capacity/observe.rs": "ddca739c49fded87bcbc1dab7e3b4641512c09c3fb278c021c7c237c7f3088e1",
+        "research/fidelity/2026-10-27-host-frame-timing/host_timing.rs": "c5298256aafdb85e09e823e9305e5142a37edabc501ea3d7fd6564a39f478daf",
+        "research/fidelity/2026-10-28-wall-sliding/harness/src/main.rs": "2aec6c749034c913aa3efaacb72c49e49485163464d7daa02abab03fbc343a35",
+        "research/fidelity/2026-10-28-turn-count-phase/harness/src/main.rs": "fc5c5bba4bec9c00c0ae5e3ee1d178907f644b782eada41ce597427f25bb8a39",
+        "research/fidelity/2026-10-27-client-view/harness/src/main.rs": "1fa35dd20e66dca3b5c5977dcfe9aca1f2d55362192b06f77a8c96ca4b547341",
+        "research/fidelity/2026-10-26-arena-radius/simulation/src/main.rs": "c305ef4267094282881387baee343f461264abce8ff6c6f74b9535717216a463",
+        "research/bots/2026-10-26-forager-port/oracle.rs": "6a5c4e7467858cc0837244ad7585e6ba42610e608a7fb6b1acce117bf6a91c82",
+        "research/battledome/2026-10-25-food-balance/measure.rs": "d2278f3231c81689482f3492f179174f9f193a88f97d6f74349e6f201eee1dc5",
+        "research/battledome/2026-10-27-pit-food/fixture.rs": "643fd6bcbb224c549d2f7e9593d8bd218eff900c5a45e3b6f0c7578444a6f12a",
+        "python/src/lib.rs": "c0b3116c52b30768d8a270b11b4d790eb433d0481fb0c648d92bdd0bcdd65674",
+        "ffi/src/lib.rs": "175dde9d74d40a8e14861e3c434e48d7d377707552da8e8b812f15cdf0a008d7",
+        "ffi/tests/abi.rs": "714d5984d374c0c3022f87c63172a0610f3c26303d8621858dd57631af038a4d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e"
+      }
+    },
+    "candidate": {
+      "ref": "af420c84",
+      "commit": "af420c844344d839f787cf6b96454e4986f94b37",
+      "archiveSha256": "9c7d45f7f0ac28d290bed74217aaf151bc5a146aa11a1576db3ab542f9b975fd",
+      "prepareSha256": "09fff9f8f4acb50ba335bcb5878a219b3920ab5a418134a1e590d613469ce94b",
+      "releaseBuild": true,
+      "rustflags": "-C target-cpu=native",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "perf_baseline": "d23564c478e6b8bdbae82907038b0fcfbb85c81532deaa310a08a9810e5583c3",
+        "study_protocols": "43a278e78bc7cca381c42bee7d7e2d5a5b533e0b3aafcfff006640ca5ccdbf6a",
+        "study_fixed": "2c54d6827dc26f9d9df082c181cbc39ec003be9441a3d7c192c6b3a9ec7b7517"
+      },
+      "sourceManifestSha256": "4343b78af56111b158721d98be3a4392dc5adee9a7dff4a77bc44afc4e35739e",
+      "instrumentedSources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "examples/basic.rs": "5aa2b6538a4804ee7224f00969b2605ca5fd57dbda58eba51dcde33f7281dbb3",
+        "examples/collision_curve.rs": "a6fc2d5f95be02920a9a018ff97aeaf36a9d23f94d4a7107ada12991ed63e448",
+        "examples/collision_delay.rs": "d858e894c1a0812d175463906184a89bed4303961f5b21576dbe57d208b7b27f",
+        "examples/fidelity_metrics.rs": "b025c42c0b4f38fd2b7e8427cc86fa9dd2c27aad746a96256286db06c2ec08d4",
+        "examples/fidelity_replay.rs": "19f5725386fe6344abf6b605e89932221f695da912fddf190bae1d2d38c4f9ad",
+        "examples/forager.rs": "3b8602b0c3a371cb27c20ab852baf83935641efdba8d9176357740d67a722d1e",
+        "examples/host_load.rs": "7df2046945a1eec02927602bd7ceed67d337d76deb752a8ef1dff96f6be61d09",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/perf_client_retained.rs": "c6bfec4fea2240681298d36670d36b5301eee1adbc0521579f7c4fd7e3ae5aef",
+        "examples/perf_observation.rs": "52f67b67bfc0eba9b041d0f8d5ea6f83076c016a479ce0288406722ea88a9a67",
+        "examples/perf_radius.rs": "6a1b3c1225ffcc940e6b88189c6f07c7077d2b2bd0c94a46dda7fd9b0cf4dc88",
+        "examples/perf_session.rs": "e9a8849cf8f8011fd70a523c6fc5d2c76d788e4c41a9990c521124a1fe416c65",
+        "examples/portable_bot.rs": "9582d85cb02cc0bd62e3676257c2927c0068a928b85e08a6fd2608ee2e3469d1",
+        "examples/study_fixed.rs": "d2ef4e1fa954f681fc0cdeee603c9ae6955882dfb374cc3dc637af8a4530e8e2",
+        "examples/study_protocols.rs": "3ab603e773581eeb057f9fece7ceef12397eab1fe4c2b1732b382450faefdcf3",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/lib.rs": "54c1bd504892f671a834edd86c0254445d6e8e06b70d0013e8af125836cce0a7",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/study_counter.rs": "84d917a10d9422cc1ed5f567ca331f5e943a06ef955f4dfa9048bbdb537c4d00",
+        "src/study_tick.rs": "84ededf5d137219af94bcfd7eba37eb600bcc062b86122ab5a4b0e75a32df2a9",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "tests/ambient_food.rs": "5041db84dd5ea4880def81edafa41e8c9aca8708a640e5af8ceaf447ed93ac7f",
+        "tests/battledome.rs": "7bda7fb261d19ce5e91d7e3201c51ef7cab5d6846b4d0c161c4c17d9f6fadf8a",
+        "tests/boost_food.rs": "3c409904afb1b2e426baf4f8b9ac41e8b28b06f3da1e66507c0675522dae53b4",
+        "tests/boundary.rs": "997bab5ae256dedb4b5be54f6bf528268de5a2d56494f4fae40c5f2ff847074a",
+        "tests/checkpoint.rs": "a850e4efbff1d19037973a45586d401405fef67aead113c46f3d260f3c9b1035",
+        "tests/circle_pickup.rs": "eff8d9056c9098a3379b5299ba8b7ddab234f8b547d6acd21cc826bdfad51f73",
+        "tests/client_challenge.rs": "5a3a7d4ae2767ac3ccc566a734d191f90f851526d1e37c8a760d72324335ac91",
+        "tests/client_contract.rs": "0e984bf1a7c05704ba9ef44189d219f311a6c70fd35c65b7b7bd180203ddfc28",
+        "tests/client_hud.rs": "e133375ec7037aab1a5ac6c4329c29179933e2307668d1a6dc70706087b2f113",
+        "tests/client_network.rs": "8c075e9e172fa59a6808aac54f01fd32e5c34267c975d0a86fefcc650633a15a",
+        "tests/client_protocol.rs": "63f3f89d4251e64503d570a75ca18133a76933d8ed8ba316029dab2ee914efc7",
+        "tests/client_received.rs": "8ddfb7a4e56bb8621c8b48517183c1dc62235b21ca5ccf81955d3cc0d8380a97",
+        "tests/client_runner.rs": "aae9cec2e0ff55bfb43ad5d5c943e11535acbf6f5672aff2362bb5e6077fa780",
+        "tests/client_server.rs": "83d6b4486f0cc7c765f799eb8997af8ad689120b842fd5dc115215f364d6f8c1",
+        "tests/client_simulation.rs": "cbfb0b0a56c79372a478bc3c03f80041c1ec2c19a1be129849a19be4f5713e1b",
+        "tests/client_spawn.rs": "2d615ac493958d2f09896208c399f6ad82986c96940e2efbfd37fcb84bec32fd",
+        "tests/client_transport.rs": "36393837c846d415f79d23c7c2718b1815db3e8b1d8776786401e19240c741c9",
+        "tests/config.rs": "52998c915c61bca9ba71f734289a9298edcc466a8c7acb551d65af5d58880d3a",
+        "tests/core_consumer.rs": "531d90342ef553903e764323d9e2a3d9f226a2b928cd760f65dc2b481387c7fa",
+        "tests/cruise_growth_retention.rs": "a217b68e549d86ccc0de790989714311c355859926465c793e5072ae2e314e52",
+        "tests/death_food.rs": "ed2f126816d63cda8977addb15cccfa8945c153aded9f037fa009344197c3e92",
+        "tests/errors.rs": "e1c2e106f1f0a74030c449c05b9a293847e19b1a81c833e9131d6246ea4fc137",
+        "tests/food_index.rs": "14b8cea7c5c3457335567b46962542162b5b407fa0b45762273b778cb65bf4ba",
+        "tests/kiosk.rs": "00ac8be87a7af62fc700dfce93454cae9629781240fdef34168f4f4826452470",
+        "tests/movement_turns.rs": "f1f385d7812d248a6a2d8d50b049d2cff12a2a5eb71c559ed1feddbbcd0f906c",
+        "tests/physics.rs": "0b6e5fdd837541f78d3b348a354fa70c026a15eeb31ac2ac98dda1d4857884ad",
+        "tests/pickup_events.rs": "4d7d4cf83227aa495f656f500e88f0a98a9494abd7bc1d466ef87ad296e93f9d",
+        "tests/prey.rs": "e17ddb614f81c427240d16688500fcd8cdb033369631e7fc2a98cd5f317c4434",
+        "tests/prey_activation.rs": "5860f2f72532c7aee446dd288717682f18226179fa9e5607d6ef7654027f6829",
+        "tests/prey_decisions.rs": "9bf0e0f46273d96c3307381ff5a0309493c97b19e07dbd67bcfa9e9ad419eb9b",
+        "tests/prey_outward.rs": "d2a6ae96eaf8a9fb648317e34f91425add55d6e54efeb0f71012f4a55b86ce7f",
+        "tests/replay_controls.rs": "b226dec97bf9693290f7d57ee61d4bb50cda45e72efc3742f89f3a454ec9b051",
+        "tests/runtime_radius_alloc.rs": "51fe60737a47c1e3a55c985962b72b255b72d3c95b684fd75495b1d879f2f42d",
+        "tests/seat_radius.rs": "66d400757a70512e6c63dbf13718c767f4dc9c045f1b1684ce289c46e0578bdc",
+        "tests/server_body.rs": "257834fff420fd88623209e8dc01c3cec053461361f50876becabef49e6cff11",
+        "tests/spawn.rs": "d9a61359623d65844105c47dd41c891e588e3d25912cc01590a76f2d8678218d",
+        "tests/speed_state.rs": "5ffb25a0957bc366967b4e905f3d4fbc6a5d9fb4e1d34b86f925ac2b3a5d9b4a",
+        "tests/transport.rs": "c189bb9ed7ba2c07c84a7f4e2ff05ce4ce1c6165d160d8e79ec354c07884312a",
+        "tests/transport_memory.rs": "054dbf048b1bd722a54afa89eb3fb4e2f680303c4b575f7a4b5be961563e9ca9",
+        "tests/world_rules.rs": "e8e7e725631a6178a239fb8b2895ebe62d42376b66664aa313094b17e643650c",
+        "tools/perf_observation_phases.rs": "cb4a56adb6a1cb40647da5cbab314924ac4ebcf258e96562fda19a084261b985",
+        "tools/fixtures/observation-phases/examples/perf_observation.rs": "7408978a598c19115f95aff242677e14e67545bf05f7a06cac6b4d4eb6b1d8e8",
+        "tools/fixtures/observation-phases/src/model.rs": "b3f90b7b51a37b2c2e2f2aa3bfb905223f451342e5a2c1bb01377503a9a6e8c0",
+        "tools/fixtures/observation-phases/src/physics.rs": "8024f15928b2c65eb5e72477481ef7680daefa943e2cea4e821ce0dc489d6faa",
+        "tools/fixtures/observation-phases/src/observation/mod.rs": "85cbc8f2f0f474567d1d9a26cfa251a323745b05b15f18bade5e24cb1376c151",
+        "tests/support/mod.rs": "cb251f967a8048895155d473c1fb62b914df6b0392cdc3550be97eecbb6e737a",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/minimap.rs": "335168f5d2f964a52f78b73fc40e83617c701ffcd739c630fcc3a1315b89b8af",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/server.rs": "702af6d08c30a4307737ab96e7442e8b08da1b6c3e354849dbd03ff14d079e32",
+        "src/client/simulation.rs": "171cedceec770db19069feb8de10cd8e93e1f102b8f5b617062b9254d7347e05",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/visibility.rs": "9173ce760bda95a7ae5b3073c38ea68349d0b92c3d0ce3fa26f7284c8354379c",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/minimap/pit_projection_tests.rs": "d6a007ff242382dcf2662062ec662bbe8df2688d99b995adb38a9f0df75eefab",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/study_fixed.rs": "6a37ca5dd2e31c63b11e1763c29402dd99ebd689122000d6e25c61b6be2a749b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/broadcast.rs": "c690198a14b8de668878ff94024053000c1855021b5037b40adebd1c0448996a",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/food.rs": "0c01e8fafa3eddc891465bf6804ff6621a6207821b2f4a3e59bc49044d1a9bf4",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/pit_tests.rs": "a587a7185d8c6fcee4888f10dc86994e7e59e81e78f922b516bcd54b62930dcc",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/snakes.rs": "8762c21a11bb383bd5b08e59b1d438f64ae2d6d8fbc9cafc9a2c8ac352979272",
+        "src/client/simulation/study_protocols.rs": "cb14b6199e7111b0b31b27fd6d885cdf9a427b2d25d49963481a42340fb41717",
+        "src/client/simulation/study_spawn_fixture.rs": "2d4914b4a957947396c818a60d6c1c38bc3ee2e0dc8013f76ad072422440011e",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/study_protocols/tick_counter.rs": "143d16e3087ac3e13acb2b52d7d34a40e279cce22f0916baabc75f7a10f68728",
+        "research/performance/2026-10-26-500-bot-qualification/host_qualification.rs": "4881584f7ff9ed89c46270c2c9c433e56e95274ef0a0b83e007ea11e20fa703e",
+        "research/performance/2026-10-26-host-capacity/host_capacity_load.rs": "0e05b2ffcd897f99b2ce6464f09cf63b338c1ff25c44e78e1d69905ca6dd1020",
+        "research/performance/2026-10-26-host-capacity/host_probe.rs": "89fa27f8f9cdff6524f25f527eca04f0b289afbbe62b53efd7ae9cb87f643e84",
+        "research/performance/2026-10-27-food-compaction/counter.rs": "c35afb6016d369ce486bda83431bf8f1a02193c0740173ee01c5c2339aef7b44",
+        "research/performance/2026-10-27-host-admission-heads/admission_fixture.rs": "b43b23afa69d21ea7caf0b81405829f0d8db07e3722ece4a8401f384dec232c4",
+        "research/performance/2026-10-27-host-cpu-targets/math_probe.rs": "be6115674d68a66a6f60c6fefb17162d041324de592a8a1fcfba91e23683263e",
+        "research/performance/2026-10-27-host-delivery-index/gateway.rs": "a5cf724c7159739fcfb77c7fcef00aeaf5d4db8181cd4561948825235718f4c8",
+        "research/performance/2026-10-27-host-food-ranges/profile.rs": "fc0df24cf34c92ca1d75c4299696e7d5f9e6a84e99eb0bb4da882b1b7579031d",
+        "research/performance/2026-10-27-host-minimap-sharing/burst_instrument.rs": "bb6d4ced9b696ab4e25a4a63b29c2def74868b395e8296c80e892a464a8c9a7d",
+        "research/performance/2026-10-27-host-snake-candidates/protocol_fixture.rs": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+        "research/performance/2026-10-27-host-snake-candidates/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+        "research/performance/2026-10-27-host-socket-readiness/idle.rs": "9e56cb8eb5634d5dedef4cb3da112dfa33f17dd9ae8baafd0c39254e6af04f54",
+        "research/performance/2026-10-27-host-socket-readiness/socket_study.rs": "c210c4fb5611c8f72206b84544fccebe2e0135db2f21d7d9546c9cd221441160",
+        "research/performance/2026-10-27-mirrored-food-retention/retention_fixture.rs": "076744d3f86aa0d8d2013e4d01c8173da15fd1c49999a85694222f45c8a39d8e",
+        "research/performance/2026-10-27-pellet-bitset-ranks/long_counter.rs": "8a4096217311aeac0c14bac92463c5a6221e63c1118828e46fd0b890a7dd45ef",
+        "research/performance/2026-10-27-pellet-bitset-ranks/long_fixture.rs": "12e6f7588f3c83da96e32b8ca5ff52fed04c09286246f82b27ff06519ee8c5c8",
+        "research/performance/2026-10-27-population-scaling/bots.rs": "dd538310eefd3e32528cbabcbe485193dbf02cd7b61c9af5e51043caf88507af",
+        "research/performance/2026-10-27-population-scaling/bounded_probe.rs": "af472888bd1806a27ff57e072df1ef0ef33e92bb9ca79c8c42451c67a10a5cf7",
+        "research/performance/2026-10-27-population-scaling/checkpoint_shape.rs": "d67b18d7f01f2215842eee440503b9742eb4089a62566a6f1366ba50fcaac783",
+        "research/performance/2026-10-27-population-scaling/cliff_probe.rs": "375d72df2e312cedc5dfec0ebeb138fc38b11e9e70ce1af5bed0646ab32271fd",
+        "research/performance/2026-10-27-population-scaling/counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "research/performance/2026-10-27-population-scaling/physics.rs": "aa055ffeb12e124a18b0d318016937d26a8f361b744df46577365fb03f1f58fe",
+        "research/performance/2026-10-27-population-scaling/warm_bounds.rs": "87ea82d0868f28a8016654370cfe371b34baac8f60f7a54ceb3fb7abde8e2823",
+        "research/performance/2026-10-28-broadcast-distance/counter.rs": "84d917a10d9422cc1ed5f567ca331f5e943a06ef955f4dfa9048bbdb537c4d00",
+        "research/performance/2026-10-28-mature-broadcast/extend.rs": "c9e12851a44623c4d8697d2884de13da160b38707aed4127f0df7aed3a18529a",
+        "research/performance/2026-10-28-mature-broadcast/mature.rs": "6138cbfc9d0027a38d645fc71502c762ebdd749379cdd9942deb73a85e479f7d",
+        "research/performance/2026-10-28-mature-covered-bounds/fixture.rs": "84575a706a150d10f79c73fefea7d16df2bb54f00e7bc485a18a166b90b9c5b4",
+        "research/performance/2026-10-28-official-density-capacity/observe.rs": "ddca739c49fded87bcbc1dab7e3b4641512c09c3fb278c021c7c237c7f3088e1",
+        "research/fidelity/2026-10-27-host-frame-timing/host_timing.rs": "c5298256aafdb85e09e823e9305e5142a37edabc501ea3d7fd6564a39f478daf",
+        "research/fidelity/2026-10-28-wall-sliding/harness/src/main.rs": "2aec6c749034c913aa3efaacb72c49e49485163464d7daa02abab03fbc343a35",
+        "research/fidelity/2026-10-28-turn-count-phase/harness/src/main.rs": "fc5c5bba4bec9c00c0ae5e3ee1d178907f644b782eada41ce597427f25bb8a39",
+        "research/fidelity/2026-10-27-client-view/harness/src/main.rs": "1fa35dd20e66dca3b5c5977dcfe9aca1f2d55362192b06f77a8c96ca4b547341",
+        "research/fidelity/2026-10-26-arena-radius/simulation/src/main.rs": "c305ef4267094282881387baee343f461264abce8ff6c6f74b9535717216a463",
+        "research/bots/2026-10-26-forager-port/oracle.rs": "6a5c4e7467858cc0837244ad7585e6ba42610e608a7fb6b1acce117bf6a91c82",
+        "research/battledome/2026-10-25-food-balance/measure.rs": "d2278f3231c81689482f3492f179174f9f193a88f97d6f74349e6f201eee1dc5",
+        "research/battledome/2026-10-27-pit-food/fixture.rs": "643fd6bcbb224c549d2f7e9593d8bd218eff900c5a45e3b6f0c7578444a6f12a",
+        "python/src/lib.rs": "c0b3116c52b30768d8a270b11b4d790eb433d0481fb0c648d92bdd0bcdd65674",
+        "ffi/src/lib.rs": "175dde9d74d40a8e14861e3c434e48d7d377707552da8e8b812f15cdf0a008d7",
+        "ffi/tests/abi.rs": "714d5984d374c0c3022f87c63172a0610f3c26303d8621858dd57631af038a4d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e"
+      }
+    },
+    "mutation": {
+      "ref": "af420c84",
+      "commit": "af420c844344d839f787cf6b96454e4986f94b37",
+      "archiveSha256": "9c7d45f7f0ac28d290bed74217aaf151bc5a146aa11a1576db3ab542f9b975fd",
+      "prepareSha256": "09fff9f8f4acb50ba335bcb5878a219b3920ab5a418134a1e590d613469ce94b",
+      "releaseBuild": true,
+      "rustflags": "-C target-cpu=native",
+      "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "binaries": {
+        "perf_baseline": "12e7d0037d856faf99f76ce0badeef20e6e855492ff72ca5ac77f89b7b0355bd",
+        "study_protocols": "8b63e03f6ead9bd94ae495e99ede62f9cc6a25bfcf6aa7ae568f029940434d80",
+        "study_fixed": "e5f3cad5f10bc85bc052dd967f3858a6c5fad65b94bd9864a957ec54162cb2ea"
+      },
+      "sourceManifestSha256": "9b6eecd78911e9083badc564c89026916180d7327ce217e6564fa5869c21fe9f",
+      "instrumentedSources": {
+        "build.rs": "b161449817bf95683cd24d987c086bb3e693b7b8d3bfd1804b3dbac40ad71069",
+        "examples/basic.rs": "5aa2b6538a4804ee7224f00969b2605ca5fd57dbda58eba51dcde33f7281dbb3",
+        "examples/collision_curve.rs": "a6fc2d5f95be02920a9a018ff97aeaf36a9d23f94d4a7107ada12991ed63e448",
+        "examples/collision_delay.rs": "d858e894c1a0812d175463906184a89bed4303961f5b21576dbe57d208b7b27f",
+        "examples/fidelity_metrics.rs": "b025c42c0b4f38fd2b7e8427cc86fa9dd2c27aad746a96256286db06c2ec08d4",
+        "examples/fidelity_replay.rs": "19f5725386fe6344abf6b605e89932221f695da912fddf190bae1d2d38c4f9ad",
+        "examples/forager.rs": "3b8602b0c3a371cb27c20ab852baf83935641efdba8d9176357740d67a722d1e",
+        "examples/host_load.rs": "7df2046945a1eec02927602bd7ceed67d337d76deb752a8ef1dff96f6be61d09",
+        "examples/perf_baseline.rs": "08efa90f1406849dcd31dcef4d5717b62f890bc4eb885357ba44e24c5aa7971d",
+        "examples/perf_client_retained.rs": "c6bfec4fea2240681298d36670d36b5301eee1adbc0521579f7c4fd7e3ae5aef",
+        "examples/perf_observation.rs": "52f67b67bfc0eba9b041d0f8d5ea6f83076c016a479ce0288406722ea88a9a67",
+        "examples/perf_radius.rs": "6a1b3c1225ffcc940e6b88189c6f07c7077d2b2bd0c94a46dda7fd9b0cf4dc88",
+        "examples/perf_session.rs": "e9a8849cf8f8011fd70a523c6fc5d2c76d788e4c41a9990c521124a1fe416c65",
+        "examples/portable_bot.rs": "9582d85cb02cc0bd62e3676257c2927c0068a928b85e08a6fd2608ee2e3469d1",
+        "examples/study_fixed.rs": "d2ef4e1fa954f681fc0cdeee603c9ae6955882dfb374cc3dc637af8a4530e8e2",
+        "examples/study_protocols.rs": "3ab603e773581eeb057f9fece7ceef12397eab1fe4c2b1732b382450faefdcf3",
+        "src/boundary.rs": "493782bf0569d62889d898d77e5b9cf8f297e034e833dba4bea3949b77ed0e4c",
+        "src/bounds_index.rs": "9f1002a44d026b14d9a426ae2d9852f1d7a018617d327530ea995b22134504b5",
+        "src/error.rs": "1653c63f91ed75aa8b30a42a66d708a49d60a79a7565619a08020daa0dbfa9b3",
+        "src/food_grid.rs": "cc21a857723906d3115bb8396cd868dd618ec379529d4083921f0d592d0aab1c",
+        "src/json.rs": "0c54a78d90806184c65ee1673676265539a14a187aa951a54ab08face86518b9",
+        "src/kiosk.rs": "7fcf3d79daac4a85fbad31543272ec81ab95aa8ede9cff837176a74834a0171d",
+        "src/lib.rs": "54c1bd504892f671a834edd86c0254445d6e8e06b70d0013e8af125836cce0a7",
+        "src/main.rs": "1a5a1a34603eca202e67b70a56d7798cb9edfafb985f9bd3e7e38aae52891c06",
+        "src/model.rs": "350b574a9f3d2f5b9e1f1b6fa0e8dd0e1f294a3ea0895b6688a6ff62037187fa",
+        "src/parallel.rs": "a4673816cf0cf2c2e6a00d2d8263548fd15f5bb8b0aace9d7d5823f774fd8c44",
+        "src/physics.rs": "809eaddda58d18f82dc60f8f48b54cee8d7f454f1bb369052cf3944e6efe7a4a",
+        "src/prey.rs": "a25a26b4888768829a74433d94a39a82408c1453af881013d3c275cf96774282",
+        "src/profiling.rs": "9469c3c7c2859259c296afb6060acb9e090b9eab96a8d7e07849ad74bbdd9f5b",
+        "src/rules.rs": "eaace65b187a46c374774ce911bcb0f7bd1d934728b49bf93c1b2f0a1c69722a",
+        "src/simulator.rs": "b372d0e9c2bbb5a321c6bc8f9fac970939cb8a4ce812599a90458da6f3341522",
+        "src/spawn.rs": "2d03a634fd9517acd2ce91c8f7b25681e5c062f8e6b21dd0507d04e8e626a00a",
+        "src/study_counter.rs": "84d917a10d9422cc1ed5f567ca331f5e943a06ef955f4dfa9048bbdb537c4d00",
+        "src/study_tick.rs": "84ededf5d137219af94bcfd7eba37eb600bcc062b86122ab5a4b0e75a32df2a9",
+        "src/transport.rs": "20dd9e019e20a00648cec661e0716fa5e9f40e18c87b93da40a1b917d663a3c8",
+        "tests/ambient_food.rs": "5041db84dd5ea4880def81edafa41e8c9aca8708a640e5af8ceaf447ed93ac7f",
+        "tests/battledome.rs": "7bda7fb261d19ce5e91d7e3201c51ef7cab5d6846b4d0c161c4c17d9f6fadf8a",
+        "tests/boost_food.rs": "3c409904afb1b2e426baf4f8b9ac41e8b28b06f3da1e66507c0675522dae53b4",
+        "tests/boundary.rs": "997bab5ae256dedb4b5be54f6bf528268de5a2d56494f4fae40c5f2ff847074a",
+        "tests/checkpoint.rs": "a850e4efbff1d19037973a45586d401405fef67aead113c46f3d260f3c9b1035",
+        "tests/circle_pickup.rs": "eff8d9056c9098a3379b5299ba8b7ddab234f8b547d6acd21cc826bdfad51f73",
+        "tests/client_challenge.rs": "5a3a7d4ae2767ac3ccc566a734d191f90f851526d1e37c8a760d72324335ac91",
+        "tests/client_contract.rs": "0e984bf1a7c05704ba9ef44189d219f311a6c70fd35c65b7b7bd180203ddfc28",
+        "tests/client_hud.rs": "e133375ec7037aab1a5ac6c4329c29179933e2307668d1a6dc70706087b2f113",
+        "tests/client_network.rs": "8c075e9e172fa59a6808aac54f01fd32e5c34267c975d0a86fefcc650633a15a",
+        "tests/client_protocol.rs": "63f3f89d4251e64503d570a75ca18133a76933d8ed8ba316029dab2ee914efc7",
+        "tests/client_received.rs": "8ddfb7a4e56bb8621c8b48517183c1dc62235b21ca5ccf81955d3cc0d8380a97",
+        "tests/client_runner.rs": "aae9cec2e0ff55bfb43ad5d5c943e11535acbf6f5672aff2362bb5e6077fa780",
+        "tests/client_server.rs": "83d6b4486f0cc7c765f799eb8997af8ad689120b842fd5dc115215f364d6f8c1",
+        "tests/client_simulation.rs": "cbfb0b0a56c79372a478bc3c03f80041c1ec2c19a1be129849a19be4f5713e1b",
+        "tests/client_spawn.rs": "2d615ac493958d2f09896208c399f6ad82986c96940e2efbfd37fcb84bec32fd",
+        "tests/client_transport.rs": "36393837c846d415f79d23c7c2718b1815db3e8b1d8776786401e19240c741c9",
+        "tests/config.rs": "52998c915c61bca9ba71f734289a9298edcc466a8c7acb551d65af5d58880d3a",
+        "tests/core_consumer.rs": "531d90342ef553903e764323d9e2a3d9f226a2b928cd760f65dc2b481387c7fa",
+        "tests/cruise_growth_retention.rs": "a217b68e549d86ccc0de790989714311c355859926465c793e5072ae2e314e52",
+        "tests/death_food.rs": "ed2f126816d63cda8977addb15cccfa8945c153aded9f037fa009344197c3e92",
+        "tests/errors.rs": "e1c2e106f1f0a74030c449c05b9a293847e19b1a81c833e9131d6246ea4fc137",
+        "tests/food_index.rs": "14b8cea7c5c3457335567b46962542162b5b407fa0b45762273b778cb65bf4ba",
+        "tests/kiosk.rs": "00ac8be87a7af62fc700dfce93454cae9629781240fdef34168f4f4826452470",
+        "tests/movement_turns.rs": "f1f385d7812d248a6a2d8d50b049d2cff12a2a5eb71c559ed1feddbbcd0f906c",
+        "tests/physics.rs": "0b6e5fdd837541f78d3b348a354fa70c026a15eeb31ac2ac98dda1d4857884ad",
+        "tests/pickup_events.rs": "4d7d4cf83227aa495f656f500e88f0a98a9494abd7bc1d466ef87ad296e93f9d",
+        "tests/prey.rs": "e17ddb614f81c427240d16688500fcd8cdb033369631e7fc2a98cd5f317c4434",
+        "tests/prey_activation.rs": "5860f2f72532c7aee446dd288717682f18226179fa9e5607d6ef7654027f6829",
+        "tests/prey_decisions.rs": "9bf0e0f46273d96c3307381ff5a0309493c97b19e07dbd67bcfa9e9ad419eb9b",
+        "tests/prey_outward.rs": "d2a6ae96eaf8a9fb648317e34f91425add55d6e54efeb0f71012f4a55b86ce7f",
+        "tests/replay_controls.rs": "b226dec97bf9693290f7d57ee61d4bb50cda45e72efc3742f89f3a454ec9b051",
+        "tests/runtime_radius_alloc.rs": "51fe60737a47c1e3a55c985962b72b255b72d3c95b684fd75495b1d879f2f42d",
+        "tests/seat_radius.rs": "66d400757a70512e6c63dbf13718c767f4dc9c045f1b1684ce289c46e0578bdc",
+        "tests/server_body.rs": "257834fff420fd88623209e8dc01c3cec053461361f50876becabef49e6cff11",
+        "tests/spawn.rs": "d9a61359623d65844105c47dd41c891e588e3d25912cc01590a76f2d8678218d",
+        "tests/speed_state.rs": "5ffb25a0957bc366967b4e905f3d4fbc6a5d9fb4e1d34b86f925ac2b3a5d9b4a",
+        "tests/transport.rs": "c189bb9ed7ba2c07c84a7f4e2ff05ce4ce1c6165d160d8e79ec354c07884312a",
+        "tests/transport_memory.rs": "054dbf048b1bd722a54afa89eb3fb4e2f680303c4b575f7a4b5be961563e9ca9",
+        "tests/world_rules.rs": "e8e7e725631a6178a239fb8b2895ebe62d42376b66664aa313094b17e643650c",
+        "tools/perf_observation_phases.rs": "cb4a56adb6a1cb40647da5cbab314924ac4ebcf258e96562fda19a084261b985",
+        "tools/fixtures/observation-phases/examples/perf_observation.rs": "7408978a598c19115f95aff242677e14e67545bf05f7a06cac6b4d4eb6b1d8e8",
+        "tools/fixtures/observation-phases/src/model.rs": "b3f90b7b51a37b2c2e2f2aa3bfb905223f451342e5a2c1bb01377503a9a6e8c0",
+        "tools/fixtures/observation-phases/src/physics.rs": "8024f15928b2c65eb5e72477481ef7680daefa943e2cea4e821ce0dc489d6faa",
+        "tools/fixtures/observation-phases/src/observation/mod.rs": "85cbc8f2f0f474567d1d9a26cfa251a323745b05b15f18bade5e24cb1376c151",
+        "tests/support/mod.rs": "cb251f967a8048895155d473c1fb62b914df6b0392cdc3550be97eecbb6e737a",
+        "src/bot/kernel.rs": "54d7ee7d716cbb972831cfa70aa4809ef670ac8e981b814bad8892c236459670",
+        "src/bot/mod.rs": "a1b49000917714f4393add837f2458900e76cffafa36c2225a3c170519c2302f",
+        "src/bot/params.rs": "880e467acaf2fadc892906345f9846b4393aea098a678b63870042b2af317d5c",
+        "src/bot/tests.rs": "ad10800c2eca7045839bc5b5945c60c1a00a8b44b74c0c3c12ca00965ee0b19b",
+        "src/client/challenge.rs": "924256fde8836c632fbdf1e8bc9bb383327fa6ba3ea2f751354f3c6f2e73f7b7",
+        "src/client/encode.rs": "57f7929f86cbbb14a0d2db6ed13978afd2511e2bf4154206d3cc9ee196bcb0a4",
+        "src/client/encode13.rs": "15ed80998384670c68cd2f5b7cc9706ae920cbc5944fb24b867dc1685de06b4a",
+        "src/client/fast_hash.rs": "c93f45004ad7f5c0056debc80ee528578e316b226b49ff27f93650b70dd8bf48",
+        "src/client/fixtures.rs": "aaeb038a64334dba10e9955008a2b2eb494b7825bea17a5cd9ffbc16684dea5b",
+        "src/client/forager.rs": "a4d0e6922052f2b3e006c6db59b0e015c8b9142f57a291544ceec58aabaf31ad",
+        "src/client/hud.rs": "b4500684a27a09d45b7dd67d054a176e13060a5120460042c9deebac52b47cc9",
+        "src/client/latency.rs": "bf7bcfc0f81f6fb558e35b88d14a2ac0a3ff76ef9b518e05e909b7c6f725e48e",
+        "src/client/minimap.rs": "7f407a0abc14418d056d20c83ae6d707d7c4adc3d2b58ed69c97262f34b81b37",
+        "src/client/mod.rs": "ee1c6c79b048e68b2afa8875fb85bfb8fa9f29e5a645806009874d0a597a07dd",
+        "src/client/network.rs": "fd58ede156ea0ffe2c4f68ff2b83f542af67fc5288f87fb1763e88c12fa0e326",
+        "src/client/presentation.rs": "bc6fd5f3d5bcac1bd332633fdb5487d2d37cd014a88baf1fa64868301cf597aa",
+        "src/client/protocol.rs": "9869ed678bc802c171ef1d6a92798401529ce9092eaf6acfa71c52405e7f74c0",
+        "src/client/received.rs": "6437fb8b2583ea6e5e29a640d6c3ad47bbc48cfac899827e4297246de79cc0b1",
+        "src/client/rules_packet.rs": "da6f49a69c6339a42c06fde492f471bf8656101b4acc19b181bf093882e089c6",
+        "src/client/server.rs": "702af6d08c30a4307737ab96e7442e8b08da1b6c3e354849dbd03ff14d079e32",
+        "src/client/simulation.rs": "171cedceec770db19069feb8de10cd8e93e1f102b8f5b617062b9254d7347e05",
+        "src/client/transport.rs": "ad319ed63d37d7d1485224317adb28b203b584dbb3d854c47f29bc0e35b19823",
+        "src/client/visibility.rs": "9173ce760bda95a7ae5b3073c38ea68349d0b92c3d0ce3fa26f7284c8354379c",
+        "src/observation/mod.rs": "7b6f70391b56a28dc9580423a70c7902aa926df368b9dc99e2babaf303dcea4c",
+        "src/simulator/checkpoint.rs": "55f4bee9144b152de38d8db16d6cf5126b6956c29d546fb21b50a391e0be45e9",
+        "src/simulator/initialization.rs": "1c06d7ea980c0e057928affa8a78227a034c76a7ac41efff2fa60a1b7260976f",
+        "src/simulator/initialization_tests.rs": "279f0288a6a1f5ae994fb23bfccc2dcb122ef8e0713921f93d8e3bba56bf9d40",
+        "src/simulator/observation_tests.rs": "296bce6de6aed1a6eb96c9926758e272ed883a9286f654434d37c002ed6f8505",
+        "src/simulator/pit_food_tests.rs": "aee082abf1de259fdc7398b9c8970920c71aec363cacd816bb48d6cbe6f3e0da",
+        "src/simulator/spawn_bounds.rs": "822c94512f1f13d2b0810bab02f88e76d0f02a251f3da03eb268df2c182c517f",
+        "src/simulator/spawn_bounds_tests.rs": "817fca2293d6e5029c0c632d744586fa1ab1ca0dba10d874481dab029ca60372",
+        "src/spawn/safety.rs": "19b809c5e04b7e9dcfdb524090d66eac33cf12467f5bee1bb1112374180f02a6",
+        "src/transport/frame.rs": "e4a6f280284b09e26d8fc1db0c5704d088ca562eaabad1df6839b563edfddbf6",
+        "src/transport/tests.rs": "5a40fa3c088f12c044300fea4af4570636ee376a0553e813ca85ec57a95586f6",
+        "src/client/encode13/tests.rs": "f809d157c8e10223a4c54b75c9f4c5934beb5905b609d3f3b0b692b4f4e3deb0",
+        "src/client/forager/conformance.rs": "49105ca27c7552ba6019b35103f0bf9409b0a28f9bd9737a0050144c8e18cefa",
+        "src/client/forager/tests.rs": "41eb6d8fe6edb037ca4f7beb25db3f3ab9d1e8f52a84635d6c4bb84fb53123ae",
+        "src/client/minimap/pit_projection_tests.rs": "d6a007ff242382dcf2662062ec662bbe8df2688d99b995adb38a9f0df75eefab",
+        "src/client/server/bot_tests.rs": "2f963ad08cc819a7c3bbdc10e25dee40c45cda6efd1c723c7c53581b996f0372",
+        "src/client/server/readiness.rs": "30ff1d19990eaebc8759397f611369087a3c710c8c794032f9a7da0bd84b935b",
+        "src/client/server/study_fixed.rs": "6a37ca5dd2e31c63b11e1763c29402dd99ebd689122000d6e25c61b6be2a749b",
+        "src/client/server/wake.rs": "5674ea814f50859bea5a6fb7f496f1ba34fd13c3b21052ffa3d6ca9d51dd6a9d",
+        "src/client/simulation/bot_tests.rs": "7c261daa897b88056365f71ad362309854c9184f5c4c7b66f5bb65e7fb8d4f14",
+        "src/client/simulation/broadcast.rs": "c690198a14b8de668878ff94024053000c1855021b5037b40adebd1c0448996a",
+        "src/client/simulation/config.rs": "a08da4852c6a59e67229b8f7c68cca4b8dbccdf67d25092c5e3764e0858fd57f",
+        "src/client/simulation/connection.rs": "3856fe486cea238fb6760b5e7430ac9339fd94ca39c873f8cee2f25c3485c8bd",
+        "src/client/simulation/food.rs": "0c01e8fafa3eddc891465bf6804ff6621a6207821b2f4a3e59bc49044d1a9bf4",
+        "src/client/simulation/markers.rs": "d59572179134bba487fa359b40e5e935a80460600c9ed248cd938e127ebce7e7",
+        "src/client/simulation/minimap.rs": "bd637ce4ddb140f4c18c67124e4864ccc4d44ae198b3cff33123f52d38e4070b",
+        "src/client/simulation/pit_tests.rs": "a587a7185d8c6fcee4888f10dc86994e7e59e81e78f922b516bcd54b62930dcc",
+        "src/client/simulation/prey_visibility.rs": "461b0a77c8ee325ad0a1608744877976c9085160ebcadee1efb8eed224f414dd",
+        "src/client/simulation/protocol13_tests.rs": "3746e61d963f1af90b2061bc8ccbf22ee4903992349be3071b5e393c26ef3565",
+        "src/client/simulation/remote.rs": "0ef2b60279af28a1af8127d57b8277a513fd97d8f8b6753accd00a10fde6d718",
+        "src/client/simulation/rules_tests.rs": "73559d43a5f27f49d5daa9739b6b6ca30f184776788d259d29763cffab1451f7",
+        "src/client/simulation/snakes.rs": "8762c21a11bb383bd5b08e59b1d438f64ae2d6d8fbc9cafc9a2c8ac352979272",
+        "src/client/simulation/study_protocols.rs": "cb14b6199e7111b0b31b27fd6d885cdf9a427b2d25d49963481a42340fb41717",
+        "src/client/simulation/study_spawn_fixture.rs": "2d4914b4a957947396c818a60d6c1c38bc3ee2e0dc8013f76ad072422440011e",
+        "src/client/simulation/tests.rs": "21c26ecfe69ea61bb7f36be34cff53b8e804c57c0c985af5768b040cc6545e60",
+        "src/client/simulation/study_protocols/tick_counter.rs": "143d16e3087ac3e13acb2b52d7d34a40e279cce22f0916baabc75f7a10f68728",
+        "research/performance/2026-10-26-500-bot-qualification/host_qualification.rs": "4881584f7ff9ed89c46270c2c9c433e56e95274ef0a0b83e007ea11e20fa703e",
+        "research/performance/2026-10-26-host-capacity/host_capacity_load.rs": "0e05b2ffcd897f99b2ce6464f09cf63b338c1ff25c44e78e1d69905ca6dd1020",
+        "research/performance/2026-10-26-host-capacity/host_probe.rs": "89fa27f8f9cdff6524f25f527eca04f0b289afbbe62b53efd7ae9cb87f643e84",
+        "research/performance/2026-10-27-food-compaction/counter.rs": "c35afb6016d369ce486bda83431bf8f1a02193c0740173ee01c5c2339aef7b44",
+        "research/performance/2026-10-27-host-admission-heads/admission_fixture.rs": "b43b23afa69d21ea7caf0b81405829f0d8db07e3722ece4a8401f384dec232c4",
+        "research/performance/2026-10-27-host-cpu-targets/math_probe.rs": "be6115674d68a66a6f60c6fefb17162d041324de592a8a1fcfba91e23683263e",
+        "research/performance/2026-10-27-host-delivery-index/gateway.rs": "a5cf724c7159739fcfb77c7fcef00aeaf5d4db8181cd4561948825235718f4c8",
+        "research/performance/2026-10-27-host-food-ranges/profile.rs": "fc0df24cf34c92ca1d75c4299696e7d5f9e6a84e99eb0bb4da882b1b7579031d",
+        "research/performance/2026-10-27-host-minimap-sharing/burst_instrument.rs": "bb6d4ced9b696ab4e25a4a63b29c2def74868b395e8296c80e892a464a8c9a7d",
+        "research/performance/2026-10-27-host-snake-candidates/protocol_fixture.rs": "a5ecb5b278d4a9d93a4e0c40a7745bee90a7d488ca446af0c35bb37eab77251b",
+        "research/performance/2026-10-27-host-snake-candidates/tick_counter.rs": "7a36be3434680d9c3403b9b22f3d923bf32a7b08844adc91aea623c65049f0b2",
+        "research/performance/2026-10-27-host-socket-readiness/idle.rs": "9e56cb8eb5634d5dedef4cb3da112dfa33f17dd9ae8baafd0c39254e6af04f54",
+        "research/performance/2026-10-27-host-socket-readiness/socket_study.rs": "c210c4fb5611c8f72206b84544fccebe2e0135db2f21d7d9546c9cd221441160",
+        "research/performance/2026-10-27-mirrored-food-retention/retention_fixture.rs": "076744d3f86aa0d8d2013e4d01c8173da15fd1c49999a85694222f45c8a39d8e",
+        "research/performance/2026-10-27-pellet-bitset-ranks/long_counter.rs": "8a4096217311aeac0c14bac92463c5a6221e63c1118828e46fd0b890a7dd45ef",
+        "research/performance/2026-10-27-pellet-bitset-ranks/long_fixture.rs": "12e6f7588f3c83da96e32b8ca5ff52fed04c09286246f82b27ff06519ee8c5c8",
+        "research/performance/2026-10-27-population-scaling/bots.rs": "dd538310eefd3e32528cbabcbe485193dbf02cd7b61c9af5e51043caf88507af",
+        "research/performance/2026-10-27-population-scaling/bounded_probe.rs": "af472888bd1806a27ff57e072df1ef0ef33e92bb9ca79c8c42451c67a10a5cf7",
+        "research/performance/2026-10-27-population-scaling/checkpoint_shape.rs": "d67b18d7f01f2215842eee440503b9742eb4089a62566a6f1366ba50fcaac783",
+        "research/performance/2026-10-27-population-scaling/cliff_probe.rs": "375d72df2e312cedc5dfec0ebeb138fc38b11e9e70ce1af5bed0646ab32271fd",
+        "research/performance/2026-10-27-population-scaling/counter.rs": "fcc9308bcac4aa898160c3f5602375e3e1bd45d6ab2bb81a4e61fc8546e0e8a2",
+        "research/performance/2026-10-27-population-scaling/physics.rs": "aa055ffeb12e124a18b0d318016937d26a8f361b744df46577365fb03f1f58fe",
+        "research/performance/2026-10-27-population-scaling/warm_bounds.rs": "87ea82d0868f28a8016654370cfe371b34baac8f60f7a54ceb3fb7abde8e2823",
+        "research/performance/2026-10-28-broadcast-distance/counter.rs": "84d917a10d9422cc1ed5f567ca331f5e943a06ef955f4dfa9048bbdb537c4d00",
+        "research/performance/2026-10-28-mature-broadcast/extend.rs": "c9e12851a44623c4d8697d2884de13da160b38707aed4127f0df7aed3a18529a",
+        "research/performance/2026-10-28-mature-broadcast/mature.rs": "6138cbfc9d0027a38d645fc71502c762ebdd749379cdd9942deb73a85e479f7d",
+        "research/performance/2026-10-28-mature-covered-bounds/fixture.rs": "84575a706a150d10f79c73fefea7d16df2bb54f00e7bc485a18a166b90b9c5b4",
+        "research/performance/2026-10-28-official-density-capacity/observe.rs": "ddca739c49fded87bcbc1dab7e3b4641512c09c3fb278c021c7c237c7f3088e1",
+        "research/fidelity/2026-10-27-host-frame-timing/host_timing.rs": "c5298256aafdb85e09e823e9305e5142a37edabc501ea3d7fd6564a39f478daf",
+        "research/fidelity/2026-10-28-wall-sliding/harness/src/main.rs": "2aec6c749034c913aa3efaacb72c49e49485163464d7daa02abab03fbc343a35",
+        "research/fidelity/2026-10-28-turn-count-phase/harness/src/main.rs": "fc5c5bba4bec9c00c0ae5e3ee1d178907f644b782eada41ce597427f25bb8a39",
+        "research/fidelity/2026-10-27-client-view/harness/src/main.rs": "1fa35dd20e66dca3b5c5977dcfe9aca1f2d55362192b06f77a8c96ca4b547341",
+        "research/fidelity/2026-10-26-arena-radius/simulation/src/main.rs": "c305ef4267094282881387baee343f461264abce8ff6c6f74b9535717216a463",
+        "research/bots/2026-10-26-forager-port/oracle.rs": "6a5c4e7467858cc0837244ad7585e6ba42610e608a7fb6b1acce117bf6a91c82",
+        "research/battledome/2026-10-25-food-balance/measure.rs": "d2278f3231c81689482f3492f179174f9f193a88f97d6f74349e6f201eee1dc5",
+        "research/battledome/2026-10-27-pit-food/fixture.rs": "643fd6bcbb224c549d2f7e9593d8bd218eff900c5a45e3b6f0c7578444a6f12a",
+        "python/src/lib.rs": "c0b3116c52b30768d8a270b11b4d790eb433d0481fb0c648d92bdd0bcdd65674",
+        "ffi/src/lib.rs": "175dde9d74d40a8e14861e3c434e48d7d377707552da8e8b812f15cdf0a008d7",
+        "ffi/tests/abi.rs": "714d5984d374c0c3022f87c63172a0610f3c26303d8621858dd57631af038a4d",
+        "examples/support/runtime.rs": "3fe437de715313b493172d364a15dc2840ef972b495c94b8b587279fc851c701",
+        "examples/support/state.rs": "8c9d606ac91f854ddf8892479cd5d0f9214cc184f45ccfef47516b6facc6457e"
+      }
+    }
+  },
+  "nativeGates": {
+    "catalog-parity.json": [
+      {
+        "case": "step-default",
+        "base": {
+          "case": "step-default",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 4747394,
+          "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c"
+        },
+        "candidate": {
+          "case": "step-default",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 4747394,
+          "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c"
+        }
+      },
+      {
+        "case": "step-food",
+        "base": {
+          "case": "step-food",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 114813212,
+          "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807"
+        },
+        "candidate": {
+          "case": "step-food",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 114813212,
+          "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807"
+        }
+      },
+      {
+        "case": "step-body",
+        "base": {
+          "case": "step-body",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 26873819,
+          "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5"
+        },
+        "candidate": {
+          "case": "step-body",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 26873819,
+          "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5"
+        }
+      },
+      {
+        "case": "observe",
+        "base": {
+          "case": "observe",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 210433034,
+          "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc"
+        },
+        "candidate": {
+          "case": "observe",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 210433034,
+          "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc"
+        }
+      },
+      {
+        "case": "portable",
+        "base": {
+          "case": "portable",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e"
+        },
+        "candidate": {
+          "case": "portable",
+          "iterations": 32,
+          "lines": 34,
+          "uncompressed_bytes": 17260699,
+          "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e"
+        }
+      },
+      {
+        "case": "protocol",
+        "base": {
+          "case": "protocol",
+          "iterations": 32,
+          "lines": 289,
+          "uncompressed_bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"
+        },
+        "candidate": {
+          "case": "protocol",
+          "iterations": 32,
+          "lines": 289,
+          "uncompressed_bytes": 8343664,
+          "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"
+        }
+      },
+      {
+        "case": "sandbox-16-step",
+        "base": {
+          "case": "sandbox-16-step",
+          "iterations": 32,
+          "lines": 2036,
+          "uncompressed_bytes": 8039178,
+          "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+          "end": {
+            "case": "sandbox-16-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 1,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 59,
+              "deferredRespawns": 14,
+              "epochs": 0,
+              "respawns": 2
+            },
+            "operations": 32,
+            "physicsTicks": 2032
+          }
+        },
+        "candidate": {
+          "case": "sandbox-16-step",
+          "iterations": 32,
+          "lines": 2036,
+          "uncompressed_bytes": 8039178,
+          "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+          "end": {
+            "case": "sandbox-16-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 1,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 59,
+              "deferredRespawns": 14,
+              "epochs": 0,
+              "respawns": 2
+            },
+            "operations": 32,
+            "physicsTicks": 2032
+          }
+        }
+      },
+      {
+        "case": "sandbox-16-bot",
+        "base": {
+          "case": "sandbox-16-bot",
+          "iterations": 24,
+          "lines": 2028,
+          "uncompressed_bytes": 54871500,
+          "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+          "end": {
+            "case": "sandbox-16-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 1,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 59,
+              "deferredRespawns": 12,
+              "epochs": 0,
+              "respawns": 1
+            },
+            "operations": 24,
+            "physicsTicks": 2024
+          }
+        },
+        "candidate": {
+          "case": "sandbox-16-bot",
+          "iterations": 24,
+          "lines": 2028,
+          "uncompressed_bytes": 54871500,
+          "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+          "end": {
+            "case": "sandbox-16-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 1,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 59,
+              "deferredRespawns": 12,
+              "epochs": 0,
+              "respawns": 1
+            },
+            "operations": 24,
+            "physicsTicks": 2024
+          }
+        }
+      },
+      {
+        "case": "official-30-step",
+        "base": {
+          "case": "official-30-step",
+          "iterations": 32,
+          "lines": 2036,
+          "uncompressed_bytes": 20728651,
+          "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+          "end": {
+            "case": "official-30-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 32,
+            "physicsTicks": 2032
+          }
+        },
+        "candidate": {
+          "case": "official-30-step",
+          "iterations": 32,
+          "lines": 2036,
+          "uncompressed_bytes": 20728651,
+          "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+          "end": {
+            "case": "official-30-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 32,
+            "physicsTicks": 2032
+          }
+        }
+      },
+      {
+        "case": "official-30-bot",
+        "base": {
+          "case": "official-30-bot",
+          "iterations": 16,
+          "lines": 2020,
+          "uncompressed_bytes": 54020496,
+          "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+          "end": {
+            "case": "official-30-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 2016
+          }
+        },
+        "candidate": {
+          "case": "official-30-bot",
+          "iterations": 16,
+          "lines": 2020,
+          "uncompressed_bytes": 54020496,
+          "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+          "end": {
+            "case": "official-30-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 2016
+          }
+        }
+      },
+      {
+        "case": "official-100-step",
+        "base": {
+          "case": "official-100-step",
+          "iterations": 16,
+          "lines": 2020,
+          "uncompressed_bytes": 42173472,
+          "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+          "end": {
+            "case": "official-100-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 2016
+          }
+        },
+        "candidate": {
+          "case": "official-100-step",
+          "iterations": 16,
+          "lines": 2020,
+          "uncompressed_bytes": 42173472,
+          "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+          "end": {
+            "case": "official-100-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 2016
+          }
+        }
+      },
+      {
+        "case": "official-100-bot",
+        "base": {
+          "case": "official-100-bot",
+          "iterations": 4,
+          "lines": 2008,
+          "uncompressed_bytes": 59803592,
+          "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+          "end": {
+            "case": "official-100-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 4,
+            "physicsTicks": 2004
+          }
+        },
+        "candidate": {
+          "case": "official-100-bot",
+          "iterations": 4,
+          "lines": 2008,
+          "uncompressed_bytes": 59803592,
+          "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+          "end": {
+            "case": "official-100-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 4,
+            "physicsTicks": 2004
+          }
+        }
+      },
+      {
+        "case": "official-200-step",
+        "base": {
+          "case": "official-200-step",
+          "iterations": 8,
+          "lines": 1012,
+          "uncompressed_bytes": 41669943,
+          "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+          "end": {
+            "case": "official-200-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 1,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 101,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 1
+            },
+            "operations": 8,
+            "physicsTicks": 1008
+          }
+        },
+        "candidate": {
+          "case": "official-200-step",
+          "iterations": 8,
+          "lines": 1012,
+          "uncompressed_bytes": 41669943,
+          "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+          "end": {
+            "case": "official-200-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 1,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 101,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 1
+            },
+            "operations": 8,
+            "physicsTicks": 1008
+          }
+        }
+      },
+      {
+        "case": "official-200-bot",
+        "base": {
+          "case": "official-200-bot",
+          "iterations": 2,
+          "lines": 1006,
+          "uncompressed_bytes": 57425821,
+          "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+          "end": {
+            "case": "official-200-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 2,
+            "physicsTicks": 1002
+          }
+        },
+        "candidate": {
+          "case": "official-200-bot",
+          "iterations": 2,
+          "lines": 1006,
+          "uncompressed_bytes": 57425821,
+          "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+          "end": {
+            "case": "official-200-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 2,
+            "physicsTicks": 1002
+          }
+        }
+      },
+      {
+        "case": "official-500-step",
+        "base": {
+          "case": "official-500-step",
+          "iterations": 4,
+          "lines": 608,
+          "uncompressed_bytes": 59311550,
+          "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+          "end": {
+            "case": "official-500-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 4,
+            "physicsTicks": 604
+          }
+        },
+        "candidate": {
+          "case": "official-500-step",
+          "iterations": 4,
+          "lines": 608,
+          "uncompressed_bytes": 59311550,
+          "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+          "end": {
+            "case": "official-500-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 4,
+            "physicsTicks": 604
+          }
+        }
+      },
+      {
+        "case": "official-500-bot",
+        "base": {
+          "case": "official-500-bot",
+          "iterations": 1,
+          "lines": 605,
+          "uncompressed_bytes": 78389779,
+          "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+          "end": {
+            "case": "official-500-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 1,
+            "physicsTicks": 601
+          }
+        },
+        "candidate": {
+          "case": "official-500-bot",
+          "iterations": 1,
+          "lines": 605,
+          "uncompressed_bytes": 78389779,
+          "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+          "end": {
+            "case": "official-500-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 1,
+            "physicsTicks": 601
+          }
+        }
+      },
+      {
+        "case": "battledome-32-step",
+        "base": {
+          "case": "battledome-32-step",
+          "iterations": 16,
+          "lines": 8020,
+          "uncompressed_bytes": 17701194,
+          "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+          "end": {
+            "case": "battledome-32-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 8016
+          }
+        },
+        "candidate": {
+          "case": "battledome-32-step",
+          "iterations": 16,
+          "lines": 8020,
+          "uncompressed_bytes": 17701194,
+          "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+          "end": {
+            "case": "battledome-32-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 8016
+          }
+        }
+      },
+      {
+        "case": "battledome-32-bot",
+        "base": {
+          "case": "battledome-32-bot",
+          "iterations": 4,
+          "lines": 8008,
+          "uncompressed_bytes": 19456951,
+          "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+          "end": {
+            "case": "battledome-32-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 4,
+            "physicsTicks": 8004
+          }
+        },
+        "candidate": {
+          "case": "battledome-32-bot",
+          "iterations": 4,
+          "lines": 8008,
+          "uncompressed_bytes": 19456951,
+          "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+          "end": {
+            "case": "battledome-32-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 4,
+            "physicsTicks": 8004
+          }
+        }
+      },
+      {
+        "case": "official-128-step",
+        "base": {
+          "case": "official-128-step",
+          "iterations": 16,
+          "lines": 2020,
+          "uncompressed_bytes": 53280691,
+          "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+          "end": {
+            "case": "official-128-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 2016
+          }
+        },
+        "candidate": {
+          "case": "official-128-step",
+          "iterations": 16,
+          "lines": 2020,
+          "uncompressed_bytes": 53280691,
+          "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+          "end": {
+            "case": "official-128-step",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 16,
+            "physicsTicks": 2016
+          }
+        }
+      },
+      {
+        "case": "official-128-bot",
+        "base": {
+          "case": "official-128-bot",
+          "iterations": 3,
+          "lines": 2007,
+          "uncompressed_bytes": 60841865,
+          "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+          "end": {
+            "case": "official-128-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 3,
+            "physicsTicks": 2003
+          }
+        },
+        "candidate": {
+          "case": "official-128-bot",
+          "iterations": 3,
+          "lines": 2007,
+          "uncompressed_bytes": 60841865,
+          "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+          "end": {
+            "case": "official-128-bot",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 0
+            },
+            "operations": 3,
+            "physicsTicks": 2003
+          }
+        }
+      },
+      {
+        "case": "client-battledome-64",
+        "base": {
+          "case": "client-battledome-64",
+          "iterations": 4,
+          "lines": 608,
+          "uncompressed_bytes": 36608905,
+          "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+          "end": {
+            "case": "client-battledome-64",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 17,
+              "epochs": 0,
+              "respawns": 3
+            },
+            "operations": 4,
+            "physicsTicks": 3624
+          }
+        },
+        "candidate": {
+          "case": "client-battledome-64",
+          "iterations": 4,
+          "lines": 608,
+          "uncompressed_bytes": 36608905,
+          "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+          "end": {
+            "case": "client-battledome-64",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 0,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 0,
+              "deferredRespawns": 17,
+              "epochs": 0,
+              "respawns": 3
+            },
+            "operations": 4,
+            "physicsTicks": 3624
+          }
+        }
+      },
+      {
+        "case": "client-official-500",
+        "base": {
+          "case": "client-official-500",
+          "iterations": 1,
+          "lines": 13,
+          "uncompressed_bytes": 82283629,
+          "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+          "end": {
+            "case": "client-official-500",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 26,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 130,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 6
+            },
+            "operations": 1,
+            "physicsTicks": 54
+          }
+        },
+        "candidate": {
+          "case": "client-official-500",
+          "iterations": 1,
+          "lines": 13,
+          "uncompressed_bytes": 82283629,
+          "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+          "end": {
+            "case": "client-official-500",
+            "kind": "end",
+            "lifecycle": {
+              "bodyDeaths": 26,
+              "boundaryDeaths": 0,
+              "deathFoodPellets": 130,
+              "deferredRespawns": 0,
+              "epochs": 0,
+              "respawns": 6
+            },
+            "operations": 1,
+            "physicsTicks": 54
+          }
+        }
+      },
+      {
+        "case": "shared-forager-a4-mean-8",
+        "base": {
+          "case": "shared-forager-a4-mean-8",
+          "iterations": 16,
+          "lines": 20,
+          "uncompressed_bytes": 8549310,
+          "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943"
+        },
+        "candidate": {
+          "case": "shared-forager-a4-mean-8",
+          "iterations": 16,
+          "lines": 20,
+          "uncompressed_bytes": 8549310,
+          "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943"
+        }
+      }
+    ],
+    "host-parity.json": [
+      {
+        "case": "official500",
+        "base": {
+          "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+          "bytes": 37938956,
+          "wireSha256": "ec7067d174d9eb36db0a8cee515131f6ab84897c0f09ad7f8dcfe4925cba2930",
+          "frames": 317188
+        },
+        "candidate": {
+          "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+          "bytes": 37938956,
+          "wireSha256": "ec7067d174d9eb36db0a8cee515131f6ab84897c0f09ad7f8dcfe4925cba2930",
+          "frames": 317188
+        }
+      },
+      {
+        "case": "official500-half",
+        "base": {
+          "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+          "bytes": 57556590,
+          "wireSha256": "f325f4c01229786d3592e946d61b9e5df4cbec6224fc246b8fe7308cd243a2c7",
+          "frames": 664841
+        },
+        "candidate": {
+          "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+          "bytes": 57556590,
+          "wireSha256": "f325f4c01229786d3592e946d61b9e5df4cbec6224fc246b8fe7308cd243a2c7",
+          "frames": 664841
+        }
+      },
+      {
+        "case": "official500-legacy",
+        "base": {
+          "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+          "bytes": 77137561,
+          "wireSha256": "4e128e1a074deb2d66b33da6826453954604d40aee89c06dfd912cc35fd4b481",
+          "frames": 1011810
+        },
+        "candidate": {
+          "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+          "bytes": 77137561,
+          "wireSha256": "4e128e1a074deb2d66b33da6826453954604d40aee89c06dfd912cc35fd4b481",
+          "frames": 1011810
+        }
+      },
+      {
+        "case": "official2281",
+        "base": {
+          "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+          "bytes": 180734869,
+          "wireSha256": "cb9031672a605ed15755f41d27020472f8b5bf853e676f8c7c617c748a4d54fe",
+          "frames": 1469820
+        },
+        "candidate": {
+          "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+          "bytes": 180734869,
+          "wireSha256": "cb9031672a605ed15755f41d27020472f8b5bf853e676f8c7c617c748a4d54fe",
+          "frames": 1469820
+        }
+      },
+      {
+        "case": "battledome8",
+        "base": {
+          "sha256": "3052edf46f77641454d9a3b6edb079735b7da78a9e4e6a4bfdfed2e834d84871",
+          "bytes": 643321,
+          "wireSha256": "19a9804a46714914bc1776408b68da23bbc3434765e0ac2cba2d6575c1e24cc0",
+          "frames": 5218
+        },
+        "candidate": {
+          "sha256": "3052edf46f77641454d9a3b6edb079735b7da78a9e4e6a4bfdfed2e834d84871",
+          "bytes": 643321,
+          "wireSha256": "19a9804a46714914bc1776408b68da23bbc3434765e0ac2cba2d6575c1e24cc0",
+          "frames": 5218
+        }
+      },
+      {
+        "case": "battledome8-legacy",
+        "base": {
+          "sha256": "01750ef2083e512c34d1a56f0b2758ad44e335b2a57c0f666f092731baf9631e",
+          "bytes": 1666305,
+          "wireSha256": "fe79f9a1cdbcfbd6562d08b2d0cbd8a443ada7a82dddc55eedaca8ba76673b5b",
+          "frames": 23368
+        },
+        "candidate": {
+          "sha256": "01750ef2083e512c34d1a56f0b2758ad44e335b2a57c0f666f092731baf9631e",
+          "bytes": 1666305,
+          "wireSha256": "fe79f9a1cdbcfbd6562d08b2d0cbd8a443ada7a82dddc55eedaca8ba76673b5b",
+          "frames": 23368
+        }
+      }
+    ],
+    "fixed-parity.json": [
+      {
+        "protocol": 19,
+        "base": {
+          "sha256": "8dae4fc0d92469f6c2a0be1df5161c16e9f3064f2fa906ba27bbf2741275b052",
+          "bytes": 574248,
+          "wireSha256": "5b061fd195ee9bae544bd420045a20dba495df5df8d4c94a582fce0da120a1fb",
+          "frames": 1006,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": false,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "candidate": {
+          "sha256": "8dae4fc0d92469f6c2a0be1df5161c16e9f3064f2fa906ba27bbf2741275b052",
+          "bytes": 574248,
+          "wireSha256": "5b061fd195ee9bae544bd420045a20dba495df5df8d4c94a582fce0da120a1fb",
+          "frames": 1006,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": false,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "mutation": {
+          "sha256": "72b95ab0f2721c30e721373982d244b408ff013be648750a16f7912c7a220000",
+          "bytes": 574488,
+          "wireSha256": "ada2814ddb014849c12bceefe7139c4a63b66a38b73c43b05817499dfed34dc5",
+          "frames": 1006,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": false,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "wireMutationDetected": true
+      },
+      {
+        "protocol": 13,
+        "base": {
+          "sha256": "44f355675ee25b1a7bd512e4f09d875a71ad2c71a7260e1e09d31ca35da3061b",
+          "bytes": 592532,
+          "wireSha256": "47c960d0c7c7431854d23fa01a9dbae29fdc5ea562306d04618f5413dd6ef530",
+          "frames": 1274,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": true,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "candidate": {
+          "sha256": "44f355675ee25b1a7bd512e4f09d875a71ad2c71a7260e1e09d31ca35da3061b",
+          "bytes": 592532,
+          "wireSha256": "47c960d0c7c7431854d23fa01a9dbae29fdc5ea562306d04618f5413dd6ef530",
+          "frames": 1274,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": true,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "mutation": {
+          "sha256": "fed3d61668c29cc61f77da6f3d653ce235f88995e210e00be6980304c967b187",
+          "bytes": 592772,
+          "wireSha256": "aabc40a04c867ad0f3238fdeace2dc202280f6b865781dfafd91d051b9a0199c",
+          "frames": 1274,
+          "summary": {
+            "blockedAttempts": 737280,
+            "blockedExhausted": 180,
+            "blockedSearches": 180,
+            "legacy": true,
+            "releaseExhausted": 182,
+            "releaseSearches": 193,
+            "row": "spawn",
+            "ticks": 720,
+            "waiting": 47
+          }
+        },
+        "wireMutationDetected": true
+      }
+    ]
+  },
+  "proofs": {
+    "minimap-13-direct-parent-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-direct-parent-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-4-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-4-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-3-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-3-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-2-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-2-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-1-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-1-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-0-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair-0-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair--1-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-pair--1-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-proof-1-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-proof-0-candidate.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-proof-1-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-13-proof-0-base.trace": {
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862
+    },
+    "minimap-19-direct-parent-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-direct-parent-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-4-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-4-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-3-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-3-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-2-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-2-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-1-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-1-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-0-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair-0-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair--1-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-pair--1-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-proof-1-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-proof-0-candidate.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-proof-1-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "minimap-19-proof-0-base.trace": {
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374
+    },
+    "fixed-parity.json": {
+      "sha256": "382013352fa12cbeb4da3c856d8da6b4ec222fa375e030729481c7328461e6af",
+      "bytes": 3280
+    },
+    "host-parity.json": {
+      "sha256": "ca3c878e51a4259d6f4cb2bbb7b277202a4a4c2e31365ec539f9b60149a520b5",
+      "bytes": 3149
+    },
+    "catalog-parity.json": {
+      "sha256": "9e2fad0a880244858d6a9bdfd5483dd25bd2d6fe6c6352e50c6955184116808c",
+      "bytes": 22061
+    },
+    "base/source/tests/fixtures/forager-native-parity.json": {
+      "sha256": "8ddd0f4a7a1f935c1e527ce336068203c1821f9db3d37a1c5cdf32cc7e34c48c",
+      "bytes": 192213
+    },
+    "candidate/source/tests/fixtures/forager-native-parity.json": {
+      "sha256": "8ddd0f4a7a1f935c1e527ce336068203c1821f9db3d37a1c5cdf32cc7e34c48c",
+      "bytes": 192213
+    },
+    "mutation/source/tests/fixtures/forager-native-parity.json": {
+      "sha256": "8ddd0f4a7a1f935c1e527ce336068203c1821f9db3d37a1c5cdf32cc7e34c48c",
+      "bytes": 192213
+    }
+  },
+  "windowWork": {
+    "19": {
+      "base": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "minimap",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "candidate": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "minimap",
+        "ticks": 360,
+        "waiting": 0
+      }
+    },
+    "13": {
+      "base": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "minimap",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "candidate": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "minimap",
+        "ticks": 360,
+        "waiting": 0
+      }
+    }
+  },
+  "steps": [
+    {
+      "label": "build-base",
+      "exit": 0,
+      "startedUTC": "2026-10-29T06:57:50Z",
+      "finishedUTC": "2026-10-29T06:59:28Z"
+    },
+    {
+      "label": "build-candidate",
+      "exit": 0,
+      "startedUTC": "2026-10-29T06:59:28Z",
+      "finishedUTC": "2026-10-29T07:00:42Z"
+    },
+    {
+      "label": "build-mutation",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:00:42Z",
+      "finishedUTC": "2026-10-29T07:01:55Z"
+    },
+    {
+      "label": "catalog",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:01:56Z",
+      "finishedUTC": "2026-10-29T07:03:03Z"
+    },
+    {
+      "label": "host",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:03:03Z",
+      "finishedUTC": "2026-10-29T07:03:49Z"
+    },
+    {
+      "label": "fixed-wire-controls",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:03:49Z",
+      "finishedUTC": "2026-10-29T07:03:59Z"
+    },
+    {
+      "label": "native-gates",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:03:59Z",
+      "finishedUTC": "2026-10-29T07:03:59Z"
+    },
+    {
+      "label": "pairs-19",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:03:59Z",
+      "finishedUTC": "2026-10-29T07:04:00Z"
+    },
+    {
+      "label": "pairs-13",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:04:00Z",
+      "finishedUTC": "2026-10-29T07:04:02Z"
+    },
+    {
+      "label": "select",
+      "exit": 0,
+      "startedUTC": "2026-10-29T07:04:02Z",
+      "finishedUTC": "2026-10-29T07:04:02Z"
+    }
+  ],
+  "context": {
+    "architecture": "x86_64",
+    "cpuFamily": "AMD EPYC",
+    "availableLogicalCpus": 4,
+    "nativeWorkerLogicalCpu": 0,
+    "controllerLogicalCpu": 1,
+    "releaseBuildJobs": 1,
+    "minimumCountedPmuScheduledFraction": 1.0,
+    "inventoryReview": "No competing build/measurement workload; ordinary guest services remain. Private process inventories retained; snapshots are not continuous isolation."
+  },
+  "resourceBounds": {
+    "scratchFilesystemBytes": 4175650816,
+    "maxObservedFilesystemUsedBytes": 2455298048,
+    "targetAbsentAfterRun": true
+  }
+}
