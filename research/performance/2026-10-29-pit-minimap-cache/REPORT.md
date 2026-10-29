@@ -17,6 +17,9 @@ belongs to one backend and is rebuilt for a different side or threshold range.
 Baseline `cf67b80e`, implementation `af420c84`; later study edits add only
 correctness tooling and notes. [Plan](PLAN.md), [attempts](ATTEMPTS.md),
 [reproduction](REPRODUCE.md), [selected correctness](correctness.json).
+The unrun natural-warm code-fixture proposal is replaced by the explicitly
+synthetic, qualified [fixed-work amendment](PLAN-ADDENDUM.md); no historical
+plan or AWS result is rewritten.
 
 ## Current evidence
 
@@ -47,8 +50,8 @@ them publicly retrievable.
 
 ## Remaining gate
 
-Wait for the maintaining agent to release the SSH guest. Then run the frozen
-Battledome full-backend fixed-work experiment, both protocols, five alternating
+Wait for the maintaining agent to release the SSH guest. Then run the amended
+Battledome full-host fixed-work experiment, both protocols, five alternating
 `instructions:u` pairs, mutation checks and separate slow-tick results. Keep
 all baseline/candidate windows and quiet-context evidence. Performance must be
 measured directly rather than inferred from eliminated `hypot` calls.

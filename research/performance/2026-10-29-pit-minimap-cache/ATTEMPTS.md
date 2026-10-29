@@ -16,6 +16,18 @@
   ignored test). Full receipts are retained externally. Full trace matrix and
   PMU evidence remain pending.
 - No SSH bench use: the maintaining agent has not released it.
+- The unrun natural-warm code-fixture proposal is replaced, before native
+  measurement, by a separate 80-viewer synthetic no-backlog control in the
+  common spawn-study harness. Its full state/wire histories are frozen after
+  300 real ticks; an actual minimap opportunity is required inside counting.
+  The old plan remains intact with an explicit amendment.
+- Shared-fixture audit failures (missing stock decorations and stale Cargo
+  reuse of a pre-staged arm) were retained in the spawn study. Final builders
+  enforce decorated/nonzero sessions and per-arm package rebuilds in the sole
+  task target. All final source manifests remained intact and each arm has a
+  distinct executable. Both queued and 80-viewer minimap byte controls pass;
+  projected-radius wire mutations are caught in both queued protocols. No
+  instruction or slow-tick measurement has run.
 - All 23 catalog rows and four historical host fixtures passed full-byte
   comparison and terminal checks. The first supplementary 16-seat Battledome
   fixture refused initial slot 14 before tracing: simultaneous ring placement
