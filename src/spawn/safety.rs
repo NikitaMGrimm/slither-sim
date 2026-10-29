@@ -103,10 +103,26 @@ impl Safety {
         query: Bounds,
         mut predicate: impl FnMut(usize, &Obstacle) -> bool,
     ) -> bool {
+        if self.obstacles.len() >= 32 {
+            return self.all_indexed_obstacles(query, predicate);
+        }
+        self.obstacles
+            .iter()
+            .enumerate()
+            .all(|(slot, obstacle)| predicate(slot, obstacle))
+    }
+
+    // Keep grid traversal out of the small-world loop's register allocation.
+    #[inline(never)]
+    fn all_indexed_obstacles(
+        &self,
+        query: Bounds,
+        mut predicate: impl FnMut(usize, &Obstacle) -> bool,
+    ) -> bool {
         // Short successful searches and small obstacle sets keep the original
         // loop. Repeated queries amortize the one bounded grid construction.
         // research/performance/2026-10-29-spawn-obstacle-index/REPORT.md
-        if self.obstacles.len() >= 32 && index::boundable(query) {
+        if index::boundable(query) {
             let queries = self.index_queries.get();
             if queries >= 16 {
                 if let Some(index) = self
