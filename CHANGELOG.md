@@ -4,6 +4,11 @@
 
 ### Added
 
+- A frozen 318-snake constant-boost Battledome admission study. An exact
+  obstacle index cuts refused-search CPU about 76% and successful-search CPU
+  about 75%, but fails the study's additional small-world gate, so the prototype
+  remains on a reference branch and production is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
 - A real-socket Battledome recheck after the two spawn-search speedups, with
   bots boosting almost all the time. At 320 players the server still falls
   behind, but for 66 ticks of the measured window instead of 231, and frame
