@@ -180,5 +180,19 @@
       "minimapTicks": 1
     }
   ],
-  "syntheticReducerControlsPass": true
+  "syntheticReducerControlsPass": true,
+  "controlBuildPinsSha256": "f99e16dae49f06c22dc310a4304c68e613f498b61a4454284a7b2da8787e8269",
+  "controlBinaries": {
+    "perf_baseline.exe": "805ba59025890132bed443fd63cc5da546e03d1876dd6604a8d42a30e9ca56d6",
+    "study_fixed.exe": "2ff456d3ba00fa287005aa1ac3ba2dcb80254329b2d3d9b0498df2d7a54fa8cb",
+    "study_protocols.exe": "977bb7ff7aea9102085dab109fae197329d8a21432940192d40ee0e7cfe13e9f"
+  },
+  "stagedNativeManifests": {
+    "minimap/base": "b2abfa3fa58913a6b285c1dae9f0011dbc71aedbf8c977f3b8c9ff7706d7fa8b",
+    "minimap/candidate": "ab8a5631af066bf06a3bae07798bb55b085dcdf64be50a7e73765487f3076e44",
+    "minimap/mutation": "16d1bbbf889db7cfeefec016ee72778b38e988bda101bbe9082a3d8194fac179",
+    "spawn/base": "b2e262cd3a143f543196a310f94ade295b9d182e13d6059bd4ef6831c8c71b56",
+    "spawn/candidate": "72497aa2fcef7963ced9d9e98421fb6cd9a4cebd44790b09d5a7040dd12cf9e3",
+    "spawn/mutation": "7eaafa35aa7b69f942d9c3373c9dca07d44127d1a125462fd27095cd67bb0977"
+  }
 }
