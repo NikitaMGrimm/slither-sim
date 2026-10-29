@@ -4,6 +4,13 @@
 
 ### Added
 
+- A live constant-boost Battledome recheck after the head-distance and lazy
+  edge-block spawn fixes. At 320 seats, the candidate records 66 deferred
+  ticks versus 231, but still falls behind. Both 480-seat rows are overloaded;
+  the candidate has lower CPU p99/max but worse median CPU, deferrals and
+  delivery. Spawn search still leads the slow tail. One window per arm,
+  with no repeatability or capacity claim
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
 - A memory study of the simulation thread in a fully grown 500-player world.
   Each player's snake history reserves a slot for every snake, 20.38 MB in
   total, to hold 176.7 kB of snakes that players actually know, and those

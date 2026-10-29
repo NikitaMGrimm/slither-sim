@@ -1,0 +1,63 @@
+{
+  "primaryWindows": 4,
+  "primaryPairCountPerSeat": 1,
+  "calibrationWindows": 10,
+  "notMeasured": [
+    640
+  ],
+  "onlineRangesReproduced": true,
+  "allCanonicalTaskClocksReconcile": true,
+  "maximumClockTaskDifferenceMs": 0.002137904658699341,
+  "allBoundaryInventoriesPresent": true,
+  "allGeneratorAndQueueGatesPass": true,
+  "minimumLivingTickBoostShareIncludingCalibration": 0.9929668066601582,
+  "maximumPrimaryWorkerCpuP99Fraction": 0.26842899730980124,
+  "worstPrimaryInputP99Ms": 28.73985,
+  "primaryCollectorCpuMsPerTickRange": [
+    0.05112702177602331,
+    0.0865463910746806
+  ],
+  "allHostThreadsPinnedToCpuZero": true,
+  "humanSeats": 0,
+  "oneSharedClientBinaryForBothArms": true,
+  "nativeBoostHeadingRuleRegressionsPassed": 2,
+  "sourcePins": "selected-results.json only; one source manifest digest per arm",
+  "spawnAndPhysicsSourceExactlyMatchEachRuntime": {
+    "base": {
+      "src/physics.rs": true,
+      "src/spawn/safety.rs": true
+    },
+    "candidate": {
+      "src/physics.rs": true,
+      "src/spawn/safety.rs": true
+    }
+  },
+  "syntheticControlsLogSha256": "269e5049fa79e95cfe4304a927e253985d6353c37ebb748da82ba3c1b708c21d",
+  "assemblerMutationControlsPassed": [
+    "archiveSha256 mismatch rejected",
+    "status mismatch rejected",
+    "requiredSourcesVerified mismatch rejected",
+    "selected row archive mismatch rejected"
+  ],
+  "allPrimaryArchivesMatchOwnSelectionAndCompleteReceipt": true,
+  "independentReview": false,
+  "rustChecks": "Both portable release builds and treatment regressions on AWS; full Rust group inapplicable to this research-only change",
+  "documentationCheck": "7 documentation tests passed on AWS; every generated table matches the report exactly; cleanup receipt and cost text appended after teardown",
+  "cleanupReceipt": "cleanup.json",
+  "documentationLogSha256": "d5af82f7cd2092aae14893461bfb750f916ed3ddfaa17444fce5d6c4572258fa",
+  "cleanupVerified": true,
+  "allRequiredSourcesVerifiedBeforeTeardown": true,
+  "privateArchivePins": {
+    "nativeBuild": {
+      "archiveSha256": "7edd078dd3e5b84b4ee6d9f8c93938c0f8bce1eb8a2fa1e2a5e9b5528f1e2e64",
+      "archiveBytes": 52357826,
+      "manifestSha256": "8dc3b059b7d5551a70fcb637a470a5976a6d9a0966b38b0eed120d5da9fa14ab"
+    },
+    "finalAnalysis": {
+      "archiveSha256": "574c4f8985209317b7f59b6d26214d00d392f35256037ac23f086dcb9c211857",
+      "archiveBytes": 8467233,
+      "manifestSha256": "004f099085fe6b80c762d46c841cabe224e5bb0ec87b300a93ed9eb0115a8e63"
+    }
+  },
+  "privacyCheck": "Public study files and new index/changelog text checked for cloud/host identifiers, addresses, account numbers and private resource names; JSON/Python syntax and LF checked"
+}
