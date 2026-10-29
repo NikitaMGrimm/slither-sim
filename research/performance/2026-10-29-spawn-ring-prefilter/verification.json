@@ -1,0 +1,184 @@
+{
+  "scope": "Local correctness only; no speed/capacity claim",
+  "baseline": "23eddca80a2ae970753dc40717fa74297ff281fc",
+  "candidate": "edab328765a6978cfb13d97356fd8f24c4ef2153",
+  "fullRustCommands": [
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --workspace --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features parallel",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test -p slither-sim-ffi --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo check -p slither-sim-py --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo run --locked --example basic",
+      "exit": 0
+    }
+  ],
+  "rustLogSha256": "191b0dc8bb1953d265ae0c283323070516bb052b3fc0d6d077371b5f308bf9a6",
+  "fullByteComparisons": 31,
+  "wireMutationControls": 2,
+  "focusedFallbackMutationDetected": true,
+  "productionSourceMatchesSelectedTraceArchive": true,
+  "localCargoJobs": 1,
+  "localTestThreads": 1,
+  "documentationTests": 7,
+  "pmuRun": false,
+  "sshGuestUsed": false,
+  "additionalControlCompilation": "Compiled locally; all six row/protocol work gates pass",
+  "independentReview": false,
+  "controls": [
+    {
+      "row": "minimap",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "minimap",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "markerTicks": 0,
+      "minimapTicks": 1
+    },
+    {
+      "row": "minimap",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "minimap",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "markerTicks": 0,
+      "minimapTicks": 1
+    },
+    {
+      "row": "markers",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "markers",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "markerTicks": 5,
+      "minimapTicks": 1
+    },
+    {
+      "row": "markers",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 0,
+        "blockedExhausted": 0,
+        "blockedSearches": 0,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "markers",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "markerTicks": 5,
+      "minimapTicks": 1
+    },
+    {
+      "row": "spawn",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 368640,
+        "blockedExhausted": 90,
+        "blockedSearches": 90,
+        "legacy": false,
+        "releaseExhausted": 90,
+        "releaseSearches": 99,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 54
+      },
+      "markerTicks": 0,
+      "minimapTicks": 1
+    },
+    {
+      "row": "spawn",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 368640,
+        "blockedExhausted": 90,
+        "blockedSearches": 90,
+        "legacy": true,
+        "releaseExhausted": 90,
+        "releaseSearches": 99,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 54
+      },
+      "markerTicks": 0,
+      "minimapTicks": 1
+    }
+  ],
+  "syntheticReducerControlsPass": true
+}

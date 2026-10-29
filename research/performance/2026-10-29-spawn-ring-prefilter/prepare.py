@@ -13,11 +13,16 @@ start=text.index("if arm == 'mutation':")
 end=text.index('env = dict(',start)
 text=text[:start]+'''# Spawn-specific wire mutation: discard otherwise eligible fallback heads.
 if arm == 'mutation':
-    p = source / 'src/client/simulation.rs'
-    payload = p.read_text()
-    old = 'if !fallback\\n                && safety'
-    assert payload.count(old) == 1
-    p.write_text(payload.replace(old, 'if true\\n                && safety'), newline='\\n')
+    if os.environ.get('STUDY_MUTATION')=='map':
+        p=source/'src/client/minimap.rs';payload=p.read_text()
+        old='pit / world.radius() * side as f64 / 2.';assert payload.count(old)>=1
+        p.write_text(payload.replace(old,old+' * 0.98'),newline='\\n')
+    else:
+        p = source / 'src/client/simulation.rs'
+        payload = p.read_text()
+        old = 'if !fallback\\n                && safety'
+        assert payload.count(old) == 1
+        p.write_text(payload.replace(old, 'if true\\n                && safety'), newline='\\n')
 
 payload = (STUDY / 'fixture_access.rs').read_text()
 (source / 'src/client/simulation/study_spawn_fixture.rs').write_text(payload, newline='\\n')
@@ -39,12 +44,22 @@ counter=repo/'research/performance/2026-10-28-broadcast-distance/counter.rs'
 (source/'src/study_counter.rs').write_text(counter.read_text(),newline='\\n')
 (source/'src/study_tick.rs').write_text((STUDY/'tick_samples.rs').read_text(),newline='\\n')
 p=source/'src/lib.rs';p.write_text(p.read_text()+'\\npub mod study_counter;\\npub mod study_tick;\\n',newline='\\n')
-(source/'examples/study_fixed.rs').write_text(\"fn main(){let a:Vec<_>=std::env::args().collect();slither_sim::client::server::study_fixed::run(a[1]==\\\"13\\\",a[2].parse().unwrap(),a.get(3).is_some_and(|s|s==\\\"--measure\\\"));}\\n\",newline='\\n')
+(source/'examples/study_fixed.rs').write_text(\"fn main(){let a:Vec<_>=std::env::args().collect();slither_sim::client::server::study_fixed::run(a[1]==\\\"13\\\",a[2].parse().unwrap(),a.get(3).is_some_and(|s|s==\\\"--measure\\\"),a.get(4).map_or(\\\"spawn\\\",String::as_str));}\\n\",newline='\\n')
 '''+text[end:]
 text=text.replace("'--example', 'study_protocols', '--example', 'perf_baseline']",
                   "'--example', 'study_protocols', '--example', 'perf_baseline', '--example', 'study_fixed']")
 text=text.replace("for binary in ['study_protocols', 'perf_baseline']:",
                   "for binary in ['study_protocols', 'perf_baseline', 'study_fixed']:")
+text=text.replace('env = dict(','''if os.environ.get('STUDY_STAGE_ONLY')=='1':
+    with archive.open('rb') as f: digest=hashlib.file_digest(f,'sha256').hexdigest()
+    sources={p.relative_to(source).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in source.rglob('*.rs')}
+    files={p.relative_to(source).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in source.rglob('*') if p.is_file()}
+    (root/arm/'source-stage.json').write_text(json.dumps({'ref':ref,'archiveSha256':digest,
+        'commit':subprocess.check_output(['git','rev-parse',ref],cwd=repo,text=True).strip(),
+        'sources':sources,'files':files,'prepareSha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},indent=2)+'\\n',newline='\\n')
+    print('STAGED ONLY',arm,flush=True)
+    raise SystemExit(0)
+env = dict(''',1)
 if os.environ.get('STUDY_RELEASE')=='1':
     text=text.replace("'--example', 'study_protocols', '--example', 'perf_baseline', '--example', 'study_fixed']",
                       "'--release', '--example', 'study_protocols', '--example', 'perf_baseline', '--example', 'study_fixed']")
@@ -58,4 +73,5 @@ root=Path(sys.argv[2]).resolve();arm=sys.argv[3]
 p=root/arm/'pins.json';pins=json.loads(p.read_text())
 pins['priorPrepareSha256']=hashlib.sha256(prior.read_bytes()).hexdigest()
 pins['releaseBuild']=os.environ.get('STUDY_RELEASE')=='1'
+pins['traceOnly']=not pins['releaseBuild']
 p.write_text(json.dumps(pins,indent=2)+'\n',newline='\n')

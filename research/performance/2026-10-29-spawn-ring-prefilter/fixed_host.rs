@@ -18,12 +18,19 @@ struct Fixture {
     deliveries: Receiver<Vec<Delivery>>,
     _commands: Sender<Command>,
     legacy: bool,
+    row: String,
 }
 
 impl Fixture {
-    fn new(legacy: bool) -> Self {
+    fn new(legacy: bool, row: &str) -> Self {
+        assert!(["spawn","minimap","markers"].contains(&row));
         let mut world = crate::Config::battledome();
-        world.dynamic_radius = false;
+        world.dynamic_radius = row!="spawn";
+        if row=="markers" {
+            world.radius_updates=(300..=800).map(|tick|crate::RadiusUpdate {
+                time:tick as f64*world.dt,radius:3584.-(tick-300) as f64,
+            }).collect();
+        }
         let world = RawSimulator::new(7, SimulationConfig { agents: SEATS, world, ..Default::default() }, SEATS).unwrap();
         let dt = world.dt();
         let shared = Arc::new(Shared {
@@ -53,19 +60,27 @@ impl Fixture {
                 session_id: false, physical_food: false, protocol13: legacy, full_minimap: false,
                 requested_tick: 0, reset_kills: true });
         }
-        Self { sim, deliveries, _commands: commands, legacy }
+        if row!="spawn" {
+            sim.waiting.clear();
+            sim.world.study_viewers(legacy,true);
+        }
+        Self { sim, deliveries, _commands: commands, legacy, row:row.into() }
     }
 
     fn state(&self) -> serde_json::Value {
         serde_json::json!({"backend": self.sim.world.study_state(), "tick": self.sim.ticks,
             "nextSpawnTick": self.sim.next_spawn_tick, "lastSpawnTick": self.sim.last_spawn_tick,
             "waiting": self.sim.waiting.iter().map(|j|(j.slot,j.generation,j.requested_tick)).collect::<Vec<_>>(),
-            "generations": self.sim.generations, "legacy": self.legacy})
+            "generations": self.sim.generations, "legacy": self.legacy,"row":self.row})
     }
 
     fn tick(&mut self, blocked: bool, trace: Option<&mut dyn Write>) -> serde_json::Value {
-        self.sim.world.study_fences(blocked);
-        self.sim.world.study_observer();
+        if self.row=="spawn" {
+            self.sim.world.study_fences(blocked);
+            self.sim.world.study_observer();
+        } else {
+            self.sim.world.study_viewers(self.legacy,false);
+        }
         let flags = self.sim.world.study_flags();
         let waiting = self.sim.waiting.len();
         let samples = crate::study_tick::begin();
@@ -107,9 +122,12 @@ impl Fixture {
         let sum = |index:usize, blocked:bool| rows.iter().filter(|r|r["blocked"]==blocked)
             .map(|r|r["sample"]["events"][index].as_u64().unwrap()).sum::<u64>();
         let searches=sum(0,true); let attempts=sum(1,true); let exhausted=sum(2,true);
-        assert!(searches>=ticks as u64/5 && exhausted==searches && attempts==4096*searches,
-            "blocked-band stress did not exhaust its exact candidate budget");
+        if self.row=="spawn" {
+            assert!(searches>=ticks as u64/5 && exhausted==searches && attempts==4096*searches,
+                "blocked-band stress did not exhaust its exact candidate budget");
+        } else { assert_eq!(self.sim.world.study_state()["living"],SEATS); }
         let summary = serde_json::json!({"ticks": ticks, "legacy": self.legacy, "waiting": self.sim.waiting.len(),
+            "row":self.row,
             "blockedSearches":searches,"blockedAttempts":attempts,"blockedExhausted":exhausted,
             "releaseSearches":sum(0,false),"releaseExhausted":sum(2,false)});
         record(out, 4, &serde_json::to_vec(&summary).unwrap());
@@ -117,12 +135,12 @@ impl Fixture {
     }
 }
 
-pub fn run(legacy: bool, ticks: usize, measured: bool) {
-    let mut fixture = Fixture::new(legacy);
+pub fn run(legacy: bool, ticks: usize, measured: bool, row: &str) {
+    let mut fixture = Fixture::new(legacy,row);
     // Populate actual observer/food histories and age every pending request
     // beyond the unchanged two-second fallback threshold before freezing.
     for _ in 0..300 { fixture.tick(true, None); }
-    assert_eq!(fixture.sim.waiting.len(), SEATS - 8);
+    assert_eq!(fixture.sim.waiting.len(),if row=="spawn" { SEATS-8 } else { 0 });
     if !measured {
         let result = fixture.window(ticks, &mut io::BufWriter::new(io::stdout().lock()), true);
         eprintln!("{}", result);
@@ -138,7 +156,16 @@ pub fn run(legacy: bool, ticks: usize, measured: bool) {
         for line in io::stdin().lock().lines() {
             let line = line.unwrap();
             if line == "quit" { break; }
-            let path = Path::new(&line); assert!(!path.exists());
+            let words:Vec<_>=line.split_whitespace().collect();
+            assert!(words.len()==2 && ["child","parent"].contains(&words[0]));
+            let path = Path::new(words[1]); assert!(!path.exists());
+            if words[0]=="parent" {
+                crate::study_tick::enable();
+                let mut output=io::BufWriter::new(fs::File::create(path.with_extension("trace")).unwrap());
+                let result=fixture.window(ticks,&mut output,false);output.flush().unwrap();
+                fs::write(path,serde_json::to_vec(&result).unwrap()).unwrap();
+                eprintln!("DONE {}",path.display());break;
+            }
             let pid = unsafe { fork() }; assert!(pid >= 0);
             if pid == 0 {
                 crate::study_tick::enable();
