@@ -20,16 +20,17 @@ research additions beyond the original baseline. Original patch SHA-256:
 `1f31fd3dc14281bafc0089e86d6e764ea90e27af66c69c003d8dd3341a339568`.
 
 Copy the original `retained-check.py`, `retained-setup-primary.py`,
-`retained-prep-primary.py`, `retained-select-primary.py` and `tables.py` from
-this study. Reuse [#274's helper patch](../2026-10-29-compact-snake-history/harness.patch)
+`retained-prep-primary.py`, `retained-select-primary.py`, `select-proofs.py`
+and `tables.py` from this study. Reuse [#274's helper patch](../2026-10-29-compact-snake-history/harness.patch)
 as `harness.patch`. Copy the confirmation helpers beside them:
 `confirmation-setup.py`, `confirmation_background.py`, `confirmation_gate.py`,
-`confirmation-controls.py`, `confirmation-select.py`, `confirmation-tables.py`
-and `confirmation-preflight.py`.
+`confirmation-controls.py`, `confirmation-select.py`,
+`confirmation-select-proofs.py`, `confirmation-tables.py` and
+`confirmation-preflight.py`.
 
 ```sh
 python3 confirmation-setup.py
-python3 confirmation-controls.py
+python3 confirmation-controls.py > confirmation-controls.log 2>&1
 python3 confirmation-select.py --prepare-only
 python3 -m py_compile setup.py confirmation_background.py compact-cohort.py \
     compact-proof-short.py select-confirmation-generated.py confirmation-tables.py
@@ -64,7 +65,12 @@ seconds, wait at least 60 seconds and run:
 python3 confirmation-preflight.py
 python3 compact-time-primary.py
 python3 confirmation-select.py
+python3 confirmation-select-proofs.py
 ```
+
+`confirmation-select-proofs.py` adapts the original `select-proofs.py` to the
+four confirmation cohorts and writes `confirmation-proofs.json`. It also reads
+`confirmation-controls.log` and requires all nine method controls to pass.
 
 The reused controller runs one discarded AB and ten alternating AB/BA pairs on
 each of the four rows. No extra guest commands run during counted windows.
