@@ -4,10 +4,11 @@
 
 ### Added
 
-- A high-duty boost follow-up to the Battledome experience study, keeping A4
-  steering and measuring 80, 160 and 320 real socket bots with a harness-only
-  boost override. At 320 bots, admission searches dominate the slow ticks and
-  the server falls behind, while 80 bots retain sub-millisecond p99 jitter
+- A follow-up Battledome check with the bots boosting almost all the time,
+  the way Battledome players do. 80 players still play smoothly, with
+  sub-millisecond jitter. At 160 there are occasional slow ticks, and at 320
+  the server falls behind and respawns take over a second. Searching for safe
+  spawn spots takes most of the time in the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-boost/REPORT.md)).
 - A Battledome check on one core of an AWS c7a.medium, with real WebSocket
   bots on a second machine, from 80 to 640 players. At 80 the median tick
