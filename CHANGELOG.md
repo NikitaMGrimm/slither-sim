@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
+
+### Other
+
+- compact recipient snake histories ([#274](https://github.com/NikitaMGrimm/slither-sim/pull/274))
+- lazily bound Battledome spawn head edges ([#273](https://github.com/NikitaMGrimm/slither-sim/pull/273))
+- skip unnecessary hypot in Battledome spawn checks ([#272](https://github.com/NikitaMGrimm/slither-sim/pull/272))
+- *(changelog)* tighten unreleased performance list ([#271](https://github.com/NikitaMGrimm/slither-sim/pull/271))
+- *(changelog)* add gateway and memory study entries ([#270](https://github.com/NikitaMGrimm/slither-sim/pull/270))
+- record constant-boost Battledome live recheck at 160/320 seats ([#267](https://github.com/NikitaMGrimm/slither-sim/pull/267))
+- skip rejected Battledome spawn-ring construction ([#266](https://github.com/NikitaMGrimm/slither-sim/pull/266))
+- cache exact Battledome pit minimap projections ([#265](https://github.com/NikitaMGrimm/slither-sim/pull/265))
+- reuse unchanged held food listings ([#264](https://github.com/NikitaMGrimm/slither-sim/pull/264))
+- measure high-duty Battledome boosting ([#263](https://github.com/NikitaMGrimm/slither-sim/pull/263))
+- skip food-sector cleanup until expiry ([#261](https://github.com/NikitaMGrimm/slither-sim/pull/261))
+- *(perf)* measure Battledome CPU tails and spawn waits ([#262](https://github.com/NikitaMGrimm/slither-sim/pull/262))
+- share repeated food-sector diffs ([#260](https://github.com/NikitaMGrimm/slither-sim/pull/260))
+- *(perf)* report c7a 750-socket slot ceiling ([#258](https://github.com/NikitaMGrimm/slither-sim/pull/258))
+
 ### Added
 
 - A memory study of the simulation thread in a fully grown 500-player world.
