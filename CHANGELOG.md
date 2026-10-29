@@ -48,6 +48,13 @@
 
 ### Performance
 
+- Battledome spawn checks skip `hypot` when a head is clearly inside or outside
+  an older body edge's clearance, using the existing exact comparison helper.
+  Threshold boundaries, non-finite cases, spawn poses and admission rules retain
+  their original results. A synthetic exhausted-search fixture uses 40.5% fewer
+  instructions; ordinary 80/160-viewer controls have nearly unchanged instructions
+  and a small observed median CPU increase
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-head-distance/REPORT.md)).
 - Battledome spawn searches no longer build a candidate body whose head spot
   is already blocked, since the search would reject it anyway. Spawn positions,
   random draws and admission rules are unchanged, and output is byte-identical.

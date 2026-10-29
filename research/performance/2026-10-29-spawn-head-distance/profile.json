@@ -1,0 +1,94 @@
+{
+  "runtime": "539b37f3be969827b5eac67c2978e604f9e814e8",
+  "scope": "Existing seven-ring, observer and 72-waiter synthetic overload; warm300/count360",
+  "sampleAttribution": {
+    "totalSamples": 3393,
+    "lostSamples": 0,
+    "sampleShares": {
+      "headPredicate": {
+        "samples": 3005,
+        "percentOfAllSamples": 88.56469201296787
+      },
+      "ringGeometry": {
+        "samples": 157,
+        "percentOfAllSamples": 4.627173592690834
+      },
+      "remainingSearch": {
+        "samples": 153,
+        "percentOfAllSamples": 4.509283819628647
+      },
+      "otherCountedWindow": {
+        "samples": 70,
+        "percentOfAllSamples": 2.06307102858827
+      },
+      "safetyConstruction": {
+        "samples": 8,
+        "percentOfAllSamples": 0.23577954612437368
+      }
+    },
+    "headPredicateParts": {
+      "hypotLeaf": {
+        "samples": 2153,
+        "percentOfAllSamples": 63.45417035072207
+      },
+      "otherHeadInstructions": {
+        "samples": 467,
+        "percentOfAllSamples": 13.763631005010316
+      },
+      "edgeProjectionAndComparison": {
+        "samples": 335,
+        "percentOfAllSamples": 9.87326849395815
+      },
+      "near": {
+        "samples": 50,
+        "percentOfAllSamples": 1.4736221632773356
+      }
+    },
+    "classification": "Exclusive first-match stack membership; inlined head predicate before outer search scopes. Head parts subdivide that category. Percentages are sample counts, not exact clocks. Warmup excluded by acknowledged perf FIFO control.",
+    "stackArchiveSha256": "baa04027f954ca746c498992897fba254d09885086cc6f82eec06756bb48d510"
+  },
+  "diagnosticQualification": {
+    "blockedAttempts": 737280,
+    "blockedExhausted": 180,
+    "blockedSearches": 180,
+    "legacy": false,
+    "releaseExhausted": 0,
+    "releaseSearches": 0,
+    "row": "spawn",
+    "ticks": 360,
+    "waiting": 72
+  },
+  "diagnosticCounts": {
+    "near": 1690799,
+    "headObstacle": 1690799,
+    "headEdge": 44270291
+  },
+  "perFailedSearch": {
+    "near": 9393.327777777778,
+    "headCalls": 4352.0,
+    "headObstacleVisits": 9393.327777777778,
+    "headEdgeTests": 245946.0611111111
+  },
+  "perHeadCall": {
+    "headObstacle": 2.1583933312908496,
+    "headEdge": 56.51334124795751
+  },
+  "instrumentationOverheadCpuSeconds": {
+    "base": {
+      "User time (seconds)": 1.14,
+      "System time (seconds)": 0.02
+    },
+    "diagnostic": {
+      "User time (seconds)": 4.06,
+      "System time (seconds)": 3.25
+    }
+  },
+  "privateArchive": {
+    "archiveSha256": "3eec3a6bd60f4fc6a866e8ce7e7ca79178ac40c6972cbdda616e359b071448e3",
+    "archiveBytes": 38698516,
+    "manifestSha256": "1fccaa7c7c936f24876075e7b0a3af3001fbd9831958f431806695e97dd03596"
+  },
+  "prepareSha256": "68187922c06f3afeb1cfe0754c9471a5fd8fcc17c8dcbcdd9ce4329337760bf8",
+  "diagnosticModuleSha256": "abbd175718c9543e7a2f6e4df843d5fa8bebb6318058028fe89c1100e5ca411d",
+  "access": "Full profile, instrumented sources and logs are local-only. Hashes identify material, not public access."
+}
