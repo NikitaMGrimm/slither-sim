@@ -4,6 +4,7 @@ use crate::{
     Point, Simulator,
     physics::{Bounds, base_speed, collision_distance, segment_distance_le, swept_distance},
 };
+use std::cell::OnceCell;
 
 struct Edge {
     a: Point,
@@ -24,7 +25,7 @@ impl Edge {
 struct Obstacle {
     valid: bool,
     edges: Vec<Edge>,
-    head_blocks: Vec<Bounds>,
+    head_blocks: OnceCell<Vec<Bounds>>,
     bounds: Bounds,
     body_width: f64,
     path: Edge,
@@ -67,10 +68,15 @@ fn head_blocks(edges: &[Edge]) -> Vec<Bounds> {
 impl Obstacle {
     fn blocks_head(&self, head: Point) -> bool {
         let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, self.head_width);
-        if self.head_blocks.is_empty()
-            || !head_boundable(head)
+        if !head_boundable(head)
             || !(0. ..=HEAD_BLOCK_LIMIT).contains(&self.head_width)
         {
+            return self.edges.iter().any(blocked);
+        }
+        // Most successful searches never reach this obstacle. Build only after
+        // the outer near check admits a supported head query, then reuse it.
+        let blocks = self.head_blocks.get_or_init(|| head_blocks(&self.edges));
+        if blocks.is_empty() {
             return self.edges.iter().any(blocked);
         }
         // As in visibility's eight-edge bounds, one unit exceeds projection/
@@ -78,7 +84,7 @@ impl Obstacle {
         // original edge test, in order; extreme/non-finite inputs stay linear.
         // research/performance/2026-10-29-spawn-head-blocks/REPORT.md
         let query = Bounds::between(head, head);
-        self.head_blocks
+        blocks
             .iter()
             .zip(self.edges.chunks(HEAD_BLOCK_EDGES))
             .any(|(&bounds, edges)| {
@@ -151,7 +157,7 @@ impl Safety {
                 );
                 Obstacle {
                     valid: path.a.finite() && path.b.finite() && s.body.iter().all(|p| p.finite()),
-                    head_blocks: head_blocks(&edges),
+                    head_blocks: OnceCell::new(),
                     edges,
                     bounds,
                     body_width: contact.max(clearance),
