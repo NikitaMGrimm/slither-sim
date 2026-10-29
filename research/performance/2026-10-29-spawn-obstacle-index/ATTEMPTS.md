@@ -22,3 +22,10 @@
   fixed-width predicates. Preserve order and conservative linear fallbacks;
   leave dynamic-margin scoring linear. This targets the measured repeated
   bounds work, rather than allocations or another exact-distance shortcut.
+- The first candidate passed 18 focused Safety tests, the wrong-skip control
+  and all 15 Rust commands. Added a direct candidate-inclusion oracle so an
+  earlier rejection cannot mask a missing index candidate, then repeated those
+  checks. Clarified the cell-mapping rationale: common monotone quantization,
+  not an assumption of exact division for subnormal inputs. This changes no
+  implementation arithmetic. Parameters were chosen before timing: 1,024-unit
+  cells, 32-obstacle minimum, 16-query lazy threshold and bounded storage.

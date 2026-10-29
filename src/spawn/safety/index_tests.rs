@@ -212,6 +212,8 @@ fn check(raw: &[Raw], p: Point, heading: f64) {
         .collect();
     let mut indexed = candidate(raw, true);
     let mut linear = candidate(raw, false);
+    assert_filter_keeps_linear_candidates(&indexed, raw, &[p]);
+    assert_filter_keeps_linear_candidates(&indexed, raw, &points);
     assert_eq!(indexed.head_is_clear(p), head(raw, p));
     assert_eq!(linear.head_is_clear(p), head(raw, p));
     assert_eq!(indexed.clears(&points), body(raw, &points));
@@ -224,6 +226,41 @@ fn check(raw: &[Raw], p: Point, heading: f64) {
         linear.clears_departures(p, heading),
         departure(raw, p, heading)
     );
+}
+
+fn assert_filter_keeps_linear_candidates(query: &Safety, raw: &[Raw], points: &[Point]) {
+    let b = bounds(points);
+    if !b.into_iter().all(|v| v.is_finite() && v.abs() <= 1e7) {
+        return;
+    }
+    let Some(index) = query.obstacle_index.get().unwrap() else {
+        return;
+    };
+    let retained: Vec<_> = index
+        .candidates(Bounds {
+            min: Point { x: b[0], y: b[1] },
+            max: Point { x: b[2], y: b[3] },
+        })
+        .collect();
+    assert!(retained.windows(2).all(|v| v[0] < v[1]));
+    for (slot, obstacle) in raw.iter().enumerate() {
+        let body = bounds(&obstacle.vertices);
+        let path = bounds(&obstacle.path);
+        let must_visit = !obstacle.valid
+            || [0, 1, 4]
+                .into_iter()
+                .any(|i| original_near(b, body, obstacle.widths[i]))
+            || [2, 5]
+                .into_iter()
+                .any(|i| original_near(b, path, obstacle.widths[i]))
+            || obstacle
+                .inward
+                .is_some_and(|p| original_near(b, bounds(&p), obstacle.widths[3]));
+        assert!(
+            !must_visit || retained.binary_search(&slot).is_ok(),
+            "slot={slot}"
+        );
+    }
 }
 
 #[test]

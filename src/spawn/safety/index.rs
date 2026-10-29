@@ -19,7 +19,7 @@ fn expanded(bounds: Bounds, width: f64) -> Option<Bounds> {
         return None;
     }
     // At this finite scale near() adds at most 0.01. One unit also covers
-    // subtraction/union roundoff. Division by the power-of-two cell is exact.
+    // subtraction/union roundoff. Both boxes use the same monotone cell mapping.
     Some(Bounds {
         min: super::Point {
             x: bounds.min.x - width - 1.,
