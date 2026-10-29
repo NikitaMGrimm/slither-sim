@@ -4059,4 +4059,6 @@ mod tests {
         assert!(!queue(&mut simulation, 1, 1), "first bot life");
         assert!(!queue(&mut simulation, 1, 2), "later bot life");
     }
+    #[cfg(target_os = "linux")]
+    mod gateway_readiness;
 }
