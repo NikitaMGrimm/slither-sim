@@ -16,3 +16,24 @@
   ignored test). Full receipts are retained externally. Full trace matrix and
   PMU evidence remain pending.
 - No SSH bench use: the maintaining agent has not released it.
+- All 23 catalog rows and four historical host fixtures passed full-byte
+  comparison and terminal checks. The first supplementary 16-seat Battledome
+  fixture refused initial slot 14 before tracing: simultaneous ring placement
+  was an invalid setup assumption, not an output mismatch. Retained the failed
+  source/binary/stderr and switched only the supplementary cases to eight seats
+  in a fresh external directory. No successful historical trace was discarded.
+- The first eight-seat preparation built successfully but its copy step still
+  used the default target after an explicit target override. Corrected the
+  helper to copy from the actual Cargo target and started another fresh
+  directory. The failed preparation and log remain intact; no unpinned binary
+  was accepted as trace evidence.
+
+- The fresh eight-seat stock and protocol-13 traces are byte-identical through
+  growth/shrink, deaths and forced reconnects. The projected-radius *0.98
+  mutation changes encoded wire bytes in both. The selected correctness receipt
+  retains all 23 catalog, four historical host and two supplementary traces,
+  focused mutation results and source/archive/binary identities. These debug
+  checks establish their stated parity scope, not an instruction saving.
+- The documentation test rejected the new report before its index row existed.
+  Added the required row with explicit pending-performance status; no completed
+  speedup or capacity claim was substituted.
