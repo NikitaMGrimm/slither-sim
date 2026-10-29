@@ -1,0 +1,1103 @@
+{
+  "scope": "Untimed local Windows debug correctness; no speed or capacity claim",
+  "baseline": "23eddca80a2ae970753dc40717fa74297ff281fc",
+  "candidate": "e51e5bef",
+  "rawAccess": "Local-only full sources, traces, copied binaries and logs; no public download.",
+  "catalog": [
+    {
+      "case": "step-default",
+      "base": {
+        "case": "step-default",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 4747390,
+        "sha256": "37998fef0d8d7bb7c98b51129d26a6d9ebd8a6e7ae05be09b89c66955fe4ca64"
+      },
+      "candidate": {
+        "case": "step-default",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 4747390,
+        "sha256": "37998fef0d8d7bb7c98b51129d26a6d9ebd8a6e7ae05be09b89c66955fe4ca64"
+      }
+    },
+    {
+      "case": "step-food",
+      "base": {
+        "case": "step-food",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 114812872,
+        "sha256": "61ce41e5b951e25be27927ab5f0a6030dff625f8070411cee877f149ba93b45e"
+      },
+      "candidate": {
+        "case": "step-food",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 114812872,
+        "sha256": "61ce41e5b951e25be27927ab5f0a6030dff625f8070411cee877f149ba93b45e"
+      }
+    },
+    {
+      "case": "step-body",
+      "base": {
+        "case": "step-body",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 26873865,
+        "sha256": "0ccfd7f331923864a62f9a4a15bb037ec2b5173cc8dc268529ea9567cefb0d94"
+      },
+      "candidate": {
+        "case": "step-body",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 26873865,
+        "sha256": "0ccfd7f331923864a62f9a4a15bb037ec2b5173cc8dc268529ea9567cefb0d94"
+      }
+    },
+    {
+      "case": "observe",
+      "base": {
+        "case": "observe",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 210431961,
+        "sha256": "32dc0c0da62871b451dd9f3e454fa84cc0c3cc53322087ce68d156dad584d8e1"
+      },
+      "candidate": {
+        "case": "observe",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 210431961,
+        "sha256": "32dc0c0da62871b451dd9f3e454fa84cc0c3cc53322087ce68d156dad584d8e1"
+      }
+    },
+    {
+      "case": "portable",
+      "base": {
+        "case": "portable",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 17260573,
+        "sha256": "cb89472b3c9a4e02de901c646c22fff295d37be9ab98fb1920a8f7cbc640d758"
+      },
+      "candidate": {
+        "case": "portable",
+        "iterations": 32,
+        "lines": 34,
+        "uncompressed_bytes": 17260573,
+        "sha256": "cb89472b3c9a4e02de901c646c22fff295d37be9ab98fb1920a8f7cbc640d758"
+      }
+    },
+    {
+      "case": "protocol",
+      "base": {
+        "case": "protocol",
+        "iterations": 32,
+        "lines": 289,
+        "uncompressed_bytes": 8343665,
+        "sha256": "43a3c5f0d137bf9b85e35dc4729729d00c1830b91936e74fdb41a02376b6e232"
+      },
+      "candidate": {
+        "case": "protocol",
+        "iterations": 32,
+        "lines": 289,
+        "uncompressed_bytes": 8343665,
+        "sha256": "43a3c5f0d137bf9b85e35dc4729729d00c1830b91936e74fdb41a02376b6e232"
+      }
+    },
+    {
+      "case": "sandbox-16-step",
+      "base": {
+        "case": "sandbox-16-step",
+        "iterations": 32,
+        "lines": 2036,
+        "uncompressed_bytes": 8039216,
+        "sha256": "0be5e924509c2286501dfc1afb332bff2d5de03f527a372fcad0bb3008edc3a1",
+        "end": {
+          "case": "sandbox-16-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 1,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 59,
+            "deferredRespawns": 14,
+            "epochs": 0,
+            "respawns": 2
+          },
+          "operations": 32,
+          "physicsTicks": 2032
+        }
+      },
+      "candidate": {
+        "case": "sandbox-16-step",
+        "iterations": 32,
+        "lines": 2036,
+        "uncompressed_bytes": 8039216,
+        "sha256": "0be5e924509c2286501dfc1afb332bff2d5de03f527a372fcad0bb3008edc3a1",
+        "end": {
+          "case": "sandbox-16-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 1,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 59,
+            "deferredRespawns": 14,
+            "epochs": 0,
+            "respawns": 2
+          },
+          "operations": 32,
+          "physicsTicks": 2032
+        }
+      }
+    },
+    {
+      "case": "sandbox-16-bot",
+      "base": {
+        "case": "sandbox-16-bot",
+        "iterations": 24,
+        "lines": 2028,
+        "uncompressed_bytes": 54871769,
+        "sha256": "980510a0e9156e2d0392c855f29b5a7979b0a040b791d9d8e400f3c5b0dc509f",
+        "end": {
+          "case": "sandbox-16-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 1,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 59,
+            "deferredRespawns": 12,
+            "epochs": 0,
+            "respawns": 1
+          },
+          "operations": 24,
+          "physicsTicks": 2024
+        }
+      },
+      "candidate": {
+        "case": "sandbox-16-bot",
+        "iterations": 24,
+        "lines": 2028,
+        "uncompressed_bytes": 54871769,
+        "sha256": "980510a0e9156e2d0392c855f29b5a7979b0a040b791d9d8e400f3c5b0dc509f",
+        "end": {
+          "case": "sandbox-16-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 1,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 59,
+            "deferredRespawns": 12,
+            "epochs": 0,
+            "respawns": 1
+          },
+          "operations": 24,
+          "physicsTicks": 2024
+        }
+      }
+    },
+    {
+      "case": "official-30-step",
+      "base": {
+        "case": "official-30-step",
+        "iterations": 32,
+        "lines": 2036,
+        "uncompressed_bytes": 20728815,
+        "sha256": "fbc304de2e3e31ff74c7ae0893911c808cab8eed521ee9d0e4766161a5c23188",
+        "end": {
+          "case": "official-30-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 32,
+          "physicsTicks": 2032
+        }
+      },
+      "candidate": {
+        "case": "official-30-step",
+        "iterations": 32,
+        "lines": 2036,
+        "uncompressed_bytes": 20728815,
+        "sha256": "fbc304de2e3e31ff74c7ae0893911c808cab8eed521ee9d0e4766161a5c23188",
+        "end": {
+          "case": "official-30-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 32,
+          "physicsTicks": 2032
+        }
+      }
+    },
+    {
+      "case": "official-30-bot",
+      "base": {
+        "case": "official-30-bot",
+        "iterations": 16,
+        "lines": 2020,
+        "uncompressed_bytes": 54021217,
+        "sha256": "dcdc268d0e1a5d71d37a67c844ad940eb82b4ce9b811f428eddbf6dcd8638f5b",
+        "end": {
+          "case": "official-30-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 2016
+        }
+      },
+      "candidate": {
+        "case": "official-30-bot",
+        "iterations": 16,
+        "lines": 2020,
+        "uncompressed_bytes": 54021217,
+        "sha256": "dcdc268d0e1a5d71d37a67c844ad940eb82b4ce9b811f428eddbf6dcd8638f5b",
+        "end": {
+          "case": "official-30-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 2016
+        }
+      }
+    },
+    {
+      "case": "official-100-step",
+      "base": {
+        "case": "official-100-step",
+        "iterations": 16,
+        "lines": 2020,
+        "uncompressed_bytes": 42173836,
+        "sha256": "d5095bcb238cf2dd00cad95e26e7a011cb14bed032b2010fd15ee8b1f13a1c82",
+        "end": {
+          "case": "official-100-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 2016
+        }
+      },
+      "candidate": {
+        "case": "official-100-step",
+        "iterations": 16,
+        "lines": 2020,
+        "uncompressed_bytes": 42173836,
+        "sha256": "d5095bcb238cf2dd00cad95e26e7a011cb14bed032b2010fd15ee8b1f13a1c82",
+        "end": {
+          "case": "official-100-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 2016
+        }
+      }
+    },
+    {
+      "case": "official-100-bot",
+      "base": {
+        "case": "official-100-bot",
+        "iterations": 4,
+        "lines": 2008,
+        "uncompressed_bytes": 59804653,
+        "sha256": "19464d7f0299dfcea9644496b941b4ba97709e4809a0a1adebe4654bbddb4de4",
+        "end": {
+          "case": "official-100-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 4,
+          "physicsTicks": 2004
+        }
+      },
+      "candidate": {
+        "case": "official-100-bot",
+        "iterations": 4,
+        "lines": 2008,
+        "uncompressed_bytes": 59804653,
+        "sha256": "19464d7f0299dfcea9644496b941b4ba97709e4809a0a1adebe4654bbddb4de4",
+        "end": {
+          "case": "official-100-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 4,
+          "physicsTicks": 2004
+        }
+      }
+    },
+    {
+      "case": "official-200-step",
+      "base": {
+        "case": "official-200-step",
+        "iterations": 8,
+        "lines": 1012,
+        "uncompressed_bytes": 41669971,
+        "sha256": "6c942698914ad2c537755ea6c5407868047c5d2069da0a72b428488ae6c0b279",
+        "end": {
+          "case": "official-200-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 1,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 101,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 1
+          },
+          "operations": 8,
+          "physicsTicks": 1008
+        }
+      },
+      "candidate": {
+        "case": "official-200-step",
+        "iterations": 8,
+        "lines": 1012,
+        "uncompressed_bytes": 41669971,
+        "sha256": "6c942698914ad2c537755ea6c5407868047c5d2069da0a72b428488ae6c0b279",
+        "end": {
+          "case": "official-200-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 1,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 101,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 1
+          },
+          "operations": 8,
+          "physicsTicks": 1008
+        }
+      }
+    },
+    {
+      "case": "official-200-bot",
+      "base": {
+        "case": "official-200-bot",
+        "iterations": 2,
+        "lines": 1006,
+        "uncompressed_bytes": 57425751,
+        "sha256": "efcfd33296a841d530d0ff5c0a11845fd265d634aa0647f7c3ac06df8e961aa1",
+        "end": {
+          "case": "official-200-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 2,
+          "physicsTicks": 1002
+        }
+      },
+      "candidate": {
+        "case": "official-200-bot",
+        "iterations": 2,
+        "lines": 1006,
+        "uncompressed_bytes": 57425751,
+        "sha256": "efcfd33296a841d530d0ff5c0a11845fd265d634aa0647f7c3ac06df8e961aa1",
+        "end": {
+          "case": "official-200-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 2,
+          "physicsTicks": 1002
+        }
+      }
+    },
+    {
+      "case": "official-500-step",
+      "base": {
+        "case": "official-500-step",
+        "iterations": 4,
+        "lines": 608,
+        "uncompressed_bytes": 59311694,
+        "sha256": "ac5c96d2f75ecc801aa8ae3c2421501831a3b904ff6b3826ff24223d03e7ab4d",
+        "end": {
+          "case": "official-500-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 4,
+          "physicsTicks": 604
+        }
+      },
+      "candidate": {
+        "case": "official-500-step",
+        "iterations": 4,
+        "lines": 608,
+        "uncompressed_bytes": 59311694,
+        "sha256": "ac5c96d2f75ecc801aa8ae3c2421501831a3b904ff6b3826ff24223d03e7ab4d",
+        "end": {
+          "case": "official-500-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 4,
+          "physicsTicks": 604
+        }
+      }
+    },
+    {
+      "case": "official-500-bot",
+      "base": {
+        "case": "official-500-bot",
+        "iterations": 1,
+        "lines": 605,
+        "uncompressed_bytes": 78390279,
+        "sha256": "1ed1ff43fc4f59fa392f025fae994f489df7b5ee2331539b095fc73bceac16c5",
+        "end": {
+          "case": "official-500-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 1,
+          "physicsTicks": 601
+        }
+      },
+      "candidate": {
+        "case": "official-500-bot",
+        "iterations": 1,
+        "lines": 605,
+        "uncompressed_bytes": 78390279,
+        "sha256": "1ed1ff43fc4f59fa392f025fae994f489df7b5ee2331539b095fc73bceac16c5",
+        "end": {
+          "case": "official-500-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 1,
+          "physicsTicks": 601
+        }
+      }
+    },
+    {
+      "case": "battledome-32-step",
+      "base": {
+        "case": "battledome-32-step",
+        "iterations": 16,
+        "lines": 8020,
+        "uncompressed_bytes": 17701134,
+        "sha256": "246e2d764368e61f67462237a04442462633b00ed8ac88fee20df19aed43234c",
+        "end": {
+          "case": "battledome-32-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 8016
+        }
+      },
+      "candidate": {
+        "case": "battledome-32-step",
+        "iterations": 16,
+        "lines": 8020,
+        "uncompressed_bytes": 17701134,
+        "sha256": "246e2d764368e61f67462237a04442462633b00ed8ac88fee20df19aed43234c",
+        "end": {
+          "case": "battledome-32-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 8016
+        }
+      }
+    },
+    {
+      "case": "battledome-32-bot",
+      "base": {
+        "case": "battledome-32-bot",
+        "iterations": 4,
+        "lines": 8008,
+        "uncompressed_bytes": 19456772,
+        "sha256": "ab1adc6032475583343735098d695a860708a0b48ad05455e1e7f0a5fdebf1f1",
+        "end": {
+          "case": "battledome-32-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 4,
+          "physicsTicks": 8004
+        }
+      },
+      "candidate": {
+        "case": "battledome-32-bot",
+        "iterations": 4,
+        "lines": 8008,
+        "uncompressed_bytes": 19456772,
+        "sha256": "ab1adc6032475583343735098d695a860708a0b48ad05455e1e7f0a5fdebf1f1",
+        "end": {
+          "case": "battledome-32-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 4,
+          "physicsTicks": 8004
+        }
+      }
+    },
+    {
+      "case": "official-128-step",
+      "base": {
+        "case": "official-128-step",
+        "iterations": 16,
+        "lines": 2020,
+        "uncompressed_bytes": 53280765,
+        "sha256": "4497be63990cd9ac6263f7f18c13298ebb47b2723ffb10863b5166060ed620db",
+        "end": {
+          "case": "official-128-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 2016
+        }
+      },
+      "candidate": {
+        "case": "official-128-step",
+        "iterations": 16,
+        "lines": 2020,
+        "uncompressed_bytes": 53280765,
+        "sha256": "4497be63990cd9ac6263f7f18c13298ebb47b2723ffb10863b5166060ed620db",
+        "end": {
+          "case": "official-128-step",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 16,
+          "physicsTicks": 2016
+        }
+      }
+    },
+    {
+      "case": "official-128-bot",
+      "base": {
+        "case": "official-128-bot",
+        "iterations": 3,
+        "lines": 2007,
+        "uncompressed_bytes": 60842048,
+        "sha256": "694216476a8615a70352b4f2d08673f69ffd5eefa6592bca521da34170a134b2",
+        "end": {
+          "case": "official-128-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 3,
+          "physicsTicks": 2003
+        }
+      },
+      "candidate": {
+        "case": "official-128-bot",
+        "iterations": 3,
+        "lines": 2007,
+        "uncompressed_bytes": 60842048,
+        "sha256": "694216476a8615a70352b4f2d08673f69ffd5eefa6592bca521da34170a134b2",
+        "end": {
+          "case": "official-128-bot",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 0
+          },
+          "operations": 3,
+          "physicsTicks": 2003
+        }
+      }
+    },
+    {
+      "case": "client-battledome-64",
+      "base": {
+        "case": "client-battledome-64",
+        "iterations": 4,
+        "lines": 608,
+        "uncompressed_bytes": 36609053,
+        "sha256": "4dc474ed47326dbfc04d09ce95c9524a824cd19d3f115b5180e2604e60d44a83",
+        "end": {
+          "case": "client-battledome-64",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 17,
+            "epochs": 0,
+            "respawns": 3
+          },
+          "operations": 4,
+          "physicsTicks": 3624
+        }
+      },
+      "candidate": {
+        "case": "client-battledome-64",
+        "iterations": 4,
+        "lines": 608,
+        "uncompressed_bytes": 36609053,
+        "sha256": "4dc474ed47326dbfc04d09ce95c9524a824cd19d3f115b5180e2604e60d44a83",
+        "end": {
+          "case": "client-battledome-64",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 0,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 0,
+            "deferredRespawns": 17,
+            "epochs": 0,
+            "respawns": 3
+          },
+          "operations": 4,
+          "physicsTicks": 3624
+        }
+      }
+    },
+    {
+      "case": "client-official-500",
+      "base": {
+        "case": "client-official-500",
+        "iterations": 1,
+        "lines": 13,
+        "uncompressed_bytes": 82283626,
+        "sha256": "3acd05bd2bdeb30a96e188a85870ba4a88423292ac6c0f127defd9cbbab4afc0",
+        "end": {
+          "case": "client-official-500",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 26,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 130,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 6
+          },
+          "operations": 1,
+          "physicsTicks": 54
+        }
+      },
+      "candidate": {
+        "case": "client-official-500",
+        "iterations": 1,
+        "lines": 13,
+        "uncompressed_bytes": 82283626,
+        "sha256": "3acd05bd2bdeb30a96e188a85870ba4a88423292ac6c0f127defd9cbbab4afc0",
+        "end": {
+          "case": "client-official-500",
+          "kind": "end",
+          "lifecycle": {
+            "bodyDeaths": 26,
+            "boundaryDeaths": 0,
+            "deathFoodPellets": 130,
+            "deferredRespawns": 0,
+            "epochs": 0,
+            "respawns": 6
+          },
+          "operations": 1,
+          "physicsTicks": 54
+        }
+      }
+    },
+    {
+      "case": "shared-forager-a4-mean-8",
+      "base": {
+        "case": "shared-forager-a4-mean-8",
+        "iterations": 16,
+        "lines": 20,
+        "uncompressed_bytes": 8549230,
+        "sha256": "a21bea0fc1263f50100d0c9c7d16df13dd4e58a6ca6706d5ccd8c1d3829a6d8c"
+      },
+      "candidate": {
+        "case": "shared-forager-a4-mean-8",
+        "iterations": 16,
+        "lines": 20,
+        "uncompressed_bytes": 8549230,
+        "sha256": "a21bea0fc1263f50100d0c9c7d16df13dd4e58a6ca6706d5ccd8c1d3829a6d8c"
+      }
+    }
+  ],
+  "host": [
+    {
+      "case": "official500",
+      "base": {
+        "sha256": "9ce18e50aee579d1619ea43e7093697cf432c2e21d5fa14477933c01822165a5",
+        "bytes": 37938956,
+        "wireSha256": "ec7067d174d9eb36db0a8cee515131f6ab84897c0f09ad7f8dcfe4925cba2930",
+        "frames": 317188
+      },
+      "candidate": {
+        "sha256": "9ce18e50aee579d1619ea43e7093697cf432c2e21d5fa14477933c01822165a5",
+        "bytes": 37938956,
+        "wireSha256": "ec7067d174d9eb36db0a8cee515131f6ab84897c0f09ad7f8dcfe4925cba2930",
+        "frames": 317188
+      }
+    },
+    {
+      "case": "official500-half",
+      "base": {
+        "sha256": "93088ed7b86298679de27e75079cda7fffdb14d8709ff9f575ef1308ee2bbe8d",
+        "bytes": 57556590,
+        "wireSha256": "f325f4c01229786d3592e946d61b9e5df4cbec6224fc246b8fe7308cd243a2c7",
+        "frames": 664841
+      },
+      "candidate": {
+        "sha256": "93088ed7b86298679de27e75079cda7fffdb14d8709ff9f575ef1308ee2bbe8d",
+        "bytes": 57556590,
+        "wireSha256": "f325f4c01229786d3592e946d61b9e5df4cbec6224fc246b8fe7308cd243a2c7",
+        "frames": 664841
+      }
+    },
+    {
+      "case": "official500-legacy",
+      "base": {
+        "sha256": "c88e7287932c0a4b5468f170c628399c857785c1f824d0939e4acd58591120d6",
+        "bytes": 77137561,
+        "wireSha256": "4e128e1a074deb2d66b33da6826453954604d40aee89c06dfd912cc35fd4b481",
+        "frames": 1011810
+      },
+      "candidate": {
+        "sha256": "c88e7287932c0a4b5468f170c628399c857785c1f824d0939e4acd58591120d6",
+        "bytes": 77137561,
+        "wireSha256": "4e128e1a074deb2d66b33da6826453954604d40aee89c06dfd912cc35fd4b481",
+        "frames": 1011810
+      }
+    },
+    {
+      "case": "official2281",
+      "base": {
+        "sha256": "59aee1194b6f58341885970b0bd0a2121a3123084d074ed2480233d5d5f9a1d5",
+        "bytes": 180734859,
+        "wireSha256": "f0f6be584a73a86caecb0876253db4ed2a02e64b155bb1338528bfaafaca6cb9",
+        "frames": 1469820
+      },
+      "candidate": {
+        "sha256": "59aee1194b6f58341885970b0bd0a2121a3123084d074ed2480233d5d5f9a1d5",
+        "bytes": 180734859,
+        "wireSha256": "f0f6be584a73a86caecb0876253db4ed2a02e64b155bb1338528bfaafaca6cb9",
+        "frames": 1469820
+      }
+    },
+    {
+      "case": "battledome8",
+      "base": {
+        "sha256": "45bd1628b40184b1e852c8f0d6a3f4fc22a9a4d21726941cbff5a6c5550c9fec",
+        "bytes": 643322,
+        "wireSha256": "19a9804a46714914bc1776408b68da23bbc3434765e0ac2cba2d6575c1e24cc0",
+        "frames": 5218
+      },
+      "candidate": {
+        "sha256": "45bd1628b40184b1e852c8f0d6a3f4fc22a9a4d21726941cbff5a6c5550c9fec",
+        "bytes": 643322,
+        "wireSha256": "19a9804a46714914bc1776408b68da23bbc3434765e0ac2cba2d6575c1e24cc0",
+        "frames": 5218
+      }
+    },
+    {
+      "case": "battledome8-legacy",
+      "base": {
+        "sha256": "cd8dd1f8180b86227193f2f20929c6fab050b18aafa284a5f2f06d46c5ab9bca",
+        "bytes": 1666306,
+        "wireSha256": "fe79f9a1cdbcfbd6562d08b2d0cbd8a443ada7a82dddc55eedaca8ba76673b5b",
+        "frames": 23368
+      },
+      "candidate": {
+        "sha256": "cd8dd1f8180b86227193f2f20929c6fab050b18aafa284a5f2f06d46c5ab9bca",
+        "bytes": 1666306,
+        "wireSha256": "fe79f9a1cdbcfbd6562d08b2d0cbd8a443ada7a82dddc55eedaca8ba76673b5b",
+        "frames": 23368
+      }
+    }
+  ],
+  "shrinkingRow": [
+    {
+      "protocol": 19,
+      "base": {
+        "sha256": "25563fdef63b025e34889be7589a0dd4f8292a656d7351ea2321e962cf497c42",
+        "bytes": 2729706,
+        "wireSha256": "7eb27d137bef0de8a5899b1b0fd166dd35f6f2bbda47eccc664d05e0120cced1",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": false,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "candidate": {
+        "sha256": "25563fdef63b025e34889be7589a0dd4f8292a656d7351ea2321e962cf497c42",
+        "bytes": 2729706,
+        "wireSha256": "7eb27d137bef0de8a5899b1b0fd166dd35f6f2bbda47eccc664d05e0120cced1",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": false,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "mutation": {
+        "sha256": "9b36c90557f5c7cb508c801b01d3d2ac99dd1cea21aedce47370c6dc4366e42a",
+        "bytes": 2528763,
+        "wireSha256": "c33e4b2d3012d24a3c7d2fc35fe12bba0dfe2356dcf4160e5f7b7540d1800b73",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": false,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "wireMutationDetected": true
+    },
+    {
+      "protocol": 13,
+      "base": {
+        "sha256": "3a51b01ea5bf8ef17548ee5e92dc720cf27650ac696158be05b2a7712e297726",
+        "bytes": 5478893,
+        "wireSha256": "d6bbe3ae01c63e439a621291b60d33d3ebf1dd9678caea12ceba8ea9d5ab0b89",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": true,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "candidate": {
+        "sha256": "3a51b01ea5bf8ef17548ee5e92dc720cf27650ac696158be05b2a7712e297726",
+        "bytes": 5478893,
+        "wireSha256": "d6bbe3ae01c63e439a621291b60d33d3ebf1dd9678caea12ceba8ea9d5ab0b89",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": true,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "mutation": {
+        "sha256": "3ca558b9f2bd8ebec083cceaebf953738c182698e7de02df1b16d37ea721edee",
+        "bytes": 3769708,
+        "wireSha256": "eb96f92496d6adef1bf897c8cb11d6eb7bba69f89acad93b1aa7b28d664c50f9",
+        "summary": {
+          "blockedAttempts": 0,
+          "blockedExhausted": 0,
+          "blockedSearches": 0,
+          "legacy": true,
+          "releaseExhausted": 0,
+          "releaseSearches": 0,
+          "row": "markers",
+          "ticks": 360,
+          "waiting": 0
+        },
+        "markerTicks": 5
+      },
+      "wireMutationDetected": true
+    }
+  ],
+  "focusedMutation": [
+    {
+      "check": "drop affected-sector hints",
+      "exit": 101,
+      "expectedFailure": true
+    },
+    {
+      "check": "restored full-union/listing oracles",
+      "exit": 0
+    }
+  ],
+  "artifacts": {
+    "base": {
+      "commit": "23eddca80a2ae970753dc40717fa74297ff281fc",
+      "archiveSha256": "56ff0b7ba704679856dcc5c94df7a536fc47632176bb058607dfbf112faf3a61",
+      "binaries": {
+        "perf_baseline.exe": "b4fa819212e6a8724d149a35c1c0bc0034af6f99eda9858bb1c22665cb55e1ba",
+        "study_fixed.exe": "669fc67c5fb9968d71be1caf07c00ffbe6d92ac503bdebcb4618b3cd988a7f32",
+        "study_protocols.exe": "703f7415bfe7616279cbb72c717ffce6c461cf9e44d605668ba501b9cee1a4af"
+      },
+      "generatedRustSourcesSha256": "7f3b01f3eddf52ab408aadc50029d7233cb5875eceb77ec60bce09fb7f629db9",
+      "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
+      "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
+      "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
+    },
+    "candidate": {
+      "commit": "e51e5bef8182a60a1ea488308311379d167c929b",
+      "archiveSha256": "92472591198c6c472d9710dc906ef4194555373e519f2636758712f3a39b45aa",
+      "binaries": {
+        "perf_baseline.exe": "6d52ed6ae4b82798fce81b8ec4a8e829deb3660af04a0eb88c88f51e6601af6e",
+        "study_fixed.exe": "e5f18239ed8bb4714cb392f63682a8b9421a08f2126622d09d0bb2ea4547a51b",
+        "study_protocols.exe": "d0c264f2fc3c8f603e4a42f59f570ed41068665dc8f208e4422d2f0e9cb1f010"
+      },
+      "generatedRustSourcesSha256": "4f4957cec72edeb212f90006ebc043db758616e00f0b58c55bdaaecba8c97e32",
+      "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
+      "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
+      "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
+    },
+    "mutation": {
+      "commit": "e51e5bef8182a60a1ea488308311379d167c929b",
+      "archiveSha256": "92472591198c6c472d9710dc906ef4194555373e519f2636758712f3a39b45aa",
+      "binaries": {
+        "perf_baseline.exe": "49ea2ffdcb83cdf06587c52beeacba3dc16be6695c2e5e52751d688c799068f6",
+        "study_fixed.exe": "8a8368030431d0ad0a11ca63313a0425d8f7204b3dfee1e5acfe36d626d7b8a7",
+        "study_protocols.exe": "0ddaf49311ed21a9ffc137570c0c59f14cf69e71f82e15eee36ab20cf42018f5"
+      },
+      "generatedRustSourcesSha256": "4e433f4c682b1c274eb2189fd2039b28df1ed2764c15ffb422713ce7e7317727",
+      "markerWrapperSha256": "c62ea81931065b449328ba9764525228231aebd6011d8fd4ebf44c8c520f35e7",
+      "priorSpawnPrepareSha256": "e68137a0f1eb5697667d4aaca2824e6400ca5963f5a072d7693edd83cfb74964",
+      "priorPrepareSha256": "646867e578fcd83c662abf6c395972c91cc9021191aa1ec2040af03c82486913"
+    }
+  }
+}

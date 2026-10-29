@@ -24,7 +24,8 @@ for protocol in [19,13]:
             while header:=f.read(16):
                 assert len(header)==16;tag,n=struct.unpack('<QQ',header);data=f.read(n);assert len(data)==n
                 if tag in [0,3]:
-                    state=json.loads(data);assert state['backend']['world']['state'];assert state['backend']['living']==80;states+=1
+                    state=json.loads(data);assert state['backend']['world']['state'];assert state['backend']['living']==80
+                    assert state['backend']['decoratedViewers']==80;states+=1
                 elif tag==1:assert len(json.loads(data))==4
                 elif tag==2:wire.update(header);wire.update(data);frames+=1
                 elif tag==4:assert json.loads(data)==result['summary']

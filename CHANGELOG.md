@@ -4,6 +4,9 @@
 
 ### Added
 
+- Exact reuse of decorated food listings outside moving pit-marker sectors,
+  with overlap/expiry and protocol byte-trace controls
+  ([evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-pit-marker-reuse/REPORT.md)).
 - A follow-up Battledome check with the bots boosting almost all the time,
   the way Battledome players do. 80 players still play smoothly, with
   sub-millisecond jitter. At 160 there are occasional slow ticks, and at 320
