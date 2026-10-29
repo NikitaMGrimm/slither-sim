@@ -1,6 +1,8 @@
 # Share encoded food bytes, frozen before measurement
 
-Base: `23e987f37b061ac80307404c24f6b7fecc71a770` (current origin/main).
+Base: `23e987f37b061ac80307404c24f6b7fecc71a770` (origin/main at branch start).
+
+## Initial per-packet prototype, later rejected
 Candidate: record the implementation commit before measuring.
 
 Reuse each broadcast-local food diff's encoded bytes through final frame assembly.
@@ -39,3 +41,28 @@ TCP Write calls, verify actual kernel syscall mapping with a bounded own-child
 ptrace witness, and keep its scheduling-distorted counts separate from timing.
 No socket implementation, changed message boundaries, outside game server,
 guest system/package change, or merge.
+
+## Whole-sector-group alternative, frozen before its measurements
+
+The initial `be09f69b` prototype is rejected after both short and mature-stock
+instruction pairs regress: short maintenance/other/all +0.361/+0.344/+0.344%,
+mature stock +0.206/+0.217/+0.216%. No mature protocol-13 timing is run for that
+losing implementation. Preserve its complete successful byte checks, controls,
+raw data and selected results; do not relabel them as the replacement's evidence.
+
+The replacement retains each sector's encoded `Vec<Vec<u8>>` behind one local
+reference-counted group, sharing that group once per recipient. It avoids the
+initial prototype's buffer packing, per-packet reference counts, and ordinary
+packet representation change. Ordinary packet vectors stay unchanged; when food
+is present, final framing borrows an ordered list of slices across ordinary
+prefix, food groups and ordinary suffix. Physical/decorated food keeps separate
+groups while borrowing the same unchanged ordinary packet bytes.
+
+Hypothesis: group ownership removes repeated food-byte copies cheaply enough to
+reduce maintenance instructions. Run the same three complete fixed rows, full
+Rust group, 27 traces and both payload-only controls. New runtime controls must
+catch lost packet boundaries and recipient copies, while existing older-view,
+pickup, pit, handoff and reconnect regressions remain active. Also verify food
+insertion positions, byte aliasing, cache lifetime, frame errors, elapsed headers
+and physical latency draws. Retain all outcomes and timing overlap. No new live
+capacity hold or socket implementation is added.

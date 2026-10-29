@@ -12,7 +12,10 @@ use std::collections::BTreeSet;
 use super::{
     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},
-    food::{FoodChanges, KnownFood, KnownSectors, eaten_sectors, food_identity, food_updates},
+    food::{
+        FoodChanges, FoodPackets, KnownFood, KnownSectors, eaten_sectors, food_identity,
+        food_updates,
+    },
     snakes::{FAM_REPORT_TICKS, FRESH_ANCHORS, KnownSnake, MOTION_REPORT_TICKS, changes},
 };
 
@@ -909,7 +912,7 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
 
 /// Diff against freshly allocated listings, as after a changed broadcast.
 fn diff_food(
-    packets: &mut Vec<encode::Packet>,
+    packets: &mut FoodPackets,
     connection: &mut Connection,
     sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
     eaters: &BTreeMap<(u64, u64), u16>,
@@ -953,7 +956,7 @@ fn a_retained_listing_still_reports_pickups_at_its_points() {
         Some(Arc::new(SectorFood(vec![([rx, ry], food)])));
     let interest = SectorInterest::from_subscribed(BTreeSet::from([[sx, sy]]));
     let mut known = KnownSectors::default();
-    let mut packets = Vec::new();
+    let mut packets = FoodPackets::default();
     let none = BTreeMap::new();
     let initial = FoodChanges::default();
     let unchanged = FoodChanges {
@@ -1027,7 +1030,7 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
     };
     let mut connection = Connection::default();
     let mut sectors = BTreeMap::from([([sx, sy], BTreeMap::from([([rx, ry], first)]))]);
-    let mut packets = Vec::new();
+    let mut packets = FoodPackets::default();
     diff_food(
         &mut packets,
         &mut connection,
@@ -1035,11 +1038,7 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
         &BTreeMap::new(),
         &BTreeSet::from([[sx, sy]]),
     );
-    assert!(
-        packets
-            .iter()
-            .any(|packet| packet.as_ref() == [b'F', sx, sy, 3, rx, ry, 20])
-    );
+    assert!(packets.contains(&[b'F', sx, sy, 3, rx, ry, 20]));
     sectors.get_mut(&[sx, sy]).unwrap().insert([rx, ry], second);
     let eaters = BTreeMap::from([(food_identity(point), 2)]);
     packets.clear();
@@ -1114,7 +1113,7 @@ fn presentation_telemetry_preserves_physics_and_source_colors() {
 #[test]
 fn sector_announcements_follow_subscription_entries_and_exits() {
     let mut connection = Connection::default();
-    let mut packets = Vec::new();
+    let mut packets = FoodPackets::default();
     let sectors = BTreeMap::new();
     let eaters = BTreeMap::new();
     diff_food(

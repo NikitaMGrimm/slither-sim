@@ -613,21 +613,8 @@ mod tests {
         vec![packet; frames]
     }
 
-    fn shared(packets: &[Vec<u8>]) -> Vec<encode::Packet> {
-        let bytes = std::rc::Rc::new(packets.concat());
-        let mut start = 0;
-        packets
-            .iter()
-            .map(|packet| {
-                let end = start + packet.len();
-                let view = encode::Packet::Shared {
-                    bytes: bytes.clone(),
-                    range: start..end,
-                };
-                start = end;
-                view
-            })
-            .collect()
+    fn shared(packets: &[Vec<u8>]) -> Vec<&[u8]> {
+        packets.iter().map(Vec::as_slice).collect()
     }
 
     #[test]

@@ -161,13 +161,13 @@ pub(super) struct FoodChanges {
 pub(super) struct SectorDiff {
     previous: Arc<SectorFood>,
     current: Arc<SectorFood>,
-    packets: Vec<encode::Packet>,
+    packets: Rc<Vec<Vec<u8>>>,
 }
 
 impl FoodChanges {
     fn append_diff(
         &self,
-        packets: &mut Vec<encode::Packet>,
+        packets: &mut FoodPackets,
         sector: [u8; 2],
         previous: &Arc<SectorFood>,
         current: &Arc<SectorFood>,
@@ -182,43 +182,97 @@ impl FoodChanges {
                 SectorDiff {
                     previous: previous.clone(),
                     current: current.clone(),
-                    packets: shared_packets(packets),
+                    packets: Rc::new(packets),
                 }
             });
         if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
-            packets.extend_from_slice(&diff.packets);
+            packets.shared(diff.packets.clone());
         } else {
             // A recipient skipped an earlier broadcast and holds an older view.
             let mut owned = Vec::new();
             sector_changes(&mut owned, sector, previous, current, eaters);
-            packets.extend(owned.into_iter().map(encode::Packet::from));
+            packets.extend(owned);
         }
     }
 }
+/// Food packet ownership is separate from ordinary packet production. One
+/// shared group retains a whole sector diff without per-packet reference counts.
+#[derive(Clone, Debug, Default)]
+pub(super) struct FoodPackets {
+    groups: Vec<FoodGroup>,
+    count: usize,
+}
 
-/// One allocation of encoded bytes per sector transition, with packet boundaries
-/// retained for the existing framing and protocol-13 conversion paths.
-fn shared_packets(packets: Vec<Vec<u8>>) -> Vec<encode::Packet> {
-    if packets.is_empty() {
-        return Vec::new();
+#[derive(Clone, Debug)]
+enum FoodGroup {
+    Owned(Vec<u8>),
+    Shared(Rc<Vec<Vec<u8>>>),
+}
+
+impl FoodPackets {
+    fn push(&mut self, packet: Vec<u8>) {
+        self.count += 1;
+        self.groups.push(FoodGroup::Owned(packet));
     }
-    let mut bytes = Vec::with_capacity(packets.iter().map(Vec::len).sum());
-    let ranges: Vec<_> = packets
-        .into_iter()
-        .map(|packet| {
-            let start = bytes.len();
-            bytes.extend_from_slice(&packet);
-            start..bytes.len()
-        })
-        .collect();
-    let bytes = Rc::new(bytes);
-    ranges
-        .into_iter()
-        .map(|range| encode::Packet::Shared {
-            bytes: bytes.clone(),
-            range,
-        })
-        .collect()
+
+    fn extend(&mut self, packets: impl IntoIterator<Item = Vec<u8>>) {
+        for packet in packets {
+            self.push(packet);
+        }
+    }
+
+    fn shared(&mut self, packets: Rc<Vec<Vec<u8>>>) {
+        if !packets.is_empty() {
+            self.count += packets.len();
+            self.groups.push(FoodGroup::Shared(packets));
+        }
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.count
+    }
+    pub(super) fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+    pub(super) fn iter(&self) -> impl Iterator<Item = &[u8]> {
+        self.groups
+            .iter()
+            .flat_map(|group| match group {
+                FoodGroup::Owned(packet) => std::slice::from_ref(packet).iter(),
+                FoodGroup::Shared(packets) => packets.iter(),
+            })
+            .map(Vec::as_slice)
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_packets(packets: Vec<Vec<u8>>) -> Self {
+        let mut out = Self::default();
+        out.extend(packets);
+        out
+    }
+
+    #[cfg(test)]
+    pub(super) fn clear(&mut self) {
+        self.groups.clear();
+        self.count = 0;
+    }
+    #[cfg(test)]
+    pub(super) fn contains(&self, packet: &[u8]) -> bool {
+        self.iter().any(|p| p == packet)
+    }
+}
+
+#[cfg(test)]
+impl PartialEq<Vec<Vec<u8>>> for FoodPackets {
+    fn eq(&self, other: &Vec<Vec<u8>>) -> bool {
+        self.iter().eq(other.iter().map(Vec::as_slice))
+    }
+}
+#[cfg(test)]
+impl<const N: usize> PartialEq<[Vec<u8>; N]> for FoodPackets {
+    fn eq(&self, other: &[Vec<u8>; N]) -> bool {
+        self.iter().eq(other.iter().map(Vec::as_slice))
+    }
 }
 
 #[cfg(test)]
@@ -507,7 +561,7 @@ impl SimulatorBackend {
 /// nonempty `F`, then births/pickups; see docs/server-rules.md#food-sector-delivery.
 /// `sectors` lists every subscribed sector.
 pub(super) fn food_updates(
-    packets: &mut Vec<encode::Packet>,
+    packets: &mut FoodPackets,
     known: &mut KnownSectors,
     interest: &SectorInterest,
     sectors: &[Option<Arc<SectorFood>>],
@@ -565,7 +619,7 @@ pub(super) fn food_updates(
     for (sector, _) in &held {
         while subscriptions.next_if(|next| *next < sector).is_some() {}
         if subscriptions.peek() != Some(&sector) {
-            packets.push((encode::sector_clear(*sector)).into());
+            packets.push(encode::sector_clear(*sector));
         }
     }
     let mut held = held.into_iter().peekable();
@@ -582,11 +636,7 @@ pub(super) fn food_updates(
             None => {
                 let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
                 if !foods.is_empty() {
-                    packets.extend(
-                        encode::food_sector(sector, &foods)
-                            .into_iter()
-                            .map(encode::Packet::from),
-                    );
+                    packets.extend(encode::food_sector(sector, &foods));
                 }
             }
             // The same listing without a pickup at its points sends nothing.
@@ -678,28 +728,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn shared_packet_storage_preserves_boundaries_and_outlives_the_diff() {
+    fn shared_groups_preserve_packet_boundaries_and_outlive_the_cache() {
         let expected = vec![vec![b'c', 1, 2, 3, 4], vec![b'f', 1, 2, 3, 4, 5, 6]];
-        let first = shared_packets(expected.clone());
-        let second = first.clone();
+        let cached = Rc::new(expected.clone());
+        let mut first = FoodPackets::default();
+        first.shared(cached.clone());
+        let mut second = FoodPackets::default();
+        second.shared(cached.clone());
+        assert_eq!(first.len(), 2);
+        assert_eq!(first.groups.len(), 1);
         assert_eq!(first, expected);
-        let encode::Packet::Shared { bytes, .. } = &first[0] else {
-            panic!("shared bytes")
-        };
-        for (a, b) in first.iter().zip(&second) {
-            let encode::Packet::Shared { bytes: other, .. } = a else {
-                panic!("shared bytes")
-            };
-            assert!(Rc::ptr_eq(bytes, other), "one sector buffer");
-            assert_eq!(
-                a.as_ref().as_ptr(),
-                b.as_ref().as_ptr(),
-                "no recipient copy"
-            );
-        }
+        assert!(
+            first
+                .iter()
+                .zip(second.iter())
+                .all(|(a, b)| a.as_ptr() == b.as_ptr())
+        );
         drop(first);
+        drop(cached);
         assert_eq!(second, expected);
-        assert!(shared_packets(Vec::new()).is_empty());
+        second.shared(Rc::new(Vec::new()));
+        assert_eq!(second.len(), 2);
+        second.clear();
+        assert!(second.is_empty());
     }
 
     #[test]
@@ -752,7 +803,7 @@ mod tests {
             let mut expected = Vec::new();
             sector_changes(&mut expected, key, previous, current, &eaters);
             for _ in 0..3 {
-                let mut actual = Vec::new();
+                let mut actual = FoodPackets::default();
                 changes.append_diff(&mut actual, key, previous, current, &eaters);
                 assert_eq!(actual, expected);
             }
@@ -761,7 +812,7 @@ mod tests {
         // A new broadcast must not reuse the preceding pickup set, even when
         // both listing identities remain the same.
         let next = FoodChanges::default();
-        let mut actual = Vec::new();
+        let mut actual = FoodPackets::default();
         next.append_diff(&mut actual, sector, &old, &old, &BTreeMap::new());
         assert!(actual.is_empty());
         changes.append_diff(&mut actual, sector, &old, &old, &eaters);
@@ -1173,7 +1224,7 @@ mod tests {
                     food_revision: Some(changes.previous.clone()),
                 };
                 let mut reference = known.entries.iter().cloned().collect();
-                let mut actual = Vec::new();
+                let mut actual = FoodPackets::default();
                 let mut expected = Vec::new();
                 food_updates(
                     &mut actual,
@@ -1281,7 +1332,7 @@ mod tests {
                 if step == 12 && stream == 1 {
                     continue; // This stream must catch up from an older snapshot.
                 }
-                let mut actual = Vec::new();
+                let mut actual = FoodPackets::default();
                 let mut expected = Vec::new();
                 food_updates(&mut actual, held, &interest, table, &changes, &eaters);
                 reference_updates(&mut expected, oracle, interest.subscribed(), table, &eaters);
@@ -1369,7 +1420,7 @@ mod tests {
                     ));
                 }
             }
-            let mut actual = Vec::new();
+            let mut actual = FoodPackets::default();
             let mut expected = Vec::new();
             food_updates(
                 &mut actual,
@@ -1616,7 +1667,7 @@ mod tests {
         sectors[3] = Some(Arc::new(SectorFood::default()));
         let interest = SectorInterest::from_subscribed(BTreeSet::from([[0, 1], [0, 2]]));
         let mut known = KnownSectors::default();
-        let mut packets = Vec::new();
+        let mut packets = FoodPackets::default();
         let eaters = BTreeMap::new();
         let initial = FoodChanges::default();
         food_updates(

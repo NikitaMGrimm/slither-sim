@@ -99,54 +99,6 @@ fn with_id(code: u8, own: bool, id: u16) -> Vec<u8> {
     packet
 }
 
-/// Recipient packet storage. Food diffs share one encoded sector buffer;
-/// ordinary packet producers retain their existing owned allocations. Shared
-/// views stay on the simulation thread; only final owned frames cross to sockets.
-#[derive(Clone, Debug)]
-pub(crate) enum Packet {
-    Owned(Vec<u8>),
-    Shared {
-        bytes: std::rc::Rc<Vec<u8>>,
-        range: std::ops::Range<usize>,
-    },
-}
-
-impl From<Vec<u8>> for Packet {
-    fn from(bytes: Vec<u8>) -> Self {
-        Self::Owned(bytes)
-    }
-}
-
-impl AsRef<[u8]> for Packet {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::Owned(bytes) => bytes,
-            Self::Shared { bytes, range } => &bytes[range.clone()],
-        }
-    }
-}
-
-impl std::ops::Deref for Packet {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] {
-        self.as_ref()
-    }
-}
-
-#[cfg(test)]
-impl PartialEq for Packet {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_ref() == other.as_ref()
-    }
-}
-
-#[cfg(test)]
-impl PartialEq<Vec<u8>> for Packet {
-    fn eq(&self, other: &Vec<u8>) -> bool {
-        self.as_ref() == other.as_slice()
-    }
-}
-
 /// Whether a packet can share a frame behind a two-byte length prefix.
 pub(crate) fn frameable(packet: &[u8]) -> bool {
     !packet.is_empty() && packet.len() <= MAX_PACKET

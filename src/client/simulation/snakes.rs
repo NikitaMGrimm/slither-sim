@@ -150,14 +150,14 @@ impl BodyBounds {
 struct SnakeDelta {
     before: KnownSnake,
     after: KnownSnake,
-    packets: Vec<encode::Packet>,
+    packets: Vec<Vec<u8>>,
 }
 
 impl SnakeDeltaCache {
     #[expect(clippy::too_many_arguments, reason = "Same explicit inputs as changes")]
     pub(super) fn changes(
         &mut self,
-        packets: &mut Vec<encode::Packet>,
+        packets: &mut Vec<Vec<u8>>,
         own: bool,
         id: u16,
         known: &mut KnownSnake,
@@ -519,28 +519,24 @@ pub(super) fn covered(
 /// appearance handler leaves the heading at the last body anchor's direction.
 /// A nonzero kill count follows, since appearances do not carry it.
 pub(super) fn full(
-    packets: &mut Vec<encode::Packet>,
+    packets: &mut Vec<Vec<u8>>,
     own: bool,
     id: u16,
     snake: &Snake,
     wanted: f64,
     profile: &PlayerAppearance,
 ) -> Result<(), String> {
-    packets.push((encode::appearance(id, snake, wanted, profile)?).into());
-    packets.extend(
-        encode::motion(
-            own,
-            id,
-            Some(encode::angle_byte(snake.heading)),
-            Some(encode::angle_byte(wanted)),
-            Some(encode::speed_byte(snake.speed)?),
-            encode::direction(snake.heading, wanted),
-        )
-        .into_iter()
-        .map(encode::Packet::from),
-    );
+    packets.push(encode::appearance(id, snake, wanted, profile)?);
+    packets.extend(encode::motion(
+        own,
+        id,
+        Some(encode::angle_byte(snake.heading)),
+        Some(encode::angle_byte(wanted)),
+        Some(encode::speed_byte(snake.speed)?),
+        encode::direction(snake.heading, wanted),
+    ));
     if snake.kills > 0 {
-        packets.push((encode::kills(id, snake.kills)).into());
+        packets.push(encode::kills(id, snake.kills));
     }
     Ok(())
 }
@@ -556,7 +552,7 @@ pub(super) fn full(
     reason = "Keep wire inputs explicit without a per-snake context"
 )]
 pub(super) fn changes(
-    packets: &mut Vec<encode::Packet>,
+    packets: &mut Vec<Vec<u8>>,
     own: bool,
     id: u16,
     known: &mut KnownSnake,
@@ -580,28 +576,24 @@ pub(super) fn changes(
             // reads the tail, so report removals first, then the new anchors.
             let grown = change.clamp(0, fresh as isize);
             for _ in 0..grown - change {
-                packets.push((encode::tail(id, fam)).into());
+                packets.push(encode::tail(id, fam));
                 fam_sent = true;
             }
             // Growth anchors carry the mass themselves.
             if !fam_sent && grown == 0 && reports.fam_due && known.fam != fam {
-                packets.push((encode::fam(id, fam)).into());
+                packets.push(encode::fam(id, fam));
                 fam_sent = true;
             }
             if reports.motion_due {
                 let [heading, target, speed] = reports.motion;
-                packets.extend(
-                    encode::motion(
-                        own,
-                        id,
-                        (heading != known.heading).then_some(heading),
-                        (target != known.wanted).then_some(target),
-                        (speed != known.speed).then_some(speed),
-                        encode::direction(snake.heading, wanted),
-                    )
-                    .into_iter()
-                    .map(encode::Packet::from),
-                );
+                packets.extend(encode::motion(
+                    own,
+                    id,
+                    (heading != known.heading).then_some(heading),
+                    (target != known.wanted).then_some(target),
+                    (speed != known.speed).then_some(speed),
+                    encode::direction(snake.heading, wanted),
+                ));
                 known.heading = heading;
                 known.wanted = target;
                 known.speed = speed;
@@ -617,14 +609,11 @@ pub(super) fn changes(
                 };
                 let carried = grows.then_some(fam);
                 fam_sent |= grows;
-                packets.push(
-                    (if step.distance(point) < 1e-6 {
-                        encode::anchor(own, id, angle, carried)
-                    } else {
-                        encode::anchor_at(own, id, angle, point, carried)?
-                    })
-                    .into(),
-                );
+                packets.push(if step.distance(point) < 1e-6 {
+                    encode::anchor(own, id, angle, carried)
+                } else {
+                    encode::anchor_at(own, id, angle, point, carried)?
+                });
             }
         }
         None => {
@@ -641,7 +630,7 @@ pub(super) fn changes(
     }
     if known.kills != snake.kills {
         known.kills = snake.kills;
-        packets.push((encode::kills(id, snake.kills)).into());
+        packets.push(encode::kills(id, snake.kills));
     }
     Ok(())
 }
@@ -1236,10 +1225,7 @@ mod tests {
         for history in histories {
             // Repeat peer encodings to exercise hits, with an own update between.
             for own in [false, false, true, false] {
-                let (mut expected, mut actual) = (
-                    vec![encode::Packet::from(vec![99])],
-                    vec![encode::Packet::from(vec![99])],
-                );
+                let (mut expected, mut actual) = (vec![vec![99]], vec![vec![99]]);
                 let (mut reference, mut shared) = (history.clone(), history.clone());
                 changes(
                     &mut expected,
@@ -1309,10 +1295,8 @@ mod tests {
                                     ..initial.clone()
                                 };
                                 for own in [false, false, true, false] {
-                                    let (mut expected, mut actual) = (
-                                        vec![encode::Packet::from(vec![99])],
-                                        vec![encode::Packet::from(vec![99])],
-                                    );
+                                    let (mut expected, mut actual) =
+                                        (vec![vec![99]], vec![vec![99]]);
                                     let (mut reference, mut shared) =
                                         (history.clone(), history.clone());
                                     let result = changes(
@@ -1377,7 +1361,7 @@ mod tests {
         let reports = SnakeReports::default();
         let mut cache = SnakeDeltaCache::default();
         for own in [false, true] {
-            let mut packets = vec![encode::Packet::from(vec![99])];
+            let mut packets = vec![vec![99]];
             cache
                 .changes(
                     &mut packets,
@@ -1439,10 +1423,7 @@ mod tests {
                 let mut cache = SnakeDeltaCache::default();
                 for _ in 0..2 {
                     let (mut reference, mut shared) = (history.clone(), history.clone());
-                    let (mut expected, mut actual) = (
-                        vec![encode::Packet::from(vec![99])],
-                        vec![encode::Packet::from(vec![99])],
-                    );
+                    let (mut expected, mut actual) = (vec![vec![99]], vec![vec![99]]);
                     let result = changes(
                         &mut expected,
                         own,

@@ -2,7 +2,7 @@
 use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::KnownPrey,
-    food::{FoodChanges, food_identity, food_updates},
+    food::{FoodChanges, FoodPackets, food_identity, food_updates},
     minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
     snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
@@ -19,7 +19,24 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Rows the stock leaderboard shows.
 pub(super) const LEADERBOARD_ROWS: usize = 10;
 /// Physical packets, plus a browser view when pit decoration is active.
-type PacketViews = (Vec<encode::Packet>, Option<Vec<encode::Packet>>);
+struct PacketViews {
+    packets: Vec<Vec<u8>>,
+    food: FoodPackets,
+    presented_food: Option<FoodPackets>,
+    food_start: usize,
+}
+
+fn packet_slices<'a>(
+    packets: &'a [Vec<u8>],
+    food_start: usize,
+    food: &'a FoodPackets,
+) -> Vec<&'a [u8]> {
+    let mut views = Vec::with_capacity(packets.len() + food.len());
+    views.extend(packets[..food_start].iter().map(Vec::as_slice));
+    views.extend(food.iter());
+    views.extend(packets[food_start..].iter().map(Vec::as_slice));
+    views
+}
 /// One prey's correction clock, shared by every recipient: official
 /// corrections for one prey align across clients, and a new viewer does not
 /// restart it.
@@ -427,9 +444,14 @@ impl SimulatorBackend {
             let mut prefix = if pongs == 0 {
                 Vec::new()
             } else {
-                vec![encode::Packet::from(encode::pong()); pongs]
+                vec![encode::pong(); pongs]
             };
-            let (updates, presented_updates) = self.updates(
+            let PacketViews {
+                packets: updates,
+                food,
+                presented_food,
+                mut food_start,
+            } = self.updates(
                 slot,
                 &food_changes,
                 &bounds,
@@ -438,20 +460,16 @@ impl SimulatorBackend {
                 &mut snakes,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
-                prefix.push(packet.into());
+                prefix.push(packet);
             }
             // Most broadcasts have neither pongs nor a map. Keep updates' own
             // allocation instead of moving every packet through another Vec.
-            let (mut packets, mut presented) = if prefix.is_empty() {
-                (updates, presented_updates)
+            let mut packets = if prefix.is_empty() {
+                updates
             } else {
-                let presented = presented_updates.map(|updates| {
-                    let mut presented = prefix.clone();
-                    presented.extend(updates);
-                    presented
-                });
+                food_start += prefix.len();
                 prefix.extend(updates);
-                (prefix, presented)
+                prefix
             };
             // The stock client ignores a leaderboard after game over, so the
             // death broadcast omits it; a record may follow.
@@ -459,14 +477,18 @@ impl SimulatorBackend {
                 .as_ref()
                 .filter(|_| leaderboard_due && (alive || was_over));
             let hud = self.hud(slot, live_board)?;
-            if let Some(presented) = &mut presented {
-                presented.extend(hud.iter().cloned().map(encode::Packet::from));
-            }
-            packets.extend(hud.into_iter().map(encode::Packet::from));
-            if let Some(presented) = presented {
-                self.emit_presented(slot, now, &presented, Some(&packets))?;
-            } else if !packets.is_empty() {
-                self.emit(slot, now, &packets)?;
+            packets.extend(hud);
+            if let Some(presented_food) = presented_food {
+                let physical = packet_slices(&packets, food_start, &food);
+                let presented = packet_slices(&packets, food_start, &presented_food);
+                self.emit_presented(slot, now, &presented, Some(&physical))?;
+            } else if food.is_empty() {
+                if !packets.is_empty() {
+                    self.emit(slot, now, &packets)?;
+                }
+            } else {
+                let views = packet_slices(&packets, food_start, &food);
+                self.emit(slot, now, &views)?;
             }
         }
         if early >= self.slots.len() {
@@ -617,29 +639,29 @@ impl SimulatorBackend {
             let known = connection.snakes.remove(slot);
             let fam = encode::fam_u24(me.fam);
             if known.as_ref().is_some_and(|known| known.fam != fam) {
-                packets.push((encode::fam(id, fam)).into());
+                packets.push(encode::fam(id, fam));
             }
             // The stock game-over score adds the credit to the final mass.
             let credit = encode::segment_credit(me.score, me.segments, fam);
             if connection.credit != credit {
                 connection.credit = credit;
-                packets.push((encode::credit(credit)).into());
+                packets.push(encode::credit(credit));
             }
             // The local record rule qualifies this life; the stock v1 flag
             // offers its player a victory-message input.
-            packets.push((encode::game_over(record)).into());
+            packets.push(encode::game_over(record));
             if known.is_some() {
-                packets.push((encode::removal(id, true)).into());
+                packets.push(encode::removal(id, true));
             }
         }
         let radius = world.radius().round() as u32;
         if connection.radius != radius {
             connection.radius = radius;
-            packets.push((encode::radius(world.radius())?).into());
+            packets.push(encode::radius(world.radius())?);
         }
         let rules = world.rules();
         if connection.rules_enabled && connection.rules_sent != Some(rules) {
-            packets.push((crate::client::rules_packet::encode(rules)).into());
+            packets.push(crate::client::rules_packet::encode(rules));
             connection.rules_sent = Some(rules);
         }
         let vision = world.config().vision;
@@ -682,14 +704,14 @@ impl SimulatorBackend {
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
-                    packets.push((encode::removal(id, died)).into());
+                    packets.push(encode::removal(id, died));
                     connection.snakes.remove(i);
                 }
                 (None, false) => {}
                 (known, true) => {
                     let wanted = physics::quantize_heading(control);
                     if known.is_some() {
-                        packets.push((encode::removal(id, true)).into());
+                        packets.push(encode::removal(id, true));
                     }
                     full(&mut packets, own, id, snake, wanted, profile)?;
                     let known = KnownSnake::new(life, snake, wanted)?;
@@ -706,26 +728,26 @@ impl SimulatorBackend {
                 let credit = encode::segment_credit(snake.score, snake.segments, fam);
                 if connection.credit != credit {
                     connection.credit = credit;
-                    packets.push((encode::credit(credit)).into());
+                    packets.push(encode::credit(credit));
                 }
                 if std::mem::take(&mut connection.session_pending) {
-                    packets.push((encode::session(id, connection.session)).into());
+                    packets.push(encode::session(id, connection.session));
                 }
             }
         }
         let connection = &mut self.slots[slot].connection;
         let food_start = packets.len();
+        let mut food = FoodPackets::default();
         food_updates(
-            &mut packets,
+            &mut food,
             &mut connection.food,
             &connection.food_interest,
             &self.food_sectors,
             food_changes,
             &self.food_eaters,
         );
-        let food_end = packets.len();
-        let mut presented = if connection.decorations && self.pit_markers.is_some() {
-            let mut presented = packets[..food_start].to_vec();
+        let presented_food = if connection.decorations && self.pit_markers.is_some() {
+            let mut presented = FoodPackets::default();
             food_updates(
                 &mut presented,
                 &mut connection.decorated_food,
@@ -753,9 +775,10 @@ impl SimulatorBackend {
             .collect();
         for id in gone {
             let known = connection.prey.remove(&id).expect("known prey");
-            packets.push(
-                (encode::prey_removal(known.wire, self.prey_eaters.get(&id).copied())).into(),
-            );
+            packets.push(encode::prey_removal(
+                known.wire,
+                self.prey_eaters.get(&id).copied(),
+            ));
         }
         for (id, prey) in visible {
             let wire = self.prey_wire[&id];
@@ -768,20 +791,22 @@ impl SimulatorBackend {
                 ],
             };
             match connection.prey.get(&id) {
-                None => packets.push((encode::prey_appearance(wire, prey)?).into()),
+                None => packets.push(encode::prey_appearance(wire, prey)?),
                 // Keep corrections even when quantized position is still.
                 Some(known) if self.prey_clocks[&id].due => {
                     let changed = known.motion != current.motion;
-                    packets.push((encode::prey_motion(wire, prey, changed)?).into())
+                    packets.push(encode::prey_motion(wire, prey, changed)?)
                 }
                 Some(_) => continue,
             }
             connection.prey.insert(id, current);
         }
-        if let Some(presented) = &mut presented {
-            presented.extend_from_slice(&packets[food_end..]);
-        }
-        Ok((packets, presented))
+        Ok(PacketViews {
+            packets,
+            food,
+            presented_food,
+            food_start,
+        })
     }
 
     /// Leaderboard when `board` is given, then an unsent record. Both wait for
@@ -897,6 +922,37 @@ mod tests {
                 format!("{previous:?}")
             );
         }
+    }
+
+    #[test]
+    fn food_views_keep_insertion_order_and_borrow_all_packet_bytes() {
+        let packets = vec![vec![b'p'], vec![b's'], vec![b'y'], vec![b'l']];
+        let food = FoodPackets::from_packets(vec![vec![b'f'], vec![b'c']]);
+        for (start, codes) in [(0, b"fcpsyl"), (2, b"psfcyl"), (4, b"psylfc")] {
+            let views = packet_slices(&packets, start, &food);
+            assert_eq!(views.iter().map(|p| p[0]).collect::<Vec<_>>(), codes);
+            for view in &views {
+                let original = packets
+                    .iter()
+                    .map(Vec::as_slice)
+                    .chain(food.iter())
+                    .find(|p| p[0] == view[0])
+                    .unwrap();
+                assert_eq!(view.as_ptr(), original.as_ptr());
+            }
+            let expected: Vec<Vec<u8>> = codes.iter().map(|&c| vec![c]).collect();
+            for elapsed in [0, 7, 65535] {
+                assert_eq!(
+                    encode::frame(elapsed, &views),
+                    encode::frame(elapsed, &expected)
+                );
+            }
+        }
+        let empty = FoodPackets::default();
+        assert_eq!(
+            encode::frame(7, &packet_slices(&packets, 2, &empty)),
+            encode::frame(7, &packets)
+        );
     }
 
     #[test]
