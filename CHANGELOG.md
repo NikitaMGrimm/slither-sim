@@ -4,6 +4,10 @@
 
 ### Added
 
+- A one-core Battledome experience study with received-frame A4 socket bots,
+  finding low latency at 80 seats and admission-search overload at 640, with
+  measured boosting, network jitter, spawn waits and ranked fix candidates
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-experience/REPORT.md)).
 - A capacity check on one core of an AWS c7a.medium, with real WebSocket bots
   on a second machine. Starting from fully grown snakes and adding bots in
   steps, it reached its preset 750-bot limit at 6.4 ms median and 9.9 ms p99
