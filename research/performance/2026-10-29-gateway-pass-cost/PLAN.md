@@ -105,3 +105,19 @@ Link earlier helpers rather than copying them. Retain rejected/instrumentation
 patches, no production patch. Archive/hash/verify before pruning; remove the target
 and leave no task processes. Add changelog/index and the actual model/role footer
 if a runtime PR is proposed. Open/link it and do not merge.
+
+## Attribution setup amendment, before mature collection
+
+The diagnostic uses a no-phase-clock control window followed by coarse and fine
+windows in one continued world. Apply the existing checkpoint quality predicates
+to each window independently; retain each failure. An invalid fine window cannot
+validate or erase a valid coarse one. These diagnostic windows are not primary
+base/candidate comparisons. Small-socket smoke rows check recorder/math plumbing,
+not the mature workload's quality gates or cost ranking.
+
+The first mature preparation was stopped near tick 25,000, before any hold, to
+move diagnostic session/empty-flush counter updates outside the per-session loops.
+Its source, binary, partial warm telemetry and failure are retained; no timing
+is selected. Fine timers also skip proven-empty flush calls. The corrected build
+passes another finite smoke run. Full-array CPU coordinates and exact interval
+intersections pass synthetic boundary/gap/flat-clock regressions.
