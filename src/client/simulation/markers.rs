@@ -1,10 +1,7 @@
 //! Pit decoration on the stock food grid, never authoritative food.
 use super::food::KnownFood;
 use crate::{client::encode, model::Point};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    f64::consts::TAU,
-};
+use std::{collections::BTreeMap, f64::consts::TAU};
 
 type Sectors = BTreeMap<u16, Vec<([u8; 2], KnownFood)>>;
 
@@ -20,7 +17,7 @@ pub(super) struct PitMarkers {
     radius: f64,
     updated_at: f64,
     previous: Option<(Sectors, f64)>,
-    affected: BTreeSet<u16>,
+    affected: Vec<u16>,
 }
 
 impl PitMarkers {
@@ -64,7 +61,7 @@ impl PitMarkers {
             radius: pit_radius,
             updated_at: 0.,
             previous: None,
-            affected: BTreeSet::new(),
+            affected: Vec::new(),
         })
     }
 
@@ -114,12 +111,16 @@ impl PitMarkers {
             if let Some((previous, _)) = &self.previous {
                 self.affected.extend(previous.keys().copied());
             }
+            // Only membership is queried. Retain scratch capacity rather than
+            // allocating and freeing tree nodes at every marker transition.
+            self.affected.sort_unstable();
+            self.affected.dedup();
         }
         Ok(changed)
     }
 
     pub(super) fn affects_sector(&self, sector: u16) -> bool {
-        self.affected.contains(&sector)
+        self.affected.binary_search(&sector).is_ok()
     }
 
     pub(super) fn overlay(
@@ -151,6 +152,7 @@ impl PitMarkers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     #[test]
     fn affected_sectors_cover_growth_shrink_overlap_and_exact_expiry() {
