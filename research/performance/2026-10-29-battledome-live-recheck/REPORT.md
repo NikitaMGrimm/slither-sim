@@ -216,8 +216,8 @@ independent review or human play acceptance is claimed.
 The approved conservative full-timer bound is **$2.973667 against a $3 cap**,
 covering all eleven paid instances across all attempts, including the four Spot
 interruptions and single On-Demand generator. It is a bound, not an invoice:
-$0.75 prior compute + $0.182 retained target + $0.625 two session Spot generators
-+ $0.766667 On-Demand generator + $0.65 all-attempt storage/IPv4/transfer/control
+$0.75 prior compute, $0.182 retained target, $0.625 two session Spot generators,
+$0.766667 On-Demand generator and $0.65 all-attempt storage/IPv4/transfer/control
 and miscellaneous allowance. The verified On-Demand retail rate was $0.49196/h;
 the bound uses $0.50/h. [Cost calculation](cost.json).
 

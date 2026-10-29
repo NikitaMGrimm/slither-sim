@@ -165,3 +165,7 @@
   whole tokens, retaining the cloud-ID, address and exact private-name checks;
   the final scan passes. Seven documentation tests pass and all table text
   exactly recomputes from selected values. No build or long local job ran.
+- The GitHub connector advertised PR creation but returned tool unavailable.
+  Used the authenticated GitHub CLI instead, opened the authorized study PR,
+  linked it to this thread and read back its base/head, ready state and
+  footer-only body. No merge or external comment was made.
