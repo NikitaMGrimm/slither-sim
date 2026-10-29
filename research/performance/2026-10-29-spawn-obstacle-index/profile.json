@@ -1,0 +1,105 @@
+{
+  "runtime": "9ad002c1",
+  "sampleEvent": "cpu-clock:u",
+  "frequencyHz": 499,
+  "build": "Portable default release codegen; full DWARF only for sampling, no native flags",
+  "fixtureSha256": "c37b0d3d766ed917cf90db648761b773729bdc5d667aab16a7bb136b448e03e7",
+  "binarySha256": "6ab6d5cdbee216bbc64e3a53c452a82c63c8cebf3b09bcfcd89104fb3b0b0129",
+  "rows": {
+    "refused": {
+      "samples": 10019,
+      "searches": 2234,
+      "exclusiveGroups": {
+        "headPredicate": 6168,
+        "bodyPredicate": 2776,
+        "ringGeometry": 343,
+        "otherAdmission": 398,
+        "safetyConstruction": 136,
+        "departurePredicates": 142,
+        "allocation": 56
+      },
+      "phasePartsIncludingNestedAllocation": {
+        "headPredicate/nearBounds": 4865,
+        "bodyPredicate/nearBounds": 2350,
+        "ringGeometry/loopAndOther": 346,
+        "headPredicate/exactDistance": 235,
+        "headPredicate/loopAndOther": 1081,
+        "otherAdmission/loopAndOther": 129,
+        "otherAdmission/exactDistance": 295,
+        "safetyConstruction/loopAndOther": 142,
+        "bodyPredicate/loopAndOther": 341,
+        "departurePredicates/nearBounds": 114,
+        "departurePredicates/loopAndOther": 27,
+        "bodyPredicate/exactDistance": 85,
+        "ringGeometry/exactDistance": 1,
+        "safetyConstruction/exactDistance": 7,
+        "departurePredicates/exactDistance": 1
+      },
+      "allocationCallers": {
+        "otherAdmission": 26,
+        "headPredicate": 13,
+        "safetyConstruction": 13,
+        "ringGeometry": 4
+      },
+      "probeCpuNsPerSearch": 8953724.5,
+      "stacksSha256": "99b1cdbdb3e3037719ce6a9c06a0bd5b5804c7403411f45bb43d1e0b7cf3bd08",
+      "exclusivePercent": {
+        "headPredicate": 61.56303024253917,
+        "bodyPredicate": 27.707356023555246,
+        "otherAdmission": 3.9724523405529495,
+        "ringGeometry": 3.4234953588182453,
+        "departurePredicates": 1.4173071164786906,
+        "safetyConstruction": 1.3574209002894502,
+        "allocation": 0.5589380177662442
+      }
+    },
+    "successful": {
+      "samples": 10062,
+      "searches": 5242,
+      "exclusiveGroups": {
+        "headPredicate": 6044,
+        "safetyConstruction": 303,
+        "bodyPredicate": 2589,
+        "otherAdmission": 378,
+        "allocation": 93,
+        "departurePredicates": 302,
+        "ringGeometry": 353
+      },
+      "phasePartsIncludingNestedAllocation": {
+        "headPredicate/nearBounds": 4735,
+        "safetyConstruction/exactDistance": 13,
+        "bodyPredicate/loopAndOther": 314,
+        "bodyPredicate/nearBounds": 2198,
+        "headPredicate/loopAndOther": 1093,
+        "headPredicate/exactDistance": 230,
+        "otherAdmission/loopAndOther": 163,
+        "safetyConstruction/loopAndOther": 318,
+        "departurePredicates/nearBounds": 261,
+        "ringGeometry/loopAndOther": 352,
+        "otherAdmission/exactDistance": 264,
+        "bodyPredicate/exactDistance": 77,
+        "departurePredicates/loopAndOther": 42,
+        "ringGeometry/exactDistance": 2
+      },
+      "allocationCallers": {
+        "safetyConstruction": 28,
+        "otherAdmission": 49,
+        "headPredicate": 14,
+        "ringGeometry": 1,
+        "departurePredicates": 1
+      },
+      "probeCpuNsPerSearch": 3815988.3,
+      "stacksSha256": "059831090f8fd1a35b42b7c1d3c64f7914290a8729583f433cf22b770e33b4ce",
+      "exclusivePercent": {
+        "headPredicate": 60.06758099781355,
+        "bodyPredicate": 25.730471079308288,
+        "otherAdmission": 3.7567084078711988,
+        "ringGeometry": 3.5082488570860666,
+        "safetyConstruction": 3.0113297555158023,
+        "departurePredicates": 3.0013913734843967,
+        "allocation": 0.9242695289206917
+      }
+    }
+  },
+  "classificationSha256": "97ad1e8941f8fe3e8aacd2b0a60dea5c254ef88e6f9399ded536c59becbbe934"
+}

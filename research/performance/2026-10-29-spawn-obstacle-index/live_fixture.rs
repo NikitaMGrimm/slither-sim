@@ -101,7 +101,20 @@ pub fn admission(path: &str, row: &str, count: usize, measured: bool) {
     let fixture:serde_json::Value=serde_json::from_slice(&fs::read(folder.join("fixture.json")).unwrap()).unwrap();
     let world=Simulator::from_checkpoint(&fs::read(folder.join("world.json")).unwrap(),crate::RestoreOptions::default()).unwrap();
     let mut backend=probe(world);
+    assert_eq!(fs::read_dir("/proc/self/task").unwrap().count(),1);
     let seed=fixture[if row=="refused" {"refusedSeed"} else {"successfulSeed"}].as_u64().unwrap();
+    if std::env::var_os("STUDY_PROFILE").is_some() {
+        profile_control("enable");
+        for _ in 0..count {
+            backend.spawn_random=Random::new(seed);
+            let result=backend.spawn_pose_waited(usize::MAX,0.);
+            assert_eq!(result.is_err(),row=="refused");
+            std::hint::black_box(result);
+        }
+        profile_control("disable");
+        println!("{}",serde_json::json!({"row":row,"searches":count,"seed":seed}));
+        return;
+    }
     let mut records=Vec::new();
     if measured { crate::study_tick::enable(); }
     for _ in 0..count {
@@ -114,4 +127,15 @@ pub fn admission(path: &str, row: &str, count: usize, measured: bool) {
             "random":format!("{:?}",backend.spawn_random)}));
     }
     println!("{}",serde_json::json!({"row":row,"records":records}));
+}
+
+fn profile_control(command: &str) {
+    use std::io::{BufRead,Write};
+    if let Ok(path)=std::env::var("STUDY_PERF_CTL") {
+        let mut f=fs::OpenOptions::new().write(true).open(path).unwrap();
+        writeln!(f,"{command}").unwrap();f.flush().unwrap();
+        let f=fs::File::open(std::env::var("STUDY_PERF_ACK").unwrap()).unwrap();
+        let mut line=String::new();std::io::BufReader::new(f).read_line(&mut line).unwrap();
+        assert_eq!(line.trim(),"ack");
+    }
 }
