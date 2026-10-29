@@ -1,0 +1,36 @@
+{
+  "kind": "Conservative estimate, not an invoice; no free credits assumed",
+  "instances": [
+    {
+      "role": "server",
+      "instanceType": "c7a.medium",
+      "secondsUpperBound": 1020,
+      "quotedSpotUSDPerHour": 0.0277,
+      "bidCapUSDPerHour": 0.06,
+      "rootGiB": 10,
+      "computeEstimateUSD": 0.007848333333333332,
+      "computeAtBidCapUSD": 0.016999999999999998
+    },
+    {
+      "role": "generator",
+      "instanceType": "c8a.2xlarge",
+      "secondsUpperBound": 1020,
+      "quotedSpotUSDPerHour": 0.1878,
+      "bidCapUSDPerHour": 0.3,
+      "rootGiB": 24,
+      "computeEstimateUSD": 0.05320999999999999,
+      "computeAtBidCapUSD": 0.085
+    }
+  ],
+  "computeAtLaunchQuotesUSD": 0.061058333333333326,
+  "computeAtBidCapsUSD": 0.10200000000000001,
+  "publicIPv4AllowanceUSD": 0.002833333333333333,
+  "storageAllowanceUSD": 0.0015835616438356162,
+  "publicTransferPayloadUpperBytes": 188957826,
+  "transferAndMiscAllowanceUSD": 0.047209926944,
+  "estimatedTotalUSD": 0.11268515525450228,
+  "capRateTotalUSD": 0.15362682192116894,
+  "taskBudgetUSD": 2,
+  "prelaunchWorstCaseUSD": 1.85,
+  "basis": "Minute-rounded launch-to-completed-cleanup upper lifetimes; launch Spot quotes and bid caps separately. IPv4 $0.005/address-hour and storage $0.12/GiB-month (730 hours) allowances. Transfer uses terminal slim status +1 MiB times a conservative poll bound, downloaded archive +10 MiB, then 20% overhead at $0.12/GB +$0.02 misc. Private same-AZ bot traffic has no inferred charge."
+}
