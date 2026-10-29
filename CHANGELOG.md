@@ -48,11 +48,13 @@
 
 ### Performance
 
-- Battledome spawn searches lazily bound visited groups of eight body edges,
-  preserving exact thresholds, poses and admission rules. A synthetic
-  exhausted-search row uses 63% fewer instructions, including construction;
-  successful-search CPU means overlap main in 80/160-viewer controls. Extreme
-  and non-finite geometry retains the original linear scan
+- Battledome spawn searches now skip groups of eight body edges that are
+  provably too far from a candidate head. Each group's bounds are built only
+  when a search first reaches that snake, so ordinary respawns cost the same
+  as before. Spawn positions, random draws and admission rules are unchanged,
+  and output is byte-identical. In a synthetic overload where every spawn
+  search fails, the host uses 63% fewer instructions and CPU p99 falls from
+  1.5 to 0.6 ms; 80- and 160-player checks are unchanged within noise
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-head-blocks/REPORT.md)).
 - Battledome spawn searches now decide whether a candidate head clears an
   older body edge from the squared distance, and fall back to the exact
