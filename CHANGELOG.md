@@ -15,10 +15,12 @@
 
 ### Performance
 
-- The host reuses shared food-sector updates while preserving packet bytes,
-  timing and order. In a mature 500-player fixture, maintenance ticks use
-  7.6% fewer user instructions with stock clients and 6.8% with protocol 13;
-  the whole fixed window uses 1.1% and 1.0% fewer respectively
+- On the food-update tick every 504 ms, the host now works out each sector's
+  food changes once and shares them with every player holding the same
+  previous view, instead of recomputing them for each player. Output is
+  byte-identical. In a fully grown 500-player world those ticks run about 7%
+  fewer instructions (1% over all ticks); the CPU-time saving is within
+  measurement noise, and the slowest ticks still exceed 7 ms
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-food-diffs/REPORT.md)).
 
 ## [0.8.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.0...v0.8.1) - 2026-10-29
