@@ -4,8 +4,8 @@ At 160 seats neither arm deferred ticks. At 320 both fell behind: the candidate
 observed 434 deferred ticks versus 749 for the base, but still spent **63.8% of
 its slowest 1% of ticks in spawn search**. Its respawn p95 remained 1.123 seconds.
 These are descriptive single-window comparisons, not an isolated causal gain.
-**480 seats were not measured. Final cleanup and the all-region audit are pending
-renewed AWS login; no cleanup success is claimed.**
+**480 seats were not measured. Final cleanup and the all-enabled-region audit
+are now verified; the initial publication recorded them as pending.**
 
 This is a real-socket follow-up to
 [#263](../2026-10-29-battledome-boost/REPORT.md), comparing the parent of #265's
@@ -221,15 +221,18 @@ $0.766667 On-Demand generator and $0.65 all-attempt storage/IPv4/transfer/contro
 and miscellaneous allowance. The verified On-Demand retail rate was $0.49196/h;
 the bound uses $0.50/h. [Cost calculation](cost.json).
 
-**Cleanup remains pending.** Earlier attempts' all-enabled-region scans passed,
-but the final current-session scan and task key/group deletion could not run
-after credential expiry. Target poweroff was verified for 15:10:44 UTC and
-generator poweroff no later than 15:19 UTC, with terminate-on-shutdown and
-DeleteOnTermination. These safeguards do not prove termination happened.
-After the maintaining agent announces login restoration, confirm both states,
-remove own remaining resources and append the final all-region receipt to
-[cleanup](cleanup.json). No renewal, retry, timer extension or further collection
-is authorized while waiting.
+**Cleanup completed after the maintaining agent authorized the permanent limited
+CLI profile.** Both remaining instances were confirmed terminated, each with
+instance-initiated shutdown as its termination reason, consistent with the
+verified target/generator timers. The task key pair and security group were
+removed. The final scan covered all 17 enabled regions (17 disabled regions
+excluded), finding zero nonterminated instances, open/active Spot requests,
+available volumes, total volumes, Elastic IPs, or this study's key pairs and
+security groups. Protected resources were untouched. The original credential
+expiry and pending-publication state remain recorded in [cleanup](cleanup.json),
+alongside the timestamped final receipt. No further measurement or timer extension
+was performed. The cost remains the conservative full-timer bound above,
+not a billing invoice.
 
 Archives become ready only after close, complete gzip verification and hashing.
 All required raw sources must be retrieved and locally size/hash/source-verified

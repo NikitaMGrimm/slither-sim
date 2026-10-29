@@ -169,3 +169,12 @@
   Used the authenticated GitHub CLI instead, opened the authorized study PR,
   linked it to this thread and read back its base/head, ready state and
   footer-only body. No merge or external comment was made.
+
+- After the maintaining agent supplied the permanent limited profile, all AWS
+  commands explicitly used that profile; the expired/default login collector
+  was not retried. Waited for the generator's timer. Both final instances were
+  confirmed terminated with instance-initiated-shutdown reasons, then removed
+  the task key/group. The final scan covered all 17 enabled regions with zero
+  nonterminated instances, open/active Spot requests, available/all volumes,
+  Elastic IPs and this study's key pairs/groups. Protected resources were untouched.
+  Appended the final receipt without erasing the initial pending-cleanup state.

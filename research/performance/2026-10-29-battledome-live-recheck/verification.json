@@ -70,7 +70,7 @@
   },
   "allMeasuredPrimaryArchivesVerifiedBeforeTeardown": true,
   "earlierLostGeneratorReceipts": "Four Spot-reclaimed generator disks were deleted; all surviving host sources verified before release. Both invalid alternative-generator rows were retrieved completely.",
-  "cleanupVerified": false,
+  "cleanupVerified": true,
   "allPaidInstancesIncludedInTimerBound": 11,
   "paidPairs": 4,
   "additionalGeneratorsCosted": 3,
@@ -79,5 +79,6 @@
   "humanBrowserAcceptance": false,
   "rustChecks": "Portable native release builds and override regressions on seven generators; no full local Rust group for this research-only change",
   "documentationCheck": "7 documentation tests passed; report tables exactly recomputed",
-  "privacyCheck": "All public study files plus index/changelog checked for cloud identifiers, addresses, account numbers and known private resource names; Python syntax and JSON parse pass"
+  "privacyCheck": "All public study files plus index/changelog checked for cloud identifiers, addresses, account numbers and known private resource names; Python syntax and JSON parse pass",
+  "cleanupReceipt": "cleanup.json"
 }

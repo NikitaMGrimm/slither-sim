@@ -16,5 +16,5 @@
   "generatorSpotInterruptions": 4,
   "capacityRejectionsWithNoInstance": 3,
   "basis": "PLAN-ONDEMAND-GENERATOR.md; includes every prior attempt, no credits or timer extension assumed",
-  "finalCleanupVerified": false
+  "finalCleanupVerified": true
 }
