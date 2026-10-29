@@ -1,0 +1,20 @@
+{
+  "runtime": "9ad002c1819eecac97b91410321bc611b4d6dde0",
+  "archiveSha256": "490d28404fef7a7d4659db89b8e26a62a70f60b681d2a0443630fcf76fc255e1",
+  "binarySha256": "ddc5729dd38e4d8e3d1e41aee5a145684c020dc5aa4a657060c9dcaa46025c98",
+  "generatedRustAggregateSha256": "c08da03364f21f5aa82beb117b3e3b0fd1f5ba03b1025df4e41e06b1e92a6f91",
+  "collectorSha256": "8336c302d04669630be5b0341df7cad2cb33f816fb4ba6b414d40419e456a15c",
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--example",
+    "study_host"
+  ],
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "portableCodegen": true,
+  "debugSymbols": true
+}

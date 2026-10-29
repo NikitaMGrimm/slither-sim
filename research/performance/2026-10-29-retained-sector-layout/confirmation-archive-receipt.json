@@ -1,0 +1,12 @@
+{
+  "sha256": "9d00978ca0436fb7aa75a9147c41812ef82629fe582597ffed28143e8e94d823",
+  "archiveBytes": 886175175,
+  "access": "local-only",
+  "normalizedArchiveOwnerMetadata": true,
+  "guestArchiveTmpfsMarginBytes": 268435456,
+  "allMembersMatchSourceBytes": true,
+  "fileCount": 8415,
+  "uncompressedFileBytes": 2193685376,
+  "archiveSha256": "9d00978ca0436fb7aa75a9147c41812ef82629fe582597ffed28143e8e94d823",
+  "localTransferredSha256Matches": true
+}

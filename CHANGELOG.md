@@ -4,6 +4,13 @@
 
 ### Added
 
+- A study of storing each player's retained food sectors in flat sorted
+  arrays instead of a tree. Food-update ticks get about 0.55 ms cheaper in
+  every measured pair, but the whole run isn't reliably faster: in a
+  separately pre-registered ten-pair confirmation, only 5 of 10 stock pairs
+  improve against the required 8. The change is rejected for good and kept as
+  a patch; no runtime change
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-retained-sector-layout/REPORT.md)).
 - A real-socket Battledome recheck after the two spawn-search speedups, with
   bots boosting almost all the time. At 320 players the server still falls
   behind, but for 66 ticks of the measured window instead of 231, and frame
@@ -11,6 +18,9 @@
   overloaded and the results are mixed. Spawn search still takes about 60% of
   the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
+
+### Performance
+
 
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
 

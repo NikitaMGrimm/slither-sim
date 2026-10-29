@@ -1,0 +1,48 @@
+{
+  "commands": [
+    {
+      "label": "documentation",
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_documentation.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "original-tables-and-gate",
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/slither-retained-confirmation-20261029/delivery-source/research/performance/2026-10-29-retained-sector-layout/tables.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "confirmation-tables-and-gate",
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/slither-retained-confirmation-20261029/delivery-source/research/performance/2026-10-29-retained-sector-layout/confirmation-tables.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "attribution-tables",
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/slither-retained-confirmation-20261029/delivery-source/research/performance/2026-10-29-retained-sector-layout/attribution-tables.py"
+      ],
+      "exit": 0
+    }
+  ],
+  "bothSeriesCheckedSeparately": true,
+  "finalRuntimeSourceEqualsConfirmationArm": "base",
+  "bothRuntimeFilesByteChecked": true,
+  "rejectedPatchRoundTripMatchesBothConfirmationArms": true,
+  "deliveryArchiveCommit": "176925da587fee6d10f8fc654be4f77078221c1d"
+}

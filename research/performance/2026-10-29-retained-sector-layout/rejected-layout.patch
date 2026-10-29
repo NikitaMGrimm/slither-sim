@@ -1,0 +1,181 @@
+diff --git a/src/client/simulation/food.rs b/src/client/simulation/food.rs
+index 332af305..438ba3c3 100644
+--- a/src/client/simulation/food.rs
++++ b/src/client/simulation/food.rs
+@@ -1210 +1210 @@ mod tests {
+-                    interest.subscribed(),
++                    &interest.subscribed().iter().copied().collect(),
+@@ -1308 +1308,7 @@ mod tests {
+-                reference_updates(&mut expected, oracle, interest.subscribed(), table, &eaters);
++                reference_updates(
++                    &mut expected,
++                    oracle,
++                    &interest.subscribed().iter().copied().collect(),
++                    table,
++                    &eaters,
++                );
+@@ -1406 +1412 @@ mod tests {
+-                interest.subscribed(),
++                &interest.subscribed().iter().copied().collect(),
+diff --git a/src/client/visibility.rs b/src/client/visibility.rs
+index b1e7b7bc..4fa6c3a2 100644
+--- a/src/client/visibility.rs
++++ b/src/client/visibility.rs
+@@ -9,4 +9,3 @@ use crate::model::Point;
+-use std::{
+-    collections::{BTreeMap, BTreeSet},
+-    sync::Arc,
+-};
++#[cfg(test)]
++use std::collections::{BTreeMap, BTreeSet};
++use std::sync::Arc;
+@@ -21 +20,2 @@ pub(super) struct SectorInterest {
+-    subscribed: BTreeSet<[u8; 2]>,
++    /// Ascending unique membership keys, shared with the timestamp vector.
++    subscribed: Vec<[u8; 2]>,
+@@ -25,3 +25,4 @@ pub(super) struct SectorInterest {
+-    /// Keys are exactly the subscribed sectors. Sectors of the current stencil
+-    /// were last seen at `touched`; their stored values may be older.
+-    last_seen: BTreeMap<[u8; 2], f64>,
++    /// Exact stored times parallel to `subscribed`, without tree nodes or a
++    /// duplicate key set. Current-stencil sectors were last seen at `touched`;
++    /// their stored values may be older.
++    last_seen: Vec<f64>,
+@@ -58 +59 @@ impl SectorInterest {
+-                    self.last_seen.insert(sector, self.touched);
++                    self.set_seen(sector, self.touched);
+@@ -67,2 +68 @@ impl SectorInterest {
+-                changed |= self.subscribed.insert(sector);
+-                self.last_seen.insert(sector, now);
++                changed |= self.set_seen(sector, now);
+@@ -75 +75 @@ impl SectorInterest {
+-                for (&sector, &seen) in &self.last_seen {
++                for (&sector, &seen) in self.subscribed.iter().zip(&self.last_seen) {
+@@ -98,5 +98,6 @@ impl SectorInterest {
+-                let subscribed = &mut self.subscribed;
+-                let oldest = &mut self.oldest;
+-                *oldest = None;
+-                self.last_seen.retain(|sector, last_seen| {
+-                    if current(*sector) {
++                self.oldest = None;
++                let mut kept = 0;
++                for read in 0..self.subscribed.len() {
++                    let sector = self.subscribed[read];
++                    let seen = self.last_seen[read];
++                    let keep = if current(sector) {
+@@ -104,2 +105,2 @@ impl SectorInterest {
+-                    } else if now - *last_seen <= RETENTION_SECONDS {
+-                        note_oldest(oldest, *sector, *last_seen);
++                    } else if now - seen <= RETENTION_SECONDS {
++                        note_oldest(&mut self.oldest, sector, seen);
+@@ -108 +109 @@ impl SectorInterest {
+-                        changed |= subscribed.remove(sector);
++                        changed = true;
+@@ -109,0 +111,7 @@ impl SectorInterest {
++                    };
++                    if keep {
++                        if kept != read {
++                            self.subscribed[kept] = sector;
++                            self.last_seen[kept] = seen;
++                        }
++                        kept += 1;
+@@ -111 +119,3 @@ impl SectorInterest {
+-                });
++                }
++                self.subscribed.truncate(kept);
++                self.last_seen.truncate(kept);
+@@ -119 +129,17 @@ impl SectorInterest {
+-    pub(super) fn subscribed(&self) -> &BTreeSet<[u8; 2]> {
++    /// Keep keys and exact times at matching indexes. Old-stencil keys already
++    /// exist; newly entered keys are inserted in wire order.
++    fn set_seen(&mut self, sector: [u8; 2], seen: f64) -> bool {
++        match self.subscribed.binary_search(&sector) {
++            Ok(index) => {
++                self.last_seen[index] = seen;
++                false
++            }
++            Err(index) => {
++                self.subscribed.insert(index, sector);
++                self.last_seen.insert(index, seen);
++                true
++            }
++        }
++    }
++
++    pub(super) fn subscribed(&self) -> &[[u8; 2]] {
+@@ -130 +156,2 @@ impl SectorInterest {
+-        let last_seen = subscribed.iter().map(|&sector| (sector, 0.)).collect();
++        let subscribed: Vec<_> = subscribed.into_iter().collect();
++        let last_seen = vec![0.; subscribed.len()];
+@@ -171,4 +198,33 @@ mod tests {
+-    fn assert_full_state(actual: &SectorInterest, reference: &SectorInterest) {
+-        assert_eq!(actual.subscribed, reference.subscribed);
+-        assert_eq!(actual.last_seen, reference.last_seen);
+-        assert_eq!(actual.center, reference.center);
++    // Literal tree-backed state for the frozen full-sweep owner below.
++    #[derive(Clone, Debug, Default)]
++    struct ReferenceInterest {
++        subscribed: BTreeSet<[u8; 2]>,
++        revision: Arc<()>,
++        last_seen: BTreeMap<[u8; 2], f64>,
++        cleanup_epoch: u64,
++        center: Option<[f64; 2]>,
++        touched: f64,
++    }
++
++    fn assert_full_state(actual: &SectorInterest, reference: &ReferenceInterest) {
++        assert_eq!(actual.subscribed.len(), actual.last_seen.len());
++        assert_eq!(
++            actual.subscribed,
++            reference.subscribed.iter().copied().collect::<Vec<_>>()
++        );
++        assert_eq!(
++            actual
++                .last_seen
++                .iter()
++                .map(|t| t.to_bits())
++                .collect::<Vec<_>>(),
++            reference
++                .last_seen
++                .values()
++                .map(|t| t.to_bits())
++                .collect::<Vec<_>>()
++        );
++        assert_eq!(
++            actual.center.map(|c| c.map(f64::to_bits)),
++            reference.center.map(|c| c.map(f64::to_bits))
++        );
+@@ -194 +250,2 @@ mod tests {
+-            assert_eq!(actual.last_seen[&sector].to_bits(), seen.to_bits());
++            let index = actual.subscribed.binary_search(&sector).unwrap();
++            assert_eq!(actual.last_seen[index].to_bits(), seen.to_bits());
+@@ -200 +257 @@ mod tests {
+-        reference: &mut SectorInterest,
++        reference: &mut ReferenceInterest,
+@@ -206 +263 @@ mod tests {
+-        let reference_old = reference.revision().clone();
++        let reference_old = reference.revision.clone();
+@@ -212 +269 @@ mod tests {
+-            Arc::ptr_eq(&reference_old, reference.revision())
++            Arc::ptr_eq(&reference_old, &reference.revision)
+@@ -219 +276 @@ mod tests {
+-        let mut reference = actual.clone();
++        let mut reference = ReferenceInterest::default();
+@@ -232 +289 @@ mod tests {
+-        reference = SectorInterest::default();
++        reference = ReferenceInterest::default();
+@@ -248 +305 @@ mod tests {
+-            let mut reference = actual.clone();
++            let mut reference = ReferenceInterest::default();
+@@ -255 +312 @@ mod tests {
+-                    reference = SectorInterest::default();
++                    reference = ReferenceInterest::default();
+@@ -281 +338 @@ mod tests {
+-    fn full_sweep(interest: &mut SectorInterest, head: Point, heading: f64, now: f64) {
++    fn full_sweep(interest: &mut ReferenceInterest, head: Point, heading: f64, now: f64) {
+@@ -473 +530 @@ mod tests {
+-        let original = interest.subscribed().clone();
++        let original = interest.subscribed().to_vec();
+@@ -475 +532 @@ mod tests {
+-        assert_eq!(interest.subscribed(), &original);
++        assert_eq!(interest.subscribed(), original.as_slice());

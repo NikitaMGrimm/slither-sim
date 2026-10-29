@@ -1,0 +1,8 @@
+{
+  "elapsedSeconds": 2.0073719400097616,
+  "logicalCpus": 4,
+  "processesOverTwoCpuQuanta": [],
+  "targetAbsent": true,
+  "counterQuantumMs": 10.0,
+  "timedWindowExclusionRule": false
+}

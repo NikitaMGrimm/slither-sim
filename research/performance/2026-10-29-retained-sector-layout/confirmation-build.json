@@ -1,0 +1,91 @@
+{
+  "series": "maintainer-post-result-confirmation",
+  "planCommit": "a6dfc764d509e53f5811a21a39d068708cd2244b",
+  "allCopiedBinariesAndGeneratedSourcesVerified": true,
+  "candidateRuntimeFilesEqualOriginal5edb5b2d": true,
+  "originalPatchSha256": "1f31fd3dc14281bafc0089e86d6e764ea90e27af66c69c003d8dd3341a339568",
+  "controllerAndCollectorAggregateSha256": "2d34822404d0dba7de682c2e4d85207297abb194b7cc23113426d772ded4824d",
+  "arms": {
+    "base": {
+      "archiveCommit": "b750004aeb8f11be61dc483a2ce458c6194f116f",
+      "archiveSha256": "af64944f3b07aa2fe3d479edb8406516c827fdc561890aca717f7f2c28cb38e1",
+      "generatedRustAggregateSha256": "f5553d8c4754274b3d93ab48f6b7b0fe8f1a635d17230e73aec3cb6c4e30b20d",
+      "binaries": {
+        "perf_baseline": "b31139376b98229091362e2c3500ff10d3b64eb2548e9e8818558c4afc6ee36f",
+        "study_protocols": "a94a264bfbf59a900496bc5330db5da225760948f10b3a6e77dca0bf9e784e81",
+        "study_host": "1d7301ed1010232b5d11132963e29a894127f39c260e55c2936a0c58dd6764d8"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "portableCodegen": true,
+      "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "layout": "base"
+    },
+    "candidate": {
+      "archiveCommit": "9a2f3bbc26f993f0fa83da7a139cb7430dea052a",
+      "archiveSha256": "3bb9d89bd494f618ae10db0a7f465b1fe43499fee533bb07ae39305c2dd8c4ad",
+      "generatedRustAggregateSha256": "2e23d3a9fafa69cdb92839234111b3fed3a54fda94ea114130732b666fe64b42",
+      "binaries": {
+        "perf_baseline": "55371a58af98ffc89b703e7b562779b31142677ec1ee84f6d30f7f6ea1a988cb",
+        "study_protocols": "57cd4f21ea26ddaf98d63d8d4f1c9aff29c41b6ea2bd084afbb7b20602bc3b43",
+        "study_host": "772fac0ebf2705fa77e7ea03ef3eba34e1ccc38aff8b6e1e0f618128b76e6f23"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "portableCodegen": true,
+      "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "layout": "candidate"
+    },
+    "mutation": {
+      "archiveCommit": "9a2f3bbc26f993f0fa83da7a139cb7430dea052a",
+      "archiveSha256": "3bb9d89bd494f618ae10db0a7f465b1fe43499fee533bb07ae39305c2dd8c4ad",
+      "generatedRustAggregateSha256": "95573039b51db3927b4429246b3322bca59e7304f3759bb7f6012fafafb4b250",
+      "binaries": {
+        "perf_baseline": "390926c3344a54158e2505305cecf870a66ae95c1dfdfbfd8caea0c35820f908",
+        "study_protocols": "1c929d2b802bf6cc80dd43c6fab528982693124488cfeadeb7efe6d194dc2004",
+        "study_host": "66664223dbb0562dd2239e0a2395c2ba7493529b32a5e8ba76cc7d356b5dbf7c"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--example",
+        "study_host",
+        "--example",
+        "study_protocols",
+        "--example",
+        "perf_baseline"
+      ],
+      "portableCodegen": true,
+      "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "layout": "mutation"
+    }
+  }
+}

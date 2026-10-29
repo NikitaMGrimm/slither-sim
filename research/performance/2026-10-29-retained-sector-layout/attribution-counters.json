@@ -1,0 +1,374 @@
+[
+  {
+    "protocol": "stock",
+    "event": "cycles",
+    "maintenance": false,
+    "runs": [
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461911.366197184,
+        "eventPerTick": 6385177.81314554,
+        "eventPerKInstructions": 610.3261239410116,
+        "cpuMsPerTick": 1.4599391539906104,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461911.713615023,
+        "eventPerTick": 7557443.818779343,
+        "eventPerKInstructions": 722.3769446404488,
+        "cpuMsPerTick": 1.7410485624413146,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461912.404694837,
+        "eventPerTick": 7123710.105164319,
+        "eventPerKInstructions": 680.9185385616036,
+        "cpuMsPerTick": 1.6315876046948357,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "cycles",
+    "maintenance": true,
+    "runs": [
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082711.733333334,
+        "eventPerTick": 15265298.6,
+        "eventPerKInstructions": 760.1213821469448,
+        "cpuMsPerTick": 3.4846633333333337,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082712.666666668,
+        "eventPerTick": 17852346.066666666,
+        "eventPerKInstructions": 888.940969428798,
+        "cpuMsPerTick": 4.100877333333334,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082715.333333332,
+        "eventPerTick": 17118461.266666666,
+        "eventPerKInstructions": 852.3977451521911,
+        "cpuMsPerTick": 3.9064166666666664,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "L1d-load-misses",
+    "maintenance": false,
+    "runs": [
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461911.827230047,
+        "eventPerTick": 276256.90798122063,
+        "eventPerKInstructions": 26.40596790943935,
+        "cpuMsPerTick": 1.5903632291079812,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461911.77370892,
+        "eventPerTick": 276873.47699530516,
+        "eventPerKInstructions": 26.46490268548202,
+        "cpuMsPerTick": 1.547897896713615,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461912.883568075,
+        "eventPerTick": 276343.40375586855,
+        "eventPerKInstructions": 26.414232925787907,
+        "cpuMsPerTick": 1.541886862910798,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "L1d-load-misses",
+    "maintenance": true,
+    "runs": [
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082713.133333333,
+        "eventPerTick": 370387.26666666666,
+        "eventPerKInstructions": 18.443089049153276,
+        "cpuMsPerTick": 3.7292806666666665,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082711.533333335,
+        "eventPerTick": 371363.5333333333,
+        "eventPerKInstructions": 18.491702811990464,
+        "cpuMsPerTick": 3.5727106666666666,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082712.866666667,
+        "eventPerTick": 369890.6666666667,
+        "eventPerKInstructions": 18.418361559140354,
+        "cpuMsPerTick": 3.6736026666666666,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "dTLB-load-misses",
+    "maintenance": false,
+    "runs": [
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461912.290140845,
+        "eventPerTick": 4542.646009389671,
+        "eventPerKInstructions": 0.4342079997813206,
+        "cpuMsPerTick": 1.5748562065727698,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461912.4657277,
+        "eventPerTick": 4555.696713615023,
+        "eventPerKInstructions": 0.4354554416832566,
+        "cpuMsPerTick": 1.5376028169014084,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10461912.63286385,
+        "eventPerTick": 4941.219718309859,
+        "eventPerKInstructions": 0.47230558041443393,
+        "cpuMsPerTick": 2.54891577370892,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "stock",
+    "event": "dTLB-load-misses",
+    "maintenance": true,
+    "runs": [
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082712.133333333,
+        "eventPerTick": 10515.533333333333,
+        "eventPerKInstructions": 0.5236112166284367,
+        "cpuMsPerTick": 3.7586366666666664,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082712.6,
+        "eventPerTick": 10497.266666666666,
+        "eventPerKInstructions": 0.5227016327797603,
+        "cpuMsPerTick": 3.6690893333333334,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 20082712.333333332,
+        "eventPerTick": 11557.8,
+        "eventPerKInstructions": 0.5755099116176821,
+        "cpuMsPerTick": 5.000869333333333,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "cycles",
+    "maintenance": false,
+    "runs": [
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784088.974647887,
+        "eventPerTick": 7185915.871361502,
+        "eventPerKInstructions": 666.3442677684445,
+        "cpuMsPerTick": 1.6599161596244132,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784098.385915494,
+        "eventPerTick": 7164735.834741784,
+        "eventPerKInstructions": 664.379680001737,
+        "cpuMsPerTick": 1.6562067887323944,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784099.063849766,
+        "eventPerTick": 7257801.785915493,
+        "eventPerKInstructions": 673.009561850646,
+        "cpuMsPerTick": 1.6803545436619718,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "cycles",
+    "maintenance": true,
+    "runs": [
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423312.4,
+        "eventPerTick": 17147442.133333333,
+        "eventPerKInstructions": 800.4104040107884,
+        "cpuMsPerTick": 3.960088,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423339.2,
+        "eventPerTick": 16743565.933333334,
+        "eventPerKInstructions": 781.5572435754242,
+        "cpuMsPerTick": 3.8606726666666664,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423343.466666665,
+        "eventPerTick": 17055214.533333335,
+        "eventPerKInstructions": 796.104238344969,
+        "cpuMsPerTick": 3.932478,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "L1d-load-misses",
+    "maintenance": false,
+    "runs": [
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784091.142723005,
+        "eventPerTick": 280668.6262910798,
+        "eventPerKInstructions": 26.02617342310503,
+        "cpuMsPerTick": 1.6687589953051642,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784097.753990611,
+        "eventPerTick": 281146.94178403757,
+        "eventPerKInstructions": 26.07051124698868,
+        "cpuMsPerTick": 1.792081979342723,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784097.50516432,
+        "eventPerTick": 280698.04319248826,
+        "eventPerKInstructions": 26.02888587181883,
+        "cpuMsPerTick": 1.695224281690141,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "L1d-load-misses",
+    "maintenance": true,
+    "runs": [
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423314.4,
+        "eventPerTick": 377850.4,
+        "eventPerKInstructions": 17.637345601388365,
+        "cpuMsPerTick": 3.696278,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423339.466666665,
+        "eventPerTick": 377876.8,
+        "eventPerKInstructions": 17.638557265451162,
+        "cpuMsPerTick": 4.0322846666666665,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423336.0,
+        "eventPerTick": 377380.26666666666,
+        "eventPerKInstructions": 17.615382901461594,
+        "cpuMsPerTick": 4.019481333333333,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "dTLB-load-misses",
+    "maintenance": false,
+    "runs": [
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784097.615962442,
+        "eventPerTick": 5401.5868544600935,
+        "eventPerKInstructions": 0.5008844547609393,
+        "cpuMsPerTick": 1.6993529004694836,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784091.614084506,
+        "eventPerTick": 5319.361502347418,
+        "eventPerKInstructions": 0.49326004384088257,
+        "cpuMsPerTick": 1.6987361774647889,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 1065,
+        "instructionsPerTick": 10784089.369014084,
+        "eventPerTick": 5308.231924882629,
+        "eventPerKInstructions": 0.4922281096941544,
+        "cpuMsPerTick": 1.6768828169014083,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  },
+  {
+    "protocol": "legacy",
+    "event": "dTLB-load-misses",
+    "maintenance": true,
+    "runs": [
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423324.466666665,
+        "eventPerTick": 11999.466666666667,
+        "eventPerKInstructions": 0.5601122592031444,
+        "cpuMsPerTick": 3.9720066666666667,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423315.066666666,
+        "eventPerTick": 12005.066666666668,
+        "eventPerKInstructions": 0.5603739024193224,
+        "cpuMsPerTick": 3.9221313333333336,
+        "minimumRunningFraction": 1.0
+      },
+      {
+        "ticks": 15,
+        "instructionsPerTick": 21423317.866666667,
+        "eventPerTick": 11960.2,
+        "eventPerKInstructions": 0.5582795379519303,
+        "cpuMsPerTick": 3.8654266666666666,
+        "minimumRunningFraction": 1.0
+      }
+    ]
+  }
+]
