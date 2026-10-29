@@ -1,0 +1,60 @@
+{
+  "base": {
+    "commit": "539b37f3be969827b5eac67c2978e604f9e814e8",
+    "archiveSha256": "d26d81627df0a66d6595282e4bc7b6d7739a58f1a55da221fb357414cb1fab34",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "-C target-cpu=native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j",
+      "1",
+      "--bin",
+      "slither-sim"
+    ],
+    "hostBinarySha256": "9083c08540ec3ffe6768928f99ca3c6d981b762e661d0357cd93e4b17b9534a9"
+  },
+  "candidate": {
+    "commit": "da7e65c26d0236156c24e23f43f9bd6dfcabca34",
+    "archiveSha256": "3de123a19182575fdd973e80d6ce863f32fab30d90b5ad13b1880cebdff299a3",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "-C target-cpu=native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j",
+      "1",
+      "--bin",
+      "slither-sim"
+    ],
+    "hostBinarySha256": "fa15be63e4ff638addd14097bce1e3bc3017975f56ce0d8caa3aeafd1cec4cf6"
+  },
+  "attribution": {
+    "commit": "cc1bb1e9935094a00cf513413d7922d858dd5c1e",
+    "archiveSha256": "7c9352f7faac7e327258b9cfbdcface485a02501de8d9bb9cfe2f8ac0ef79254",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "-C target-cpu=native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j",
+      "1",
+      "--bin",
+      "slither-sim"
+    ],
+    "hostBinarySha256": "b756642936b8741ccfe4a711cc98911c8ed0292f4f89097f8f70bb6bb343bd6c"
+  },
+  "harnessPatchSha256": "ecd863ef693cc7f40c3f7d79e751bfd315899eabae0ef23355a848c410ff4bda",
+  "access": "Per-file forensic inventories remain in local-only archives; public pins identify whole artifacts.",
+  "freshFrozenPlanCommit": "9ef4d81377ba12eb4286a0175ecbd40416f54b52",
+  "freshHarnessPatchSha256": "b70431a6f61fa5713b4ed86646825ea94b70ea27f9b176b135466db75a671638"
+}

@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "label": "original",
+      "expectedFailure": false,
+      "exit": 0
+    },
+    {
+      "label": "ignore-overlapping-ranges",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "allow-touching-ranges",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "median-tail-only",
+      "expectedFailure": true,
+      "exit": 1
+    },
+    {
+      "label": "restored",
+      "expectedFailure": false,
+      "exit": 0
+    }
+  ]
+}

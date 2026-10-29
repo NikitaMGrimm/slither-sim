@@ -1,0 +1,20 @@
+{
+  "kind": "Approved conservative full-timer bound, not an invoice or a completed-cleanup estimate",
+  "taskBudgetUSD": 3,
+  "combinedFullTimerBoundUSD": 2.973666666666667,
+  "componentsUSD": {
+    "priorPaidComputeOutsideRetainedTargetSession": 0.75,
+    "retainedTarget182MinutesAt006PerHour": 0.182,
+    "twoSessionSpotGenerators50And25MinutesAt050PerHour": 0.625,
+    "approvedOnDemandGenerator92MinutesAt050PerHour": 0.7666666666666667,
+    "allAttemptStorageIPv4TransferControlAndMiscAllowance": 0.65
+  },
+  "verifiedOnDemandRetailUSDPerHour": 0.49196,
+  "paidInstancesAcrossAllAttempts": 11,
+  "paidPairs": 4,
+  "additionalGenerators": 3,
+  "generatorSpotInterruptions": 4,
+  "capacityRejectionsWithNoInstance": 3,
+  "basis": "PLAN-ONDEMAND-GENERATOR.md; includes every prior attempt, no credits or timer extension assumed",
+  "finalCleanupVerified": true
+}
