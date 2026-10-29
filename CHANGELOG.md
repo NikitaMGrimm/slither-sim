@@ -28,6 +28,12 @@
 
 ### Performance
 
+- Battledome spawn searches no longer build a candidate body whose head spot
+  is already blocked, since the search would reject it anyway. Spawn positions,
+  random draws and admission rules are unchanged, and output is byte-identical.
+  In a synthetic overload with 72 players waiting to spawn, where every search
+  tries all 4,096 candidates, the host uses 36.7% fewer instructions
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-ring-prefilter/REPORT.md)).
 - Battledome's pit minimap now reuses its outline mask between updates
   instead of recomputing each cell's distance from the pit edge. Output is
   byte-identical. In a synthetic 80-player check, minimap ticks use about 52%
