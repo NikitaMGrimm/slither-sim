@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.8.1](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.0...v0.8.1) - 2026-10-29
+
 ### Added
 
 - A capacity check with 500 real WebSocket players and fully grown snakes,
