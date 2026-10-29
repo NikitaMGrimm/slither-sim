@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
-
 ### Added
 
 - A real-socket Battledome recheck after the two spawn-search speedups, with
@@ -13,6 +11,11 @@
   overloaded and the results are mixed. Spawn search still takes about 60% of
   the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
+
+## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
+
+### Added
+
 - A memory study of the simulation thread in a fully grown 500-player world.
   Each player's snake history reserves a slot for every snake, 20.38 MB in
   total, to hold 176.7 kB of snakes that players actually know, and those
