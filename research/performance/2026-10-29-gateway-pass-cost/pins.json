@@ -1,0 +1,108 @@
+{
+  "base": {
+    "commit": "539b37f3be969827b5eac67c2978e604f9e814e8",
+    "archiveSha256": "d26d81627df0a66d6595282e4bc7b6d7739a58f1a55da221fb357414cb1fab34",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "-C target-cpu=native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j",
+      "1",
+      "--bin",
+      "slither-sim"
+    ],
+    "binaries": {
+      "host": "9083c08540ec3ffe6768928f99ca3c6d981b762e661d0357cd93e4b17b9534a9"
+    },
+    "postHoldReadinessScope": "whole function; stage12 disabled during primary holds",
+    "postBracketBuilderSha256": "913b952755e93e6069fd5031718262a1498efc635145ce2b07b553a635513456",
+    "changedSourceSha256": {
+      "src/client/server.rs": "9f1a1c10da6d5cb4166829b9daf3a98e9f0859838929910f49533dabe436f23b",
+      "src/client/server/readiness.rs": "67cc7ff51546e803ad08bbb5c5c008d9f1dfefd33f91f96c61963e0483218a0e",
+      "src/client/simulation/broadcast.rs": "ce7b9f37e6ee3778152a57e1f5ed3e50efa2d61e4bde222080579af7d4b8e0d0",
+      "src/study_observe.rs": "60c61c47b6dcff5146807fbd427c488aa506c71e3714b3f69041ec7523125824"
+    }
+  },
+  "candidate": {
+    "commit": "da7e65c26d0236156c24e23f43f9bd6dfcabca34",
+    "archiveSha256": "3de123a19182575fdd973e80d6ce863f32fab30d90b5ad13b1880cebdff299a3",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "-C target-cpu=native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j",
+      "1",
+      "--bin",
+      "slither-sim"
+    ],
+    "binaries": {
+      "host": "fa15be63e4ff638addd14097bce1e3bc3017975f56ce0d8caa3aeafd1cec4cf6"
+    },
+    "postHoldReadinessScope": "whole function; stage12 disabled during primary holds",
+    "postBracketBuilderSha256": "913b952755e93e6069fd5031718262a1498efc635145ce2b07b553a635513456",
+    "changedSourceSha256": {
+      "src/client/server.rs": "984a55fdc64780152f13803cb1559446cb4825a5f81ed08cbe0b075acd3a4e74",
+      "src/client/server/readiness.rs": "ac4b613aea4f4125168b2926b5d86554893cfa39585713b34e7e26f6c3999d30",
+      "src/client/simulation/broadcast.rs": "ce7b9f37e6ee3778152a57e1f5ed3e50efa2d61e4bde222080579af7d4b8e0d0",
+      "src/study_observe.rs": "60c61c47b6dcff5146807fbd427c488aa506c71e3714b3f69041ec7523125824"
+    }
+  },
+  "helperSourcesSha256": {
+    "build.py": "d5ded01411369473944c6084492fd98b172ccfd98f46df36d0b879dc0ad7be5b",
+    "timing.rs": "46ab65f0a09b88146ec0c280c1fc619c350d2b537d06fd66b8556f42a0062d2e",
+    "run.py": "618898611560c8620cecf8c95e1438727e64aeed8e2864194fb36e40abce5d15",
+    "select.py": "e9c5324ad77fb9f52de07df74dd84f74ba435e5b2e488a3ed861515a5a2a7e9f",
+    "core_cpu.py": "244ad1e9ffb9188b8218bfe2ef9a15c92e81b09e5bfcf5e9dcbefb5b23fcb5bb",
+    "overlay.py": "cedb8ef270e2f235c14e5a566b461be9bb5c2c9e34a0337b5190e09809d39e77",
+    "gateway_costs.rs": "de93dcf4819215345cfc258991fdf45aa58af9fa50fe96127062a23caaf91745",
+    "run_attribution.py": "e306bca45cada2855dda1c6ec1d64d6ef2e45254cc27230a7f336b6386d48f43",
+    "analyze.py": "3a23ee75412a21c9f9053d75bf8fb849494c34d3c4548b3898dd8ddb7d7147d9",
+    "test_attribution.py": "491d5479e75d01c71e038eecf2d77362ec97068c252351f69a7ac64c03b9ac6d",
+    "check_math.py": "d820d51dae45a3c6d66a04bf0e379f0580c4521b36ad318c56f7a23a0e96d097",
+    "primary_build.py": "db8d3e306210c2f65b3d34362dbe67a37944847471e6f5d113c30dc9ceef5020",
+    "check_integrated.py": "f4fba8db8220e612090b506e643d2f9490b82d3b5ee382a1ef6d0f279b6de6f1",
+    "check_final_tests.py": "0a3a47905fc055c1de6c05be6261086fd17ef3ec41e0bbeee7a460a7d87255b0",
+    "live_series.py": "7b49b234f1ff334876a1f206aaf9f987d631649125170b73d320c069abc668ef",
+    "start_series.py": "bd06b32a5ab982b9c0865b90fb8313c234909139b81c6f68e51fe0833637be36",
+    "series_follow.py": "c065f1c4f732a4fdcf73d202ad0ac5dfea86205006075ca68bdad12bd02b1b45",
+    "reduce_live.py": "dc67a8a38d51c6438ecac3a0765f2809db203fa2bd0c16c4a642e322d43a4983",
+    "cleanup_target.py": "501f5f852178ffad82c1e72ca3e7ac885743bacaaf6cea4f8212ceaca5544d81",
+    "prepare_fixed.py": "8018c2c35e612278c16eba2960a72435efb4707eece1245787b377e43f236aa1",
+    "run_fixed_all.py": "5a7604403edc9599e58363c9f89f689c7b61a41695a147dd599a91311e2aa149",
+    "rebuild_primary.py": "913b952755e93e6069fd5031718262a1498efc635145ce2b07b553a635513456",
+    "launch_v2.py": "591d026fcecd9b56d5f3e6760adfaffc4b94e80d271f6902fa5f0ad3685c0074",
+    "resume_builds.py": "1b846b8f0354c3ef06239ff197e3fe911a98278515780a82e791240eb50d8c00",
+    "reduce_incomplete.py": "900f4f3f53cad8848baebb9c9ab3f2bfd86cde2bb402153a29477be0b249a0d8",
+    "archive_final.py": "199c0408b621d68050c2b292e9bc2fd0a44b90c767c03c81fd8dab3a43613c97"
+  },
+  "attribution": {
+    "commit": "cc1bb1e9935094a00cf513413d7922d858dd5c1e",
+    "archiveSha256": "7c9352f7faac7e327258b9cfbdcface485a02501de8d9bb9cfe2f8ac0ef79254",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "-C target-cpu=native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j",
+      "1",
+      "--bin",
+      "slither-sim"
+    ],
+    "binaries": {
+      "host": "b756642936b8741ccfe4a711cc98911c8ed0292f4f89097f8f70bb6bb343bd6c"
+    },
+    "gatewayOverlaySha256": "cedb8ef270e2f235c14e5a566b461be9bb5c2c9e34a0337b5190e09809d39e77",
+    "gatewayModuleSha256": "de93dcf4819215345cfc258991fdf45aa58af9fa50fe96127062a23caaf91745"
+  }
+}
