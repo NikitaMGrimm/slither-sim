@@ -1,0 +1,23 @@
+{
+  "complete": true,
+  "verifiedUTC": "2026-10-29T18:06:19.866704+00:00",
+  "instanceTerminated": true,
+  "keyPairDeleted": true,
+  "securityGroupDeleted": true,
+  "protectedResourcesUntouched": true,
+  "scan": {
+    "regionsAttempted": 17,
+    "regionsFullyScanned": 17,
+    "regionsUnavailable": 0,
+    "disabledRegionsNotScanned": 17,
+    "nonterminatedInstances": 0,
+    "openOrActiveSpotRequests": 0,
+    "availableVolumes": 0,
+    "allVolumes": 0,
+    "elasticIPs": 0,
+    "taskKeyPairs": 0,
+    "taskSecurityGroups": 0,
+    "projectKeyPairs": 0,
+    "projectSecurityGroups": 0
+  }
+}

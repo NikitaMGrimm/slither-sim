@@ -4,6 +4,7 @@ use crate::{
     Point, Simulator,
     physics::{Bounds, base_speed, collision_distance, segment_distance_le, swept_distance},
 };
+use std::cell::OnceCell;
 
 struct Edge {
     a: Point,
@@ -35,10 +36,39 @@ struct Obstacle {
     head_width: f64,
 }
 
+const HEAD_BLOCK_EDGES: usize = 8;
+const HEAD_BLOCK_LIMIT: f64 = 1e7;
+
+fn head_boundable(point: Point) -> bool {
+    point.finite() && point.x.abs() <= HEAD_BLOCK_LIMIT && point.y.abs() <= HEAD_BLOCK_LIMIT
+}
+
+fn head_blocks(edges: &[Edge]) -> Vec<Bounds> {
+    if edges.len() <= HEAD_BLOCK_EDGES
+        || !edges
+            .iter()
+            .all(|edge| head_boundable(edge.a) && head_boundable(edge.b))
+    {
+        return Vec::new();
+    }
+    edges
+        .chunks(HEAD_BLOCK_EDGES)
+        .map(|chunk| {
+            let mut bounds = chunk[0].bounds;
+            for edge in &chunk[1..] {
+                bounds.include(edge.a);
+                bounds.include(edge.b);
+            }
+            bounds
+        })
+        .collect()
+}
+
 /// Immutable neighbors, with a reused candidate buffer. Built after excluding
 /// the joining slot; no world tick runs during the search.
 pub(crate) struct Safety {
     obstacles: Vec<Obstacle>,
+    head_blocks: OnceCell<Vec<OnceCell<Vec<Bounds>>>>,
     candidate: Vec<Edge>,
     wall_limit: f64,
     segments: usize,
@@ -62,6 +92,34 @@ fn near(a: Bounds, b: Bounds, width: f64) -> bool {
 }
 
 impl Safety {
+    fn blocks_head(&self, index: usize, head: Point) -> bool {
+        let obstacle = &self.obstacles[index];
+        let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, obstacle.head_width);
+        if !head_boundable(head) || !(0. ..=HEAD_BLOCK_LIMIT).contains(&obstacle.head_width) {
+            return obstacle.edges.iter().any(blocked);
+        }
+        // Keep obstacle layout/construction unchanged. Neither the cache table
+        // nor an obstacle's bounds exist until a supported query reaches them.
+        let cells = self
+            .head_blocks
+            .get_or_init(|| self.obstacles.iter().map(|_| OnceCell::new()).collect());
+        let blocks = cells[index].get_or_init(|| head_blocks(&obstacle.edges));
+        if blocks.is_empty() {
+            return obstacle.edges.iter().any(blocked);
+        }
+        // As in visibility's eight-edge bounds, one unit exceeds projection/
+        // hypot roundoff at this finite scale. Borderline boxes keep every
+        // original edge test, in order; extreme/non-finite inputs stay linear.
+        // research/performance/2026-10-29-spawn-head-blocks/REPORT.md
+        let query = Bounds::between(head, head);
+        blocks
+            .iter()
+            .zip(obstacle.edges.chunks(HEAD_BLOCK_EDGES))
+            .any(|(&bounds, edges)| {
+                bounds.near(query, obstacle.head_width + 1.) && edges.iter().any(blocked)
+            })
+    }
+
     #[cfg(test)]
     pub(crate) fn new(world: &Simulator, segments: usize, clearance: f64, horizon: f64) -> Self {
         Self::new_excluding(world, None, segments, clearance, horizon)
@@ -128,6 +186,7 @@ impl Safety {
             .collect();
         Self {
             obstacles,
+            head_blocks: OnceCell::new(),
             candidate: Vec::with_capacity(segments.saturating_sub(1)),
             wall_limit: world.radius() - crate::simulator::SPAWN_WALL_MARGIN,
             segments,
@@ -235,15 +294,10 @@ impl Safety {
             return false;
         }
         let head_bounds = Bounds::between(head, head);
-        !self.obstacles.iter().any(|obstacle| {
+        !self.obstacles.iter().enumerate().any(|(index, obstacle)| {
             !obstacle.valid
                 || (near(head_bounds, obstacle.bounds, obstacle.head_width)
-                    && obstacle
-                        .edges
-                        .iter()
-                        // Keep projection and inclusive thresholds; ambiguous
-                        // distances retain the original hypot comparison.
-                        .any(|edge| segment_distance_le(head, edge.a, edge.b, obstacle.head_width)))
+                    && self.blocks_head(index, head))
         })
     }
 

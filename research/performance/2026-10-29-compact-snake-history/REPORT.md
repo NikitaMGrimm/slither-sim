@@ -110,13 +110,16 @@ is no post-result threshold change, retry, layout tuning or runtime adoption.
 
 The [plan](PLAN.md), [pilot selection amendment](SELECTION.md) and
 [baseline refresh](BASELINE-REFRESH.md) precede primary observations. Final
-runtime pins are base `e860ec237f172de5df34caff86a9eb26082e82d6` and candidate
+measured runtime pins are base `e860ec237f172de5df34caff86a9eb26082e82d6` and candidate
 `d781ff000d2dfee10627ab1b8a4c07bfff3638c0`.
 [Refreshed build pins](refreshed-build-pins.json) were committed before timing.
 All compilation, runtime/output checks, measurements and numerical reductions
 run on a 4-vCPU Zen 5 EPYC KVM guest. Rust 1.99 portable release code generation
 uses thin LTO and one codegen unit, without affinity, native CPU targeting or
 profiler sampling.
+
+Main's later #273 landed after the counted series. It is preserved in the
+research-only delivery; no measurements here are attributed to that runtime.
 
 The [earlier full-backend fixture](../2026-10-28-mature-covered-bounds/fixture.rs)
 warms once per runtime/protocol at full speed to tick 193,000, with 500 remote

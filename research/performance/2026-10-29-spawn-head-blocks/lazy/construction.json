@@ -1,0 +1,638 @@
+{
+  "spawn": {
+    "19": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 6978.53125,
+            "instructionsPerTwoSafetiesMean": 109735.8037109375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13898.25,
+            "instructionsPerTwoSafetiesMean": 221736.6142578125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6931.4375,
+            "instructionsPerTwoSafetiesMean": 109709.79296875
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 6992.28125,
+            "instructionsPerTwoSafetiesMean": 109735.8046875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13899.75,
+            "instructionsPerTwoSafetiesMean": 221736.61328125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6909.8125,
+            "instructionsPerTwoSafetiesMean": 109709.79296875
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 7737.25,
+            "instructionsPerTwoSafetiesMean": 109709.7939453125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13895.3125,
+            "instructionsPerTwoSafetiesMean": 221736.6142578125
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 6931.5625,
+            "instructionsPerTwoSafetiesMean": 109702.33203125
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7727.59375,
+            "instructionsPerTwoSafetiesMean": 109735.8037109375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 14012.0625,
+            "instructionsPerTwoSafetiesMean": 221736.61328125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6918.15625,
+            "instructionsPerTwoSafetiesMean": 109694.3876953125
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6972.15625,
+            "instructionsPerTwoSafetiesMean": 109709.7919921875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13900.46875,
+            "instructionsPerTwoSafetiesMean": 221736.61328125
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7727.65625,
+            "instructionsPerTwoSafetiesMean": 109735.8056640625
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 6941.46875,
+            "instructionsPerTwoSafetiesMean": 109702.3310546875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13904.0,
+            "instructionsPerTwoSafetiesMean": 221736.61328125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6912.96875,
+            "instructionsPerTwoSafetiesMean": 109709.79296875
+          }
+        }
+      ],
+      "candidateBlocksOnly": {
+        "cpuNsPerSafetyMedian": 3077.4375,
+        "instructionsPerSafetyMean": 57546.2470703125
+      },
+      "scope": "Whole Safety pair includes edges, paths, bounds, allocations/drop; blocks-only reuses existing edges, one Safety obstacle set; 16 repeats per sample,64 samples. Five paired whole-build windows plus discarded warmup; blocks-only is one descriptive window."
+    },
+    "13": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7185.0,
+            "instructionsPerTwoSafetiesMean": 109763.201171875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13903.96875,
+            "instructionsPerTwoSafetiesMean": 221742.9287109375
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6947.75,
+            "instructionsPerTwoSafetiesMean": 109756.2939453125
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 6961.90625,
+            "instructionsPerTwoSafetiesMean": 109763.201171875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13908.90625,
+            "instructionsPerTwoSafetiesMean": 221742.9296875
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6967.875,
+            "instructionsPerTwoSafetiesMean": 109756.294921875
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6977.34375,
+            "instructionsPerTwoSafetiesMean": 109756.2939453125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13927.84375,
+            "instructionsPerTwoSafetiesMean": 221742.9296875
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7016.53125,
+            "instructionsPerTwoSafetiesMean": 109763.2001953125
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7793.59375,
+            "instructionsPerTwoSafetiesMean": 109763.201171875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13841.5625,
+            "instructionsPerTwoSafetiesMean": 221742.9287109375
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6916.40625,
+            "instructionsPerTwoSafetiesMean": 109756.2939453125
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6927.75,
+            "instructionsPerTwoSafetiesMean": 109756.2939453125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 13895.46875,
+            "instructionsPerTwoSafetiesMean": 221742.9296875
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7006.21875,
+            "instructionsPerTwoSafetiesMean": 109763.2001953125
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 7755.25,
+            "instructionsPerTwoSafetiesMean": 109763.2001953125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 14030.46875,
+            "instructionsPerTwoSafetiesMean": 221742.9296875
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 6928.34375,
+            "instructionsPerTwoSafetiesMean": 109756.294921875
+          }
+        }
+      ],
+      "candidateBlocksOnly": {
+        "cpuNsPerSafetyMedian": 3071.15625,
+        "instructionsPerSafetyMean": 57546.890625
+      },
+      "scope": "Whole Safety pair includes edges, paths, bounds, allocations/drop; blocks-only reuses existing edges, one Safety obstacle set; 16 repeats per sample,64 samples. Five paired whole-build windows plus discarded warmup; blocks-only is one descriptive window."
+    }
+  },
+  "seats80": {
+    "19": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27485.28125,
+            "instructionsPerTwoSafetiesMean": 431150.8974609375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50787.625,
+            "instructionsPerTwoSafetiesMean": 834564.9892578125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 27830.96875,
+            "instructionsPerTwoSafetiesMean": 431700.998046875
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27453.28125,
+            "instructionsPerTwoSafetiesMean": 430846.1748046875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 51199.90625,
+            "instructionsPerTwoSafetiesMean": 835183.15625
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 27580.5625,
+            "instructionsPerTwoSafetiesMean": 431224.67578125
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 27691.59375,
+            "instructionsPerTwoSafetiesMean": 431697.0546875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50875.03125,
+            "instructionsPerTwoSafetiesMean": 834222.169921875
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27573.375,
+            "instructionsPerTwoSafetiesMean": 430871.8125
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27847.90625,
+            "instructionsPerTwoSafetiesMean": 430322.541015625
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 51584.25,
+            "instructionsPerTwoSafetiesMean": 831657.0078125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 27865.6875,
+            "instructionsPerTwoSafetiesMean": 430888.2958984375
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 28782.90625,
+            "instructionsPerTwoSafetiesMean": 431600.0810546875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50924.78125,
+            "instructionsPerTwoSafetiesMean": 833480.501953125
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27499.09375,
+            "instructionsPerTwoSafetiesMean": 431335.9580078125
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27566.65625,
+            "instructionsPerTwoSafetiesMean": 430757.0126953125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50744.84375,
+            "instructionsPerTwoSafetiesMean": 833220.330078125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 28037.40625,
+            "instructionsPerTwoSafetiesMean": 431715.82421875
+          }
+        }
+      ],
+      "candidateBlocksOnly": {
+        "cpuNsPerSafetyMedian": 9106.09375,
+        "instructionsPerSafetyMean": 180860.109375
+      },
+      "scope": "Whole Safety pair includes edges, paths, bounds, allocations/drop; blocks-only reuses existing edges, one Safety obstacle set; 16 repeats per sample,64 samples. Five paired whole-build windows plus discarded warmup; blocks-only is one descriptive window."
+    },
+    "13": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27158.65625,
+            "instructionsPerTwoSafetiesMean": 428990.134765625
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 51040.59375,
+            "instructionsPerTwoSafetiesMean": 825992.98046875
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 27503.375,
+            "instructionsPerTwoSafetiesMean": 428583.947265625
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 28647.6875,
+            "instructionsPerTwoSafetiesMean": 428398.0087890625
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 51326.78125,
+            "instructionsPerTwoSafetiesMean": 827432.666015625
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 27243.6875,
+            "instructionsPerTwoSafetiesMean": 428239.3994140625
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 28062.78125,
+            "instructionsPerTwoSafetiesMean": 425353.2412109375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50840.40625,
+            "instructionsPerTwoSafetiesMean": 828836.1484375
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27245.0625,
+            "instructionsPerTwoSafetiesMean": 428912.7158203125
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 28735.8125,
+            "instructionsPerTwoSafetiesMean": 428160.9609375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50721.0,
+            "instructionsPerTwoSafetiesMean": 828232.333984375
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 26670.46875,
+            "instructionsPerTwoSafetiesMean": 426031.41015625
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 26448.5,
+            "instructionsPerTwoSafetiesMean": 426113.3232421875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50744.09375,
+            "instructionsPerTwoSafetiesMean": 827572.7919921875
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27281.28125,
+            "instructionsPerTwoSafetiesMean": 428923.5478515625
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 27095.96875,
+            "instructionsPerTwoSafetiesMean": 428375.416015625
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 50795.65625,
+            "instructionsPerTwoSafetiesMean": 827060.1845703125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 26673.15625,
+            "instructionsPerTwoSafetiesMean": 427101.3720703125
+          }
+        }
+      ],
+      "candidateBlocksOnly": {
+        "cpuNsPerSafetyMedian": 9329.96875,
+        "instructionsPerSafetyMean": 184123.55859375
+      },
+      "scope": "Whole Safety pair includes edges, paths, bounds, allocations/drop; blocks-only reuses existing edges, one Safety obstacle set; 16 repeats per sample,64 samples. Five paired whole-build windows plus discarded warmup; blocks-only is one descriptive window."
+    }
+  },
+  "seats160": {
+    "19": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55670.15625,
+            "instructionsPerTwoSafetiesMean": 856426.90625
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104062.75,
+            "instructionsPerTwoSafetiesMean": 1680257.314453125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 57675.03125,
+            "instructionsPerTwoSafetiesMean": 855694.2548828125
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 56195.90625,
+            "instructionsPerTwoSafetiesMean": 857292.876953125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 105494.75,
+            "instructionsPerTwoSafetiesMean": 1683016.3203125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 56298.65625,
+            "instructionsPerTwoSafetiesMean": 855189.7138671875
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 56431.78125,
+            "instructionsPerTwoSafetiesMean": 857053.240234375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104613.96875,
+            "instructionsPerTwoSafetiesMean": 1682296.2626953125
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 57153.875,
+            "instructionsPerTwoSafetiesMean": 856412.1708984375
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 56335.34375,
+            "instructionsPerTwoSafetiesMean": 856415.9453125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104319.59375,
+            "instructionsPerTwoSafetiesMean": 1682438.8017578125
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 56378.125,
+            "instructionsPerTwoSafetiesMean": 856814.697265625
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 57634.03125,
+            "instructionsPerTwoSafetiesMean": 854950.484375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104340.125,
+            "instructionsPerTwoSafetiesMean": 1683963.4462890625
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 57184.28125,
+            "instructionsPerTwoSafetiesMean": 855102.6591796875
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55532.46875,
+            "instructionsPerTwoSafetiesMean": 857803.1689453125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104511.34375,
+            "instructionsPerTwoSafetiesMean": 1680958.7021484375
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 56412.0625,
+            "instructionsPerTwoSafetiesMean": 856619.4404296875
+          }
+        }
+      ],
+      "candidateBlocksOnly": {
+        "cpuNsPerSafetyMedian": 18369.8125,
+        "instructionsPerSafetyMean": 361783.837890625
+      },
+      "scope": "Whole Safety pair includes edges, paths, bounds, allocations/drop; blocks-only reuses existing edges, one Safety obstacle set; 16 repeats per sample,64 samples. Five paired whole-build windows plus discarded warmup; blocks-only is one descriptive window."
+    },
+    "13": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 56101.9375,
+            "instructionsPerTwoSafetiesMean": 852815.9375
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104823.59375,
+            "instructionsPerTwoSafetiesMean": 1669480.0888671875
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 55647.3125,
+            "instructionsPerTwoSafetiesMean": 853598.6787109375
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55862.8125,
+            "instructionsPerTwoSafetiesMean": 853528.466796875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104576.84375,
+            "instructionsPerTwoSafetiesMean": 1668573.8427734375
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 56057.21875,
+            "instructionsPerTwoSafetiesMean": 852697.74609375
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 55679.9375,
+            "instructionsPerTwoSafetiesMean": 853775.828125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 105161.84375,
+            "instructionsPerTwoSafetiesMean": 1671880.552734375
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55918.71875,
+            "instructionsPerTwoSafetiesMean": 853186.70703125
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55960.6875,
+            "instructionsPerTwoSafetiesMean": 853267.6064453125
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104713.15625,
+            "instructionsPerTwoSafetiesMean": 1670104.6669921875
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 58828.46875,
+            "instructionsPerTwoSafetiesMean": 853679.5556640625
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 55677.71875,
+            "instructionsPerTwoSafetiesMean": 853498.8056640625
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 104477.96875,
+            "instructionsPerTwoSafetiesMean": 1672253.3447265625
+          },
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55884.28125,
+            "instructionsPerTwoSafetiesMean": 852186.1015625
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "cpuNsPerTwoSafetiesMedian": 55894.5,
+            "instructionsPerTwoSafetiesMean": 852991.5029296875
+          },
+          "eager": {
+            "cpuNsPerTwoSafetiesMedian": 105100.8125,
+            "instructionsPerTwoSafetiesMean": 1669495.978515625
+          },
+          "candidate": {
+            "cpuNsPerTwoSafetiesMedian": 55735.125,
+            "instructionsPerTwoSafetiesMean": 853511.833984375
+          }
+        }
+      ],
+      "candidateBlocksOnly": {
+        "cpuNsPerSafetyMedian": 18917.75,
+        "instructionsPerSafetyMean": 366897.6533203125
+      },
+      "scope": "Whole Safety pair includes edges, paths, bounds, allocations/drop; blocks-only reuses existing edges, one Safety obstacle set; 16 repeats per sample,64 samples. Five paired whole-build windows plus discarded warmup; blocks-only is one descriptive window."
+    }
+  }
+}

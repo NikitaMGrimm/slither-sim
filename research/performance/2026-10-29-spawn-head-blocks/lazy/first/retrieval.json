@@ -1,0 +1,9 @@
+{
+  "requiredSourcesVerified": true,
+  "verifiedBeforeTeardown": true,
+  "nativeProofArchiveSha256": "f947888941f5172cdb11ea6500ca92060864830a1f3fda62992e1723d4035bff",
+  "nativeProofManifestSha256": "3a2aed0fa3850e6e594979d6a8ab8efa2017006103390859d87d8030b332c3d4",
+  "timingDeltaArchiveSha256": "52fabfb9f794614d3832f9ee908419a27a33681c73d3b8116b0e2103280b4fc2",
+  "timingDeltaManifestSha256": "cb4fc37a3fd2a4d3c96cef738d4862545c4a4502b4f62f9e4a55dec0eb7efe89",
+  "method": "All source/trace/timing manifest members verified remotely in closed archives before readiness; every downloaded archive size/SHA verified locally; bounded selected files independently checked against the final delta manifest; delta binds the immutable proof archive."
+}
