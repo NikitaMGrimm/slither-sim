@@ -58,12 +58,14 @@ overlay. Keep paths free of spaces. The builder extracts the fixture from each
 source archive and overlays identical measurement code on both arms.
 
 ```sh
-python3 pipeline.py
+python3 compact-current-driver.py
 python3 compact-stream-control.py
-python3 compact-start-mature.py
-python3 compact-proof-mature.py
-python3 compact-proof-short.py
 ```
+
+The driver runs `pipeline.py`, verifies the copied binaries, deletes the Cargo
+target and records `target-cleanup.json`, which the timing stage requires. It
+then runs `compact-start-mature.py`, `compact-proof-mature.py` and
+`compact-proof-short.py`.
 
 `pipeline.py` first runs `check.py`: focused snake tests, then three separate
 mutations (wrong removal, lost replacement, reversed enumeration), each required
