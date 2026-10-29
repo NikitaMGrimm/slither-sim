@@ -1,0 +1,825 @@
+{
+  "machine": "a 4-vCPU Zen 5 EPYC KVM guest",
+  "status": "unqualified; no primary pair completed",
+  "limits": "Discarded controls and one isolation-failed base window only. No before/after performance conclusion; no failed window is promoted. Actual food flags are checked for every reduced tick.",
+  "seriesCpuSeconds": 9534.609447,
+  "cpuCeilingHours": 12,
+  "attempts": [
+    {
+      "pair": -1,
+      "arm": "base",
+      "attempt": 1,
+      "name": "pair--1-base-attempt-1",
+      "discarded": true,
+      "accepted": true
+    },
+    {
+      "pair": -1,
+      "arm": "candidate",
+      "attempt": 1,
+      "name": "pair--1-candidate-attempt-1",
+      "discarded": true,
+      "accepted": false
+    },
+    {
+      "pair": -1,
+      "arm": "candidate",
+      "attempt": 2,
+      "name": "pair--1-candidate-attempt-2",
+      "discarded": true,
+      "accepted": true
+    },
+    {
+      "pair": 0,
+      "arm": "base",
+      "attempt": 1,
+      "name": "pair-0-base-attempt-1",
+      "discarded": false,
+      "accepted": false
+    }
+  ],
+  "isolationFailure": {
+    "largestOtherUserProcessCpuSeconds": 0.29999999999999716,
+    "totalOtherUserProcessCpuSeconds": 0.38999999999997215,
+    "thresholdSeconds": 0.29405191898345945,
+    "passes": false,
+    "observedOtherProcessCpuQuantumSeconds": 0.01,
+    "selectedWallSeconds": 29.405191898345947
+  },
+  "cases": {
+    "pair--1-base-attempt-1": {
+      "arm": "base",
+      "discarded": true,
+      "qualifiedPrimary": false,
+      "selectorPassed": true,
+      "exclusion": "discarded control",
+      "summary": {
+        "all": {
+          "ticks": 4200,
+          "gatewayCpuMs": {
+            "mean": 2.2874542035714285,
+            "p50": 2.25392,
+            "p99": 4.13105
+          },
+          "worldCpuMs": {
+            "mean": 5.361889736428571,
+            "p50": 5.35318,
+            "p99": 8.87531
+          }
+        },
+        "maintenance": {
+          "ticks": 59,
+          "gatewayCpuMs": {
+            "mean": 3.327471525423729,
+            "p50": 3.1467,
+            "p99": 5.41795
+          },
+          "worldCpuMs": {
+            "mean": 9.278084915254237,
+            "p50": 9.17097,
+            "p99": 12.66185
+          }
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "gatewayCpuMs": {
+            "mean": 2.272636279884086,
+            "p50": 2.24848,
+            "p99": 4.07422
+          },
+          "worldCpuMs": {
+            "mean": 5.306092702970297,
+            "p50": 5.33064,
+            "p99": 7.60581
+          }
+        }
+      },
+      "quality": {
+        "ticks": 4200,
+        "wallSeconds": 29.40350604057312,
+        "ticksPerSecond": 142.84010873412618,
+        "worldCpuMsPerTick": {
+          "p50": 5.35318,
+          "p99": 8.87531,
+          "mean": 5.361889736428571,
+          "max": 12.66185
+        },
+        "simulationCpuMsPerTick": {
+          "p50": 3.08273,
+          "p99": 5.32364,
+          "mean": 3.0744355328571427,
+          "max": 7.823
+        },
+        "socketCpuMsPerTick": {
+          "p50": 2.25392,
+          "p99": 4.13105,
+          "mean": 2.2874542035714285,
+          "max": 5.41795
+        },
+        "tickBusyWallMs": {
+          "p50": 5.09368,
+          "p99": 8.211709,
+          "mean": 5.060966396666666,
+          "max": 11.97436
+        },
+        "cpuReconciliationMsPerTick": 5.361682297721671,
+        "phaseAverageCpuMsPerTick": {
+          "movement": 0.09929210238095237,
+          "collisionBuild": 0.11185590476190477,
+          "collisionQuery": 0.19074074285714285,
+          "deathFood": 0.0004897785714285714,
+          "pickupFoodCache": 0.3067054547619048,
+          "prey": 0.026501928571428572,
+          "ambient": 0.0074227357142857145,
+          "admission": 0.0014427357142857142,
+          "broadcast": 2.0862250495238093
+        },
+        "threadCpu": {
+          "host": {
+            "userMsPerTick": 0.0,
+            "systemMsPerTick": 0.002380952380952383,
+            "affinity": [
+              3
+            ]
+          },
+          "slither-simulat": {
+            "userMsPerTick": 3.0516545243402433,
+            "systemMsPerTick": 0.02408335558776371,
+            "affinity": [
+              0
+            ]
+          },
+          "slither-sockets": {
+            "userMsPerTick": 0.4485721690129332,
+            "systemMsPerTick": 1.837372248780731,
+            "affinity": [
+              0
+            ]
+          }
+        },
+        "client": {
+          "workersCpuFraction": {
+            "1": {
+              "p50": 0.4230444573567761,
+              "p99": 0.46091411740482574,
+              "mean": 0.4236775001577588,
+              "max": 0.46091411740482574
+            },
+            "2": {
+              "p50": 0.4263386729267436,
+              "p99": 0.46330645231438095,
+              "mean": 0.423805728360893,
+              "max": 0.46330645231438095
+            },
+            "3": {
+              "p50": 0.4219173385648693,
+              "p99": 0.4806677630639329,
+              "mean": 0.4246351263954965,
+              "max": 0.4806677630639329
+            }
+          },
+          "worstOneSecondLateP99Ms": 3.049623,
+          "maxPassMs": 6.295169,
+          "minPlayingPerWorker": 165,
+          "maxReceiptAge": 0.17140407000010782,
+          "keepsUp": true,
+          "processCpuCoresMean": 1.2723601415527817,
+          "counterDeltas": {
+            "frames": 1430915,
+            "bytes": 33931246,
+            "decisions": 333425,
+            "due": 333444,
+            "joins": 16,
+            "deaths": 16,
+            "forced": 0
+          }
+        },
+        "socket": {
+          "backpressure": {
+            "rejects": 0,
+            "writeBlocks": 0,
+            "bufferFull": 0,
+            "clientAdmissionRefusals": 0
+          },
+          "queues": {
+            "queueBytes": {
+              "p50": 0,
+              "p99": 0,
+              "mean": 0,
+              "max": 0,
+              "slopeBytesPerSecond": 0.0,
+              "firstThirdMean": 0,
+              "lastThirdMean": 0
+            },
+            "kernelSendBytes": {
+              "p50": 6287,
+              "p99": 16240,
+              "mean": 6569.931034482759,
+              "max": 16240,
+              "slopeBytesPerSecond": -2.1884102466373614,
+              "firstThirdMean": 6624.555555555556,
+              "lastThirdMean": 6519.222222222223
+            }
+          },
+          "playersRange": [
+            499,
+            500
+          ]
+        },
+        "census": {
+          "living": {
+            "first": 500,
+            "last": 500,
+            "min": 499,
+            "max": 500
+          },
+          "occupied": {
+            "first": 500,
+            "last": 500,
+            "min": 499,
+            "max": 500
+          },
+          "radius": {
+            "first": 14785.61124877832,
+            "last": 14785.61124877832,
+            "min": 14785.61124877832,
+            "max": 14785.61124877832
+          },
+          "meanSegments": {
+            "first": 54.312,
+            "last": 58.05,
+            "min": 53.898,
+            "max": 58.05
+          },
+          "p90Segments": {
+            "first": 177,
+            "last": 170,
+            "min": 167,
+            "max": 178
+          },
+          "p99Segments": {
+            "first": 262,
+            "last": 263,
+            "min": 262,
+            "max": 263
+          },
+          "food": {
+            "first": 28788,
+            "last": 28654,
+            "min": 28596,
+            "max": 29570
+          },
+          "prey": {
+            "first": 27,
+            "last": 30,
+            "min": 27,
+            "max": 33
+          }
+        },
+        "hostVcpuContextMsPerTick": {
+          "user": 3.908004642147543,
+          "nice": 0.0,
+          "system": 1.1099827422291733,
+          "idle": 1.5809378962252856,
+          "iowait": 0.0,
+          "irq": 0.0,
+          "softirq": 0.7778937497298665,
+          "steal": 0.004761904761903814,
+          "guest": 0.0,
+          "guestNice": 0.0
+        },
+        "deferredTicks": 0,
+        "backgroundProcessScreen": {
+          "largestOtherUserProcessCpuSeconds": 0.06999999999999318,
+          "totalOtherUserProcessCpuSeconds": 0.14000000000001478,
+          "thresholdSeconds": 0.2940350604057312,
+          "passes": true
+        }
+      }
+    },
+    "pair--1-candidate-attempt-2": {
+      "arm": "candidate",
+      "discarded": true,
+      "qualifiedPrimary": false,
+      "selectorPassed": true,
+      "exclusion": "discarded control",
+      "summary": {
+        "all": {
+          "ticks": 4200,
+          "gatewayCpuMs": {
+            "mean": 1.8932805183333334,
+            "p50": 1.86048,
+            "p99": 3.907
+          },
+          "worldCpuMs": {
+            "mean": 4.417851372619047,
+            "p50": 4.29571,
+            "p99": 7.71099
+          }
+        },
+        "maintenance": {
+          "ticks": 59,
+          "gatewayCpuMs": {
+            "mean": 2.633107627118644,
+            "p50": 2.46816,
+            "p99": 4.28617
+          },
+          "worldCpuMs": {
+            "mean": 7.848893728813559,
+            "p50": 7.5384,
+            "p99": 10.05381
+          }
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "gatewayCpuMs": {
+            "mean": 1.8827396346293166,
+            "p50": 1.85423,
+            "p99": 3.8844
+          },
+          "worldCpuMs": {
+            "mean": 4.368966683168317,
+            "p50": 4.27887,
+            "p99": 7.03538
+          }
+        }
+      },
+      "quality": {
+        "ticks": 4200,
+        "wallSeconds": 29.40328621864319,
+        "ticksPerSecond": 142.84117662116913,
+        "worldCpuMsPerTick": {
+          "p50": 4.29571,
+          "p99": 7.71099,
+          "mean": 4.417851372619047,
+          "max": 10.05381
+        },
+        "simulationCpuMsPerTick": {
+          "p50": 2.39166,
+          "p99": 4.83584,
+          "mean": 2.5245708542857144,
+          "max": 6.82316
+        },
+        "socketCpuMsPerTick": {
+          "p50": 1.86048,
+          "p99": 3.907,
+          "mean": 1.8932805183333334,
+          "max": 5.19104
+        },
+        "tickBusyWallMs": {
+          "p50": 4.033869,
+          "p99": 7.13415,
+          "mean": 3.965310330714286,
+          "max": 9.85357
+        },
+        "cpuReconciliationMsPerTick": 4.4162137873580605,
+        "phaseAverageCpuMsPerTick": {
+          "movement": 0.08109007857142857,
+          "collisionBuild": 0.08922558571428571,
+          "collisionQuery": 0.17210399523809522,
+          "deathFood": 0.0004275761904761905,
+          "pickupFoodCache": 0.24333315952380954,
+          "prey": 0.02425772380952381,
+          "ambient": 0.006797721428571429,
+          "admission": 0.0004200547619047619,
+          "broadcast": 1.6996746114285715
+        },
+        "threadCpu": {
+          "host": {
+            "userMsPerTick": 0.0,
+            "systemMsPerTick": 0.00238095238095238,
+            "affinity": [
+              3
+            ]
+          },
+          "slither-simulat": {
+            "userMsPerTick": 2.511347575025438,
+            "systemMsPerTick": 0.011904761904761915,
+            "affinity": [
+              0
+            ]
+          },
+          "slither-sockets": {
+            "userMsPerTick": 0.39380726923081083,
+            "systemMsPerTick": 1.4991541811970488,
+            "affinity": [
+              0
+            ]
+          }
+        },
+        "client": {
+          "workersCpuFraction": {
+            "1": {
+              "p50": 0.3793705783984711,
+              "p99": 0.4319851333939729,
+              "mean": 0.38447230638383323,
+              "max": 0.4319851333939729
+            },
+            "2": {
+              "p50": 0.3895165423299248,
+              "p99": 0.41041115927948446,
+              "mean": 0.38386167549480377,
+              "max": 0.41041115927948446
+            },
+            "3": {
+              "p50": 0.3793102934323042,
+              "p99": 0.43123184366994327,
+              "mean": 0.3797340178748322,
+              "max": 0.43123184366994327
+            }
+          },
+          "worstOneSecondLateP99Ms": 1.915747,
+          "maxPassMs": 4.4111,
+          "minPlayingPerWorker": 166,
+          "maxReceiptAge": 0.15435100000013335,
+          "keepsUp": true,
+          "processCpuCoresMean": 1.1490943455310982,
+          "counterDeltas": {
+            "frames": 1433548,
+            "bytes": 33572568,
+            "decisions": 333412,
+            "due": 333421,
+            "joins": 7,
+            "deaths": 7,
+            "forced": 0
+          }
+        },
+        "socket": {
+          "backpressure": {
+            "rejects": 0,
+            "writeBlocks": 0,
+            "bufferFull": 0,
+            "clientAdmissionRefusals": 0
+          },
+          "queues": {
+            "queueBytes": {
+              "p50": 0,
+              "p99": 0,
+              "mean": 0,
+              "max": 0,
+              "slopeBytesPerSecond": 0.0,
+              "firstThirdMean": 0,
+              "lastThirdMean": 0
+            },
+            "kernelSendBytes": {
+              "p50": 6048,
+              "p99": 8840,
+              "mean": 5882.0344827586205,
+              "max": 8840,
+              "slopeBytesPerSecond": -14.997291741196715,
+              "firstThirdMean": 6206.777777777777,
+              "lastThirdMean": 5781.444444444444
+            }
+          },
+          "playersRange": [
+            500,
+            500
+          ]
+        },
+        "census": {
+          "living": {
+            "first": 500,
+            "last": 500,
+            "min": 500,
+            "max": 500
+          },
+          "occupied": {
+            "first": 500,
+            "last": 500,
+            "min": 500,
+            "max": 500
+          },
+          "radius": {
+            "first": 14709.513928067101,
+            "last": 14709.513928067101,
+            "min": 14709.513928067101,
+            "max": 14709.513928067101
+          },
+          "meanSegments": {
+            "first": 55.068,
+            "last": 59.26,
+            "min": 55.068,
+            "max": 59.26
+          },
+          "p90Segments": {
+            "first": 184,
+            "last": 185,
+            "min": 184,
+            "max": 185
+          },
+          "p99Segments": {
+            "first": 247,
+            "last": 248,
+            "min": 247,
+            "max": 248
+          },
+          "food": {
+            "first": 27800,
+            "last": 27397,
+            "min": 27397,
+            "max": 28351
+          },
+          "prey": {
+            "first": 32,
+            "last": 25,
+            "min": 23,
+            "max": 37
+          }
+        },
+        "hostVcpuContextMsPerTick": {
+          "user": 3.00843669254391,
+          "nice": 0.0,
+          "system": 0.970213751535907,
+          "idle": 2.5206179619930307,
+          "iowait": 0.0,
+          "irq": 0.0,
+          "softirq": 0.6597135368820957,
+          "steal": 0.0022569948176760185,
+          "guest": 0.0,
+          "guestNice": 0.0
+        },
+        "deferredTicks": 0,
+        "backgroundProcessScreen": {
+          "largestOtherUserProcessCpuSeconds": 0.06999999999999318,
+          "totalOtherUserProcessCpuSeconds": 0.1600000000000006,
+          "thresholdSeconds": 0.2940328621864319,
+          "passes": true
+        }
+      }
+    },
+    "pair-0-base-attempt-1": {
+      "arm": "base",
+      "discarded": false,
+      "qualifiedPrimary": false,
+      "selectorPassed": false,
+      "exclusion": "failed competing-process CPU gate",
+      "summary": {
+        "all": {
+          "ticks": 4200,
+          "gatewayCpuMs": {
+            "mean": 1.964309254047619,
+            "p50": 1.93791,
+            "p99": 4.15389
+          },
+          "worldCpuMs": {
+            "mean": 4.3850298104761904,
+            "p50": 4.29734,
+            "p99": 8.18694
+          }
+        },
+        "maintenance": {
+          "ticks": 59,
+          "gatewayCpuMs": {
+            "mean": 3.220755593220339,
+            "p50": 2.95618,
+            "p99": 4.5937
+          },
+          "worldCpuMs": {
+            "mean": 8.378155254237289,
+            "p50": 8.31646,
+            "p99": 11.13971
+          }
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "gatewayCpuMs": {
+            "mean": 1.9464077003139337,
+            "p50": 1.93238,
+            "p99": 4.1051
+          },
+          "worldCpuMs": {
+            "mean": 4.328136692586332,
+            "p50": 4.28306,
+            "p99": 6.87802
+          }
+        }
+      },
+      "quality": {
+        "ticks": 4200,
+        "wallSeconds": 29.405191898345947,
+        "ticksPerSecond": 142.83191942835958,
+        "worldCpuMsPerTick": {
+          "p50": 4.29734,
+          "p99": 8.18694,
+          "mean": 4.3850298104761904,
+          "max": 11.13971
+        },
+        "simulationCpuMsPerTick": {
+          "p50": 2.31249,
+          "p99": 4.70317,
+          "mean": 2.4207205564285714,
+          "max": 7.32356
+        },
+        "socketCpuMsPerTick": {
+          "p50": 1.93791,
+          "p99": 4.15389,
+          "mean": 1.964309254047619,
+          "max": 4.8102
+        },
+        "tickBusyWallMs": {
+          "p50": 3.944399,
+          "p99": 7.320339,
+          "mean": 3.669426158809524,
+          "max": 14.570079
+        },
+        "cpuReconciliationMsPerTick": 4.381896205085973,
+        "phaseAverageCpuMsPerTick": {
+          "movement": 0.08161518809523809,
+          "collisionBuild": 0.08972931904761905,
+          "collisionQuery": 0.1716332119047619,
+          "deathFood": 0.00044369761904761905,
+          "pickupFoodCache": 0.23808922857142856,
+          "prey": 0.02261835238095238,
+          "ambient": 0.006917252380952381,
+          "admission": 0.000986302380952381,
+          "broadcast": 1.5945484542857142
+        },
+        "threadCpu": {
+          "host": {
+            "userMsPerTick": 0.0,
+            "systemMsPerTick": 0.002380952380952383,
+            "affinity": [
+              3
+            ]
+          },
+          "slither-simulat": {
+            "userMsPerTick": 2.401913443465289,
+            "systemMsPerTick": 0.016666666666666632,
+            "affinity": [
+              0
+            ]
+          },
+          "slither-sockets": {
+            "userMsPerTick": 0.38384670189114584,
+            "systemMsPerTick": 1.5794693930628716,
+            "affinity": [
+              0
+            ]
+          }
+        },
+        "client": {
+          "workersCpuFraction": {
+            "1": {
+              "p50": 0.379549489854567,
+              "p99": 0.41793286961558523,
+              "mean": 0.3774707561328147,
+              "max": 0.41793286961558523
+            },
+            "2": {
+              "p50": 0.38419723796482885,
+              "p99": 0.42069204339021204,
+              "mean": 0.3830343953438715,
+              "max": 0.42069204339021204
+            },
+            "3": {
+              "p50": 0.39731559002185657,
+              "p99": 0.4232380319374992,
+              "mean": 0.39709019402225615,
+              "max": 0.4232380319374992
+            }
+          },
+          "worstOneSecondLateP99Ms": 5.096065,
+          "maxPassMs": 7.429459,
+          "minPlayingPerWorker": 166,
+          "maxReceiptAge": 0.11950482199995349,
+          "keepsUp": true,
+          "processCpuCoresMean": 1.1566819704056797,
+          "counterDeltas": {
+            "frames": 1409893,
+            "bytes": 33231380,
+            "decisions": 333425,
+            "due": 333445,
+            "joins": 17,
+            "deaths": 17,
+            "forced": 0
+          }
+        },
+        "socket": {
+          "backpressure": {
+            "rejects": 0,
+            "writeBlocks": 0,
+            "bufferFull": 0,
+            "clientAdmissionRefusals": 0
+          },
+          "queues": {
+            "queueBytes": {
+              "p50": 0,
+              "p99": 0,
+              "mean": 0,
+              "max": 0,
+              "slopeBytesPerSecond": 0.0,
+              "firstThirdMean": 0,
+              "lastThirdMean": 0
+            },
+            "kernelSendBytes": {
+              "p50": 6222,
+              "p99": 9361,
+              "mean": 6157.793103448276,
+              "max": 9361,
+              "slopeBytesPerSecond": 28.44795386770718,
+              "firstThirdMean": 5966.222222222223,
+              "lastThirdMean": 6352.111111111111
+            }
+          },
+          "playersRange": [
+            499,
+            500
+          ]
+        },
+        "census": {
+          "living": {
+            "first": 500,
+            "last": 500,
+            "min": 499,
+            "max": 500
+          },
+          "occupied": {
+            "first": 500,
+            "last": 500,
+            "min": 499,
+            "max": 500
+          },
+          "radius": {
+            "first": 14800.78376303093,
+            "last": 14800.78376303093,
+            "min": 14800.78376303093,
+            "max": 14800.78376303093
+          },
+          "meanSegments": {
+            "first": 54.722,
+            "last": 58.77,
+            "min": 54.642,
+            "max": 58.77
+          },
+          "p90Segments": {
+            "first": 189,
+            "last": 190,
+            "min": 188,
+            "max": 192
+          },
+          "p99Segments": {
+            "first": 258,
+            "last": 260,
+            "min": 258,
+            "max": 260
+          },
+          "food": {
+            "first": 28377,
+            "last": 28105,
+            "min": 28067,
+            "max": 28880
+          },
+          "prey": {
+            "first": 22,
+            "last": 26,
+            "min": 21,
+            "max": 29
+          }
+        },
+        "hostVcpuContextMsPerTick": {
+          "user": 2.826619467336319,
+          "nice": 0.0,
+          "system": 0.9422733821067942,
+          "idle": 2.549290835734047,
+          "iowait": 0.0,
+          "irq": 0.0,
+          "softirq": 0.6893028657265988,
+          "steal": 0.002380952380951907,
+          "guest": 0.0,
+          "guestNice": 0.0
+        },
+        "deferredTicks": 0,
+        "backgroundProcessScreen": {
+          "largestOtherUserProcessCpuSeconds": 0.29999999999999716,
+          "totalOtherUserProcessCpuSeconds": 0.38999999999997215,
+          "thresholdSeconds": 0.29405191898345945,
+          "passes": false,
+          "observedOtherProcessCpuQuantumSeconds": 0.01
+        }
+      }
+    }
+  },
+  "completedPrimaryPairs": 0,
+  "classFailure": {
+    "name": "pair--1-candidate-attempt-1",
+    "censusSamples": 43,
+    "ranges": {
+      "living": [
+        499,
+        500
+      ],
+      "meanSegments": [
+        57.098,
+        60.568
+      ],
+      "p90Segments": [
+        194,
+        197
+      ],
+      "p99Segments": [
+        238,
+        240
+      ]
+    }
+  }
+}

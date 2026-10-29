@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "productionPrefixMatchesMeasuredCandidate": true,
+  "checks": [
+    {
+      "label": "transport-controls",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-j",
+        "1",
+        "--lib",
+        "client::server::tests::gateway_readiness"
+      ],
+      "expectedFailure": false,
+      "exit": 0
+    },
+    {
+      "label": "blocked-new-buffered-session",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-j",
+        "1",
+        "--lib",
+        "client::server::tests::gateway_readiness"
+      ],
+      "expectedFailure": true,
+      "exit": 101
+    },
+    {
+      "label": "restored-transport-controls",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-j",
+        "1",
+        "--lib",
+        "client::server::tests::gateway_readiness"
+      ],
+      "expectedFailure": false,
+      "exit": 0
+    },
+    {
+      "label": "final-rust-group",
+      "command": [
+        "python3",
+        "tools/check.py",
+        "rust"
+      ],
+      "expectedFailure": false,
+      "exit": 0
+    }
+  ]
+}

@@ -1,0 +1,317 @@
+diff --git a/setup_fresh.py b/setup_fresh.py
+new file mode 100644
+--- /dev/null
++++ b/setup_fresh.py
+@@ -0,0 +1,42 @@
++"""Prepare a separate fresh series from verified immutable prior artifacts."""
++from pathlib import Path
++import hashlib,json,os,tarfile
++r=Path(__file__).resolve().parent
++assert r==Path('/tmp/slither-gateway-round3-fresh-20261029') and r.resolve()==r
++assert not Path('/tmp/slither-gateway-round3-target').exists()
++assert not (r/'runs').exists() and not (r/'series.json').exists()
++archive=r/'prior-complete.tar.gz'
++sha=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
++assert sha(archive)=='d4a4d38020b737a20f699387d1c9b6a99bec25f8c6674f25f57d4dd96fefab6e'
++with tarfile.open(archive) as t:
++ names=['run.py','select.py','core_cpu.py','target-cleanup.json','final-tests-pass.json','required-checks-pass.json']
++ members=[m for m in t if m.name in names or any(m.name.startswith(prefix) for prefix in
++    ['base/source/','base/bin/','candidate/source/','candidate/bin/','retained-common-client/']) or m.name in ['base/pins.json','candidate/pins.json']]
++ t.extractall(r,members=members,filter='data')
++assert not (r/'common-client').exists()
++(r/'retained-common-client').rename(r/'common-client')
++for arm,commit in [('base','539b37f3be969827b5eac67c2978e604f9e814e8'),('candidate','da7e65c26d0236156c24e23f43f9bd6dfcabca34')]:
++ pin=json.loads((r/arm/'pins.json').read_text());assert pin['commit']==commit
++ assert sha(r/arm/'bin/host')==pin['binaries']['host']
++ assert {str(p.relative_to(r/arm/'source')):sha(p) for p in (r/arm/'source/src').rglob('*.rs')}==pin['overlays']
++client=json.loads((r/'common-client/pins.json').read_text())
++assert sha(r/'common-client/bin/clients')==client['binarySha256']
++selector=r/'select.py';old=selector.read_text()
++needle='   threshold=3*(end-start)/300'
++assert old.count(needle)==1
++new=old.replace(needle,needle+'+.010')
++needle="'thresholdSeconds':threshold,'passes':"
++assert new.count(needle)==1
++new=new.replace(needle,"'thresholdSeconds':threshold,'baseThresholdSeconds':threshold-.010,'counterQuantumSeconds':.010,'passes':")
++selector.write_text(new,newline='\n')
++assert new.count('threshold=3*(end-start)/300+.010')==1
++assert json.loads((r/'required-checks-pass.json').read_text())['passed']
++assert json.loads((r/'final-tests-pass.json').read_text())['passed']
++(r/'CORE_STOP').touch()
++receipt={'frozenPlanCommit':'9ef4d81377ba12eb4286a0175ecbd40416f54b52',
++ 'priorArchiveSha256':sha(archive),'selectorBeforeSha256':hashlib.sha256(old.encode()).hexdigest(),
++ 'selectorAfterSha256':sha(selector),'newIsolationAllowanceSeconds':.010,
++ 'runtimeBinariesReused':True,'commonClientReused':True,'previousChecksReusedForIdenticalSource':True,
++ 'targetAbsent':True}
++(r/'fresh-setup.json').write_text(json.dumps(receipt,indent=2)+'\n')
++print(json.dumps(receipt,indent=2),flush=True)
+diff --git a/preflight.py b/preflight.py
+new file mode 100644
+--- /dev/null
++++ b/preflight.py
+@@ -0,0 +1,17 @@
++"""Read-only isolation/process boundary before starting the fresh series."""
++from pathlib import Path
++import hashlib,json,os,pwd,subprocess
++r=Path(__file__).resolve().parent
++assert not Path('/tmp/slither-gateway-round3-target').exists()
++commands=subprocess.check_output(['ps','-eo','pid,ppid,stat,pcpu,args','-ww'],text=True)
++commands=commands.replace(pwd.getpwuid(os.getuid()).pw_name,'<redacted-account>')
++(r/'fresh-start-processes.txt').write_text(commands)
++foreign=[]
++for p in Path('/proc').glob('[0-9]*'):
++ try:
++  exe=(p/'exe').resolve()
++  if exe.name in ['cargo','rustc','host','slither-sim','clients']:foreign.append(int(p.name))
++ except (FileNotFoundError,PermissionError,ProcessLookupError):pass
++assert not foreign,foreign
++print(json.dumps({'taskExecutablesBeforeStart':foreign,'logicalCpus':os.cpu_count(),
++ 'processCommandsSha256':hashlib.sha256(commands.encode()).hexdigest(),'targetAbsent':True}),flush=True)
+diff --git a/live_series.py b/live_series.py
+--- a/live_series.py
++++ b/live_series.py
+@@ -14,6 +14,8 @@
+ with (r/'series-core.log').open('xb') as log:
+  sampler=subprocess.Popen(['python3',str(r/'core_cpu.py')],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+ state={'startedUnix':time.time(),'cpuCeilingHours':12,'warmupCeilingSeconds':2700,'samplerPid':sampler.pid,'attempts':[],
++       'seriesIdentity':'fresh-quantum','frozenPlanCommit':'9ef4d81377ba12eb4286a0175ecbd40416f54b52',
++       'isolationCounterQuantumSeconds':.010,'sixHourStatusSent':False,
+        'budgetBasis':'Mature attribution ended with 890.37 host +1562.54 client CPU seconds (~0.681 CPUh/cohort); twelve independent cohorts project ~8.18 CPUh. 12 CPUh bounds class retries and normal variation. Builds/checks precede series.'}
+ save=lambda:(r/'series.json').write_text(json.dumps(state,indent=2)+'\n')
+ def usage():
+@@ -43,6 +45,8 @@
+     with (r/(name+'-controller.log')).open('xb') as log:
+      proc=subprocess.Popen(['python3',str(r/'run.py'),arm,name,'500','--short-mature'],stdout=log,stderr=subprocess.STDOUT,stdin=subprocess.DEVNULL)
+      while proc.poll() is None:
++      if not state['sixHourStatusSent'] and time.time()-state['startedUnix']>=6*3600:
++       state['sixHourStatusSent']=True;save();print('SIX-HOUR STATUS',name,'cpuHours',round((usage()+active_host_client_cpu(name))/3600,3),flush=True)
+       if usage()+active_host_client_cpu(name)>=12*3600:
+        proc.send_signal(signal.SIGINT);proc.wait();raise AssertionError('series CPU ceiling reached inside cohort; partial retained')
+       time.sleep(.5)
+diff --git a/select.py b/select.py
+--- a/select.py
++++ b/select.py
+@@ -86,8 +86,8 @@
+     prior=old.get(v['pid'])
+     if prior is not None and prior['start']==v['start'] and not v['study'] and not v['kernel']:
+      other.append(v['cpu']-prior['cpu'])
+-   threshold=3*(end-start)/300
+-   row['backgroundProcessScreen']={'largestOtherUserProcessCpuSeconds':max(other,default=0),'totalOtherUserProcessCpuSeconds':sum(other),'thresholdSeconds':threshold,'passes':max(other,default=0)<=threshold}
++   threshold=3*(end-start)/300+.010
++   row['backgroundProcessScreen']={'largestOtherUserProcessCpuSeconds':max(other,default=0),'totalOtherUserProcessCpuSeconds':sum(other),'thresholdSeconds':threshold,'baseThresholdSeconds':threshold-.010,'counterQuantumSeconds':.010,'passes':max(other,default=0)<=threshold}
+    assert row['backgroundProcessScreen']['passes'],'competing process CPU'
+  # Continued-world syscall brackets are a separate diagnostic, not primary time.
+  ds=[v for v in sockets if meta['diagnosticStartUnix']+3<=v['unix']<=meta['diagnosticEndUnix']-1]
+diff --git a/reduce_live.py b/reduce_live.py
+--- a/reduce_live.py
++++ b/reduce_live.py
+@@ -1,6 +1,7 @@
+ """Matched-order descriptive live pairs with exact per-tick maintenance flags."""
+ from pathlib import Path
+ import json,math,statistics,sys
++from adoption import evaluate
+ r=Path(__file__).resolve().parent
+ state=json.loads((r/'series.json').read_text());assert state['status']=='complete'
+ def q(values):
+@@ -65,5 +66,7 @@
+         'pairs':pairs,'aggregates':aggregates,'discarded':[v for v in cases.values() if v['discarded']],
+         'failedAttempts':[v for v in state['attempts'] if not v.get('accepted')],
+         'seriesCpuSeconds':state['cpuSeconds'],'cpuCeilingHours':state['cpuCeilingHours']}
++output['seriesIdentity']='fresh-quantum'
++output['adoption']=evaluate(pairs)
+ (r/'live-selected.json').write_text(json.dumps(output,indent=2)+'\n')
+ print(json.dumps(aggregates,indent=2),flush=True)
+diff --git a/adoption.py b/adoption.py
+new file mode 100644
+--- /dev/null
++++ b/adoption.py
+@@ -0,0 +1,22 @@
++"""The adoption rule frozen in 9ef4d813; no tuning from observed results."""
++import statistics
++
++def evaluate(pairs):
++ assert len(pairs)==5 and {p['pair'] for p in pairs}==set(range(5))
++ means={arm:[p['arms'][arm]['summary']['all']['gatewayCpuMs']['mean'] for p in pairs]
++        for arm in ['base','candidate']}
++ tails={arm:[p['arms'][arm]['summary']['all']['worldCpuMs']['p99'] for p in pairs]
++        for arm in ['base','candidate']}
++ paired_gateway=[100*(c/b-1) for b,c in zip(means['base'],means['candidate'])]
++ paired_tail=[100*(c/b-1) for b,c in zip(tails['base'],tails['candidate'])]
++ separation=max(means['candidate'])<min(means['base'])
++ every_gateway=all(c<b for b,c in zip(means['base'],means['candidate']))
++ every_tail=all(c<=b for b,c in zip(tails['base'],tails['candidate']))
++ return {'frozenPlanCommit':'9ef4d81377ba12eb4286a0175ecbd40416f54b52',
++  'gatewayMeanRangesMs':{arm:[min(v),max(v)] for arm,v in means.items()},
++  'gatewayRangesDoNotOverlap':separation,'everyPairedGatewayMeanImproves':every_gateway,
++  'everyPairedWorldP99DoesNotRegress':every_tail,
++  'gatewayPairedChangesPercent':paired_gateway,'worldP99PairedChangesPercent':paired_tail,
++  'gatewayMedianPairedChangePercent':statistics.median(paired_gateway),
++  'worldP99MedianPairedChangePercent':statistics.median(paired_tail),
++  'adopt':separation and every_gateway and every_tail}
+diff --git a/test_adoption.py b/test_adoption.py
+new file mode 100644
+--- /dev/null
++++ b/test_adoption.py
+@@ -0,0 +1,22 @@
++import unittest
++from adoption import evaluate
++
++def rows(base,candidate,base_tail=None,candidate_tail=None):
++ base_tail=base_tail or [8]*5;candidate_tail=candidate_tail or [7]*5
++ return [{'pair':i,'arms':{arm:{'summary':{'all':{'gatewayCpuMs':{'mean':means[i]},
++         'worldCpuMs':{'p99':tails[i]}}}} for arm,means,tails in
++         [('base',base,base_tail),('candidate',candidate,candidate_tail)]}} for i in range(5)]
++
++class AdoptionTests(unittest.TestCase):
++ def test_separated_ranges_and_equal_world_tails_qualify(self):
++  self.assertTrue(evaluate(rows([3,3.1,3.2,3.3,3.4],[2,2.1,2.2,2.3,2.4],[8]*5,[8]*5))['adopt'])
++ def test_every_paired_mean_improves_but_overlapping_ranges_reject(self):
++  result=evaluate(rows([2,2.1,2.2,2.3,2.4],[1.9,2,2.1,2.2,2.3]))
++  self.assertTrue(result['everyPairedGatewayMeanImproves']);self.assertFalse(result['adopt'])
++ def test_touching_ranges_reject(self):
++  self.assertFalse(evaluate(rows([3,3.1,3.2,3.3,3.4],[2,2.1,2.2,2.3,3]))['adopt'])
++ def test_one_tail_regression_rejects_even_with_better_median(self):
++  result=evaluate(rows([3]*5,[2]*5,[8]*5,[7,7,7,7,8.001]))
++  self.assertLess(result['worldP99MedianPairedChangePercent'],0);self.assertFalse(result['adopt'])
++
++if __name__=='__main__':unittest.main()
+diff --git a/check_adoption.py b/check_adoption.py
+new file mode 100644
+--- /dev/null
++++ b/check_adoption.py
+@@ -0,0 +1,23 @@
++"""Check frozen policy edges and deliberate policy violations; no timing."""
++from pathlib import Path
++import json,subprocess,sys
++r=Path(__file__).resolve().parent;out=r/'adoption-controls';out.mkdir(exist_ok=False)
++source=(r/'adoption.py').read_bytes();tests=(r/'test_adoption.py').read_bytes();rows=[]
++def run(label,body,fault=False):
++ root=out/label;root.mkdir();(root/'adoption.py').write_bytes(body);(root/'test_adoption.py').write_bytes(tests)
++ result=subprocess.run([sys.executable,'-B','-m','unittest','test_adoption'],cwd=root,capture_output=True,text=True)
++ (root/'test.log').write_text(result.stdout+result.stderr,newline='\n')
++ assert (result.returncode!=0 and 'FAILED' in result.stderr) if fault else result.returncode==0
++ rows.append({'label':label,'expectedFailure':fault,'exit':result.returncode})
++run('original',source)
++for label,old,new in [
++ ('ignore-overlapping-ranges',b"separation=max(means['candidate'])<min(means['base'])",b'separation=True'),
++ ('allow-touching-ranges',b"separation=max(means['candidate'])<min(means['base'])",b"separation=max(means['candidate'])<=min(means['base'])"),
++ ('median-tail-only',b"every_tail=all(c<=b for b,c in zip(tails['base'],tails['candidate']))",b"every_tail=statistics.median(tails['candidate'])<=statistics.median(tails['base'])"),
++]:
++ assert source.count(old)==1
++ run(label,source.replace(old,new),True)
++assert (r/'adoption.py').read_bytes()==source
++run('restored',source)
++(out/'results.json').write_text(json.dumps({'passed':True,'checks':rows},indent=2)+'\n',newline='\n')
++print(json.dumps(rows))
+diff --git a/reduce_partial.py b/reduce_partial.py
+new file mode 100644
+--- /dev/null
++++ b/reduce_partial.py
+@@ -0,0 +1,61 @@
++"""Guest-only diagnosis of the stopped fresh series, with no promoted window."""
++from pathlib import Path
++import bisect,json,math,statistics,sys
++r=Path(__file__).resolve().parent
++state=json.loads((r/'series.json').read_text());assert state['status']=='failed'
++failed=[a for a in state['attempts'] if not a.get('accepted')]
++assert len(failed)==1 and 'competing process CPU' in failed[0]['selectionFailure']
++bad=failed[0]
++selector=(r/'select.py').read_text();selector=selector[:selector.index("selected={'machine'")]
++needle="   assert row['backgroundProcessScreen']['passes'],'competing process CPU'"
++assert selector.count(needle)==1
++selector=selector.replace(needle,'   # Diagnostic exposes the failed screen; acceptance stays false.')
++scope={'__file__':str(r/'select.py'),'__name__':'failed_fresh_diagnostic'}
++saved=sys.argv;sys.argv=['select.py',str(r),'unused.json']
++try:exec(compile(selector,str(r/'select.py'),'exec'),scope)
++finally:sys.argv=saved
++diagnostic=scope['reduce'](bad['name'])
++screen=diagnostic['holds'][0]['backgroundProcessScreen'];assert not screen['passes']
++
++# Reuse the full-series math and exact-food-flag checks by reference. Only expose
++# the already-rejected isolation row; never write a new accepted receipt.
++source=(r/'reduce_live.py').read_text()
++body=source[source.index('def q(values):'):source.index('pairs=[]')]
++needle=" if not attempt.get('accepted'):continue"
++assert body.count(needle)==1
++body=body.replace(needle," if not attempt.get('accepted') and attempt['name']!=bad['name']:continue")
++needle=" accepted=json.loads((r/(name+'-accepted.json')).read_text())['cases'][name]"
++assert body.count(needle)==1
++body=body.replace(needle," accepted=rejected_case if name==bad['name'] else json.loads((r/(name+'-accepted.json')).read_text())['cases'][name]")
++math_scope={'r':r,'state':state,'bad':bad,'rejected_case':diagnostic,'json':json,'math':math,'statistics':statistics}
++exec(compile(body,str(r/'reduce_live.py'),'exec'),math_scope)
++cases=math_scope['cases']
++for name,case in cases.items():
++ attempt=next(a for a in state['attempts'] if a['name']==name)
++ case['selectorPassed']=bool(attempt.get('accepted'))
++ case['qualifiedPrimary']=case['selectorPassed'] and not case['discarded']
++ case['exclusion']='discarded control' if case['discarded'] else ('failed isolation gate' if not case['selectorPassed'] else None)
++paired=[]
++for pair in range(5):
++ arms={a:next((v for v in cases.values() if v['pair']==pair and v['arm']==a and v['qualifiedPrimary']),None) for a in ['base','candidate']}
++ if not all(arms.values()):continue
++ changes={phase:{metric:{stat:100*(arms['candidate']['summary'][phase][metric][stat]/arms['base']['summary'][phase][metric][stat]-1)
++                        for stat in ['mean','p50','p99']}
++                 for metric in ['gatewayCpuMs','worldCpuMs']}
++          for phase in ['all','maintenance','ordinary']}
++ paired.append({'pair':pair,'order':'AB' if pair%2==0 else 'BA','arms':arms,'changePercent':changes})
++assert len(paired)<5
++output={'machine':'a 4-vCPU Zen 5 EPYC KVM guest','seriesIdentity':'fresh-quantum',
++ 'frozenPlanCommit':state['frozenPlanCommit'],'status':'stopped at frozen non-class gate',
++ 'seriesCpuSeconds':state['cpuSeconds'],'cpuCeilingHours':state['cpuCeilingHours'],
++ 'wallSeconds':max(json.loads((r/'runs'/a['name']/'summary.json').read_text())['diagnosticEndUnix'] for a in state['attempts'])-state['startedUnix'],
++ 'completedPrimaryPairs':len(paired),'pairs':paired,'cases':cases,'isolationFailure':screen,
++ 'adoption':{'adopt':False,'completeFivePairs':False,'fivePairGatewayRangeTest':'unavailable',
++             'reason':'fresh series stopped at its frozen isolation gate before five qualified pairs'},
++ 'attempts':[{k:a[k] for k in ['pair','arm','attempt','name','discarded','accepted']} for a in state['attempts']],
++ 'limits':'Only qualified complete pairs are paired; discarded controls and the rejected candidate stay excluded. In-memory diagnostic exposure of a failed isolation assertion never changes acceptance. No five-pair performance conclusion.'}
++(r/'fresh-partial.json').write_text(json.dumps(output,indent=2)+'\n')
++print(json.dumps({'cpuHours':state['cpuSeconds']/3600,'wallHours':output['wallSeconds']/3600,
++ 'completedPrimaryPairs':len(paired),'isolationFailure':screen,
++ 'pairChanges':[{k:p[k] for k in ['pair','changePercent']} for p in paired],
++ 'summaries':{name:v['summary'] for name,v in cases.items()}},indent=2),flush=True)
+diff --git a/publish_fresh.py b/publish_fresh.py
+new file mode 100644
+--- /dev/null
++++ b/publish_fresh.py
+@@ -0,0 +1,29 @@
++"""Guest-only bounded selection and table formatting for the stopped series."""
++from pathlib import Path
++import copy,json
++r=Path(__file__).resolve().parent
++raw=json.loads((r/'fresh-partial.json').read_text());out=copy.deepcopy(raw)
++for name,case in out['cases'].items():
++ for row in case['summary'].values():
++  row.pop('simulationCpuMs',None);row.pop('tickBusyWallMs',None)
++ quality=case['quality']
++ case['quality']={key:quality[key] for key in ['ticks','wallSeconds','ticksPerSecond',
++      'cpuReconciliationMsPerTick','client','socket','census','backgroundProcessScreen']}
++for pair in out['pairs']:
++ pair['caseNames']={arm:next(name for name,case in out['cases'].items()
++     if case['pair']==pair['pair'] and case['arm']==arm and case['qualifiedPrimary']) for arm in ['base','candidate']}
++ pair.pop('arms')
++(r/'fresh-results.json').write_text(json.dumps(out,indent=2)+'\n')
++p=raw['pairs'][0];assert len(raw['pairs'])==1
++lines=['| Tick class / metric | Base ms/tick | Candidate | Change |',
++       '| --- | ---: | ---: | ---: |']
++for phase in ['all','maintenance','ordinary']:
++ for metric,label,stats in [('gatewayCpuMs','Gateway',['mean','p50','p99']),('worldCpuMs','World',['mean','p50','p99'])]:
++  for stat in stats:
++   base=p['arms']['base']['summary'][phase][metric][stat]
++   candidate=p['arms']['candidate']['summary'][phase][metric][stat]
++   change=p['changePercent'][phase][metric][stat]
++   lines.append(f'| {phase} / {label} {stat} | {base:.6f} | {candidate:.6f} | {change:+.3f}% |')
++(r/'fresh-table.md').write_text('\n'.join(lines)+'\n')
++print(json.dumps({'publicBytes':(r/'fresh-results.json').stat().st_size,
++ 'pairs':out['completedPrimaryPairs'],'decision':out['adoption'],'failure':out['isolationFailure']},indent=2))
+diff --git a/archive_final.py b/archive_final.py
+--- a/archive_final.py
++++ b/archive_final.py
+@@ -3,7 +3,7 @@
+ import hashlib,json,os,pwd,shutil,subprocess,sys,tarfile
+ 
+ r=Path(__file__).resolve().parent
+-assert r==Path('/tmp/slither-gateway-round3-20261029') and r.resolve()==r
++assert r==Path('/tmp/slither-gateway-round3-fresh-20261029') and r.resolve()==r
+ archive=r.with_name(r.name+'-final.tar.gz')
+ target=Path('/tmp/slither-gateway-round3-target')
+ sha=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
