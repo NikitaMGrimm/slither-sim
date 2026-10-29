@@ -1,7 +1,10 @@
 //! Pit decoration on the stock food grid, never authoritative food.
 use super::food::KnownFood;
 use crate::{client::encode, model::Point};
-use std::{collections::BTreeMap, f64::consts::TAU};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    f64::consts::TAU,
+};
 
 type Sectors = BTreeMap<u16, Vec<([u8; 2], KnownFood)>>;
 
@@ -11,11 +14,13 @@ type Sectors = BTreeMap<u16, Vec<([u8; 2], KnownFood)>>;
 const FADE_SECONDS: f64 = 0.5;
 
 #[derive(Default)]
+#[cfg_attr(test, derive(Clone))]
 pub(super) struct PitMarkers {
     sectors: Sectors,
     radius: f64,
     updated_at: f64,
     previous: Option<(Sectors, f64)>,
+    affected: BTreeSet<u16>,
 }
 
 impl PitMarkers {
@@ -59,6 +64,7 @@ impl PitMarkers {
             radius: pit_radius,
             updated_at: 0.,
             previous: None,
+            affected: BTreeSet::new(),
         })
     }
 
@@ -76,24 +82,44 @@ impl PitMarkers {
             && now - self.updated_at >= FADE_SECONDS
             && (radius / cell).floor() != (previous_radius / cell).floor();
         let mut changed = false;
-        if self
+        let expired = self
             .previous
             .as_ref()
-            .is_some_and(|(_, expires)| now >= *expires)
-        {
+            .is_some_and(|(_, expires)| now >= *expires);
+        self.affected.clear();
+        if expired || growth || shrink {
+            // Include disappearing generations as well as the replacement:
+            // expiry or growth can remove a sector absent from the new ring.
+            self.affected.extend(self.sectors.keys().copied());
+            if let Some((previous, _)) = &self.previous {
+                self.affected.extend(previous.keys().copied());
+            }
+        }
+        if expired {
             self.previous = None;
             changed = true;
         }
         if growth || shrink {
             let mut next = Self::new(radius)?;
             next.updated_at = now;
+            next.affected = std::mem::take(&mut self.affected);
             if shrink {
                 next.previous = Some((std::mem::take(&mut self.sectors), now + FADE_SECONDS));
             }
             *self = next;
             changed = true;
         }
+        if changed {
+            self.affected.extend(self.sectors.keys().copied());
+            if let Some((previous, _)) = &self.previous {
+                self.affected.extend(previous.keys().copied());
+            }
+        }
         Ok(changed)
+    }
+
+    pub(super) fn affects_sector(&self, sector: u16) -> bool {
+        self.affected.contains(&sector)
     }
 
     pub(super) fn overlay(
@@ -125,6 +151,45 @@ impl PitMarkers {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn affected_sectors_cover_growth_shrink_overlap_and_exact_expiry() {
+        let mut markers = PitMarkers::new(1784.).unwrap();
+        for (radius, now) in [
+            (1784., 0.),
+            (1500., 0.5),
+            (1400., 0.8),
+            (1200., 1.),
+            (1784., 1.1),
+            (1800., 1.11),
+            (900., 1.7),
+            (900., 2.2_f64.next_down()),
+            (900., 2.2),
+            (900., 2.3),
+        ] {
+            let previous = markers.clone();
+            let changed = markers.update(radius, now).unwrap();
+            let mut sectors = BTreeSet::from([0]);
+            for generation in [&previous, &markers] {
+                sectors.extend(generation.sectors.keys().copied());
+                if let Some((previous, _)) = &generation.previous {
+                    sectors.extend(previous.keys().copied());
+                }
+            }
+            for sector in sectors {
+                if previous.overlay(sector, &[]) != markers.overlay(sector, &[]) {
+                    assert!(
+                        changed && markers.affects_sector(sector),
+                        "lost overlay hint at {now}: {sector}"
+                    );
+                }
+                if !changed {
+                    assert!(!markers.affects_sector(sector));
+                }
+            }
+            assert!(!markers.affects_sector(0));
+        }
+    }
 
     #[test]
     fn pit_markers_are_unique_outside_the_edge_and_use_the_design_style() {

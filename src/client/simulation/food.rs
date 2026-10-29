@@ -422,6 +422,10 @@ impl SimulatorBackend {
                 }
             }
             if (pit_changed
+                && self
+                    .pit_markers
+                    .as_ref()
+                    .is_some_and(|m| m.affects_sector(index))
                 || self
                     .decorated_food_sectors
                     .get(usize::from(index))
@@ -437,6 +441,12 @@ impl SimulatorBackend {
                 );
                 // Pit motion or timed retirement can replace only the decorated
                 // listing; stable recipients need a hint for either transition.
+                changed.insert(index.to_be_bytes());
+            }
+            // Preserve the existing conservative change-hint inventory while
+            // retaining physical/decorated handles outside every old/new ring.
+            // Those hints produce no packet when the listing is unchanged.
+            if pit_changed {
                 changed.insert(index.to_be_bytes());
             }
         };
