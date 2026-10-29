@@ -2,7 +2,7 @@
 //! admission; distant edge pairs only skip work. See the safe-spawn study.
 use crate::{
     Point, Simulator,
-    physics::{Bounds, base_speed, collision_distance, segment_distance, swept_distance},
+    physics::{Bounds, base_speed, collision_distance, segment_distance_le, swept_distance},
 };
 
 struct Edge {
@@ -241,7 +241,9 @@ impl Safety {
                     && obstacle
                         .edges
                         .iter()
-                        .any(|edge| segment_distance(head, edge.a, edge.b) <= obstacle.head_width))
+                        // Keep projection and inclusive thresholds; ambiguous
+                        // distances retain the original hypot comparison.
+                        .any(|edge| segment_distance_le(head, edge.a, edge.b, obstacle.head_width)))
         })
     }
 
@@ -299,6 +301,9 @@ impl Safety {
             })
     }
 }
+
+#[cfg(test)]
+mod head_tests;
 
 #[cfg(test)]
 mod tests {
